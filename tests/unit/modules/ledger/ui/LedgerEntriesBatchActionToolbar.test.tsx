@@ -19,7 +19,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
   it("counts and offers select all before anything is selected", () => {
     const { props } = renderToolbar();
 
-    expect(screen.getByText(/已选择 0 条明细/)).toBeInTheDocument();
+    expect(screen.getByText("已选择 0")).toBeInTheDocument();
     const master = screen.getByRole("checkbox", { name: "全选" });
     expect(master).toBeEnabled();
 
@@ -27,10 +27,11 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(props.onSelectAll).toHaveBeenCalledOnce();
   });
 
-  it("names what the count counts", () => {
-    renderToolbar({ selectedCount: 3, selectionUnit: "document" });
+  it("states the count without naming what is being counted", () => {
+    renderToolbar({ selectedCount: 3 });
 
-    expect(screen.getByText(/已选择 3 张单据/)).toBeInTheDocument();
+    expect(screen.getByText("已选择 3")).toBeInTheDocument();
+    expect(screen.queryByText(/张单据|条明细/)).not.toBeInTheDocument();
   });
 
   it("marks a partial selection as mixed", () => {

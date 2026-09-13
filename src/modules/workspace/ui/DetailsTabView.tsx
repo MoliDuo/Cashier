@@ -90,8 +90,11 @@ export function DetailsTabView(props: DetailsTabViewProps) {
 
   return (
     <>
+      {/* Selection replaces the browsing controls, so the box stops being a
+          refresh surface there: no hint over the count, and no stray refetch
+          from a tap on the band. */}
       <DetailsToolbar
-        onRefresh={onRefresh}
+        onRefresh={batch.isSelectionMode ? undefined : onRefresh}
         isRefreshing={isRefreshing}
         {...(!batch.isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
         {...(!batch.isSelectionMode && monthStats.mainTotal != null
@@ -106,7 +109,6 @@ export function DetailsTabView(props: DetailsTabViewProps) {
         batchActions={
           batch.isSelectionMode ? (
             <LedgerEntriesBatchActionToolbar
-              selectionUnit="entry"
               selectedCount={batch.selectedIds.length}
               isAllSelected={batch.isAllSelected}
               hasMoreData={hasNextPage || entries.length > batch.selectableCount}

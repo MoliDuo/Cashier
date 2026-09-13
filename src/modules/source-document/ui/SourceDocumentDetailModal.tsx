@@ -267,7 +267,6 @@ function SourceDocumentDetailEditor({
               // modal is a column, so a full-width basis would become a
               // full-height one — the band only needs its own height.
               className="shrink-0 border-t border-border pt-3"
-              selectionUnit="entry"
               selectedCount={selection.selectedIds.length}
               isAllSelected={selection.isAllSelected}
               onSelectAll={() => selection.handleSelectAll(true)}

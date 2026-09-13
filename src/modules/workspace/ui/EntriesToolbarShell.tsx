@@ -120,7 +120,9 @@ export function EntriesToolbarShell({
           ) : null}
         </div>
       ) : null}
-      {batchActions != null ? <div className="min-w-0 basis-full">{batchActions}</div> : null}
+      {/* The batch band takes the room the browsing controls leave rather than
+          a row of its own, so the back control stays on its line. */}
+      {batchActions != null ? <div className="min-w-0 flex-1">{batchActions}</div> : null}
     </div>
   );
 }

@@ -13,9 +13,6 @@ export interface LedgerEntriesBatchActionToolbarProps {
   hasMoreData?: boolean;
   onSelectAll: () => void;
   onClearSelection: () => void;
-  /** What the count counts: the stream selects bills, the entry surfaces select
-   * entries, and "已选择 3 项" would mean two different things. */
-  selectionUnit?: "document" | "entry";
   categories?: EntryCategory[];
   preferredCurrencies?: string[];
   isChangingCategory?: boolean;
@@ -37,6 +34,9 @@ export interface LedgerEntriesBatchActionToolbarProps {
  * stream and details tabs put it inside their toolbar box, and the
  * source-document detail modal puts it above its footer.
  *
+ * The count and the actions share one row, so the band reads as a single bar
+ * next to whatever entered selection mode; only a narrow viewport wraps them.
+ *
  * It renders for as long as selection mode is on, including with nothing
  * selected — otherwise the empty state has no count and no way to select all,
  * and the row has to be entered one row at a time.
@@ -47,7 +47,6 @@ export function LedgerEntriesBatchActionToolbar({
   hasMoreData = false,
   onSelectAll,
   onClearSelection,
-  selectionUnit = "entry",
   categories = [],
   preferredCurrencies = [],
   isChangingCategory: isChangingCategoryProp,
@@ -127,7 +126,7 @@ export function LedgerEntriesBatchActionToolbar({
   );
 
   return (
-    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+    <div className={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1", className)}>
       <label className="flex min-w-0 items-center gap-2">
         <Checkbox
           checked={masterChecked}
@@ -139,13 +138,11 @@ export function LedgerEntriesBatchActionToolbar({
           aria-label={isAllSelected ? t("deselectAll") : t("selectAll")}
           className="h-4 w-4"
         />
-        <span aria-live="polite" className="text-xs font-medium sm:text-sm">
-          {selectionUnit === "document"
-            ? t("selectedDocuments", { count: selectedCount })
-            : t("selectedEntries", { count: selectedCount })}
+        <span aria-live="polite" className="whitespace-nowrap text-xs font-medium sm:text-sm">
+          {t("selectedCount", { count: selectedCount })}
         </span>
         {isAllSelected && hasMoreData ? (
-          <span className="text-xs text-muted-foreground">{t("loadedOnly")}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{t("loadedOnly")}</span>
         ) : null}
       </label>
 

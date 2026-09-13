@@ -86,8 +86,7 @@
     "deleted": "已删除 {count} 条记录",
     "retried": "已提交 {count} 条记录重试",
     "partialResult": "成功 {succeeded} 项，跳过 {skipped} 项，失败 {failed} 项",
-    "selectedDocuments": "已选择 {count} 张单据",
-    "selectedEntries": "已选择 {count} 条明细",
+    "selectedCount": "已选择 {count}",
     "loadedOnly": "仅选中已加载的部分",
     "deleteTitleDocuments": "删除所选单据",
     "deleteDescriptionDocuments": "确定删除所选 {count} 张单据吗？{scope} 此操作无法撤销。"

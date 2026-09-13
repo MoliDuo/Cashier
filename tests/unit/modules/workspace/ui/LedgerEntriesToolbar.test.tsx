@@ -44,7 +44,7 @@ describe("LedgerEntriesToolbar", () => {
   it("shows selection controls instead of totals and filters while selecting", () => {
     render(<LedgerEntriesToolbar {...defaultProps} isSelectionMode={true} selectedCount={3} />);
 
-    expect(screen.getByText(/已选择 3 张单据/)).toBeInTheDocument();
+    expect(screen.getByText("已选择 3")).toBeInTheDocument();
     expect(screen.getByTitle("取消")).toBeInTheDocument();
     expect(screen.queryByText("¥123.45")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "筛选" })).not.toBeInTheDocument();
@@ -53,12 +53,29 @@ describe("LedgerEntriesToolbar", () => {
   it("offers select all before anything is selected", () => {
     render(<LedgerEntriesToolbar {...defaultProps} isSelectionMode={true} selectedCount={0} />);
 
-    expect(screen.getByText(/已选择 0 张单据/)).toBeInTheDocument();
+    expect(screen.getByText("已选择 0")).toBeInTheDocument();
     const master = screen.getByRole("checkbox");
     expect(master).toBeEnabled();
 
     fireEvent.click(master);
     expect(defaultProps.onSelectAll).toHaveBeenCalled();
+  });
+
+  it("stops offering refresh once the box carries selection controls", () => {
+    const { rerender } = render(<LedgerEntriesToolbar {...defaultProps} onRefresh={vi.fn()} />);
+
+    expect(screen.getByTestId("toolbar-refresh-hint")).toBeInTheDocument();
+
+    rerender(
+      <LedgerEntriesToolbar
+        {...defaultProps}
+        onRefresh={vi.fn()}
+        isSelectionMode={true}
+        selectedCount={1}
+      />
+    );
+
+    expect(screen.queryByTestId("toolbar-refresh-hint")).not.toBeInTheDocument();
   });
 
   it("keeps active status details inside the filter panel", () => {

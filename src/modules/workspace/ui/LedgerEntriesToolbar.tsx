@@ -158,10 +158,13 @@ export function LedgerEntriesToolbar({
     handleDateDialogOpenChange(false);
   };
 
+  // Selection replaces the browsing controls, so the box stops being a refresh
+  // surface there: no hint over the count, and no stray refetch from a tap on
+  // the band.
   return (
     <EntriesToolbarShell
       syncStatus={syncStatus}
-      onRefresh={onRefresh}
+      onRefresh={isSelectionMode ? undefined : onRefresh}
       isRefreshing={isRefreshing}
       {...(!isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
       totalLabel={
@@ -192,8 +195,7 @@ export function LedgerEntriesToolbar({
 
       {isSelectionMode && (
         <LedgerEntriesBatchActionToolbar
-          className="basis-full"
-          selectionUnit="document"
+          className="min-w-0 flex-1"
           selectedCount={selectedCount}
           isAllSelected={isAllSelected}
           hasMoreData={hasMoreData}
