@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { BatchCategoryDialog } from "./BatchCategoryDialog";
@@ -34,14 +35,20 @@ export interface LedgerEntriesBatchActionToolbarProps {
 /**
  * The one selection band. Every surface that selects rows renders this: the
  * stream and details tabs put it inside their toolbar box, and the
- * source-document detail modal puts it above its footer.
+ * source-document detail modal puts it in the entries card's header row.
  *
- * The count and the actions share one row, so the band reads as a single bar
+ * The band prints no number. Which rows are in is already on the rows — every
+ * selected card draws its own outline — and the box's three states say the rest:
+ * empty for none, a mixed mark for some, a tick for all. What is left worth
+ * saying is what the control does, so the box carries the words and flips from
+ * `selectAll` to `deselectAll` once everything loaded is in.
+ *
+ * The control and the actions share one row, so the band reads as a single bar
  * next to whatever entered selection mode; only a narrow viewport wraps them.
  *
  * It renders for as long as selection mode is on, including with nothing
- * selected — otherwise the empty state has no count and no way to select all,
- * and the row has to be entered one row at a time.
+ * selected — otherwise the empty state has no way to select all, and the rows
+ * have to be entered one at a time.
  */
 export function LedgerEntriesBatchActionToolbar({
   selectedCount,
@@ -83,8 +90,8 @@ export function LedgerEntriesBatchActionToolbar({
     : selectedCount > 0
       ? "indeterminate"
       : false;
-  // A surface that supports none of the batch writes still gets the count and
-  // the way to select all, but no empty row of buttons.
+  // A surface that supports none of the batch writes still gets the way to
+  // select all, but no empty row of buttons.
   const hasActions =
     onChangeCategory != null ||
     onChangeCurrency != null ||
@@ -141,11 +148,13 @@ export function LedgerEntriesBatchActionToolbar({
             if (checked === true) onSelectAll();
             else onClearSelection();
           }}
+          // The box's own name, because the label next to it also carries the
+          // loaded-scope note, which is not part of what the control is.
           aria-label={isAllSelected ? t("deselectAll") : t("selectAll")}
           className="h-4 w-4"
         />
-        <span aria-live="polite" className="whitespace-nowrap text-xs font-medium sm:text-sm">
-          {t("selectedCount", { count: selectedCount })}
+        <span className={textRoleClassName("bodyStrong", "whitespace-nowrap")}>
+          {isAllSelected ? t("deselectAll") : t("selectAll")}
         </span>
         {isAllSelected && hasMoreData ? (
           <span className="whitespace-nowrap text-xs text-muted-foreground">{t("loadedOnly")}</span>

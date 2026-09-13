@@ -25,7 +25,6 @@
     "deleted": "Deleted {count} records",
     "retried": "Submitted {count} records for retry",
     "partialResult": "Completed {succeeded}; skipped {skipped}; failed {failed}",
-    "selectedCount": "{count} selected",
     "loadedOnly": "Only the loaded items are selected",
     "deleteTitleDocuments": "Delete selected bills",
     "deleteDescriptionDocuments": "Delete the selected {count} bills? {scope} This cannot be undone."

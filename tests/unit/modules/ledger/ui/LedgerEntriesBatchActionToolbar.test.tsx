@@ -30,10 +30,10 @@ function renderToolbar(
 }
 
 describe("LedgerEntriesBatchActionToolbar", () => {
-  it("counts and offers select all before anything is selected", () => {
+  it("offers select all, and says so, before anything is selected", () => {
     const { props } = renderToolbar();
 
-    expect(screen.getByText("已选择 0")).toBeInTheDocument();
+    expect(screen.getByText("全选")).toBeInTheDocument();
     const master = screen.getByRole("checkbox", { name: "全选" });
     expect(master).toBeEnabled();
 
@@ -41,11 +41,18 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(props.onSelectAll).toHaveBeenCalledOnce();
   });
 
-  it("states the count without naming what is being counted", () => {
+  it("names what the control does rather than how many rows are in", () => {
     renderToolbar({ selectedCount: 3 });
 
-    expect(screen.getByText("已选择 3")).toBeInTheDocument();
-    expect(screen.queryByText(/张单据|条明细/)).not.toBeInTheDocument();
+    expect(screen.getByText("全选")).toBeInTheDocument();
+    expect(screen.queryByText(/已选择|3/)).not.toBeInTheDocument();
+  });
+
+  it("flips the control's words once everything loaded is selected", () => {
+    renderToolbar({ selectedCount: 3, isAllSelected: true });
+
+    expect(screen.getByText("取消全选")).toBeInTheDocument();
+    expect(screen.queryByText("全选")).not.toBeInTheDocument();
   });
 
   it("marks a partial selection as mixed", () => {
@@ -54,7 +61,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(screen.getByRole("checkbox")).toHaveAttribute("data-state", "indeterminate");
   });
 
-  it("does not repeat the count when the scope is only the loaded rows", () => {
+  it("keeps the loaded-scope note, without a number in it", () => {
     renderToolbar({ selectedCount: 3, isAllSelected: true, hasMoreData: true });
 
     expect(screen.getByText("仅选中已加载的部分")).toBeInTheDocument();

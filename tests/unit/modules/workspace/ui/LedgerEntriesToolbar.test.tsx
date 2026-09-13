@@ -44,7 +44,8 @@ describe("LedgerEntriesToolbar", () => {
   it("shows selection controls instead of totals and filters while selecting", () => {
     render(<LedgerEntriesToolbar {...defaultProps} isSelectionMode={true} selectedCount={3} />);
 
-    expect(screen.getByText("已选择 3")).toBeInTheDocument();
+    expect(screen.getByText("全选")).toBeInTheDocument();
+    expect(screen.queryByText(/已选择/)).not.toBeInTheDocument();
     expect(screen.getByTitle("取消")).toBeInTheDocument();
     expect(screen.queryByText("¥123.45")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "筛选" })).not.toBeInTheDocument();
@@ -53,7 +54,6 @@ describe("LedgerEntriesToolbar", () => {
   it("offers select all before anything is selected", () => {
     render(<LedgerEntriesToolbar {...defaultProps} isSelectionMode={true} selectedCount={0} />);
 
-    expect(screen.getByText("已选择 0")).toBeInTheDocument();
     const master = screen.getByRole("checkbox");
     expect(master).toBeEnabled();
 
