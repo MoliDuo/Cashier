@@ -124,7 +124,7 @@ describe("EntryFilterPanel", () => {
     expect(screen.getAllByRole("button", { name: "date" })).toHaveLength(2);
   });
 
-  it("renders status checkboxes for all processing statuses", async () => {
+  it("offers every processing status as one chip", async () => {
     render(
       <EntryFilterPanel
         filters={{}}
@@ -136,31 +136,18 @@ describe("EntryFilterPanel", () => {
     );
     await openPanel();
 
-    // The status set is a checkbox group; its name is carried for screen
-    // readers only, because the checkbox labels already say what it filters.
-    expect(screen.getByRole("group", { name: "状态" })).toBeInTheDocument();
-    expect(screen.getByText("处理中")).toBeDefined(); // checkbox label
-    expect(screen.getByText("已完成")).toBeDefined();
-    expect(screen.getByText("失败")).toBeDefined();
-    expect(screen.getByText("已取消")).toBeDefined();
+    // The status set is a row of toggle buttons; its name is carried for screen
+    // readers only, because the chips already say what they filter.
+    const group = screen.getByRole("group", { name: "状态" });
+    expect(group).toBeInTheDocument();
+    for (const label of ["处理中", "已完成", "失败", "已取消"]) {
+      const chip = screen.getByRole("button", { name: label });
+      expect(group.contains(chip)).toBe(true);
+      expect(chip).toHaveAttribute("aria-pressed", "false");
+    }
   });
 
-  it("clears the status filter by unchecking, without a separate control", async () => {
-    render(
-      <EntryFilterPanel
-        filters={{ statuses: ["failed"] }}
-        onFiltersChange={vi.fn()}
-        showCategory={false}
-        showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
-      />
-    );
-    await openPanel();
-
-    expect(screen.queryByRole("button", { name: "全部状态" })).not.toBeInTheDocument();
-  });
-
-  it("keeps needs_attention preset in the draft until Apply", async () => {
+  it("toggles a status off the chip itself, without a separate control", async () => {
     const user = userEvent.setup();
     const onFiltersChange = vi.fn();
 
@@ -175,20 +162,21 @@ describe("EntryFilterPanel", () => {
     );
     await openPanel();
 
-    await user.click(screen.getByRole("button", { name: "待处理" }));
-    expect(onFiltersChange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "失败" }));
+    await user.click(screen.getByRole("button", { name: "已取消" }));
+    expect(screen.getByRole("button", { name: "失败" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "全部状态" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "应用筛选" }));
-    expect(onFiltersChange).toHaveBeenCalledTimes(1);
     expect(onFiltersChange.mock.calls[0]?.[0].statuses).toEqual(["failed", "cancelled"]);
   });
 
-  it("keeps in_progress preset in the draft until Apply", async () => {
+  it("drops a status the user taps a second time", async () => {
     const user = userEvent.setup();
     const onFiltersChange = vi.fn();
 
     render(
       <EntryFilterPanel
-        filters={{}}
+        filters={{ statuses: ["processing"] }}
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
@@ -197,11 +185,12 @@ describe("EntryFilterPanel", () => {
     );
     await openPanel();
 
-    await user.click(screen.getByRole("button", { name: "进行中" }));
-    expect(onFiltersChange).not.toHaveBeenCalled();
+    const chip = screen.getByRole("button", { name: "处理中" });
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    await user.click(chip);
     await user.click(screen.getByRole("button", { name: "应用筛选" }));
-    expect(onFiltersChange).toHaveBeenCalledTimes(1);
-    expect(onFiltersChange.mock.calls[0]?.[0].statuses).toEqual(["processing"]);
+
+    expect(onFiltersChange.mock.calls[0]?.[0].statuses).toEqual([]);
   });
 
   it("submits filters only once after selecting a date preset", async () => {

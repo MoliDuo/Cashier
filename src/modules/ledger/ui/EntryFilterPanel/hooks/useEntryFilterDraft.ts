@@ -4,11 +4,7 @@ import { periodToDateRange, type PeriodParams, type PeriodPreset } from "@/lib/p
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import { resolveActivePreset, type EntryFilterPreset } from "@/modules/ledger/entry-filter-presets";
-import {
-  type EntryFilters,
-  type StreamStatusPreset,
-  STREAM_STATUS_PRESET_VALUES,
-} from "@/modules/ledger/filters";
+import { type EntryFilters } from "@/modules/ledger/filters";
 import { compare, DECIMAL_STRING_PATTERN } from "@/lib/money/decimal";
 
 function normalizeAmountRange(filters: EntryFilters): EntryFilters {
@@ -154,11 +150,6 @@ export function useEntryFilterDraft({
     });
   };
 
-  const handlePreset = (preset: StreamStatusPreset) => {
-    const presetStatuses = STREAM_STATUS_PRESET_VALUES[preset];
-    setTempFilters((prev) => ({ ...prev, statuses: presetStatuses }));
-  };
-
   return {
     open,
     setOpen,
@@ -174,6 +165,5 @@ export function useEntryFilterDraft({
     handleApply,
     handleReset,
     toggleStatus,
-    handlePreset,
   };
 }

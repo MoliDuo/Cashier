@@ -4,7 +4,6 @@ import {
   buildLedgerFilterKey,
   splitLedgerFilterChange,
 } from "@/modules/workspace/ledger-filter-state";
-import { STREAM_STATUS_PRESET_VALUES, STREAM_STATUS_PRESETS } from "@/modules/ledger/filters";
 
 describe("ledger-filter-state", () => {
   it("derives entry filters and filterKey from period + advanced filters", () => {
@@ -121,20 +120,6 @@ describe("ledger-filter-state", () => {
       period: "custom",
       startDate: "2026-03-01",
       endDate: "2026-03-31",
-    });
-  });
-
-  describe("STREAM_STATUS_PRESETS", () => {
-    it("defines the attention and in-progress presets", () => {
-      expect(STREAM_STATUS_PRESETS).toEqual(["needs_attention", "in_progress"]);
-    });
-
-    it("needs_attention includes cancelled and failed", () => {
-      expect(STREAM_STATUS_PRESET_VALUES.needs_attention).toEqual(["failed", "cancelled"]);
-    });
-
-    it("in_progress includes processing", () => {
-      expect(STREAM_STATUS_PRESET_VALUES.in_progress).toEqual(["processing"]);
     });
   });
 });

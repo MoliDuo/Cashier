@@ -104,8 +104,6 @@
     "reset": "Clear All",
     "apply": "Apply Filters",
     "status": "Status",
-    "needsAttention": "Needs Attention",
-    "inProgress": "In Progress",
     "statusProcessing": "Processing",
     "statusCompleted": "Completed",
     "statusFailed": "Failed",

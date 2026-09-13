@@ -1,7 +1,6 @@
 "use client";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { AmountInput } from "@/components/ui/amount-input";
 import {
   Select,
@@ -20,7 +19,7 @@ import {
   type EntryFilterPreset,
 } from "@/modules/ledger/entry-filter-presets";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
-import type { EntryFilters, StreamStatusPreset } from "@/modules/ledger/filters";
+import type { EntryFilters } from "@/modules/ledger/filters";
 
 const STATUS_OPTIONS: SourceDocumentProcessingStatus[] = [
   "processing",
@@ -38,7 +37,6 @@ interface EntryFilterContentProps {
   handleApply: () => void;
   handleReset: () => void;
   toggleStatus: (status: SourceDocumentProcessingStatus) => void;
-  handlePreset: (preset: StreamStatusPreset) => void;
   categories: EntryCategory[];
   preferredCurrencies: string[];
   timeZone?: string | undefined;
@@ -56,7 +54,6 @@ export function EntryFilterContent({
   handleApply,
   handleReset,
   toggleStatus,
-  handlePreset,
   categories,
   preferredCurrencies,
   timeZone,
@@ -111,7 +108,6 @@ export function EntryFilterContent({
           }
           placeholder={t("searchPlaceholder")}
           aria-label={t("searchPlaceholder")}
-          className="h-9 text-base sm:text-sm"
         />
 
         <div className="space-y-2">
@@ -177,7 +173,7 @@ export function EntryFilterContent({
               }))
             }
           >
-            <SelectTrigger aria-label={t("category")} className="w-full h-9 text-base sm:text-sm">
+            <SelectTrigger aria-label={t("category")} className="w-full">
               <SelectValue placeholder={t("allCategories")} />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
@@ -203,7 +199,7 @@ export function EntryFilterContent({
               }))
             }
           >
-            <SelectTrigger aria-label={t("currency")} className="w-full h-9 text-base sm:text-sm">
+            <SelectTrigger aria-label={t("currency")} className="w-full">
               <SelectValue placeholder={t("allCurrencies")} />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
@@ -230,7 +226,7 @@ export function EntryFilterContent({
                 minAmount: value !== "" ? value : null,
               }))
             }
-            className="min-w-0 flex-1 h-9 text-base sm:text-sm"
+            className="min-w-0 flex-1"
           />
           <span className="text-sm text-muted-foreground">-</span>
           <AmountInput
@@ -245,43 +241,35 @@ export function EntryFilterContent({
                 maxAmount: value !== "" ? value : null,
               }))
             }
-            className="min-w-0 flex-1 h-9 text-base sm:text-sm"
+            className="min-w-0 flex-1"
           />
         </div>
 
         {showStatus && (
-          <fieldset className="space-y-1">
-            <legend className="sr-only">{t("status")}</legend>
-            {STATUS_OPTIONS.map((status) => (
-              <label key={status} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
-                <Checkbox
-                  checked={tempFilters.statuses?.includes(status) ?? false}
-                  onCheckedChange={() => toggleStatus(status)}
-                />
-                {statusLabel(status)}
-              </label>
-            ))}
-            {/* Unchecking is how the status filter is cleared, so no 全部状态
-                control restates the empty state. */}
-            <div className="flex flex-wrap gap-1 pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-7"
-                onClick={() => handlePreset("needs_attention")}
-              >
-                {t("needsAttention")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-7"
-                onClick={() => handlePreset("in_progress")}
-              >
-                {t("inProgress")}
-              </Button>
-            </div>
-          </fieldset>
+          // A chosen status is outlined the way a chosen card is. Toggling a
+          // chip off is how the status filter is cleared, so there is still no
+          // 全部状态 control restating the empty state.
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t("status")}>
+            {STATUS_OPTIONS.map((status) => {
+              const isSelected = tempFilters.statuses?.includes(status) ?? false;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => toggleStatus(status)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-sm transition-colors duration-[var(--motion-feedback)]",
+                    isSelected
+                      ? "border-primary bg-primary/5 font-medium text-primary ring-1 ring-primary/20"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-text"
+                  )}
+                >
+                  {statusLabel(status)}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 

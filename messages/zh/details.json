@@ -158,8 +158,6 @@
     "reset": "清除全部",
     "apply": "应用筛选",
     "status": "状态",
-    "needsAttention": "待处理",
-    "inProgress": "进行中",
     "statusProcessing": "处理中",
     "statusCompleted": "已完成",
     "statusFailed": "失败",
