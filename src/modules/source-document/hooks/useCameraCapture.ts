@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const MAX_CAPTURE_EDGE = 1600;
 const CAPTURE_QUALITY = 0.92;
 
-export type CameraStatus = "idle" | "starting" | "ready" | "unavailable" | "unsupported";
+export type CameraStatus =
+  "idle" | "starting" | "ready" | "unavailable" | "unsupported" | "insecure";
 
 type FacingMode = "environment" | "user";
 
@@ -62,7 +63,9 @@ export function useCameraCapture({ enabled, onCapture }: UseCameraCaptureOptions
 
     const start = async () => {
       if (navigator.mediaDevices?.getUserMedia == null) {
-        setStatus("unsupported");
+        // Browsers only expose the camera on a secure context, so a phone
+        // opened over a plain-HTTP address lands here rather than failing.
+        setStatus(window.isSecureContext ? "unsupported" : "insecure");
         return;
       }
       setStatus("starting");

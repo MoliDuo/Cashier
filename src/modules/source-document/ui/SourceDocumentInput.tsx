@@ -81,6 +81,8 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
           preview: t("cameraPreview"),
           starting: t("cameraStarting"),
           unavailable: t("cameraUnavailable"),
+          unsupported: t("cameraUnsupported"),
+          insecure: t("cameraInsecure"),
           capture: t("capturePhoto"),
           limitReached: t("tooManyImages"),
           switchCamera: t("switchCamera"),

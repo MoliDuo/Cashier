@@ -7,6 +7,8 @@ const messages: ComponentProps<typeof SourceDocumentCameraPanel>["messages"] = {
   preview: "Camera preview",
   starting: "Starting camera",
   unavailable: "Camera unavailable",
+  unsupported: "This browser cannot take photos",
+  insecure: "This address is not HTTPS",
   capture: "Take photo",
   limitReached: "You can upload up to 3 images.",
   switchCamera: "Switch camera",
@@ -43,10 +45,19 @@ function renderPanel(overrides: Partial<ComponentProps<typeof SourceDocumentCame
 }
 
 describe("SourceDocumentCameraPanel", () => {
-  it("renders nothing where the browser has no camera API", () => {
+  it("says why a browser with no camera API cannot take a photo", () => {
     const { view } = renderPanel({ status: "unsupported" });
 
-    expect(view.container.firstElementChild).toBeNull();
+    expect(screen.getByText("This browser cannot take photos")).toBeInTheDocument();
+    expect(view.queryByRole("button", { name: "Take photo" })).toBeNull();
+  });
+
+  it("blames the address when the page is not a secure context", () => {
+    const { view } = renderPanel({ status: "insecure" });
+
+    expect(screen.getByText("This address is not HTTPS")).toBeInTheDocument();
+    // Offering to reopen a camera that the browser will refuse would be a lie.
+    expect(view.queryByRole("button", { name: "Open camera" })).toBeNull();
   });
 
   it("asks before trying the camera again after a refusal", () => {

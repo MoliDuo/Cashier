@@ -294,6 +294,8 @@
     "cameraPreview": "Camera Preview",
     "cameraStarting": "Starting Camera",
     "cameraUnavailable": "Can't use the camera. Check the camera permission, or close other apps using it.",
+    "cameraUnsupported": "This browser can't take photos directly. Pick one from the album, or type instead.",
+    "cameraInsecure": "This address is not HTTPS, so the browser won't open the camera. Use the album or type instead.",
     "capturePhoto": "Take Photo",
     "switchCamera": "Switch Camera",
     "dropImages": "Drop images to add"

@@ -294,6 +294,8 @@
     "cameraPreview": "取景画面",
     "cameraStarting": "正在启动相机",
     "cameraUnavailable": "无法使用相机，请检查相机权限，或关闭其他正在使用相机的应用。",
+    "cameraUnsupported": "此浏览器不支持直接拍照，请从相册选择照片或直接输入文字。",
+    "cameraInsecure": "当前地址不是 HTTPS，浏览器不允许打开相机。请改用相册或直接输入文字。",
     "capturePhoto": "拍照",
     "switchCamera": "切换前后摄像头",
     "dropImages": "松开即可添加图片"

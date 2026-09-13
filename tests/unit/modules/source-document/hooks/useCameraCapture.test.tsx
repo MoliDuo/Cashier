@@ -31,6 +31,17 @@ function renderCamera(enabled: boolean) {
   );
 }
 
+async function withSecureContext(value: boolean, run: () => Promise<void>): Promise<void> {
+  const original = Object.getOwnPropertyDescriptor(window, "isSecureContext");
+  Object.defineProperty(window, "isSecureContext", { configurable: true, value });
+  try {
+    await run();
+  } finally {
+    if (original != null) Object.defineProperty(window, "isSecureContext", original);
+    else Reflect.deleteProperty(window, "isSecureContext");
+  }
+}
+
 afterEach(() => {
   Reflect.deleteProperty(navigator, "mediaDevices");
 });
@@ -47,9 +58,20 @@ describe("useCameraCapture", () => {
   });
 
   it("reports a browser without a camera API instead of throwing", async () => {
-    const { result } = renderCamera(true);
+    // jsdom itself is not a secure context, so ask for one to isolate the case.
+    await withSecureContext(true, async () => {
+      const { result } = renderCamera(true);
 
-    await waitFor(() => expect(result.current.status).toBe("unsupported"));
+      await waitFor(() => expect(result.current.status).toBe("unsupported"));
+    });
+  });
+
+  it("blames the address, not the browser, on a page outside a secure context", async () => {
+    await withSecureContext(false, async () => {
+      const { result } = renderCamera(true);
+
+      await waitFor(() => expect(result.current.status).toBe("insecure"));
+    });
   });
 
   it("reports a refusal instead of leaving a dead viewfinder", async () => {

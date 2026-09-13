@@ -34,6 +34,8 @@ const messages: SourceDocumentInputViewProps["messages"] = {
     preview: "Camera preview",
     starting: "Starting camera",
     unavailable: "Camera unavailable",
+    unsupported: "This browser cannot take photos",
+    insecure: "This address is not HTTPS",
     capture: "Take photo",
     limitReached: "You can upload up to 3 images.",
     switchCamera: "Switch camera",

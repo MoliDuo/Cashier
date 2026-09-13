@@ -11,6 +11,8 @@ export interface SourceDocumentCameraPanelMessages {
   preview: string;
   starting: string;
   unavailable: string;
+  unsupported: string;
+  insecure: string;
   capture: string;
   limitReached: string;
   switchCamera: string;
@@ -38,9 +40,9 @@ interface SourceDocumentCameraPanelProps {
 /**
  * The in-form viewfinder: a full-width live box, then one row of controls.
  *
- * `unsupported` renders nothing at all — an embedded browser that has no camera
- * API should leave the form looking exactly as it did before, with the album
- * picker as the only image entry point.
+ * A browser that cannot open the camera says so in one line rather than
+ * disappearing: a phone that expected a viewfinder and finds nothing has no way
+ * to tell a missing camera from a missing feature.
  */
 export function SourceDocumentCameraPanel({
   videoRef,
@@ -57,7 +59,13 @@ export function SourceDocumentCameraPanel({
   onCollapse,
   onRetry,
 }: SourceDocumentCameraPanelProps) {
-  if (status === "unsupported") return null;
+  if (status === "insecure" || status === "unsupported") {
+    return (
+      <p role="status" className={textRoleClassName("meta")}>
+        {status === "insecure" ? messages.insecure : messages.unsupported}
+      </p>
+    );
+  }
 
   if (!isOpen) {
     return (

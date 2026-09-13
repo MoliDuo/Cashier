@@ -114,7 +114,8 @@ export function SourceDocumentInputView({
     isCameraAvailable &&
     isCameraOpen &&
     camera.status !== "unavailable" &&
-    camera.status !== "unsupported";
+    camera.status !== "unsupported" &&
+    camera.status !== "insecure";
 
   return (
     <div
