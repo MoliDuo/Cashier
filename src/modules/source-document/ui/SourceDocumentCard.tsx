@@ -10,11 +10,19 @@ import { type SourceDocumentProcessingStatus } from "@/modules/source-document/c
 import type { SupportedSourceDocumentAction } from "@/application/contracts";
 import type { ApplicationErrorCode, ProcessingFailureCode } from "@/application/contracts";
 import type { RevisionFailureKind } from "@/application/contracts";
-import { EntryCardShell } from "@/components/entry-card-shell";
+import { EntryCardShell, type EntryCardTone } from "@/components/entry-card-shell";
 import { SelectableCardSurface } from "@/components/selectable-card-surface";
 import { SourceDocumentCardHeader } from "./SourceDocumentCardHeader";
 import { sortSourceDocumentEntries } from "./source-document-card.utils";
 import { SourceDocumentCardEntries } from "./SourceDocumentCardEntries";
+import { ProcessingSweep } from "./processing-sweep";
+
+const cardToneByStatus: Record<SourceDocumentProcessingStatus, EntryCardTone> = {
+  processing: "busy",
+  failed: "danger",
+  cancelled: "muted",
+  completed: "default",
+};
 
 interface SourceDocumentCardProps {
   sourceDocument: SourceDocument | SourceDocumentLight | SourceDocumentListItemDto;
@@ -90,6 +98,10 @@ function SourceDocumentCardBody({
   const supportedActions: readonly SupportedSourceDocumentAction[] = readOnly
     ? []
     : sourceDocument.supportedActions;
+  // The card itself carries the state: green and working, red and failed, grey
+  // and inert. Anything else (a finished document, one with no submission in
+  // flight) keeps the neutral surface every card starts from.
+  const cardTone = processingStatus == null ? "default" : cardToneByStatus[processingStatus];
 
   return (
     <SelectableCardSurface
@@ -117,8 +129,10 @@ function SourceDocumentCardBody({
         data-source-document-id={sourceDocument.id}
         selected={selectionMode && isSelected}
         interactive={selectionMode}
+        tone={cardTone}
         className={className}
       >
+        {processingStatus === "processing" ? <ProcessingSweep /> : null}
         <SourceDocumentCardHeader
           sourceDocument={sourceDocument}
           processingStatus={processingStatus}

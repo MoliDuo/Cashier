@@ -318,6 +318,74 @@ describe("SourceDocumentCard interactions", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
+  it("paints the card by the document's state instead of printing it", () => {
+    // Regression: every state used to print a status pill. The card now carries
+    // the state itself — green and working, red and failed, grey and inert.
+    const tones = [
+      { status: "processing" as const, expected: ["bg-primary/5", "border-primary/25"] },
+      { status: "failed" as const, expected: ["bg-danger/5", "border-danger/20"] },
+      { status: "cancelled" as const, expected: ["bg-surface2", "border-border"] },
+      { status: "completed" as const, expected: ["bg-surface", "border-border"] },
+    ];
+
+    for (const { status, expected } of tones) {
+      const { unmount } = render(
+        <SourceDocumentCard
+          sourceDocument={{ ...sourceDocument, processingStatus: status }}
+          ledgerEntries={[]}
+          processingStatus={status}
+        />
+      );
+      const card = screen.getByTestId("source-document-card-root");
+      for (const className of expected) expect(card).toHaveClass(className);
+      unmount();
+    }
+  });
+
+  it("sweeps a band of light across a card only while its document is processing", () => {
+    const { unmount } = render(
+      <SourceDocumentCard
+        sourceDocument={{ ...sourceDocument, processingStatus: "processing" }}
+        ledgerEntries={[]}
+        processingStatus="processing"
+      />
+    );
+    const sweep = screen.getByTestId("source-document-processing-sweep");
+    expect(sweep).toHaveClass("source-document-processing-sweep");
+    // The band is decoration: the state itself stays in the live region.
+    expect(sweep).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("status")).toHaveTextContent(/处理中|Processing/i);
+    unmount();
+
+    for (const status of ["completed", "cancelled"] as const) {
+      const { unmount: unmountOther } = render(
+        <SourceDocumentCard
+          sourceDocument={{ ...sourceDocument, processingStatus: status }}
+          ledgerEntries={[]}
+          processingStatus={status}
+        />
+      );
+      expect(screen.queryByTestId("source-document-processing-sweep")).not.toBeInTheDocument();
+      // No words either: the surface is the whole message.
+      expect(screen.queryByTestId("status-label")).not.toBeInTheDocument();
+      unmountOther();
+    }
+  });
+
+  it("still shows the total of a document that is being processed again", () => {
+    // A retry keeps the previous result on screen; the card keeps its number.
+    render(
+      <SourceDocumentCard
+        sourceDocument={{ ...sourceDocument, processingStatus: "processing" }}
+        ledgerEntries={[ledgerEntry]}
+        processingStatus="processing"
+        defaultExpanded={false}
+      />
+    );
+
+    expect(screen.getByText(/12\.00/)).toBeInTheDocument();
+  });
+
   it("hides the expansion toggle when the card has no expandable entries", () => {
     render(
       <SourceDocumentCard

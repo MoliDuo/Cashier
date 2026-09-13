@@ -58,12 +58,23 @@ describe("source document accessibility", () => {
     expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
   });
 
-  it("replaces the frozen ring with a solid dot for processing under reduced motion", () => {
-    reducedMotion = true;
-    render(<ProcessingStatus status="processing" />);
-    const status = screen.getByRole("status");
-    expect(status.querySelector("[data-processing-ring]")).toBeNull();
-    expect(screen.getByRole("status")).toBeInTheDocument();
+  it("keeps naming the state in words now that the card paints it instead", () => {
+    // The surface carries the state and the band of light is decoration, so the
+    // live region is the only place the state is actually said.
+    const { rerender } = render(<ProcessingStatus status="processing" />);
+    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("status")).toHaveTextContent(/处理中|Processing/i);
+
+    rerender(<ProcessingStatus status="cancelled" />);
+    expect(screen.getByRole("status")).toHaveTextContent(/已取消|Cancelled/i);
+  });
+
+  it("prints a failure's reason and nothing else on the card", () => {
+    render(<ProcessingStatus status="error" label="无法解析" />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveAttribute("aria-live", "assertive");
+    expect(alert).toHaveTextContent("无法解析");
+    expect(screen.queryByText(/Error/i)).not.toBeInTheDocument();
   });
 
   it("supports keyboard image navigation, Escape dismissal, and focus return", async () => {

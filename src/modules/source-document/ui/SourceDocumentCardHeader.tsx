@@ -98,14 +98,11 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const processingStatus = getProcessingStatus(status);
-  const shouldShowProcessingStatus =
-    processingStatus != null &&
-    processingStatus !== "completed" &&
-    (ledgerEntries.length === 0 ||
-      status === "failed" ||
-      status === "processing" ||
-      status === "cancelled");
-  const shouldShowTotal = ledgerEntries.length > 0 && (status === "completed" || status == null);
+  // The card's surface says which state the document is in, so the only state
+  // worth words here is a failure, which has to name its reason. Everything
+  // else is announced to assistive tech and left unprinted.
+  const shouldAnnounceStatus = processingStatus != null;
+  const shouldShowTotal = ledgerEntries.length > 0;
 
   // A failed document shows one stable label: a document the AI could not turn
   // into entries reads as unparsable, everything else by its failure code. The
@@ -168,7 +165,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
       </button>
 
       <div className="flex items-center gap-2 shrink-0">
-        {shouldShowProcessingStatus && (
+        {shouldAnnounceStatus && (
           <ProcessingStatus
             status={processingStatus}
             {...(failureLabel != null ? { label: failureLabel } : {})}

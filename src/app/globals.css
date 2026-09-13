@@ -243,6 +243,14 @@ body {
     animation: none !important;
     transform: none;
   }
+
+  /* The processing band parks on the card instead of leaving it: without motion
+     the band is what still says "processing", and a card that was only tinted
+     green would read as a selected one. */
+  .source-document-processing-sweep {
+    animation: none !important;
+    transform: translateX(200%);
+  }
 }
 
 /* Utilities based on UI.md */
@@ -399,6 +407,28 @@ body {
   animation: cashier-spin 900ms linear infinite;
   transform-origin: 50% 50%;
   transform-box: fill-box;
+}
+
+/* Processing sweep — a card says "working" by carrying a band of light across
+   itself instead of printing a status label. Transform only, on the band's own
+   element, so it never competes with the stream list's FLIP transforms. */
+@keyframes source-document-processing-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.source-document-processing-sweep {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--primary) 22%, transparent),
+    transparent
+  );
+  animation: source-document-processing-sweep 2s linear infinite;
 }
 
 /* Stream list card transitions — transform/opacity only. Reduced-motion is
