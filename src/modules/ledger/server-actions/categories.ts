@@ -1,11 +1,14 @@
 "use server";
 import { withLedgerAccess } from "../access";
 import type {
+  ApplyCategoryPresetInput,
   DeleteEntryCategoryResultDto,
   EntryCategoryDto,
+  EntryCategoryWithCountDto,
   ReorderEntryCategoriesResultDto,
 } from "@/modules/ledger/contracts";
 import {
+  parseApplyCategoryPresetInput,
   parseCreateEntryCategoryInput,
   parseEntryCategoryId,
   parseReorderEntryCategoriesInput,
@@ -16,6 +19,7 @@ import {
   type SaveEntryCategoriesInput,
 } from "@/modules/ledger/contract-schemas";
 import { listEntryCategories } from "@/modules/ledger/application/queries/list-entry-categories";
+import { applyCategoryPreset } from "@/modules/ledger/application/use-cases/apply-category-preset";
 import { createEntryCategory } from "@/modules/ledger/application/use-cases/create-entry-category";
 import { deleteEntryCategory } from "@/modules/ledger/application/use-cases/delete-entry-category";
 import { updateEntryCategory } from "@/modules/ledger/application/use-cases/update-entry-category";
@@ -97,6 +101,25 @@ export const saveEntryCategoriesAction = withLedgerAccess(
 
 export const getEntryCategoriesAction = withLedgerAccess((ledgerId: string) =>
   listEntryCategories(ledgerId, serverComposition.categories)
+);
+
+export const applyCategoryPresetAction = withLedgerAccess(
+  async (
+    ledgerId: string,
+    input: ApplyCategoryPresetInput
+  ): Promise<EntryCategoryWithCountDto[]> => {
+    const validated = parseApplyCategoryPresetInput(input);
+    return applyCategoryPreset(
+      ledgerId,
+      {
+        expectedRevision: validated.expectedRevision,
+        presetId: validated.presetId,
+        locale: validated.locale,
+        mappings: validated.mappings,
+      },
+      serverComposition.categories
+    );
+  }
 );
 
 /**

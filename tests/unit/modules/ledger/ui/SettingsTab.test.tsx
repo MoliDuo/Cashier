@@ -107,6 +107,7 @@ describe("explicit settings section drafts", () => {
     });
     render(
       <BookkeepingSettings
+        ledgerId="ledger-1"
         settings={{
           ...getDefaultLedger().settings,
           mainCurrency: "CNY",

@@ -2,6 +2,7 @@
 
 import type {
   EntryCategory,
+  EntryCategoryWithCount,
   Ledger,
   SaveEntryCategoriesInput,
   Settings,
@@ -24,8 +25,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 interface BookkeepingSettingsProps {
+  ledgerId: string;
   settings: Settings;
-  categories: EntryCategory[];
+  categories: EntryCategoryWithCount[];
   uncategorizedCount: number;
   deviceTimeZone: string | null;
   onUpdateSettings: (data: Partial<Settings>) => Promise<Ledger>;
@@ -38,6 +40,7 @@ interface BookkeepingSettingsProps {
 }
 
 export function BookkeepingSettings({
+  ledgerId,
   settings,
   categories,
   uncategorizedCount,
@@ -184,6 +187,7 @@ export function BookkeepingSettings({
         onCancel={handleCancel}
       />
       <CategorySection
+        ledgerId={ledgerId}
         categories={categories}
         uncategorizedCount={uncategorizedCount}
         onSaveCategories={onSaveCategories}

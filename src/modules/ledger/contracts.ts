@@ -1,4 +1,5 @@
 import type { LedgerSettingsContract } from "@/application/contracts/ledger";
+import type { CategoryPresetId } from "@/config/category-presets";
 
 export type LedgerDto = {
   id: string;
@@ -58,6 +59,18 @@ interface SaveEntryCategoryTargetDto {
 export interface SaveEntryCategoriesInput {
   expectedRevision: string;
   categories: SaveEntryCategoryTargetDto[];
+}
+
+/**
+ * A preset switch. The preset's category text is resolved on the server from
+ * `presetId` + `locale`, so a client cannot invent categories; it only decides
+ * where each existing category's entries land.
+ */
+export interface ApplyCategoryPresetInput {
+  expectedRevision: string;
+  presetId: CategoryPresetId;
+  locale: string;
+  mappings: { fromCategoryId: string; toPresetIndex: number | null }[];
 }
 
 export type SourceDocumentReferenceDto = {

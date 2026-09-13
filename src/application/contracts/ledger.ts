@@ -46,6 +46,16 @@ export interface CategoryPort {
     categories: readonly CategoryTargetContract[],
     expectedRevision: string
   ): Promise<readonly CategoryContract[]>;
+  /**
+   * Replace the ledger's category structure with a preset in one transaction,
+   * moving entries onto their mapped target instead of unsetting them. Every
+   * active category must appear exactly once in `mappings`; `toPresetIndex:
+   * null` keeps that category alongside the preset.
+   */
+  applyPreset(
+    ledgerId: LedgerId,
+    input: ApplyCategoryPresetContract
+  ): Promise<readonly CategoryContract[]>;
   countUncategorized(ledgerId: LedgerId): Promise<number>;
 }
 export interface CurrencyPort {
@@ -104,6 +114,20 @@ interface CategoryContract {
 
 interface CategoryWithCountContract extends CategoryContract {
   entryCount: number;
+}
+
+/** A category as the preset defines it. Order is the array order. */
+interface PresetCategoryContract {
+  name: string;
+  description: string;
+  icon: string;
+}
+
+interface ApplyCategoryPresetContract {
+  expectedRevision: string;
+  presetCategories: readonly PresetCategoryContract[];
+  /** `toPresetIndex: null` keeps that category instead of migrating it. */
+  mappings: readonly { fromCategoryId: string; toPresetIndex: number | null }[];
 }
 
 export interface LedgerSettingsContract {

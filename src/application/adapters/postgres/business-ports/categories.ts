@@ -382,6 +382,161 @@ export const postgresCategoryAdapter: CategoryPort = {
     });
   },
 
+  async applyPreset(ledgerId, input) {
+    const { presetCategories, mappings } = input;
+    return db.transaction(async (tx) => {
+      await lockLedgerForUpdate(tx, ledgerId);
+      const current = await tx
+        .select()
+        .from(entryCategories)
+        .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+        .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id)
+        .for("update");
+      const actualRevision = await computeCategoryCollectionRevision(current);
+      if (actualRevision !== input.expectedRevision) {
+        throw new ConflictError("Category collection changed since it was loaded");
+      }
+
+      // Every active category has to be accounted for exactly once, so the
+      // caller can never drop one by omission.
+      if (mappings.length !== current.length) {
+        throw new ValidationError("Category preset mapping must cover every active category");
+      }
+      const currentById = new Map(current.map((category) => [category.id, category]));
+      const mappedIds = new Set<string>();
+      for (const mapping of mappings) {
+        if (!currentById.has(mapping.fromCategoryId) || mappedIds.has(mapping.fromCategoryId)) {
+          throw new ValidationError("Category preset mapping references an inaccessible category");
+        }
+        if (
+          mapping.toPresetIndex != null &&
+          (mapping.toPresetIndex < 0 || mapping.toPresetIndex >= presetCategories.length)
+        ) {
+          throw new ValidationError("Category preset mapping target is out of range");
+        }
+        mappedIds.add(mapping.fromCategoryId);
+      }
+
+      const now = new Date();
+
+      // Soft-delete what migrates away before inserting anything. The rows stay
+      // (only `deleted_at` is set) so the composite foreign key from
+      // ledger_entries keeps holding and step 3 can still match `from_id`.
+      const migrating = mappings.filter(
+        (mapping): mapping is { fromCategoryId: string; toPresetIndex: number } =>
+          mapping.toPresetIndex != null
+      );
+      const migratedIds = migrating.map((mapping) => mapping.fromCategoryId);
+      if (migratedIds.length > 0) {
+        await tx
+          .update(entryCategories)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(entryCategories.ledgerId, ledgerId),
+              inArray(entryCategories.id, migratedIds),
+              isNull(entryCategories.deletedAt)
+            )
+          );
+      }
+
+      // Materialize the preset. A preset name that matches a kept category
+      // reuses that row rather than inserting a duplicate: the partial unique
+      // index is `WHERE deleted_at IS NULL`, and the user's own description and
+      // icon for that name should survive.
+      const keptByName = new Map(
+        current
+          .filter((category) => !migratedIds.includes(category.id))
+          .map((category) => [category.name, category])
+      );
+      const toInsert: { name: string; description: string; icon: string; sortOrder: number }[] = [];
+      presetCategories.forEach((preset, index) => {
+        if (keptByName.has(preset.name)) return;
+        toInsert.push({
+          name: preset.name,
+          description: preset.description,
+          icon: preset.icon,
+          sortOrder: index,
+        });
+      });
+      const inserted =
+        toInsert.length === 0
+          ? []
+          : await tx
+              .insert(entryCategories)
+              .values(toInsert.map((category) => ({ ledgerId, ...category, updatedAt: now })))
+              .returning({ id: entryCategories.id, name: entryCategories.name });
+      const insertedByName = new Map(inserted.map((row) => [row.name, row.id]));
+
+      // One target id per preset slot: either a reused row or a fresh insert.
+      const presetTargetIds = presetCategories.map(
+        (preset) => keptByName.get(preset.name)?.id ?? insertedByName.get(preset.name)!
+      );
+
+      // Move every migrated category's entries onto its target. Set-based, so
+      // many-to-one collapses naturally.
+      if (migrating.length > 0) {
+        const transfers = JSON.stringify(
+          migrating.map((mapping) => ({
+            from_id: mapping.fromCategoryId,
+            to_id: presetTargetIds[mapping.toPresetIndex]!,
+          }))
+        );
+        await tx.execute(sql`
+          WITH transfers AS (
+            SELECT * FROM jsonb_to_recordset(${transfers}::jsonb) AS value(
+              from_id uuid,
+              to_id uuid
+            )
+          )
+          UPDATE ledger_entries AS entry
+          SET category_id = transfers.to_id,
+              updated_at = ${now}
+          FROM transfers
+          WHERE entry.ledger_id = ${ledgerId}
+            AND entry.category_id = transfers.from_id
+            AND entry.deleted_at IS NULL
+        `);
+      }
+
+      // Preset categories take the leading slots; kept extras follow. A reused
+      // row already occupies its preset slot.
+      const orderById = new Map<string, number>();
+      presetCategories.forEach((_, index) => orderById.set(presetTargetIds[index]!, index));
+      let nextSortOrder = presetCategories.length;
+      for (const category of current) {
+        if (migratedIds.includes(category.id) || orderById.has(category.id)) continue;
+        orderById.set(category.id, nextSortOrder);
+        nextSortOrder += 1;
+      }
+      const ordering = JSON.stringify(
+        [...orderById].map(([id, sortOrder]) => ({ id, sort_order: sortOrder }))
+      );
+      await tx.execute(sql`
+        WITH ordering AS (
+          SELECT * FROM jsonb_to_recordset(${ordering}::jsonb) AS value(
+            id uuid,
+            sort_order integer
+          )
+        )
+        UPDATE entry_categories AS category
+        SET sort_order = ordering.sort_order,
+            updated_at = ${now}
+        FROM ordering
+        WHERE category.id = ordering.id
+          AND category.ledger_id = ${ledgerId}
+          AND category.deleted_at IS NULL
+      `);
+
+      const saved = await tx
+        .select()
+        .from(entryCategories)
+        .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+        .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
+      return saved.map(mapCategory);
+    });
+  },
+
   async countUncategorized(ledgerId) {
     const row = await db
       .select({ count: sql<number>`count(*)` })

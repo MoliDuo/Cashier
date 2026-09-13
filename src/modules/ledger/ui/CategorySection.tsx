@@ -1,18 +1,26 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
-import type { EntryCategory, SaveEntryCategoriesInput } from "@/modules/ledger/contracts";
+import { useLocale, useTranslations } from "next-intl";
+import type {
+  EntryCategory,
+  EntryCategoryWithCount,
+  SaveEntryCategoriesInput,
+} from "@/modules/ledger/contracts";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { useCategoryManagementDraft } from "@/modules/ledger/hooks/useCategoryManagementDraft";
+import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPresetSwitch";
 import { CategoryEditDialog } from "./CategoryEditDialog";
+import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { toast } from "sonner";
 
 interface CategorySectionProps {
-  categories: EntryCategory[];
+  ledgerId: string;
+  /** Carries `entryCount`; the preset dialog sums it for its impact summary. */
+  categories: EntryCategoryWithCount[];
   uncategorizedCount?: number;
   onSaveCategories: (input: SaveEntryCategoriesInput) => Promise<EntryCategory[]>;
   onReloadCategories?: () => Promise<EntryCategory[]>;
@@ -23,6 +31,7 @@ interface CategorySectionProps {
 }
 
 export function CategorySection({
+  ledgerId,
   categories,
   uncategorizedCount = 0,
   onSaveCategories,
@@ -34,6 +43,8 @@ export function CategorySection({
 }: CategorySectionProps) {
   const t = useTranslations("Settings");
   const common = useTranslations("Common");
+  const locale = useLocale();
+  const preset = useCategoryPresetSwitch({ ledgerId, categories, locale });
 
   const {
     managing,
@@ -73,9 +84,20 @@ export function CategorySection({
           <p className="mt-1 text-sm text-muted-foreground">{t("categoriesDesc")}</p>
         </div>
         {!managing ? (
-          <Button type="button" variant="outline" size="sm" onClick={enterManagement}>
-            {t("manageCategories")}
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSaving || preset.isPending}
+              onClick={preset.openDialog}
+            >
+              {t("switchPreset")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={enterManagement}>
+              {t("manageCategories")}
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -237,6 +259,8 @@ export function CategorySection({
         onRequestClose={requestEditClose}
         onCommit={commitEdit}
       />
+
+      <CategoryPresetDialog preset={preset} />
 
       <ConfirmDialog
         open={deleteTarget != null}

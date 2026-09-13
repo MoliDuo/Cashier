@@ -317,6 +317,7 @@ export function SettingsTab({
       </SettingsSection>
 
       <BookkeepingSettings
+        ledgerId={ledgerId}
         settings={settingsLedger.settings}
         categories={categories}
         uncategorizedCount={uncategorizedCount}
