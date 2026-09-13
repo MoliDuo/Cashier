@@ -135,7 +135,7 @@ export function SourceDocumentDetailStatusPanels({
                     <span className={textRoleClassName("micro")}>
                       {t("activeResultDescription")}
                     </span>
-                    <AmountText variant="group">
+                    <AmountText variant="caption">
                       {sourceDocument.activeResultSummary.entryCount} ·{" "}
                       {sourceDocument.activeResultSummary.total}
                     </AmountText>
