@@ -608,7 +608,7 @@
     "networkError": "网络请求已中断，输入内容已保留，请重试。",
     "validationError": "记录内容校验失败，请检查后重试。",
     "createError": "创建记录失败，输入内容已保留，请重试。",
-    "tooManyImages": "最多只能上传 3 张图片。",
+    "tooManyImages": "最多只能上传 {count} 张图片。",
     "cancelUpload": "取消上传",
     "savedMayBeHidden": "已保存，但当前筛选可能隐藏这条记录。",
     "viewRecord": "查看新记录",

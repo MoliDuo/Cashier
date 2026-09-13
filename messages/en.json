@@ -284,7 +284,7 @@
     "networkError": "The network request was interrupted. Your input has been kept; please retry.",
     "validationError": "Some record details are invalid. Review your input and try again.",
     "createError": "The record could not be created. Your input has been kept; please retry.",
-    "tooManyImages": "You can upload up to 3 images.",
+    "tooManyImages": "You can upload up to {count} images.",
     "cancelUpload": "Cancel upload",
     "savedMayBeHidden": "Saved. Current filters may hide this record.",
     "viewRecord": "View record",

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { uploadSourceDocumentSubmissionImages } from "@/modules/source-document/hooks/source-document-submission-upload";
 
 function imageFile(byteSize = 1): File {
@@ -67,7 +68,7 @@ describe("source-document inline submission preparation", () => {
     ).rejects.toMatchObject({ stage: "prepare" });
   });
 
-  it("rejects more than three images before compression", async () => {
+  it("rejects more images than the web upload policy allows, before compression", async () => {
     const compress = vi.fn();
     await expect(
       uploadSourceDocumentSubmissionImages(
@@ -76,11 +77,11 @@ describe("source-document inline submission preparation", () => {
           documentDate: "2026-07-15",
           text: null,
           storedFileIds: [],
-          images: Array.from({ length: 4 }, () => uploadImage()),
+          images: Array.from({ length: MAX_FILES + 1 }, () => uploadImage()),
         },
         { compress }
       )
-    ).rejects.toThrow("Maximum 3 images");
+    ).rejects.toThrow(`Maximum ${MAX_FILES} images`);
     expect(compress).not.toHaveBeenCalled();
   });
 

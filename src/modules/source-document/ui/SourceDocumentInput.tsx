@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { useSourceDocumentInputController } from "../hooks/useSourceDocumentInputController";
 import type { SourceDocumentInputProps } from "./source-document-input.types";
 import { SourceDocumentInputView } from "./SourceDocumentInputView";
@@ -30,7 +31,7 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
       networkError: t("networkError"),
       validationError: t("validationError"),
       createError: t("createError"),
-      tooManyImages: t("tooManyImages"),
+      tooManyImages: t("tooManyImages", { count: MAX_FILES }),
     },
   });
 
@@ -84,7 +85,7 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
           unsupported: t("cameraUnsupported"),
           insecure: t("cameraInsecure"),
           capture: t("capturePhoto"),
-          limitReached: t("tooManyImages"),
+          limitReached: t("tooManyImages", { count: MAX_FILES }),
           switchCamera: t("switchCamera"),
           collapse: t("collapseCamera"),
           open: t("openCamera"),

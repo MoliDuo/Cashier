@@ -97,17 +97,15 @@ describe("validateFileCount", () => {
 describe("validateAggregateFileCount", () => {
   it("accepts aggregate count boundaries and rejects any combination over the limit", () => {
     expect(() => validateAggregateFileCount(0, 0, 0)).not.toThrow();
-    expect(() => validateAggregateFileCount(0, 3, 0)).not.toThrow();
-    expect(() => validateAggregateFileCount(3, 0, 0)).not.toThrow();
-    expect(() => validateAggregateFileCount(1, 2, 0)).not.toThrow();
+    expect(() => validateAggregateFileCount(MAX_FILES, 0, 0)).not.toThrow();
+    expect(() => validateAggregateFileCount(1, MAX_FILES - 1, 0)).not.toThrow();
     for (const counts of [
-      [3, 1, 0],
-      [2, 2, 0],
-      [1, 2, 1],
-      [0, 0, 4],
+      [MAX_FILES, 1, 0],
+      [MAX_FILES - 1, 2, 0],
+      [0, 0, MAX_FILES + 1],
     ] as const) {
       expect(() => validateAggregateFileCount(counts[0], counts[1], counts[2])).toThrow(
-        "exceeds maximum of 3 files"
+        `exceeds maximum of ${MAX_FILES} files`
       );
     }
   });

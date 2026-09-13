@@ -1,8 +1,8 @@
 "use client";
 
 import { compressImage } from "@/lib/image-utils";
-import { API_V1_MAX_IMAGES } from "@/modules/source-document/api-v1-policy";
 import {
+  MAX_FILES,
   MAX_NORMALIZED_BYTES_PER_REVISION,
   MAX_ORIGINAL_BYTES_PER_FILE,
 } from "@/lib/storage/upload-policy";
@@ -97,8 +97,8 @@ export async function uploadSourceDocumentSubmissionImages(
   const images = payload.images ?? [];
   const base = submissionBase(payload);
   if (images.length === 0) return base;
-  if (images.length + payload.storedFileIds.length > API_V1_MAX_IMAGES) {
-    throw new SourceDocumentSubmissionUploadError("Maximum 3 images allowed", "prepare");
+  if (images.length + payload.storedFileIds.length > MAX_FILES) {
+    throw new SourceDocumentSubmissionUploadError(`Maximum ${MAX_FILES} images allowed`, "prepare");
   }
 
   onProgress?.({ phase: "preparing", percent: 0, fileCount: images.length });

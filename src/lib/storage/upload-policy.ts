@@ -24,7 +24,7 @@ import { ValidationError } from "@/lib/errors";
 // ---------------------------------------------------------------------------
 
 /** Maximum number of files per upload revision. */
-export const MAX_FILES = 3;
+export const MAX_FILES = 4;
 
 /** Maximum original (raw uploaded) bytes per individual file. */
 export const MAX_ORIGINAL_BYTES_PER_FILE = 3 * 1024 * 1024; // 3 MB
