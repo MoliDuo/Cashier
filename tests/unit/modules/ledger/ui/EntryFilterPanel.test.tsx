@@ -1,39 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
-
-vi.mock("@/components/ui/popover", () => ({
-  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div data-testid="popover-content">{children}</div>
-  ),
-}));
 
 vi.mock("@/components/ui/date-filter", () => ({
   DateFilter: () => <button type="button">date</button>,
 }));
 
-let mobileViewport = false;
-
-beforeEach(() => {
-  mobileViewport = false;
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: vi.fn().mockImplementation(() => ({
-      matches: mobileViewport,
-      media: "(max-width: 639px)",
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  });
-});
+// The panel is one dialog at every width, so nothing inside it exists until the
+// trigger opens it — the same way it works in the app.
+async function openPanel() {
+  await userEvent.click(screen.getByRole("button", { name: /筛选/ }));
+  return screen.getByRole("dialog", { name: "筛选" });
+}
 
 describe("EntryFilterPanel", () => {
   it("counts only non-default periods as active filters", () => {
@@ -60,8 +39,7 @@ describe("EntryFilterPanel", () => {
     expect(screen.getByRole("button", { name: "已启用 1 个筛选" })).toBeInTheDocument();
   });
 
-  it("opens a bottom dialog and applies the shared draft on mobile", async () => {
-    mobileViewport = true;
+  it("opens a dialog and applies the shared draft", async () => {
     const user = userEvent.setup();
     const onFiltersChange = vi.fn();
 
@@ -71,14 +49,12 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
-
         periodParams={{ period: "thisMonth" }}
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "筛选" }));
-    screen.getByRole("dialog", { name: "筛选" });
-    expect(screen.queryByTestId("popover-content")).not.toBeInTheDocument();
+    const dialog = await openPanel();
+    expect(dialog).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText("搜索标题、名称或描述"), "coffee");
     await user.click(screen.getByRole("button", { name: "应用筛选" }));
@@ -87,15 +63,13 @@ describe("EntryFilterPanel", () => {
     expect(screen.queryByRole("dialog", { name: "筛选" })).not.toBeInTheDocument();
   });
 
-  it("does not promise a dropdown where the panel opens as a sheet", async () => {
-    mobileViewport = true;
+  it("promises a dialog rather than a dropdown", () => {
     const { container } = render(
       <EntryFilterPanel
         filters={{}}
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
-
         periodParams={{ period: "thisMonth" }}
       />
     );
@@ -104,7 +78,7 @@ describe("EntryFilterPanel", () => {
     expect(container.querySelector(".lucide-chevron-down")).toBeNull();
   });
 
-  it("offers the four date presets and no other windows", () => {
+  it("offers the four date presets and no other windows", async () => {
     render(
       <EntryFilterPanel
         filters={{}}
@@ -114,6 +88,7 @@ describe("EntryFilterPanel", () => {
         showCurrency={false}
       />
     );
+    await openPanel();
 
     const group = screen.getByRole("group", { name: "时间范围" });
     expect(group).toBeInTheDocument();
@@ -124,7 +99,7 @@ describe("EntryFilterPanel", () => {
     expect(screen.queryByRole("button", { name: "最近30天" })).not.toBeInTheDocument();
   });
 
-  it("shows the start and end fields only for a hand-picked range", () => {
+  it("shows the start and end fields only for a hand-picked range", async () => {
     const view = render(
       <EntryFilterPanel
         filters={{}}
@@ -134,6 +109,7 @@ describe("EntryFilterPanel", () => {
         showCurrency={false}
       />
     );
+    await openPanel();
     expect(screen.queryAllByRole("button", { name: "date" })).toHaveLength(0);
 
     view.rerender(
@@ -148,17 +124,17 @@ describe("EntryFilterPanel", () => {
     expect(screen.getAllByRole("button", { name: "date" })).toHaveLength(2);
   });
 
-  it("renders status checkboxes for all processing statuses", () => {
+  it("renders status checkboxes for all processing statuses", async () => {
     render(
       <EntryFilterPanel
         filters={{}}
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
-
         periodParams={{ period: "thisMonth" }}
       />
     );
+    await openPanel();
 
     // The status set is a checkbox group; its name is carried for screen
     // readers only, because the checkbox labels already say what it filters.
@@ -169,17 +145,17 @@ describe("EntryFilterPanel", () => {
     expect(screen.getByText("已取消")).toBeDefined();
   });
 
-  it("clears the status filter by unchecking, without a separate control", () => {
+  it("clears the status filter by unchecking, without a separate control", async () => {
     render(
       <EntryFilterPanel
         filters={{ statuses: ["failed"] }}
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
-
         periodParams={{ period: "thisMonth" }}
       />
     );
+    await openPanel();
 
     expect(screen.queryByRole("button", { name: "全部状态" })).not.toBeInTheDocument();
   });
@@ -194,10 +170,10 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
-
         periodParams={{ period: "thisMonth" }}
       />
     );
+    await openPanel();
 
     await user.click(screen.getByRole("button", { name: "待处理" }));
     expect(onFiltersChange).not.toHaveBeenCalled();
@@ -216,10 +192,10 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
-
         periodParams={{ period: "thisMonth" }}
       />
     );
+    await openPanel();
 
     await user.click(screen.getByRole("button", { name: "进行中" }));
     expect(onFiltersChange).not.toHaveBeenCalled();
@@ -241,6 +217,7 @@ describe("EntryFilterPanel", () => {
         showCurrency={false}
       />
     );
+    await openPanel();
 
     await user.click(screen.getByRole("button", { name: "本月" }));
     await user.click(screen.getByRole("button", { name: "应用筛选" }));
@@ -265,6 +242,7 @@ describe("EntryFilterPanel", () => {
         showCurrency={false}
       />
     );
+    await openPanel();
 
     await user.click(screen.getByRole("button", { name: "自定义区间" }));
     await user.click(screen.getByRole("button", { name: "应用筛选" }));
@@ -286,6 +264,7 @@ describe("EntryFilterPanel", () => {
         showCurrency={false}
       />
     );
+    await openPanel();
 
     await user.click(screen.getByRole("button", { name: "上个月" }));
     await user.click(screen.getByRole("button", { name: "应用筛选" }));

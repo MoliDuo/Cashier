@@ -60,6 +60,11 @@ interface SourceDocumentViewDetailsProps {
   onMobileViewChange: (view: "details" | "evidence") => void;
   /** Ledger timezone; the suggestion panel names today/yesterday against it. */
   timeZone?: string;
+  /**
+   * The selection band, built by the modal that owns the batch write. It takes
+   * the entries card's header row for as long as selection mode is on.
+   */
+  selectionToolbar?: ReactNode;
 }
 
 export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails({
@@ -89,6 +94,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
   mobileView,
   onMobileViewChange,
   timeZone,
+  selectionToolbar,
 }: SourceDocumentViewDetailsProps): ReactNode {
   const t = useTranslations("SourceDocumentDetail");
   const displayEntryDate = pendingChanges.sourceDoc.entryDate ?? sourceDocument.documentDate ?? "";
@@ -162,6 +168,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
             isSelectionMode={isSelectionMode}
             interactionDisabled={interactionDisabled}
             onToggleSelectionMode={onToggleSelectionMode}
+            {...(selectionToolbar != null ? { selectionToolbar } : {})}
           />
 
           <SourceDocumentEntriesList

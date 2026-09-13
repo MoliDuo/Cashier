@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
+import { BatchCategoryDialog } from "./BatchCategoryDialog";
+import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
 import { LedgerEntriesActions } from "./LedgerEntriesActions";
 
 export interface LedgerEntriesBatchActionToolbarProps {
@@ -65,6 +67,10 @@ export function LedgerEntriesBatchActionToolbar({
   const t = useTranslations("BatchActions");
   const [internalChangingCategory, setInternalChangingCategory] = useState(false);
   const [internalChangingCurrency, setInternalChangingCurrency] = useState(false);
+  // The band owns both pickers: the choice is one list, and every surface that
+  // renders the band gets the same one without wiring up its own dialog.
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [currencyDialogOpen, setCurrencyDialogOpen] = useState(false);
 
   const isChangingCategory = isChangingCategoryProp ?? internalChangingCategory;
   const isChangingCurrency = isChangingCurrencyProp ?? internalChangingCurrency;
@@ -149,21 +155,40 @@ export function LedgerEntriesBatchActionToolbar({
       {hasActions ? (
         <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
           <LedgerEntriesActions
-            categories={categories}
-            preferredCurrencies={preferredCurrencies}
             disabled={actionsDisabled}
             isChangingCategory={isChangingCategory}
             isChangingCurrency={isChangingCurrency}
             isRetrying={isRetrying}
             isDeleting={isDeleting}
-            {...(onChangeCategory != null ? { onChangeCategory: handleChangeCategory } : {})}
-            {...(onChangeCurrency != null ? { onChangeCurrency: handleChangeCurrency } : {})}
+            {...(onChangeCategory != null
+              ? { onOpenCategory: () => setCategoryDialogOpen(true) }
+              : {})}
+            {...(onChangeCurrency != null
+              ? { onOpenCurrency: () => setCurrencyDialogOpen(true) }
+              : {})}
             {...(onChangeDate != null ? { onChangeDate } : {})}
             {...(onRetry != null ? { onRetry } : {})}
             {...(onSplit != null ? { onSplit } : {})}
             {...(onDelete != null ? { onDelete } : {})}
           />
         </div>
+      ) : null}
+
+      {onChangeCategory != null ? (
+        <BatchCategoryDialog
+          open={categoryDialogOpen}
+          onOpenChange={setCategoryDialogOpen}
+          categories={categories}
+          onSelect={(categoryId) => void handleChangeCategory(categoryId)}
+        />
+      ) : null}
+      {onChangeCurrency != null ? (
+        <BatchCurrencyDialog
+          open={currencyDialogOpen}
+          onOpenChange={setCurrencyDialogOpen}
+          preferredCurrencies={preferredCurrencies}
+          onSelect={(currency) => void handleChangeCurrency(currency)}
+        />
       ) : null}
     </div>
   );

@@ -1,9 +1,7 @@
 "use client";
-import * as React from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TOOLBAR_CONTROL_CLASS } from "@/components/toolbar-control";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
@@ -29,22 +27,13 @@ interface EntryFilterPanelProps {
   className?: string;
 }
 
-const MOBILE_FILTER_QUERY = "(max-width: 639px)";
-
-function subscribeToMobileFilter(callback: () => void) {
-  const mediaQuery = window.matchMedia(MOBILE_FILTER_QUERY);
-  mediaQuery.addEventListener("change", callback);
-  return () => mediaQuery.removeEventListener("change", callback);
-}
-
-function getMobileFilterSnapshot() {
-  return window.matchMedia(MOBILE_FILTER_QUERY).matches;
-}
-
-function getServerMobileFilterSnapshot() {
-  return false;
-}
-
+/**
+ * The filter is one dialog at every width, the way every other box in the app
+ * opens — never a panel anchored to the trigger and no longer a bottom sheet on
+ * a phone. The draft and its 应用筛选 are what make that possible: the panel
+ * covers the toolbar it was opened from, so it has to carry its own title and
+ * its own apply.
+ */
 export function EntryFilterPanel({
   filters,
   onFiltersChange,
@@ -58,11 +47,6 @@ export function EntryFilterPanel({
   className,
 }: EntryFilterPanelProps) {
   const t = useTranslations("EntryFilterPanel");
-  const isMobile = React.useSyncExternalStore(
-    subscribeToMobileFilter,
-    getMobileFilterSnapshot,
-    getServerMobileFilterSnapshot
-  );
 
   const draft = useEntryFilterDraft({
     filters,
@@ -81,12 +65,12 @@ export function EntryFilterPanel({
         TOOLBAR_CONTROL_CLASS,
         activeFilterCount > 0 && "border-primary/50 text-primary"
       )}
-      onClick={isMobile ? () => handleOpenChange(true) : undefined}
+      onClick={() => handleOpenChange(true)}
       aria-label={
         activeFilterCount > 0 ? t("activeFilterCount", { count: activeFilterCount }) : t("filter")
       }
-      aria-haspopup={isMobile ? "dialog" : undefined}
-      aria-expanded={isMobile ? open : undefined}
+      aria-haspopup="dialog"
+      aria-expanded={open}
     >
       <SlidersHorizontal aria-hidden="true" />
       <span>{t("filter")}</span>
@@ -95,9 +79,6 @@ export function EntryFilterPanel({
           {activeFilterCount}
         </span>
       )}
-      {/* A chevron promises a panel anchored to the trigger, which is what the
-          desktop popover does; on mobile this opens a sheet from the bottom. */}
-      {!isMobile && <ChevronDown aria-hidden="true" className="opacity-50" />}
     </Button>
   );
 
@@ -115,36 +96,21 @@ export function EntryFilterPanel({
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      {isMobile ? (
-        <>
-          {trigger}
-          <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent
-              variant="sheet"
-              className="max-h-[calc(100svh-1rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 rounded-b-none rounded-t-lg p-0"
-              aria-describedby={undefined}
-            >
-              {/* The sheet covers the trigger, so it has to say what it is. */}
-              <DialogTitle className="border-b border-border px-4 py-3 pr-12 text-sm font-medium">
-                {t("filter")}
-              </DialogTitle>
-              {filterContent}
-            </DialogContent>
-          </Dialog>
-        </>
-      ) : (
-        <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent
-            align="start"
-            collisionPadding={16}
-            sideOffset={10}
-            className="max-h-[calc(100svh-8rem)] w-[min(360px,calc(100vw-2rem))] overflow-y-auto p-0"
-          >
-            {filterContent}
-          </PopoverContent>
-        </Popover>
-      )}
+      {trigger}
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          variant="modal"
+          // The header and the footer are fixed rows; the sections between them
+          // are the only thing that scrolls, so 应用筛选 is never scrolled away.
+          className="max-h-[calc(100svh-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0"
+          aria-describedby={undefined}
+        >
+          <DialogHeader className="border-b border-border px-4 py-3 pr-12">
+            <DialogTitle className="text-sm font-medium">{t("filter")}</DialogTitle>
+          </DialogHeader>
+          {filterContent}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

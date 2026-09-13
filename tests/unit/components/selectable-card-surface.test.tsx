@@ -73,10 +73,8 @@ describe("SelectableCardSurface", () => {
     expect(onInternalClick).toHaveBeenCalledTimes(1);
   });
 
-  it("outlines the unselected box neutrally and fills it only when selected", () => {
-    // Regression: the empty box carried border-primary, so every row in
-    // selection mode looked pre-selected.
-    const { container } = render(
+  it("marks a selected card with the outline alone, never with a box to tick", () => {
+    const { container, rerender } = render(
       <SelectableCardSurface
         selectionMode
         selected={false}
@@ -87,9 +85,23 @@ describe("SelectableCardSurface", () => {
       </SelectableCardSurface>
     );
 
-    const box = container.querySelector('[aria-hidden="true"].absolute.left-3');
-    expect(box).toHaveClass("border-muted-foreground/40");
-    expect(box).not.toHaveClass("border-primary");
+    // Nothing is drawn over the card's content, and an unselected card carries
+    // no outline of its own — only the selected one does.
+    expect(container.querySelector("[aria-hidden='true']")).toBeNull();
+    expect(container.querySelector('[data-selection-mode="true"]')).not.toHaveClass("ring-primary");
+
+    rerender(
+      <SelectableCardSurface
+        selectionMode
+        selected
+        selectionLabel="Select lunch"
+        onToggleSelection={vi.fn()}
+      >
+        <div>Lunch</div>
+      </SelectableCardSurface>
+    );
+
+    expect(container.querySelector('[data-selected="true"]')).toHaveClass("ring-1", "ring-primary");
   });
 
   it("disables an unselected card when the selection limit is reached", async () => {

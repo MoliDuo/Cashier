@@ -1,116 +1,88 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { EntryCategory } from "@/modules/ledger/contracts";
 import { LedgerEntriesActions } from "@/modules/ledger/ui/batch-action-toolbar/LedgerEntriesActions";
 
-const category: EntryCategory = {
-  id: "category-1",
-  ledgerId: "ledger-1",
-  name: "餐饮",
-  description: null,
-  icon: "Utensils",
-  sortOrder: 0,
-  createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
-  deletedAt: null,
-};
+type ActionsProps = React.ComponentProps<typeof LedgerEntriesActions>;
 
-function renderActions() {
-  return render(
-    <LedgerEntriesActions
-      categories={[category]}
-      preferredCurrencies={["USD"]}
-      disabled={false}
-      isChangingCategory={false}
-      isChangingCurrency={false}
-      onChangeCategory={vi.fn()}
-      onChangeCurrency={vi.fn()}
-    />
-  );
+function renderActions(overrides: Partial<ActionsProps> = {}) {
+  const props: ActionsProps = {
+    disabled: false,
+    onOpenCategory: vi.fn(),
+    onOpenCurrency: vi.fn(),
+    ...overrides,
+  };
+  return { ...render(<LedgerEntriesActions {...props} />), props };
 }
 
-describe("LedgerEntriesActions dropdown triggers", () => {
+describe("LedgerEntriesActions", () => {
+  it("opens the category picker from its own button", async () => {
+    const { props } = renderActions();
+
+    await userEvent.click(screen.getByRole("button", { name: /指定分类|set category/i }));
+
+    expect(props.onOpenCategory).toHaveBeenCalledOnce();
+  });
+
+  it("opens the currency picker from its own button", async () => {
+    const { props } = renderActions();
+
+    await userEvent.click(screen.getByRole("button", { name: /修改货币|set currency/i }));
+
+    expect(props.onOpenCurrency).toHaveBeenCalledOnce();
+  });
+
+  it("opens nothing of its own: no action here is a menu", async () => {
+    renderActions();
+
+    await userEvent.click(screen.getByRole("button", { name: /指定分类|set category/i }));
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows a running write on the button that started it", () => {
+    renderActions({ isChangingCategory: true });
+
+    const category = screen.getByRole("button", { name: /指定分类|set category/i });
+    expect(category).toHaveAttribute("aria-busy", "true");
+    expect(category).toBeDisabled();
+    expect(screen.getByRole("button", { name: /修改货币|set currency/i })).toBeEnabled();
+  });
+
   it("renders the optional split command only when provided", async () => {
     const onSplit = vi.fn();
-    const { rerender } = render(
-      <LedgerEntriesActions
-        categories={[category]}
-        preferredCurrencies={["USD"]}
-        disabled={false}
-        isChangingCategory={false}
-        isChangingCurrency={false}
-        onChangeCategory={vi.fn()}
-        onChangeCurrency={vi.fn()}
-        onSplit={onSplit}
-      />
-    );
+    const { rerender } = render(<LedgerEntriesActions disabled={false} onSplit={onSplit} />);
+
     await userEvent.click(screen.getByRole("button", { name: /拆分|split/i }));
     expect(onSplit).toHaveBeenCalledOnce();
 
-    rerender(
-      <LedgerEntriesActions
-        categories={[category]}
-        preferredCurrencies={["USD"]}
-        disabled={false}
-        isChangingCategory={false}
-        isChangingCurrency={false}
-        onChangeCategory={vi.fn()}
-        onChangeCurrency={vi.fn()}
-      />
-    );
+    rerender(<LedgerEntriesActions disabled={false} />);
     expect(screen.queryByRole("button", { name: /拆分|split/i })).not.toBeInTheDocument();
   });
 
-  it("does not open the category menu during a press or drag outside", () => {
-    renderActions();
-    const trigger = screen.getByRole("button", { name: /指定分类|set category/i });
+  it("keeps the actions in one order", () => {
+    renderActions({
+      onChangeDate: vi.fn(),
+      onSplit: vi.fn(),
+      onRetry: vi.fn(),
+      onDelete: vi.fn(),
+    });
 
-    fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    fireEvent.pointerUp(document, { button: 0, pointerId: 1 });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-
-    fireEvent.pointerDown(trigger, { button: 0, pointerId: 2 });
-    fireEvent.pointerUp(trigger, { button: 0, pointerId: 2 });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("menu")).toBeInTheDocument();
+    // jsdom does not apply `display: none`, so a button with a mobile label
+    // carries both spans here; the order is what this asserts.
+    const labels = screen.getAllByRole("button").map((button) => button.textContent ?? "");
+    ["指定分类", "修改日期", "拆分", "重试", "修改货币", "删除"].forEach((label, index) => {
+      expect(labels[index]).toContain(label);
+    });
   });
 
-  it("opens and closes the category menu after a complete click", async () => {
-    const user = userEvent.setup();
-    renderActions();
-    const trigger = screen.getByRole("button", { name: /指定分类|set category/i });
+  it("keeps every action visible but unavailable with nothing to act on", () => {
+    renderActions({ disabled: true, onChangeDate: vi.fn() });
 
-    await user.click(trigger);
-    expect(await screen.findByRole("menuitem", { name: /餐饮/ })).toBeInTheDocument();
-
-    fireEvent.pointerDown(trigger, { button: 0 });
-    fireEvent.click(trigger);
-    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
-  });
-
-  it("does not open the currency menu during a press or drag outside", () => {
-    renderActions();
-    const trigger = screen.getByRole("button", { name: /修改货币|set currency/i });
-
-    fireEvent.pointerDown(trigger, { button: 0, pointerId: 3 });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    fireEvent.pointerUp(document, { button: 0, pointerId: 3 });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-
-    fireEvent.pointerDown(trigger, { button: 0, pointerId: 4 });
-    fireEvent.pointerUp(trigger, { button: 0, pointerId: 4 });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-  });
-
-  it("opens the currency menu after a complete click", async () => {
-    const user = userEvent.setup();
-    renderActions();
-    const trigger = screen.getByRole("button", { name: /修改货币|set currency/i });
-
-    await user.click(trigger);
-    expect(await screen.findByRole("menuitem", { name: "USD" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).toBeDisabled();
+    }
   });
 });

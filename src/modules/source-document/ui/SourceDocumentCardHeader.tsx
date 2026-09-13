@@ -118,15 +118,16 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
 
   return (
     <div
-      className={cn(
-        // The shell's 56px minimum is measured over its own 1px top and bottom
-        // borders, so a header filling the full 56px would push a collapsed
-        // card to 58px — 2px taller than the single-row entry cards it sits
-        // beside in the details tab. What is left is one entry row's height,
-        // which is the point: this header carries less than a row does.
-        "flex h-[calc(var(--selectable-card-header-height,56px)-2px)] items-center gap-1 py-2 pr-2 sm:pr-3",
-        selectionMode ? "pl-11" : "pl-2 sm:pl-3"
-      )}
+      // The shell's 56px minimum is measured over its own 1px top and bottom
+      // borders, so a header filling the full 56px would push a collapsed card
+      // to 58px — 2px taller than the single-row entry cards it sits beside in
+      // the details tab. What is left is one entry row's height, which is the
+      // point: this header carries less than a row does.
+      //
+      // The left inset is the same whether or not rows can be selected: the
+      // selection indicator is the card's outline now, so nothing takes the
+      // chevron's place and the title never shifts entering selection mode.
+      className="flex h-[calc(var(--selectable-card-header-height,56px)-2px)] items-center gap-1 py-2 pl-2 pr-2 sm:pl-3 sm:pr-3"
     >
       {hasExpandableContent && !selectionMode ? (
         <button

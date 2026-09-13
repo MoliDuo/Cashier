@@ -60,7 +60,6 @@ export const SelectableEditableEntryCard = memo(function SelectableEditableEntry
       selected={selected}
       selectionLabel={selectionLabel}
       onToggleSelection={() => onSelectEntry(entry.id, !selected)}
-      indicatorPlacement="center"
       radiusClassName={isLast ? LAST_ROW_RADIUS : "rounded-none"}
     >
       <Card
@@ -75,7 +74,6 @@ export const SelectableEditableEntryCard = memo(function SelectableEditableEntry
           categoryPlaceholder={categoryPlaceholder}
           preferredCurrencies={preferredCurrencies}
           mainCurrency={mainCurrency}
-          className={cn(selectionMode && "pl-11")}
           onChange={(changes) => onEntryChange(entry.id, changes)}
           sourceDocumentEntryDate={sourceDocumentEntryDate}
           originalEntryDate={originalEntryDate}

@@ -40,7 +40,7 @@ interface UseEntryFilterDraftOptions {
   showStatus: boolean;
 }
 
-/** Owns the popover/sheet's draft filter state, independent from the applied `filters` prop. */
+/** Owns the filter dialog's draft state, independent from the applied `filters` prop. */
 export function useEntryFilterDraft({
   filters,
   onFiltersChange,
@@ -51,11 +51,11 @@ export function useEntryFilterDraft({
 }: UseEntryFilterDraftOptions) {
   const [open, setOpen] = React.useState(false);
 
-  // Internal state for editing before applying - initialized from filters when popover opens
+  // Internal state for editing before applying - initialized from filters when dialog opens
   const [tempFilters, setTempFilters] = React.useState<EntryFilters>(filters);
   const [tempPeriod, setTempPeriod] = React.useState<EntryFilterPreset | null>(null);
 
-  // Reset temp filters when popover opens (not using useEffect to sync with external filters)
+  // Reset temp filters when the dialog opens (not using useEffect to sync with external filters)
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {

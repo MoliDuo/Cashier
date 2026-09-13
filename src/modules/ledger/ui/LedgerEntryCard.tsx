@@ -58,9 +58,11 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
             }
           : {})}
       >
-        {/* Same padding as the entry rows inside a source document, so a card
-            here is exactly as tall as one of those rows. */}
-        <div className="px-3 py-2 sm:px-4">
+        {/* The same padding as the entry rows inside a source document, so a
+            card here is exactly as tall as one of those rows — and its amounts
+            line up with them, and with the toolbar's total above. Widening the
+            inset at `sm` broke both. */}
+        <div className="px-3 py-2">
           <div
             className={cn(onView != null && !selectionMode && "cursor-pointer")}
             onClick={(e) => {
@@ -73,12 +75,7 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
             }}
           >
             <div className="flex items-center justify-between">
-              <div
-                className={cn(
-                  "flex min-w-0 flex-1 items-center gap-3 mr-3",
-                  selectionMode && "pl-8"
-                )}
-              >
+              <div className="flex min-w-0 flex-1 items-center gap-3 mr-3">
                 <div className="h-8 w-8 flex items-center justify-center bg-surface2 rounded-full text-lg text-text shrink-0">
                   <CategoryIcon
                     {...(ledgerEntry.category?.icon !== undefined

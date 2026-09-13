@@ -112,7 +112,6 @@ function SourceDocumentCardBody({
         item: sourceDocument.title?.trim() || tCard("untitled"),
       })}
       onToggleSelection={() => onToggleSelect?.()}
-      indicatorPlacement="header"
       expandable={
         hasExpandableContent
           ? {

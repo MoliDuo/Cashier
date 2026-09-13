@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,13 @@ interface SourceDocumentSummaryHeaderProps {
   isSelectionMode: boolean;
   interactionDisabled: boolean;
   onToggleSelectionMode: () => void;
+  /**
+   * The selection band. In selection mode it takes the row in place of the date
+   * and the total, so this header reads exactly like the stream and details
+   * toolbars — back control, count and batch actions on one line — instead of
+   * leaving a second bar at the bottom of the modal.
+   */
+  selectionToolbar?: ReactNode;
 }
 
 /**
@@ -42,6 +50,7 @@ export function SourceDocumentSummaryHeader({
   isSelectionMode,
   interactionDisabled,
   onToggleSelectionMode,
+  selectionToolbar,
 }: SourceDocumentSummaryHeaderProps) {
   const t = useTranslations("SourceDocumentDetail");
   const tCommon = useTranslations("Common");
@@ -72,39 +81,48 @@ export function SourceDocumentSummaryHeader({
         )}
       </div>
 
-      {/* Centred on the bar itself from the sm breakpoint up; on a narrow
-          screen it falls back into the flow so it cannot collide with a total
-          that carries a conversion caveat. */}
-      <div className="flex min-w-0 items-center gap-2 sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-[55%] sm:-translate-x-1/2 sm:-translate-y-1/2">
-        {/* The bar carries no visible label; name the date for screen readers. */}
-        <span className="sr-only">{t("transactionTime")}</span>
-        <DateFilter
-          value={displayEntryDate}
-          onChange={(date) => {
-            if (date) {
-              onSourceDocChange({ entryDate: formatDateTimeForApi(date) });
-            }
-          }}
-          size="sm"
-          className="min-w-fit shrink-0"
-          truncate={false}
-          readOnly={fieldsDisabled}
-          readOnlyTextClassName="font-medium"
-          hideReadOnlyIcon
-        />
-        {isInvalid && (
-          <Badge variant="error" className="h-5 shrink-0 rounded-full px-1.5 text-xs font-medium">
-            {tCommon("error")}
-          </Badge>
-        )}
-      </div>
+      {selectionToolbar != null ? (
+        <div className="flex min-w-0 flex-1 items-center">{selectionToolbar}</div>
+      ) : (
+        <>
+          {/* Centred on the bar itself from the sm breakpoint up; on a narrow
+              screen it falls back into the flow so it cannot collide with a total
+              that carries a conversion caveat. */}
+          <div className="flex min-w-0 items-center gap-2 sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-[55%] sm:-translate-x-1/2 sm:-translate-y-1/2">
+            {/* The bar carries no visible label; name the date for screen readers. */}
+            <span className="sr-only">{t("transactionTime")}</span>
+            <DateFilter
+              value={displayEntryDate}
+              onChange={(date) => {
+                if (date) {
+                  onSourceDocChange({ entryDate: formatDateTimeForApi(date) });
+                }
+              }}
+              size="sm"
+              className="min-w-fit shrink-0"
+              truncate={false}
+              readOnly={fieldsDisabled}
+              readOnlyTextClassName="font-medium"
+              hideReadOnlyIcon
+            />
+            {isInvalid && (
+              <Badge
+                variant="error"
+                className="h-5 shrink-0 rounded-full px-1.5 text-xs font-medium"
+              >
+                {tCommon("error")}
+              </Badge>
+            )}
+          </div>
 
-      <SourceDocumentTotal
-        totalInMainCurrency={totalInMainCurrency}
-        mainCurrency={mainCurrency}
-        staleConversionCount={staleConversionCount}
-        unconvertedCount={unconvertedCount}
-      />
+          <SourceDocumentTotal
+            totalInMainCurrency={totalInMainCurrency}
+            mainCurrency={mainCurrency}
+            staleConversionCount={staleConversionCount}
+            unconvertedCount={unconvertedCount}
+          />
+        </>
+      )}
     </div>
   );
 }

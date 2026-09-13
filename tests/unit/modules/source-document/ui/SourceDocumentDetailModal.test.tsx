@@ -72,6 +72,7 @@ vi.mock("@/modules/source-document/ui/SourceDocumentViewDetails", () => ({
     onSelectEntry,
     onAddEntry,
     onDateAdjustmentStateChange,
+    selectionToolbar,
   }: {
     isEditMode?: boolean;
     isSelectionMode: boolean;
@@ -80,8 +81,11 @@ vi.mock("@/modules/source-document/ui/SourceDocumentViewDetails", () => ({
     onSelectEntry: (entryId: string, selected: boolean) => void;
     onAddEntry?: () => void;
     onDateAdjustmentStateChange?: (active: boolean, dirty: boolean) => void;
+    selectionToolbar?: ReactNode;
   }) => (
     <div>
+      {/* The real pane renders the band in the entries card's header row. */}
+      {selectionToolbar}
       <span>{isEditMode ? "editing" : "viewing"}</span>
       <span>{isSelectionMode ? "selecting" : "not-selecting"}</span>
       <button disabled={!isEditMode} onClick={() => onSourceDocChange({ title: "Changed" })}>

@@ -15,8 +15,6 @@ export interface BatchActionButtonProps extends Omit<ButtonProps, "children"> {
    * reads, so the short form has to be contained in it.
    */
   shortLabel?: string;
-  /** Rendered after the label, for the chevron that marks a menu. */
-  trailing?: ReactNode;
   children: ReactNode;
 }
 
@@ -28,7 +26,6 @@ export function BatchActionButton({
   icon: Icon,
   loading = false,
   shortLabel,
-  trailing,
   children,
   className,
   disabled,
@@ -55,7 +52,6 @@ export function BatchActionButton({
           <span className="sm:hidden">{shortLabel}</span>
         </>
       )}
-      {trailing}
     </Button>
   );
 }

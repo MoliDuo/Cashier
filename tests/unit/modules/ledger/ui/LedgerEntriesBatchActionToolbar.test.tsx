@@ -1,6 +1,20 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { EntryCategory } from "@/modules/ledger/contracts";
 import { LedgerEntriesBatchActionToolbar } from "@/modules/ledger/ui/batch-action-toolbar";
+
+const dining: EntryCategory = {
+  id: "category-1",
+  ledgerId: "ledger-1",
+  name: "餐饮",
+  description: null,
+  icon: "Utensils",
+  sortOrder: 0,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  deletedAt: null,
+};
 
 function renderToolbar(
   overrides: Partial<React.ComponentProps<typeof LedgerEntriesBatchActionToolbar>> = {}
@@ -90,5 +104,40 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     renderToolbar({ selectedCount: 2 });
 
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("applies the category the picker lists, and closes it", async () => {
+    const onChangeCategory = vi.fn();
+    renderToolbar({ selectedCount: 1, categories: [dining], onChangeCategory });
+
+    await userEvent.click(screen.getByRole("button", { name: /指定分类/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "餐饮" }));
+
+    expect(onChangeCategory).toHaveBeenCalledWith("category-1");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("offers the uncategorized row the menu used to carry", async () => {
+    const onChangeCategory = vi.fn();
+    renderToolbar({ selectedCount: 1, categories: [dining], onChangeCategory });
+
+    await userEvent.click(screen.getByRole("button", { name: /指定分类/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "未分类" }));
+
+    expect(onChangeCategory).toHaveBeenCalledWith(null);
+  });
+
+  it("applies the currency the picker lists", async () => {
+    const onChangeCurrency = vi.fn();
+    renderToolbar({
+      selectedCount: 1,
+      preferredCurrencies: ["SGD"],
+      onChangeCurrency,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /修改货币/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "SGD" }));
+
+    expect(onChangeCurrency).toHaveBeenCalledWith("SGD");
   });
 });

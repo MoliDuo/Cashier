@@ -145,6 +145,29 @@ function SourceDocumentDetailEditor({
     if (!dateDraftDirty) discardDateDraft();
     actions.handleClose();
   };
+  // Selection takes over the entries card's header row instead of adding a bar
+  // along the bottom, so the modal reads like the stream and details toolbars:
+  // the back control, the count and the batch actions on one line, and the date
+  // and total step aside with the browsing state they belong to.
+  const selectionToolbar = selection.isSelectionMode ? (
+    <LedgerEntriesBatchActionToolbar
+      selectedCount={selection.selectedIds.length}
+      isAllSelected={selection.isAllSelected}
+      onSelectAll={() => selection.handleSelectAll(true)}
+      onClearSelection={() => selection.handleSelectAll(false)}
+      onChangeCategory={actions.handleBatchCategory}
+      onChangeCurrency={actions.handleBatchCurrency}
+      {...(sourceDocument?.supportedActions.includes("split_entries") && onSplit != null
+        ? { onSplit: actions.handleOpenSplit }
+        : {})}
+      onDelete={actions.handleOpenBatchDelete}
+      categories={categories}
+      preferredCurrencies={preferredCurrencies}
+      isChangingCategory={status.isSaving}
+      isChangingCurrency={status.isSaving}
+      isProcessing={status.busy}
+    />
+  ) : undefined;
 
   return (
     <>
@@ -255,35 +278,11 @@ function SourceDocumentDetailEditor({
                     setDateAdjustmentActive(active || dirty);
                     setDateDraftDirty(dirty);
                   }}
+                  {...(selectionToolbar != null ? { selectionToolbar } : {})}
                 />
               </div>
             )}
           </div>
-
-          {selection.isSelectionMode && (
-            <LedgerEntriesBatchActionToolbar
-              // The band sits between the entry list and the footer, so it
-              // carries the separator the modal body does not provide. The
-              // modal is a column, so a full-width basis would become a
-              // full-height one — the band only needs its own height.
-              className="shrink-0 border-t border-border pt-3"
-              selectedCount={selection.selectedIds.length}
-              isAllSelected={selection.isAllSelected}
-              onSelectAll={() => selection.handleSelectAll(true)}
-              onClearSelection={() => selection.handleSelectAll(false)}
-              onChangeCategory={actions.handleBatchCategory}
-              onChangeCurrency={actions.handleBatchCurrency}
-              {...(sourceDocument?.supportedActions.includes("split_entries") && onSplit != null
-                ? { onSplit: actions.handleOpenSplit }
-                : {})}
-              onDelete={actions.handleOpenBatchDelete}
-              categories={categories}
-              preferredCurrencies={preferredCurrencies}
-              isChangingCategory={status.isSaving}
-              isChangingCurrency={status.isSaving}
-              isProcessing={status.busy}
-            />
-          )}
 
           <SourceDocumentDetailFooterActions
             sourceDocument={sourceDocument}
