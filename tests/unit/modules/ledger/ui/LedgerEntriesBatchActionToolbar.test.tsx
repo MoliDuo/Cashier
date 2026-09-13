@@ -147,4 +147,58 @@ describe("LedgerEntriesBatchActionToolbar", () => {
 
     expect(onChangeCurrency).toHaveBeenCalledWith("SGD");
   });
+
+  it("opens the AI candidate picker and holds the button until two are chosen", async () => {
+    const onStartAiCategory = vi.fn();
+    const onToggleAiCategory = vi.fn();
+    renderToolbar({
+      selectedCount: 5,
+      categories: [dining],
+      onOpenAiCategory: vi.fn(),
+      aiCategoryDialogOpen: true,
+      onToggleAiCategory,
+      onStartAiCategory,
+      aiCategorySelection: [],
+    });
+
+    const start = screen.getByRole("button", { name: "开始归类" });
+    expect(start).toBeDisabled();
+    expect(screen.getByText("至少选择 2 个候选分类")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /餐饮/ }));
+    expect(onToggleAiCategory).toHaveBeenCalledWith("category-1", true);
+    expect(onStartAiCategory).not.toHaveBeenCalled();
+  });
+
+  it("starts the run once the candidate set is large enough", () => {
+    const onStartAiCategory = vi.fn();
+    renderToolbar({
+      selectedCount: 5,
+      categories: [dining],
+      onOpenAiCategory: vi.fn(),
+      aiCategoryDialogOpen: true,
+      onToggleAiCategory: vi.fn(),
+      onStartAiCategory,
+      aiCategorySelection: ["category-1", "category-2"],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "开始归类" }));
+
+    expect(onStartAiCategory).toHaveBeenCalledOnce();
+  });
+
+  it("holds the run when the selection moved under the dialog", () => {
+    renderToolbar({
+      selectedCount: 5,
+      categories: [dining],
+      onOpenAiCategory: vi.fn(),
+      aiCategoryDialogOpen: true,
+      onToggleAiCategory: vi.fn(),
+      onStartAiCategory: vi.fn(),
+      aiCategorySelection: ["category-1", "category-2"],
+      aiCategorySelectionChanged: true,
+    });
+
+    expect(screen.getByRole("button", { name: "开始归类" })).toBeDisabled();
+  });
 });

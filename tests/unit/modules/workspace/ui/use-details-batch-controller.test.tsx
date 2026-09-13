@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDetailsBatchController } from "@/modules/workspace/ui/useDetailsBatchController";
@@ -9,13 +9,19 @@ const {
   batchUpdateLedgerEntriesActionMock,
   batchUpdateLedgerEntryDatesActionMock,
   previewBatchLedgerEntryDateActionMock,
+  startCategoryReclassificationActionMock,
+  reclassificationJobMock,
   toastErrorMock,
+  toastSuccessMock,
 } = vi.hoisted(() => ({
   batchDeleteLedgerEntriesActionMock: vi.fn(),
   batchUpdateLedgerEntriesActionMock: vi.fn(),
   batchUpdateLedgerEntryDatesActionMock: vi.fn(),
   previewBatchLedgerEntryDateActionMock: vi.fn(),
+  startCategoryReclassificationActionMock: vi.fn(),
+  reclassificationJobMock: vi.fn(),
   toastErrorMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
 }));
 
 vi.mock("next-intl", () => ({
@@ -23,7 +29,7 @@ vi.mock("next-intl", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: toastErrorMock, warning: vi.fn() },
+  toast: { success: toastSuccessMock, error: toastErrorMock, warning: vi.fn() },
 }));
 
 vi.mock("@/modules/ledger/server-actions/entries", () => ({
@@ -31,6 +37,14 @@ vi.mock("@/modules/ledger/server-actions/entries", () => ({
   batchUpdateLedgerEntriesAction: batchUpdateLedgerEntriesActionMock,
   batchUpdateLedgerEntryDatesAction: batchUpdateLedgerEntryDatesActionMock,
   previewBatchLedgerEntryDateAction: previewBatchLedgerEntryDateActionMock,
+}));
+
+vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
+  startCategoryReclassificationAction: startCategoryReclassificationActionMock,
+}));
+
+vi.mock("@/lib/queries/ledger-query-client", () => ({
+  getCategoryReclassificationJobAction: reclassificationJobMock,
 }));
 
 function deferred() {
@@ -82,6 +96,7 @@ function entry(id: string, sourceDocumentId = "document-1") {
 describe("useDetailsBatchController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reclassificationJobMock.mockResolvedValue(null);
   });
 
   it("closes delete confirmation and finishes before refresh settles", async () => {
@@ -322,5 +337,102 @@ describe("useDetailsBatchController", () => {
     expect(result.current.dateDialogOpen).toBe(true);
     expect(result.current.datePreviewFailed).toBe(true);
     expect(result.current.dateImpact).toBeNull();
+  });
+
+  it("starts an AI sort for the captured selection and clears it", async () => {
+    const { wrapper } = setup();
+    startCategoryReclassificationActionMock.mockResolvedValue({
+      id: "job-1",
+      status: "pending",
+      total: 1,
+      cursor: 0,
+      appliedCount: 0,
+      confirmedCount: 0,
+      undecidedCount: 1,
+      attempts: 0,
+      lastError: null,
+      createdAt: "2026-09-04T00:00:00.000Z",
+      updatedAt: "2026-09-04T00:00:00.000Z",
+    });
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.openAiCategoryDialog());
+    act(() => {
+      result.current.toggleAiCategory("category-1", true);
+      result.current.toggleAiCategory("category-2", true);
+    });
+
+    await act(async () => result.current.confirmAiCategory());
+    await act(async () => Promise.resolve());
+
+    expect(startCategoryReclassificationActionMock).toHaveBeenCalledWith("ledger-1", {
+      ledgerEntryIds: ["entry-1"],
+      candidateCategoryIds: ["category-1", "category-2"],
+    });
+    expect(result.current.selectedIds).toEqual([]);
+    expect(result.current.aiCategoryDialogOpen).toBe(false);
+    expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryRunning");
+  });
+
+  it("refuses to start when the selection moved under the dialog", async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(
+      () =>
+        useDetailsBatchController("ledger-1", [entry("entry-1"), entry("entry-2")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.openAiCategoryDialog());
+    act(() => result.current.toggleAiCategory("category-1", true));
+    // The dialog is still open but the selection behind it changed.
+    act(() => result.current.handleSelect("entry-2", true));
+
+    await act(async () => result.current.confirmAiCategory());
+
+    expect(result.current.aiCategorySelectionChanged).toBe(true);
+    expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
+  });
+
+  it("reports a finished run once, and only for a run this client watched", async () => {
+    const { wrapper, queryClient } = setup();
+    const running = {
+      id: "job-1",
+      status: "running" as const,
+      total: 3,
+      cursor: 1,
+      appliedCount: 1,
+      confirmedCount: 0,
+      undecidedCount: 2,
+      attempts: 0,
+      lastError: null,
+      createdAt: "2026-09-04T00:00:00.000Z",
+      updatedAt: "2026-09-04T00:00:00.000Z",
+    };
+    reclassificationJobMock.mockResolvedValueOnce(running).mockResolvedValue({
+      ...running,
+      status: "succeeded",
+      cursor: 3,
+      appliedCount: 2,
+      confirmedCount: 1,
+      undecidedCount: 0,
+    });
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.isReclassifying).toBe(true));
+
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: ["ledger", "ledger-1", "category-reclassification"],
+      });
+    });
+
+    await waitFor(() => expect(result.current.isReclassifying).toBe(false));
+    expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryDone");
   });
 });

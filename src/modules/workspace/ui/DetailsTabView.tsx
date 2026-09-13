@@ -131,6 +131,15 @@ export function DetailsTabView(props: DetailsTabViewProps) {
               onChangeDate={batch.openDateDialog}
               onDelete={() => batch.setDeleteDialogOpen(true)}
               isDeleting={batch.remove.isPending}
+              onOpenAiCategory={batch.openAiCategoryDialog}
+              aiCategoryDialogOpen={batch.aiCategoryDialogOpen}
+              onAiCategoryDialogOpenChange={batch.setAiCategoryDialogOpen}
+              aiCategorySelection={batch.aiCategorySelection}
+              onToggleAiCategory={batch.toggleAiCategory}
+              aiCategorySelectionChanged={batch.aiCategorySelectionChanged}
+              onStartAiCategory={batch.confirmAiCategory}
+              isStartingAiCategory={batch.startAiCategory.isPending}
+              isReclassifying={batch.isReclassifying}
               isProcessing={batch.isPending}
             />
           ) : undefined

@@ -42,6 +42,7 @@ import {
   fetchWithRetry as fetchExchangeRatesWithRetry,
 } from "@/application/adapters/postgres/exchange-rate";
 import { categoryMetadataGeneratorAdapter } from "@/application/adapters/ai/category-metadata-generator";
+import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
 import { createAIContext } from "@/lib/tasks/ai-context";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { runtimeEnv } from "@/lib/env/runtime";
@@ -99,6 +100,7 @@ export const serverComposition = {
     listEntriesBySourceDocumentIds: listLedgerEntryViewsBySourceDocumentIds,
   },
   categoryMetadataGenerator: categoryMetadataGeneratorAdapter,
+  categoryReclassificationJobs: postgresCategoryReclassificationJobAdapter,
   stats: {
     queryEnhanced: getEnhancedStatsQuery,
   },

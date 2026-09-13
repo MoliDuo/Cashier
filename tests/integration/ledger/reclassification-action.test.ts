@@ -1,0 +1,331 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { and, eq, isNull } from "drizzle-orm";
+import { auth } from "@/auth";
+import { startCategoryReclassificationAction } from "@/modules/ledger/server-actions/reclassification";
+import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
+import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { getTestDb } from "../../setup";
+import {
+  createCategoryData,
+  createLedgerData,
+  createSourceDocumentData,
+} from "../../helpers/factories";
+import { activateTestSourceDocumentProjection, createTestUser } from "../../helpers/schema-setup";
+import { flushAfterCallbacks } from "../../setup.common";
+import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
+
+const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
+
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/ai/openai-client", () => ({
+  getOpenAIClient: () => ({ generateContent }),
+}));
+
+const userId = "00000000-0000-0000-0000-000000000000";
+
+/** Entries the model can be asked about, each on the document's live revision. */
+async function seedEntries(input: {
+  ledgerId: string;
+  documentId: string;
+  revisionId: string;
+  categoryId: string | null;
+  count: number;
+}): Promise<string[]> {
+  const db = getTestDb();
+  const ids = Array.from({ length: input.count }, () => crypto.randomUUID());
+  await db.insert(ledgerEntries).values(
+    ids.map((id, position) => ({
+      id,
+      ledgerId: input.ledgerId,
+      categoryId: input.categoryId,
+      sourceDocumentId: input.documentId,
+      sourceDocumentRevisionId: input.revisionId,
+      position,
+      amount: "10.00",
+      currency: "CNY",
+      itemName: `Item ${position + 1}`,
+    }))
+  );
+  return ids;
+}
+
+async function setupLedger() {
+  const db = getTestDb();
+  const ledger = createLedgerData({ userId });
+  const food = createCategoryData(ledger.id, { name: "吃喝", sortOrder: 0 });
+  const home = createCategoryData(ledger.id, { name: "居家", sortOrder: 1 });
+  const document = createSourceDocumentData(ledger.id);
+  await db.insert(ledgers).values(ledger);
+  await db.insert(entryCategories).values([food, home]);
+  await db.insert(sourceDocuments).values(document);
+  const revisionId = await activateTestSourceDocumentProjection(db, document.id);
+  return { ledger, food, home, document, revisionId };
+}
+
+describe("startCategoryReclassificationAction", () => {
+  beforeEach(() => {
+    vi.mocked(
+      auth as unknown as () => Promise<{
+        user: { id: string; email: string };
+        expires: string;
+      } | null>
+    ).mockResolvedValue({
+      user: { id: userId, email: "reclassify@example.com" },
+      expires: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+    vi.clearAllMocks();
+  });
+
+  it("runs the whole chain and reports what it moved", async () => {
+    const db = getTestDb();
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: null,
+      count: 2,
+    });
+    generateContent.mockResolvedValue({
+      content: JSON.stringify({
+        decisions: [
+          { entry_index: 1, category_index: 1 },
+          { entry_index: 2, category_index: 1 },
+        ],
+      }),
+    });
+
+    const job = await startCategoryReclassificationAction(ledger.id, {
+      ledgerEntryIds: entryIds,
+      candidateCategoryIds: [food.id, home.id],
+    });
+    await flushAfterCallbacks();
+
+    expect(job).toMatchObject({ status: "pending", total: 2, appliedCount: 0 });
+    const stored = await getCategoryReclassificationJobAction(ledger.id);
+    expect(stored).toMatchObject({
+      status: "succeeded",
+      total: 2,
+      appliedCount: 2,
+      confirmedCount: 0,
+      undecidedCount: 0,
+      cursor: 2,
+    });
+    const rows = await db
+      .select({ id: ledgerEntries.id, categoryId: ledgerEntries.categoryId })
+      .from(ledgerEntries)
+      .where(and(eq(ledgerEntries.ledgerId, ledger.id), isNull(ledgerEntries.deletedAt)));
+    expect(rows.every((row) => row.categoryId === food.id)).toBe(true);
+  });
+
+  it("keeps entries the model declined to place", async () => {
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: home.id,
+      count: 3,
+    });
+    generateContent.mockResolvedValue({
+      content: JSON.stringify({
+        decisions: [
+          { entry_index: 1, category_index: 1 },
+          { entry_index: 2, category_index: 0 },
+          // Missing: the third entry is never mentioned.
+        ],
+      }),
+    });
+
+    await startCategoryReclassificationAction(ledger.id, {
+      ledgerEntryIds: entryIds,
+      candidateCategoryIds: [food.id, home.id],
+    });
+    await flushAfterCallbacks();
+
+    // One moved, two left exactly as they were.
+    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
+      status: "succeeded",
+      appliedCount: 1,
+      confirmedCount: 0,
+      undecidedCount: 2,
+    });
+  });
+
+  it("counts an entry the model left in place as confirmed", async () => {
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: food.id,
+      count: 1,
+    });
+    generateContent.mockResolvedValue({
+      content: JSON.stringify({ decisions: [{ entry_index: 1, category_index: 1 }] }),
+    });
+
+    await startCategoryReclassificationAction(ledger.id, {
+      ledgerEntryIds: entryIds,
+      candidateCategoryIds: [food.id, home.id],
+    });
+    await flushAfterCallbacks();
+
+    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
+      status: "succeeded",
+      appliedCount: 0,
+      confirmedCount: 1,
+    });
+  });
+
+  it("rejects a ledger the caller does not own", async () => {
+    const db = getTestDb();
+    const secondUserId = crypto.randomUUID();
+    await createTestUser(db, undefined, secondUserId);
+    const { ledger, food, home } = await setupLedger();
+    const foreign = createLedgerData({ userId: secondUserId });
+    await db.insert(ledgers).values(foreign);
+
+    await expect(
+      startCategoryReclassificationAction(foreign.id, {
+        ledgerEntryIds: [crypto.randomUUID()],
+        candidateCategoryIds: [food.id, home.id],
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
+  });
+
+  it("rejects a batch that is too large or a candidate set that is too small", async () => {
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: null,
+      count: 3,
+    });
+    const oversized = Array.from({ length: 101 }, () => crypto.randomUUID());
+
+    await expect(
+      startCategoryReclassificationAction(ledger.id, {
+        ledgerEntryIds: oversized,
+        candidateCategoryIds: [food.id, home.id],
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      startCategoryReclassificationAction(ledger.id, {
+        ledgerEntryIds: entryIds,
+        candidateCategoryIds: [food.id],
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      startCategoryReclassificationAction(ledger.id, {
+        ledgerEntryIds: entryIds,
+        candidateCategoryIds: [
+          food.id,
+          home.id,
+          ...Array.from({ length: 7 }, () => crypto.randomUUID()),
+        ],
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rejects a candidate category that belongs to another ledger", async () => {
+    const db = getTestDb();
+    const secondUserId = crypto.randomUUID();
+    await createTestUser(db, undefined, secondUserId);
+    const { ledger, food, document, revisionId } = await setupLedger();
+    const foreign = createLedgerData({ userId: secondUserId });
+    const foreignCategory = createCategoryData(foreign.id, { name: "别人的", sortOrder: 0 });
+    await db.insert(ledgers).values(foreign);
+    await db.insert(entryCategories).values(foreignCategory);
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: null,
+      count: 1,
+    });
+
+    await expect(
+      startCategoryReclassificationAction(ledger.id, {
+        ledgerEntryIds: entryIds,
+        candidateCategoryIds: [food.id, foreignCategory.id],
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
+  });
+
+  it("rejects a candidate set that is no longer live before registering anything", async () => {
+    const db = getTestDb();
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: null,
+      count: 1,
+    });
+    await db
+      .update(entryCategories)
+      .set({ deletedAt: new Date() })
+      .where(eq(entryCategories.id, home.id));
+
+    await expect(
+      startCategoryReclassificationAction(ledger.id, {
+        ledgerEntryIds: entryIds,
+        candidateCategoryIds: [food.id, home.id],
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
+  });
+
+  it("reports a provider failure without losing the run", async () => {
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: null,
+      count: 1,
+    });
+    generateContent.mockResolvedValue({ content: "not json at all" });
+
+    await startCategoryReclassificationAction(ledger.id, {
+      ledgerEntryIds: entryIds,
+      candidateCategoryIds: [food.id, home.id],
+    });
+    await flushAfterCallbacks();
+
+    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
+      status: "pending",
+      attempts: 1,
+      lastError: "AI_JSON_REPAIR_FAILED",
+    });
+  });
+
+  it("refuses a second run while one is active", async () => {
+    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      revisionId,
+      categoryId: null,
+      count: 1,
+    });
+    // A run already in flight, registered without going through the action so
+    // no model call is left pending.
+    await postgresCategoryReclassificationJobAdapter.enqueue({
+      ledgerId: ledger.id,
+      ledgerEntryIds: entryIds,
+      candidateCategoryIds: [food.id, home.id],
+    });
+
+    await expect(
+      startCategoryReclassificationAction(ledger.id, {
+        ledgerEntryIds: entryIds,
+        candidateCategoryIds: [food.id, home.id],
+      })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});

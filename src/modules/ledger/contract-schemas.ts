@@ -151,6 +151,15 @@ const ledgerEntryIdsSchema = z.preprocess(
   (value) => (Array.isArray(value) ? [...new Set(value)] : value),
   z.array(uuidSchema).min(1).max(MAX_BATCH_SIZE)
 );
+// Fewer than two candidates leaves nothing for a model to choose between.
+const candidateCategoryIdsSchema = z.preprocess(
+  (value) => (Array.isArray(value) ? [...new Set(value)] : value),
+  z.array(uuidSchema).min(2).max(8)
+);
+const startCategoryReclassificationInputSchema = strictObjectSchema({
+  ledgerEntryIds: ledgerEntryIdsSchema,
+  candidateCategoryIds: candidateCategoryIdsSchema,
+});
 const entryCategoryIdSchema = uuidSchema;
 const serviceCredentialIdSchema = uuidSchema;
 
@@ -264,6 +273,8 @@ export const parseLedgerEntryId = (input: unknown) =>
   parseLedgerContract(ledgerEntryIdSchema, input);
 export const parseLedgerEntryIds = (input: unknown) =>
   parseLedgerContract(ledgerEntryIdsSchema, input);
+export const parseStartCategoryReclassificationInput = (input: unknown) =>
+  parseLedgerContract(startCategoryReclassificationInputSchema, input);
 export const parseCreateServiceCredentialInput = (input: unknown) =>
   parseLedgerContract(createServiceCredentialInputSchema, input);
 export const parseServiceCredentialId = (input: unknown) =>

@@ -63,6 +63,7 @@ describe("LedgerEntriesActions", () => {
 
   it("keeps the actions in one order", () => {
     renderActions({
+      onOpenAiCategory: vi.fn(),
       onChangeDate: vi.fn(),
       onSplit: vi.fn(),
       onRetry: vi.fn(),
@@ -72,9 +73,19 @@ describe("LedgerEntriesActions", () => {
     // jsdom does not apply `display: none`, so a button with a mobile label
     // carries both spans here; the order is what this asserts.
     const labels = screen.getAllByRole("button").map((button) => button.textContent ?? "");
-    ["指定分类", "修改日期", "拆分", "重试", "修改货币", "删除"].forEach((label, index) => {
-      expect(labels[index]).toContain(label);
-    });
+    ["指定分类", "AI 归类", "修改日期", "拆分", "重试", "修改货币", "删除"].forEach(
+      (label, index) => {
+        expect(labels[index]).toContain(label);
+      }
+    );
+  });
+
+  it("opens the AI category picker next to the manual one", async () => {
+    const { props } = renderActions({ onOpenAiCategory: vi.fn() });
+
+    await userEvent.click(screen.getByRole("button", { name: /AI 归类|ai category/i }));
+
+    expect(props.onOpenAiCategory).toHaveBeenCalledOnce();
   });
 
   it("keeps every action visible but unavailable with nothing to act on", () => {

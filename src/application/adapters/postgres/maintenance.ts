@@ -1,6 +1,7 @@
 import { and, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  categoryReclassificationJobs,
   emailChangeChallenges,
   objectCleanupJobs,
   uploadSessionFiles,
@@ -10,6 +11,7 @@ import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { drainDueExchangeRateRecalculations } from "@/application/orchestration/exchange-rate-ledger-recalculation";
+import { drainDueCategoryReclassifications } from "@/application/orchestration/category-reclassification";
 import { acknowledgeObjectCleanup, claimObjectCleanup } from "./object-cleanup";
 
 const LIMIT = 1000;
@@ -45,6 +47,13 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
     )`);
     await tx.execute(sql`DELETE FROM ${emailChangeChallenges} WHERE id IN (
       SELECT id FROM ${emailChangeChallenges} WHERE expires_at < ${now} LIMIT ${LIMIT}
+    )`);
+    // Terminal reclassification rows are the client's only way to observe a
+    // finished run, so they survive their run by a day before being collected.
+    await tx.execute(sql`DELETE FROM ${categoryReclassificationJobs} WHERE id IN (
+      SELECT id FROM ${categoryReclassificationJobs}
+      WHERE status IN ('succeeded', 'failed') AND updated_at < ${dayAgo}
+      LIMIT ${LIMIT}
     )`);
 
     const staleSessions = await tx
@@ -107,6 +116,7 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
   if (!acquired) return;
 
   await drainDueExchangeRateRecalculations(now);
+  await drainDueCategoryReclassifications(now);
 
   const jobs = await claimObjectCleanup(new Date());
   if (jobs.length === 0) return;

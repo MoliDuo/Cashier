@@ -364,6 +364,63 @@ export const exchangeRateRecalculationJobs = pgTable(
   ]
 );
 
+/**
+ * One AI reclassification run over a batch of entries. `cursor` is the only
+ * progress pointer (how far into `ledgerEntryIds` the run has consumed), so a
+ * resumed run never re-asks the model about a prefix it already applied.
+ * `total` is derived from the array and `undecided` from
+ * `total - appliedCount - confirmedCount`.
+ */
+export const categoryReclassificationStatusEnum = pgEnum("category_reclassification_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+]);
+
+export const categoryReclassificationJobs = pgTable(
+  "category_reclassification_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ledgerId: uuid("ledger_id")
+      .notNull()
+      .references(() => ledgers.id, { onDelete: "cascade" }),
+    status: categoryReclassificationStatusEnum("status").notNull().default("pending"),
+    ledgerEntryIds: uuid("ledger_entry_ids").array().notNull(),
+    candidateCategoryIds: uuid("candidate_category_ids").array().notNull(),
+    cursor: integer("cursor").notNull().default(0),
+    appliedCount: integer("applied_count").notNull().default(0),
+    confirmedCount: integer("confirmed_count").notNull().default(0),
+    attempts: integer("attempts").notNull().default(0),
+    claimToken: uuid("claim_token"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
+    nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),
+    lastError: text("last_error"),
+    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
+    updatedAt: requiredTimestamp("updated_at").$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("idx_category_reclassification_jobs_due").on(table.status, table.nextAttemptAt),
+    // One run per ledger at a time: a double submit becomes a conflict instead
+    // of paying for the same model calls twice.
+    uniqueIndex("uq_category_reclassification_jobs_active")
+      .on(table.ledgerId)
+      .where(sql`${table.status} IN ('pending', 'running')`),
+    check(
+      "ck_category_reclassification_jobs_entries",
+      sql`cardinality(${table.ledgerEntryIds}) BETWEEN 1 AND 100`
+    ),
+    check(
+      "ck_category_reclassification_jobs_candidates",
+      sql`cardinality(${table.candidateCategoryIds}) BETWEEN 2 AND 8`
+    ),
+    check(
+      "ck_category_reclassification_jobs_cursor",
+      sql`${table.cursor} >= 0 AND ${table.cursor} <= cardinality(${table.ledgerEntryIds})`
+    ),
+  ]
+);
+
 export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   bucketKey: text("bucket_key").primaryKey(),
   count: integer("count").notNull().default(0),

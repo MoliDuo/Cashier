@@ -288,6 +288,13 @@
       "when": 1789131120662,
       "tag": "0040_unify_source_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789302066680,
+      "tag": "0041_category_reclassification_jobs",
+      "breakpoints": true
     }
   ]
 }

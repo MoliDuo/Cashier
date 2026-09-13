@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
+import { BatchAiCategoryDialog } from "./BatchAiCategoryDialog";
 import { BatchCategoryDialog } from "./BatchCategoryDialog";
 import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
 import { LedgerEntriesActions } from "./LedgerEntriesActions";
@@ -28,6 +29,19 @@ export interface LedgerEntriesBatchActionToolbarProps {
   onSplit?: () => void;
   onDelete?: () => void;
   isDeleting?: boolean;
+  /** A reclassification run for this ledger is in flight. */
+  isReclassifying?: boolean;
+  /** Opens the candidate picker; the chosen set is owned by the caller, because
+   * the run itself outlives this band. */
+  onOpenAiCategory?: () => void;
+  aiCategoryDialogOpen?: boolean;
+  onAiCategoryDialogOpenChange?: (open: boolean) => void;
+  aiCategorySelection?: readonly string[];
+  onToggleAiCategory?: (categoryId: string, selected: boolean) => void;
+  /** The captured selection no longer matches the live one. */
+  aiCategorySelectionChanged?: boolean;
+  onStartAiCategory?: () => void;
+  isStartingAiCategory?: boolean;
   isProcessing?: boolean;
   className?: string;
 }
@@ -68,6 +82,15 @@ export function LedgerEntriesBatchActionToolbar({
   onSplit,
   onDelete,
   isDeleting = false,
+  isReclassifying = false,
+  onOpenAiCategory,
+  aiCategoryDialogOpen = false,
+  onAiCategoryDialogOpenChange,
+  aiCategorySelection = [],
+  onToggleAiCategory,
+  aiCategorySelectionChanged = false,
+  onStartAiCategory,
+  isStartingAiCategory = false,
   isProcessing: externallyProcessing = false,
   className,
 }: LedgerEntriesBatchActionToolbarProps) {
@@ -81,7 +104,8 @@ export function LedgerEntriesBatchActionToolbar({
 
   const isChangingCategory = isChangingCategoryProp ?? internalChangingCategory;
   const isChangingCurrency = isChangingCurrencyProp ?? internalChangingCurrency;
-  const isProcessing = isChangingCategory || isChangingCurrency || externallyProcessing;
+  const isProcessing =
+    isChangingCategory || isChangingCurrency || isReclassifying || externallyProcessing;
   // Nothing selected means nothing to act on; keeping the buttons visible but
   // unavailable says what the mode offers without a layout shift on first tap.
   const actionsDisabled = isProcessing || selectedCount === 0;
@@ -98,7 +122,8 @@ export function LedgerEntriesBatchActionToolbar({
     onChangeDate != null ||
     onRetry != null ||
     onSplit != null ||
-    onDelete != null;
+    onDelete != null ||
+    onOpenAiCategory != null;
 
   const handleChangeCategory = useCallback(
     async (categoryId: string | null) => {
@@ -169,9 +194,11 @@ export function LedgerEntriesBatchActionToolbar({
             isChangingCurrency={isChangingCurrency}
             isRetrying={isRetrying}
             isDeleting={isDeleting}
+            isReclassifying={isReclassifying}
             {...(onChangeCategory != null
               ? { onOpenCategory: () => setCategoryDialogOpen(true) }
               : {})}
+            {...(onOpenAiCategory != null ? { onOpenAiCategory } : {})}
             {...(onChangeCurrency != null
               ? { onOpenCurrency: () => setCurrencyDialogOpen(true) }
               : {})}
@@ -197,6 +224,19 @@ export function LedgerEntriesBatchActionToolbar({
           onOpenChange={setCurrencyDialogOpen}
           preferredCurrencies={preferredCurrencies}
           onSelect={(currency) => void handleChangeCurrency(currency)}
+        />
+      ) : null}
+      {onOpenAiCategory != null && onToggleAiCategory != null && onStartAiCategory != null ? (
+        <BatchAiCategoryDialog
+          open={aiCategoryDialogOpen}
+          onOpenChange={(open) => onAiCategoryDialogOpenChange?.(open)}
+          categories={categories}
+          selectedCount={selectedCount}
+          selectedCategoryIds={aiCategorySelection}
+          onToggleCategory={onToggleAiCategory}
+          selectionChanged={aiCategorySelectionChanged}
+          isStarting={isStartingAiCategory}
+          onStart={onStartAiCategory}
         />
       ) : null}
     </div>

@@ -17,6 +17,8 @@ import {
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { getLedgerEntryAction } from "@/modules/ledger/server/get-entry";
+import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
+import { scheduleCategoryReclassificationRecoveryAfter } from "@/application/processing/schedule-category-reclassification";
 import {
   parseLedgerStatsQuery,
   parseListLedgerEntriesInput,
@@ -27,7 +29,17 @@ import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
 const requestSchema = z
   .object({
-    query: z.enum(["detail", "stream", "total", "refresh", "entries", "entry", "summary", "stats"]),
+    query: z.enum([
+      "detail",
+      "stream",
+      "total",
+      "refresh",
+      "entries",
+      "entry",
+      "summary",
+      "stats",
+      "reclassification",
+    ]),
     args: z.array(z.unknown()).min(1).max(2),
   })
   .strict();
@@ -92,6 +104,13 @@ export async function POST(request: Request) {
           break;
         case "summary":
           result = await getLedgerStatsAction(ledgerId, parseLedgerStatsQuery(input ?? {}));
+          break;
+        case "reclassification":
+          result = await getCategoryReclassificationJobAction(ledgerId);
+          // This poll is the recovery trigger: a run whose after() callback
+          // died is restarted on the next poll instead of waiting for the
+          // periodic drain.
+          scheduleCategoryReclassificationRecoveryAfter(ledgerId);
           break;
       }
     }

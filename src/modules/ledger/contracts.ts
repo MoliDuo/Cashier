@@ -73,6 +73,37 @@ export interface ApplyCategoryPresetInput {
   mappings: { fromCategoryId: string; toPresetIndex: number | null }[];
 }
 
+export interface StartCategoryReclassificationInput {
+  ledgerEntryIds: string[];
+  candidateCategoryIds: string[];
+}
+
+export type CategoryReclassificationStatus = "pending" | "running" | "succeeded" | "failed";
+
+/**
+ * A reclassification run as the client sees it. The entry and category id
+ * arrays stay on the server; the counts and the derived `undecided` are all
+ * the progress display needs.
+ */
+export interface CategoryReclassificationJobDto {
+  id: string;
+  status: CategoryReclassificationStatus;
+  /** How many entries the run covers. */
+  total: number;
+  cursor: number;
+  /** Entries the model actually moved. */
+  appliedCount: number;
+  /** Entries the model placed in the category they already had. */
+  confirmedCount: number;
+  /** `total - appliedCount - confirmedCount`. */
+  undecidedCount: number;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export type CategoryReclassificationJob = CategoryReclassificationJobDto;
+
 export type SourceDocumentReferenceDto = {
   id: string;
   version: number;
