@@ -114,19 +114,18 @@ export function SourceDocumentCameraPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span {...(isFull ? { title: messages.limitReached } : {})}>
-          <Button
-            type="button"
-            size="sm"
-            onClick={onCapture}
-            disabled={!isReady || isFull || isBusy}
-            aria-label={messages.capture}
-          >
-            <Camera className="h-4 w-4" />
-            {messages.capture}
-          </Button>
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCollapse}
+          aria-label={messages.collapse}
+          title={messages.collapse}
+        >
+          <ChevronUp className="h-4 w-4" />
+          {messages.collapse}
+        </Button>
         {canSwitch ? (
           <Button
             type="button"
@@ -139,18 +138,18 @@ export function SourceDocumentCameraPanel({
             {messages.switchCamera}
           </Button>
         ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onCollapse}
-          aria-label={messages.collapse}
-          title={messages.collapse}
-          className="ml-auto"
-        >
-          <ChevronUp className="h-4 w-4" />
-          {messages.collapse}
-        </Button>
+        <span {...(isFull ? { title: messages.limitReached } : {})}>
+          <Button
+            type="button"
+            size="sm"
+            onClick={onCapture}
+            disabled={!isReady || isFull || isBusy}
+            aria-label={messages.capture}
+          >
+            <Camera className="h-4 w-4" />
+            {messages.capture}
+          </Button>
+        </span>
       </div>
     </div>
   );
