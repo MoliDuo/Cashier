@@ -1,4 +1,4 @@
-import { Calendar, DollarSign, RefreshCw, Scissors, Sparkles, Tag, Trash2 } from "lucide-react";
+import { Calendar, DollarSign, RefreshCw, Scissors, Tag, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { BatchActionButton } from "@/components/batch-action-button";
 
@@ -10,12 +10,11 @@ interface LedgerEntriesActionsProps {
   isChangingCurrency?: boolean;
   isRetrying?: boolean;
   isDeleting?: boolean;
+  /** An AI classification run for this ledger is in flight. */
   isReclassifying?: boolean;
-  /** Opens the dialog that picks a category; the choice itself belongs to the
-   * band, which owns the list. */
+  /** Opens the dialog that decides the category: one pick sets it, several ask
+   * the model. The choice itself belongs to the band, which owns the list. */
   onOpenCategory?: () => void;
-  /** Opens the dialog that picks which categories the model may choose from. */
-  onOpenAiCategory?: () => void;
   onOpenCurrency?: () => void;
   onChangeDate?: () => void;
   onRetry?: () => void;
@@ -24,13 +23,17 @@ interface LedgerEntriesActionsProps {
 }
 
 /**
- * The batch action row, in one order everywhere: category, AI category, date,
- * split, retry, currency, delete. A surface renders only the actions its
- * entities support, so the subsets still line up — every view puts delete last.
+ * The batch action row, in one order everywhere: category, date, split, retry,
+ * currency, delete. A surface renders only the actions its entities support, so
+ * the subsets still line up — every view puts delete last.
  *
  * Every action opens something: a dialog for the four that pick a value, a
  * confirm for the two that write. Nothing here is a menu, so nothing here
  * carries a chevron.
+ *
+ * Category is one button whether the answer is the user's or the model's —
+ * which of the two it turns out to be is decided inside the dialog, by how many
+ * categories are picked.
  */
 export function LedgerEntriesActions({
   disabled,
@@ -40,7 +43,6 @@ export function LedgerEntriesActions({
   isDeleting = false,
   isReclassifying = false,
   onOpenCategory,
-  onOpenAiCategory,
   onOpenCurrency,
   onChangeDate,
   onRetry,
@@ -56,24 +58,11 @@ export function LedgerEntriesActions({
           variant="outline"
           icon={Tag}
           disabled={disabled}
-          loading={isChangingCategory}
+          loading={isChangingCategory || isReclassifying}
           shortLabel={t("manualCategoryShort")}
           onClick={onOpenCategory}
         >
           {t("manualCategory")}
-        </BatchActionButton>
-      )}
-
-      {onOpenAiCategory != null && (
-        <BatchActionButton
-          variant="outline"
-          icon={Sparkles}
-          disabled={disabled}
-          loading={isReclassifying}
-          shortLabel={t("aiCategoryShort")}
-          onClick={onOpenAiCategory}
-        >
-          {t("aiCategory")}
         </BatchActionButton>
       )}
 

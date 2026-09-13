@@ -18,6 +18,7 @@ import {
   previewBatchLedgerEntryDateAction,
 } from "@/modules/ledger/server-actions/entries";
 import { startCategoryReclassificationAction } from "@/modules/ledger/server-actions/reclassification";
+import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
 import type { CategoryReclassificationJob, LedgerEntry } from "@/modules/ledger/contracts";
 import type { VersionedTarget } from "@/modules/source-document/contracts";
 import { unwrapAtomicBatchCommandResult } from "@/modules/source-document/command-results";
@@ -102,12 +103,13 @@ export function useDetailsBatchController(
       dateSelectionSnapshot.entryIds.some((id, index) => id !== selection.selectedIds[index]));
 
   const queryClient = useQueryClient();
-  const [aiCategoryDialogOpen, setAiCategoryDialogOpen] = useState(false);
-  const [aiCategorySelection, setAiCategorySelection] = useState<string[]>([]);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [pickedCategoryIds, setPickedCategoryIds] = useState<string[]>([]);
+  const [clearCategoryPicked, setClearCategoryPicked] = useState(false);
   // Captured when the dialog opens. There is no server preview to ask for, so
   // the task row's `ledgerEntryIds` is the authority from the moment it is
   // written; the snapshot only has to survive the trip from open to confirm.
-  const [aiCategorySnapshot, setAiCategorySnapshot] = useState<string[] | null>(null);
+  const [categorySnapshot, setCategorySnapshot] = useState<string[] | null>(null);
   const announcedJobRef = useRef<string | null>(null);
   const announcedJobsRef = useRef(new Set<string>());
 
@@ -128,8 +130,8 @@ export function useDetailsBatchController(
   const reclassificationJob = reclassification.data ?? null;
   const isReclassifying =
     reclassificationJob != null && isReclassificationActive(reclassificationJob);
-  const aiCategorySelectionChanged =
-    aiCategorySnapshot != null && !selectionMatches(aiCategorySnapshot, selection.selectedIds);
+  const categorySelectionChanged =
+    categorySnapshot != null && !selectionMatches(categorySnapshot, selection.selectedIds);
 
   // Announce a finished run only if this client watched it run. A terminal job
   // left over from an earlier visit is history, not news — but a run this page
@@ -157,26 +159,35 @@ export function useDetailsBatchController(
     toast.error(tBatch("aiCategoryFailed"));
   }, [reclassificationJob, isReclassifying, ledgerId, queryClient, tBatch]);
 
-  const openAiCategoryDialog = useCallback(() => {
-    setAiCategorySnapshot([...selection.selectedIds]);
-    setAiCategorySelection([]);
-    setAiCategoryDialogOpen(true);
-  }, [selection.selectedIds]);
-  const setAiCategoryDialogVisibility = useCallback((open: boolean) => {
-    setAiCategoryDialogOpen(open);
-    if (!open) {
-      setAiCategorySnapshot(null);
-      setAiCategorySelection([]);
+  // Opening captures the selection: there is no server preview to ask for, so
+  // the task row's `ledgerEntryIds` is the authority from the moment it is
+  // written, and the snapshot only has to survive the trip from open to
+  // confirm. Closing drops the picks with it.
+  const setCategoryDialogVisibility = useCallback(
+    (open: boolean) => {
+      setCategoryDialogOpen(open);
+      setCategorySnapshot(open ? [...selection.selectedIds] : null);
+      setPickedCategoryIds([]);
+      setClearCategoryPicked(false);
+    },
+    [selection.selectedIds]
+  );
+  // Clearing is exclusive: "no category" is not one more candidate to weigh
+  // against the others, it is the other answer to the same question.
+  const toggleCategoryPick = useCallback((categoryId: string | null, picked: boolean) => {
+    if (categoryId == null) {
+      setClearCategoryPicked(picked);
+      if (picked) setPickedCategoryIds([]);
+      return;
     }
-  }, []);
-  const toggleAiCategory = useCallback((categoryId: string, selected: boolean) => {
-    setAiCategorySelection((current) =>
-      selected
+    setPickedCategoryIds((current) =>
+      picked
         ? current.includes(categoryId)
           ? current
           : [...current, categoryId]
         : current.filter((id) => id !== categoryId)
     );
+    if (picked) setClearCategoryPicked(false);
   }, []);
 
   const startAiCategory = useLedgerMutation<
@@ -193,7 +204,7 @@ export function useDetailsBatchController(
       announcedJobRef.current = job.id;
       toast.success(tBatch("aiCategoryRunning"));
       selection.clearSelection();
-      setAiCategoryDialogVisibility(false);
+      setCategoryDialogVisibility(false);
       void queryClient.invalidateQueries({
         queryKey: queryKeys.categoryReclassification(ledgerId),
       });
@@ -204,21 +215,6 @@ export function useDetailsBatchController(
       }
     },
   });
-  const confirmAiCategory = useCallback(() => {
-    const snapshot = aiCategorySnapshot;
-    if (
-      snapshot == null ||
-      snapshot.length === 0 ||
-      !selectionMatches(snapshot, selection.selectedIds)
-    ) {
-      toast.error(tBatch("selectionMoved"));
-      return;
-    }
-    startAiCategory.mutate({
-      ledgerEntryIds: snapshot,
-      candidateCategoryIds: aiCategorySelection,
-    });
-  }, [aiCategorySelection, aiCategorySnapshot, selection.selectedIds, startAiCategory, tBatch]);
 
   useEffect(() => {
     document.documentElement.dataset.batchSelection = String(selection.isSelectionMode);
@@ -250,6 +246,51 @@ export function useDetailsBatchController(
       selection.clearSelection();
     },
   });
+  /**
+   * One pick is the user's own answer and is written directly; several are a
+   * question for the model. Which of the two it is comes from the same resolver
+   * the dialog's summary reads, so the button cannot promise one thing and do
+   * another.
+   *
+   * The manual write leaves the dialog open when it fails — the pick is still
+   * on screen to retry — while the run closes it, because the run outlives the
+   * dialog and reports itself.
+   */
+  const confirmCategory = useCallback(() => {
+    const snapshot = categorySnapshot;
+    if (snapshot == null || snapshot.length === 0) return;
+    if (!selectionMatches(snapshot, selection.selectedIds)) {
+      toast.error(tBatch("selectionMoved"));
+      return;
+    }
+
+    const pick = resolveBatchCategoryPick({
+      categoryIds: pickedCategoryIds,
+      clearPicked: clearCategoryPicked,
+    });
+    if (pick.kind === "clear" || pick.kind === "assign") {
+      void update.mutateAsync({ categoryId: pick.kind === "clear" ? null : pick.categoryId }).then(
+        () => setCategoryDialogVisibility(false),
+        () => undefined
+      );
+      return;
+    }
+    if (pick.kind === "ai") {
+      startAiCategory.mutate({
+        ledgerEntryIds: snapshot,
+        candidateCategoryIds: [...pick.categoryIds],
+      });
+    }
+  }, [
+    categorySnapshot,
+    clearCategoryPicked,
+    pickedCategoryIds,
+    selection.selectedIds,
+    setCategoryDialogVisibility,
+    startAiCategory,
+    tBatch,
+    update,
+  ]);
   const remove = useLedgerMutation<
     Awaited<ReturnType<typeof batchDeleteLedgerEntriesAction>>,
     void
@@ -344,16 +385,17 @@ export function useDetailsBatchController(
     remove,
     previewDate,
     updateDates,
-    aiCategoryDialogOpen,
-    openAiCategoryDialog,
-    setAiCategoryDialogOpen: setAiCategoryDialogVisibility,
-    aiCategorySelection,
-    toggleAiCategory,
-    aiCategorySelectionChanged,
-    confirmAiCategory,
+    categoryDialogOpen,
+    setCategoryDialogOpen: setCategoryDialogVisibility,
+    pickedCategoryIds,
+    clearCategoryPicked,
+    toggleCategoryPick,
+    categorySelectionChanged,
+    confirmCategory,
     startAiCategory,
     reclassificationJob,
     isReclassifying,
+    isConfirmingCategory: update.isPending || startAiCategory.isPending,
     isPending:
       update.isPending ||
       remove.isPending ||

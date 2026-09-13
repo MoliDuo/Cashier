@@ -6,9 +6,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
-import { BatchAiCategoryDialog } from "./BatchAiCategoryDialog";
 import { BatchCategoryDialog } from "./BatchCategoryDialog";
 import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
+import { BatchSetCategoryDialog } from "./BatchSetCategoryDialog";
 import { LedgerEntriesActions } from "./LedgerEntriesActions";
 
 export interface LedgerEntriesBatchActionToolbarProps {
@@ -29,19 +29,24 @@ export interface LedgerEntriesBatchActionToolbarProps {
   onSplit?: () => void;
   onDelete?: () => void;
   isDeleting?: boolean;
-  /** A reclassification run for this ledger is in flight. */
+  /** A classification run for this ledger is in flight. */
   isReclassifying?: boolean;
-  /** Opens the candidate picker; the chosen set is owned by the caller, because
-   * the run itself outlives this band. */
-  onOpenAiCategory?: () => void;
-  aiCategoryDialogOpen?: boolean;
-  onAiCategoryDialogOpenChange?: (open: boolean) => void;
-  aiCategorySelection?: readonly string[];
-  onToggleAiCategory?: (categoryId: string, selected: boolean) => void;
+  /**
+   * Passing this switches the category dialog from "the row you tap is applied"
+   * to the confirm-based one, where several picks are a question for the model.
+   * The caller owns that dialog's state, because the run it can start outlives
+   * this band.
+   */
+  onConfirmCategory?: () => void;
+  categoryDialogOpen?: boolean;
+  onCategoryDialogOpenChange?: (open: boolean) => void;
+  pickedCategoryIds?: readonly string[];
+  /** The clear row is picked. */
+  clearCategoryPicked?: boolean;
+  onToggleCategoryPick?: (categoryId: string | null, picked: boolean) => void;
   /** The captured selection no longer matches the live one. */
-  aiCategorySelectionChanged?: boolean;
-  onStartAiCategory?: () => void;
-  isStartingAiCategory?: boolean;
+  categorySelectionChanged?: boolean;
+  isConfirmingCategory?: boolean;
   isProcessing?: boolean;
   className?: string;
 }
@@ -83,14 +88,14 @@ export function LedgerEntriesBatchActionToolbar({
   onDelete,
   isDeleting = false,
   isReclassifying = false,
-  onOpenAiCategory,
-  aiCategoryDialogOpen = false,
-  onAiCategoryDialogOpenChange,
-  aiCategorySelection = [],
-  onToggleAiCategory,
-  aiCategorySelectionChanged = false,
-  onStartAiCategory,
-  isStartingAiCategory = false,
+  onConfirmCategory,
+  categoryDialogOpen: categoryDialogOpenProp = false,
+  onCategoryDialogOpenChange,
+  pickedCategoryIds = [],
+  clearCategoryPicked = false,
+  onToggleCategoryPick,
+  categorySelectionChanged = false,
+  isConfirmingCategory = false,
   isProcessing: externallyProcessing = false,
   className,
 }: LedgerEntriesBatchActionToolbarProps) {
@@ -98,14 +103,30 @@ export function LedgerEntriesBatchActionToolbar({
   const [internalChangingCategory, setInternalChangingCategory] = useState(false);
   const [internalChangingCurrency, setInternalChangingCurrency] = useState(false);
   // The band owns both pickers: the choice is one list, and every surface that
-  // renders the band gets the same one without wiring up its own dialog.
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  // renders the band gets the same one without wiring up its own dialog. The
+  // category dialog is the exception — the confirm-based variant is owned by
+  // whichever caller can start a run from it.
+  const [internalCategoryDialogOpen, setInternalCategoryDialogOpen] = useState(false);
   const [currencyDialogOpen, setCurrencyDialogOpen] = useState(false);
+
+  const confirmsCategory = onConfirmCategory != null && onToggleCategoryPick != null;
+  const categoryDialogOpen = confirmsCategory ? categoryDialogOpenProp : internalCategoryDialogOpen;
+  const handleCategoryDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (confirmsCategory) onCategoryDialogOpenChange?.(open);
+      else setInternalCategoryDialogOpen(open);
+    },
+    [confirmsCategory, onCategoryDialogOpenChange]
+  );
 
   const isChangingCategory = isChangingCategoryProp ?? internalChangingCategory;
   const isChangingCurrency = isChangingCurrencyProp ?? internalChangingCurrency;
   const isProcessing =
-    isChangingCategory || isChangingCurrency || isReclassifying || externallyProcessing;
+    isChangingCategory ||
+    isChangingCurrency ||
+    isReclassifying ||
+    isConfirmingCategory ||
+    externallyProcessing;
   // Nothing selected means nothing to act on; keeping the buttons visible but
   // unavailable says what the mode offers without a layout shift on first tap.
   const actionsDisabled = isProcessing || selectedCount === 0;
@@ -122,8 +143,7 @@ export function LedgerEntriesBatchActionToolbar({
     onChangeDate != null ||
     onRetry != null ||
     onSplit != null ||
-    onDelete != null ||
-    onOpenAiCategory != null;
+    onDelete != null;
 
   const handleChangeCategory = useCallback(
     async (categoryId: string | null) => {
@@ -196,9 +216,8 @@ export function LedgerEntriesBatchActionToolbar({
             isDeleting={isDeleting}
             isReclassifying={isReclassifying}
             {...(onChangeCategory != null
-              ? { onOpenCategory: () => setCategoryDialogOpen(true) }
+              ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
               : {})}
-            {...(onOpenAiCategory != null ? { onOpenAiCategory } : {})}
             {...(onChangeCurrency != null
               ? { onOpenCurrency: () => setCurrencyDialogOpen(true) }
               : {})}
@@ -210,10 +229,24 @@ export function LedgerEntriesBatchActionToolbar({
         </div>
       ) : null}
 
-      {onChangeCategory != null ? (
+      {onChangeCategory != null && confirmsCategory ? (
+        <BatchSetCategoryDialog
+          open={categoryDialogOpen}
+          onOpenChange={handleCategoryDialogOpenChange}
+          categories={categories}
+          selectedCount={selectedCount}
+          pickedCategoryIds={pickedCategoryIds}
+          clearPicked={clearCategoryPicked}
+          onTogglePick={onToggleCategoryPick}
+          selectionChanged={categorySelectionChanged}
+          isConfirming={isConfirmingCategory}
+          onConfirm={onConfirmCategory}
+        />
+      ) : null}
+      {onChangeCategory != null && !confirmsCategory ? (
         <BatchCategoryDialog
           open={categoryDialogOpen}
-          onOpenChange={setCategoryDialogOpen}
+          onOpenChange={handleCategoryDialogOpenChange}
           categories={categories}
           onSelect={(categoryId) => void handleChangeCategory(categoryId)}
         />
@@ -224,19 +257,6 @@ export function LedgerEntriesBatchActionToolbar({
           onOpenChange={setCurrencyDialogOpen}
           preferredCurrencies={preferredCurrencies}
           onSelect={(currency) => void handleChangeCurrency(currency)}
-        />
-      ) : null}
-      {onOpenAiCategory != null && onToggleAiCategory != null && onStartAiCategory != null ? (
-        <BatchAiCategoryDialog
-          open={aiCategoryDialogOpen}
-          onOpenChange={(open) => onAiCategoryDialogOpenChange?.(open)}
-          categories={categories}
-          selectedCount={selectedCount}
-          selectedCategoryIds={aiCategorySelection}
-          onToggleCategory={onToggleAiCategory}
-          selectionChanged={aiCategorySelectionChanged}
-          isStarting={isStartingAiCategory}
-          onStart={onStartAiCategory}
         />
       ) : null}
     </div>

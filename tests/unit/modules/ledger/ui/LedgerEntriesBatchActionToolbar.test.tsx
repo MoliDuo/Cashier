@@ -148,57 +148,126 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(onChangeCurrency).toHaveBeenCalledWith("SGD");
   });
 
-  it("opens the AI candidate picker and holds the button until two are chosen", async () => {
-    const onStartAiCategory = vi.fn();
-    const onToggleAiCategory = vi.fn();
+  it("opens the confirm-based category dialog from the one category button", async () => {
+    const onCategoryDialogOpenChange = vi.fn();
+    renderToolbar({
+      selectedCount: 1,
+      categories: [dining],
+      onChangeCategory: vi.fn(),
+      onConfirmCategory: vi.fn(),
+      onToggleCategoryPick: vi.fn(),
+      onCategoryDialogOpenChange,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /指定分类/ }));
+
+    expect(onCategoryDialogOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it("holds the confirm until a category is picked, then names what it will do", () => {
+    const { props, rerender } = renderToolbar({
+      selectedCount: 5,
+      categories: [dining],
+      onChangeCategory: vi.fn(),
+      onConfirmCategory: vi.fn(),
+      onToggleCategoryPick: vi.fn(),
+      categoryDialogOpen: true,
+      pickedCategoryIds: [],
+    });
+
+    expect(screen.getByRole("button", { name: "确认" })).toBeDisabled();
+
+    rerender(<LedgerEntriesBatchActionToolbar {...props} pickedCategoryIds={["category-1"]} />);
+
+    expect(screen.getByText(/将 5 条明细指定为「餐饮」/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认" })).toBeEnabled();
+  });
+
+  it("turns several picks into the model's question, and refuses more than eight", () => {
+    const props = {
+      selectedCount: 5,
+      isAllSelected: false,
+      onSelectAll: vi.fn(),
+      onClearSelection: vi.fn(),
+      categories: [dining],
+      onChangeCategory: vi.fn(),
+      onConfirmCategory: vi.fn(),
+      onToggleCategoryPick: vi.fn(),
+      categoryDialogOpen: true,
+    };
+    const { rerender } = render(
+      <LedgerEntriesBatchActionToolbar
+        {...props}
+        pickedCategoryIds={["category-1", "category-2"]}
+      />
+    );
+
+    expect(screen.getByText(/AI 将在已选的 2 个分类里逐条判断/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认" })).toBeEnabled();
+
+    rerender(
+      <LedgerEntriesBatchActionToolbar
+        {...props}
+        pickedCategoryIds={["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"]}
+      />
+    );
+
+    expect(screen.getByText(/最多选择 8 个分类/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认" })).toBeDisabled();
+  });
+
+  it("makes the clear row a pick of its own, against every category", () => {
+    const onToggleCategoryPick = vi.fn();
     renderToolbar({
       selectedCount: 5,
       categories: [dining],
-      onOpenAiCategory: vi.fn(),
-      aiCategoryDialogOpen: true,
-      onToggleAiCategory,
-      onStartAiCategory,
-      aiCategorySelection: [],
+      onChangeCategory: vi.fn(),
+      onConfirmCategory: vi.fn(),
+      onToggleCategoryPick,
+      categoryDialogOpen: true,
+      clearCategoryPicked: true,
     });
 
-    const start = screen.getByRole("button", { name: "开始归类" });
-    expect(start).toBeDisabled();
-    expect(screen.getByText("至少选择 2 个候选分类")).toBeInTheDocument();
+    expect(screen.getByText(/将清空 5 条明细的分类/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("checkbox", { name: /餐饮/ }));
-    expect(onToggleAiCategory).toHaveBeenCalledWith("category-1", true);
-    expect(onStartAiCategory).not.toHaveBeenCalled();
+    expect(onToggleCategoryPick).toHaveBeenCalledWith("category-1", true);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "未分类" }));
+    expect(onToggleCategoryPick).toHaveBeenCalledWith(null, false);
   });
 
-  it("starts the run once the candidate set is large enough", () => {
-    const onStartAiCategory = vi.fn();
+  it("confirms the pick the summary promises", () => {
+    const onConfirmCategory = vi.fn();
     renderToolbar({
       selectedCount: 5,
       categories: [dining],
-      onOpenAiCategory: vi.fn(),
-      aiCategoryDialogOpen: true,
-      onToggleAiCategory: vi.fn(),
-      onStartAiCategory,
-      aiCategorySelection: ["category-1", "category-2"],
+      onChangeCategory: vi.fn(),
+      onConfirmCategory,
+      onToggleCategoryPick: vi.fn(),
+      categoryDialogOpen: true,
+      pickedCategoryIds: ["category-1"],
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "开始归类" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认" }));
 
-    expect(onStartAiCategory).toHaveBeenCalledOnce();
+    expect(onConfirmCategory).toHaveBeenCalledOnce();
   });
 
-  it("holds the run when the selection moved under the dialog", () => {
+  it("holds the confirm when the selection moved under the dialog", () => {
     renderToolbar({
       selectedCount: 5,
       categories: [dining],
-      onOpenAiCategory: vi.fn(),
-      aiCategoryDialogOpen: true,
-      onToggleAiCategory: vi.fn(),
-      onStartAiCategory: vi.fn(),
-      aiCategorySelection: ["category-1", "category-2"],
-      aiCategorySelectionChanged: true,
+      onChangeCategory: vi.fn(),
+      onConfirmCategory: vi.fn(),
+      onToggleCategoryPick: vi.fn(),
+      categoryDialogOpen: true,
+      pickedCategoryIds: ["category-1", "category-2"],
+      categorySelectionChanged: true,
     });
 
-    expect(screen.getByRole("button", { name: "开始归类" })).toBeDisabled();
+    expect(screen.getByText(/所选项目已变化/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认" })).toBeDisabled();
   });
 });

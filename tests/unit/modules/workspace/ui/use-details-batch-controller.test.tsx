@@ -359,13 +359,13 @@ describe("useDetailsBatchController", () => {
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
-    act(() => result.current.openAiCategoryDialog());
+    act(() => result.current.setCategoryDialogOpen(true));
     act(() => {
-      result.current.toggleAiCategory("category-1", true);
-      result.current.toggleAiCategory("category-2", true);
+      result.current.toggleCategoryPick("category-1", true);
+      result.current.toggleCategoryPick("category-2", true);
     });
 
-    await act(async () => result.current.confirmAiCategory());
+    await act(async () => result.current.confirmCategory());
     await act(async () => Promise.resolve());
 
     expect(startCategoryReclassificationActionMock).toHaveBeenCalledWith("ledger-1", {
@@ -373,8 +373,69 @@ describe("useDetailsBatchController", () => {
       candidateCategoryIds: ["category-1", "category-2"],
     });
     expect(result.current.selectedIds).toEqual([]);
-    expect(result.current.aiCategoryDialogOpen).toBe(false);
+    expect(result.current.categoryDialogOpen).toBe(false);
     expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryRunning");
+  });
+
+  it("writes one picked category straight through instead of asking the model", async () => {
+    const { wrapper } = setup();
+    batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
+      ok: true,
+      versions: [{ sourceDocumentId: "document-1", version: 2 }],
+      data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
+    });
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => result.current.toggleCategoryPick("category-1", true));
+
+    await act(async () => result.current.confirmCategory());
+    await act(async () => Promise.resolve());
+
+    expect(batchUpdateLedgerEntriesActionMock).toHaveBeenCalledWith(
+      "ledger-1",
+      expect.anything(),
+      ["entry-1"],
+      { categoryId: "category-1" }
+    );
+    expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
+    expect(result.current.categoryDialogOpen).toBe(false);
+  });
+
+  it("takes the clear row as an answer, and drops the categories it excluded", async () => {
+    const { wrapper } = setup();
+    batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
+      ok: true,
+      versions: [{ sourceDocumentId: "document-1", version: 2 }],
+      data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
+    });
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => {
+      result.current.toggleCategoryPick("category-1", true);
+      result.current.toggleCategoryPick(null, true);
+    });
+
+    expect(result.current.pickedCategoryIds).toEqual([]);
+    expect(result.current.clearCategoryPicked).toBe(true);
+
+    await act(async () => result.current.confirmCategory());
+    await act(async () => Promise.resolve());
+
+    expect(batchUpdateLedgerEntriesActionMock).toHaveBeenCalledWith(
+      "ledger-1",
+      expect.anything(),
+      ["entry-1"],
+      { categoryId: null }
+    );
+    expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
   });
 
   it("refuses to start when the selection moved under the dialog", async () => {
@@ -385,15 +446,16 @@ describe("useDetailsBatchController", () => {
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
-    act(() => result.current.openAiCategoryDialog());
-    act(() => result.current.toggleAiCategory("category-1", true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => result.current.toggleCategoryPick("category-1", true));
     // The dialog is still open but the selection behind it changed.
     act(() => result.current.handleSelect("entry-2", true));
 
-    await act(async () => result.current.confirmAiCategory());
+    await act(async () => result.current.confirmCategory());
 
-    expect(result.current.aiCategorySelectionChanged).toBe(true);
+    expect(result.current.categorySelectionChanged).toBe(true);
     expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
+    expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
   });
 
