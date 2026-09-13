@@ -127,6 +127,15 @@ export function SourceDocumentInputView({
         </p>
       ) : null}
 
+      <DateFilter
+        value={entryDate}
+        onChange={(date) => onEntryDateChange(date ?? new Date())}
+        placeholder={messages.entryDate}
+        size="sm"
+        className="w-full"
+        disabled={isPending}
+      />
+
       {isCameraAvailable ? (
         <SourceDocumentCameraPanel
           videoRef={camera.videoRef}
@@ -185,15 +194,6 @@ export function SourceDocumentInputView({
         className="resize-none"
         rows={5}
         autoFocus={!showsViewfinder}
-        disabled={isPending}
-      />
-
-      <DateFilter
-        value={entryDate}
-        onChange={(date) => onEntryDateChange(date ?? new Date())}
-        placeholder={messages.entryDate}
-        size="sm"
-        className="w-full"
         disabled={isPending}
       />
 

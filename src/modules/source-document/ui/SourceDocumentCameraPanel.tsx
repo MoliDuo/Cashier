@@ -36,7 +36,7 @@ interface SourceDocumentCameraPanelProps {
 }
 
 /**
- * The in-form viewfinder: a small live box, a shutter, and a way out of it.
+ * The in-form viewfinder: a full-width live box, then one row of controls.
  *
  * `unsupported` renders nothing at all — an embedded browser that has no camera
  * API should leave the form looking exactly as it did before, with the album
@@ -84,8 +84,8 @@ export function SourceDocumentCameraPanel({
   const isFull = remaining <= 0;
 
   return (
-    <div role="group" aria-label={messages.preview} className="flex items-start gap-3">
-      <div className="relative aspect-[4/3] w-36 shrink-0 overflow-hidden rounded-md border border-border bg-surface2">
+    <div role="group" aria-label={messages.preview} className="space-y-2">
+      <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-surface2">
         <video
           ref={videoRef}
           autoPlay
@@ -106,31 +106,19 @@ export function SourceDocumentCameraPanel({
         )}
       </div>
 
-      <div className="flex min-w-0 flex-col items-start gap-2">
-        <div className="flex items-center gap-1">
-          <span {...(isFull ? { title: messages.limitReached } : {})}>
-            <Button
-              type="button"
-              size="sm"
-              onClick={onCapture}
-              disabled={!isReady || isFull || isBusy}
-              aria-label={messages.capture}
-            >
-              <Camera className="h-4 w-4" />
-              {messages.capture}
-            </Button>
-          </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span {...(isFull ? { title: messages.limitReached } : {})}>
           <Button
             type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={onCollapse}
-            aria-label={messages.collapse}
-            title={messages.collapse}
+            size="sm"
+            onClick={onCapture}
+            disabled={!isReady || isFull || isBusy}
+            aria-label={messages.capture}
           >
-            <ChevronUp className="h-4 w-4" />
+            <Camera className="h-4 w-4" />
+            {messages.capture}
           </Button>
-        </div>
+        </span>
         {canSwitch ? (
           <Button
             type="button"
@@ -143,6 +131,18 @@ export function SourceDocumentCameraPanel({
             {messages.switchCamera}
           </Button>
         ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCollapse}
+          aria-label={messages.collapse}
+          title={messages.collapse}
+          className="ml-auto"
+        >
+          <ChevronUp className="h-4 w-4" />
+          {messages.collapse}
+        </Button>
       </div>
     </div>
   );
