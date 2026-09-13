@@ -52,6 +52,21 @@ describe("EntriesToolbarShell", () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it("spins while a refresh is running rather than naming the wait", () => {
+    render(
+      <EntriesToolbarShell onRefresh={vi.fn()} isRefreshing>
+        {null}
+      </EntriesToolbarShell>
+    );
+
+    const hint = screen.getByTestId("toolbar-refresh-hint");
+    expect(hint.querySelector("svg")).toHaveClass("animate-spin");
+    expect(hint).not.toHaveTextContent("refreshHint");
+    // The label stays for whoever cannot see the spinner, and keeps the control
+    // reachable by its name.
+    expect(screen.getByRole("button", { name: "refreshing" })).toBe(hint);
+  });
+
   it("reports a failed refresh and ignores one that is already running", async () => {
     const onRefresh = vi.fn().mockRejectedValue(new Error("offline"));
     const { rerender } = render(

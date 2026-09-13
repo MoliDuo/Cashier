@@ -1,4 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
+import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AmountText } from "@/modules/currency/ui/amount-text";
@@ -87,16 +88,26 @@ export function EntriesToolbarShell({
         // Doubling as the trigger keeps the refresh reachable by keyboard, which
         // clicking the box is not. Centred on the box rather than between the
         // controls, because it names a gesture the whole box answers to;
-        // nothing in the row grows, so the middle is always free.
+        // nothing in the row grows, so the middle is always free. While the
+        // refetch runs it spins, the way the refresh button on the other tabs
+        // does; the label stays for screen readers.
         <button
           type="button"
           data-testid="toolbar-refresh-hint"
           onClick={() => void refresh()}
           disabled={isRefreshing}
           title={t("refresh")}
-          className="absolute left-1/2 top-1/2 shrink-0 -translate-x-1/2 -translate-y-1/2 select-none rounded-sm px-0.5 text-micro text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+          aria-busy={isRefreshing || undefined}
+          className="absolute left-1/2 top-1/2 flex shrink-0 -translate-x-1/2 -translate-y-1/2 select-none items-center gap-1.5 rounded-sm px-0.5 text-micro text-muted-foreground/60 transition-colors hover:text-muted-foreground"
         >
-          {isRefreshing ? t("refreshing") : t("refreshHint")}
+          {isRefreshing ? (
+            <>
+              <RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin" />
+              <span className="sr-only">{t("refreshing")}</span>
+            </>
+          ) : (
+            t("refreshHint")
+          )}
         </button>
       ) : null}
       {rangeLabel != null || (totalLabel != null && totalLabel !== "") ? (
