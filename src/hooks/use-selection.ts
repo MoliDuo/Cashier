@@ -16,6 +16,8 @@ interface UseSelectionReturn {
   selectedCount: number;
   handleSelect: (id: string, selected: boolean) => void;
   handleSelectAll: (selected: boolean) => void;
+  /** Adds or removes a subset — a day's rows — in one update. */
+  handleSelectMany: (ids: readonly string[], selected: boolean) => void;
   toggleSelectionMode: () => void;
   clearSelection: () => void;
   exitSelectionMode: () => void;
@@ -92,6 +94,30 @@ export function useSelection({
       }));
     },
     [queryFingerprint, uniqueAllIds]
+  );
+
+  const handleSelectMany = useCallback(
+    (ids: readonly string[], selected: boolean) => {
+      setSelection((current) => {
+        const selectedIds = intersectSelection(
+          current.queryFingerprint === queryFingerprint ? current.selectedIds : [],
+          uniqueAllIdSet
+        );
+        const affected = new Set(ids.filter((id) => uniqueAllIdSet.has(id)));
+        const nextIds = selected
+          ? [...selectedIds, ...[...affected].filter((id) => !selectedIds.includes(id))].slice(
+              0,
+              MAX_BATCH_SIZE
+            )
+          : selectedIds.filter((id) => !affected.has(id));
+        return {
+          queryFingerprint,
+          selectedIds: nextIds,
+          isSelectionMode: current.queryFingerprint === queryFingerprint && current.isSelectionMode,
+        };
+      });
+    },
+    [queryFingerprint, uniqueAllIdSet]
   );
 
   const toggleSelectionMode = useCallback(() => {
@@ -250,6 +276,7 @@ export function useSelection({
     selectedCount,
     handleSelect,
     handleSelectAll,
+    handleSelectMany,
     toggleSelectionMode,
     clearSelection,
     exitSelectionMode,

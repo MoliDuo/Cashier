@@ -3,11 +3,28 @@ import type { UnifiedStreamGroup } from "@/modules/source-document/stream-groupi
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useStreamListMotion, type StreamListMotionApi } from "../use-stream-list-motion";
-import { UnifiedGroupHeader } from "./group-header";
+import { UnifiedGroupHeader, type UnifiedGroupHeaderSelection } from "./group-header";
 import { StreamItemRow } from "./stream-item-row";
 import type { ControlledRendererProps, RendererProps } from "./types";
 
 const VIRTUALIZATION_THRESHOLD = 80;
+
+/**
+ * A day's own checkbox: the cards it opens, and what the band should do with
+ * them. Absent outside selection mode, where the band is plain text.
+ */
+function groupSelectionFor(
+  group: UnifiedStreamGroup,
+  props: RendererProps
+): UnifiedGroupHeaderSelection | undefined {
+  if (!props.isSelectionMode || props.onSetGroupSelection == null) return undefined;
+  return {
+    ids: group.items.map((item) => item.sourceDocument.id),
+    selectedIdSet: props.selectedIdSet,
+    disabled: props.disableUnselected === true,
+    onSelectMany: props.onSetGroupSelection,
+  };
+}
 
 export function StaticUnifiedGroups(props: RendererProps & { readOnly: true }) {
   return (
@@ -74,12 +91,14 @@ function AnimatedInteractiveGroups(props: ControlledRendererProps) {
   const children: ReactNode[] = [];
 
   for (const dateGroup of props.streamGroups) {
+    const selection = groupSelectionFor(dateGroup, props);
     children.push(
       <UnifiedGroupHeader
         key={`header:${dateGroup.date}`}
         group={dateGroup}
         mainCurrency={props.mainCurrency}
         {...(props.timeZone != null ? { timeZone: props.timeZone } : {})}
+        {...(selection == null ? {} : { selection })}
       />
     );
     for (const item of dateGroup.items) {
@@ -182,6 +201,7 @@ function VirtualizedInteractiveGroups(props: ControlledRendererProps) {
       {virtualizer.getVirtualItems().map((virtualRow) => {
         const row = rows[virtualRow.index];
         if (row == null) return null;
+        const selection = row.kind === "header" ? groupSelectionFor(row.group, props) : undefined;
         return (
           <div
             key={row.key}
@@ -195,6 +215,7 @@ function VirtualizedInteractiveGroups(props: ControlledRendererProps) {
                 group={row.group}
                 mainCurrency={props.mainCurrency}
                 {...(props.timeZone != null ? { timeZone: props.timeZone } : {})}
+                {...(selection == null ? {} : { selection })}
               />
             ) : (
               <div className="px-2 pb-4">

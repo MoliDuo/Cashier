@@ -2,6 +2,8 @@
   "BatchActions": {
     "selectAll": "Select All",
     "deselectAll": "Deselect All",
+    "selectDay": "Select every record on {date}",
+    "deselectDay": "Deselect every record on {date}",
     "manualCategory": "Set Category",
     "manualCategoryShort": "Category",
     "uncategorized": "Uncategorized",

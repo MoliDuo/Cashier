@@ -80,12 +80,18 @@ export function DetailsTabView(props: DetailsTabViewProps) {
   const tFilter = useTranslations("EntryFilterPanel");
   const locale = useLocale();
   const rangeLabel = usePeriodLabel(periodParams, batch.timeZone);
-  const { isPending, toggleSelection } = batch;
+  const { isPending, toggleSelection, handleSelectMany } = batch;
   const handleToggleSelection = useCallback(
     (id: string) => {
       if (!isPending) toggleSelection(id);
     },
     [isPending, toggleSelection]
+  );
+  const handleSetGroupSelection = useCallback(
+    (ids: readonly string[], selected: boolean) => {
+      if (!isPending) handleSelectMany(ids, selected);
+    },
+    [handleSelectMany, isPending]
   );
 
   return (
@@ -177,6 +183,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
             selectedIds={batch.selectedIds}
             disableUnselected={batch.isSelectionLimitReached}
             onToggleSelection={handleToggleSelection}
+            onSetGroupSelection={handleSetGroupSelection}
           />
           {isLoading ? (
             <div className="space-y-4 px-2 animate-pulse" role="status" aria-busy="true">

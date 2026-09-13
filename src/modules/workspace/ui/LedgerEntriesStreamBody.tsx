@@ -28,6 +28,7 @@ interface LedgerEntriesStreamBodyProps {
   selectedIds: string[];
   disableUnselected: boolean;
   onToggleSelection: (id: string) => void;
+  onSetGroupSelection?: (ids: readonly string[], selected: boolean) => void;
   timeZone?: string | undefined;
   collapseEntriesDefault: boolean;
   hasNextPage: boolean;
@@ -60,6 +61,7 @@ export function LedgerEntriesStreamBody({
   selectedIds,
   disableUnselected,
   onToggleSelection,
+  onSetGroupSelection,
   timeZone,
   collapseEntriesDefault,
   hasNextPage,
@@ -94,6 +96,7 @@ export function LedgerEntriesStreamBody({
               selectedIds={selectedIds}
               disableUnselected={disableUnselected}
               onToggleSelection={onToggleSelection}
+              {...(onSetGroupSelection != null ? { onSetGroupSelection } : {})}
               noRecordsText={tCommon("noRecords")}
               getItemProps={getEmptyItemProps}
               {...(timeZone != null ? { timeZone } : {})}

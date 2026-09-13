@@ -48,6 +48,7 @@ export function useLedgerEntriesSelection({
     toggleSelectionMode,
     selectedIds,
     toggleSelection,
+    handleSelectMany,
     selectAll,
     clearSelection,
     retainSelection,
@@ -96,6 +97,13 @@ export function useLedgerEntriesSelection({
     [isBatchPending, toggleSelection]
   );
 
+  const handleSetGroupSelection = useCallback(
+    (ids: readonly string[], selected: boolean) => {
+      if (!isBatchPending) handleSelectMany(ids, selected);
+    },
+    [handleSelectMany, isBatchPending]
+  );
+
   const handleBatchUpdateDates = useCallback(
     (date: string, ids: string[]) => batchUpdateDates.mutate({ ids, entryDate: date }),
     [batchUpdateDates]
@@ -119,6 +127,7 @@ export function useLedgerEntriesSelection({
     isBatchPending,
     handleToggleSelectionMode,
     handleToggleSelection,
+    handleSetGroupSelection,
     handleBatchUpdateDates,
   };
 }

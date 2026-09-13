@@ -19,6 +19,8 @@ export interface UnifiedStreamGroupProps {
   selectedIds: string[];
   disableUnselected?: boolean;
   onToggleSelection: (id: string) => void;
+  /** Selects or clears a whole day at once. Absent where nothing selects. */
+  onSetGroupSelection?: (ids: readonly string[], selected: boolean) => void;
   noRecordsText: string;
   getItemProps: () => Record<string, unknown>;
   timeZone?: string;

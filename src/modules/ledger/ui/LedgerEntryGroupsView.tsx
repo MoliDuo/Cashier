@@ -1,11 +1,11 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { formatCurrencyAmount } from "@/lib/format/currency";
-import { EntryGroupHeader } from "@/components/EntryGroupHeader";
+import { EntryGroupHeader, groupSelectionState } from "@/components/EntryGroupHeader";
 import { LedgerEntryCard } from "./LedgerEntryCard";
 
 interface LedgerEntryGroupsViewProps {
@@ -16,10 +16,12 @@ interface LedgerEntryGroupsViewProps {
   selectedIds?: readonly string[];
   disableUnselected?: boolean;
   onToggleSelection?: (id: string) => void;
+  /** Selects or clears a whole day at once. Absent where nothing selects. */
+  onSetGroupSelection?: (ids: readonly string[], selected: boolean) => void;
 }
 
 type LedgerEntryGroupRow =
-  | { key: string; kind: "header"; title: string; total: string }
+  | { key: string; kind: "header"; title: string; total: string; entryIds: string[] }
   | { key: string; kind: "entry"; entry: LedgerEntry };
 
 const VIRTUALIZATION_THRESHOLD = 40;
@@ -33,6 +35,7 @@ export function flattenLedgerEntryGroups(
       kind: "header" as const,
       title: group.title,
       total: group.total,
+      entryIds: group.items.map((entry) => entry.id),
     },
     ...group.items.map((entry) => ({ key: `entry:${entry.id}`, kind: "entry" as const, entry })),
   ]);
@@ -46,10 +49,32 @@ export function LedgerEntryGroupsView({
   selectedIds = [],
   disableUnselected = false,
   onToggleSelection,
+  onSetGroupSelection,
 }: LedgerEntryGroupsViewProps) {
   const locale = useLocale();
+  const tBatch = useTranslations("BatchActions");
   const rows = useMemo(() => flattenLedgerEntryGroups(groups), [groups]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // The day band is the day's own checkbox while the list is selecting: the box
+  // says how much of the day is in, the whole band is the tap target.
+  const headerSelection = useCallback(
+    (title: string, entryIds: readonly string[]) => {
+      if (!selectionMode || onSetGroupSelection == null) return {};
+      const state = groupSelectionState(entryIds, selectedIdSet);
+      return {
+        selection: {
+          state,
+          disabled: disableUnselected && state === "none",
+          label:
+            state === "all"
+              ? tBatch("deselectDay", { date: title })
+              : tBatch("selectDay", { date: title }),
+          onToggle: () => onSetGroupSelection(entryIds, state !== "all"),
+        },
+      };
+    },
+    [disableUnselected, onSetGroupSelection, selectedIdSet, selectionMode, tBatch]
+  );
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
   const shouldVirtualize = rows.length > VIRTUALIZATION_THRESHOLD;
@@ -77,6 +102,7 @@ export function LedgerEntryGroupsView({
       <EntryGroupHeader
         title={row.title}
         totalLabel={formatCurrencyAmount(row.total, mainCurrency, locale)}
+        {...headerSelection(row.title, row.entryIds)}
       />
     ) : (
       <div className="px-2 pb-4">
@@ -98,6 +124,10 @@ export function LedgerEntryGroupsView({
         <EntryGroupHeader
           title={group.title}
           totalLabel={formatCurrencyAmount(group.total, mainCurrency, locale)}
+          {...headerSelection(
+            group.title,
+            group.items.map((entry) => entry.id)
+          )}
         />
         <div className="space-y-4 px-2">
           {group.items.map((entry) => (

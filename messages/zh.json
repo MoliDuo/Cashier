@@ -63,6 +63,8 @@
   "BatchActions": {
     "selectAll": "全选",
     "deselectAll": "取消全选",
+    "selectDay": "选中{date}的全部记录",
+    "deselectDay": "取消选中{date}的全部记录",
     "manualCategory": "指定分类",
     "manualCategoryShort": "分类",
     "uncategorized": "未分类",

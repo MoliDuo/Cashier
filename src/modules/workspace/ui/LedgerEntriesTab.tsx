@@ -213,6 +213,7 @@ export function LedgerEntriesTab({
           selectedIds={selection.selectedIds}
           disableUnselected={selection.isSelectionLimitReached}
           onToggleSelection={selection.handleToggleSelection}
+          onSetGroupSelection={selection.handleSetGroupSelection}
           timeZone={timeZone}
           collapseEntriesDefault={collapseEntriesDefault}
           recovery={recovery}

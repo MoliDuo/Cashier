@@ -88,6 +88,36 @@ describe("useSelection", () => {
     expect(result.current.selectedIds).toContain("entry-101");
   });
 
+  it("takes and gives back a whole day in one update", () => {
+    const { result } = renderHook(() => useSelection({ allIds: ["a", "b", "c", "d"] }));
+
+    act(() => result.current.handleSelectMany(["a", "b"], true));
+    expect(result.current.selectedIds).toEqual(["a", "b"]);
+
+    // Re-selecting a day keeps what was already in and adds the rest, so the
+    // day ends up whole however it was entered.
+    act(() => result.current.handleSelectMany(["b", "c"], true));
+    expect(result.current.selectedIds).toEqual(["a", "b", "c"]);
+
+    act(() => result.current.handleSelectMany(["a", "c"], false));
+    expect(result.current.selectedIds).toEqual(["b"]);
+  });
+
+  it("lets a day fill the last of the batch budget but never past it", () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `entry-${index + 1}`);
+    const { result } = renderHook(() => useSelection({ allIds: ids }));
+
+    act(() => result.current.handleSelectMany(["entry-1", "entry-2"], true));
+    act(() => result.current.handleSelectMany(ids, true));
+    expect(result.current.selectedIds).toHaveLength(100);
+    expect(result.current.selectedIds[0]).toBe("entry-1");
+
+    // Clearing a day only removes that day's rows.
+    act(() => result.current.handleSelectMany(["entry-1", "entry-2"], false));
+    expect(result.current.selectedIds).not.toContain("entry-1");
+    expect(result.current.selectedIds).toHaveLength(98);
+  });
+
   it("intersects selection with refreshed visible IDs", () => {
     const { result, rerender } = renderHook(
       ({ allIds }) => useSelection({ allIds, queryFingerprint: "same-query" }),
