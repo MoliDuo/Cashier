@@ -38,7 +38,7 @@ export interface AIGenerateOptions {
 /**
  * AI message content part
  */
-type AIMessageContentPart =
+export type AIMessageContentPart =
   { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
 /**

@@ -8,6 +8,11 @@ import { entryReclassifierAdapter } from "@/application/adapters/ai/entry-reclas
 import { postgresCategoryAdapter } from "@/application/adapters/postgres/business-ports/categories";
 import { postgresSettingsAdapter } from "@/application/adapters/postgres/business-ports/settings";
 import {
+  isSuccessfulLoadImageResult,
+  loadStoredFilesForAI,
+} from "@/application/adapters/in-process";
+import { storedFileAdapter } from "@/application/adapters/storage";
+import {
   runCategoryReclassification,
   type CategoryReclassificationDependencies,
 } from "@/modules/ledger/application/use-cases/run-category-reclassification";
@@ -28,6 +33,21 @@ async function loadDependencies(
     assignment: postgresEntryCategoryAssignmentAdapter,
     reclassifier: entryReclassifierAdapter,
     categories: postgresCategoryAdapter,
+    // Evidence the model gets to see, loaded per document. A file that fails to
+    // read is already logged with its ledger and stored-file subject inside the
+    // loader; here it just drops out, so a document keeps whatever did load and
+    // degrades to text-only when nothing did.
+    loadStoredFiles: async ({ ledgerId, storedFileIds }) => {
+      const loaded = await loadStoredFilesForAI(
+        (authorizedLedgerId, storedFileId) =>
+          storedFileAdapter.readAuthorized(authorizedLedgerId, storedFileId),
+        ledgerId,
+        [...storedFileIds]
+      );
+      return loaded
+        .filter(isSuccessfulLoadImageResult)
+        .map((image) => ({ dataUrl: image.dataUrl }));
+    },
     now,
     ...(settings?.aiCustomPrompt == null || settings.aiCustomPrompt === ""
       ? {}

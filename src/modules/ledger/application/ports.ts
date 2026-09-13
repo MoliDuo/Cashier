@@ -2,7 +2,7 @@ import type { LedgerEntryDto, LedgerEntryEmbeddedViewDto, LedgerEntrySummary } f
 import type { LedgerEntryFilterParams } from "../filters";
 import type {
   ReclassificationCandidate,
-  ReclassificationSubject,
+  ReclassificationDocumentGroup,
 } from "./reclassification-protocol";
 import type {
   AtomicBatchCommandResult,
@@ -36,7 +36,9 @@ export interface CategoryMetadataGeneratorPort {
 export interface EntryReclassifierPort {
   decide(input: {
     candidates: readonly ReclassificationCandidate[];
-    subjects: readonly ReclassificationSubject[];
+    group: ReclassificationDocumentGroup;
+    /** Encoded evidence for this document; empty for a text-only submission. */
+    images: readonly { dataUrl: string }[];
     customPrompt?: string;
   }): Promise<{
     decisions: readonly { ledgerEntryId: string; categoryId: string }[];
@@ -50,10 +52,15 @@ export interface EntryReclassifierPort {
  * adapter's file header for the trade-off that implies.
  */
 export interface EntryCategoryAssignmentPort {
-  loadSubjects(input: {
+  /**
+   * Entries grouped by the source document their evidence hangs off. Entries
+   * whose document has no live active revision are absent, exactly as the
+   * ungrouped read excluded them.
+   */
+  loadDocumentGroups(input: {
     ledgerId: string;
     ledgerEntryIds: readonly string[];
-  }): Promise<readonly ReclassificationSubject[]>;
+  }): Promise<readonly ReclassificationDocumentGroup[]>;
   assign(input: {
     ledgerId: string;
     decisions: readonly { ledgerEntryId: string; categoryId: string }[];

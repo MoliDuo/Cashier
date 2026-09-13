@@ -3,14 +3,15 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { AppError } from "@/lib/errors";
 import { extractJson } from "@/lib/tasks/json-utils";
 import {
+  buildReclassificationDocumentMessage,
   buildReclassificationPrompt,
-  buildReclassificationSubjectsMessage,
   reclassificationResponseSchema,
   resolveReclassificationDecisions,
 } from "@/modules/ledger/application/reclassification-protocol";
 import type { EntryReclassifierPort } from "@/modules/ledger/application/ports";
 
-const MAX_TOKENS = 2000;
+/** One document can be a full receipt: up to MAX_BATCH_SIZE rows, one decision each. */
+const MAX_TOKENS = 4000;
 /** Batch assignment is a judgement call, not a creative one. */
 const TEMPERATURE = 0.1;
 
@@ -25,7 +26,10 @@ export const entryReclassifierAdapter: EntryReclassifierPort = {
       [
         {
           role: "user",
-          content: buildReclassificationSubjectsMessage({ subjects: input.subjects }),
+          content: buildReclassificationDocumentMessage({
+            group: input.group,
+            images: input.images,
+          }),
         },
       ],
       runtimeEnv.aiModel,
@@ -38,7 +42,7 @@ export const entryReclassifierAdapter: EntryReclassifierPort = {
         JSON.parse(extractJson(result.content))
       );
       return resolveReclassificationDecisions({
-        subjects: input.subjects,
+        subjects: input.group.subjects,
         candidates: input.candidates,
         response,
       });

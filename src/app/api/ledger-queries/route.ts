@@ -27,6 +27,13 @@ import {
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
+/**
+ * The `reclassification` poll below is the recovery driver for a batch AI
+ * reclassification run, so this handler has to outlive the default function
+ * budget the same way the protected page that starts a run does.
+ */
+export const maxDuration = 120;
+
 const requestSchema = z
   .object({
     query: z.enum([

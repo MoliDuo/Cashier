@@ -8,14 +8,20 @@ import type {
 } from "../ports";
 import type { ReclassificationCandidate } from "../reclassification-protocol";
 
-/** Entries per model call. Small enough to stay well inside one response. */
-export const RECLASSIFICATION_SLICE_SIZE = 20;
-
 export interface CategoryReclassificationDependencies {
   jobs: CategoryReclassificationJobPort;
   assignment: EntryCategoryAssignmentPort;
   reclassifier: EntryReclassifierPort;
   categories: Pick<CategoryPort, "list">;
+  /**
+   * Evidence for one document's stored files, already narrowed to the ones that
+   * loaded. A file that cannot be read is logged where it fails and simply does
+   * not travel — one broken object must not sink the run.
+   */
+  loadStoredFiles: (input: {
+    ledgerId: string;
+    storedFileIds: readonly string[];
+  }) => Promise<readonly { dataUrl: string }[]>;
   now: Date;
   customPrompt?: string;
 }
@@ -29,18 +35,25 @@ export interface CategoryReclassificationOutcome {
 }
 
 /**
- * Walk a claimed run from its stored cursor, one slice at a time.
+ * Walk a claimed run in one round: every source document concurrently, then a
+ * single write.
+ *
+ * Slicing by document rather than by entry is what lets a receipt's evidence
+ * travel with its line items — the images hang off the revision, so grouping
+ * sends each picture once instead of once per entry.
  *
  * The candidate list is resolved once, before the first model call, and reused
- * for every slice. Its order is the index base the model answers in, so letting
- * it shift between slices would silently remap later answers onto the wrong
- * categories. A candidate deleted mid-run therefore does not renumber
- * anything: `assign` simply stops matching it.
+ * for every document. Its order is the index base the model answers in, so
+ * letting it shift between calls would silently remap answers onto the wrong
+ * categories. A candidate deleted mid-run therefore does not renumber anything:
+ * `assign` simply stops matching it.
  *
- * The model call happens outside any transaction or ledger lock. Progress is
- * recorded only after a slice is applied, so an error leaves the cursor before
- * the failing slice and a retry resumes there instead of paying for the
- * already-applied prefix again.
+ * The calls happen outside any transaction or ledger lock, and the run is
+ * all-or-nothing: every decision is applied by one `assign` once every document
+ * has answered. A model call that fails therefore fails the whole run with the
+ * cursor still at its stored value, so the retry re-asks every document instead
+ * of resuming mid-way. That is the price of not windowing the fan-out, and it
+ * is bounded by the batch cap rather than by the ledger's size.
  */
 export async function runCategoryReclassification(
   job: ClaimedCategoryReclassificationJob,
@@ -48,48 +61,53 @@ export async function runCategoryReclassification(
 ): Promise<CategoryReclassificationOutcome> {
   const candidates = await resolveCandidates(job, deps);
 
-  let cursor = job.cursor;
+  const groups = await deps.assignment.loadDocumentGroups({
+    ledgerId: job.ledgerId,
+    ledgerEntryIds: job.ledgerEntryIds,
+  });
+
+  const customPrompt =
+    deps.customPrompt == null || deps.customPrompt === ""
+      ? {}
+      : { customPrompt: deps.customPrompt };
+
+  const results = await Promise.all(
+    groups.map(async (group) => {
+      const images =
+        group.storedFileIds.length === 0
+          ? []
+          : await deps.loadStoredFiles({
+              ledgerId: job.ledgerId,
+              storedFileIds: group.storedFileIds,
+            });
+      return deps.reclassifier.decide({ candidates, group, images, ...customPrompt });
+    })
+  );
+
+  // Reduced rather than pushed into a shared array: the fan-out above settles
+  // in whatever order the provider answers, and the decisions should not.
+  const decisions = results.flatMap((result) => result.decisions);
+  const confirmedCount =
+    job.confirmedCount + results.reduce((total, result) => total + result.confirmedCount, 0);
+
   let appliedCount = job.appliedCount;
-  let confirmedCount = job.confirmedCount;
-
-  while (cursor < job.ledgerEntryIds.length) {
-    const sliceIds = job.ledgerEntryIds.slice(cursor, cursor + RECLASSIFICATION_SLICE_SIZE);
-    const subjects = await deps.assignment.loadSubjects({
-      ledgerId: job.ledgerId,
-      ledgerEntryIds: sliceIds,
-    });
-
-    if (subjects.length > 0) {
-      const decided = await deps.reclassifier.decide({
-        candidates,
-        subjects,
-        ...(deps.customPrompt == null || deps.customPrompt === ""
-          ? {}
-          : { customPrompt: deps.customPrompt }),
-      });
-      if (decided.decisions.length > 0) {
-        const { appliedCount: applied } = await deps.assignment.assign({
-          ledgerId: job.ledgerId,
-          decisions: decided.decisions,
-        });
-        appliedCount += applied;
-      }
-      confirmedCount += decided.confirmedCount;
-    }
-
-    // Advance by the slice we asked about, not by how many of its entries are
-    // still alive, so the cursor stays aligned with `ledgerEntryIds`.
-    cursor += sliceIds.length;
-    const stillOwned = await deps.jobs.recordProgress({
-      jobId: job.id,
-      claimToken: job.claimToken,
-      cursor,
-      appliedCount,
-      confirmedCount,
-      now: deps.now,
-    });
-    if (!stillOwned) return { completed: false, cursor, appliedCount, confirmedCount };
+  if (decisions.length > 0) {
+    const applied = await deps.assignment.assign({ ledgerId: job.ledgerId, decisions });
+    appliedCount += applied.appliedCount;
   }
+
+  // Nothing left to ask about is not a special case: `groups` is then empty, no
+  // call is made, and the run still lands on the end of the id list.
+  const cursor = job.ledgerEntryIds.length;
+  const stillOwned = await deps.jobs.recordProgress({
+    jobId: job.id,
+    claimToken: job.claimToken,
+    cursor,
+    appliedCount,
+    confirmedCount,
+    now: deps.now,
+  });
+  if (!stillOwned) return { completed: false, cursor, appliedCount, confirmedCount };
 
   await deps.jobs.complete({
     jobId: job.id,

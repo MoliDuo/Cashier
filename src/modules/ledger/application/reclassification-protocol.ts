@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AIMessageContentPart } from "@/lib/tasks/types";
 
 /**
  * The wire protocol between the ledger and the model for a reclassification
@@ -25,6 +26,25 @@ export interface ReclassificationSubject {
   /** Context for the model; never a field it may change. */
   currentCategoryId: string | null;
   currentCategoryName: string | null;
+}
+
+/**
+ * One source document and the entries projected from its active revision.
+ *
+ * Reclassification is sliced by document rather than by entry because the
+ * evidence hangs off the revision: a receipt's N line items share one set of
+ * images, so grouping sends each picture exactly once. The `subjects` order is
+ * the index base the model answers in, and `entry_index` is scoped to this one
+ * document — a run with one document per entry degrades to one call per entry.
+ */
+export interface ReclassificationDocumentGroup {
+  sourceDocumentId: string;
+  title: string | null;
+  documentDate: string | null;
+  /** The text the user typed when submitting the document. */
+  inputText: string | null;
+  storedFileIds: readonly string[];
+  subjects: readonly ReclassificationSubject[];
 }
 
 export const reclassificationResponseSchema = z.object({
@@ -75,7 +95,7 @@ export function buildReclassificationPrompt(input: {
       ? `\n### Additional Instructions\n${input.customPrompt}\n`
       : "";
 
-  return `You are an expense categorizer. You are given a list of candidate categories and a numbered list of expense entries. Decide which candidate category each entry belongs to.
+  return `You are an expense categorizer. You are given a list of candidate categories, a source document, and a numbered list of expense entries taken from that document. Decide which candidate category each entry belongs to.
 
 ### Candidate Categories
 ${candidateSection}
@@ -95,19 +115,51 @@ Return a single JSON object:
 \`\`\`
 
 ### Rules
-- \`entry_index\` is the 1-based position of the expense entry in the numbered list you receive. \`category_index\` is the 1-based position of the candidate category.
+- \`entry_index\` is the 1-based position of the expense entry in the numbered list you receive. That list covers a single source document. \`category_index\` is the 1-based position of the candidate category.
 - Judge every entry you are given exactly once. Do not invent entries and do not repeat an \`entry_index\`.
 - \`current_category\` is context only. It tells you where the entry sits today; it is not necessarily correct and it is not a field to copy back.
-- Decide from the item name, the notes, and the amount. If the evidence is thin or ambiguous, answer 0 for that entry — leaving an entry alone is always better than filing it wrongly.
+- Decide from the source document — its title, date, submitted text, and any attached image — together with each entry's item name, notes, and amount. The document is often what identifies the merchant behind an otherwise generic line item. If the evidence is thin or ambiguous, answer 0 for that entry — leaving an entry alone is always better than filing it wrongly.
 ${customSection}`;
 }
 
-/** The user message: the numbered entries this slice asks about. */
-export function buildReclassificationSubjectsMessage(input: {
-  subjects: readonly ReclassificationSubject[];
-}): string {
-  return `### Expense Entries
-${input.subjects.map(subjectLine).join("\n")}`;
+function documentHeaderLines(group: ReclassificationDocumentGroup): string[] {
+  const lines: string[] = [];
+  if (group.title != null && group.title !== "") lines.push(`document_title: ${group.title}`);
+  if (group.documentDate != null) lines.push(`document_date: ${group.documentDate}`);
+  if (group.inputText != null && group.inputText !== "") {
+    lines.push(`submitted_text: ${group.inputText}`);
+  }
+  return lines;
+}
+
+/**
+ * The user message for one source document: the document's own context and
+ * numbered entries as text, then its images as content parts.
+ *
+ * Pictures follow the text rather than being interleaved with the rows: the
+ * evidence belongs to the document, and a multi-row receipt must not upload the
+ * same image once per entry. `dataUrl` is passed through untouched — the
+ * caller has already validated and encoded it.
+ */
+export function buildReclassificationDocumentMessage(input: {
+  group: ReclassificationDocumentGroup;
+  images?: readonly { dataUrl: string }[];
+}): AIMessageContentPart[] {
+  const images = input.images ?? [];
+  const text = [
+    "### Source Document",
+    ...documentHeaderLines(input.group),
+    ...(images.length > 0 ? [`attached_images: ${images.length}`] : []),
+    "",
+    "### Expense Entries",
+    ...input.group.subjects.map(subjectLine),
+  ].join("\n");
+
+  const content: AIMessageContentPart[] = [{ type: "text", text }];
+  for (const image of images) {
+    content.push({ type: "image_url", image_url: { url: image.dataUrl } });
+  }
+  return content;
 }
 
 /**

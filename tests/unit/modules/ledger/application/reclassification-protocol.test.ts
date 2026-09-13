@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { AIMessageContentPart } from "@/lib/tasks/types";
 import {
+  buildReclassificationDocumentMessage,
   buildReclassificationPrompt,
-  buildReclassificationSubjectsMessage,
   resolveReclassificationDecisions,
   type ReclassificationCandidate,
+  type ReclassificationDocumentGroup,
   type ReclassificationSubject,
 } from "@/modules/ledger/application/reclassification-protocol";
 
@@ -26,6 +28,34 @@ function subject(overrides: Partial<ReclassificationSubject> = {}): Reclassifica
   };
 }
 
+function group(
+  overrides: Partial<ReclassificationDocumentGroup> = {}
+): ReclassificationDocumentGroup {
+  return {
+    sourceDocumentId: "doc-1",
+    title: null,
+    documentDate: null,
+    inputText: null,
+    storedFileIds: [],
+    subjects: [
+      subject({ ledgerEntryId: "a", itemName: "Lunch", amount: "45.00", currency: "CNY" }),
+      subject({
+        ledgerEntryId: "b",
+        itemName: "Taxi",
+        amount: "18.00",
+        currency: null,
+        currentCategoryName: "出行",
+      }),
+    ],
+    ...overrides,
+  };
+}
+
+function textOf(parts: readonly AIMessageContentPart[]): string {
+  const [first] = parts;
+  return first != null && first.type === "text" ? first.text : "";
+}
+
 describe("buildReclassificationPrompt", () => {
   it("numbers candidates from 1 and offers 0 for an entry that fits nothing", () => {
     const prompt = buildReclassificationPrompt({ candidates });
@@ -34,6 +64,14 @@ describe("buildReclassificationPrompt", () => {
     expect(prompt).toContain("2. 居家");
     expect(prompt).toContain("3. 健康 — 医疗与健身");
     expect(prompt).toContain("Use category_index 0 when an entry does not clearly belong");
+  });
+
+  it("points the model at the document itself and scopes the entry list to one document", () => {
+    const prompt = buildReclassificationPrompt({ candidates });
+
+    expect(prompt).toContain("That list covers a single source document");
+    expect(prompt).toContain("its title, date, submitted text, and any attached image");
+    expect(prompt).toContain("it is not a field to copy back");
   });
 
   it("carries the ledger's own instructions when it has any", () => {
@@ -55,25 +93,60 @@ describe("buildReclassificationPrompt", () => {
   });
 });
 
-describe("buildReclassificationSubjectsMessage", () => {
-  it("numbers entries from 1 and shows where each one sits today", () => {
-    const message = buildReclassificationSubjectsMessage({
-      subjects: [
-        subject({ ledgerEntryId: "a", itemName: "Lunch", amount: "45.00", currency: "CNY" }),
-        subject({
-          ledgerEntryId: "b",
-          itemName: "Taxi",
-          amount: "18.00",
-          currency: null,
-          currentCategoryName: "出行",
-        }),
-      ],
-    });
+describe("buildReclassificationDocumentMessage", () => {
+  it("numbers the document's entries from 1 and shows where each one sits today", () => {
+    const parts = buildReclassificationDocumentMessage({ group: group() });
 
-    expect(message).toContain(
+    expect(parts).toHaveLength(1);
+    const body = textOf(parts);
+    expect(body).toContain("### Source Document");
+    expect(body).toContain("### Expense Entries");
+    expect(body).toContain(
       "1. item_name: Lunch | amount: 45.00 CNY | current_category: uncategorized"
     );
-    expect(message).toContain("2. item_name: Taxi | amount: 18.00 | current_category: 出行");
+    expect(body).toContain("2. item_name: Taxi | amount: 18.00 | current_category: 出行");
+  });
+
+  it("carries the document's own context when it has any", () => {
+    const body = textOf(
+      buildReclassificationDocumentMessage({
+        group: group({
+          title: "全家便利店",
+          documentDate: "2026-09-10",
+          inputText: "楼下买的",
+        }),
+      })
+    );
+
+    expect(body).toContain("document_title: 全家便利店");
+    expect(body).toContain("document_date: 2026-09-10");
+    expect(body).toContain("submitted_text: 楼下买的");
+  });
+
+  it("omits context the document does not have and says nothing about images", () => {
+    const body = textOf(
+      buildReclassificationDocumentMessage({
+        group: group({ title: "", inputText: "" }),
+      })
+    );
+
+    expect(body).not.toContain("document_title:");
+    expect(body).not.toContain("document_date:");
+    expect(body).not.toContain("submitted_text:");
+    expect(body).not.toContain("attached_images:");
+  });
+
+  it("appends the evidence as image parts after the text, in the order given", () => {
+    const parts = buildReclassificationDocumentMessage({
+      group: group({ storedFileIds: ["f1", "f2"] }),
+      images: [{ dataUrl: "data:image/jpeg;base64,AAA" }, { dataUrl: "data:image/png;base64,BBB" }],
+    });
+
+    expect(parts).toEqual([
+      { type: "text", text: expect.stringContaining("attached_images: 2") },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,AAA" } },
+      { type: "image_url", image_url: { url: "data:image/png;base64,BBB" } },
+    ]);
   });
 });
 
