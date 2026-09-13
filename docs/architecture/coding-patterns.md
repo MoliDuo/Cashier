@@ -130,8 +130,11 @@ headings, metadata and micro labels identical across surfaces.
   alias is gone: both names resolved to the same token, which made the palette look larger than it
   was.
 - Headings are `font-semibold`. `font-bold` is reserved for display numerals.
-- Interactive controls keep their own sizes: `Button` is 14px (`text-xs` at `size="sm"`), and form
-  inputs stay `text-base md:text-sm` so mobile browsers do not zoom on focus.
+- Interactive controls keep their own sizes: `Button` is 14px (`text-xs` at `size="sm"`), and `Input`
+  and `Textarea` are 14px too, so a field is the same size as the labels, chips and buttons around
+  it. They used to be `text-base md:text-sm` so iOS Safari would not zoom on focus; that trade was
+  dropped on 2026-09-13 because the 16px field read a whole size larger than every control beside it
+  on the widths where the app is used. Do not reintroduce a responsive step here.
 
 Run `npm run check:architecture` locally. CI must reject import cycles.
 Architecture rules inspect TypeScript syntax for protected writes and structured log fields; comments
