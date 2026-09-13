@@ -14,6 +14,11 @@
  * `saveEntryCategories` writes 0-based ones) and a third source of truth would
  * only create a mismatch. Consumers that need a stored order index it
  * themselves.
+ *
+ * This order is the display order for ledgers seeded from here. Rows that
+ * already exist keep the `sort_order` they were written with, so a reorder
+ * needs a data migration alongside it — `0042_reorder_default_categories.sql`
+ * holds the current one, and the two have to move together.
  */
 
 export const CATEGORY_PRESET_IDS = ["default", "concise"] as const;
@@ -39,9 +44,31 @@ const DEFAULT_CATEGORIES_ZH: readonly PresetCategory[] = [
     icon: "ShoppingCart",
   },
   {
-    name: "娱乐",
-    description: "涵盖休闲、社交与文化活动支出，如游戏、电影、演出、展览及相关数字服务",
-    icon: "Gamepad2",
+    name: "购物",
+    description:
+      "用于无法归入日用、服饰、个护或其他明确类别的商品，如数码电子、文具、礼品及杂项商品",
+    icon: "ShoppingBag",
+  },
+  {
+    name: "服饰",
+    description: "涵盖衣物、鞋靴、箱包、首饰、手表及其他穿戴配饰的购置、清洗与修补",
+    icon: "Shirt",
+  },
+  {
+    name: "个护",
+    description: "涵盖个人护理及形象管理支出，如洗护、护肤、彩妆、香水、理发及美容服务",
+    icon: "Scissors",
+  },
+  {
+    name: "住房",
+    description: "涵盖住房相关固定支出，如房租、水电燃气、网络、物业管理及家居修缮",
+    icon: "House",
+  },
+  {
+    name: "生活",
+    description:
+      "涵盖日常生活服务及零散事务支出，如快递寄送、家政保洁、证件办理、通信话费、打印复印及其他生活杂费",
+    icon: "Receipt",
   },
   {
     name: "交通",
@@ -64,30 +91,14 @@ const DEFAULT_CATEGORIES_ZH: readonly PresetCategory[] = [
     icon: "Crown",
   },
   {
-    name: "服饰",
-    description: "涵盖衣物、鞋靴、箱包、首饰、手表及其他穿戴配饰的购置、清洗与修补",
-    icon: "Shirt",
-  },
-  {
-    name: "个护",
-    description: "涵盖个人护理及形象管理支出，如洗护、护肤、彩妆、香水、理发及美容服务",
-    icon: "Scissors",
-  },
-  {
-    name: "购物",
-    description:
-      "用于无法归入日用、服饰、个护或其他明确类别的商品，如数码电子、文具、礼品及杂项商品",
-    icon: "ShoppingBag",
+    name: "娱乐",
+    description: "涵盖休闲、社交与文化活动支出，如游戏、电影、演出、展览及相关数字服务",
+    icon: "Gamepad2",
   },
   {
     name: "人情",
     description: "涵盖红包、礼金、请客、捐赠及其他人情往来支出",
     icon: "Gift",
-  },
-  {
-    name: "住房",
-    description: "涵盖住房相关固定支出，如房租、水电燃气、网络、物业管理及家居修缮",
-    icon: "House",
   },
 ];
 
@@ -105,10 +116,34 @@ const DEFAULT_CATEGORIES_EN: readonly PresetCategory[] = [
     icon: "ShoppingCart",
   },
   {
-    name: "Entertainment",
+    name: "Shopping",
     description:
-      "Leisure, social, and cultural activities, such as games, movies, performances, exhibitions, and related digital services",
-    icon: "Gamepad2",
+      "Goods that do not fit household, clothing, personal care, or another specific category, such as electronics, stationery, gifts, and miscellaneous items",
+    icon: "ShoppingBag",
+  },
+  {
+    name: "Clothing",
+    description:
+      "Clothing, footwear, bags, jewelry, watches, and other wearable accessories, including purchases, cleaning, and repairs",
+    icon: "Shirt",
+  },
+  {
+    name: "Personal Care",
+    description:
+      "Personal care and grooming expenses, such as hair care, skincare, cosmetics, perfume, haircuts, and beauty services",
+    icon: "Scissors",
+  },
+  {
+    name: "Housing",
+    description:
+      "Fixed housing expenses, such as rent, utilities, internet, property management, and home repairs",
+    icon: "House",
+  },
+  {
+    name: "Daily Life",
+    description:
+      "Everyday services and miscellaneous expenses, such as courier delivery, housekeeping, document processing, phone bills, printing, and other odds and ends",
+    icon: "Receipt",
   },
   {
     name: "Transport",
@@ -135,34 +170,16 @@ const DEFAULT_CATEGORIES_EN: readonly PresetCategory[] = [
     icon: "Crown",
   },
   {
-    name: "Clothing",
+    name: "Entertainment",
     description:
-      "Clothing, footwear, bags, jewelry, watches, and other wearable accessories, including purchases, cleaning, and repairs",
-    icon: "Shirt",
-  },
-  {
-    name: "Personal Care",
-    description:
-      "Personal care and grooming expenses, such as hair care, skincare, cosmetics, perfume, haircuts, and beauty services",
-    icon: "Scissors",
-  },
-  {
-    name: "Shopping",
-    description:
-      "Goods that do not fit household, clothing, personal care, or another specific category, such as electronics, stationery, gifts, and miscellaneous items",
-    icon: "ShoppingBag",
+      "Leisure, social, and cultural activities, such as games, movies, performances, exhibitions, and related digital services",
+    icon: "Gamepad2",
   },
   {
     name: "Gifts & Giving",
     description:
       "Gift money, cash gifts, treating others, donations, and other social-obligation expenses",
     icon: "Gift",
-  },
-  {
-    name: "Housing",
-    description:
-      "Fixed housing expenses, such as rent, utilities, internet, property management, and home repairs",
-    icon: "House",
   },
 ];
 

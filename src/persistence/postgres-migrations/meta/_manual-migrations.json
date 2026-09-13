@@ -81,6 +81,10 @@
     {
       "file": "0041_category_reclassification_jobs.sql",
       "sha256": "63ef9f6b8e634f027bb7de3cff418fa517ebc1e0ab460e836cd28d65be8a5885"
+    },
+    {
+      "file": "0042_reorder_default_categories.sql",
+      "sha256": "6a9ae940f9a3cbbe3520d03a27d6f373f6e9aba32c6a314b0723227f2fc8700e"
     }
   ]
 }

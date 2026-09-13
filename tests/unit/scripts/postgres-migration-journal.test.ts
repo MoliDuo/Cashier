@@ -31,7 +31,7 @@ describe("Postgres migration journal", () => {
     });
 
     expect(observedInversions).toEqual(allowedLegacyInversions);
-    expect(journal.entries.at(-1)?.tag).toBe("0041_category_reclassification_jobs");
+    expect(journal.entries.at(-1)?.tag).toBe("0042_reorder_default_categories");
   });
 
   it("recovers every schema change skipped by the legacy inversions", () => {
