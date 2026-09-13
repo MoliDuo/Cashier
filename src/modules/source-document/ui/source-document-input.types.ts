@@ -6,6 +6,12 @@ interface SourceDocumentInputBaseProps {
   onPendingChange?: (pending: boolean) => void;
   onDirtyChange?: (dirty: boolean) => void;
   timeZone?: string;
+  /**
+   * False when the form is mounted but not the visible tab. The switch between
+   * AI and quick entry only hides the other form, so a running camera needs to
+   * be told to stop rather than waiting for an unmount that never comes.
+   */
+  isActive?: boolean;
   initialData?: {
     text?: string;
     images?: Array<{ data: string; mimeType: string; storedFileId?: string }>;

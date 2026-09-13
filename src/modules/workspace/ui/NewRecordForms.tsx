@@ -139,6 +139,7 @@ export function NewRecordForms({
         <SourceDocumentInput
           key={ledgerId}
           ledgerId={ledgerId}
+          isActive={inputMode === "ai"}
           onPendingChange={setAiPending}
           onDirtyChange={setAiDirty}
           {...(timeZone != null ? { timeZone } : {})}

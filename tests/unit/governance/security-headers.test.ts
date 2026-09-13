@@ -9,7 +9,7 @@ describe("global security headers", () => {
       expect.arrayContaining([
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "Referrer-Policy", value: "same-origin" },
-        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
       ])
     );
   });

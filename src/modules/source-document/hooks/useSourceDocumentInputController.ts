@@ -9,6 +9,8 @@ import { loadSourceDocumentInputFiles } from "./source-document-input-images";
 import type { SourceDocumentInputControllerMessages } from "./source-document-input-controller.types";
 import { useSourceDocumentInputDraft } from "./useSourceDocumentInputDraft";
 import { useSourceDocumentSubmitMutations } from "./useSourceDocumentSubmitMutations";
+import { useCameraCapture } from "./useCameraCapture";
+import { useIsTouchInput } from "@/hooks/use-is-touch-input";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 
 type UseSourceDocumentInputControllerOptions = SourceDocumentInputProps & {
@@ -139,6 +141,23 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
     submitMutations.submit(buildSubmitPayload(draft.text, draft.images, draft.entryDate, timeZone));
   };
 
+  const addImageFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    fireAndForget(appendFiles(files), { context: "SourceDocumentInput.addImages" });
+  };
+
+  const [isCameraOpen, setIsCameraOpen] = useState(true);
+  const isTouchInput = useIsTouchInput();
+  const camera = useCameraCapture({
+    enabled:
+      isTouchInput &&
+      mode === "create" &&
+      options.isActive !== false &&
+      isCameraOpen &&
+      !submitMutations.isPending,
+    onCapture: (file) => addImageFiles([file]),
+  });
+
   return {
     mode,
     text: draft.text,
@@ -153,11 +172,18 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
     canCancelUpload: submitMutations.canCancel,
     canSubmit: draft.canSubmit && pendingFileCount === 0,
     isDirty: draft.isDirty || pendingFileCount > 0,
+    remainingImageSlots: Math.max(0, MAX_FILES - draft.images.length - pendingFileCount),
+    isTouchInput,
+    camera,
+    isCameraOpen,
+    openCamera: () => setIsCameraOpen(true),
+    collapseCamera: () => setIsCameraOpen(false),
     setText: draft.setText,
     setEntryDate: draft.setEntryDate,
     openImage: draft.openImage,
     closeImage: draft.closeImage,
     removeImage: draft.removeImage,
+    addImageFiles,
     triggerFileDialog: () => fileInputRef.current?.click(),
     handleFileInputChange,
     handleTextareaPaste,

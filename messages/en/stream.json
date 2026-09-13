@@ -612,6 +612,14 @@
     "cancelUpload": "Cancel upload",
     "savedMayBeHidden": "Saved. Current filters may hide this record.",
     "viewRecord": "View record",
-    "uploadedImage": "Uploaded image {index}"
+    "uploadedImage": "Uploaded image {index}",
+    "openCamera": "Open Camera",
+    "collapseCamera": "Collapse Camera",
+    "cameraPreview": "Camera Preview",
+    "cameraStarting": "Starting Camera",
+    "cameraUnavailable": "Can't use the camera. Check the camera permission, or close other apps using it.",
+    "capturePhoto": "Take Photo",
+    "switchCamera": "Switch Camera",
+    "dropImages": "Drop images to add"
   }
 }

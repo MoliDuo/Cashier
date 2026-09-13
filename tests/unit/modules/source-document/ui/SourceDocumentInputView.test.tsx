@@ -1,6 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { CameraCapture } from "@/modules/source-document/hooks/useCameraCapture";
 import {
   SourceDocumentInputView,
   type SourceDocumentInputViewProps,
@@ -29,6 +30,39 @@ const messages: SourceDocumentInputViewProps["messages"] = {
   cancelling: "Cancelling",
   cancelUpload: "Cancel upload",
   uploadedImage: (index) => `Uploaded image ${index}`,
+  camera: {
+    preview: "Camera preview",
+    starting: "Starting camera",
+    unavailable: "Camera unavailable",
+    capture: "Take photo",
+    limitReached: "You can upload up to 3 images.",
+    switchCamera: "Switch camera",
+    collapse: "Collapse camera",
+    open: "Open camera",
+    retry: "Retry",
+  },
+  dropImages: "Drop images to add",
+};
+
+const camera: CameraCapture = {
+  videoRef: createRef<HTMLVideoElement>(),
+  status: "idle",
+  canSwitch: false,
+  isMirrored: false,
+  capture: vi.fn(),
+  switchFacing: vi.fn(),
+  retry: vi.fn(),
+};
+
+const viewExtras = {
+  isCameraAvailable: false,
+  isCameraOpen: true,
+  remainingImageSlots: 3,
+  camera,
+  isDropEnabled: false,
+  onAddImageFiles: vi.fn(),
+  onCameraOpen: vi.fn(),
+  onCameraCollapse: vi.fn(),
 };
 
 function renderView(
@@ -57,6 +91,7 @@ function renderView(
       onSelectImages={vi.fn()}
       onSubmit={vi.fn()}
       onCancelUpload={onCancelUpload}
+      {...viewExtras}
       onRemoveImage={vi.fn()}
       onImageOpen={vi.fn()}
       onImageClose={vi.fn()}
@@ -93,6 +128,7 @@ describe("SourceDocumentInputView upload cancellation", () => {
         onSelectImages={vi.fn()}
         onSubmit={vi.fn()}
         onCancelUpload={onCancelUpload}
+        {...viewExtras}
         onRemoveImage={vi.fn()}
         onImageOpen={vi.fn()}
         onImageClose={vi.fn()}
@@ -141,6 +177,7 @@ describe("SourceDocumentInputView image labels", () => {
         onSelectImages={vi.fn()}
         onSubmit={vi.fn()}
         onCancelUpload={vi.fn()}
+        {...viewExtras}
         onRemoveImage={vi.fn()}
         onImageOpen={vi.fn()}
         onImageClose={vi.fn()}
@@ -151,5 +188,82 @@ describe("SourceDocumentInputView image labels", () => {
     expect(screen.getByRole("button", { name: uploadedImage(2) })).toBeInTheDocument();
     expect(screen.getByAltText(uploadedImage(1))).toBeInTheDocument();
     expect(screen.getByAltText(uploadedImage(2))).toBeInTheDocument();
+  });
+});
+
+describe("SourceDocumentInputView image drop zone", () => {
+  function renderDropZone(overrides: Partial<SourceDocumentInputViewProps> = {}) {
+    const onAddImageFiles = vi.fn();
+    const view = render(
+      <SourceDocumentInputView
+        mode="create"
+        text=""
+        entryDate={new Date("2026-07-17T00:00:00.000Z")}
+        images={[]}
+        selectedImageIndex={null}
+        fileInputRef={createRef<HTMLInputElement>()}
+        isPending={false}
+        isSubmitting={false}
+        progress={null}
+        canSubmit
+        canCancelUpload={false}
+        messages={messages}
+        onEntryDateChange={vi.fn()}
+        onTextChange={vi.fn()}
+        onTextareaPaste={vi.fn()}
+        onFileInputChange={vi.fn()}
+        onSelectImages={vi.fn()}
+        onSubmit={vi.fn()}
+        onCancelUpload={vi.fn()}
+        onRemoveImage={vi.fn()}
+        onImageOpen={vi.fn()}
+        onImageClose={vi.fn()}
+        {...viewExtras}
+        isDropEnabled
+        onAddImageFiles={onAddImageFiles}
+        {...overrides}
+      />
+    );
+    return {
+      onAddImageFiles,
+      form: view.container.firstElementChild as HTMLElement,
+    };
+  }
+
+  it("takes image files dropped anywhere on the form", () => {
+    const { onAddImageFiles, form } = renderDropZone();
+    const file = new File(["receipt"], "receipt.png", { type: "image/png" });
+
+    fireEvent.drop(form, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(onAddImageFiles).toHaveBeenCalledWith([file]);
+  });
+
+  it("leaves a drag that carries no files to the browser", () => {
+    const { onAddImageFiles, form } = renderDropZone();
+
+    fireEvent.drop(form, { dataTransfer: { types: ["text/plain"], files: [] } });
+
+    expect(onAddImageFiles).not.toHaveBeenCalled();
+  });
+
+  it("ignores drops when the drop zone is disabled", () => {
+    const { onAddImageFiles, form } = renderDropZone({ isDropEnabled: false });
+    const file = new File(["receipt"], "receipt.png", { type: "image/png" });
+
+    fireEvent.drop(form, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(onAddImageFiles).not.toHaveBeenCalled();
+  });
+
+  it("highlights the form only while a file drag is over it", () => {
+    const { form } = renderDropZone();
+    const drag = { dataTransfer: { types: ["Files"], files: [] } };
+
+    fireEvent.dragEnter(form, drag);
+    expect(form).toHaveClass("ring-1");
+
+    fireEvent.dragLeave(form, drag);
+    expect(form).not.toHaveClass("ring-1");
   });
 });

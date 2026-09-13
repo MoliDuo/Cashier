@@ -1,0 +1,149 @@
+"use client";
+
+import type { RefObject } from "react";
+import { Camera, ChevronUp, RefreshCw, SwitchCamera } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { textRoleClassName } from "@/components/typography";
+import { cn } from "@/lib/utils";
+import type { CameraStatus } from "../hooks/useCameraCapture";
+
+export interface SourceDocumentCameraPanelMessages {
+  preview: string;
+  starting: string;
+  unavailable: string;
+  capture: string;
+  limitReached: string;
+  switchCamera: string;
+  collapse: string;
+  open: string;
+  retry: string;
+}
+
+interface SourceDocumentCameraPanelProps {
+  videoRef: RefObject<HTMLVideoElement | null>;
+  status: CameraStatus;
+  canSwitch: boolean;
+  isMirrored: boolean;
+  isOpen: boolean;
+  isBusy: boolean;
+  remaining: number;
+  messages: SourceDocumentCameraPanelMessages;
+  onCapture: () => void;
+  onSwitchFacing: () => void;
+  onOpen: () => void;
+  onCollapse: () => void;
+  onRetry: () => void;
+}
+
+/**
+ * The in-form viewfinder: a small live box, a shutter, and a way out of it.
+ *
+ * `unsupported` renders nothing at all — an embedded browser that has no camera
+ * API should leave the form looking exactly as it did before, with the album
+ * picker as the only image entry point.
+ */
+export function SourceDocumentCameraPanel({
+  videoRef,
+  status,
+  canSwitch,
+  isMirrored,
+  isOpen,
+  isBusy,
+  remaining,
+  messages,
+  onCapture,
+  onSwitchFacing,
+  onOpen,
+  onCollapse,
+  onRetry,
+}: SourceDocumentCameraPanelProps) {
+  if (status === "unsupported") return null;
+
+  if (!isOpen) {
+    return (
+      <Button type="button" variant="outline" size="sm" onClick={onOpen}>
+        <Camera className="h-4 w-4" />
+        {messages.open}
+      </Button>
+    );
+  }
+
+  if (status === "unavailable") {
+    return (
+      <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className={textRoleClassName("meta", "min-w-0")}>{messages.unavailable}</span>
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw className="h-4 w-4" />
+          {messages.retry}
+        </Button>
+      </div>
+    );
+  }
+
+  const isReady = status === "ready";
+  const isFull = remaining <= 0;
+
+  return (
+    <div role="group" aria-label={messages.preview} className="flex items-start gap-3">
+      <div className="relative aspect-[4/3] w-36 shrink-0 overflow-hidden rounded-md border border-border bg-surface2">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          aria-hidden="true"
+          className={cn(
+            "h-full w-full object-cover",
+            isMirrored && "-scale-x-100",
+            isReady ? undefined : "invisible"
+          )}
+        />
+        {isReady ? null : (
+          <div role="status" className="absolute inset-0 flex items-center justify-center">
+            <RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="sr-only">{messages.starting}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-col items-start gap-2">
+        <div className="flex items-center gap-1">
+          <span {...(isFull ? { title: messages.limitReached } : {})}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onCapture}
+              disabled={!isReady || isFull || isBusy}
+              aria-label={messages.capture}
+            >
+              <Camera className="h-4 w-4" />
+              {messages.capture}
+            </Button>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onCollapse}
+            aria-label={messages.collapse}
+            title={messages.collapse}
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+        </div>
+        {canSwitch ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onSwitchFacing}
+            disabled={!isReady}
+          >
+            <SwitchCamera className="h-4 w-4" />
+            {messages.switchCamera}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}

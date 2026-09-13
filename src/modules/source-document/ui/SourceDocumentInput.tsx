@@ -57,6 +57,11 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
       isPreparingImages={controller.isPreparingImages}
       progress={controller.progress}
       canSubmit={controller.canSubmit}
+      isCameraAvailable={controller.mode === "create" && controller.isTouchInput}
+      isCameraOpen={controller.isCameraOpen}
+      remainingImageSlots={controller.remainingImageSlots}
+      camera={controller.camera}
+      isDropEnabled={!controller.isTouchInput}
       messages={{
         placeholder: t("placeholder"),
         image: t("image"),
@@ -72,12 +77,27 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
         cancelling: t("cancelling"),
         cancelUpload: t("cancelUpload"),
         uploadedImage: (index: number) => t("uploadedImage", { index }),
+        camera: {
+          preview: t("cameraPreview"),
+          starting: t("cameraStarting"),
+          unavailable: t("cameraUnavailable"),
+          capture: t("capturePhoto"),
+          limitReached: t("tooManyImages"),
+          switchCamera: t("switchCamera"),
+          collapse: t("collapseCamera"),
+          open: t("openCamera"),
+          retry: tCommon("retry"),
+        },
+        dropImages: t("dropImages"),
       }}
       onEntryDateChange={controller.setEntryDate}
       onTextChange={controller.setText}
       onTextareaPaste={controller.handleTextareaPaste}
       onFileInputChange={controller.handleFileInputChange}
       onSelectImages={controller.triggerFileDialog}
+      onAddImageFiles={controller.addImageFiles}
+      onCameraOpen={controller.openCamera}
+      onCameraCollapse={controller.collapseCamera}
       onSubmit={controller.handleSubmit}
       canCancelUpload={controller.canCancelUpload}
       onCancelUpload={controller.cancelUpload}

@@ -28,7 +28,9 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "same-origin" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            // `self` lets the new-record form open the phone's camera for
+            // photographing a receipt; microphone and geolocation stay off.
+            value: "camera=(self), microphone=(), geolocation=()",
           },
         ],
       },

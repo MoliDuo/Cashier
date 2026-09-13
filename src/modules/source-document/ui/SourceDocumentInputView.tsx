@@ -5,6 +5,14 @@ import { Camera, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import { Textarea } from "@/components/ui/textarea";
+import { textRoleClassName } from "@/components/typography";
+import { cn } from "@/lib/utils";
+import { useFileDropZone } from "../hooks/useFileDropZone";
+import type { CameraCapture } from "../hooks/useCameraCapture";
+import {
+  SourceDocumentCameraPanel,
+  type SourceDocumentCameraPanelMessages,
+} from "./SourceDocumentCameraPanel";
 import {
   SourceDocumentImageModal,
   type SourceDocumentModalImage,
@@ -29,6 +37,8 @@ interface SourceDocumentInputViewMessages {
   cancelling: string;
   cancelUpload: string;
   uploadedImage: (index: number) => string;
+  camera: SourceDocumentCameraPanelMessages;
+  dropImages: string;
 }
 
 export interface SourceDocumentInputViewProps {
@@ -44,12 +54,21 @@ export interface SourceDocumentInputViewProps {
   progress: SourceDocumentSubmissionProgress | null;
   canSubmit: boolean;
   canCancelUpload: boolean;
+  /** False on a desktop pointer, or when the retry dialog reuses this form. */
+  isCameraAvailable: boolean;
+  isCameraOpen: boolean;
+  remainingImageSlots: number;
+  camera: CameraCapture;
+  isDropEnabled: boolean;
   messages: SourceDocumentInputViewMessages;
   onEntryDateChange: (date: Date) => void;
   onTextChange: (value: string) => void;
   onTextareaPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
   onFileInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSelectImages: () => void;
+  onAddImageFiles: (files: File[]) => void;
+  onCameraOpen: () => void;
+  onCameraCollapse: () => void;
   onSubmit: () => void;
   onCancelUpload: () => void;
   onRemoveImage: (index: number) => void;
@@ -70,20 +89,62 @@ export function SourceDocumentInputView({
   progress,
   canSubmit,
   canCancelUpload,
+  isCameraAvailable,
+  isCameraOpen,
+  remainingImageSlots,
+  camera,
+  isDropEnabled,
   messages,
   onEntryDateChange,
   onTextChange,
   onTextareaPaste,
   onFileInputChange,
   onSelectImages,
+  onAddImageFiles,
+  onCameraOpen,
+  onCameraCollapse,
   onSubmit,
   onCancelUpload,
   onRemoveImage,
   onImageOpen,
   onImageClose,
 }: SourceDocumentInputViewProps) {
+  const drop = useFileDropZone({ enabled: isDropEnabled, onFiles: onAddImageFiles });
+  const showsViewfinder =
+    isCameraAvailable &&
+    isCameraOpen &&
+    camera.status !== "unavailable" &&
+    camera.status !== "unsupported";
+
   return (
-    <div className="space-y-4">
+    <div
+      className={cn("space-y-4", drop.isDragging && "rounded-md ring-1 ring-primary")}
+      {...drop.dropProps}
+    >
+      {drop.isDragging ? (
+        <p role="status" className={textRoleClassName("meta")}>
+          {messages.dropImages}
+        </p>
+      ) : null}
+
+      {isCameraAvailable ? (
+        <SourceDocumentCameraPanel
+          videoRef={camera.videoRef}
+          status={camera.status}
+          canSwitch={camera.canSwitch}
+          isMirrored={camera.isMirrored}
+          isOpen={isCameraOpen}
+          isBusy={isSubmitting}
+          remaining={remainingImageSlots}
+          messages={messages.camera}
+          onCapture={camera.capture}
+          onSwitchFacing={camera.switchFacing}
+          onOpen={onCameraOpen}
+          onCollapse={onCameraCollapse}
+          onRetry={camera.retry}
+        />
+      ) : null}
+
       {images.length > 0 && (
         <div className="grid grid-cols-4 gap-2">
           {images.map((image, index) => {
@@ -123,7 +184,7 @@ export function SourceDocumentInputView({
         aria-label={messages.placeholder}
         className="resize-none"
         rows={5}
-        autoFocus
+        autoFocus={!showsViewfinder}
         disabled={isPending}
       />
 

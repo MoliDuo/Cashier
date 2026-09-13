@@ -612,6 +612,14 @@
     "cancelUpload": "取消上传",
     "savedMayBeHidden": "已保存，但当前筛选可能隐藏这条记录。",
     "viewRecord": "查看新记录",
-    "uploadedImage": "已上传图片 {index}"
+    "uploadedImage": "已上传图片 {index}",
+    "openCamera": "打开相机",
+    "collapseCamera": "收起相机",
+    "cameraPreview": "取景画面",
+    "cameraStarting": "正在启动相机",
+    "cameraUnavailable": "无法使用相机，请检查相机权限，或关闭其他正在使用相机的应用。",
+    "capturePhoto": "拍照",
+    "switchCamera": "切换前后摄像头",
+    "dropImages": "松开即可添加图片"
   }
 }
