@@ -11,7 +11,9 @@ import { AmountDisplay } from "@/modules/currency/ui/AmountDisplay";
  * The source document container determines the variant, and entries inherit the theme.
  */
 const itemVariants = cva(
-  "flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-[color,background-color,border-color,opacity] duration-[var(--motion-feedback)] disabled:cursor-default",
+  // Square and full-bleed inside the card that holds it, so the row reads as a
+  // row of that card rather than as a small card of its own.
+  "flex w-full items-center justify-between px-3 py-2 text-left transition-[color,background-color,border-color,opacity] duration-[var(--motion-feedback)] disabled:cursor-default",
   {
     variants: {
       variant: {

@@ -49,6 +49,7 @@ export function SourceDocumentEntriesList({
   const t = useTranslations("SourceDocumentDetail");
   const tCommon = useTranslations("Common");
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const hasAddEntry = !interactionDisabled && isEditMode && onAddEntry != null;
 
   return (
     <div className="min-w-0">
@@ -60,7 +61,7 @@ export function SourceDocumentEntriesList({
             <p className="text-muted-foreground text-sm font-medium">{t("noEntries")}</p>
           </div>
         ) : (
-          entries.map((entry) => (
+          entries.map((entry, index) => (
             <div
               key={entry.id}
               onClick={() => {
@@ -84,6 +85,7 @@ export function SourceDocumentEntriesList({
                 sourceDocumentEntryDate={displayEntryDate}
                 originalEntryDate={originalEntryDate}
                 readOnly={fieldsDisabled || activeEntryId !== entry.id}
+                isLast={!hasAddEntry && index === entries.length - 1}
                 onDelete={
                   !interactionDisabled && isEditMode && onDeleteEntry != null
                     ? () => onDeleteEntry(entry.id)
@@ -96,7 +98,7 @@ export function SourceDocumentEntriesList({
             </div>
           ))
         )}
-        {!interactionDisabled && isEditMode && onAddEntry != null ? (
+        {hasAddEntry ? (
           <Button
             type="button"
             variant="outline"

@@ -104,6 +104,26 @@ describe("SourceDocumentCard interactions", () => {
     expect(onViewDetails).toHaveBeenCalledTimes(1);
   });
 
+  it("runs the entry rows edge to edge in the card, the way the detail sheet does", () => {
+    // Regression: the rows sat inside a padded list and were rounded, so each
+    // one read as a small card of its own inside the card, with visible left
+    // and right edges and a rule that stopped short of them.
+    render(
+      <SourceDocumentCard
+        sourceDocument={sourceDocument}
+        ledgerEntries={[ledgerEntry]}
+        processingStatus="completed"
+      />
+    );
+
+    const list = screen.getByTestId("source-document-card-body").firstElementChild as HTMLElement;
+    const row = list.querySelector("button") as HTMLElement;
+    expect(list).not.toHaveClass("px-3");
+    expect(list).toHaveClass("divide-y");
+    expect(row).toHaveClass("px-3");
+    expect(row).not.toHaveClass("rounded-md");
+  });
+
   it("supports a collapsed default and repeated expansion", async () => {
     render(
       <SourceDocumentCard

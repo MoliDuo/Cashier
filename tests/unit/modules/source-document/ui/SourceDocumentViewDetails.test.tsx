@@ -339,3 +339,68 @@ describe("SourceDocumentViewDetails selection", () => {
     expect(screen.getByDisplayValue("Edited lunch").closest("[inert]")).toBeNull();
   });
 });
+
+describe("SourceDocumentViewDetails entry row outline", () => {
+  const entry = (id: string, itemName: string): LedgerEntry => ({
+    id,
+    ledgerId: "ledger-1",
+    categoryId: null,
+    sourceDocumentId: "doc-1",
+    amount: "12.00",
+    currency: "CNY",
+    itemName,
+    description: null,
+    convertedAmount: "12.00",
+    exchangeRate: "1",
+    createdAt: "2026-07-28T00:00:00.000Z",
+    updatedAt: "2026-07-28T00:00:00.000Z",
+    deletedAt: null,
+  });
+
+  function renderSelection(ledgerEntries: LedgerEntry[], selectedEntryIds: string[]) {
+    return renderWithQueryClient(
+      <SourceDocumentViewDetails
+        sourceDocument={documentWithFiles(0)}
+        ledgerEntries={ledgerEntries}
+        categories={[]}
+        pendingChanges={{ sourceDoc: {}, entries: {} }}
+        selectedEntryIds={selectedEntryIds}
+        isSelectionMode
+        mobileView="details"
+        onMobileViewChange={vi.fn()}
+        onSourceDocChange={vi.fn()}
+        onEntryChange={vi.fn()}
+        onSelectEntry={vi.fn()}
+        onToggleSelectionMode={vi.fn()}
+      />
+    );
+  }
+
+  it("does not clip a selected entry's outline down to its top and bottom edges", () => {
+    // Regression: the entries card clipped its rows, and the outline is drawn
+    // one pixel outside the row — on the card's own border — so a selected row
+    // lost both verticals and read as two stray strips above and below it.
+    const { container } = renderSelection([entry("entry-1", "Lunch")], ["entry-1"]);
+
+    const card = screen.getByTestId("source-document-date-row").parentElement as HTMLElement;
+    expect(card).not.toHaveClass("overflow-hidden");
+    expect(
+      container.querySelector('[data-selection-mode="true"][data-selected="true"]')
+    ).toHaveClass("ring-1", "ring-primary");
+  });
+
+  it("gives the row that closes the card the card's own bottom corners", () => {
+    const { container } = renderSelection(
+      [entry("entry-1", "Lunch"), entry("entry-2", "Dinner")],
+      []
+    );
+
+    const surfaces = [...container.querySelectorAll("[data-selection-mode]")];
+    expect(surfaces).toHaveLength(2);
+    // Square where it meets the row above it, so its rule replaces the shared
+    // divider instead of sitting next to it.
+    expect(surfaces[0]).toHaveClass("rounded-none");
+    expect(surfaces[1]).not.toHaveClass("rounded-none");
+    expect(surfaces[1]).toHaveClass("rounded-b-[calc(var(--radius-lg)-1px)]");
+  });
+});

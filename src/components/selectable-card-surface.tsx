@@ -10,6 +10,13 @@ export interface SelectableCardSurfaceProps {
   onToggleSelection: () => void;
   indicatorPlacement?: "center" | "header";
   /**
+   * Corner radius of the surface. Defaults to one card's own radius. A row that
+   * is not a card of its own — a full-bleed row inside a shared entries card —
+   * passes the corners of the card it sits in, so the selected outline runs
+   * along the container's edge instead of curving away from it.
+   */
+  radiusClassName?: string;
+  /**
    * When set, an expand/collapse control is rendered above the selection
    * overlay while in selection mode so cards with an expandable body keep
    * their chevron interactive during batch selection.
@@ -42,6 +49,7 @@ export const SelectableCardSurface = memo(function SelectableCardSurface({
   selectionLabel,
   onToggleSelection,
   indicatorPlacement = "center",
+  radiusClassName = "rounded-[var(--radius-xl)]",
   expandable,
   children,
 }: SelectableCardSurfaceProps) {
@@ -52,7 +60,8 @@ export const SelectableCardSurface = memo(function SelectableCardSurface({
         // document, an entry card in the details tab — is this tall, and the
         // source-document header is this tall, so an expanded card's header
         // lines up with the entry rows underneath it.
-        "relative rounded-[var(--radius-xl)] [--selectable-card-header-height:56px]",
+        "relative [--selectable-card-header-height:56px]",
+        radiusClassName,
         selectionMode && "isolate",
         selectionMode && selected && "ring-1 ring-primary",
         selectionMode && disabled && "opacity-60"

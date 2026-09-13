@@ -16,7 +16,10 @@ export const SourceDocumentCardEntries = memo(function SourceDocumentCardEntries
   onViewLedgerEntry,
 }: SourceDocumentCardEntriesProps) {
   return (
-    <div className="divide-y divide-border border-t border-border px-3">
+    // Full-bleed rows: the rules and the hover surface reach the card's edges,
+    // the way the entry rows of the detail sheet do, and each row carries its
+    // own inset so the text still lines up with the header above it.
+    <div className="divide-y divide-border border-t border-border">
       {entries.map((entry) => (
         <LedgerEntryItem
           key={entry.id}

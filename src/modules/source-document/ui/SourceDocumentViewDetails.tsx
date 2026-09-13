@@ -144,8 +144,11 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
         ) : null}
 
         {/* The toolbar and the entries are one card, the way the suggestion
-            panel above them reads: a header row over the list it summarises. */}
-        <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface">
+            panel above them reads: a header row over the list it summarises.
+            Deliberately not clipped: a selected entry row is outlined one pixel
+            outside itself, which is exactly the border the card draws there, so
+            clipping would leave the outline with only its top and bottom. */}
+        <div className="min-w-0 rounded-lg border border-border bg-surface">
           <SourceDocumentSummaryHeader
             displayEntryDate={displayEntryDate}
             totalInMainCurrency={totalInMainCurrency}
