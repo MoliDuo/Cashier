@@ -2,7 +2,12 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useIsTouchInput } from "@/hooks/use-is-touch-input";
 
-function stubEnvironment(options: { coarse: boolean; desktopLike: boolean; touchPoints?: number }) {
+function stubEnvironment(options: {
+  coarse: boolean;
+  desktopLike: boolean;
+  touchPoints?: number;
+  mobileHint?: boolean;
+}) {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn((query: string) => ({
@@ -16,6 +21,12 @@ function stubEnvironment(options: { coarse: boolean; desktopLike: boolean; touch
     configurable: true,
     value: options.touchPoints ?? 0,
   });
+  if (options.mobileHint != null) {
+    Object.defineProperty(navigator, "userAgentData", {
+      configurable: true,
+      value: { mobile: options.mobileHint },
+    });
+  }
 }
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
@@ -24,6 +35,7 @@ afterEach(() => {
   if (originalMatchMedia != null) Object.defineProperty(window, "matchMedia", originalMatchMedia);
   else Reflect.deleteProperty(window, "matchMedia");
   Reflect.deleteProperty(navigator, "maxTouchPoints");
+  Reflect.deleteProperty(navigator, "userAgentData");
 });
 
 describe("useIsTouchInput", () => {
@@ -47,6 +59,12 @@ describe("useIsTouchInput", () => {
 
   it("still reads a touch device as touch when the pointer reports fine", () => {
     stubEnvironment({ coarse: false, desktopLike: false, touchPoints: 5 });
+
+    expect(renderHook(() => useIsTouchInput()).result.current).toBe(true);
+  });
+
+  it("trusts Chromium's own mobile hint when every pointer query says desktop", () => {
+    stubEnvironment({ coarse: false, desktopLike: true, touchPoints: 0, mobileHint: true });
 
     expect(renderHook(() => useIsTouchInput()).result.current).toBe(true);
   });
