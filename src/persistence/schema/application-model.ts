@@ -365,17 +365,35 @@ export const exchangeRateRecalculationJobs = pgTable(
 );
 
 /**
- * One AI reclassification run over a batch of entries. `cursor` is the only
- * progress pointer (how far into `ledgerEntryIds` the run has consumed), so a
- * resumed run never re-asks the model about a prefix it already applied.
- * `total` is derived from the array and `undecided` from
- * `total - appliedCount - confirmedCount`.
+ * One category assignment run. V1 compatibility columns remain on this table;
+ * v2 selection, document work, persisted decisions, and final outcomes live
+ * in the child tables below.
  */
 export const categoryReclassificationStatusEnum = pgEnum("category_reclassification_status", [
+  "preparing",
+  "pending",
+  "running",
+  "succeeded",
+  "partial",
+  "failed",
+  "cancelled",
+]);
+export const categoryAssignmentEntryOutcomeEnum = pgEnum("category_assignment_entry_outcome", [
+  "applied",
+  "confirmed",
+  "failed",
+  "conflict",
+  "skipped",
+  "cancelled",
+]);
+export const categoryAssignmentDocumentStatusEnum = pgEnum("category_assignment_document_status", [
   "pending",
   "running",
   "succeeded",
   "failed",
+  "conflict",
+  "skipped",
+  "cancelled",
 ]);
 
 export const categoryReclassificationJobs = pgTable(
@@ -386,38 +404,173 @@ export const categoryReclassificationJobs = pgTable(
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
     status: categoryReclassificationStatusEnum("status").notNull().default("pending"),
-    ledgerEntryIds: uuid("ledger_entry_ids").array().notNull(),
-    candidateCategoryIds: uuid("candidate_category_ids").array().notNull(),
+    formatVersion: integer("format_version").notNull().default(1),
+    mode: text("mode").$type<"ai" | "assign" | "clear">().notNull().default("ai"),
+    directCategoryId: uuid("direct_category_id"),
+    candidateSnapshot: jsonb("candidate_snapshot")
+      .$type<import("@/modules/ledger/contracts").CategoryAssignmentCandidateSnapshot[]>()
+      .notNull()
+      .default([]),
+    customPromptSnapshot: text("custom_prompt_snapshot"),
+    requestKey: uuid("request_key"),
+    parentJobId: uuid("parent_job_id"),
+    declaredEntryCount: integer("declared_entry_count").notNull().default(0),
+    receivedEntryCount: integer("received_entry_count").notNull().default(0),
+    ledgerEntryIds: uuid("ledger_entry_ids")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::uuid[]`),
+    candidateCategoryIds: uuid("candidate_category_ids")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::uuid[]`),
     cursor: integer("cursor").notNull().default(0),
     appliedCount: integer("applied_count").notNull().default(0),
     confirmedCount: integer("confirmed_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    conflictCount: integer("conflict_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    cancelledCount: integer("cancelled_count").notNull().default(0),
+    documentTotal: integer("document_total").notNull().default(0),
+    documentCompleted: integer("document_completed").notNull().default(0),
     attempts: integer("attempts").notNull().default(0),
     claimToken: uuid("claim_token"),
     claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
     nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),
     lastError: text("last_error"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
     updatedAt: requiredTimestamp("updated_at").$defaultFn(() => new Date()),
   },
   (table) => [
+    foreignKey({
+      columns: [table.parentJobId],
+      foreignColumns: [table.id],
+      name: "category_reclassification_jobs_parent_job_id_fk",
+    }).onDelete("set null"),
     index("idx_category_reclassification_jobs_due").on(table.status, table.nextAttemptAt),
+    uniqueIndex("uq_category_assignment_request_key").on(table.ledgerId, table.requestKey),
     // One run per ledger at a time: a double submit becomes a conflict instead
     // of paying for the same model calls twice.
     uniqueIndex("uq_category_reclassification_jobs_active")
       .on(table.ledgerId)
-      .where(sql`${table.status} IN ('pending', 'running')`),
-    check(
-      "ck_category_reclassification_jobs_entries",
-      sql`cardinality(${table.ledgerEntryIds}) BETWEEN 1 AND 100`
-    ),
-    check(
-      "ck_category_reclassification_jobs_candidates",
-      sql`cardinality(${table.candidateCategoryIds}) BETWEEN 2 AND 8`
-    ),
+      .where(sql`${table.status} IN ('preparing', 'pending', 'running')`),
     check(
       "ck_category_reclassification_jobs_cursor",
       sql`${table.cursor} >= 0 AND ${table.cursor} <= cardinality(${table.ledgerEntryIds})`
     ),
+  ]
+);
+
+export const categoryAssignmentSelectionChunks = pgTable(
+  "category_assignment_selection_chunks",
+  {
+    jobId: uuid("job_id").notNull(),
+    ledgerId: uuid("ledger_id").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    contentHash: text("content_hash").notNull(),
+    entryCount: integer("entry_count").notNull(),
+    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.jobId, table.chunkIndex] }),
+    foreignKey({
+      columns: [table.jobId],
+      foreignColumns: [categoryReclassificationJobs.id],
+      name: "category_assignment_selection_chunks_job_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "category_assignment_selection_chunks_ledger_id_fkey",
+    }).onDelete("cascade"),
+    index("idx_category_assignment_chunks_ledger_job").on(table.ledgerId, table.jobId),
+  ]
+);
+
+export const categoryReclassificationJobDocuments = pgTable(
+  "category_reclassification_job_documents",
+  {
+    jobId: uuid("job_id").notNull(),
+    ledgerId: uuid("ledger_id").notNull(),
+    sourceDocumentId: uuid("source_document_id").notNull(),
+    expectedVersion: integer("expected_version").notNull(),
+    revisionId: uuid("revision_id").notNull(),
+    firstSelectionOrder: integer("first_selection_order").notNull(),
+    status: categoryAssignmentDocumentStatusEnum("status").notNull().default("pending"),
+    claimToken: uuid("claim_token"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
+    claimStartedAt: timestamp("claim_started_at", { withTimezone: true }),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    completedChunkCount: integer("completed_chunk_count").notNull().default(0),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),
+    errorCode: text("error_code"),
+    evidenceIncomplete: boolean("evidence_incomplete").notNull().default(false),
+    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
+    updatedAt: requiredTimestamp("updated_at").$defaultFn(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.jobId, table.sourceDocumentId] }),
+    foreignKey({
+      columns: [table.jobId],
+      foreignColumns: [categoryReclassificationJobs.id],
+      name: "category_reclassification_job_documents_job_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "category_reclassification_job_documents_ledger_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sourceDocumentId],
+      foreignColumns: [sourceDocuments.id],
+      name: "category_reclassification_job_documents_source_document_id_fkey",
+    }).onDelete("cascade"),
+    index("idx_category_assignment_documents_due").on(table.status, table.nextAttemptAt),
+    index("idx_category_assignment_documents_ledger_job").on(table.ledgerId, table.jobId),
+  ]
+);
+
+export const categoryReclassificationJobEntries = pgTable(
+  "category_reclassification_job_entries",
+  {
+    jobId: uuid("job_id").notNull(),
+    ledgerId: uuid("ledger_id").notNull(),
+    ledgerEntryId: uuid("ledger_entry_id").notNull(),
+    sourceDocumentId: uuid("source_document_id").notNull(),
+    selectionOrder: integer("selection_order").notNull(),
+    expectedVersion: integer("expected_version").notNull(),
+    originalCategoryId: uuid("original_category_id"),
+    targetCategoryId: uuid("target_category_id"),
+    decisionPersisted: boolean("decision_persisted").notNull().default(false),
+    outcome: categoryAssignmentEntryOutcomeEnum("outcome"),
+    errorCode: text("error_code"),
+    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
+    updatedAt: requiredTimestamp("updated_at").$defaultFn(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.jobId, table.ledgerEntryId] }),
+    uniqueIndex("uq_category_assignment_entry_order").on(table.jobId, table.selectionOrder),
+    index("idx_category_assignment_entries_ledger_job").on(table.ledgerId, table.jobId),
+    foreignKey({
+      columns: [table.jobId],
+      foreignColumns: [categoryReclassificationJobs.id],
+      name: "category_reclassification_job_entries_job_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "category_reclassification_job_entries_ledger_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.jobId, table.sourceDocumentId],
+      foreignColumns: [
+        categoryReclassificationJobDocuments.jobId,
+        categoryReclassificationJobDocuments.sourceDocumentId,
+      ],
+      name: "fk_category_assignment_entry_document",
+    }).onDelete("cascade"),
   ]
 );
 

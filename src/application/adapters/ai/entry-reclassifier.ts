@@ -34,7 +34,10 @@ export const entryReclassifierAdapter: EntryReclassifierPort = {
       ],
       runtimeEnv.aiModel,
       MAX_TOKENS,
-      TEMPERATURE
+      TEMPERATURE,
+      undefined,
+      input.signal,
+      { maxAttempts: 1, timeoutMs: runtimeEnv.aiCategoryRequestTimeoutMs }
     );
 
     try {
@@ -49,7 +52,7 @@ export const entryReclassifierAdapter: EntryReclassifierPort = {
     } catch (error) {
       throw new AppError(
         "AI category reclassification response was invalid",
-        "AI_JSON_REPAIR_FAILED",
+        "ai_schema_invalid",
         502,
         {
           cause: error instanceof Error ? error.name : "UnknownError",

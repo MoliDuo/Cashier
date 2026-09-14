@@ -116,6 +116,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
           batch.isSelectionMode ? (
             <LedgerEntriesBatchActionToolbar
               selectedCount={batch.selectedIds.length}
+              loadedCount={entries.length}
               isAllSelected={batch.isAllSelected}
               hasMoreData={hasNextPage || entries.length > batch.selectableCount}
               onSelectAll={() => !batch.isPending && batch.selectAll()}
@@ -139,7 +140,8 @@ export function DetailsTabView(props: DetailsTabViewProps) {
               categorySelectionChanged={batch.categorySelectionChanged}
               onConfirmCategory={batch.confirmCategory}
               isConfirmingCategory={batch.isConfirmingCategory}
-              isReclassifying={batch.isReclassifying}
+              selectionUploadProgress={batch.selectionUploadProgress}
+              isReclassifying={false}
               isProcessing={batch.isPending}
             />
           ) : undefined

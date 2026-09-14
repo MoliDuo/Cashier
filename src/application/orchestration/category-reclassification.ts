@@ -1,149 +1,239 @@
 import "server-only";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { runtimeEnv } from "@/lib/env/runtime";
 import { logIdentifier } from "@/lib/security/log-identifier";
-import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
+import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
 import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
+import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import { entryReclassifierAdapter } from "@/application/adapters/ai/entry-reclassifier";
-import { postgresCategoryAdapter } from "@/application/adapters/postgres/business-ports/categories";
-import { postgresSettingsAdapter } from "@/application/adapters/postgres/business-ports/settings";
 import {
   isSuccessfulLoadImageResult,
   loadStoredFilesForAI,
 } from "@/application/adapters/in-process";
 import { storedFileAdapter } from "@/application/adapters/storage";
-import {
-  runCategoryReclassification,
-  type CategoryReclassificationDependencies,
-} from "@/modules/ledger/application/use-cases/run-category-reclassification";
-import type { ClaimedCategoryReclassificationJob } from "@/modules/ledger/application/ports";
+import type { ClaimedCategoryAssignmentDocument } from "@/application/adapters/postgres/category-assignment-v2";
 
 const CLAIM_LEASE_MS = 120_000;
-const DRAIN_CLAIM_LIMIT = 5;
-const MAX_DRAIN_BATCHES = 10;
-const MAX_DRAIN_DURATION_MS = 30_000;
+const CLAIM_HEARTBEAT_MS = 20_000;
+const REQUEST_CHUNK_SIZE = 50;
+const MAX_IDLE_WAIT_MS = 30_000;
+const SLOT_RECHECK_MS = 250;
 
-async function loadDependencies(
-  job: ClaimedCategoryReclassificationJob,
-  now: Date
-): Promise<CategoryReclassificationDependencies> {
-  const settings = await postgresSettingsAdapter.get(job.ledgerId);
-  return {
-    jobs: postgresCategoryReclassificationJobAdapter,
-    assignment: postgresEntryCategoryAssignmentAdapter,
-    reclassifier: entryReclassifierAdapter,
-    categories: postgresCategoryAdapter,
-    // Evidence the model gets to see, loaded per document. A file that fails to
-    // read is already logged with its ledger and stored-file subject inside the
-    // loader; here it just drops out, so a document keeps whatever did load and
-    // degrades to text-only when nothing did.
-    loadStoredFiles: async ({ ledgerId, storedFileIds }) => {
-      const loaded = await loadStoredFilesForAI(
-        (authorizedLedgerId, storedFileId) =>
-          storedFileAdapter.readAuthorized(authorizedLedgerId, storedFileId),
-        ledgerId,
-        [...storedFileIds]
+function stableErrorCode(error: unknown): string {
+  if (error instanceof AppError) return error.code;
+  return "ai_provider_unavailable";
+}
+
+async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise<void> {
+  const startedAt = Date.now();
+  const selection = await postgresCategoryAssignmentV2Adapter.loadDocumentSelection({
+    ledgerId: work.ledgerId,
+    jobId: work.jobId,
+    sourceDocumentId: work.sourceDocumentId,
+  });
+  try {
+    if (work.mode.kind === "ai") {
+      const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+        ledgerId: work.ledgerId,
+        ledgerEntryIds: selection.entryIds,
+      });
+      const group = groups.find(
+        (candidate) => candidate.sourceDocumentId === work.sourceDocumentId
       );
-      return loaded
+      if (group == null) {
+        await postgresSourceDocumentAggregateAdapter.applyCategoryAssignments({
+          ledgerId: work.ledgerId,
+          jobId: work.jobId,
+          sourceDocumentId: work.sourceDocumentId,
+          claimToken: work.claimToken,
+        });
+        return;
+      }
+      const imageStartedAt = Date.now();
+      const loaded = await loadStoredFilesForAI(
+        (ledgerId, storedFileId) => storedFileAdapter.readAuthorized(ledgerId, storedFileId),
+        work.ledgerId,
+        [...group.storedFileIds]
+      );
+      const images = loaded
         .filter(isSuccessfulLoadImageResult)
         .map((image) => ({ dataUrl: image.dataUrl }));
-    },
-    now,
-    ...(settings?.aiCustomPrompt == null || settings.aiCustomPrompt === ""
-      ? {}
-      : { customPrompt: settings.aiCustomPrompt }),
-  };
-}
-
-/**
- * Run one claimed job to completion. The claim token fences the run: if the
- * lease is taken over, `recordProgress` returns false and the run abandons its
- * remaining slices instead of racing the new owner.
- */
-export async function runCategoryReclassificationJob(
-  jobId: string,
-  now = new Date()
-): Promise<boolean> {
-  const claimed = await postgresCategoryReclassificationJobAdapter.claim({
-    now,
-    leaseMs: CLAIM_LEASE_MS,
-    jobId,
-    limit: 1,
-  });
-  const job = claimed[0];
-  if (job == null) return false;
-  await processJob(job, now);
-  return true;
-}
-
-/** Recovery pass for a single ledger, driven by that ledger's polling client. */
-export async function recoverLedgerCategoryReclassifications(
-  ledgerId: string,
-  now = new Date()
-): Promise<void> {
-  const claimed = await postgresCategoryReclassificationJobAdapter.claim({
-    now,
-    leaseMs: CLAIM_LEASE_MS,
-    ledgerId,
-    limit: 1,
-  });
-  for (const job of claimed) await processJob(job, now);
-}
-
-/**
- * Fallback drain for ledgers nobody is polling any more — a closed tab, a
- * crashed process. Not the primary driver: status polling recovers its own
- * ledger far sooner.
- */
-export async function drainDueCategoryReclassifications(now = new Date()): Promise<void> {
-  const deadline = Date.now() + MAX_DRAIN_DURATION_MS;
-  for (let batch = 0; batch < MAX_DRAIN_BATCHES && Date.now() < deadline; batch += 1) {
-    const claimed = await postgresCategoryReclassificationJobAdapter.claim({
-      now,
-      leaseMs: CLAIM_LEASE_MS,
-      limit: DRAIN_CLAIM_LIMIT,
+      if (loaded.some((image) => !image.success)) {
+        await postgresCategoryAssignmentV2Adapter.markEvidenceIncomplete({
+          ledgerId: work.ledgerId,
+          jobId: work.jobId,
+          sourceDocumentId: work.sourceDocumentId,
+          claimToken: work.claimToken,
+        });
+      }
+      for (
+        let chunkIndex = selection.completedChunkCount;
+        chunkIndex * REQUEST_CHUNK_SIZE < group.subjects.length;
+        chunkIndex += 1
+      ) {
+        const now = new Date();
+        const owned = await postgresCategoryAssignmentV2Adapter.renewDocumentClaim({
+          ledgerId: work.ledgerId,
+          jobId: work.jobId,
+          sourceDocumentId: work.sourceDocumentId,
+          claimToken: work.claimToken,
+          leaseMs: CLAIM_LEASE_MS,
+          now,
+        });
+        if (!owned) return;
+        const controller = new AbortController();
+        const chunk = {
+          ...group,
+          subjects: group.subjects.slice(
+            chunkIndex * REQUEST_CHUNK_SIZE,
+            (chunkIndex + 1) * REQUEST_CHUNK_SIZE
+          ),
+        };
+        const aiStartedAt = Date.now();
+        let heartbeatInFlight: Promise<void> | null = null;
+        const heartbeat = setInterval(() => {
+          if (heartbeatInFlight != null) return;
+          heartbeatInFlight = postgresCategoryAssignmentV2Adapter
+            .renewDocumentClaim({
+              ledgerId: work.ledgerId,
+              jobId: work.jobId,
+              sourceDocumentId: work.sourceDocumentId,
+              claimToken: work.claimToken,
+              leaseMs: CLAIM_LEASE_MS,
+              now: new Date(),
+            })
+            .then((renewed) => {
+              if (!renewed) controller.abort();
+            })
+            .catch(() => controller.abort())
+            .finally(() => {
+              heartbeatInFlight = null;
+            });
+        }, CLAIM_HEARTBEAT_MS);
+        let result;
+        try {
+          result = await entryReclassifierAdapter.decide({
+            candidates: work.candidates,
+            group: chunk,
+            images,
+            signal: controller.signal,
+            ...(work.customPrompt == null || work.customPrompt === ""
+              ? {}
+              : { customPrompt: work.customPrompt }),
+          });
+        } finally {
+          clearInterval(heartbeat);
+          if (heartbeatInFlight != null) await heartbeatInFlight;
+        }
+        const persisted = await postgresCategoryAssignmentV2Adapter.persistDecisions({
+          ledgerId: work.ledgerId,
+          jobId: work.jobId,
+          sourceDocumentId: work.sourceDocumentId,
+          claimToken: work.claimToken,
+          decisions: result.decisions,
+          completedChunkCount: chunkIndex + 1,
+          now: new Date(),
+        });
+        logger.info(
+          {
+            jobSubject: logIdentifier("processing-job", work.jobId),
+            documentSubject: logIdentifier("source-document", work.sourceDocumentId),
+            attempt: work.attempts,
+            entryCount: chunk.subjects.length,
+            imageCount: images.length,
+            imageLoadDurationMs: Date.now() - imageStartedAt,
+            aiDurationMs: Date.now() - aiStartedAt,
+            errorCode: persisted ? null : "claim_lost",
+          },
+          "Category assignment request block finished"
+        );
+        if (!persisted) return;
+      }
+    }
+    const commitStartedAt = Date.now();
+    const result = await postgresSourceDocumentAggregateAdapter.applyCategoryAssignments({
+      ledgerId: work.ledgerId,
+      jobId: work.jobId,
+      sourceDocumentId: work.sourceDocumentId,
+      claimToken: work.claimToken,
+      now: new Date(),
     });
-    if (claimed.length === 0) return;
-    for (const job of claimed) await processJob(job, now);
-  }
-}
-
-async function processJob(job: ClaimedCategoryReclassificationJob, now: Date): Promise<void> {
-  try {
-    const dependencies = await loadDependencies(job, now);
-    const outcome = await runCategoryReclassification(job, dependencies);
     logger.info(
       {
-        jobSubject: logIdentifier("processing-job", job.id),
-        ledgerSubject: logIdentifier("ledger", job.ledgerId),
-        completed: outcome.completed,
-        appliedCount: outcome.appliedCount,
-        confirmedCount: outcome.confirmedCount,
+        jobSubject: logIdentifier("processing-job", work.jobId),
+        documentSubject: logIdentifier("source-document", work.sourceDocumentId),
+        attempt: work.attempts,
+        entryCount: selection.entryIds.length,
+        databaseCommitDurationMs: Date.now() - commitStartedAt,
+        totalDurationMs: Date.now() - startedAt,
+        outcome: result.status,
       },
-      "Category reclassification finished"
+      "Category assignment document finished"
     );
   } catch (error) {
-    const errorCode =
-      error instanceof AppError
-        ? error.code
-        : error instanceof Error && error.name !== ""
-          ? error.name
-          : "ReclassificationFailed";
-    const outcome = await postgresCategoryReclassificationJobAdapter.fail({
-      jobId: job.id,
-      claimToken: job.claimToken,
-      now,
+    const errorCode = stableErrorCode(error);
+    const outcome = await postgresCategoryAssignmentV2Adapter.failDocument({
+      ledgerId: work.ledgerId,
+      jobId: work.jobId,
+      sourceDocumentId: work.sourceDocumentId,
+      claimToken: work.claimToken,
       errorCode,
+      maxAttempts: runtimeEnv.aiCategoryMaxAttempts,
+      ...(errorCode === "ai_rate_limited" ? { retryAfterMs: 10_000 } : {}),
+      now: new Date(),
     });
-    logger.error(
+    logger.warn(
       {
-        jobSubject: logIdentifier("processing-job", job.id),
-        ledgerSubject: logIdentifier("ledger", job.ledgerId),
-        attempts: job.attempts + 1,
+        jobSubject: logIdentifier("processing-job", work.jobId),
+        documentSubject: logIdentifier("source-document", work.sourceDocumentId),
+        attempt: work.attempts,
+        entryCount: selection.entryIds.length,
+        totalDurationMs: Date.now() - startedAt,
         errorCode,
-        outcome,
+        retrying: outcome === "retry_scheduled",
       },
-      "Category reclassification job failed"
+      "Category assignment document failed"
     );
   }
+}
+
+async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<boolean> {
+  let processed = false;
+  for (;;) {
+    const claimed = await postgresCategoryAssignmentV2Adapter.claimDocuments({
+      now: new Date(),
+      leaseMs: CLAIM_LEASE_MS,
+      concurrency: runtimeEnv.aiCategoryConcurrency,
+      ...scope,
+    });
+    if (claimed.length > 0) {
+      processed = true;
+      await Promise.all(claimed.map(processDocument));
+      continue;
+    }
+    const nextDue = await postgresCategoryAssignmentV2Adapter.nextDue(scope);
+    if (nextDue == null) return processed;
+    const waitMs = nextDue.getTime() - Date.now();
+    if (waitMs <= 0) {
+      // Due work can remain unclaimed while another process owns every global
+      // slot. Keep this after() lifecycle alive so the job starts as soon as a
+      // lease is released instead of waiting for a future browser request.
+      await new Promise((resolve) => setTimeout(resolve, SLOT_RECHECK_MS));
+      continue;
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, MAX_IDLE_WAIT_MS)));
+  }
+}
+
+export async function runCategoryReclassificationJob(jobId: string): Promise<boolean> {
+  return runLoop({ jobId });
+}
+
+export async function recoverLedgerCategoryReclassifications(ledgerId: string): Promise<void> {
+  await runLoop({ ledgerId });
+}
+
+export async function drainDueCategoryReclassifications(_now?: Date): Promise<void> {
+  await runLoop({});
 }

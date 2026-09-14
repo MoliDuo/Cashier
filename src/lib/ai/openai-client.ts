@@ -6,6 +6,18 @@ import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { runtimeEnv } from "@/lib/env/runtime";
 
+export interface GenerateContentOptions {
+  maxAttempts?: number;
+  timeoutMs?: number;
+}
+
+function isSdkError<T extends Error>(
+  error: unknown,
+  constructor: (abstract new (...args: never[]) => T) | undefined
+): error is T {
+  return typeof constructor === "function" && error instanceof constructor;
+}
+
 export class OpenAIClient {
   private client: OpenAI;
 
@@ -39,11 +51,13 @@ export class OpenAIClient {
           type: "json_schema";
           json_schema: { name: string; schema: Record<string, unknown>; strict?: boolean };
         },
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: GenerateContentOptions
   ): Promise<{ content: string; usage?: { promptTokens: number; completionTokens: number } }> {
     const effectiveMaxTokens = maxTokens ?? 8192;
     const effectiveTemperature = temperature ?? 1;
-    const maxAttempts = Math.min(runtimeEnv.aiMaxRetries + 1, 3);
+    const maxAttempts = options?.maxAttempts ?? Math.min(runtimeEnv.aiMaxRetries + 1, 3);
+    const timeoutMs = options?.timeoutMs ?? runtimeEnv.aiRequestTimeoutMs;
     const baseDelay = runtimeEnv.aiRetryDelayMs;
     const correlationId = crypto.randomUUID();
     const serializedMessages = JSON.stringify(messages);
@@ -84,7 +98,7 @@ export class OpenAIClient {
             >,
           };
         }
-        const requestOptions = signal !== undefined ? { signal } : {};
+        const requestOptions = { ...(signal !== undefined ? { signal } : {}), timeout: timeoutMs };
         const response = await this.client.chat.completions.create(request, requestOptions);
 
         if (
@@ -151,7 +165,7 @@ export class OpenAIClient {
         );
 
         // If it's an OpenAI APIError, check the status code
-        if (error instanceof OpenAI.APIError && error.status != null) {
+        if (isSdkError(error, OpenAI.APIError) && error.status != null) {
           // 4xx errors are generally NOT retryable, except for 429 (Rate Limit)
           if (error.status >= 400 && error.status < 500 && error.status !== 429) {
             isRetryable = false;
@@ -166,10 +180,9 @@ export class OpenAIClient {
               inputHash,
               model,
               durationMs: Date.now() - startedAt,
-              errorCode:
-                error instanceof OpenAI.APIError
-                  ? `OPENAI_${error.status ?? "API_ERROR"}`
-                  : "OPENAI_REQUEST_FAILED",
+              errorCode: isSdkError(error, OpenAI.APIError)
+                ? `OPENAI_${error.status ?? "API_ERROR"}`
+                : "OPENAI_REQUEST_FAILED",
               attempt: attempt + 1,
               maxAttempts,
               delayMs: Math.round(delay),
@@ -188,23 +201,20 @@ export class OpenAIClient {
     // Classify exhausted retries into typed application errors so callers can
     // branch on stable codes instead of provider-specific error shapes or
     // message text. Non-retryable 4xx errors are rethrown unchanged.
-    if (lastError instanceof OpenAI.APIError) {
+    if (isSdkError(lastError, OpenAI.APIError)) {
       if (lastError.status === 429) {
-        throw new AppError(
-          "AI provider rate limited after retries",
-          "AI_PROVIDER_RATE_LIMITED",
-          503,
-          { cause: lastError.message }
-        );
+        throw new AppError("AI provider rate limited after retries", "ai_rate_limited", 503);
       }
       if (lastError.status != null && lastError.status >= 500) {
-        throw new AppError(
-          "AI provider unavailable after retries",
-          "AI_PROVIDER_UNAVAILABLE",
-          503,
-          { cause: lastError.message }
-        );
+        throw new AppError("AI provider unavailable after retries", "ai_provider_unavailable", 503);
       }
+      if (lastError.status === 401 || lastError.status === 403 || lastError.status === 404) {
+        throw new AppError("AI provider configuration is invalid", "ai_configuration_invalid", 500);
+      }
+    }
+
+    if (isSdkError(lastError, OpenAI.APIConnectionTimeoutError)) {
+      throw new AppError("AI request timed out", "ai_timeout", 504);
     }
 
     throw lastError;

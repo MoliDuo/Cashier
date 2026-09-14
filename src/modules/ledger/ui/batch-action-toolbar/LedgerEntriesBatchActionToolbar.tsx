@@ -13,6 +13,7 @@ import { LedgerEntriesActions } from "./LedgerEntriesActions";
 
 export interface LedgerEntriesBatchActionToolbarProps {
   selectedCount: number;
+  loadedCount?: number;
   isAllSelected: boolean;
   hasMoreData?: boolean;
   onSelectAll: () => void;
@@ -47,6 +48,7 @@ export interface LedgerEntriesBatchActionToolbarProps {
   /** The captured selection no longer matches the live one. */
   categorySelectionChanged?: boolean;
   isConfirmingCategory?: boolean;
+  selectionUploadProgress?: { received: number; total: number } | null;
   isProcessing?: boolean;
   className?: string;
 }
@@ -71,6 +73,7 @@ export interface LedgerEntriesBatchActionToolbarProps {
  */
 export function LedgerEntriesBatchActionToolbar({
   selectedCount,
+  loadedCount = selectedCount,
   isAllSelected,
   hasMoreData = false,
   onSelectAll,
@@ -96,6 +99,7 @@ export function LedgerEntriesBatchActionToolbar({
   onToggleCategoryPick,
   categorySelectionChanged = false,
   isConfirmingCategory = false,
+  selectionUploadProgress = null,
   isProcessing: externallyProcessing = false,
   className,
 }: LedgerEntriesBatchActionToolbarProps) {
@@ -122,11 +126,7 @@ export function LedgerEntriesBatchActionToolbar({
   const isChangingCategory = isChangingCategoryProp ?? internalChangingCategory;
   const isChangingCurrency = isChangingCurrencyProp ?? internalChangingCurrency;
   const isProcessing =
-    isChangingCategory ||
-    isChangingCurrency ||
-    isReclassifying ||
-    isConfirmingCategory ||
-    externallyProcessing;
+    isChangingCategory || isChangingCurrency || isConfirmingCategory || externallyProcessing;
   // Nothing selected means nothing to act on; keeping the buttons visible but
   // unavailable says what the mode offers without a layout shift on first tap.
   const actionsDisabled = isProcessing || selectedCount === 0;
@@ -195,11 +195,13 @@ export function LedgerEntriesBatchActionToolbar({
           }}
           // The box's own name, because the label next to it also carries the
           // loaded-scope note, which is not part of what the control is.
-          aria-label={isAllSelected ? t("deselectAll") : t("selectAll")}
+          aria-label={
+            isAllSelected ? t("deselectAll") : t("selectAllLoadedCount", { loaded: loadedCount })
+          }
           className="h-4 w-4"
         />
         <span className={textRoleClassName("bodyStrong", "whitespace-nowrap")}>
-          {isAllSelected ? t("deselectAll") : t("selectAll")}
+          {isAllSelected ? t("deselectAll") : t("selectAllLoadedCount", { loaded: loadedCount })}
         </span>
         {isAllSelected && hasMoreData ? (
           <span className="whitespace-nowrap text-xs text-muted-foreground">{t("loadedOnly")}</span>
@@ -210,6 +212,7 @@ export function LedgerEntriesBatchActionToolbar({
         <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
           <LedgerEntriesActions
             disabled={actionsDisabled}
+            nonCategoryDisabled={selectedCount > 100}
             isChangingCategory={isChangingCategory}
             isChangingCurrency={isChangingCurrency}
             isRetrying={isRetrying}
@@ -229,6 +232,12 @@ export function LedgerEntriesBatchActionToolbar({
         </div>
       ) : null}
 
+      <div className={textRoleClassName("meta", "basis-full space-y-0.5")} aria-live="polite">
+        <p>{t("selectedLoadedCount", { selected: selectedCount, loaded: loadedCount })}</p>
+        {hasMoreData ? <p>{t("unloadedExcluded")}</p> : null}
+        {selectedCount > 100 ? <p>{t("nonCategoryBatchLimit")}</p> : null}
+      </div>
+
       {onChangeCategory != null && confirmsCategory ? (
         <BatchSetCategoryDialog
           open={categoryDialogOpen}
@@ -240,6 +249,7 @@ export function LedgerEntriesBatchActionToolbar({
           onTogglePick={onToggleCategoryPick}
           selectionChanged={categorySelectionChanged}
           isConfirming={isConfirmingCategory}
+          uploadProgress={selectionUploadProgress}
           onConfirm={onConfirmCategory}
         />
       ) : null}

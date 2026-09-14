@@ -192,29 +192,22 @@ describe("category reclassification jobs", () => {
     expect(claimed[0]!.id).not.toBe(firstJob.id);
   });
 
-  it("enforces the batch bounds in the database", async () => {
+  it("does not retain the old 100-entry or 8-candidate database bounds", async () => {
     const ledger = await seedLedger();
 
-    await expect(
-      postgresCategoryReclassificationJobAdapter.enqueue({
-        ledgerId: ledger.id,
-        ledgerEntryIds: ids(101),
-        candidateCategoryIds: ids(2),
-      })
-    ).rejects.toBeTruthy();
-    await expect(
-      postgresCategoryReclassificationJobAdapter.enqueue({
-        ledgerId: ledger.id,
-        ledgerEntryIds: ids(2),
-        candidateCategoryIds: ids(1),
-      })
-    ).rejects.toBeTruthy();
+    const created = await postgresCategoryReclassificationJobAdapter.enqueue({
+      ledgerId: ledger.id,
+      ledgerEntryIds: ids(101),
+      candidateCategoryIds: ids(13),
+    });
+    expect(created.ledgerEntryIds).toHaveLength(101);
+    expect(created.candidateCategoryIds).toHaveLength(13);
 
     await expect(
       getTestDb()
         .select({ id: categoryReclassificationJobs.id })
         .from(categoryReclassificationJobs)
         .where(eq(categoryReclassificationJobs.ledgerId, ledger.id))
-    ).resolves.toHaveLength(0);
+    ).resolves.toHaveLength(1);
   });
 });

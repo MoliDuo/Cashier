@@ -140,3 +140,13 @@ Run `npm run check:architecture` locally. CI must reject import cycles.
 Architecture rules inspect TypeScript syntax for protected writes and structured log fields; comments
 and ordinary strings are not architectural evidence. The typography rules read class literals, so
 arbitrary text sizes and the retired `text-muted` alias fail the check while comments stay exempt.
+
+### Category assignment writes
+
+Category changes initiated by persistent assignment jobs belong to the source-document aggregate.
+Acquire locks in this order: ledger, source documents ordered by ID, then assignment job/document
+work. The aggregate transaction validates the document version, active revision, editable state,
+target category, claim token, and lease before changing any entry. It increments each document
+version at most once and writes entry outcomes, work status, and parent counters in the same
+transaction. Do not reintroduce a standalone unversioned category writer or record job progress in a
+second transaction.

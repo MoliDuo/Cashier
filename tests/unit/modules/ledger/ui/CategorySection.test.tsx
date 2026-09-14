@@ -15,6 +15,9 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
   applyCategoryPresetAction: applyPresetAction,
 }));
+vi.mock("@/modules/ledger/hooks/useCategoryAssignmentJob", () => ({
+  useCategoryAssignmentJob: () => ({ job: null, isReadError: false, refresh: vi.fn() }),
+}));
 
 const category: EntryCategoryWithCount = {
   id: "category-1",
@@ -58,7 +61,7 @@ describe("CategorySection", () => {
   it("keeps category changes in a draft and submits them atomically", async () => {
     const { onSaveCategories } = renderSection();
 
-    fireEvent.click(screen.getByRole("button", { name: "manageCategories" }));
+    fireEvent.click(await screen.findByRole("button", { name: "manageCategories" }));
     fireEvent.change(screen.getByLabelText("newCategoryPlaceholder"), {
       target: { value: "Travel" },
     });
@@ -87,14 +90,21 @@ describe("CategorySection", () => {
   });
 
   it("blocks a preset switch until every category has a destination", async () => {
-    applyPresetAction.mockResolvedValue([]);
+    applyPresetAction.mockResolvedValue({
+      categories: [category],
+      changed: true,
+      movedEntryCount: 3,
+      createdCategoryCount: 6,
+      removedCategoryCount: 1,
+      retainedCategoryCount: 0,
+    });
     renderSection();
 
-    fireEvent.click(screen.getByRole("button", { name: "switchPreset" }));
+    fireEvent.click(await screen.findByRole("button", { name: "switchPreset" }));
 
     // "Meals" is not a category in either preset, so nothing is preselected and
     // the switch cannot be confirmed until the user picks a destination.
-    const apply = screen.getByRole("button", { name: "presetApply" });
+    const apply = await screen.findByRole("button", { name: "presetApply" });
     expect(apply).toBeDisabled();
     expect(screen.getByText("presetSummaryNone")).toBeTruthy();
 

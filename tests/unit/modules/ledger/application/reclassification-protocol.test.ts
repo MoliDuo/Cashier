@@ -57,13 +57,15 @@ function textOf(parts: readonly AIMessageContentPart[]): string {
 }
 
 describe("buildReclassificationPrompt", () => {
-  it("numbers candidates from 1 and offers 0 for an entry that fits nothing", () => {
+  it("numbers candidates from 1 and requires the closest candidate", () => {
     const prompt = buildReclassificationPrompt({ candidates });
 
     expect(prompt).toContain("1. 吃喝 — 正餐与饮品");
     expect(prompt).toContain("2. 居家");
     expect(prompt).toContain("3. 健康 — 医疗与健身");
-    expect(prompt).toContain("Use category_index 0 when an entry does not clearly belong");
+    expect(prompt).toContain("Every entry must be assigned to exactly one candidate category");
+    expect(prompt).toContain("choose the closest candidate");
+    expect(prompt).not.toContain("category_index 0");
   });
 
   it("points the model at the document itself and scopes the entry list to one document", () => {
@@ -157,27 +159,53 @@ describe("resolveReclassificationDecisions", () => {
     subject({ ledgerEntryId: "c", currentCategoryId: "cat-food" }),
   ];
 
-  it("emits one decision per entry the model placed elsewhere", () => {
+  it("resolves one complete decision for every entry", () => {
     expect(
       resolveReclassificationDecisions({
         subjects,
         candidates,
-        response: { decisions: [{ entry_index: 1, category_index: 1 }] },
+        response: {
+          decisions: [
+            { entry_index: 1, category_index: 1 },
+            { entry_index: 2, category_index: 3 },
+            { entry_index: 3, category_index: 2 },
+          ],
+        },
       })
-    ).toEqual({ decisions: [{ ledgerEntryId: "a", categoryId: "cat-food" }], confirmedCount: 0 });
+    ).toEqual({
+      decisions: [
+        { ledgerEntryId: "a", categoryId: "cat-food" },
+        { ledgerEntryId: "b", categoryId: "cat-health" },
+        { ledgerEntryId: "c", categoryId: "cat-home" },
+      ],
+      confirmedCount: 0,
+    });
   });
 
-  it("counts a decision that matches the entry's current category as confirmed", () => {
+  it("returns targets that already match so the transaction can confirm them", () => {
     expect(
       resolveReclassificationDecisions({
         subjects,
         candidates,
-        response: { decisions: [{ entry_index: 2, category_index: 2 }] },
+        response: {
+          decisions: [
+            { entry_index: 1, category_index: 1 },
+            { entry_index: 2, category_index: 2 },
+            { entry_index: 3, category_index: 1 },
+          ],
+        },
       })
-    ).toEqual({ decisions: [], confirmedCount: 1 });
+    ).toEqual({
+      decisions: [
+        { ledgerEntryId: "a", categoryId: "cat-food" },
+        { ledgerEntryId: "b", categoryId: "cat-home" },
+        { ledgerEntryId: "c", categoryId: "cat-food" },
+      ],
+      confirmedCount: 0,
+    });
   });
 
-  it("leaves an entry alone rather than guessing", () => {
+  it("rejects zero and out-of-range indexes", () => {
     const cases: readonly {
       label: string;
       decisions: { entry_index: number; category_index: number }[];
@@ -187,21 +215,20 @@ describe("resolveReclassificationDecisions", () => {
       { label: "an entry past the slice", decisions: [{ entry_index: 9, category_index: 1 }] },
     ];
     for (const testCase of cases) {
-      expect(
+      expect(() =>
         resolveReclassificationDecisions({
-          subjects,
+          subjects: [subjects[0]!],
           candidates,
           response: { decisions: testCase.decisions },
-        }),
-        testCase.label
-      ).toEqual({ decisions: [], confirmedCount: 0 });
+        })
+      ).toThrowError(expect.objectContaining({ code: "ai_schema_invalid" }));
     }
   });
 
-  it("keeps the first decision when the model repeats an entry", () => {
-    expect(
+  it("rejects duplicate entry decisions", () => {
+    expect(() =>
       resolveReclassificationDecisions({
-        subjects,
+        subjects: subjects.slice(0, 2),
         candidates,
         response: {
           decisions: [
@@ -210,16 +237,16 @@ describe("resolveReclassificationDecisions", () => {
           ],
         },
       })
-    ).toEqual({ decisions: [{ ledgerEntryId: "a", categoryId: "cat-home" }], confirmedCount: 0 });
+    ).toThrowError(expect.objectContaining({ code: "ai_schema_invalid" }));
   });
 
-  it("ignores entries the model never mentioned", () => {
-    expect(
+  it("rejects missing entry decisions", () => {
+    expect(() =>
       resolveReclassificationDecisions({
         subjects,
         candidates,
         response: { decisions: [{ entry_index: 3, category_index: 3 }] },
       })
-    ).toEqual({ decisions: [{ ledgerEntryId: "c", categoryId: "cat-health" }], confirmedCount: 0 });
+    ).toThrowError(expect.objectContaining({ code: "ai_schema_invalid" }));
   });
 });

@@ -1,7 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -31,13 +30,14 @@ const UNSET_VALUE = "";
 
 interface CategoryPresetDialogProps {
   preset: CategoryPresetSwitch;
+  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
-export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
+export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDialogProps) {
   const t = useTranslations("Settings");
   const common = useTranslations("Common");
-  const locale = useLocale();
-  const { summary, isPending } = preset;
+  const { summary } = preset;
+  const isPending = preset.isPending || preset.isPreparing;
 
   // Literal keys only: the i18n validator rejects `t()` fed a lookup result.
   const presetLabel = (id: CategoryPresetId) =>
@@ -88,13 +88,15 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
                     selected ? "border-primary" : "border-border"
                   )}
                 >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => preset.choosePreset(presetId)}
-                    className="flex w-full items-start justify-between gap-3 text-left"
-                  >
+                  <label className="flex min-h-11 w-full cursor-pointer items-start gap-3 text-left">
+                    <input
+                      type="radio"
+                      name="category-preset"
+                      checked={selected}
+                      disabled={isPending}
+                      onChange={() => preset.choosePreset(presetId)}
+                      className="mt-1 size-4 accent-primary"
+                    />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium text-text">
                         {presetLabel(presetId)}
@@ -103,22 +105,24 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
                         {presetDescription(presetId)}
                       </span>
                     </span>
-                    {selected ? (
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                    ) : null}
-                  </button>
+                  </label>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {getCategoryPreset(presetId, locale).map((category) => (
-                      <span
+                    {getCategoryPreset(presetId, preset.locale).map((category) => (
+                      <details
                         key={category.name}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-sm bg-surface2 px-2 py-1",
+                          "rounded-sm bg-surface2 px-2 py-1",
                           textRoleClassName("micro")
                         )}
                       >
-                        <CategoryIcon iconName={category.icon} className="h-4 w-4" />
-                        <span className="text-text">{category.name}</span>
-                      </span>
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-text">
+                          <CategoryIcon iconName={category.icon} className="h-4 w-4" />
+                          {category.name}
+                        </summary>
+                        <p className="mt-1 max-w-xs text-muted-foreground">
+                          {category.description}
+                        </p>
+                      </details>
                     ))}
                   </div>
                 </div>
@@ -137,12 +141,28 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
                     ? KEEP_VALUE
                     : String(mapping);
               return (
-                <div key={category.id} className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 items-baseline gap-2">
-                    <span className="truncate text-sm text-text">{category.name}</span>
+                <div
+                  key={category.id}
+                  className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="min-w-0 truncate text-sm text-text">{category.name}</span>
+                      {preset.isSuggestedMapping(category.id) ? (
+                        <span className={textRoleClassName("micro")}>{t("presetSuggested")}</span>
+                      ) : null}
+                    </div>
                     <span className={cn("shrink-0", textRoleClassName("meta"))}>
                       {t("categoryItemCount", { count: category.entryCount ?? 0 })}
                     </span>
+                    {category.description == null || category.description === "" ? null : (
+                      <details className={textRoleClassName("meta")}>
+                        <summary className="flex min-h-11 cursor-pointer items-center">
+                          {t("presetExpandDescription")}
+                        </summary>
+                        <p className="text-muted-foreground">{category.description}</p>
+                      </details>
+                    )}
                   </div>
                   <Select
                     value={value}
@@ -151,7 +171,7 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
                       preset.setMapping(category.id, next === KEEP_VALUE ? null : Number(next))
                     }
                   >
-                    <SelectTrigger aria-label={category.name} className="w-44 shrink-0">
+                    <SelectTrigger aria-label={category.name} className="w-full shrink-0 sm:w-44">
                       <SelectValue placeholder={t("presetMappingUnset")} />
                     </SelectTrigger>
                     <SelectContent position="popper">
@@ -170,6 +190,52 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
               );
             })}
           </div>
+          <div className="space-y-2">
+            <h4 className={textRoleClassName("cardTitle")}>{t("presetFinalStructure")}</h4>
+            <p className={textRoleClassName("bodyMuted")}>{t("presetWholeCategoryDescription")}</p>
+            <p className={textRoleClassName("bodyMuted")}>{t("presetUncategorizedDescription")}</p>
+            <p className={textRoleClassName("bodyMuted")}>{t("presetAfterDescription")}</p>
+            <p className={textRoleClassName("bodyMuted")}>{t("presetMergeIrreversible")}</p>
+            <p className={textRoleClassName("bodyStrong")}>
+              {[
+                ...preset.preset.map((category) => category.name),
+                ...preset.categories
+                  .filter((category) => preset.mappings[category.id] === null)
+                  .map((category) => category.name),
+              ].join(" · ")}
+            </p>
+            <p className={textRoleClassName("meta")}>
+              {t("presetImpactPreview", {
+                entries: summary.entryCount,
+                merged: summary.mergedCount,
+                created: summary.createdCount,
+                retained: summary.keepCount,
+              })}
+            </p>
+          </div>
+          {preset.serverChanged ? (
+            <div className="flex flex-wrap items-center gap-2 border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+              <p className="min-w-0 flex-1" role="alert">
+                {t("presetDraftChanged")}
+              </p>
+              <Button type="button" size="sm" variant="outline" onClick={preset.reloadCategories}>
+                {t("presetReloadCategories")}
+              </Button>
+            </div>
+          ) : null}
+          {preset.result == null ? null : (
+            <div
+              className="border border-success/30 bg-success/10 p-3 text-sm text-success"
+              role="status"
+            >
+              {t("presetResultSummary", {
+                entries: preset.result.movedEntryCount,
+                created: preset.result.createdCategoryCount,
+                removed: preset.result.removedCategoryCount,
+                retained: preset.result.retainedCategoryCount,
+              })}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="shrink-0 gap-3 border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:flex-row sm:items-center sm:justify-between sm:space-x-0 sm:px-6 sm:py-4">
@@ -192,15 +258,30 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
               disabled={isPending}
               onClick={preset.closeDialog}
             >
-              {common("cancel")}
+              {preset.result == null ? common("cancel") : common("close")}
             </Button>
-            <Button
-              type="button"
-              disabled={!preset.canConfirm || isPending}
-              onClick={() => preset.setConfirmOpen(true)}
-            >
-              {t("presetApply")}
-            </Button>
+            {preset.result == null ? (
+              <Button
+                type="button"
+                disabled={!preset.canConfirm || isPending}
+                onClick={() => preset.setConfirmOpen(true)}
+              >
+                {preset.noChanges
+                  ? t("presetNoChanges")
+                  : isPending
+                    ? t("presetApplying")
+                    : t("presetApply")}
+              </Button>
+            ) : onGoToDetails == null ? null : (
+              <Button
+                type="button"
+                onClick={() =>
+                  onGoToDetails(preset.result!.categories.map((category) => category.id))
+                }
+              >
+                {t("presetGoToDetails")}
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
@@ -211,10 +292,21 @@ export function CategoryPresetDialog({ preset }: CategoryPresetDialogProps) {
         title={t("presetConfirmTitle", { preset: presetLabel(preset.presetId) })}
         description={t("presetConfirmDescription", {
           entries: summary.entryCount,
-          keep: summary.keepCount,
+          merged: summary.mergedCount,
+          created: summary.createdCount,
+          retained: summary.keepCount,
         })}
         confirmLabel={t("presetApply")}
         onConfirm={preset.confirm}
+      />
+      <ConfirmDialog
+        open={preset.discardOpen}
+        onOpenChange={preset.setDiscardOpen}
+        title={common("unsavedChangesTitle")}
+        description={common("unsavedChangesDescription")}
+        confirmLabel={common("discard")}
+        variant="destructive"
+        onConfirm={preset.confirmDiscard}
       />
     </Dialog>
   );

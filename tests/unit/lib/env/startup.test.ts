@@ -165,6 +165,9 @@ describe("validateStartupEnv", () => {
 
   it("owns all app env defaults in the startup module", () => {
     expect(Object.keys(ENV_DEFAULTS).sort()).toEqual([
+      "AI_CATEGORY_CONCURRENCY",
+      "AI_CATEGORY_MAX_ATTEMPTS",
+      "AI_CATEGORY_REQUEST_TIMEOUT_MS",
       "AI_MAX_RETRIES",
       "AI_MODEL",
       "AI_REQUEST_TIMEOUT_MS",

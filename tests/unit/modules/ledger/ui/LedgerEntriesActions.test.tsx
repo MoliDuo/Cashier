@@ -19,7 +19,7 @@ describe("LedgerEntriesActions", () => {
   it("opens the category picker from its own button", async () => {
     const { props } = renderActions();
 
-    await userEvent.click(screen.getByRole("button", { name: /指定分类|set category/i }));
+    await userEvent.click(screen.getByRole("button", { name: /设置分类|set category/i }));
 
     expect(props.onOpenCategory).toHaveBeenCalledOnce();
   });
@@ -35,7 +35,7 @@ describe("LedgerEntriesActions", () => {
   it("opens nothing of its own: no action here is a menu", async () => {
     renderActions();
 
-    await userEvent.click(screen.getByRole("button", { name: /指定分类|set category/i }));
+    await userEvent.click(screen.getByRole("button", { name: /设置分类|set category/i }));
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("LedgerEntriesActions", () => {
   it("shows a running write on the button that started it", () => {
     renderActions({ isChangingCategory: true });
 
-    const category = screen.getByRole("button", { name: /指定分类|set category/i });
+    const category = screen.getByRole("button", { name: /设置分类|set category/i });
     expect(category).toHaveAttribute("aria-busy", "true");
     expect(category).toBeDisabled();
     expect(screen.getByRole("button", { name: /修改货币|set currency/i })).toBeEnabled();
@@ -73,7 +73,7 @@ describe("LedgerEntriesActions", () => {
     // carries both spans here; the order is what this asserts. Category is one
     // button, not two: both answers are picked inside its dialog.
     const labels = screen.getAllByRole("button").map((button) => button.textContent ?? "");
-    ["指定分类", "修改日期", "拆分", "重试", "修改货币", "删除"].forEach((label, index) => {
+    ["设置分类", "修改日期", "拆分", "重试", "修改货币", "删除"].forEach((label, index) => {
       expect(labels[index]).toContain(label);
     });
   });
@@ -81,7 +81,7 @@ describe("LedgerEntriesActions", () => {
   it("shows a classification run on the category button that started it", () => {
     renderActions({ isReclassifying: true });
 
-    expect(screen.getByRole("button", { name: /指定分类|set category/i })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /设置分类|set category/i })).toHaveAttribute(
       "aria-busy",
       "true"
     );

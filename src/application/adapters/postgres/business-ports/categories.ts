@@ -2,11 +2,47 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { CategoryPort } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { ConflictError, ValidationError } from "@/lib/errors";
-import { entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
-import { lockLedgerForUpdate } from "../transaction-locks";
+import {
+  categoryReclassificationJobs,
+  entryCategories,
+  ledgerEntries,
+  sourceDocuments,
+} from "@/persistence";
+import { lockLedgerForUpdate, lockSourceDocumentsForUpdate } from "../transaction-locks";
+import { assertSourceDocumentNotProcessing } from "../source-document-write-guards";
+import type { PostgresTransaction } from "../transaction-locks";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
+import { incrementCategoryChangedDocumentVersions } from "../source-document-aggregate/category-assignments";
 
 import { mapCategory } from "./shared";
+
+async function assertCategoryCandidatesMutable(
+  tx: PostgresTransaction,
+  ledgerId: string,
+  categoryIds: readonly string[]
+): Promise<void> {
+  if (categoryIds.length === 0) return;
+  const active = await tx
+    .select({ id: categoryReclassificationJobs.id })
+    .from(categoryReclassificationJobs)
+    .where(
+      and(
+        eq(categoryReclassificationJobs.ledgerId, ledgerId),
+        inArray(categoryReclassificationJobs.status, ["preparing", "pending", "running"]),
+        sql`(
+          EXISTS (
+            SELECT 1
+            FROM unnest(${categoryReclassificationJobs.candidateCategoryIds}) AS candidate(category_id)
+            WHERE ${inArray(sql`candidate.category_id`, categoryIds)}
+          )
+          OR ${inArray(categoryReclassificationJobs.directCategoryId, categoryIds)}
+        )`
+      )
+    )
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (active != null) throw new ConflictError("CATEGORY_ASSIGNMENT_ACTIVE");
+}
 
 export const postgresCategoryAdapter: CategoryPort = {
   async list(ledgerId) {
@@ -82,19 +118,25 @@ export const postgresCategoryAdapter: CategoryPort = {
   },
 
   async update(ledgerId, categoryId, input) {
-    const updated = await db
-      .update(entryCategories)
-      .set({ ...input, updatedAt: new Date() })
-      .where(
-        and(
-          eq(entryCategories.ledgerId, ledgerId),
-          eq(entryCategories.id, categoryId),
-          isNull(entryCategories.deletedAt)
+    return db.transaction(async (tx) => {
+      await lockLedgerForUpdate(tx, ledgerId);
+      if (input.name !== undefined || input.description !== undefined) {
+        await assertCategoryCandidatesMutable(tx, ledgerId, [categoryId]);
+      }
+      const updated = await tx
+        .update(entryCategories)
+        .set({ ...input, updatedAt: new Date() })
+        .where(
+          and(
+            eq(entryCategories.ledgerId, ledgerId),
+            eq(entryCategories.id, categoryId),
+            isNull(entryCategories.deletedAt)
+          )
         )
-      )
-      .returning()
-      .then((rows) => rows[0]);
-    return updated == null ? null : mapCategory(updated);
+        .returning()
+        .then((rows) => rows[0]);
+      return updated == null ? null : mapCategory(updated);
+    });
   },
 
   async updateMissingMetadata(ledgerId, categoryId, input) {
@@ -127,6 +169,7 @@ export const postgresCategoryAdapter: CategoryPort = {
       if (!wroteIcon && !wroteDescription) {
         return { status: "updated" as const, wroteIcon: false, wroteDescription: false };
       }
+      if (wroteDescription) await assertCategoryCandidatesMutable(tx, ledgerId, [categoryId]);
       await tx
         .update(entryCategories)
         .set({
@@ -148,6 +191,7 @@ export const postgresCategoryAdapter: CategoryPort = {
   async delete(ledgerId, categoryId) {
     return db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, ledgerId);
+      await assertCategoryCandidatesMutable(tx, ledgerId, [categoryId]);
       const category = await tx
         .select({ id: entryCategories.id })
         .from(entryCategories)
@@ -247,6 +291,17 @@ export const postgresCategoryAdapter: CategoryPort = {
       }
 
       const removed = current.filter((category) => !targetIds.has(category.id));
+      const candidateAffectingIds = [
+        ...removed.map((category) => category.id),
+        ...targets.flatMap((target) => {
+          const existing = target.id == null ? undefined : currentById.get(target.id);
+          return existing != null &&
+            (existing.name !== target.name || existing.description !== target.description)
+            ? [existing.id]
+            : [];
+        }),
+      ];
+      await assertCategoryCandidatesMutable(tx, ledgerId, candidateAffectingIds);
 
       const now = new Date();
       const removedIds = removed.map((category) => category.id);
@@ -386,6 +441,18 @@ export const postgresCategoryAdapter: CategoryPort = {
     const { presetCategories, mappings } = input;
     return db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, ledgerId);
+      const activeAssignment = await tx
+        .select({ id: categoryReclassificationJobs.id })
+        .from(categoryReclassificationJobs)
+        .where(
+          and(
+            eq(categoryReclassificationJobs.ledgerId, ledgerId),
+            inArray(categoryReclassificationJobs.status, ["preparing", "pending", "running"])
+          )
+        )
+        .limit(1)
+        .then((rows) => rows[0]);
+      if (activeAssignment != null) throw new ConflictError("CATEGORY_ASSIGNMENT_ACTIVE");
       const current = await tx
         .select()
         .from(entryCategories)
@@ -422,11 +489,48 @@ export const postgresCategoryAdapter: CategoryPort = {
       // Soft-delete what migrates away before inserting anything. The rows stay
       // (only `deleted_at` is set) so the composite foreign key from
       // ledger_entries keeps holding and step 3 can still match `from_id`.
+      const reusableTargetByIndex = new Map<number, string>();
+      for (const mapping of mappings) {
+        const category = currentById.get(mapping.fromCategoryId)!;
+        const sameNameIndex = presetCategories.findIndex((preset) => preset.name === category.name);
+        if (
+          sameNameIndex >= 0 &&
+          (mapping.toPresetIndex === sameNameIndex || mapping.toPresetIndex === null)
+        ) {
+          reusableTargetByIndex.set(sameNameIndex, category.id);
+        }
+      }
       const migrating = mappings.filter(
         (mapping): mapping is { fromCategoryId: string; toPresetIndex: number } =>
-          mapping.toPresetIndex != null
+          mapping.toPresetIndex != null &&
+          reusableTargetByIndex.get(mapping.toPresetIndex) !== mapping.fromCategoryId
       );
       const migratedIds = migrating.map((mapping) => mapping.fromCategoryId);
+      const affectedDocumentIds =
+        migrating.length === 0
+          ? []
+          : await tx
+              .selectDistinct({ id: sourceDocuments.id })
+              .from(ledgerEntries)
+              .innerJoin(
+                sourceDocuments,
+                and(
+                  eq(sourceDocuments.ledgerId, ledgerId),
+                  eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
+                  eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
+                  isNull(sourceDocuments.deletedAt)
+                )
+              )
+              .where(
+                and(
+                  eq(ledgerEntries.ledgerId, ledgerId),
+                  inArray(ledgerEntries.categoryId, migratedIds),
+                  isNull(ledgerEntries.deletedAt)
+                )
+              )
+              .then((rows) => rows.map((row) => row.id).sort());
+      const lockedDocuments = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
+      for (const document of lockedDocuments) await assertSourceDocumentNotProcessing(tx, document);
       if (migratedIds.length > 0) {
         await tx
           .update(entryCategories)
@@ -451,7 +555,7 @@ export const postgresCategoryAdapter: CategoryPort = {
       );
       const toInsert: { name: string; description: string; icon: string; sortOrder: number }[] = [];
       presetCategories.forEach((preset, index) => {
-        if (keptByName.has(preset.name)) return;
+        if (reusableTargetByIndex.has(index) || keptByName.has(preset.name)) return;
         toInsert.push({
           name: preset.name,
           description: preset.description,
@@ -470,11 +574,15 @@ export const postgresCategoryAdapter: CategoryPort = {
 
       // One target id per preset slot: either a reused row or a fresh insert.
       const presetTargetIds = presetCategories.map(
-        (preset) => keptByName.get(preset.name)?.id ?? insertedByName.get(preset.name)!
+        (preset, index) =>
+          reusableTargetByIndex.get(index) ??
+          keptByName.get(preset.name)?.id ??
+          insertedByName.get(preset.name)!
       );
 
       // Move every migrated category's entries onto its target. Set-based, so
       // many-to-one collapses naturally.
+      let movedEntryCount = 0;
       if (migrating.length > 0) {
         const transfers = JSON.stringify(
           migrating.map((mapping) => ({
@@ -482,7 +590,7 @@ export const postgresCategoryAdapter: CategoryPort = {
             to_id: presetTargetIds[mapping.toPresetIndex]!,
           }))
         );
-        await tx.execute(sql`
+        const moved = await tx.execute<{ source_document_id: string }>(sql`
           WITH transfers AS (
             SELECT * FROM jsonb_to_recordset(${transfers}::jsonb) AS value(
               from_id uuid,
@@ -492,11 +600,20 @@ export const postgresCategoryAdapter: CategoryPort = {
           UPDATE ledger_entries AS entry
           SET category_id = transfers.to_id,
               updated_at = ${now}
-          FROM transfers
+          FROM transfers, source_documents AS document
           WHERE entry.ledger_id = ${ledgerId}
             AND entry.category_id = transfers.from_id
             AND entry.deleted_at IS NULL
+            AND document.ledger_id = ${ledgerId}
+            AND document.id = entry.source_document_id
+            AND document.active_revision_id = entry.source_document_revision_id
+            AND document.deleted_at IS NULL
+            AND entry.category_id IS DISTINCT FROM transfers.to_id
+          RETURNING entry.source_document_id
         `);
+        movedEntryCount = moved.rows.length;
+        const changedDocumentIds = [...new Set(moved.rows.map((row) => row.source_document_id))];
+        await incrementCategoryChangedDocumentVersions(tx, ledgerId, changedDocumentIds, now);
       }
 
       // Preset categories take the leading slots; kept extras follow. A reused
@@ -526,14 +643,52 @@ export const postgresCategoryAdapter: CategoryPort = {
         WHERE category.id = ordering.id
           AND category.ledger_id = ${ledgerId}
           AND category.deleted_at IS NULL
+          AND category.sort_order IS DISTINCT FROM ordering.sort_order
       `);
 
       const saved = await tx
-        .select()
+        .select({
+          category: entryCategories,
+          entryCount: sql<number>`count(${sourceDocuments.id})`,
+        })
         .from(entryCategories)
+        .leftJoin(
+          ledgerEntries,
+          and(
+            eq(ledgerEntries.ledgerId, ledgerId),
+            eq(ledgerEntries.categoryId, entryCategories.id),
+            isNull(ledgerEntries.deletedAt)
+          )
+        )
+        .leftJoin(
+          sourceDocuments,
+          and(
+            eq(sourceDocuments.ledgerId, ledgerId),
+            eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
+            eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
+            isNull(sourceDocuments.deletedAt)
+          )
+        )
         .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+        .groupBy(entryCategories.id)
         .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
-      return saved.map(mapCategory);
+      const orderingChanged = [...orderById].some(
+        ([id, sortOrder]) => currentById.get(id)?.sortOrder !== sortOrder
+      );
+      return {
+        categories: saved.map(({ category, entryCount }) => ({
+          ...mapCategory(category),
+          entryCount: Number(entryCount),
+        })),
+        changed:
+          movedEntryCount > 0 || inserted.length > 0 || migratedIds.length > 0 || orderingChanged,
+        movedEntryCount,
+        createdCategoryCount: inserted.length,
+        removedCategoryCount: migratedIds.length,
+        retainedCategoryCount: current.filter(
+          (category) => !migratedIds.includes(category.id) && !presetTargetIds.includes(category.id)
+        ).length,
+      };
     });
   },
 

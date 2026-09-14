@@ -6,6 +6,7 @@ interface LedgerEntriesActionsProps {
   /** Every action is unavailable, either because a write is running or because
    * the selection is empty. */
   disabled: boolean;
+  nonCategoryDisabled?: boolean;
   isChangingCategory?: boolean;
   isChangingCurrency?: boolean;
   isRetrying?: boolean;
@@ -37,6 +38,7 @@ interface LedgerEntriesActionsProps {
  */
 export function LedgerEntriesActions({
   disabled,
+  nonCategoryDisabled = false,
   isChangingCategory = false,
   isChangingCurrency = false,
   isRetrying = false,
@@ -70,7 +72,7 @@ export function LedgerEntriesActions({
         <BatchActionButton
           variant="outline"
           icon={Calendar}
-          disabled={disabled}
+          disabled={disabled || nonCategoryDisabled}
           shortLabel={t("setDateShort")}
           onClick={onChangeDate}
         >
@@ -98,7 +100,7 @@ export function LedgerEntriesActions({
         <BatchActionButton
           variant="outline"
           icon={DollarSign}
-          disabled={disabled}
+          disabled={disabled || nonCategoryDisabled}
           loading={isChangingCurrency}
           shortLabel={t("setCurrencyShort")}
           onClick={onOpenCurrency}
@@ -111,7 +113,7 @@ export function LedgerEntriesActions({
         <BatchActionButton
           variant="destructive"
           icon={Trash2}
-          disabled={disabled}
+          disabled={disabled || nonCategoryDisabled}
           loading={isDeleting}
           onClick={onDelete}
         >

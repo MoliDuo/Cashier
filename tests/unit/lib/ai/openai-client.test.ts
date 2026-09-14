@@ -77,7 +77,7 @@ describe("openai-client", () => {
       expect(create).toHaveBeenCalledTimes(1);
     });
 
-    it("maps exhausted rate-limit retries to AI_PROVIDER_RATE_LIMITED", async () => {
+    it("maps exhausted rate-limit retries to ai_rate_limited", async () => {
       const { OpenAI } = await import("openai");
       const client = await loadClient();
       stubSdkCreate(
@@ -88,11 +88,11 @@ describe("openai-client", () => {
       await expect(
         client.generateContent("system", [{ role: "user", content: "Hello" }], "gpt-4o")
       ).rejects.toMatchObject({
-        code: "AI_PROVIDER_RATE_LIMITED",
+        code: "ai_rate_limited",
       });
     });
 
-    it("maps exhausted 5xx retries to AI_PROVIDER_UNAVAILABLE", async () => {
+    it("maps exhausted 5xx retries to ai_provider_unavailable", async () => {
       const { OpenAI } = await import("openai");
       const client = await loadClient();
       stubSdkCreate(
@@ -103,11 +103,11 @@ describe("openai-client", () => {
       await expect(
         client.generateContent("system", [{ role: "user", content: "Hello" }], "gpt-4o")
       ).rejects.toMatchObject({
-        code: "AI_PROVIDER_UNAVAILABLE",
+        code: "ai_provider_unavailable",
       });
     });
 
-    it("rethrows non-retryable 4xx errors unchanged", async () => {
+    it("maps authentication failures to a stable configuration error", async () => {
       const { OpenAI } = await import("openai");
       const client = await loadClient();
       const apiError = new OpenAI.APIError(
@@ -120,7 +120,7 @@ describe("openai-client", () => {
 
       await expect(
         client.generateContent("system", [{ role: "user", content: "Hello" }], "gpt-4o")
-      ).rejects.toBe(apiError);
+      ).rejects.toMatchObject({ code: "ai_configuration_invalid" });
     });
   });
 });

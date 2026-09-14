@@ -154,12 +154,44 @@ const ledgerEntryIdsSchema = z.preprocess(
 // Fewer than two candidates leaves nothing for a model to choose between.
 const candidateCategoryIdsSchema = z.preprocess(
   (value) => (Array.isArray(value) ? [...new Set(value)] : value),
-  z.array(uuidSchema).min(2).max(8)
+  z.array(uuidSchema).min(2)
 );
 const startCategoryReclassificationInputSchema = strictObjectSchema({
-  ledgerEntryIds: ledgerEntryIdsSchema,
+  ledgerEntryIds: z.preprocess(
+    (value) => (Array.isArray(value) ? [...new Set(value)] : value),
+    z.array(uuidSchema).min(1)
+  ),
   candidateCategoryIds: candidateCategoryIdsSchema,
 });
+const categoryAssignmentModeSchema = z.union([
+  strictObjectSchema({ kind: z.literal("ai"), candidateCategoryIds: candidateCategoryIdsSchema }),
+  strictObjectSchema({ kind: z.literal("assign"), categoryId: uuidSchema }),
+  strictObjectSchema({ kind: z.literal("clear") }),
+]);
+const categoryAssignmentSelectionEntrySchema = strictObjectSchema({
+  ledgerEntryId: uuidSchema,
+  sourceDocumentId: uuidSchema,
+  expectedVersion: z.number().int().positive(),
+});
+const beginCategoryAssignmentInputSchema = strictObjectSchema({
+  requestKey: uuidSchema,
+  mode: categoryAssignmentModeSchema,
+  expectedEntryCount: z.number().int().positive(),
+});
+const appendCategoryAssignmentSelectionInputSchema = strictObjectSchema({
+  jobId: uuidSchema,
+  chunkIndex: z.number().int().nonnegative(),
+  entries: z.array(categoryAssignmentSelectionEntrySchema).min(1).max(1000),
+});
+const commitCategoryAssignmentSelectionInputSchema = strictObjectSchema({
+  jobId: uuidSchema,
+  expectedEntryCount: z.number().int().positive(),
+});
+const retryCategoryAssignmentInputSchema = strictObjectSchema({
+  jobId: uuidSchema,
+  requestKey: uuidSchema,
+});
+const cancelCategoryAssignmentInputSchema = strictObjectSchema({ jobId: uuidSchema });
 const entryCategoryIdSchema = uuidSchema;
 const serviceCredentialIdSchema = uuidSchema;
 
@@ -275,6 +307,16 @@ export const parseLedgerEntryIds = (input: unknown) =>
   parseLedgerContract(ledgerEntryIdsSchema, input);
 export const parseStartCategoryReclassificationInput = (input: unknown) =>
   parseLedgerContract(startCategoryReclassificationInputSchema, input);
+export const parseBeginCategoryAssignmentInput = (input: unknown) =>
+  parseLedgerContract(beginCategoryAssignmentInputSchema, input);
+export const parseAppendCategoryAssignmentSelectionInput = (input: unknown) =>
+  parseLedgerContract(appendCategoryAssignmentSelectionInputSchema, input);
+export const parseCommitCategoryAssignmentSelectionInput = (input: unknown) =>
+  parseLedgerContract(commitCategoryAssignmentSelectionInputSchema, input);
+export const parseRetryCategoryAssignmentInput = (input: unknown) =>
+  parseLedgerContract(retryCategoryAssignmentInputSchema, input);
+export const parseCancelCategoryAssignmentInput = (input: unknown) =>
+  parseLedgerContract(cancelCategoryAssignmentInputSchema, input);
 export const parseCreateServiceCredentialInput = (input: unknown) =>
   parseLedgerContract(createServiceCredentialInputSchema, input);
 export const parseServiceCredentialId = (input: unknown) =>

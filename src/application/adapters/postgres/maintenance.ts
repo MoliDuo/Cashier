@@ -32,6 +32,7 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
     `);
     if (cooldown.rows.length === 0) return false;
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
     await tx.execute(sql`DELETE FROM rate_limit_buckets WHERE bucket_key IN (
@@ -48,11 +49,11 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
     await tx.execute(sql`DELETE FROM ${emailChangeChallenges} WHERE id IN (
       SELECT id FROM ${emailChangeChallenges} WHERE expires_at < ${now} LIMIT ${LIMIT}
     )`);
-    // Terminal reclassification rows are the client's only way to observe a
-    // finished run, so they survive their run by a day before being collected.
+    // Result work rows cascade with the parent after the seven-day viewing window.
     await tx.execute(sql`DELETE FROM ${categoryReclassificationJobs} WHERE id IN (
       SELECT id FROM ${categoryReclassificationJobs}
-      WHERE status IN ('succeeded', 'failed') AND updated_at < ${dayAgo}
+      WHERE status IN ('succeeded', 'partial', 'failed', 'cancelled')
+        AND updated_at < ${sevenDaysAgo}
       LIMIT ${LIMIT}
     )`);
 

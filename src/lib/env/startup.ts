@@ -12,6 +12,9 @@ export const ENV_DEFAULTS = {
   AI_RETRY_DELAY_MS: "1000",
   AI_REQUEST_TIMEOUT_MS: "60000",
   AI_REVISION_DEADLINE_MS: "180000",
+  AI_CATEGORY_CONCURRENCY: "100",
+  AI_CATEGORY_REQUEST_TIMEOUT_MS: "60000",
+  AI_CATEGORY_MAX_ATTEMPTS: "3",
   UPLOAD_PLAN_LIMIT_PER_15_MIN: "20",
   UPLOAD_OPEN_SESSION_LIMIT: "5",
   UPLOAD_DAILY_BYTES_LIMIT: "104857600",
@@ -143,6 +146,18 @@ const startupEnvFields = {
   AI_RETRY_DELAY_MS: nonNegativeIntWithDefault("AI_RETRY_DELAY_MS"),
   AI_REQUEST_TIMEOUT_MS: positiveIntWithDefault("AI_REQUEST_TIMEOUT_MS"),
   AI_REVISION_DEADLINE_MS: positiveIntWithDefault("AI_REVISION_DEADLINE_MS"),
+  AI_CATEGORY_CONCURRENCY: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(1).max(256).default(100)
+  ),
+  AI_CATEGORY_REQUEST_TIMEOUT_MS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(1000).max(180000).default(60000)
+  ),
+  AI_CATEGORY_MAX_ATTEMPTS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(1).max(5).default(3)
+  ),
   UPLOAD_PLAN_LIMIT_PER_15_MIN: positiveIntWithDefault("UPLOAD_PLAN_LIMIT_PER_15_MIN"),
   UPLOAD_OPEN_SESSION_LIMIT: positiveIntWithDefault("UPLOAD_OPEN_SESSION_LIMIT"),
   UPLOAD_DAILY_BYTES_LIMIT: positiveIntWithDefault("UPLOAD_DAILY_BYTES_LIMIT"),

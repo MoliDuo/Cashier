@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useSelection } from "@/hooks/use-selection";
-import { useSmartPolling } from "@/hooks/use-smart-polling";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { invalidateLedgerQueries } from "@/lib/mutations/ledger-invalidation";
 import { queryKeys } from "@/lib/query-keys";
@@ -17,9 +16,19 @@ import {
   batchUpdateLedgerEntryDatesAction,
   previewBatchLedgerEntryDateAction,
 } from "@/modules/ledger/server-actions/entries";
-import { startCategoryReclassificationAction } from "@/modules/ledger/server-actions/reclassification";
+import {
+  appendCategoryAssignmentSelectionAction,
+  beginCategoryAssignmentAction,
+  commitCategoryAssignmentSelectionAction,
+} from "@/modules/ledger/server-actions/reclassification";
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
-import type { CategoryReclassificationJob, LedgerEntry } from "@/modules/ledger/contracts";
+import type {
+  CategoryAssignmentMode,
+  CategoryAssignmentSelectionEntry,
+  CategoryReclassificationJob,
+  EntryCategory,
+  LedgerEntry,
+} from "@/modules/ledger/contracts";
 import type { VersionedTarget } from "@/modules/source-document/contracts";
 import { unwrapAtomicBatchCommandResult } from "@/modules/source-document/command-results";
 
@@ -31,23 +40,20 @@ type BatchDateImpact = Awaited<ReturnType<typeof previewBatchLedgerEntryDateActi
  * spent before a slow run finished. The index advances on every response,
  * not only on a change, so the tail has to be long enough to outlast the run.
  */
-const RECLASSIFICATION_POLL_INTERVALS_MS = [
-  2_000, 3_000, 5_000, 10_000, 15_000, 20_000, 30_000, 30_000, 30_000, 30_000, 30_000,
-] as const;
-
 function selectionMatches(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
 function isReclassificationActive(job: CategoryReclassificationJob): boolean {
-  return job.status === "pending" || job.status === "running";
+  return job.status === "preparing" || job.status === "pending" || job.status === "running";
 }
 
 export function useDetailsBatchController(
   ledgerId: string,
   entries: readonly LedgerEntry[],
   queryFingerprint: string,
-  timeZone?: string
+  timeZone?: string,
+  categories: readonly EntryCategory[] = []
 ) {
   const t = useTranslations("DetailsTab");
   const tBatch = useTranslations("BatchActions");
@@ -72,7 +78,7 @@ export function useDetailsBatchController(
     },
     [entryById]
   );
-  const selection = useSelection({ allIds, queryFingerprint });
+  const selection = useSelection({ allIds, queryFingerprint, maxSelected: null });
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
@@ -109,29 +115,38 @@ export function useDetailsBatchController(
   // Captured when the dialog opens. There is no server preview to ask for, so
   // the task row's `ledgerEntryIds` is the authority from the moment it is
   // written; the snapshot only has to survive the trip from open to confirm.
-  const [categorySnapshot, setCategorySnapshot] = useState<string[] | null>(null);
+  const [categorySnapshot, setCategorySnapshot] = useState<{
+    ledgerId: string;
+    queryFingerprint: string;
+    categorySignature: string;
+    entries: CategoryAssignmentSelectionEntry[];
+  } | null>(null);
+  const [selectionUploadProgress, setSelectionUploadProgress] = useState<{
+    received: number;
+    total: number;
+  } | null>(null);
+  const categoryRequestKeyRef = useRef<string | null>(null);
   const announcedJobRef = useRef<string | null>(null);
   const announcedJobsRef = useRef(new Set<string>());
 
   const reclassification = useQuery<CategoryReclassificationJob | null>({
     queryKey: queryKeys.categoryReclassification(ledgerId),
     queryFn: () => getCategoryReclassificationJobAction(ledgerId),
-    refetchInterval: useSmartPolling<CategoryReclassificationJob | null>({
-      // This ledger-scoped query is always a live polling session; whether it
-      // should be polling right now is the job's business, not the session's.
-      sessionKey: 1,
-      // A second run restarts the schedule instead of inheriting the one the
-      // previous run already spent.
-      resetToken: useCallback((job) => job?.id ?? "", []),
-      intervalsMs: RECLASSIFICATION_POLL_INTERVALS_MS,
-      isPollingActive: useCallback((job) => job != null && isReclassificationActive(job), []),
-    }),
+    refetchInterval: (query) =>
+      query.state.data != null && isReclassificationActive(query.state.data) ? 3_000 : false,
   });
   const reclassificationJob = reclassification.data ?? null;
   const isReclassifying =
     reclassificationJob != null && isReclassificationActive(reclassificationJob);
   const categorySelectionChanged =
-    categorySnapshot != null && !selectionMatches(categorySnapshot, selection.selectedIds);
+    categorySnapshot != null &&
+    (categorySnapshot.ledgerId !== ledgerId ||
+      categorySnapshot.queryFingerprint !== queryFingerprint ||
+      categorySnapshot.categorySignature !== categories.map((category) => category.id).join(":") ||
+      !selectionMatches(
+        categorySnapshot.entries.map((entry) => entry.ledgerEntryId),
+        selection.selectedIds
+      ));
 
   // Announce a finished run only if this client watched it run. A terminal job
   // left over from an earlier visit is history, not news — but a run this page
@@ -150,7 +165,7 @@ export function useDetailsBatchController(
         tBatch("aiCategoryDone", {
           applied: job.appliedCount,
           confirmed: job.confirmedCount,
-          undecided: job.undecidedCount,
+          issues: job.failedCount + job.conflictCount + job.skippedCount,
         })
       );
       void invalidateLedgerQueries(queryClient, ledgerId, ["documents", "stats"]);
@@ -166,11 +181,30 @@ export function useDetailsBatchController(
   const setCategoryDialogVisibility = useCallback(
     (open: boolean) => {
       setCategoryDialogOpen(open);
-      setCategorySnapshot(open ? [...selection.selectedIds] : null);
+      if (open) categoryRequestKeyRef.current = null;
+      setCategorySnapshot(
+        open
+          ? {
+              ledgerId,
+              queryFingerprint,
+              categorySignature: categories.map((category) => category.id).join(":"),
+              entries: selection.selectedIds.map((id) => {
+                const entry = entryById.get(id);
+                if (entry?.sourceDocument == null)
+                  throw new Error("Entry has no source document version");
+                return {
+                  ledgerEntryId: id,
+                  sourceDocumentId: entry.sourceDocument.id,
+                  expectedVersion: entry.sourceDocument.version,
+                };
+              }),
+            }
+          : null
+      );
       setPickedCategoryIds([]);
       setClearCategoryPicked(false);
     },
-    [selection.selectedIds]
+    [categories, entryById, ledgerId, queryFingerprint, selection.selectedIds]
   );
   // Clearing is exclusive: "no category" is not one more candidate to weigh
   // against the others, it is the other answer to the same question.
@@ -192,11 +226,38 @@ export function useDetailsBatchController(
 
   const startAiCategory = useLedgerMutation<
     CategoryReclassificationJob,
-    { ledgerEntryIds: string[]; candidateCategoryIds: string[] }
+    {
+      requestKey: string;
+      mode: CategoryAssignmentMode;
+      entries: CategoryAssignmentSelectionEntry[];
+    }
   >(ledgerId, {
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    mutationFn: async (input) => startCategoryReclassificationAction(ledgerId, input),
+    mutationFn: async (input) => {
+      const started = await beginCategoryAssignmentAction(ledgerId, {
+        requestKey: input.requestKey,
+        mode: input.mode,
+        expectedEntryCount: input.entries.length,
+      });
+      setSelectionUploadProgress({ received: started.receivedCount, total: input.entries.length });
+      for (
+        let offset = started.receivedCount, chunkIndex = Math.floor(started.receivedCount / 1000);
+        offset < input.entries.length;
+        offset += 1000, chunkIndex += 1
+      ) {
+        const progress = await appendCategoryAssignmentSelectionAction(ledgerId, {
+          jobId: started.id,
+          chunkIndex,
+          entries: input.entries.slice(offset, offset + 1000),
+        });
+        setSelectionUploadProgress({ received: progress.received, total: input.entries.length });
+      }
+      return commitCategoryAssignmentSelectionAction(ledgerId, {
+        jobId: started.id,
+        expectedEntryCount: input.entries.length,
+      });
+    },
     invalidationErrorMessage: tCommon("savedRefreshFailed"),
     errorMessage: tBatch("aiCategoryFailed"),
     onSuccess: (job) => {
@@ -204,6 +265,8 @@ export function useDetailsBatchController(
       announcedJobRef.current = job.id;
       toast.success(tBatch("aiCategoryRunning"));
       selection.clearSelection();
+      setSelectionUploadProgress(null);
+      categoryRequestKeyRef.current = null;
       setCategoryDialogVisibility(false);
       void queryClient.invalidateQueries({
         queryKey: queryKeys.categoryReclassification(ledgerId),
@@ -258,8 +321,8 @@ export function useDetailsBatchController(
    */
   const confirmCategory = useCallback(() => {
     const snapshot = categorySnapshot;
-    if (snapshot == null || snapshot.length === 0) return;
-    if (!selectionMatches(snapshot, selection.selectedIds)) {
+    if (snapshot == null || snapshot.entries.length === 0) return;
+    if (categorySelectionChanged) {
       toast.error(tBatch("selectionMoved"));
       return;
     }
@@ -268,24 +331,30 @@ export function useDetailsBatchController(
       categoryIds: pickedCategoryIds,
       clearPicked: clearCategoryPicked,
     });
-    if (pick.kind === "clear" || pick.kind === "assign") {
+    if ((pick.kind === "clear" || pick.kind === "assign") && snapshot.entries.length <= 100) {
       void update.mutateAsync({ categoryId: pick.kind === "clear" ? null : pick.categoryId }).then(
         () => setCategoryDialogVisibility(false),
         () => undefined
       );
       return;
     }
-    if (pick.kind === "ai") {
+    if (pick.kind === "ai" || pick.kind === "assign" || pick.kind === "clear") {
       startAiCategory.mutate({
-        ledgerEntryIds: snapshot,
-        candidateCategoryIds: [...pick.categoryIds],
+        requestKey: (categoryRequestKeyRef.current ??= crypto.randomUUID()),
+        entries: snapshot.entries,
+        mode:
+          pick.kind === "ai"
+            ? { kind: "ai", candidateCategoryIds: [...pick.categoryIds] }
+            : pick.kind === "assign"
+              ? { kind: "assign", categoryId: pick.categoryId }
+              : { kind: "clear" },
       });
     }
   }, [
     categorySnapshot,
+    categorySelectionChanged,
     clearCategoryPicked,
     pickedCategoryIds,
-    selection.selectedIds,
     setCategoryDialogVisibility,
     startAiCategory,
     tBatch,
@@ -394,6 +463,7 @@ export function useDetailsBatchController(
     confirmCategory,
     startAiCategory,
     reclassificationJob,
+    selectionUploadProgress,
     isReclassifying,
     isConfirmingCategory: update.isPending || startAiCategory.isPending,
     isPending:

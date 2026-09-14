@@ -12,7 +12,7 @@ import {
 } from "@/persistence";
 import { getTestDb } from "../../setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
-import { createTestUser } from "../../helpers/schema-setup";
+import { activateTestSourceDocumentProjection, createTestUser } from "../../helpers/schema-setup";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 
 vi.mock("@/auth", () => ({
@@ -69,11 +69,14 @@ describe("applyCategoryPresetAction", () => {
       { id: customId, ledgerId: ledger.id, name: "自定义", sortOrder: 2 },
     ]);
     await db.insert(sourceDocuments).values(document);
+    const revisionId = await activateTestSourceDocumentProjection(db, document.id);
     await db.insert(ledgerEntries).values([
       {
         id: foodEntryId,
         ledgerId: ledger.id,
         sourceDocumentId: document.id,
+        sourceDocumentRevisionId: revisionId,
+        position: 0,
         itemName: "Lunch",
         amount: "30.00",
         currency: "CNY",
@@ -83,6 +86,8 @@ describe("applyCategoryPresetAction", () => {
         id: travelEntryId,
         ledgerId: ledger.id,
         sourceDocumentId: document.id,
+        sourceDocumentRevisionId: revisionId,
+        position: 1,
         itemName: "Metro",
         amount: "6.00",
         currency: "CNY",
@@ -102,7 +107,7 @@ describe("applyCategoryPresetAction", () => {
     });
 
     // Six preset categories plus the kept one.
-    expect(saved.map((category) => category.name)).toEqual([
+    expect(saved.categories.map((category) => category.name)).toEqual([
       "吃喝",
       "居家",
       "出行",
@@ -111,7 +116,7 @@ describe("applyCategoryPresetAction", () => {
       "其他",
       "自定义",
     ]);
-    expect(saved.map((category) => category.sortOrder)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(saved.categories.map((category) => category.sortOrder)).toEqual([0, 1, 2, 3, 4, 5, 6]);
 
     const food = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, foodEntryId),
@@ -157,7 +162,7 @@ describe("applyCategoryPresetAction", () => {
       ],
     });
 
-    const others = saved.filter((category) => category.name === "其他");
+    const others = saved.categories.filter((category) => category.name === "其他");
     expect(others).toHaveLength(1);
     // The user's own row survives, metadata included.
     expect(others[0]?.id).toBe(otherId);

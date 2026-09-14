@@ -41,17 +41,36 @@ function violatesConstraint(error: unknown, constraint: string): boolean {
 }
 
 function mapJob(row: JobRow): CategoryReclassificationJobRecord {
+  const mode =
+    row.mode === "assign"
+      ? { kind: "assign" as const, categoryId: row.directCategoryId! }
+      : row.mode === "clear"
+        ? { kind: "clear" as const }
+        : { kind: "ai" as const, candidateCategoryIds: row.candidateCategoryIds };
   return {
     id: row.id,
     ledgerId: row.ledgerId,
     status: row.status,
+    formatVersion: row.formatVersion,
+    mode,
+    candidateSnapshot: row.candidateSnapshot,
+    declaredEntryCount: row.declaredEntryCount,
+    receivedEntryCount: row.receivedEntryCount,
     ledgerEntryIds: row.ledgerEntryIds,
     candidateCategoryIds: row.candidateCategoryIds,
     cursor: row.cursor,
     appliedCount: row.appliedCount,
     confirmedCount: row.confirmedCount,
+    failedCount: row.failedCount,
+    conflictCount: row.conflictCount,
+    skippedCount: row.skippedCount,
+    cancelledCount: row.cancelledCount,
+    documentTotal: row.documentTotal,
+    documentCompleted: row.documentCompleted,
     attempts: row.attempts,
     lastError: row.lastError,
+    nextAttemptAt: row.nextAttemptAt?.toISOString() ?? null,
+    completedAt: row.completedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -155,13 +174,26 @@ export const postgresCategoryReclassificationJobAdapter: CategoryReclassificatio
         id: row.id,
         ledgerId: row.ledger_id,
         status: row.status,
+        formatVersion: 1,
+        mode: { kind: "ai", candidateCategoryIds: row.candidate_category_ids },
+        candidateSnapshot: [],
+        declaredEntryCount: row.ledger_entry_ids.length,
+        receivedEntryCount: row.ledger_entry_ids.length,
         ledgerEntryIds: row.ledger_entry_ids,
         candidateCategoryIds: row.candidate_category_ids,
         cursor: row.cursor,
         appliedCount: row.applied_count,
         confirmedCount: row.confirmed_count,
+        failedCount: 0,
+        conflictCount: 0,
+        skippedCount: 0,
+        cancelledCount: 0,
+        documentTotal: 0,
+        documentCompleted: 0,
         attempts: row.attempts,
         lastError: row.last_error,
+        nextAttemptAt: null,
+        completedAt: null,
         createdAt: new Date(row.created_at).toISOString(),
         updatedAt: new Date(row.updated_at).toISOString(),
         claimToken: row.claim_token,

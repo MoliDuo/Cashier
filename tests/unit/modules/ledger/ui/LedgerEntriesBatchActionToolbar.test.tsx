@@ -33,8 +33,8 @@ describe("LedgerEntriesBatchActionToolbar", () => {
   it("offers select all, and says so, before anything is selected", () => {
     const { props } = renderToolbar();
 
-    expect(screen.getByText("全选")).toBeInTheDocument();
-    const master = screen.getByRole("checkbox", { name: "全选" });
+    expect(screen.getByText("全选已加载的 0 条")).toBeInTheDocument();
+    const master = screen.getByRole("checkbox", { name: "全选已加载的 0 条" });
     expect(master).toBeEnabled();
 
     fireEvent.click(master);
@@ -44,15 +44,15 @@ describe("LedgerEntriesBatchActionToolbar", () => {
   it("names what the control does rather than how many rows are in", () => {
     renderToolbar({ selectedCount: 3 });
 
-    expect(screen.getByText("全选")).toBeInTheDocument();
-    expect(screen.queryByText(/已选择|3/)).not.toBeInTheDocument();
+    expect(screen.getByText("全选已加载的 3 条")).toBeInTheDocument();
+    expect(screen.getByText("已选 3 / 已加载 3 条")).toBeInTheDocument();
   });
 
   it("flips the control's words once everything loaded is selected", () => {
     renderToolbar({ selectedCount: 3, isAllSelected: true });
 
     expect(screen.getByText("取消全选")).toBeInTheDocument();
-    expect(screen.queryByText("全选")).not.toBeInTheDocument();
+    expect(screen.queryByText(/全选已加载/)).not.toBeInTheDocument();
   });
 
   it("marks a partial selection as mixed", () => {
@@ -64,8 +64,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
   it("keeps the loaded-scope note, without a number in it", () => {
     renderToolbar({ selectedCount: 3, isAllSelected: true, hasMoreData: true });
 
-    expect(screen.getByText("仅选中已加载的部分")).toBeInTheDocument();
-    expect(screen.queryByText(/仅选中已加载的 3/)).not.toBeInTheDocument();
+    expect(screen.getByText("尚未加载的明细不在本次选择中")).toBeInTheDocument();
   });
 
   it("keeps the actions visible but unavailable with nothing selected", () => {
@@ -102,7 +101,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       .map((button) => button.textContent ?? "")
       .filter((label) => label !== "");
     expect(labels).toHaveLength(4);
-    ["指定分类", "修改日期", "修改货币", "删除"].forEach((label, index) => {
+    ["设置分类", "修改日期", "修改货币", "删除"].forEach((label, index) => {
       expect(labels[index]).toContain(label);
     });
   });
@@ -117,7 +116,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     const onChangeCategory = vi.fn();
     renderToolbar({ selectedCount: 1, categories: [dining], onChangeCategory });
 
-    await userEvent.click(screen.getByRole("button", { name: /指定分类/ }));
+    await userEvent.click(screen.getByRole("button", { name: /设置分类/ }));
     await userEvent.click(await screen.findByRole("button", { name: "餐饮" }));
 
     expect(onChangeCategory).toHaveBeenCalledWith("category-1");
@@ -128,7 +127,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     const onChangeCategory = vi.fn();
     renderToolbar({ selectedCount: 1, categories: [dining], onChangeCategory });
 
-    await userEvent.click(screen.getByRole("button", { name: /指定分类/ }));
+    await userEvent.click(screen.getByRole("button", { name: /设置分类/ }));
     await userEvent.click(await screen.findByRole("button", { name: "未分类" }));
 
     expect(onChangeCategory).toHaveBeenCalledWith(null);
@@ -159,7 +158,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       onCategoryDialogOpenChange,
     });
 
-    await userEvent.click(screen.getByRole("button", { name: /指定分类/ }));
+    await userEvent.click(screen.getByRole("button", { name: /设置分类/ }));
 
     expect(onCategoryDialogOpenChange).toHaveBeenCalledWith(true);
   });
@@ -175,21 +174,27 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       pickedCategoryIds: [],
     });
 
+    expect(screen.getByText("请选择一个或多个分类")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认" })).toBeDisabled();
 
     rerender(<LedgerEntriesBatchActionToolbar {...props} pickedCategoryIds={["category-1"]} />);
 
-    expect(screen.getByText(/将 5 条明细指定为「餐饮」/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "设为「餐饮」" })).toBeEnabled();
   });
 
-  it("turns several picks into the model's question, and refuses more than eight", () => {
+  it("turns several picks into the model's question and accepts all 13 preset categories", () => {
+    const categories = Array.from({ length: 13 }, (_, index) => ({
+      ...dining,
+      id: `category-${index + 1}`,
+      name: `分类 ${index + 1}`,
+      sortOrder: index,
+    }));
     const props = {
       selectedCount: 5,
       isAllSelected: false,
       onSelectAll: vi.fn(),
       onClearSelection: vi.fn(),
-      categories: [dining],
+      categories,
       onChangeCategory: vi.fn(),
       onConfirmCategory: vi.fn(),
       onToggleCategoryPick: vi.fn(),
@@ -202,18 +207,18 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       />
     );
 
-    expect(screen.getByText(/AI 将在已选的 2 个分类里逐条判断/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认" })).toBeEnabled();
+    expect(screen.getByText(/将把 5 条明细分别归入已选的 2 个分类之一/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI 分类 5 条明细" })).toBeEnabled();
 
     rerender(
       <LedgerEntriesBatchActionToolbar
         {...props}
-        pickedCategoryIds={["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"]}
+        pickedCategoryIds={categories.map((category) => category.id)}
       />
     );
 
-    expect(screen.getByText(/最多选择 8 个分类/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认" })).toBeDisabled();
+    expect(screen.getByText(/将把 5 条明细分别归入已选的 13 个分类之一/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI 分类 5 条明细" })).toBeEnabled();
   });
 
   it("makes the clear row a pick of its own, against every category", () => {
@@ -228,13 +233,12 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       clearCategoryPicked: true,
     });
 
-    expect(screen.getByText(/将清空 5 条明细的分类/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "清空 5 条分类" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("checkbox", { name: /餐饮/ }));
     expect(onToggleCategoryPick).toHaveBeenCalledWith("category-1", true);
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "未分类" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "清空分类" }));
     expect(onToggleCategoryPick).toHaveBeenCalledWith(null, false);
   });
 
@@ -250,7 +254,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       pickedCategoryIds: ["category-1"],
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "确认" }));
+    fireEvent.click(screen.getByRole("button", { name: "设为「餐饮」" }));
 
     expect(onConfirmCategory).toHaveBeenCalledOnce();
   });
@@ -268,6 +272,6 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     });
 
     expect(screen.getByText(/所选项目已变化/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "AI 分类 5 条明细" })).toBeDisabled();
   });
 });

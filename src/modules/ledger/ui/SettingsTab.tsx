@@ -41,6 +41,7 @@ interface SettingsTabProps {
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
   interfaceLanguage?: InterfaceLanguage;
+  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 type AppearanceField = "theme" | "language";
@@ -54,6 +55,7 @@ export function SettingsTab({
   hasPassword = false,
   passwordUpdatedAt = null,
   interfaceLanguage = "auto",
+  onGoToDetails,
 }: SettingsTabProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -329,6 +331,7 @@ export function SettingsTab({
         failedCategoryIds={failedCategoryIds}
         onRetryMetadata={retryCategoryMetadata}
         isSavingCategories={saveCategories.isPending}
+        {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
 
       <AiSettings

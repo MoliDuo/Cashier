@@ -4,6 +4,7 @@ import { useLocale, useMessages, useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
+import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
 import { useFeatureMessages } from "@/i18n/use-feature-messages";
 import { useDrilldownNavigation } from "../hooks/useDrilldownNavigation";
 import { useLedgerHistorySync } from "../hooks/useLedgerHistorySync";
@@ -22,6 +23,9 @@ import { LedgerTabPanels } from "./LedgerTabPanels";
 import { NewRecordDialog } from "./NewRecordDialog";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { ModalStackGate } from "./ModalStackGate";
+import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
+import { CategoryAssignmentStatus } from "@/modules/ledger/ui/CategoryAssignmentStatus";
+import { pushLedgerUrl } from "../ledger-url-navigation";
 
 interface LedgerPageClientProps {
   ledgerId: string;
@@ -66,6 +70,7 @@ export function LedgerPageClient({
   const locale = useLocale();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const categoryAssignment = useCategoryAssignmentJob(ledgerId);
 
   const { activeTab, handleTabChange: _handleTabChange } = useLedgerTabs({
     initialTab,
@@ -145,6 +150,19 @@ export function LedgerPageClient({
     ledgerId,
     locale,
   });
+  const handleGoToDetails = (validCategoryIds: readonly string[]) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "details");
+    const categoryId = params.get("detailsCategoryId");
+    if (
+      categoryId != null &&
+      categoryId !== "__uncategorized__" &&
+      !validCategoryIds.includes(categoryId)
+    ) {
+      params.delete("detailsCategoryId");
+    }
+    pushLedgerUrl(pathname, params, locale, "tab");
+  };
 
   if (ledger == null) {
     return (
@@ -157,6 +175,16 @@ export function LedgerPageClient({
   return (
     <>
       <div>
+        {categoryAssignment.job != null || categoryAssignment.isReadError ? (
+          <DeferredFeatureMessages feature="details" locale={locale} fallback={null}>
+            <CategoryAssignmentStatus
+              ledgerId={ledgerId}
+              job={categoryAssignment.job}
+              isReadError={categoryAssignment.isReadError}
+              onRefresh={categoryAssignment.refresh}
+            />
+          </DeferredFeatureMessages>
+        ) : null}
         {/* The stream and details tabs refresh from their own toolbar box, so
             only the tabs without one keep the bar. */}
         {activeTab === "stats" || activeTab === "settings" ? (
@@ -205,6 +233,7 @@ export function LedgerPageClient({
           interfaceLanguage={interfaceLanguage}
           onRefresh={refreshActiveTab}
           isRefreshing={isRefreshing}
+          onGoToDetails={handleGoToDetails}
         />
 
         <NewRecordDialog

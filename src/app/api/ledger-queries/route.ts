@@ -17,7 +17,10 @@ import {
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { getLedgerEntryAction } from "@/modules/ledger/server/get-entry";
-import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
+import {
+  getCategoryAssignmentResultsAction,
+  getCategoryReclassificationJobAction,
+} from "@/modules/ledger/server/get-category-reclassification-job";
 import { scheduleCategoryReclassificationRecoveryAfter } from "@/application/processing/schedule-category-reclassification";
 import {
   parseLedgerStatsQuery,
@@ -46,6 +49,7 @@ const requestSchema = z
       "summary",
       "stats",
       "reclassification",
+      "category-assignment-results",
     ]),
     args: z.array(z.unknown()).min(1).max(2),
   })
@@ -118,6 +122,19 @@ export async function POST(request: Request) {
           // died is restarted on the next poll instead of waiting for the
           // periodic drain.
           scheduleCategoryReclassificationRecoveryAfter(ledgerId);
+          break;
+        case "category-assignment-results":
+          result = await getCategoryAssignmentResultsAction(
+            ledgerId,
+            z
+              .object({
+                jobId: z.string().uuid(),
+                cursor: z.number().int().nonnegative().optional(),
+                limit: z.number().int().min(1).max(50).optional(),
+              })
+              .strict()
+              .parse(input) as { jobId: string; cursor?: number; limit?: number }
+          );
           break;
       }
     }

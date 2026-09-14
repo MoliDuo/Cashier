@@ -16,6 +16,7 @@ import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPrese
 import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { toast } from "sonner";
+import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
 
 interface CategorySectionProps {
   ledgerId: string;
@@ -28,6 +29,7 @@ interface CategorySectionProps {
   failedCategoryIds?: Set<string>;
   onRetryMetadata?: (id: string) => void;
   isSaving?: boolean;
+  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 export function CategorySection({
@@ -40,11 +42,15 @@ export function CategorySection({
   failedCategoryIds = new Set(),
   onRetryMetadata,
   isSaving = false,
+  onGoToDetails,
 }: CategorySectionProps) {
   const t = useTranslations("Settings");
   const common = useTranslations("Common");
   const locale = useLocale();
   const preset = useCategoryPresetSwitch({ ledgerId, categories, locale });
+  const assignment = useCategoryAssignmentJob(ledgerId);
+  const categoryAssignmentActive =
+    assignment.job != null && ["preparing", "pending", "running"].includes(assignment.job.status);
 
   const {
     managing,
@@ -89,17 +95,35 @@ export function CategorySection({
               type="button"
               variant="outline"
               size="sm"
-              disabled={isSaving || preset.isPending}
+              disabled={isSaving || preset.isPending || categoryAssignmentActive}
               onClick={preset.openDialog}
             >
               {t("switchPreset")}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={enterManagement}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={categoryAssignmentActive}
+              onClick={enterManagement}
+            >
               {t("manageCategories")}
             </Button>
           </div>
         ) : null}
       </div>
+
+      {categoryAssignmentActive ? (
+        <div
+          className="border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
+          role="status"
+        >
+          <p>{t("categoryAssignmentActive")}</p>
+          <Button asChild size="sm" variant="outline" className="mt-2">
+            <a href="#category-assignment-status">{t("categoryAssignmentViewTask")}</a>
+          </Button>
+        </div>
+      ) : null}
 
       {uncategorizedCount > 0 ? (
         <div className="flex items-start gap-3 rounded-md border border-warning/25 bg-warning/10 p-3">
@@ -260,7 +284,7 @@ export function CategorySection({
         onCommit={commitEdit}
       />
 
-      <CategoryPresetDialog preset={preset} />
+      <CategoryPresetDialog preset={preset} {...(onGoToDetails == null ? {} : { onGoToDetails })} />
 
       <ConfirmDialog
         open={deleteTarget != null}

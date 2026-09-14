@@ -9,7 +9,12 @@ import { getCategoryPreset, type PresetCategory } from "./category-presets";
  * `PresetCategory` carries no order of its own.
  */
 function seedCategories(preset: readonly PresetCategory[]) {
-  return preset.map((category, index) => ({ ...category, sortOrder: index + 1 }));
+  return preset.map(({ name, description, icon }, index) => ({
+    name,
+    description,
+    icon,
+    sortOrder: index + 1,
+  }));
 }
 
 const zhLedger = {

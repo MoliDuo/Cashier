@@ -302,6 +302,13 @@
       "when": 1789312251928,
       "tag": "0042_reorder_default_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789398651928,
+      "tag": "0043_category_assignment_v2",
+      "breakpoints": true
     }
   ]
 }

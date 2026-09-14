@@ -72,37 +72,103 @@ export interface ApplyCategoryPresetInput {
   locale: string;
   mappings: { fromCategoryId: string; toPresetIndex: number | null }[];
 }
+export interface ApplyCategoryPresetResult {
+  categories: EntryCategoryWithCount[];
+  changed: boolean;
+  movedEntryCount: number;
+  createdCategoryCount: number;
+  removedCategoryCount: number;
+  retainedCategoryCount: number;
+}
 
 export interface StartCategoryReclassificationInput {
   ledgerEntryIds: string[];
   candidateCategoryIds: string[];
 }
 
-export type CategoryReclassificationStatus = "pending" | "running" | "succeeded" | "failed";
+export type CategoryAssignmentMode =
+  | { kind: "ai"; candidateCategoryIds: string[] }
+  | { kind: "assign"; categoryId: string }
+  | { kind: "clear" };
+export interface CategoryAssignmentSelectionEntry {
+  ledgerEntryId: string;
+  sourceDocumentId: string;
+  expectedVersion: number;
+}
+export interface BeginCategoryAssignmentInput {
+  requestKey: string;
+  mode: CategoryAssignmentMode;
+  expectedEntryCount: number;
+}
+export interface AppendCategoryAssignmentSelectionInput {
+  jobId: string;
+  chunkIndex: number;
+  entries: CategoryAssignmentSelectionEntry[];
+}
+export interface CommitCategoryAssignmentSelectionInput {
+  jobId: string;
+  expectedEntryCount: number;
+}
+export type CategoryAssignmentJobStatus =
+  "preparing" | "pending" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
+export type CategoryAssignmentEntryOutcome =
+  "applied" | "confirmed" | "failed" | "conflict" | "skipped" | "cancelled";
+export interface CategoryAssignmentCandidateSnapshot {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 /**
- * A reclassification run as the client sees it. The entry and category id
- * arrays stay on the server; the counts and the derived `undecided` are all
- * the progress display needs.
+ * A category assignment run as the client sees it. Selection rows stay on the
+ * server and every v2 entry has one mutually exclusive final outcome.
  */
 export interface CategoryReclassificationJobDto {
   id: string;
-  status: CategoryReclassificationStatus;
+  formatVersion: number;
+  mode: CategoryAssignmentMode;
+  status: CategoryAssignmentJobStatus;
   /** How many entries the run covers. */
   total: number;
-  cursor: number;
+  processedCount: number;
   /** Entries the model actually moved. */
   appliedCount: number;
   /** Entries the model placed in the category they already had. */
   confirmedCount: number;
-  /** `total - appliedCount - confirmedCount`. */
-  undecidedCount: number;
-  attempts: number;
-  lastError: string | null;
+  failedCount: number;
+  conflictCount: number;
+  skippedCount: number;
+  cancelledCount: number;
+  documentTotal: number;
+  documentCompleted: number;
+  activeDocumentCount: number;
+  retryingDocumentCount: number;
+  nextRetryAt: string | null;
+  candidateCategories: CategoryAssignmentCandidateSnapshot[];
+  receivedCount: number;
+  errorCode: string | null;
   createdAt: string;
   updatedAt: string;
+  completedAt: string | null;
+  canRetryFailed: boolean;
+  evidenceIncomplete: boolean;
 }
 export type CategoryReclassificationJob = CategoryReclassificationJobDto;
+
+export interface CategoryAssignmentEntryResultDto {
+  ledgerEntryId: string;
+  itemName: string | null;
+  originalCategoryId: string | null;
+  originalCategoryName: string | null;
+  targetCategoryId: string | null;
+  targetCategoryName: string | null;
+  outcome: CategoryAssignmentEntryOutcome | null;
+  errorCode: string | null;
+}
+export interface CategoryAssignmentResultPageDto {
+  items: CategoryAssignmentEntryResultDto[];
+  nextCursor: number | null;
+}
 
 export type SourceDocumentReferenceDto = {
   id: string;

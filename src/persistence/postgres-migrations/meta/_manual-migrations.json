@@ -84,7 +84,11 @@
     },
     {
       "file": "0042_reorder_default_categories.sql",
-      "sha256": "6a9ae940f9a3cbbe3520d03a27d6f373f6e9aba32c6a314b0723227f2fc8700e"
+      "sha256": "02de002b415aaab8abd21aa9f9d5317944c304c707d47d45dddb71fa65b0831c"
+    },
+    {
+      "file": "0043_category_assignment_v2.sql",
+      "sha256": "74e6b19e33da5d68d9f24ffaafeb359fd3611cce4733f95817ad13c9e167472c"
     }
   ]
 }

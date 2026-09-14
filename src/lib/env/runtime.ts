@@ -25,6 +25,9 @@ export interface RuntimeEnv {
   readonly aiRetryDelayMs: number;
   readonly aiRequestTimeoutMs: number;
   readonly aiRevisionDeadlineMs: number;
+  readonly aiCategoryConcurrency: number;
+  readonly aiCategoryRequestTimeoutMs: number;
+  readonly aiCategoryMaxAttempts: number;
   readonly uploadPlanLimitPer15Min: number;
   readonly uploadOpenSessionLimit: number;
   readonly uploadDailyBytesLimit: number;
@@ -133,6 +136,15 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get aiRevisionDeadlineMs() {
     return getStartupEnvValue("AI_REVISION_DEADLINE_MS");
+  },
+  get aiCategoryConcurrency() {
+    return getStartupEnvValue("AI_CATEGORY_CONCURRENCY");
+  },
+  get aiCategoryRequestTimeoutMs() {
+    return getStartupEnvValue("AI_CATEGORY_REQUEST_TIMEOUT_MS");
+  },
+  get aiCategoryMaxAttempts() {
+    return getStartupEnvValue("AI_CATEGORY_MAX_ATTEMPTS");
   },
   get uploadPlanLimitPer15Min() {
     return getStartupEnvValue("UPLOAD_PLAN_LIMIT_PER_15_MIN");

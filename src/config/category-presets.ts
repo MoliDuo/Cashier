@@ -16,9 +16,8 @@
  * themselves.
  *
  * This order is the display order for ledgers seeded from here. Rows that
- * already exist keep the `sort_order` they were written with, so a reorder
- * needs a data migration alongside it — `0042_reorder_default_categories.sql`
- * holds the current one, and the two have to move together.
+ * already exist keep the `sort_order` they were written with. They change
+ * only when the user explicitly applies a preset or reorders categories.
  */
 
 export const CATEGORY_PRESET_IDS = ["default", "concise"] as const;
@@ -26,13 +25,16 @@ export const CATEGORY_PRESET_IDS = ["default", "concise"] as const;
 export type CategoryPresetId = (typeof CATEGORY_PRESET_IDS)[number];
 
 export interface PresetCategory {
+  key?: string;
   name: string;
   description: string;
   /** Must be a name in `COMMON_LUCIDE_ICONS`, or the icon silently falls back to `Package`. */
   icon: string;
 }
 
-const DEFAULT_CATEGORIES_ZH: readonly PresetCategory[] = [
+type PresetCategoryDefinition = Omit<PresetCategory, "key">;
+
+const DEFAULT_CATEGORIES_ZH: readonly PresetCategoryDefinition[] = [
   {
     name: "餐饮",
     description: "涵盖日常膳食及饮水支出，包括正餐、烹饪食材、调味品、饮品及零食",
@@ -102,7 +104,7 @@ const DEFAULT_CATEGORIES_ZH: readonly PresetCategory[] = [
   },
 ];
 
-const DEFAULT_CATEGORIES_EN: readonly PresetCategory[] = [
+const DEFAULT_CATEGORIES_EN: readonly PresetCategoryDefinition[] = [
   {
     name: "Dining",
     description:
@@ -183,7 +185,7 @@ const DEFAULT_CATEGORIES_EN: readonly PresetCategory[] = [
   },
 ];
 
-const CONCISE_CATEGORIES_ZH: readonly PresetCategory[] = [
+const CONCISE_CATEGORIES_ZH: readonly PresetCategoryDefinition[] = [
   {
     name: "吃喝",
     description: "涵盖日常饮食支出，包括正餐、饮品、零食及食材采购",
@@ -216,7 +218,7 @@ const CONCISE_CATEGORIES_ZH: readonly PresetCategory[] = [
   },
 ];
 
-const CONCISE_CATEGORIES_EN: readonly PresetCategory[] = [
+const CONCISE_CATEGORIES_EN: readonly PresetCategoryDefinition[] = [
   {
     name: "Food & Drink",
     description: "Everyday food and drink, including meals, beverages, snacks, and groceries",
@@ -255,7 +257,10 @@ const CONCISE_CATEGORIES_EN: readonly PresetCategory[] = [
 ];
 
 const CATEGORY_PRESETS: Readonly<
-  Record<CategoryPresetId, { zh: readonly PresetCategory[]; en: readonly PresetCategory[] }>
+  Record<
+    CategoryPresetId,
+    { zh: readonly PresetCategoryDefinition[]; en: readonly PresetCategoryDefinition[] }
+  >
 > = {
   default: { zh: DEFAULT_CATEGORIES_ZH, en: DEFAULT_CATEGORIES_EN },
   concise: { zh: CONCISE_CATEGORIES_ZH, en: CONCISE_CATEGORIES_EN },
@@ -265,7 +270,37 @@ const CATEGORY_PRESETS: Readonly<
 export function getCategoryPreset(
   presetId: CategoryPresetId,
   locale: string = "zh"
-): readonly PresetCategory[] {
+): readonly (PresetCategory & { key: string })[] {
   const preset = CATEGORY_PRESETS[presetId];
-  return locale.startsWith("zh") ? preset.zh : preset.en;
+  const definitions = locale.startsWith("zh") ? preset.zh : preset.en;
+  const keys =
+    presetId === "default"
+      ? [
+          "dining",
+          "household",
+          "shopping",
+          "clothing",
+          "personal-care",
+          "housing",
+          "daily-life",
+          "transport",
+          "healthcare",
+          "education",
+          "memberships",
+          "entertainment",
+          "gifts",
+        ]
+      : ["food-drink", "home", "travel", "health", "leisure", "other"];
+  return definitions.map((category, index) => ({ ...category, key: keys[index]! }));
+}
+
+/** Match only exact built-in names, across both supported data languages. */
+export function getPresetSemanticKey(name: string): string | null {
+  for (const presetId of CATEGORY_PRESET_IDS) {
+    for (const locale of ["zh", "en"] as const) {
+      const match = getCategoryPreset(presetId, locale).find((category) => category.name === name);
+      if (match != null) return match.key;
+    }
+  }
+  return null;
 }

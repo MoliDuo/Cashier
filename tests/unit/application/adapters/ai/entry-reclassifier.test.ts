@@ -75,7 +75,9 @@ describe("entryReclassifierAdapter", () => {
   });
 
   it("sends the document's own context, not just the entries", async () => {
-    generateContent.mockResolvedValue({ content: '{"decisions":[]}' });
+    generateContent.mockResolvedValue({
+      content: '{"decisions":[{"entry_index":1,"category_index":1}]}',
+    });
 
     await entryReclassifierAdapter.decide({
       candidates,
@@ -91,7 +93,9 @@ describe("entryReclassifierAdapter", () => {
   });
 
   it("passes the document's images through as content parts, in order", async () => {
-    generateContent.mockResolvedValue({ content: '{"decisions":[]}' });
+    generateContent.mockResolvedValue({
+      content: '{"decisions":[{"entry_index":1,"category_index":1}]}',
+    });
 
     await entryReclassifierAdapter.decide({
       candidates,
@@ -116,7 +120,7 @@ describe("entryReclassifierAdapter", () => {
     await expect(
       entryReclassifierAdapter.decide({ candidates, group: group(), images: [] })
     ).rejects.toMatchObject({
-      code: "AI_JSON_REPAIR_FAILED",
+      code: "ai_schema_invalid",
       statusCode: 502,
     });
   });
@@ -129,7 +133,7 @@ describe("entryReclassifierAdapter", () => {
     await expect(
       entryReclassifierAdapter.decide({ candidates, group: group(), images: [] })
     ).rejects.toMatchObject({
-      code: "AI_JSON_REPAIR_FAILED",
+      code: "ai_schema_invalid",
       statusCode: 502,
     });
   });

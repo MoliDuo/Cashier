@@ -193,8 +193,29 @@ async function readBody(request) {
 
 function promptOf(payload) {
   return (payload.messages ?? [])
-    .map((message) => (typeof message.content === "string" ? message.content : ""))
+    .flatMap((message) =>
+      typeof message.content === "string"
+        ? [message.content]
+        : (message.content ?? [])
+            .filter((part) => part.type === "text" && typeof part.text === "string")
+            .map((part) => part.text)
+    )
     .join("\n");
+}
+
+function categoryAssignmentBody(prompt, scenario) {
+  if (!prompt.includes("You are an expense categorizer")) return null;
+  if (scenario === "schema-invalid") {
+    return { decisions: [{ entry_index: 1, category_index: 0 }] };
+  }
+  const entries = prompt.split("### Expense Entries")[1] ?? "";
+  const count = entries.split("\n").filter((line) => /^\d+\. item_name:/.test(line)).length;
+  return {
+    decisions: Array.from({ length: count }, (_, index) => ({
+      entry_index: index + 1,
+      category_index: 1,
+    })),
+  };
 }
 
 async function respond(request, response, options) {
@@ -207,7 +228,9 @@ async function respond(request, response, options) {
   }
 
   const payload = JSON.parse((await readBody(request)) || "{}");
-  const answer = answerFor(promptOf(payload), options);
+  const prompt = promptOf(payload);
+  const answer = answerFor(prompt, options);
+  const assignmentBody = categoryAssignmentBody(prompt, answer.scenario);
 
   options.log(
     `[demo-ai] scenario=${answer.scenario}` +
@@ -226,7 +249,9 @@ async function respond(request, response, options) {
   }
 
   response.writeHead(200, { "content-type": "application/json" });
-  response.end(JSON.stringify(chatCompletionEnvelope(payload, JSON.stringify(answer.body))));
+  response.end(
+    JSON.stringify(chatCompletionEnvelope(payload, JSON.stringify(assignmentBody ?? answer.body)))
+  );
 }
 
 export function createDemoAiServer({

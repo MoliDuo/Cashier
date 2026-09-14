@@ -43,6 +43,7 @@ import {
 } from "@/application/adapters/postgres/exchange-rate";
 import { categoryMetadataGeneratorAdapter } from "@/application/adapters/ai/category-metadata-generator";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
+import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
 import { createAIContext } from "@/lib/tasks/ai-context";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { runtimeEnv } from "@/lib/env/runtime";
@@ -101,6 +102,7 @@ export const serverComposition = {
   },
   categoryMetadataGenerator: categoryMetadataGeneratorAdapter,
   categoryReclassificationJobs: postgresCategoryReclassificationJobAdapter,
+  categoryAssignments: postgresCategoryAssignmentV2Adapter,
   stats: {
     queryEnhanced: getEnhancedStatsQuery,
   },

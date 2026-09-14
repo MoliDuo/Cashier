@@ -37,6 +37,7 @@ type ExistingDocumentCommand = Exclude<
   | "createManualDocument"
   | "installIdempotentRetry"
   | "completeProcessing"
+  | "applyCategoryAssignments"
 >;
 
 const port: SourceDocumentAggregateWritePort = serverComposition.sourceDocumentAggregate;

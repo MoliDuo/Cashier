@@ -15,11 +15,7 @@ import {
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
-import {
-  isConfirmableBatchCategoryPick,
-  MAX_RECLASSIFICATION_CANDIDATES,
-  resolveBatchCategoryPick,
-} from "./batch-category-pick";
+import { isConfirmableBatchCategoryPick, resolveBatchCategoryPick } from "./batch-category-pick";
 
 interface BatchSetCategoryDialogProps {
   open: boolean;
@@ -34,6 +30,7 @@ interface BatchSetCategoryDialogProps {
    * a different set of entries than the one on screen. */
   selectionChanged: boolean;
   isConfirming: boolean;
+  uploadProgress?: { received: number; total: number } | null;
   onConfirm: () => void;
 }
 
@@ -61,6 +58,7 @@ export function BatchSetCategoryDialog({
   onTogglePick,
   selectionChanged,
   isConfirming,
+  uploadProgress = null,
   onConfirm,
 }: BatchSetCategoryDialogProps) {
   const t = useTranslations("BatchActions");
@@ -78,13 +76,22 @@ export function BatchSetCategoryDialog({
       case "assign":
         return t("categoryPickAssign", { count: selectedCount, name: pickedName });
       case "ai":
-        return t("categoryPickAi", { count: pick.categoryIds.length });
-      case "tooMany":
-        return t("categoryPickLimit", { count: MAX_RECLASSIFICATION_CANDIDATES });
+        return t("categoryPickAi", {
+          entryCount: selectedCount,
+          categoryCount: pick.categoryIds.length,
+        });
       case "none":
         return "";
     }
   })();
+  const confirmLabel =
+    pick.kind === "assign"
+      ? t("categoryAssignConfirm", { name: pickedName })
+      : pick.kind === "ai"
+        ? t("categoryAiConfirm", { count: selectedCount })
+        : pick.kind === "clear"
+          ? t("categoryClearConfirm", { count: selectedCount })
+          : t("confirm");
 
   return (
     <Dialog
@@ -94,7 +101,8 @@ export function BatchSetCategoryDialog({
       }}
     >
       <DialogContent
-        variant="modal"
+        variant="detail"
+        className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-xl sm:rounded-lg"
         aria-describedby={undefined}
         hideCloseButton={isConfirming}
         onEscapeKeyDown={(event) => {
@@ -104,15 +112,70 @@ export function BatchSetCategoryDialog({
           if (isConfirming) event.preventDefault();
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <DialogTitle>{t("manualCategory")}</DialogTitle>
         </DialogHeader>
 
-        <p className={textRoleClassName("bodyMuted")}>
-          {t("categoryPickDescription", { count: selectedCount })}
-        </p>
-
-        <div className="max-h-[60vh] overflow-y-auto subtle-scrollbar">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 subtle-scrollbar sm:p-6">
+          <p className={textRoleClassName("bodyMuted")}>
+            {t("categoryPickDescription", { count: selectedCount })}
+          </p>
+          <div className="my-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={
+                isConfirming ||
+                categories.every((category) => pickedCategoryIds.includes(category.id))
+              }
+              onClick={() => categories.forEach((category) => onTogglePick(category.id, true))}
+            >
+              {t("categorySelectAllCandidates")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isConfirming || pickedCategoryIds.length === 0}
+              onClick={() => pickedCategoryIds.forEach((id) => onTogglePick(id, false))}
+            >
+              {t("categoryClearCandidates")}
+            </Button>
+          </div>
+          <div className="divide-y divide-border">
+            {categories.map((category) => {
+              const checked = pickedCategoryIds.includes(category.id);
+              return (
+                <label
+                  key={category.id}
+                  className={cn(
+                    "flex min-h-11 w-full cursor-pointer items-start gap-2 px-2 py-3 text-sm text-text transition-colors",
+                    checked ? "bg-accent/60" : "hover:bg-accent"
+                  )}
+                >
+                  <Checkbox
+                    checked={checked}
+                    disabled={isConfirming}
+                    onCheckedChange={(next) => onTogglePick(category.id, next === true)}
+                  />
+                  <CategoryIcon iconName={category.icon} className="h-4 w-4" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{category.name}</span>
+                    {category.description == null || category.description === "" ? null : (
+                      <details className={textRoleClassName("meta")}>
+                        <summary className="line-clamp-2 cursor-pointer list-none">
+                          {category.description}
+                        </summary>
+                        <p className="mt-1">{category.description}</p>
+                      </details>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="my-3 h-px bg-border" />
           <label
             className={cn(
               "flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm transition-colors",
@@ -125,44 +188,30 @@ export function BatchSetCategoryDialog({
               onCheckedChange={(next) => onTogglePick(null, next === true)}
             />
             <CircleSlash aria-hidden="true" className="h-4 w-4 opacity-50" />
-            <span className="min-w-0 flex-1 truncate">{t("uncategorized")}</span>
+            <span className="min-w-0 flex-1">{t("categoryClearChoice")}</span>
           </label>
-
-          {categories.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
-
-          {categories.map((category) => {
-            const checked = pickedCategoryIds.includes(category.id);
-            return (
-              <label
-                key={category.id}
-                className={cn(
-                  "flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm text-text transition-colors",
-                  checked ? "bg-accent/60" : "hover:bg-accent"
-                )}
-              >
-                <Checkbox
-                  checked={checked}
-                  disabled={isConfirming}
-                  onCheckedChange={(next) => onTogglePick(category.id, next === true)}
-                />
-                <CategoryIcon iconName={category.icon} className="h-4 w-4" />
-                <span className="min-w-0 flex-1 truncate">{category.name}</span>
-              </label>
-            );
-          })}
+          {pick.kind === "ai" ? (
+            <p className={textRoleClassName("bodyMuted", "mt-3")}>
+              {t("categoryAiStrictDescription")}
+            </p>
+          ) : null}
         </div>
 
-        <DialogFooter className="gap-2 sm:items-center sm:justify-between sm:space-x-0">
+        <DialogFooter className="shrink-0 gap-2 border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:items-center sm:justify-between sm:space-x-0 sm:px-6 sm:py-4">
           <p className={textRoleClassName("meta")} aria-live="polite">
-            {summary}
-            {selectionChanged ? `${summary === "" ? "" : " "}${t("selectionMoved")}` : ""}
+            {uploadProgress == null
+              ? summary || t("categorySelectionRequired")
+              : t("categorySelectionUploading", uploadProgress)}
+            {selectionChanged && uploadProgress == null
+              ? `${summary === "" ? "" : " "}${t("selectionMoved")}`
+              : ""}
           </p>
           <Button
             type="button"
             disabled={!confirmable || selectionChanged || isConfirming || selectedCount === 0}
             onClick={onConfirm}
           >
-            {t("confirm")}
+            {confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

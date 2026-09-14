@@ -23,6 +23,23 @@ for that ledger can claim pending work. With no later request, recovery does not
 Cancelling a delivered HTTP request does not undo a completed upload. API clients should reuse the
 same `Idempotency-Key` when retrying a create request.
 
+## Category assignment jobs
+
+Batch category assignment also uses `after()` with durable PostgreSQL work rows. A normal lifecycle
+keeps claiming document work, waits through short retry delays, and does not depend on the details
+page polling. Closing the page therefore does not cancel a committed job. Polling only displays
+progress and gives a later request an opportunity to recover expired leases after a process restart
+or serverless termination.
+
+The database coordinates deployment-wide document slots with leases and fencing tokens. A document
+is the atomic classification commit unit; groups above 50 selected entries use persisted request
+blocks. An external AI request is not exactly-once: a process can die after receiving an answer but
+before persisting it, so recovery may repeat that block. Category writes, source-document versions,
+entry outcomes, and job counters are idempotent and commit together.
+
+Serverless `maxDuration` can still terminate a long run. With no later ledger request and no separate
+worker or scheduler, Cashier does not promise automatic recovery after that termination.
+
 ## Unified Stream
 
 The ledger home shows one Stream containing queued, processing, invalid, duplicate-review, failed,

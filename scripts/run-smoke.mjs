@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { prepareTestPostgres } from "./prepare-test-postgres.mjs";
+import { createDemoAiServer } from "./demo-ai-server.mjs";
 
 const adminUrl = new URL(
   process.env.TEST_DATABASE_URL ?? "postgresql://cashier:cashier@127.0.0.1:55432/cashier_test"
@@ -22,11 +23,17 @@ adminUrl.href = postgres.databaseUrl;
 const databaseName = `smoke_${randomUUID().replaceAll("-", "")}`;
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
-const listener = net.createServer();
-listener.listen(0, "127.0.0.1");
-await once(listener, "listening");
-const port = listener.address().port;
-await new Promise((resolve) => listener.close(resolve));
+const reservePort = async () => {
+  const listener = net.createServer();
+  listener.listen(0, "127.0.0.1");
+  await once(listener, "listening");
+  const address = listener.address();
+  if (typeof address !== "object" || address == null) throw new Error("Could not reserve port");
+  await new Promise((resolve) => listener.close(resolve));
+  return address.port;
+};
+const port = await reservePort();
+const aiPort = await reservePort();
 const baseURL = `http://127.0.0.1:${port}`;
 const password = `Smoke9-${randomUUID()}`;
 const env = {
@@ -43,7 +50,7 @@ const env = {
   AUTH_RESEND_KEY: "",
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
   OPENAI_API_KEY: "smoke-unused",
-  OPENAI_BASE_URL: "http://127.0.0.1:1/v1",
+  OPENAI_BASE_URL: `http://127.0.0.1:${aiPort}/v1`,
   AI_MAX_RETRIES: "0",
   S3_ENDPOINT: "http://127.0.0.1:1",
   S3_PUBLIC_ENDPOINT: "http://127.0.0.1:1",
@@ -60,6 +67,9 @@ const env = {
 };
 let activeChild;
 let server;
+const aiServer = createDemoAiServer({ latencyMs: 3_000 });
+aiServer.listen(aiPort, "127.0.0.1");
+await once(aiServer, "listening");
 let created = false;
 let interrupted = false;
 const run = async (args) => {
@@ -120,6 +130,7 @@ try {
 } finally {
   await stop(activeChild);
   await stop(server);
+  if (aiServer.listening) await new Promise((resolve) => aiServer.close(resolve));
   if (created && /^smoke_[a-f0-9]{32}$/.test(databaseName)) {
     const target = await admin.query("SELECT datname FROM pg_database WHERE datname = $1", [
       databaseName,

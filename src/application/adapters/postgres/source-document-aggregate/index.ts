@@ -10,8 +10,10 @@ import {
   applyDateOrganization,
   dismissDateOrganization,
 } from "../source-document-date-organization";
+import { applyCategoryAssignments } from "./category-assignments";
 
 export const postgresSourceDocumentAggregateAdapter: SourceDocumentAggregateWritePort = {
+  applyCategoryAssignments,
   createProcessingDocument: (input) => postgresSourceDocumentSubmissionAdapter.submit(input),
   createIdempotentProcessingDocument: (idempotency, prepare) =>
     postgresSourceDocumentSubmissionAdapter.submitIdempotently(idempotency, prepare),

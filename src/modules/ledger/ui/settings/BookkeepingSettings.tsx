@@ -37,6 +37,7 @@ interface BookkeepingSettingsProps {
   failedCategoryIds: Set<string>;
   onRetryMetadata: (id: string) => void;
   isSavingCategories: boolean;
+  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 export function BookkeepingSettings({
@@ -52,6 +53,7 @@ export function BookkeepingSettings({
   failedCategoryIds,
   onRetryMetadata,
   isSavingCategories,
+  onGoToDetails,
 }: BookkeepingSettingsProps) {
   const t = useTranslations("Settings");
   const incoming = useMemo(() => normalizeBookkeepingSettings(settings), [settings]);
@@ -196,6 +198,7 @@ export function BookkeepingSettings({
         failedCategoryIds={failedCategoryIds}
         onRetryMetadata={onRetryMetadata}
         isSaving={isSavingCategories}
+        {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
     </SettingsSection>
   );

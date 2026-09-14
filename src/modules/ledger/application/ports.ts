@@ -40,17 +40,14 @@ export interface EntryReclassifierPort {
     /** Encoded evidence for this document; empty for a text-only submission. */
     images: readonly { dataUrl: string }[];
     customPrompt?: string;
+    signal?: AbortSignal;
   }): Promise<{
     decisions: readonly { ledgerEntryId: string; categoryId: string }[];
     confirmedCount: number;
   }>;
 }
 
-/**
- * Reads the entries a run needs and writes the categories back. `assign` is a
- * non-versioned, set-based write of `ledger_entries.category_id`; see the
- * adapter's file header for the trade-off that implies.
- */
+/** Reads the source-document groups and evidence references a run needs. */
 export interface EntryCategoryAssignmentPort {
   /**
    * Entries grouped by the source document their evidence hangs off. Entries
@@ -61,24 +58,33 @@ export interface EntryCategoryAssignmentPort {
     ledgerId: string;
     ledgerEntryIds: readonly string[];
   }): Promise<readonly ReclassificationDocumentGroup[]>;
-  assign(input: {
-    ledgerId: string;
-    decisions: readonly { ledgerEntryId: string; categoryId: string }[];
-  }): Promise<{ appliedCount: number }>;
 }
 
 /** A job as stored, including the ids a run has to walk. */
 export interface CategoryReclassificationJobRecord {
   id: string;
   ledgerId: string;
-  status: "pending" | "running" | "succeeded" | "failed";
+  status: import("../contracts").CategoryAssignmentJobStatus;
+  formatVersion?: number;
+  mode?: import("../contracts").CategoryAssignmentMode;
+  candidateSnapshot?: ReclassificationCandidate[];
+  declaredEntryCount?: number;
+  receivedEntryCount?: number;
   ledgerEntryIds: string[];
   candidateCategoryIds: string[];
   cursor: number;
   appliedCount: number;
   confirmedCount: number;
+  failedCount?: number;
+  conflictCount?: number;
+  skippedCount?: number;
+  cancelledCount?: number;
+  documentTotal?: number;
+  documentCompleted?: number;
   attempts: number;
   lastError: string | null;
+  nextAttemptAt?: string | null;
+  completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

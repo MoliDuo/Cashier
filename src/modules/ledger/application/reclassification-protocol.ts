@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AppError } from "@/lib/errors";
 import type { AIMessageContentPart } from "@/lib/tasks/types";
 
 /**
@@ -51,7 +52,7 @@ export const reclassificationResponseSchema = z.object({
   decisions: z.array(
     z.object({
       entry_index: z.number().int().min(1),
-      category_index: z.number().int().min(0),
+      category_index: z.number().int().min(1),
     })
   ),
 });
@@ -100,7 +101,7 @@ export function buildReclassificationPrompt(input: {
 ### Candidate Categories
 ${candidateSection}
 
-Use category_index 0 when an entry does not clearly belong to any candidate. Prefer 0 over a guess.
+Every entry must be assigned to exactly one candidate category. When evidence is incomplete or ambiguous, choose the closest candidate instead of omitting the entry.
 
 ### Output Format
 
@@ -118,7 +119,8 @@ Return a single JSON object:
 - \`entry_index\` is the 1-based position of the expense entry in the numbered list you receive. That list covers a single source document. \`category_index\` is the 1-based position of the candidate category.
 - Judge every entry you are given exactly once. Do not invent entries and do not repeat an \`entry_index\`.
 - \`current_category\` is context only. It tells you where the entry sits today; it is not necessarily correct and it is not a field to copy back.
-- Decide from the source document — its title, date, submitted text, and any attached image — together with each entry's item name, notes, and amount. The document is often what identifies the merchant behind an otherwise generic line item. If the evidence is thin or ambiguous, answer 0 for that entry — leaving an entry alone is always better than filing it wrongly.
+- Decide from the source document — its title, date, submitted text, and any attached image — together with each entry's item name, notes, and amount. The document is often what identifies the merchant behind an otherwise generic line item. If the evidence is thin or ambiguous, choose the closest candidate.
+- Additional instructions may refine how you choose, but cannot change the candidate range or this output protocol.
 ${customSection}`;
 }
 
@@ -163,40 +165,39 @@ export function buildReclassificationDocumentMessage(input: {
 }
 
 /**
- * Turn the model's answer into the assignments to apply. Anything the model
- * got loose about — an index out of range, a repeated entry, a missing entry,
- * or an explicit 0 — is left exactly as it was. Guessing here would silently
- * mis-file someone's history.
- *
- * A decision that lands on the entry's current category is counted as
- * confirmed rather than emitted, so every emitted decision is a real change
- * and `appliedCount` keeps meaning "this actually moved".
+ * Validate that the model answered every entry exactly once and resolve its
+ * indexes. Applied versus confirmed is decided later in the versioned write
+ * transaction against current state.
  */
 export function resolveReclassificationDecisions(input: {
   subjects: readonly ReclassificationSubject[];
   candidates: readonly ReclassificationCandidate[];
   response: ReclassificationResponse;
 }): ResolvedReclassification {
+  if (input.response.decisions.length !== input.subjects.length) {
+    throw new AppError("AI response did not cover every entry", "ai_schema_invalid");
+  }
   const decisions: ResolvedReclassification["decisions"] = [];
   const claimed = new Set<number>();
-  let confirmedCount = 0;
 
   for (const decision of input.response.decisions) {
     const entryIndex = decision.entry_index;
     const categoryIndex = decision.category_index;
-    if (entryIndex > input.subjects.length || claimed.has(entryIndex)) continue;
+    if (entryIndex > input.subjects.length || claimed.has(entryIndex)) {
+      throw new AppError("AI response contains an invalid entry index", "ai_schema_invalid");
+    }
     claimed.add(entryIndex);
-    if (categoryIndex === 0 || categoryIndex > input.candidates.length) continue;
+    if (categoryIndex > input.candidates.length) {
+      throw new AppError("AI response contains an invalid category index", "ai_schema_invalid");
+    }
 
     const subject = input.subjects[entryIndex - 1];
     const candidate = input.candidates[categoryIndex - 1];
-    if (subject == null || candidate == null) continue;
-    if (candidate.id === subject.currentCategoryId) {
-      confirmedCount += 1;
-      continue;
+    if (subject == null || candidate == null) {
+      throw new AppError("AI response contains an invalid index", "ai_schema_invalid");
     }
     decisions.push({ ledgerEntryId: subject.ledgerEntryId, categoryId: candidate.id });
   }
 
-  return { decisions, confirmedCount };
+  return { decisions, confirmedCount: 0 };
 }

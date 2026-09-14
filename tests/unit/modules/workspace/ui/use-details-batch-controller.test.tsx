@@ -9,7 +9,9 @@ const {
   batchUpdateLedgerEntriesActionMock,
   batchUpdateLedgerEntryDatesActionMock,
   previewBatchLedgerEntryDateActionMock,
-  startCategoryReclassificationActionMock,
+  beginCategoryAssignmentActionMock,
+  appendCategoryAssignmentSelectionActionMock,
+  commitCategoryAssignmentSelectionActionMock,
   reclassificationJobMock,
   toastErrorMock,
   toastSuccessMock,
@@ -18,7 +20,9 @@ const {
   batchUpdateLedgerEntriesActionMock: vi.fn(),
   batchUpdateLedgerEntryDatesActionMock: vi.fn(),
   previewBatchLedgerEntryDateActionMock: vi.fn(),
-  startCategoryReclassificationActionMock: vi.fn(),
+  beginCategoryAssignmentActionMock: vi.fn(),
+  appendCategoryAssignmentSelectionActionMock: vi.fn(),
+  commitCategoryAssignmentSelectionActionMock: vi.fn(),
   reclassificationJobMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
@@ -40,7 +44,9 @@ vi.mock("@/modules/ledger/server-actions/entries", () => ({
 }));
 
 vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
-  startCategoryReclassificationAction: startCategoryReclassificationActionMock,
+  beginCategoryAssignmentAction: beginCategoryAssignmentActionMock,
+  appendCategoryAssignmentSelectionAction: appendCategoryAssignmentSelectionActionMock,
+  commitCategoryAssignmentSelectionAction: commitCategoryAssignmentSelectionActionMock,
 }));
 
 vi.mock("@/lib/queries/ledger-query-client", () => ({
@@ -93,10 +99,51 @@ function entry(id: string, sourceDocumentId = "document-1") {
   };
 }
 
+function assignmentJob(status: "pending" | "running" | "succeeded" = "pending") {
+  return {
+    id: "job-1",
+    formatVersion: 2,
+    mode: { kind: "ai" as const, candidateCategoryIds: ["category-1", "category-2"] },
+    status,
+    total: 1,
+    processedCount: status === "succeeded" ? 1 : 0,
+    appliedCount: status === "succeeded" ? 1 : 0,
+    confirmedCount: 0,
+    failedCount: 0,
+    conflictCount: 0,
+    skippedCount: 0,
+    cancelledCount: 0,
+    documentTotal: 1,
+    documentCompleted: status === "succeeded" ? 1 : 0,
+    activeDocumentCount: status === "running" ? 1 : 0,
+    retryingDocumentCount: 0,
+    nextRetryAt: null,
+    candidateCategories: [],
+    receivedCount: status === "pending" ? 1 : 0,
+    errorCode: null,
+    createdAt: "2026-09-04T00:00:00.000Z",
+    updatedAt: "2026-09-04T00:00:00.000Z",
+    completedAt: status === "succeeded" ? "2026-09-04T00:00:01.000Z" : null,
+    canRetryFailed: false,
+    evidenceIncomplete: false,
+  };
+}
+
 describe("useDetailsBatchController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     reclassificationJobMock.mockResolvedValue(null);
+    beginCategoryAssignmentActionMock.mockResolvedValue({
+      ...assignmentJob("pending"),
+      status: "preparing",
+      receivedCount: 0,
+    });
+    appendCategoryAssignmentSelectionActionMock.mockResolvedValue({
+      jobId: "job-1",
+      received: 1,
+      total: 1,
+    });
+    commitCategoryAssignmentSelectionActionMock.mockResolvedValue(assignmentJob());
   });
 
   it("closes delete confirmation and finishes before refresh settles", async () => {
@@ -341,19 +388,6 @@ describe("useDetailsBatchController", () => {
 
   it("starts an AI sort for the captured selection and clears it", async () => {
     const { wrapper } = setup();
-    startCategoryReclassificationActionMock.mockResolvedValue({
-      id: "job-1",
-      status: "pending",
-      total: 1,
-      cursor: 0,
-      appliedCount: 0,
-      confirmedCount: 0,
-      undecidedCount: 1,
-      attempts: 0,
-      lastError: null,
-      createdAt: "2026-09-04T00:00:00.000Z",
-      updatedAt: "2026-09-04T00:00:00.000Z",
-    });
     const { result } = renderHook(
       () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
       { wrapper }
@@ -368,9 +402,19 @@ describe("useDetailsBatchController", () => {
     await act(async () => result.current.confirmCategory());
     await act(async () => Promise.resolve());
 
-    expect(startCategoryReclassificationActionMock).toHaveBeenCalledWith("ledger-1", {
-      ledgerEntryIds: ["entry-1"],
-      candidateCategoryIds: ["category-1", "category-2"],
+    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith("ledger-1", {
+      requestKey: expect.any(String),
+      mode: { kind: "ai", candidateCategoryIds: ["category-1", "category-2"] },
+      expectedEntryCount: 1,
+    });
+    expect(appendCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith("ledger-1", {
+      jobId: "job-1",
+      chunkIndex: 0,
+      entries: [{ ledgerEntryId: "entry-1", sourceDocumentId: "document-1", expectedVersion: 1 }],
+    });
+    expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith("ledger-1", {
+      jobId: "job-1",
+      expectedEntryCount: 1,
     });
     expect(result.current.selectedIds).toEqual([]);
     expect(result.current.categoryDialogOpen).toBe(false);
@@ -401,7 +445,7 @@ describe("useDetailsBatchController", () => {
       ["entry-1"],
       { categoryId: "category-1" }
     );
-    expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
+    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
     expect(result.current.categoryDialogOpen).toBe(false);
   });
 
@@ -435,7 +479,7 @@ describe("useDetailsBatchController", () => {
       ["entry-1"],
       { categoryId: null }
     );
-    expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
+    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
   });
 
   it("refuses to start when the selection moved under the dialog", async () => {
@@ -454,33 +498,22 @@ describe("useDetailsBatchController", () => {
     await act(async () => result.current.confirmCategory());
 
     expect(result.current.categorySelectionChanged).toBe(true);
-    expect(startCategoryReclassificationActionMock).not.toHaveBeenCalled();
+    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
     expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
   });
 
   it("reports a finished run once, and only for a run this client watched", async () => {
     const { wrapper, queryClient } = setup();
-    const running = {
-      id: "job-1",
-      status: "running" as const,
-      total: 3,
-      cursor: 1,
-      appliedCount: 1,
-      confirmedCount: 0,
-      undecidedCount: 2,
-      attempts: 0,
-      lastError: null,
-      createdAt: "2026-09-04T00:00:00.000Z",
-      updatedAt: "2026-09-04T00:00:00.000Z",
-    };
+    const running = assignmentJob("running");
     reclassificationJobMock.mockResolvedValueOnce(running).mockResolvedValue({
       ...running,
       status: "succeeded",
-      cursor: 3,
-      appliedCount: 2,
-      confirmedCount: 1,
-      undecidedCount: 0,
+      processedCount: 1,
+      appliedCount: 1,
+      documentCompleted: 1,
+      activeDocumentCount: 0,
+      completedAt: "2026-09-04T00:00:01.000Z",
     });
     const { result } = renderHook(
       () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),

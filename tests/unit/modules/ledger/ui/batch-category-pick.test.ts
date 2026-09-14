@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
-import { MAX_RECLASSIFICATION_CANDIDATES } from "@/modules/ledger/ui/batch-action-toolbar/batch-category-pick";
 
 describe("resolveBatchCategoryPick", () => {
   it("asks for nothing until something is picked", () => {
@@ -22,13 +21,11 @@ describe("resolveBatchCategoryPick", () => {
     ).toEqual({ kind: "ai", categoryIds: ["category-1", "category-2"] });
   });
 
-  it("stops at the candidate limit, where the question stops being well posed", () => {
-    const within = Array.from({ length: MAX_RECLASSIFICATION_CANDIDATES }, (_, i) => `c${i}`);
-    const over = [...within, `c${MAX_RECLASSIFICATION_CANDIDATES}`];
-
-    expect(resolveBatchCategoryPick({ categoryIds: within, clearPicked: false }).kind).toBe("ai");
-    expect(resolveBatchCategoryPick({ categoryIds: over, clearPicked: false })).toEqual({
-      kind: "tooMany",
+  it("accepts every category in the default preset", () => {
+    const categories = Array.from({ length: 13 }, (_, i) => `c${i}`);
+    expect(resolveBatchCategoryPick({ categoryIds: categories, clearPicked: false })).toEqual({
+      kind: "ai",
+      categoryIds: categories,
     });
   });
 

@@ -18,5 +18,13 @@ export default defineConfig({
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
+    {
+      name: "short-mobile",
+      testMatch: /category-workflows\.spec\.ts/,
+      use: {
+        ...devices["Pixel 7"],
+        viewport: { width: 320, height: 568 },
+      },
+    },
   ],
 });

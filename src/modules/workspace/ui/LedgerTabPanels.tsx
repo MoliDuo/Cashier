@@ -56,6 +56,7 @@ interface LedgerTabPanelsProps {
   /** Owned by the page, because the tab that needs it is the tab that is mounted. */
   onRefresh?: () => Promise<unknown> | unknown;
   isRefreshing?: boolean | undefined;
+  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 /** Routes to whichever ledger tab is active; inactive tabs stay unmounted. */
@@ -79,6 +80,7 @@ export function LedgerTabPanels({
   interfaceLanguage,
   onRefresh,
   isRefreshing,
+  onGoToDetails,
 }: LedgerTabPanelsProps) {
   return (
     <div className={hidden ? "hidden" : undefined} aria-hidden={hidden || undefined}>
@@ -152,6 +154,7 @@ export function LedgerTabPanels({
               {...(hasPassword !== undefined ? { hasPassword } : {})}
               {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
               {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
+              {...(onGoToDetails == null ? {} : { onGoToDetails })}
             />
           </DeferredFeatureMessages>
         </div>

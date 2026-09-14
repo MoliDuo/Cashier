@@ -59,8 +59,22 @@ export interface SourceDocumentReadPort {
   }>;
 }
 
+export interface ApplyCategoryAssignmentsInput {
+  ledgerId: string;
+  jobId: string;
+  sourceDocumentId: string;
+  claimToken: string;
+  now?: Date;
+}
+export type ApplyCategoryAssignmentsResult =
+  | { status: "applied"; appliedCount: number; confirmedCount: number; version: number }
+  | { status: "conflict" | "skipped" | "cancelled" | "claim_lost" };
+
 /** The only application-facing boundary for writes that change a document's visible projection. */
 export interface SourceDocumentAggregateWritePort {
+  applyCategoryAssignments(
+    input: ApplyCategoryAssignmentsInput
+  ): Promise<ApplyCategoryAssignmentsResult>;
   createProcessingDocument: SourceDocumentSubmissionPort["submit"];
   createIdempotentProcessingDocument: (
     idempotency: SourceDocumentIdempotencyInput,

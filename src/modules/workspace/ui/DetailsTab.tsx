@@ -70,7 +70,13 @@ export function DetailsTab({
       }),
     [advancedFilters, periodParams]
   );
-  const batch = useDetailsBatchController(ledgerId, data.entries, queryFingerprint, timeZone);
+  const batch = useDetailsBatchController(
+    ledgerId,
+    data.entries,
+    queryFingerprint,
+    timeZone,
+    categories
+  );
   const { filters } = useDetailsTabFilters({
     periodParams,
     advancedFilters,

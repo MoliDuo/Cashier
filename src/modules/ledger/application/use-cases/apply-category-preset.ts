@@ -2,7 +2,7 @@ import type { CategoryPort } from "@/application/contracts";
 import { getCategoryPreset } from "@/config/category-presets";
 import type {
   ApplyCategoryPresetInput,
-  EntryCategoryWithCountDto,
+  ApplyCategoryPresetResult,
 } from "@/modules/ledger/contracts";
 
 /**
@@ -18,12 +18,14 @@ export async function applyCategoryPreset(
   ledgerId: string,
   input: ApplyCategoryPresetInput,
   categories: Pick<CategoryPort, "applyPreset" | "listWithCount">
-): Promise<EntryCategoryWithCountDto[]> {
-  await categories.applyPreset(ledgerId, {
+): Promise<ApplyCategoryPresetResult> {
+  const result = await categories.applyPreset(ledgerId, {
     expectedRevision: input.expectedRevision,
     presetCategories: getCategoryPreset(input.presetId, input.locale),
     mappings: input.mappings,
   });
-  const listed = await categories.listWithCount(ledgerId);
-  return listed.map((category) => ({ ...category, deletedAt: null }));
+  return {
+    ...result,
+    categories: result.categories.map((category) => ({ ...category, deletedAt: null })),
+  };
 }

@@ -31,7 +31,16 @@ describe("Postgres migration journal", () => {
     });
 
     expect(observedInversions).toEqual(allowedLegacyInversions);
-    expect(journal.entries.at(-1)?.tag).toBe("0042_reorder_default_categories");
+    expect(journal.entries.at(-1)?.tag).toBe("0043_category_assignment_v2");
+  });
+
+  it("keeps the harmful global category reorder migration as an intentional no-op", () => {
+    const sql = readFileSync(
+      path.join(migrationsDirectory, "0042_reorder_default_categories.sql"),
+      "utf8"
+    );
+    expect(sql).toContain("SELECT 1;");
+    expect(sql).not.toContain("UPDATE entry_categories");
   });
 
   it("recovers every schema change skipped by the legacy inversions", () => {

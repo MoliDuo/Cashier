@@ -5,6 +5,8 @@ import { MAX_BATCH_SIZE } from "@/lib/batch-ids";
 interface UseSelectionOptions {
   allIds: string[];
   queryFingerprint?: string | null;
+  /** `null` allows every currently loaded item to be selected. */
+  maxSelected?: number | null;
 }
 
 interface UseSelectionReturn {
@@ -33,13 +35,25 @@ interface SelectionState {
   isSelectionMode: boolean;
 }
 
-function intersectSelection(selectedIds: string[], visibleIds: ReadonlySet<string>): string[] {
-  return selectedIds.filter((id) => visibleIds.has(id)).slice(0, MAX_BATCH_SIZE);
+function limitSelection(ids: string[], maxSelected: number | null): string[] {
+  return maxSelected == null ? ids : ids.slice(0, maxSelected);
+}
+
+function intersectSelection(
+  selectedIds: string[],
+  visibleIds: ReadonlySet<string>,
+  maxSelected: number | null
+): string[] {
+  return limitSelection(
+    selectedIds.filter((id) => visibleIds.has(id)),
+    maxSelected
+  );
 }
 
 export function useSelection({
   allIds,
   queryFingerprint,
+  maxSelected = MAX_BATCH_SIZE,
 }: UseSelectionOptions): UseSelectionReturn {
   const [selection, setSelection] = useState<SelectionState>(() => ({
     queryFingerprint,
@@ -48,28 +62,30 @@ export function useSelection({
   }));
   const uniqueAllIds = useMemo(() => [...new Set(allIds)], [allIds]);
   const uniqueAllIdSet = useMemo(() => new Set(uniqueAllIds), [uniqueAllIds]);
-  const selectableCount = Math.min(uniqueAllIds.length, MAX_BATCH_SIZE);
+  const selectableCount =
+    maxSelected == null ? uniqueAllIds.length : Math.min(uniqueAllIds.length, maxSelected);
 
   const storedSelectedIds =
     selection.queryFingerprint === queryFingerprint ? selection.selectedIds : [];
-  const selectedIds = intersectSelection(storedSelectedIds, uniqueAllIdSet);
+  const selectedIds = intersectSelection(storedSelectedIds, uniqueAllIdSet, maxSelected);
   const isSelectionMode =
     selection.queryFingerprint === queryFingerprint ? selection.isSelectionMode : false;
   const selectedCount = selectedIds.length;
   const isAllSelected = selectedCount === selectableCount && selectableCount > 0;
-  const isSelectionLimitReached = selectedCount >= MAX_BATCH_SIZE;
+  const isSelectionLimitReached = maxSelected != null && selectedCount >= maxSelected;
 
   const handleSelect = useCallback(
     (id: string, selected: boolean) => {
       setSelection((current) => {
         const selectedIds = intersectSelection(
           current.queryFingerprint === queryFingerprint ? current.selectedIds : [],
-          uniqueAllIdSet
+          uniqueAllIdSet,
+          maxSelected
         );
         const nextIds = selected
           ? selectedIds.includes(id)
             ? selectedIds
-            : selectedIds.length >= MAX_BATCH_SIZE || !uniqueAllIdSet.has(id)
+            : (maxSelected != null && selectedIds.length >= maxSelected) || !uniqueAllIdSet.has(id)
               ? selectedIds
               : [...selectedIds, id]
           : selectedIds.includes(id)
@@ -82,18 +98,18 @@ export function useSelection({
         };
       });
     },
-    [queryFingerprint, uniqueAllIdSet]
+    [maxSelected, queryFingerprint, uniqueAllIdSet]
   );
 
   const handleSelectAll = useCallback(
     (selected: boolean) => {
       setSelection((current) => ({
         queryFingerprint,
-        selectedIds: selected ? uniqueAllIds.slice(0, MAX_BATCH_SIZE) : [],
+        selectedIds: selected ? limitSelection(uniqueAllIds, maxSelected) : [],
         isSelectionMode: current.queryFingerprint === queryFingerprint && current.isSelectionMode,
       }));
     },
-    [queryFingerprint, uniqueAllIds]
+    [maxSelected, queryFingerprint, uniqueAllIds]
   );
 
   const handleSelectMany = useCallback(
@@ -101,13 +117,14 @@ export function useSelection({
       setSelection((current) => {
         const selectedIds = intersectSelection(
           current.queryFingerprint === queryFingerprint ? current.selectedIds : [],
-          uniqueAllIdSet
+          uniqueAllIdSet,
+          maxSelected
         );
         const affected = new Set(ids.filter((id) => uniqueAllIdSet.has(id)));
         const nextIds = selected
-          ? [...selectedIds, ...[...affected].filter((id) => !selectedIds.includes(id))].slice(
-              0,
-              MAX_BATCH_SIZE
+          ? limitSelection(
+              [...selectedIds, ...[...affected].filter((id) => !selectedIds.includes(id))],
+              maxSelected
             )
           : selectedIds.filter((id) => !affected.has(id));
         return {
@@ -117,7 +134,7 @@ export function useSelection({
         };
       });
     },
-    [queryFingerprint, uniqueAllIdSet]
+    [maxSelected, queryFingerprint, uniqueAllIdSet]
   );
 
   const toggleSelectionMode = useCallback(() => {
@@ -129,11 +146,11 @@ export function useSelection({
         selectedIds:
           wasSelectionMode || current.queryFingerprint !== queryFingerprint
             ? []
-            : intersectSelection(current.selectedIds, uniqueAllIdSet),
+            : intersectSelection(current.selectedIds, uniqueAllIdSet, maxSelected),
         isSelectionMode: !wasSelectionMode,
       };
     });
-  }, [queryFingerprint, uniqueAllIdSet]);
+  }, [maxSelected, queryFingerprint, uniqueAllIdSet]);
 
   const clearSelection = useCallback(() => {
     setSelection((current) => ({
@@ -157,12 +174,12 @@ export function useSelection({
         queryFingerprint,
         selectedIds:
           value && current.queryFingerprint === queryFingerprint
-            ? intersectSelection(current.selectedIds, uniqueAllIdSet)
+            ? intersectSelection(current.selectedIds, uniqueAllIdSet, maxSelected)
             : [],
         isSelectionMode: value,
       }));
     },
-    [queryFingerprint, uniqueAllIdSet]
+    [maxSelected, queryFingerprint, uniqueAllIdSet]
   );
 
   const toggleSelection = useCallback(
@@ -170,20 +187,21 @@ export function useSelection({
       setSelection((current) => {
         const selectedIds = intersectSelection(
           current.queryFingerprint === queryFingerprint ? current.selectedIds : [],
-          uniqueAllIdSet
+          uniqueAllIdSet,
+          maxSelected
         );
         return {
           queryFingerprint,
           selectedIds: selectedIds.includes(id)
             ? selectedIds.filter((selectedId) => selectedId !== id)
-            : selectedIds.length >= MAX_BATCH_SIZE || !uniqueAllIdSet.has(id)
+            : (maxSelected != null && selectedIds.length >= maxSelected) || !uniqueAllIdSet.has(id)
               ? selectedIds
               : [...selectedIds, id],
           isSelectionMode: current.queryFingerprint === queryFingerprint && current.isSelectionMode,
         };
       });
     },
-    [queryFingerprint, uniqueAllIdSet]
+    [maxSelected, queryFingerprint, uniqueAllIdSet]
   );
 
   useEffect(() => {
@@ -200,7 +218,11 @@ export function useSelection({
           };
         }
 
-        const nextSelectedIds = intersectSelection(current.selectedIds, uniqueAllIdSet);
+        const nextSelectedIds = intersectSelection(
+          current.selectedIds,
+          uniqueAllIdSet,
+          maxSelected
+        );
         if (
           nextSelectedIds.length === current.selectedIds.length &&
           nextSelectedIds.every((id, index) => id === current.selectedIds[index])
@@ -214,27 +236,28 @@ export function useSelection({
     return () => {
       active = false;
     };
-  }, [queryFingerprint, uniqueAllIdSet]);
+  }, [maxSelected, queryFingerprint, uniqueAllIdSet]);
 
   const selectAll = useCallback(() => {
     setSelection((current) => ({
       queryFingerprint,
-      selectedIds: uniqueAllIds.slice(0, MAX_BATCH_SIZE),
+      selectedIds: limitSelection(uniqueAllIds, maxSelected),
       isSelectionMode: current.queryFingerprint === queryFingerprint && current.isSelectionMode,
     }));
-  }, [queryFingerprint, uniqueAllIds]);
+  }, [maxSelected, queryFingerprint, uniqueAllIds]);
 
   const retainSelection = useCallback(
     (ids: string[]) => {
       setSelection((current) => ({
         queryFingerprint,
-        selectedIds: [...new Set(ids)]
-          .filter((id) => uniqueAllIdSet.has(id))
-          .slice(0, MAX_BATCH_SIZE),
+        selectedIds: limitSelection(
+          [...new Set(ids)].filter((id) => uniqueAllIdSet.has(id)),
+          maxSelected
+        ),
         isSelectionMode: current.queryFingerprint === queryFingerprint && current.isSelectionMode,
       }));
     },
-    [queryFingerprint, uniqueAllIdSet]
+    [maxSelected, queryFingerprint, uniqueAllIdSet]
   );
 
   useEffect(() => {

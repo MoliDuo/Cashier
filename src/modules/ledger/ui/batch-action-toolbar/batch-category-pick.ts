@@ -10,16 +10,11 @@
  * write its button starts can never disagree.
  */
 
-/** One pick is the user's own answer; two is the fewest the model can choose
- * between; more than eight dilutes the decision and the prompt. */
-export const MAX_RECLASSIFICATION_CANDIDATES = 8;
-
 export type BatchCategoryPick =
   | { kind: "none" }
   | { kind: "clear" }
   | { kind: "assign"; categoryId: string }
-  | { kind: "ai"; categoryIds: readonly string[] }
-  | { kind: "tooMany" };
+  | { kind: "ai"; categoryIds: readonly string[] };
 
 export function resolveBatchCategoryPick({
   categoryIds,
@@ -33,7 +28,6 @@ export function resolveBatchCategoryPick({
   const [first, ...rest] = categoryIds;
   if (first == null) return { kind: "none" };
   if (rest.length === 0) return { kind: "assign", categoryId: first };
-  if (rest.length + 1 > MAX_RECLASSIFICATION_CANDIDATES) return { kind: "tooMany" };
   return { kind: "ai", categoryIds };
 }
 

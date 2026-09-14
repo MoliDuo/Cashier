@@ -88,6 +88,22 @@ describe("useSelection", () => {
     expect(result.current.selectedIds).toContain("entry-101");
   });
 
+  it("selects every loaded item when the caller disables the cap", () => {
+    const ids = Array.from({ length: 150 }, (_, index) => `entry-${index + 1}`);
+    const { result, rerender } = renderHook(
+      ({ allIds }) => useSelection({ allIds, maxSelected: null }),
+      { initialProps: { allIds: ids } }
+    );
+
+    act(() => result.current.selectAll());
+    expect(result.current.selectedIds).toHaveLength(150);
+    expect(result.current.isAllSelected).toBe(true);
+
+    rerender({ allIds: [...ids, "entry-151"] });
+    expect(result.current.selectedIds).toHaveLength(150);
+    expect(result.current.isAllSelected).toBe(false);
+  });
+
   it("takes and gives back a whole day in one update", () => {
     const { result } = renderHook(() => useSelection({ allIds: ["a", "b", "c", "d"] }));
 

@@ -4,7 +4,6 @@ import type {
   ApplyCategoryPresetInput,
   DeleteEntryCategoryResultDto,
   EntryCategoryDto,
-  EntryCategoryWithCountDto,
   ReorderEntryCategoriesResultDto,
 } from "@/modules/ledger/contracts";
 import {
@@ -107,7 +106,7 @@ export const applyCategoryPresetAction = withLedgerAccess(
   async (
     ledgerId: string,
     input: ApplyCategoryPresetInput
-  ): Promise<EntryCategoryWithCountDto[]> => {
+  ): Promise<import("@/modules/ledger/contracts").ApplyCategoryPresetResult> => {
     const validated = parseApplyCategoryPresetInput(input);
     return applyCategoryPreset(
       ledgerId,

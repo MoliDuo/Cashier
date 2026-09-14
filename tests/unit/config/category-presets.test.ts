@@ -1,13 +1,9 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { COMMON_LUCIDE_ICONS } from "@/config/icons";
 import { CATEGORY_PRESET_IDS, getCategoryPreset } from "@/config/category-presets";
 import { getDefaultLedger } from "@/config/default-ledger";
 
 const commonIcons: readonly string[] = COMMON_LUCIDE_ICONS;
-/** The newest reorder migration; point this at the next one when the order changes. */
-const DEFAULT_PRESET_REORDER_MIGRATION = "0042_reorder_default_categories.sql";
 
 describe("getCategoryPreset", () => {
   it("keeps the default preset aligned with the seeded ledger categories", () => {
@@ -40,30 +36,12 @@ describe("getCategoryPreset", () => {
     expect(getCategoryPreset("default", "en")).toHaveLength(13);
   });
 
-  /**
-   * Existing rows keep the `sort_order` they were written with, so the preset's
-   * order only reaches them through the migration. A name missing from it, or a
-   * wrong slot, is invisible to every other test — the migration runs while the
-   * test schema is built, long before any test could seed a row to check.
-   */
-  it("reorders existing ledgers onto the same slots the preset declares", () => {
-    const sql = readFileSync(
-      path.resolve("src/persistence/postgres-migrations", DEFAULT_PRESET_REORDER_MIGRATION),
-      "utf8"
-    );
-    const orderByName = new Map(
-      [...sql.matchAll(/\('([^']+)', (\d+)\)/g)].map(([, name, sortOrder]) => [
-        name!,
-        Number(sortOrder),
-      ])
-    );
-    expect(orderByName.size).toBeGreaterThan(0);
-
-    for (const locale of ["zh-CN", "en"] as const) {
-      const preset = getCategoryPreset("default", locale);
-      expect(preset.map((category) => orderByName.get(category.name))).toEqual(
-        preset.map((_, index) => index + 1)
-      );
+  it("gives every built-in category a stable semantic key across locales", () => {
+    for (const presetId of CATEGORY_PRESET_IDS) {
+      const zh = getCategoryPreset(presetId, "zh-CN");
+      const en = getCategoryPreset(presetId, "en");
+      expect(zh.map((category) => category.key)).toEqual(en.map((category) => category.key));
+      expect(new Set(zh.map((category) => category.key)).size).toBe(zh.length);
     }
   });
 

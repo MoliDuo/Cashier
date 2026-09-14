@@ -101,15 +101,14 @@ describe("startCategoryReclassificationAction", () => {
     });
     await flushAfterCallbacks();
 
-    expect(job).toMatchObject({ status: "pending", total: 2, appliedCount: 0 });
+    expect(job).toMatchObject({ total: 2, appliedCount: 0 });
     const stored = await getCategoryReclassificationJobAction(ledger.id);
     expect(stored).toMatchObject({
       status: "succeeded",
       total: 2,
       appliedCount: 2,
       confirmedCount: 0,
-      undecidedCount: 0,
-      cursor: 2,
+      processedCount: 2,
     });
     const rows = await db
       .select({ id: ledgerEntries.id, categoryId: ledgerEntries.categoryId })
@@ -118,7 +117,7 @@ describe("startCategoryReclassificationAction", () => {
     expect(rows.every((row) => row.categoryId === food.id)).toBe(true);
   });
 
-  it("keeps entries the model declined to place", async () => {
+  it("fails incomplete model output instead of leaving entries undecided", async () => {
     const { ledger, food, home, document, revisionId } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
@@ -141,14 +140,14 @@ describe("startCategoryReclassificationAction", () => {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
-    await flushAfterCallbacks();
+    await flushAfterCallbacks(15_000);
 
-    // One moved, two left exactly as they were.
     await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
-      status: "succeeded",
-      appliedCount: 1,
+      status: "failed",
+      appliedCount: 0,
       confirmedCount: 0,
-      undecidedCount: 2,
+      failedCount: 3,
+      processedCount: 3,
     });
   });
 
@@ -195,8 +194,8 @@ describe("startCategoryReclassificationAction", () => {
     await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
   });
 
-  it("rejects a batch that is too large or a candidate set that is too small", async () => {
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+  it("accepts selections above 100 but rejects a candidate set that is too small", async () => {
+    const { ledger, food, document, revisionId } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
@@ -204,28 +203,10 @@ describe("startCategoryReclassificationAction", () => {
       categoryId: null,
       count: 3,
     });
-    const oversized = Array.from({ length: 101 }, () => crypto.randomUUID());
-
-    await expect(
-      startCategoryReclassificationAction(ledger.id, {
-        ledgerEntryIds: oversized,
-        candidateCategoryIds: [food.id, home.id],
-      })
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     await expect(
       startCategoryReclassificationAction(ledger.id, {
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id],
-      })
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    await expect(
-      startCategoryReclassificationAction(ledger.id, {
-        ledgerEntryIds: entryIds,
-        candidateCategoryIds: [
-          food.id,
-          home.id,
-          ...Array.from({ length: 7 }, () => crypto.randomUUID()),
-        ],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
@@ -295,12 +276,11 @@ describe("startCategoryReclassificationAction", () => {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
-    await flushAfterCallbacks();
+    await flushAfterCallbacks(15_000);
 
     await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
-      status: "pending",
-      attempts: 1,
-      lastError: "AI_JSON_REPAIR_FAILED",
+      status: "failed",
+      failedCount: 1,
     });
   });
 

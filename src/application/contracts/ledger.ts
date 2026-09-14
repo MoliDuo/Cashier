@@ -55,7 +55,14 @@ export interface CategoryPort {
   applyPreset(
     ledgerId: LedgerId,
     input: ApplyCategoryPresetContract
-  ): Promise<readonly CategoryContract[]>;
+  ): Promise<{
+    categories: readonly CategoryWithCountContract[];
+    changed: boolean;
+    movedEntryCount: number;
+    createdCategoryCount: number;
+    removedCategoryCount: number;
+    retainedCategoryCount: number;
+  }>;
   countUncategorized(ledgerId: LedgerId): Promise<number>;
 }
 export interface CurrencyPort {
