@@ -61,4 +61,14 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   const results = page.getByRole("dialog");
   await expect(results.getByText(item, { exact: true })).toBeVisible();
   await expect(results.getByText("Updated", { exact: true })).toBeVisible();
+  await results.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(results).toHaveCount(0);
+
+  // A finished run reports itself until the reader closes it, and then stays closed.
+  await status.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(status).toHaveCount(0);
+  await navigation.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(status).toHaveCount(0);
+  await navigation.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(status).toHaveCount(0);
 });

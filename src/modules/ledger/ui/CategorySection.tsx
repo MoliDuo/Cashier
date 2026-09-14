@@ -17,6 +17,7 @@ import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { toast } from "sonner";
 import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
+import { isCategoryAssignmentJobActive } from "@/modules/ledger/ui/category-assignment-status-visibility";
 
 interface CategorySectionProps {
   ledgerId: string;
@@ -49,8 +50,7 @@ export function CategorySection({
   const locale = useLocale();
   const preset = useCategoryPresetSwitch({ ledgerId, categories, locale });
   const assignment = useCategoryAssignmentJob(ledgerId);
-  const categoryAssignmentActive =
-    assignment.job != null && ["preparing", "pending", "running"].includes(assignment.job.status);
+  const categoryAssignmentActive = isCategoryAssignmentJobActive(assignment.job);
 
   const {
     managing,

@@ -68,6 +68,7 @@
     "categoryRefreshStatus": "刷新状态",
     "categoryViewResults": "查看结果",
     "categoryStop": "停止",
+    "categoryAssignmentClose": "隐藏",
     "categoryResultsTitle": "分类结果",
     "categoryLegacyJob": "这是旧版任务，不提供逐条结果。需要重新运行时，请重新选择明细。",
     "categoryEntryDeleted": "明细已删除",

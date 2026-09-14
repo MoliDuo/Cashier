@@ -104,4 +104,36 @@ describe("CategoryAssignmentStatus", () => {
     fireEvent.click(screen.getByRole("button", { name: /categoryViewResults/ }));
     expect(screen.getByRole("button", { name: /categoryRetryLatest/ })).toBeEnabled();
   });
+
+  it("lets a finished run's band be closed", () => {
+    const onDismiss = vi.fn();
+    renderStatus({ job: job({ status: "succeeded", processedCount: 10 }), onDismiss });
+
+    fireEvent.click(screen.getByRole("button", { name: "close" }));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no close control while the run is still moving", () => {
+    renderStatus({ onDismiss: vi.fn() });
+
+    expect(screen.queryByRole("button", { name: "close" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /categoryStop/ })).toBeEnabled();
+  });
+
+  it("keeps the close control off a read failure that is still polling", () => {
+    renderStatus({ isReadError: true, onDismiss: vi.fn() });
+
+    expect(screen.queryByRole("button", { name: "close" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /categoryRefreshStatus/ })).toBeEnabled();
+  });
+
+  it("lets a read failure with no run to report be closed", () => {
+    const onDismiss = vi.fn();
+    renderStatus({ isReadError: true, job: null, onDismiss });
+
+    fireEvent.click(screen.getByRole("button", { name: "close" }));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });

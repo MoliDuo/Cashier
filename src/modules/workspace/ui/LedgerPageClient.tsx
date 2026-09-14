@@ -175,13 +175,14 @@ export function LedgerPageClient({
   return (
     <>
       <div>
-        {categoryAssignment.job != null || categoryAssignment.isReadError ? (
+        {categoryAssignment.isVisible ? (
           <DeferredFeatureMessages feature="details" locale={locale} fallback={null}>
             <CategoryAssignmentStatus
               ledgerId={ledgerId}
               job={categoryAssignment.job}
               isReadError={categoryAssignment.isReadError}
               onRefresh={categoryAssignment.refresh}
+              onDismiss={categoryAssignment.dismiss}
             />
           </DeferredFeatureMessages>
         ) : null}

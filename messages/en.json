@@ -129,6 +129,7 @@
     "categoryRefreshStatus": "Refresh status",
     "categoryViewResults": "View results",
     "categoryStop": "Stop",
+    "categoryAssignmentClose": "Hide",
     "categoryResultsTitle": "Category results",
     "categoryLegacyJob": "This is a legacy job and has no entry-level results. Select the entries again to rerun it.",
     "categoryEntryDeleted": "Entry deleted",

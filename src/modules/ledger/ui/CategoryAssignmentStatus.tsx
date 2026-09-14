@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, RefreshCw, Square } from "lucide-react";
+import { Eye, RefreshCw, Square, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
@@ -13,12 +13,14 @@ import {
 } from "@/modules/ledger/server-actions/reclassification";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentResultDialog } from "./CategoryAssignmentResultDialog";
+import { isCategoryAssignmentJobActive } from "./category-assignment-status-visibility";
 
 interface CategoryAssignmentStatusProps {
   ledgerId: string;
   job: CategoryReclassificationJob | null;
   isReadError: boolean;
   onRefresh: () => Promise<unknown>;
+  onDismiss?: () => void;
 }
 
 export function CategoryAssignmentStatus({
@@ -26,8 +28,10 @@ export function CategoryAssignmentStatus({
   job,
   isReadError,
   onRefresh,
+  onDismiss,
 }: CategoryAssignmentStatusProps) {
   const t = useTranslations("BatchActions");
+  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
   const [resultsOpen, setResultsOpen] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
@@ -70,7 +74,11 @@ export function CategoryAssignmentStatus({
     return () => window.clearInterval(timer);
   }, [job?.nextRetryAt, job?.retryingDocumentCount]);
   if (job == null && !isReadError) return null;
-  const active = job != null && ["preparing", "pending", "running"].includes(job.status);
+  const active = isCategoryAssignmentJobActive(job);
+  // Closing a live run would take away the only progress readout, the only Stop
+  // control, and the retry the status polling still has to make, so the band
+  // becomes closable once the run has an outcome to report.
+  const canDismiss = onDismiss != null && !active;
   const retrySeconds =
     job?.nextRetryAt == null
       ? 0
@@ -137,6 +145,7 @@ export function CategoryAssignmentStatus({
         ) : null}
         {active && job != null ? (
           <Button
+            type="button"
             size="sm"
             variant="outline"
             disabled={cancel.isPending}
@@ -144,6 +153,19 @@ export function CategoryAssignmentStatus({
           >
             <Square className="h-4 w-4" />
             {t("categoryStop")}
+          </Button>
+        ) : null}
+        {canDismiss ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="min-w-9 shrink-0 px-2"
+            aria-label={tCommon("close")}
+            title={t("categoryAssignmentClose")}
+            onClick={onDismiss}
+          >
+            <X className="h-4 w-4" />
           </Button>
         ) : null}
       </div>
