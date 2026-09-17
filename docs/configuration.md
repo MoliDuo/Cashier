@@ -5,18 +5,23 @@
 
 ## 应用与 AI
 
-| 变量                             | 必需     | 默认值                      | 说明                                              |
-| -------------------------------- | -------- | --------------------------- | ------------------------------------------------- |
-| `INITIAL_USER_EMAIL`             | 首次启动 | 无                          | 空数据库中创建的初始账号邮箱。                    |
-| `INITIAL_USER_PASSWORD`          | 首次启动 | 无                          | 初始账号密码；用户创建后不会再次同步。            |
-| `APP_URL`                        | 否       | `http://localhost:3000`     | 用户访问 Cashier 的公开地址。                     |
-| `OPENAI_API_KEY`                 | 是       | 无                          | OpenAI 或兼容服务的 API 密钥。                    |
-| `OPENAI_BASE_URL`                | 否       | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址。                          |
-| `AI_MODEL`                       | 否       | `gpt-4o`                    | 用于票据解析和分类的模型名。                      |
-| `AI_CATEGORY_CONCURRENCY`        | 否       | `100`                       | 部署内批量分类同时占用的账单槽位，范围 1–256。    |
-| `AI_CATEGORY_REQUEST_TIMEOUT_MS` | 否       | `60000`                     | 批量分类单次 AI 请求超时，范围 1000–180000 毫秒。 |
-| `AI_CATEGORY_MAX_ATTEMPTS`       | 否       | `3`                         | 每个分类请求块最多尝试次数，范围 1–5。            |
-| `TZ`                             | 否       | `Asia/Shanghai`             | 服务端默认时区。                                  |
+| 变量                             | 必需   | 默认值                      | 说明                                              |
+| -------------------------------- | ------ | --------------------------- | ------------------------------------------------- |
+| `COUPLE_OWNER_USER_ID`           | 是     | 无                          | 第一位成员的稳定 UUID。                           |
+| `COUPLE_PARTNER_USER_ID`         | 是     | 无                          | 第二位成员的稳定 UUID。                           |
+| `COUPLE_LEDGER_ID`               | 是     | 无                          | 共同账本的稳定 UUID。                             |
+| `COUPLE_OWNER_EMAIL`             | 初始化 | 无                          | 空库显式初始化时第一位成员邮箱。                  |
+| `COUPLE_OWNER_PASSWORD`          | 初始化 | 无                          | 空库显式初始化时第一位成员密码。                  |
+| `COUPLE_PARTNER_EMAIL`           | 初始化 | 无                          | 空库显式初始化时第二位成员邮箱。                  |
+| `COUPLE_PARTNER_PASSWORD`        | 初始化 | 无                          | 空库显式初始化时第二位成员密码。                  |
+| `APP_URL`                        | 否     | `http://localhost:3000`     | 用户访问 Cashier 的公开地址。                     |
+| `OPENAI_API_KEY`                 | 是     | 无                          | OpenAI 或兼容服务的 API 密钥。                    |
+| `OPENAI_BASE_URL`                | 否     | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址。                          |
+| `AI_MODEL`                       | 否     | `gpt-4o`                    | 用于票据解析和分类的模型名。                      |
+| `AI_CATEGORY_CONCURRENCY`        | 否     | `100`                       | 部署内批量分类同时占用的账单槽位，范围 1–256。    |
+| `AI_CATEGORY_REQUEST_TIMEOUT_MS` | 否     | `60000`                     | 批量分类单次 AI 请求超时，范围 1000–180000 毫秒。 |
+| `AI_CATEGORY_MAX_ATTEMPTS`       | 否     | `3`                         | 每个分类请求块最多尝试次数，范围 1–5。            |
+| `TZ`                             | 否     | `Asia/Shanghai`             | 服务端默认时区。                                  |
 
 ## PostgreSQL
 
@@ -51,7 +56,6 @@
 | `AUTH_OTP_PEPPER`      | 运行时 | 本地模板提供；Docker 可自动生成 | 邮箱验证码哈希使用的 pepper。                                    |
 | `AUTH_RESEND_KEY`      | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和注册。                         |
 | `AUTH_EMAIL_FROM`      | 否     | `Cashier <noreply@example.com>` | 验证码和登录通知的发件人。                                       |
-| `DISABLE_REGISTRATION` | 否     | `false`                         | 设为 `true` 后禁止新邮箱注册。                                   |
 | `SESSION_MAX_AGE_DAYS` | 否     | `14`                            | 登录会话最长天数。                                               |
 | `DEV_AUTH_BYPASS`      | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。 |
 

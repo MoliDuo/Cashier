@@ -11,15 +11,20 @@ Cashier 提供两种 Docker Compose 部署方式：
 
 ## 本地全家桶
 
-复制本地模板并填写初始账号与 AI 配置：
+复制本地模板并填写双人账号、账本 UUID 与 AI 配置：
 
 ```bash
 cp .env.local.example .env
 ```
 
 ```dotenv
-INITIAL_USER_EMAIL=you@example.com
-INITIAL_USER_PASSWORD=choose-a-strong-password
+COUPLE_OWNER_USER_ID=<UUID>
+COUPLE_PARTNER_USER_ID=<different UUID>
+COUPLE_LEDGER_ID=<UUID>
+COUPLE_OWNER_EMAIL=<first member email>
+COUPLE_OWNER_PASSWORD=<strong password>
+COUPLE_PARTNER_EMAIL=<second member email>
+COUPLE_PARTNER_PASSWORD=<strong password>
 OPENAI_API_KEY=your-api-key
 ```
 
@@ -58,7 +63,8 @@ cp .env.example .env
 - `S3_ENDPOINT`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、
   `S3_SECRET_ACCESS_KEY`：S3 或 R2 配置。
 - `S3_PUBLIC_ENDPOINT`：浏览器可以访问的对象存储端点。
-- `INITIAL_USER_EMAIL`、`INITIAL_USER_PASSWORD`：仅在空数据库上创建初始用户。
+- `COUPLE_*_ID`：固定成员和共同账本的三个 UUID；空库初始化时还需要
+  `COUPLE_*_EMAIL` 与 `COUPLE_*_PASSWORD`。
 - `OPENAI_API_KEY`：AI 服务密钥。
 
 对象存储桶必须预先创建。然后启动：
@@ -76,8 +82,18 @@ docker compose -f docker-compose.yml up -d
 1. 如果没有显式提供内部密钥，在 `cashier_config` 卷中生成并持久化
    `AUTH_SECRET`、`API_KEY_PEPPER`、`RATE_LIMIT_PEPPER` 和 `AUTH_OTP_PEPPER`。
 2. 等待 PostgreSQL 并应用 `src/persistence/postgres-migrations/` 中的迁移。
-3. 当数据库中没有用户时，根据 `INITIAL_USER_EMAIL` 和 `INITIAL_USER_PASSWORD` 创建初始用户。
-4. 启动 Cashier。
+3. 启动 Cashier；容器不会自动创建账号。
+
+空数据库首次启动后，显式预览并执行双人初始化：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap
+docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap -- --apply
+```
+
+使用外部服务部署时，将命令中的 `docker compose -f docker-compose.yml -f docker-compose.local.yml`
+替换为 `docker compose -f docker-compose.yml`。已有数据库不要运行初始化命令，
+先阅读 [双人账本迁移说明](./deployment/couple-only.md)。
 
 初始密码只在创建用户时使用。后续修改 `.env` 不会同步修改现有账号密码。
 

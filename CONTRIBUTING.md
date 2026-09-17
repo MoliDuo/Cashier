@@ -40,7 +40,9 @@ npm run db:migrate
 npm run dev
 ```
 
-Fill the initial user and AI values in `.env` before starting the application. Never commit `.env`,
+Fill the couple member IDs, shared ledger ID, and AI values in `.env`. On an empty database, run
+`npm run db:bootstrap` to preview and `npm run db:bootstrap -- --apply` to create the two users and
+shared ledger before signing in. Never commit `.env`,
 provider credentials, real receipts, API keys, or raw personal data.
 
 ## Project layout
@@ -120,7 +122,7 @@ desktop and mobile Chromium tests. It does not use an authentication bypass, rea
 object storage. `TEST_DATABASE_URL` may override the test connection, but must still point to a
 loopback database named `cashier_test` with `CREATEDB` permission. Never point it at production.
 
-The suite covers password rejection/login, automatic initial ledger creation, manual entry,
+The suite covers password rejection/login, shared ledger access, manual entry,
 editing, persistence after reload, deletion, logout, and protected-page redirects. Failures retain
 screenshots and traces in `test-results/` and an HTML report in `playwright-report/`. Normal exit,
 failure, and handled interruptions stop the test server and remove only this run's database.

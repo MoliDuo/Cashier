@@ -42,11 +42,16 @@ cd Cashier
 cp .env.local.example .env
 ```
 
-Set at least these three values in `.env`:
+Configure two fixed members and the AI key in `.env`:
 
 ```dotenv
-INITIAL_USER_EMAIL=you@example.com
-INITIAL_USER_PASSWORD=choose-a-strong-password
+COUPLE_OWNER_USER_ID=<UUID>
+COUPLE_PARTNER_USER_ID=<different UUID>
+COUPLE_LEDGER_ID=<UUID>
+COUPLE_OWNER_EMAIL=<first member email>
+COUPLE_OWNER_PASSWORD=<strong password>
+COUPLE_PARTNER_EMAIL=<second member email>
+COUPLE_PARTNER_PASSWORD=<strong password>
 OPENAI_API_KEY=your-api-key
 ```
 
@@ -56,9 +61,15 @@ Start the bundled stack:
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
-On the first start, Cashier creates PostgreSQL, the MinIO bucket, the database schema, and the
-initial user. Open [http://localhost:3000](http://localhost:3000) and sign in with the email and
-password you configured.
+On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. Then
+preview and explicitly initialize the two accounts and shared ledger:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap
+docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap -- --apply
+```
+
+Open [http://localhost:3000](http://localhost:3000) and sign in as either member.
 
 `AI_MODEL` defaults to `gpt-4o`. When using another OpenAI-compatible service, set both
 `OPENAI_BASE_URL` and `AI_MODEL`.

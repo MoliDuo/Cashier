@@ -42,11 +42,16 @@ cd Cashier
 cp .env.local.example .env
 ```
 
-编辑 `.env`，至少填写以下三项：
+编辑 `.env`，配置两个固定成员的 ID、登录邮箱和密码及 AI 密钥：
 
 ```dotenv
-INITIAL_USER_EMAIL=you@example.com
-INITIAL_USER_PASSWORD=choose-a-strong-password
+COUPLE_OWNER_USER_ID=<UUID>
+COUPLE_PARTNER_USER_ID=<different UUID>
+COUPLE_LEDGER_ID=<UUID>
+COUPLE_OWNER_EMAIL=<first member email>
+COUPLE_OWNER_PASSWORD=<strong password>
+COUPLE_PARTNER_EMAIL=<second member email>
+COUPLE_PARTNER_PASSWORD=<strong password>
 OPENAI_API_KEY=your-api-key
 ```
 
@@ -56,8 +61,14 @@ OPENAI_API_KEY=your-api-key
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
-首次启动会自动创建 PostgreSQL、MinIO 存储桶、数据库表和初始用户。打开
-[http://localhost:3000](http://localhost:3000)，使用刚才填写的邮箱和密码登录。
+首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表。然后显式预览并初始化空数据库：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap
+docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap -- --apply
+```
+
+打开 [http://localhost:3000](http://localhost:3000)，用任一成员的邮箱和密码登录。
 
 `AI_MODEL` 默认为 `gpt-4o`。如果你使用其他 OpenAI 兼容服务，请同时修改
 `OPENAI_BASE_URL` 和 `AI_MODEL`。

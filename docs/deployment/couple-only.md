@@ -32,15 +32,48 @@ work or unexpected attribution is reported. After checking the preview, run
 transaction moves ledger-scoped data, preserves unchanged row contents
 (including original money, revision links, image keys, and credential hashes),
 checks attribution and foreign keys, and rolls back on any mismatch.
+Migration `0045_couple_runtime_cleanup.sql` drops the obsolete registration
+column and requires both attribution columns to be non-null. The migration
+runner checks that existing configured members were active and had completed
+registration before applying migrations. It stops on unassigned historical
+documents or credentials, including deleted and revoked rows. The old ledger
+owner column stays available for the original-data merge and cleanup tools.
+Both tools recognize the pre-0045 and post-0045 schemas.
 Matching categories with identical properties merge; differing properties
 receive an ID-derived suffix. A different main currency requires valid
 stored exchange rates. Re-running after a successful merge is rejected.
+
+For a **new empty database**, configure the three `COUPLE_*_ID` UUIDs and
+`COUPLE_OWNER_EMAIL`, `COUPLE_OWNER_PASSWORD`, `COUPLE_PARTNER_EMAIL`, and
+`COUPLE_PARTNER_PASSWORD`. After `npm run db:migrate`, run
+`npm run db:bootstrap` to preview and `npm run db:bootstrap -- --apply` to
+create exactly two accounts, one ledger, and its default categories.
+Bootstrap rejects nonempty databases and never runs during normal app startup.
+The Docker runner image was also tested against a separate empty local database:
+preview made no writes, and `--apply` created two users, one ledger, and 13
+default categories.
 
 The second local restore of the same immutable backup successfully applied
 the updated merge: the shared ledger has 1,547 source documents, 2,568
 entries, 1,839 revisions, 1,508 stored-file records, and 3 credentials.
 All foreign keys are valid. These are snapshot counts, not a live production
 baseline.
+
+For the runtime cleanup rehearsal, a new database
+`cashier_couple_runtime_20260917` was restored from the same original dump.
+It applied `0044` and `0045`, merged both ledgers, rejected a second merge,
+then removed the four unrelated accounts using a fresh cleanup preview.
+The result has two users, one active shared ledger, the same 1,547 documents,
+2,568 entries, 1,839 revisions, 1,508 stored-file records, and three credentials.
+There are no null attributions or unvalidated constraints. A separate copy
+of the already-merged `0044` rehearsal database also upgraded directly to
+`0045` with no null attributions or unvalidated constraints. The original
+dump and earlier rehearsal databases were left unchanged.
+
+When another demo server is running, set `CASHIER_DEMO_PROJECT` and unused
+`CASHIER_DEMO_APP_PORT`, `CASHIER_DEMO_POSTGRES_PORT`, and `CASHIER_DEMO_S3_PORT`
+for `npm run test:demo`; this creates separate containers and volumes instead
+of resetting the active demo workspace.
 
 ## Optional database cleanup
 
