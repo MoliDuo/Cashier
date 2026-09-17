@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
@@ -61,6 +62,7 @@ describe("source-document-queries", () => {
         ledgerId,
         title: "Coffee and cake",
         documentDate: "2026-03-20",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const sourceDocument = requireDefined(document, "filtered subtotal document");
@@ -109,16 +111,19 @@ describe("source-document-queries", () => {
           ledgerId,
           title: "completed-total",
           documentDate: "2026-03-15",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
         {
           ledgerId,
           title: "failed-with-active-result",
           documentDate: "2026-03-16",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
         {
           ledgerId,
           title: "completed-out-of-range",
           documentDate: "2026-02-01",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
       ])
       .returning();
@@ -210,6 +215,7 @@ describe("source-document-queries", () => {
       .values({
         ledgerId,
         documentDate: "2026-03-20",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const deleted = await db
@@ -218,6 +224,7 @@ describe("source-document-queries", () => {
         ledgerId,
         documentDate: "2026-03-19",
         deletedAt: new Date(),
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     for (const doc of [...active, ...deleted]) {

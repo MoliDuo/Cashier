@@ -38,6 +38,8 @@ async function pendingIntent(
   const pending = await postgresRevisionAdapter.createProcessingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
+    attributedUserId: userId,
+    createdByUserId: userId,
   });
   return {
     ledgerId,

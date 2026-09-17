@@ -7,7 +7,6 @@ import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 
 import { recalculateCurrentEntries } from "../source-document-aggregate/recalculate-current-entries";
 import { postgresLedgerAdapter } from "./ledger";
-import { getCoupleConfig } from "@/lib/couple-config";
 import { mapLedgerSettings, settingsColumns } from "./shared";
 
 export const postgresSettingsAdapter: SettingsPort = {
@@ -27,15 +26,9 @@ export const postgresSettingsAdapter: SettingsPort = {
   },
 
   async getRequiredExchangeRateDates(ledgerId, userId) {
-    const couple = getCoupleConfig();
-    if (couple == null || !(await postgresLedgerAdapter.isOwnedByUser(ledgerId, userId)))
-      return null;
+    if (!(await postgresLedgerAdapter.canAccess(ledgerId, userId))) return null;
     const ledger = await db.query.ledgers.findFirst({
-      where: and(
-        eq(ledgers.id, ledgerId),
-        eq(ledgers.userId, couple.ownerId),
-        isNull(ledgers.deletedAt)
-      ),
+      where: and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)),
       columns: { mainCurrency: true },
     });
     if (ledger == null) return null;
@@ -66,25 +59,14 @@ export const postgresSettingsAdapter: SettingsPort = {
   },
 
   async updateWithCurrencyRecalculation(input) {
-    const couple = getCoupleConfig();
-    if (
-      couple == null ||
-      !(await postgresLedgerAdapter.isOwnedByUser(input.ledgerId, input.userId))
-    )
-      return null;
+    if (!(await postgresLedgerAdapter.canAccess(input.ledgerId, input.userId))) return null;
     return db.transaction(async (tx) => {
       // Lock the ledger row to serialise with concurrent first-entry creation.
       // This prevents a main-currency change from interleaving with activateRevision / createManual.
       const ledger = await tx
         .select()
         .from(ledgers)
-        .where(
-          and(
-            eq(ledgers.id, input.ledgerId),
-            eq(ledgers.userId, couple.ownerId),
-            isNull(ledgers.deletedAt)
-          )
-        )
+        .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
         .for("update")
         .then((rows) => rows[0]);
       if (ledger == null) return null;
@@ -146,13 +128,12 @@ export const postgresSettingsAdapter: SettingsPort = {
           }),
           updatedAt,
         })
-        .where(and(eq(ledgers.id, input.ledgerId), eq(ledgers.userId, couple.ownerId)))
+        .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
         .returning()
         .then((rows) => rows[0]);
       if (updated == null) throw new ConflictError("Failed to update ledger settings");
       return {
         id: updated.id,
-        userId: updated.userId,
         settings: mapLedgerSettings(updated),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),

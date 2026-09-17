@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
@@ -29,7 +30,10 @@ async function seedSelection() {
   const document = createSourceDocumentData(ledger.id);
   await db.insert(ledgers).values(ledger);
   await db.insert(entryCategories).values(category);
-  await db.insert(sourceDocuments).values(document);
+  await db.insert(sourceDocuments).values({
+    ...document,
+    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+  });
   const revisionId = await activateTestSourceDocumentProjection(db, document.id);
   const entryId = crypto.randomUUID();
   await db.insert(ledgerEntries).values({

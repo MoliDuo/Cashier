@@ -19,7 +19,7 @@ export interface AuthorizedFileRepository {
 
 function authorizedFileQuery() {
   return db
-    .select({ file: storedFiles, userId: ledgers.userId })
+    .select({ file: storedFiles })
     .from(storedFiles)
     .innerJoin(ledgers, and(eq(ledgers.id, storedFiles.ledgerId), isNull(ledgers.deletedAt)))
     .innerJoin(
@@ -62,8 +62,7 @@ export const postgresAuthorizedFileRepository: AuthorizedFileRepository = {
   },
   async findForUser(userId, fileId) {
     const ledgerId = getCoupleConfig()?.ledgerId;
-    if (ledgerId == null || !(await postgresLedgerAdapter.isOwnedByUser(ledgerId, userId)))
-      return null;
+    if (ledgerId == null || !(await postgresLedgerAdapter.canAccess(ledgerId, userId))) return null;
     const rows = await authorizedFileQuery()
       .where(
         and(

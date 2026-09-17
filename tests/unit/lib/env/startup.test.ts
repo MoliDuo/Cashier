@@ -185,7 +185,6 @@ describe("validateStartupEnv", () => {
       "CURRENCY_STALE_TIME_MS",
       "DATABASE_POOL_MAX",
       "DEV_AUTH_BYPASS",
-      "DISABLE_REGISTRATION",
       "LOG_LEVEL",
       "MAX_IMAGE_QUALITY",
       "MAX_INPUT_PIXELS",

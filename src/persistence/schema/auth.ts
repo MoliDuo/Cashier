@@ -23,7 +23,6 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
     authVersion: integer("auth_version").notNull().default(1),
-    registrationCompletedAt: timestamp("registration_completed_at", { withTimezone: true }),
     preferences: jsonb("preferences")
       .$type<UserPreferences>()
       .notNull()

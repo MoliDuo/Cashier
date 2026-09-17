@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { ValidationError } from "@/lib/errors";
@@ -98,10 +99,12 @@ describe("getEnhancedStatsQuery", () => {
         {
           ledgerId,
           documentDate: "2024-03-01",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
         {
           ledgerId,
           documentDate: "2024-03-02",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
       ])
       .returning();
@@ -163,6 +166,7 @@ describe("getEnhancedStatsQuery", () => {
         ledgerId,
         documentDate: null,
         createdAt: new Date("2024-03-10T12:00:00Z"),
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
@@ -195,6 +199,7 @@ describe("getEnhancedStatsQuery", () => {
       .values({
         ledgerId,
         documentDate: "2024-03-12",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
@@ -244,11 +249,13 @@ describe("getEnhancedStatsQuery", () => {
         {
           ledgerId,
           documentDate: "2024-03-05",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
         {
           ledgerId,
           documentDate: "2024-03-05",
           deletedAt: new Date(),
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         },
       ])
       .returning();
@@ -306,6 +313,7 @@ describe("getEnhancedStatsQuery", () => {
       .values({
         ledgerId,
         documentDate: "2024-04-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
@@ -350,6 +358,7 @@ describe("getEnhancedStatsQuery", () => {
       .values({
         ledgerId,
         documentDate: "2024-05-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
@@ -385,6 +394,7 @@ describe("getEnhancedStatsQuery", () => {
         .values({
           ledgerId,
           documentDate: `2024-06-${day}`,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         })
         .returning();
 
@@ -427,6 +437,7 @@ describe("getEnhancedStatsQuery", () => {
       .values({
         ledgerId,
         documentDate: "2024-07-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
 
@@ -540,6 +551,7 @@ describe("getEnhancedStatsQuery", () => {
       .values({
         ledgerId,
         documentDate: "2024-08-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");

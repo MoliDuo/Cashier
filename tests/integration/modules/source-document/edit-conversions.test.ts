@@ -10,9 +10,11 @@ afterEach(() => vi.restoreAllMocks());
 
 async function fixture() {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(db);
+  const { ledgerId, userId } = await createTestUserWithLedger(db);
   const created = await aggregate.createManualDocument({
     ledgerId,
+    attributedUserId: userId,
+    createdByUserId: userId,
     expectedMainCurrency: "CNY",
     title: "Original",
     entryDate: "2026-01-01",

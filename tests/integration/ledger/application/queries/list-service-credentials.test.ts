@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger } from "tests/helpers/schema-setup";
@@ -29,6 +30,7 @@ describe("listServiceCredentials", () => {
         tokenSuffix: "lder",
         createdAt: new Date("2026-03-01T00:00:00.000Z"),
         lastUsedAt: new Date("2026-03-05T00:00:00.000Z"),
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       },
       {
         id: crypto.randomUUID(),
@@ -39,6 +41,7 @@ describe("listServiceCredentials", () => {
         tokenSuffix: "eted",
         createdAt: new Date("2026-03-02T00:00:00.000Z"),
         deletedAt: new Date("2026-03-06T00:00:00.000Z"),
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       },
       {
         id: crypto.randomUUID(),
@@ -48,6 +51,7 @@ describe("listServiceCredentials", () => {
         tokenPrefix: "sk_newes",
         tokenSuffix: "west",
         createdAt: new Date("2026-03-03T00:00:00.000Z"),
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       },
     ]);
     // Note: token_prefix/token_suffix are set for the test, but the adapter

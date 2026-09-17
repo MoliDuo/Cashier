@@ -18,8 +18,8 @@ import { eq } from "drizzle-orm";
 import { serverComposition } from "@/application/server-composition-root";
 import type { SourceDocumentAggregateWritePort } from "@/modules/source-document/application/ports";
 import { ConflictError, NotFoundError, StaleSourceDocumentVersionError } from "@/lib/errors";
-import { ledgers, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { sourceDocuments } from "@/persistence";
+import { createTestUserWithLedger, TEST_PARTNER_USER_ID } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 /**
@@ -86,6 +86,8 @@ async function createActiveDocument(ledgerId: string, count = 1) {
   const created = await port.createManualDocument({
     expectedMainCurrency: "CNY",
     ledgerId,
+    attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+    createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     title: "Original",
     entryDate: "2026-08-01",
     entries: Array.from({ length: count }, (_, index) => ({
@@ -106,6 +108,8 @@ async function createActiveDocument(ledgerId: string, count = 1) {
 async function createProcessingDocument(ledgerId: string) {
   const pending = await port.createProcessingDocument({
     ledgerId,
+    attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+    createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     input: { text: "Processing fixture", storedFileIds: [], documentDate: null },
   });
   return { sourceDocumentId: pending.document.id, version: pending.document.version };
@@ -115,12 +119,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
   async assignAttribution() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
-    const db = getTestDb();
-    const [ledger] = await db
-      .select({ userId: ledgers.userId })
-      .from(ledgers)
-      .where(eq(ledgers.id, ledgerId));
-    const input = { ledgerId, sourceDocumentId, attributedUserId: ledger!.userId };
+    const input = { ledgerId, sourceDocumentId, attributedUserId: TEST_PARTNER_USER_ID };
     expect(await port.assignAttribution({ ...input, expectedVersion: 1 })).toEqual({
       ok: true,
       version: 2,

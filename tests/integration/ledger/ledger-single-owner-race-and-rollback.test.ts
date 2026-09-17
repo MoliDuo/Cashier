@@ -6,7 +6,6 @@ import { ledgers, storedFiles, uploadSessionFiles, uploadSessions, users } from 
 import { postgresAuthorizedFileRepository } from "@/application/adapters/postgres/authorized-files";
 import { createStoredFileAdapter } from "@/application/adapters/local/stored-files";
 import { serverComposition } from "@/application/server-composition-root";
-import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 const originalConfig = {
   owner: process.env.COUPLE_OWNER_USER_ID,
@@ -30,15 +29,14 @@ describe("couple ledger provisioning", () => {
     const owner = await createTestUser(db);
     const partner = await createTestUser(db, undefined, crypto.randomUUID());
     const outsider = await createTestUser(db, undefined, crypto.randomUUID());
-    await db.update(users).set({ registrationCompletedAt: new Date() });
     const ledgerId = crypto.randomUUID();
     await db.insert(ledgers).values({ id: ledgerId, userId: owner });
     process.env.COUPLE_OWNER_USER_ID = owner;
     process.env.COUPLE_PARTNER_USER_ID = partner;
     process.env.COUPLE_LEDGER_ID = ledgerId;
-    expect(await serverComposition.ledgers.getOwned(ledgerId, owner)).not.toBeNull();
-    expect(await serverComposition.ledgers.getOwned(ledgerId, partner)).not.toBeNull();
-    expect(await serverComposition.ledgers.getOwned(ledgerId, outsider)).toBeNull();
+    expect(await serverComposition.ledgers.getSharedForMember(owner)).not.toBeNull();
+    expect(await serverComposition.ledgers.getSharedForMember(partner)).not.toBeNull();
+    expect(await serverComposition.ledgers.getSharedForMember(outsider)).toBeNull();
     const existingLedger = (await db.select().from(ledgers).where(eq(ledgers.id, ledgerId)))[0]!;
     const updated = await serverComposition.settings.updateWithCurrencyRecalculation({
       ledgerId,
@@ -93,22 +91,15 @@ describe("couple ledger provisioning", () => {
       ledgerId
     );
     delete process.env.COUPLE_LEDGER_ID;
-    expect(await serverComposition.ledgers.getOwned(ledgerId, owner)).toBeNull();
+    expect(await serverComposition.ledgers.getSharedForMember(owner)).toBeNull();
     process.env.COUPLE_LEDGER_ID = ledgerId;
     await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, partner));
-    expect(await serverComposition.ledgers.getOwned(ledgerId, owner)).toBeNull();
+    expect(await serverComposition.ledgers.getSharedForMember(owner)).toBeNull();
   });
   it("does not create a third personal ledger", async () => {
     const db = getTestDb();
     const userId = await createTestUser(db, undefined, crypto.randomUUID());
-    const defaults = getDefaultLedger();
-    await expect(
-      serverComposition.ledgers.createDefault({
-        userId,
-        settings: defaults.settings,
-        categories: defaults.categories,
-      })
-    ).rejects.toThrow("Shared ledger must be migrated");
+    expect(await serverComposition.ledgers.getSharedForMember(userId)).toBeNull();
     expect(await db.query.ledgers.findFirst({ where: eq(ledgers.userId, userId) })).toBeUndefined();
   });
 });

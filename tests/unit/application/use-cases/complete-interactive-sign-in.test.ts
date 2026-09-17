@@ -1,27 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  EmailDeliveryPort,
-  LedgerPort,
-  OtpTokenPort,
-  UserAccountPort,
-} from "@/application/contracts";
+import type { EmailDeliveryPort, LedgerPort, OtpTokenPort } from "@/application/contracts";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 
-const {
-  ensureUserLedgerMock,
-  consumeOTPClaimMock,
-  releaseOTPClaimMock,
-  sendLoginNotificationMock,
-} = vi.hoisted(() => ({
-  ensureUserLedgerMock: vi.fn(),
-  consumeOTPClaimMock: vi.fn(),
-  releaseOTPClaimMock: vi.fn(),
-  sendLoginNotificationMock: vi.fn(),
-}));
+const { resolveHomeMock, consumeOTPClaimMock, releaseOTPClaimMock, sendLoginNotificationMock } =
+  vi.hoisted(() => ({
+    resolveHomeMock: vi.fn(),
+    consumeOTPClaimMock: vi.fn(),
+    releaseOTPClaimMock: vi.fn(),
+    sendLoginNotificationMock: vi.fn(),
+  }));
 
-vi.mock("@/modules/workspace/application/use-cases/ensure-user-ledger", () => ({
-  ensureUserLedger: ensureUserLedgerMock,
+vi.mock("@/modules/workspace/application/use-cases/resolve-home", () => ({
+  resolveHome: resolveHomeMock,
 }));
 
 vi.mock("@/modules/auth/services/otp-verification", () => ({
@@ -37,11 +28,8 @@ import { completeInteractiveSignIn } from "@/application/use-cases/complete-inte
 
 const ledgers = {} as LedgerPort;
 const otpTokens = {} as OtpTokenPort;
-const users = {
-  completeRegistration: vi.fn().mockResolvedValue(true),
-} as unknown as UserAccountPort;
 const emailDelivery = {} as EmailDeliveryPort;
-const dependencies = { ledgers, otpTokens, users, emailDelivery };
+const dependencies = { ledgers, otpTokens, emailDelivery };
 const principal: AuthenticatedPrincipal = {
   id: "user-1",
   email: "user@example.com",
@@ -49,7 +37,6 @@ const principal: AuthenticatedPrincipal = {
   image: null,
   locale: "en",
   authVersion: 1,
-  registrationCompletedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 const otpPrincipal: AuthenticatedPrincipal = {
   ...principal,
@@ -59,33 +46,29 @@ const otpPrincipal: AuthenticatedPrincipal = {
 describe("completeInteractiveSignIn", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    ensureUserLedgerMock.mockResolvedValue({
-      ledger: {
-        id: "ledger-1",
-        userId: "user-1",
-        settings: {},
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      },
-      created: false,
+    resolveHomeMock.mockResolvedValue({
+      id: "ledger-1",
+      settings: {},
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
     });
     consumeOTPClaimMock.mockResolvedValue(true);
     releaseOTPClaimMock.mockResolvedValue(true);
     sendLoginNotificationMock.mockResolvedValue(undefined);
   });
 
-  it("ensures the default ledger with the principal locale", async () => {
+  it("verifies the shared ledger before completing sign-in", async () => {
     const result = await completeInteractiveSignIn(principal, dependencies);
 
-    expect(ensureUserLedgerMock).toHaveBeenCalledWith({ userId: "user-1", locale: "en" }, ledgers);
+    expect(resolveHomeMock).toHaveBeenCalledWith("user-1", ledgers);
     expect(result).toEqual(principal);
     expect(consumeOTPClaimMock).not.toHaveBeenCalled();
   });
 
-  it("omits an empty locale from the ledger request", async () => {
+  it("does not use locale for ledger lookup", async () => {
     await completeInteractiveSignIn({ ...principal, locale: "" }, dependencies);
 
-    expect(ensureUserLedgerMock).toHaveBeenCalledWith({ userId: "user-1" }, ledgers);
+    expect(resolveHomeMock).toHaveBeenCalledWith("user-1", ledgers);
   });
 
   it("consumes the OTP claim only after ledger setup succeeds", async () => {
@@ -100,7 +83,7 @@ describe("completeInteractiveSignIn", () => {
   });
 
   it("releases the OTP claim and propagates ledger setup failures", async () => {
-    ensureUserLedgerMock.mockRejectedValueOnce(new Error("ledger unavailable"));
+    resolveHomeMock.mockRejectedValueOnce(new Error("ledger unavailable"));
 
     await expect(completeInteractiveSignIn(otpPrincipal, dependencies)).rejects.toThrow(
       "ledger unavailable"
@@ -113,20 +96,8 @@ describe("completeInteractiveSignIn", () => {
     expect(consumeOTPClaimMock).not.toHaveBeenCalled();
   });
 
-  it("releases the OTP claim when registration completion fails", async () => {
-    vi.mocked(users.completeRegistration).mockRejectedValueOnce(
-      new Error("registration unavailable")
-    );
-
-    await expect(
-      completeInteractiveSignIn({ ...otpPrincipal, registrationCompletedAt: null }, dependencies)
-    ).rejects.toThrow("registration unavailable");
-    expect(releaseOTPClaimMock).toHaveBeenCalledWith(otpPrincipal.pendingOtpClaim, otpTokens);
-    expect(consumeOTPClaimMock).not.toHaveBeenCalled();
-  });
-
   it("propagates ledger setup failures without a claim", async () => {
-    ensureUserLedgerMock.mockRejectedValueOnce(new Error("ledger unavailable"));
+    resolveHomeMock.mockRejectedValueOnce(new Error("ledger unavailable"));
 
     await expect(completeInteractiveSignIn(principal, dependencies)).rejects.toThrow(
       "ledger unavailable"
@@ -148,27 +119,14 @@ describe("completeInteractiveSignIn", () => {
     expect(caught).toMatchObject({ code: AUTH_ERROR_CODES.OTP_INVALID });
   });
 
-  it("marks registration complete after ledger setup and skips the first-login notification", async () => {
-    await completeInteractiveSignIn(
-      { ...principal, registrationCompletedAt: null, isNewUser: true },
-      dependencies
-    );
-
-    expect(users.completeRegistration).toHaveBeenCalledWith("user-1", expect.any(Date));
-    expect(sendLoginNotificationMock).not.toHaveBeenCalled();
-  });
-
-  it("sends an existing-user notification and removes transient new-user state", async () => {
-    const result = await completeInteractiveSignIn(
-      { ...principal, isNewUser: false },
-      dependencies
-    );
+  it("sends a member login notification", async () => {
+    const result = await completeInteractiveSignIn(principal, dependencies);
 
     expect(sendLoginNotificationMock).toHaveBeenCalledWith(
       { email: "user@example.com", locale: "en" },
       emailDelivery
     );
-    expect(result).not.toHaveProperty("isNewUser");
+    expect(result).toEqual(principal);
   });
 
   it("releases the claim when consuming it throws", async () => {

@@ -4,21 +4,24 @@ import type { UserAccountPort } from "@/application/contracts";
 import { authenticateDevUser } from "@/modules/auth/application/use-cases/authenticate-dev-user";
 
 const user = {
-  id: "dev-user-1",
+  id: "00000000-0000-4000-8000-000000000001",
   email: "dev@cashier.local",
   name: "Local Developer",
   image: null,
 };
 
 describe("authenticateDevUser", () => {
-  const findOrCreate = vi.fn();
-  const users = { findOrCreate } as unknown as UserAccountPort;
+  const findByEmail = vi.fn();
+  const users = { findByEmail } as unknown as UserAccountPort;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.DEV_AUTH_BYPASS = "true";
     (process.env as Record<string, string | undefined>).NODE_ENV = "development";
-    findOrCreate.mockResolvedValue({ user, isExistingUser: true });
+    process.env.COUPLE_OWNER_USER_ID = user.id;
+    process.env.COUPLE_PARTNER_USER_ID = "00000000-0000-4000-8000-000000000002";
+    process.env.COUPLE_LEDGER_ID = "00000000-0000-4000-8000-000000000003";
+    findByEmail.mockResolvedValue(user);
   });
 
   it("rejects when the flag is not enabled", async () => {
@@ -33,7 +36,7 @@ describe("authenticateDevUser", () => {
 
   it("returns the principal through the target user port", async () => {
     const result = await authenticateDevUser({ locale: "en-US" }, { users });
-    expect(findOrCreate).toHaveBeenCalledWith("dev@cashier.local", "Local Developer");
-    expect(result).toEqual({ ...user, locale: "en-US", isNewUser: false });
+    expect(findByEmail).toHaveBeenCalledWith("dev@cashier.local");
+    expect(result).toEqual({ ...user, locale: "en-US" });
   });
 });

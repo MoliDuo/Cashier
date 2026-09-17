@@ -77,6 +77,7 @@ async function seedLedgerWithEntry(input: {
     ledgerId,
     documentDate: input.entryDate,
     ...(input.deleted === true ? { deletedAt: new Date() } : {}),
+    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
   });
   await db.insert(sourceDocumentRevisions).values({
     id: revisionId,
@@ -452,11 +453,13 @@ describe("exchange-rate ledger recalculation orchestration", () => {
         id: sourceDocumentId,
         ledgerId,
         documentDate: "2026-03-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       },
       {
         id: secondSourceDocumentId,
         ledgerId: secondLedgerId,
         documentDate: "2026-03-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${secondLedgerId})`,
       },
     ]);
     await db.insert(sourceDocumentRevisions).values([
@@ -583,8 +586,18 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     });
 
     await db.insert(sourceDocuments).values([
-      { id: datedSourceDocumentId, ledgerId, documentDate: "2026-06-01" },
-      { id: undatedSourceDocumentId, ledgerId, documentDate: null },
+      {
+        id: datedSourceDocumentId,
+        ledgerId,
+        documentDate: "2026-06-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      },
+      {
+        id: undatedSourceDocumentId,
+        ledgerId,
+        documentDate: null,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      },
     ]);
     await db.insert(sourceDocumentRevisions).values([
       {

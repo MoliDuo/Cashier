@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries } from "@/persistence";
@@ -36,6 +37,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
       id: uuidv4(),
       ledgerId,
       documentDate: entryDate ?? null,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
     })
     .returning();
   expect(doc).toBeDefined();

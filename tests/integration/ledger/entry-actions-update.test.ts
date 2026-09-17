@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { updateLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
@@ -30,6 +31,7 @@ describe("updateLedgerEntryAction version CAS", () => {
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
       ledgerId,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
     });
     await db.insert(ledgerEntries).values({
       id: entryId,

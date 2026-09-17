@@ -156,6 +156,8 @@ describe("current-runtime target adapters", () => {
     const pending = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: null, storedFileIds: [uploaded.id], documentDate: null },
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     expect(
       await db.query.sourceDocuments.findFirst({

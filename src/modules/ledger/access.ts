@@ -8,7 +8,8 @@ export async function requireLedgerAccess(ledgerId: string) {
   const userId = session?.user?.id;
   if (userId == null || userId === "") throw new UnauthorizedError();
   if (!isValidUuid(ledgerId)) throw new NotFoundError("Ledger");
-  const ledger = await serverComposition.ledgers.getOwned(ledgerId, userId);
+  const shared = await serverComposition.ledgers.getSharedForMember(userId);
+  const ledger = shared?.id === ledgerId ? shared : null;
   if (ledger == null) throw new NotFoundError("Ledger");
   return { userId, ledger };
 }

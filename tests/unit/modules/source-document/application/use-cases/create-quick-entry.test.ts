@@ -63,6 +63,8 @@ describe("createQuickEntry", () => {
       },
       {
         categoryId: "cat-1",
+        attributedUserId: "user-1",
+        createdByUserId: "user-1",
         amount: "100",
       },
       ports
@@ -76,6 +78,8 @@ describe("createQuickEntry", () => {
     });
     expect(createManualMock).toHaveBeenCalledWith({
       ledgerId: "ledger-1",
+      attributedUserId: "user-1",
+      createdByUserId: "user-1",
       expectedMainCurrency: "USD",
       title: "Food",
       entryDate: "2026-03-20",
@@ -103,6 +107,8 @@ describe("createQuickEntry", () => {
       },
       {
         categoryId: "cat-1",
+        attributedUserId: "user-1",
+        createdByUserId: "user-1",
         amount: "25",
         currency: "CNY",
         entryDate: "2026-01-31",

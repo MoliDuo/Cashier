@@ -6,8 +6,8 @@ import type { QuickEntryPorts } from "../ports";
 import type { LedgerSettingsContract } from "@/application/contracts";
 
 export interface CreateQuickEntryPayload {
-  attributedUserId?: string;
-  createdByUserId?: string;
+  attributedUserId: string;
+  createdByUserId: string;
   categoryId: string;
   amount: string;
   currency?: string;
@@ -22,8 +22,8 @@ interface ConversionResult {
 }
 
 interface QuickEntryInsertData {
-  attributedUserId?: string;
-  createdByUserId?: string;
+  attributedUserId: string;
+  createdByUserId: string;
   categoryId: string;
   itemName: string | null;
   description: string | null;
@@ -44,8 +44,8 @@ async function createQuickEntryAtomically(
   const itemName = data.itemName ?? categoryName;
   const created = await ports.projections.createManual({
     ledgerId,
-    ...(data.attributedUserId === undefined ? {} : { attributedUserId: data.attributedUserId }),
-    ...(data.createdByUserId === undefined ? {} : { createdByUserId: data.createdByUserId }),
+    attributedUserId: data.attributedUserId,
+    createdByUserId: data.createdByUserId,
     expectedMainCurrency,
     title: itemName,
     entryDate: data.entryDate,
@@ -94,12 +94,8 @@ export async function createQuickEntry(
     entryCurrency,
     conversion,
     {
-      ...(payload.attributedUserId === undefined
-        ? {}
-        : { attributedUserId: payload.attributedUserId }),
-      ...(payload.createdByUserId === undefined
-        ? {}
-        : { createdByUserId: payload.createdByUserId }),
+      attributedUserId: payload.attributedUserId,
+      createdByUserId: payload.createdByUserId,
       categoryId: payload.categoryId,
       itemName: payload.itemName ?? null,
       description: payload.description ?? null,

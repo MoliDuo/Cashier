@@ -32,7 +32,6 @@ export async function updateLedger(
   if (updated == null) throw new NotFoundError("Ledger");
   return {
     id: updated.id,
-    userId: updated.userId,
     settings: updated.settings,
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,

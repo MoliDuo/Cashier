@@ -48,7 +48,6 @@ describe("runtimeEnv", () => {
       AUTH_PASSWORD_IP_MAX_ATTEMPTS: "51",
       AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "601",
       AUTH_EMAIL_FROM: "Cashier <security@example.com>",
-      DISABLE_REGISTRATION: "true",
       LOG_LEVEL: "warn",
       MAX_IMAGE_QUALITY: "72",
       MAX_INPUT_PIXELS: "123456",
@@ -103,7 +102,6 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.otpVerifyMaxAttemptsPerMinute).toBe(6);
     expect(runtimeEnv.apiRateLimitPerMinute).toBe(75);
     expect(runtimeEnv.sessionMaxAgeDays).toBe(21);
-    expect(runtimeEnv.disableRegistration).toBe(true);
     expect(runtimeEnv.maxInputPixels).toBe(123456);
     expect(runtimeEnv.maxImageQuality).toBe(72);
     expect(runtimeEnv.logLevel).toBe("warn");

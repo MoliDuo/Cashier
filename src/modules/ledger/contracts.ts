@@ -3,7 +3,6 @@ import type { CategoryPresetId } from "@/config/category-presets";
 
 export type LedgerDto = {
   id: string;
-  userId: string;
   settings: LedgerSettingsContract;
   createdAt: string;
   updatedAt: string;
@@ -19,6 +18,7 @@ export type UpdateLedgerActionResult =
 
 export type ServiceCredentialDto = {
   id: string;
+  attributedUserId: string;
   tokenPrefix: string;
   tokenSuffix: string;
   ledgerId: string;

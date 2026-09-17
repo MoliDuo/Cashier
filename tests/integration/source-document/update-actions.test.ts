@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import { getTestDb } from "../../setup";
@@ -41,7 +42,12 @@ describe("Source Document Update Actions", () => {
       const documents = ["2024-03-14", "2024-03-15"].map((documentDate) =>
         createSourceDocumentData(ledger.id, { status: "completed", documentDate })
       );
-      await db.insert(sourceDocuments).values(documents);
+      await db.insert(sourceDocuments).values(
+        documents.map((document) => ({
+          ...document,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+        }))
+      );
       const ids = documents.map(() => crypto.randomUUID());
       for (const [index, document] of documents.entries()) {
         await db.insert(ledgerEntries).values({
@@ -90,7 +96,10 @@ describe("Source Document Update Actions", () => {
         status: "completed",
         documentDate: "2024-03-14",
       });
-      await db.insert(sourceDocuments).values(document);
+      await db.insert(sourceDocuments).values({
+        ...document,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+      });
       await activateTestSourceDocumentProjection(db, document.id);
       const convert = vi.spyOn(postgresFxRateBook, "convertBatch");
       try {
@@ -115,7 +124,16 @@ describe("Source Document Update Actions", () => {
       // Create multiple documents
       const docData1 = createSourceDocumentData(ledgerData.id);
       const docData2 = createSourceDocumentData(ledgerData.id);
-      await db.insert(sourceDocuments).values([docData1, docData2]);
+      await db.insert(sourceDocuments).values([
+        {
+          ...docData1,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData1.ledgerId})`,
+        },
+        {
+          ...docData2,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData2.ledgerId})`,
+        },
+      ]);
       await activateTestSourceDocumentProjection(db, docData1.id);
       await activateTestSourceDocumentProjection(db, docData2.id);
 
@@ -152,7 +170,10 @@ describe("Source Document Update Actions", () => {
         status: "completed",
         documentDate: "2024-03-14",
       });
-      await db.insert(sourceDocuments).values(document);
+      await db.insert(sourceDocuments).values({
+        ...document,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+      });
       const entryId = crypto.randomUUID();
       await db.insert(ledgerEntries).values({
         id: entryId,
@@ -208,7 +229,10 @@ describe("Source Document Update Actions", () => {
       await db.insert(ledgers).values(ledgerData);
       await configureTestCoupleLedger(db, ledgerData.id);
       const docData = createSourceDocumentData(ledgerData.id, { title: "Same title" });
-      await db.insert(sourceDocuments).values(docData);
+      await db.insert(sourceDocuments).values({
+        ...docData,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      });
       await activateTestSourceDocumentProjection(db, docData.id);
 
       const result = await batchUpdateSourceDocumentsAction(ledgerData.id, {
@@ -234,7 +258,16 @@ describe("Source Document Update Actions", () => {
       await configureTestCoupleLedger(db, ledgerData.id);
       const okDoc = createSourceDocumentData(ledgerData.id, { title: "Original A" });
       const staleDoc = createSourceDocumentData(ledgerData.id, { title: "Original B" });
-      await db.insert(sourceDocuments).values([okDoc, staleDoc]);
+      await db.insert(sourceDocuments).values([
+        {
+          ...okDoc,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${okDoc.ledgerId})`,
+        },
+        {
+          ...staleDoc,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${staleDoc.ledgerId})`,
+        },
+      ]);
       // Advance staleDoc's version out from under the caller's expectation.
       await db
         .update(sourceDocuments)

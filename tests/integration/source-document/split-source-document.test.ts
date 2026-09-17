@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -65,7 +66,10 @@ describe("splitSourceDocumentAction", () => {
     const ids = Array.from({ length: entryCount }, () => crypto.randomUUID());
     await db.insert(ledgers).values(ledger);
     await configureTestCoupleLedger(db, ledger.id);
-    await db.insert(sourceDocuments).values(document);
+    await db.insert(sourceDocuments).values({
+      ...document,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+    });
     await db.insert(ledgerEntries).values(
       ids.map((id, position) => ({
         id,

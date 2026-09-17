@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
@@ -37,6 +38,7 @@ describe("source-document-queries", () => {
           ledgerId,
           documentDate: `2026-03-${String(day).padStart(2, "0")}`,
           createdAt: new Date(`2026-03-${String(day).padStart(2, "0")}T12:00:00Z`),
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
         })
         .returning();
       await activateTestSourceDocumentProjection(db, inserted[0]!.id);

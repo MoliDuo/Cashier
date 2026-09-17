@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getSourceDocumentLightAction } from "@/modules/source-document/server/get-document-light";
@@ -58,7 +59,10 @@ describe("getSourceDocumentLightAction", () => {
       title: "Test Receipt",
       text: "Lunch for 25.50",
     });
-    await db.insert(sourceDocuments).values(docData);
+    await db.insert(sourceDocuments).values({
+      ...docData,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+    });
     await activateTestSourceDocumentProjection(db, docData.id, { text: "Lunch for 25.50" });
 
     const result = await getSourceDocumentLightAction(ledgerData.id, docData.id);
@@ -81,7 +85,10 @@ describe("getSourceDocumentLightAction", () => {
     const docData = createSourceDocumentData(ledgerData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
-    await db.insert(sourceDocuments).values(docData);
+    await db.insert(sourceDocuments).values({
+      ...docData,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+    });
     await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
@@ -103,7 +110,10 @@ describe("getSourceDocumentLightAction", () => {
     await configureTestCoupleLedger(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id);
-    await db.insert(sourceDocuments).values(docData);
+    await db.insert(sourceDocuments).values({
+      ...docData,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+    });
     const revisionId = await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
@@ -136,7 +146,10 @@ describe("getSourceDocumentLightAction", () => {
     await configureTestCoupleLedger(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id);
-    await db.insert(sourceDocuments).values(docData);
+    await db.insert(sourceDocuments).values({
+      ...docData,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+    });
     await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
@@ -168,7 +181,10 @@ describe("getSourceDocumentLightAction", () => {
     await db.insert(entryCategories).values(categoryData);
 
     const docData = createSourceDocumentData(ledgerData.id);
-    await db.insert(sourceDocuments).values(docData);
+    await db.insert(sourceDocuments).values({
+      ...docData,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+    });
 
     const entryData = createLedgerEntryData(ledgerData.id, {
       sourceDocumentId: docData.id,
@@ -221,7 +237,10 @@ describe("getSourceDocumentLightAction", () => {
     await db.insert(ledgers).values(ledgerData);
 
     const docData = createSourceDocumentData(ledgerData.id);
-    await db.insert(sourceDocuments).values(docData);
+    await db.insert(sourceDocuments).values({
+      ...docData,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+    });
 
     // withSourceDocumentLedgerAccess preserves ledger-not-found semantics for inaccessible ledgers.
     await expect(getSourceDocumentLightAction(ledgerData.id, docData.id)).rejects.toBeInstanceOf(

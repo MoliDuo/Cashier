@@ -40,6 +40,8 @@ async function pendingIntent(
   const pending = await postgresRevisionAdapter.createProcessingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
+    attributedUserId: userId,
+    createdByUserId: userId,
   });
   return {
     ledgerId,
@@ -211,9 +213,15 @@ describe("PostgresProcessingJobAdapter", () => {
       .where(eq(ledgers.id, ledgerId));
 
     // Create a second revision (retry) after the settings change
+    const [ledgerOwner] = await db
+      .select({ userId: ledgers.userId })
+      .from(ledgers)
+      .where(eq(ledgers.id, ledgerId));
     const pending2 = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Dinner 25.00 USD", storedFileIds: [], documentDate: null },
+      attributedUserId: ledgerOwner!.userId,
+      createdByUserId: ledgerOwner!.userId,
     });
 
     const generate2 = vi.fn(async () => ({

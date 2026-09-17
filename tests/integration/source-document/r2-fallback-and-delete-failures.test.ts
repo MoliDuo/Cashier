@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
@@ -29,7 +30,13 @@ describe("source-document delete tolerance", () => {
 
   it("returns deleted false instead of throwing when the document is already soft deleted", async () => {
     const db = getTestDb();
-    const [document] = await db.insert(sourceDocuments).values({ ledgerId }).returning();
+    const [document] = await db
+      .insert(sourceDocuments)
+      .values({
+        ledgerId,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      })
+      .returning();
     await expect(
       deleteSourceDocumentAction(ledgerId, document!.id, document!.version)
     ).resolves.toMatchObject({

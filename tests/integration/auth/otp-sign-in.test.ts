@@ -44,23 +44,15 @@ async function createTestOTP(email: string, otp: string, expiresAt?: Date) {
 }
 
 describe("authenticateWithOTP", () => {
-  const originalDisableRegistration = process.env.DISABLE_REGISTRATION;
   const originalOTPMaxAttempts = process.env.OTP_MAX_ATTEMPTS;
   const originalTrustedProxy = process.env.TRUSTED_PROXY;
 
   beforeEach(async () => {
-    delete process.env.DISABLE_REGISTRATION;
     delete process.env.OTP_MAX_ATTEMPTS;
     await createTestUserWithLedger(getTestDb(), TEST_EMAIL);
   });
 
   afterEach(() => {
-    if (originalDisableRegistration == null) {
-      delete process.env.DISABLE_REGISTRATION;
-    } else {
-      process.env.DISABLE_REGISTRATION = originalDisableRegistration;
-    }
-
     if (originalOTPMaxAttempts == null) {
       delete process.env.OTP_MAX_ATTEMPTS;
     } else {
@@ -96,7 +88,6 @@ describe("authenticateWithOTP", () => {
     await completeInteractiveSignIn(principal, {
       ledgers: serverComposition.ledgers,
       otpTokens: serverComposition.otpTokens,
-      users: serverComposition.userAccounts,
       emailDelivery: serverComposition.email,
     });
 

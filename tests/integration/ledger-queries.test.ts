@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@/auth";
 import { POST } from "@/app/api/ledger-queries/route";
@@ -35,7 +36,10 @@ describe("session ledger query transport", () => {
     await db.insert(ledgers).values([ledger, other]);
     await configureTestCoupleLedger(db, ledger.id);
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
-    await db.insert(sourceDocuments).values(document);
+    await db.insert(sourceDocuments).values({
+      ...document,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+    });
     await activateTestSourceDocumentProjection(db, document.id);
     const response = await POST(request("detail", [ledger.id, document.id]));
     expect(response.status).toBe(200);

@@ -3,11 +3,16 @@ import createNextIntlPlugin from "next-intl/plugin";
 import withSerwistInit from "@serwist/next";
 
 const withNextIntl = createNextIntlPlugin();
+const demoProject = process.env.CASHIER_DEMO_PROJECT;
+if (demoProject != null && !/^[a-z][a-z0-9-]{0,40}$/.test(demoProject)) {
+  throw new Error("CASHIER_DEMO_PROJECT must be a lowercase Compose project name");
+}
 
 // Build remotePatterns from environment
 const remotePatterns: Array<{ protocol: "https" | "http"; hostname: string }> = [];
 
 const nextConfig: NextConfig = {
+  ...(demoProject == null ? {} : { distDir: `.next-${demoProject}` }),
   // instrumentation.ts is enabled by default in Next.js 16+
   output: "standalone",
   // The dev tools badge is fixed to a viewport corner, where it covers the

@@ -35,10 +35,8 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   if (!z.string().uuid().safeParse(ledgerId).success) notFound();
   const [locale, session] = await Promise.all([getLocale(), auth()]);
   const userId = session?.user?.id;
-  const ledger =
-    userId == null || userId === ""
-      ? null
-      : await serverComposition.ledgers.getOwned(ledgerId, userId);
+  const shared = userId ? await serverComposition.ledgers.getSharedForMember(userId) : null;
+  const ledger = shared?.id === ledgerId ? shared : null;
 
   if (!ledger) {
     const t = await getTranslations({ locale, namespace: "LedgerPage" });

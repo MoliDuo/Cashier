@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -73,7 +74,10 @@ describe("applyCategoryPresetAction", () => {
       { id: travelId, ledgerId: ledger.id, name: "交通", sortOrder: 1 },
       { id: customId, ledgerId: ledger.id, name: "自定义", sortOrder: 2 },
     ]);
-    await db.insert(sourceDocuments).values(document);
+    await db.insert(sourceDocuments).values({
+      ...document,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+    });
     const revisionId = await activateTestSourceDocumentProjection(db, document.id);
     await db.insert(ledgerEntries).values([
       {

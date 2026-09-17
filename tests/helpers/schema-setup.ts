@@ -19,10 +19,6 @@ export async function configureTestCoupleLedger(
     .where(eq(schema.users.id, partnerId))
     .limit(1);
   if (partner.length === 0) await createTestUser(db, undefined, partnerId);
-  await db
-    .update(schema.users)
-    .set({ registrationCompletedAt: new Date() })
-    .where(sql`${schema.users.id} IN (${ownerId}, ${partnerId})`);
   process.env.COUPLE_OWNER_USER_ID = ownerId;
   process.env.COUPLE_PARTNER_USER_ID = partnerId;
   process.env.COUPLE_LEDGER_ID = ledgerId;
@@ -111,6 +107,7 @@ export async function createTestSourceDocument(
             ledgerId,
             documentDate: overrides.entryDate,
             title: overrides.title,
+            attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
           })
           .returning()
       )[0],

@@ -10,7 +10,7 @@ export interface ServiceCredentialPort {
   create(
     ledgerId: LedgerId,
     name: string,
-    userId?: string
+    userId: string
   ): Promise<CreatedServiceCredentialContract>;
   revoke(
     ledgerId: LedgerId,
@@ -87,21 +87,12 @@ interface UserAccountContract {
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
   authVersion: number;
-  registrationCompletedAt: Date | null;
   interfaceLanguage: "auto" | "zh" | "en";
 }
 
 export interface UserAccountPort {
-  findOrCreate(
-    email: string,
-    name?: string
-  ): Promise<{
-    user: UserAccountContract;
-    isExistingUser: boolean;
-  }>;
   findByEmail(email: string): Promise<UserAccountContract | null>;
   findById(id: string): Promise<UserAccountContract | null>;
-  completeRegistration(userId: string, completedAt: Date): Promise<boolean>;
 }
 
 export interface UserPreferencesContract {

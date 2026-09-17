@@ -124,8 +124,6 @@ export async function authenticateWithPassword(
     name: user.name,
     image: user.image,
     authVersion: user.authVersion,
-    registrationCompletedAt: user.registrationCompletedAt,
     ...(params.locale === undefined ? {} : { locale: params.locale }),
-    isNewUser: false,
   };
 }

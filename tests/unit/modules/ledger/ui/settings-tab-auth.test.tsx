@@ -93,7 +93,6 @@ describe("SettingsTab account authentication controls", () => {
   it("renders email change and sign-out, but not destructive account mutations", () => {
     const ledger: Ledger = {
       id: "ledger-1",
-      userId: "user-1",
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -125,7 +124,6 @@ describe("SettingsTab account authentication controls", () => {
     queryState.status = "error";
     const ledger: Ledger = {
       id: "ledger-1",
-      userId: "user-1",
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",

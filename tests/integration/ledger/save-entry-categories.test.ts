@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -42,7 +43,10 @@ describe("saveEntryCategoriesAction", () => {
       { id: keepId, ledgerId: ledger.id, name: "Keep", sortOrder: 0 },
       { id: removeId, ledgerId: ledger.id, name: "Remove", sortOrder: 1 },
     ]);
-    await db.insert(sourceDocuments).values(document);
+    await db.insert(sourceDocuments).values({
+      ...document,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+    });
     await db.insert(ledgerEntries).values({
       id: entryId,
       ledgerId: ledger.id,

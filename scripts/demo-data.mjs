@@ -160,12 +160,17 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
         )`,
       [fixture.user.email]
     );
+    await client.query(
+      `DELETE FROM ledgers WHERE user_id IN
+        (SELECT id FROM users WHERE lower(email) = $1)`,
+      [fixture.user.email]
+    );
     await client.query("DELETE FROM users WHERE lower(email) = $1", [fixture.user.email]);
   }
   await client.query(
     `INSERT INTO users
-      (id, email, name, email_verified, registration_completed_at, preferences, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
+      (id, email, name, email_verified, preferences, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
      ON CONFLICT (id) DO NOTHING`,
     [userId, fixture.user.email, fixture.user.name, now]
   );
@@ -382,8 +387,8 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
 async function ensurePartner(client, now = new Date()) {
   await client.query(
     `INSERT INTO users
-      (id, email, name, email_verified, registration_completed_at, preferences, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
+      (id, email, name, email_verified, preferences, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
      ON CONFLICT (id) DO NOTHING`,
     [fixture.partner.id, fixture.partner.email, fixture.partner.name, now]
   );

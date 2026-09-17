@@ -61,7 +61,6 @@ const env = {
   S3_ACCESS_KEY_ID: "smoke-unused",
   S3_SECRET_ACCESS_KEY: "smoke-unused",
   DEV_AUTH_BYPASS: "false",
-  DISABLE_REGISTRATION: "true",
   TRUSTED_PROXY: "",
   TZ: "UTC",
   SMOKE_BASE_URL: baseURL,
@@ -116,7 +115,7 @@ try {
       [partnerId, env.SMOKE_PARTNER_EMAIL],
     ]) {
       await db.query(
-        `INSERT INTO users (id, email, email_verified, password_hash, password_updated_at, registration_completed_at, created_at, updated_at) VALUES ($1, $2, now(), $3, now(), now(), now(), now())`,
+        `INSERT INTO users (id, email, email_verified, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, now(), $3, now(), now(), now())`,
         [id, email, hash]
       );
     }

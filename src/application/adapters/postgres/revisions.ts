@@ -24,18 +24,18 @@ import { softDeleteSourceDocumentInTransaction } from "./source-document-delete"
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 
-export interface CreatePendingRevisionInput {
+export type CreatePendingRevisionInput = {
   ledgerId: string;
-  attributedUserId?: string;
-  createdByUserId?: string | null;
-  sourceDocumentId?: string;
   input: {
     text: string | null;
     storedFileIds: readonly string[];
     documentDate: string | null;
     dateReference?: string | null;
   };
-}
+} & (
+  | { sourceDocumentId: string; attributedUserId?: string; createdByUserId?: string }
+  | { sourceDocumentId?: never; attributedUserId: string; createdByUserId: string }
+);
 
 function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
   return and(
@@ -151,6 +151,12 @@ export async function createProcessingRevisionInTransaction(
   if (existingDocument == null && input.sourceDocumentId != null) {
     throw new NotFoundError("Source document");
   }
+  if (
+    existingDocument == null &&
+    (input.attributedUserId == null || input.createdByUserId == null)
+  ) {
+    throw new ValidationError("Member attribution and creator required");
+  }
 
   // Acquire a lock on existing documents or create a new one.
   const document =
@@ -160,7 +166,7 @@ export async function createProcessingRevisionInTransaction(
           .values({
             id: sourceDocumentId,
             ledgerId: input.ledgerId,
-            attributedUserId: input.attributedUserId ?? null,
+            attributedUserId: input.attributedUserId!,
             createdByUserId: input.createdByUserId ?? null,
           })
           .returning()

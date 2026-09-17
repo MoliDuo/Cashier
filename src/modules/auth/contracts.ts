@@ -4,13 +4,11 @@ export interface AuthenticatedPrincipal {
   name: string | null;
   image: string | null;
   authVersion: number;
-  registrationCompletedAt: Date | null;
-  isNewUser?: boolean;
   locale?: string | null;
   /**
    * OTP-only: the verified token is claimed but not yet consumed. The
    * interactive sign-in orchestrator consumes it only after cross-module
-   * completion (default ledger setup) succeeds, and releases it on failure.
+   * completion (shared ledger validation) succeeds, and releases it on failure.
    */
   pendingOtpClaim?: { email: string; tokenHash: string };
 }

@@ -118,8 +118,22 @@ async function integrityFingerprints(
 }
 
 async function inspect(client: PoolClient, lock: boolean) {
+  const schema = await client.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema()
+       AND table_name = 'users' AND column_name = 'registration_completed_at'`
+  );
+  const attribution = await client.query<{ table_name: string; is_nullable: string }>(
+    `SELECT table_name, is_nullable FROM information_schema.columns WHERE table_schema = current_schema()
+       AND table_name IN ('source_documents', 'service_credentials') AND column_name = 'attributed_user_id'`
+  );
+  if (
+    attribution.rowCount !== 2 ||
+    attribution.rows.some((row) => row.is_nullable !== (schema.rowCount ? "YES" : "NO"))
+  )
+    throw new Error("Unknown couple attribution schema");
   const users = await client.query(
-    "SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL AND registration_completed_at IS NOT NULL",
+    `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
+     ${schema.rowCount ? "AND registration_completed_at IS NOT NULL" : ""}`,
     [[config.owner, config.partner]]
   );
   if (users.rowCount !== 2) throw new Error("Both existing accounts must be active");

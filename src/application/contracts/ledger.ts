@@ -6,19 +6,8 @@ import type {
 } from "./source-documents";
 
 export interface LedgerPort {
-  isOwnedByUser(ledgerId: LedgerId, userId: string): Promise<boolean>;
-  getOwned(ledgerId: LedgerId, userId: string): Promise<LedgerContract | null>;
-  listIdsForUser(userId: string): Promise<readonly LedgerId[]>;
-  listForUser(userId: string): Promise<readonly LedgerContract[]>;
-  createDefault(input: {
-    userId: string;
-    settings: LedgerSettingsContract;
-    categories: readonly CategoryMutationContract[];
-  }): Promise<LedgerContract>;
-  deleteOwned(
-    ledgerId: LedgerId,
-    userId: string
-  ): Promise<"deleted" | "already_deleted" | "forbidden" | "not_found">;
+  canAccess(ledgerId: LedgerId, userId: string): Promise<boolean>;
+  getSharedForMember(userId: string): Promise<LedgerContract | null>;
 }
 export interface CategoryPort {
   list(ledgerId: LedgerId): Promise<readonly CategoryContract[]>;
@@ -148,7 +137,6 @@ export interface LedgerSettingsContract {
 
 export interface LedgerContract {
   id: LedgerId;
-  userId: string;
   settings: LedgerSettingsContract;
   createdAt: string;
   updatedAt: string;
@@ -157,7 +145,7 @@ export interface LedgerContract {
 export interface AuthenticatedServiceCredentialContract {
   id: string;
   ledgerId: LedgerId;
-  attributedUserId?: string;
+  attributedUserId: string;
 }
 
 export interface ServiceCredentialContract extends AuthenticatedServiceCredentialContract {
@@ -200,8 +188,8 @@ export interface LedgerProjectionPort {
   }): Promise<boolean>;
   createManual(input: {
     ledgerId: LedgerId;
-    attributedUserId?: string;
-    createdByUserId?: string;
+    attributedUserId: string;
+    createdByUserId: string;
     expectedMainCurrency: string;
     sourceDocumentId?: SourceDocumentId;
     inputText?: string | null;

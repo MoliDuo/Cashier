@@ -30,6 +30,7 @@ async function seedEntry(
       id: uuidv4(),
       ledgerId,
       documentDate: opts.entryDate ?? null,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
     })
     .returning();
   expect(doc).toBeDefined();

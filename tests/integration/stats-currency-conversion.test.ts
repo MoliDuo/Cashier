@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb } from "../setup";
 import {
@@ -36,6 +37,7 @@ describe("Stats Currency Conversion", () => {
       .values({
         ledgerId,
         documentDate: "2024-01-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     expect(sourceDoc).toBeDefined();

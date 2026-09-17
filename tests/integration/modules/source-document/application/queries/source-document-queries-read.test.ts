@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { NotFoundError } from "@/lib/errors";
@@ -52,6 +53,7 @@ describe("source-document full query", () => {
         ledgerId,
         deletedAt: new Date(),
         documentDate: "2026-03-22",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
 

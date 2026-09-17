@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
@@ -35,7 +36,20 @@ describe("ledger source-document linkage", () => {
 
     await db.insert(ledgers).values([ledger, otherLedger]);
     await db.insert(entryCategories).values(category);
-    await db.insert(sourceDocuments).values([firstDoc, secondDoc, otherDoc]);
+    await db.insert(sourceDocuments).values([
+      {
+        ...firstDoc,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${firstDoc.ledgerId})`,
+      },
+      {
+        ...secondDoc,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${secondDoc.ledgerId})`,
+      },
+      {
+        ...otherDoc,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${otherDoc.ledgerId})`,
+      },
+    ]);
     await db.insert(ledgerEntries).values([
       createLedgerEntryData(ledgerId, {
         sourceDocumentId: firstDoc.id,

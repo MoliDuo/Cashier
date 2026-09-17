@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { postgresRevisionAdapter } from "@/application/adapters/postgres/revisions";
@@ -158,7 +159,11 @@ describe("bounded target read models", () => {
     const { ledgerId } = await createTestUserWithLedger(db);
     const [document] = await db
       .insert(sourceDocuments)
-      .values({ ledgerId, documentDate: "2026-09-03" })
+      .values({
+        ledgerId,
+        documentDate: "2026-09-03",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      })
       .returning();
     await db.insert(ledgerEntries).values({
       ledgerId,
@@ -243,6 +248,8 @@ describe("bounded target read models", () => {
           storedFileIds: files.map((file) => file.id),
           documentDate: null,
         },
+        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
       })
     );
     const ownershipSelects = capture.statements
@@ -271,6 +278,9 @@ describe("bounded target read models", () => {
           documentDate: "2026-07-15",
           createdAt,
           updatedAt: createdAt,
+        })).map((row) => ({
+          ...row,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${row.ledgerId})`,
         }))
       )
       .returning();
@@ -346,6 +356,8 @@ describe("bounded target read models", () => {
         exchangeRate: "1.000000",
         createdAt,
       })),
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     const firstPage = await listLedgerEntries(ledgerId, { limit: 7 });
     const history = await collectLedgerEntryPages(ledgerId, 7);

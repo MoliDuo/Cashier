@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
@@ -49,6 +50,8 @@ describe("target Settings currency workflow", () => {
           exchangeRate: "1.000000",
         },
       ],
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     sourceDocumentId = result.sourceDocumentId;
   }
@@ -111,6 +114,7 @@ describe("target Settings currency workflow", () => {
       id: sourceDocumentId,
       ledgerId,
       documentDate: "2026-07-15",
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
     });
     await db.insert(sourceDocumentRevisions).values([
       {
@@ -260,9 +264,12 @@ describe("target Settings currency workflow", () => {
       const db = getTestDb();
       const sourceDocumentId = crypto.randomUUID();
       const activeRevisionId = crypto.randomUUID();
-      await db
-        .insert(sourceDocuments)
-        .values({ id: sourceDocumentId, ledgerId, documentDate: entryDate });
+      await db.insert(sourceDocuments).values({
+        id: sourceDocumentId,
+        ledgerId,
+        documentDate: entryDate,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      });
       await db.insert(sourceDocumentRevisions).values({
         id: activeRevisionId,
         ledgerId,
@@ -387,7 +394,11 @@ describe("settings concurrency invariants", () => {
     const { ledgerId } = await createTestUserWithLedger(db, "settings-stale-activation");
     const sourceDocumentId = crypto.randomUUID();
     const revisionId = crypto.randomUUID();
-    await db.insert(sourceDocuments).values({ id: sourceDocumentId, ledgerId });
+    await db.insert(sourceDocuments).values({
+      id: sourceDocumentId,
+      ledgerId,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+    });
     await db.insert(sourceDocumentRevisions).values({
       id: revisionId,
       ledgerId,
@@ -461,6 +472,8 @@ describe("settings concurrency invariants", () => {
               exchangeRate: "1.000000",
             },
           ],
+          attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+          createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
         }),
       ]);
 
@@ -534,7 +547,11 @@ describe("settings concurrency invariants", () => {
       const sourceDocumentId = crypto.randomUUID();
       await db
         .insert(sourceDocuments)
-        .values({ id: sourceDocumentId, ledgerId })
+        .values({
+          id: sourceDocumentId,
+          ledgerId,
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        })
         .returning()
         .then((rows) => rows[0]!);
 

@@ -7,6 +7,7 @@ export async function listServiceCredentials(
 ): Promise<ServiceCredentialDto[]> {
   return (await credentials.list(ledgerId)).map((credential) => ({
     id: credential.id,
+    attributedUserId: credential.attributedUserId,
     tokenPrefix: credential.tokenPrefix,
     tokenSuffix: credential.tokenSuffix,
     ledgerId: credential.ledgerId,

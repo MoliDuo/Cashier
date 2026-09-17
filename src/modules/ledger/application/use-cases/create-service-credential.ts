@@ -5,11 +5,12 @@ export async function createServiceCredential(
   ledgerId: string,
   input: { name: string },
   credentials: Pick<ServiceCredentialPort, "create">,
-  userId?: string
+  userId: string
 ): Promise<CreatedServiceCredentialDto> {
   const credential = await credentials.create(ledgerId, input.name, userId);
   return {
     id: credential.id,
+    attributedUserId: credential.attributedUserId,
     token: credential.token,
     tokenPrefix: credential.tokenPrefix,
     tokenSuffix: credential.tokenSuffix,

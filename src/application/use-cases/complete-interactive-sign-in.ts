@@ -1,47 +1,30 @@
-import type {
-  EmailDeliveryPort,
-  LedgerPort,
-  OtpTokenPort,
-  UserAccountPort,
-} from "@/application/contracts";
+import type { EmailDeliveryPort, LedgerPort, OtpTokenPort } from "@/application/contracts";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { consumeOTPClaim, releaseOTPClaim } from "@/modules/auth/services/otp-verification";
-import { ensureUserLedger } from "@/modules/workspace/application/use-cases/ensure-user-ledger";
+import { resolveHome } from "@/modules/workspace/application/use-cases/resolve-home";
 import { sendLoginNotification } from "@/modules/auth/services/notifications";
 
 /**
  * Complete the cross-domain part of an interactive sign-in.
  *
  * Auth application use cases authenticate an account only. This composition
- * use case is the single place that ensures the user's default ledger exists
+ * use case is the single place that verifies the shared ledger exists
  * and commits (or releases) a pending OTP claim only after that completes.
  */
 export async function completeInteractiveSignIn(
   principal: AuthenticatedPrincipal,
   dependencies: {
-    ledgers: Pick<LedgerPort, "listForUser" | "createDefault">;
+    ledgers: Pick<LedgerPort, "getSharedForMember">;
     otpTokens: OtpTokenPort;
-    users: UserAccountPort;
     emailDelivery: EmailDeliveryPort;
   }
 ): Promise<AuthenticatedPrincipal> {
   const claim = principal.pendingOtpClaim ?? null;
   try {
-    await ensureUserLedger(
-      {
-        userId: principal.id,
-        ...(principal.locale != null && principal.locale !== ""
-          ? { locale: principal.locale }
-          : {}),
-      },
-      dependencies.ledgers
-    );
-    if (principal.registrationCompletedAt == null) {
-      await dependencies.users.completeRegistration(principal.id, new Date());
-    }
+    await resolveHome(principal.id, dependencies.ledgers);
   } catch (error) {
     if (claim != null) {
       await releaseOTPClaim(claim, dependencies.otpTokens).catch((releaseError) => {
@@ -54,7 +37,7 @@ export async function completeInteractiveSignIn(
     throw error;
   }
 
-  if (principal.isNewUser !== true && principal.email != null && principal.email !== "") {
+  if (principal.email != null && principal.email !== "") {
     await sendLoginNotification(
       {
         email: principal.email,
@@ -65,8 +48,7 @@ export async function completeInteractiveSignIn(
   }
 
   if (claim == null) {
-    const { isNewUser: _isNewUser, ...completedPrincipal } = principal;
-    return completedPrincipal;
+    return principal;
   }
 
   let consumed: boolean;
@@ -86,10 +68,6 @@ export async function completeInteractiveSignIn(
   }
 
   // Never let the transient claim leak into the Auth.js user/JWT payload.
-  const {
-    pendingOtpClaim: _pendingOtpClaim,
-    isNewUser: _isNewUser,
-    ...completedPrincipal
-  } = principal;
+  const { pendingOtpClaim: _pendingOtpClaim, ...completedPrincipal } = principal;
   return completedPrincipal;
 }

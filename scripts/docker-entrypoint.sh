@@ -51,7 +51,5 @@ until node scripts/migrate-database.mjs; do
     sleep 2
 done
 
-node scripts/bootstrap-initial-user.mjs
-
 echo "[INIT] Starting application..."
 exec node server.js

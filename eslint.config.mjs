@@ -7,6 +7,7 @@ export default defineConfig([
   ...nextTs,
   globalIgnores([
     ".next/**",
+    ".next-cashier-*/**",
     ".worktrees/**",
     ".tmp/**",
     "out/**",

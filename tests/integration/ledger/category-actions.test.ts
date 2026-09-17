@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, entryCategories, users } from "@/persistence";
@@ -177,6 +178,7 @@ describe("deleteEntryCategoryAction", () => {
       .values({
         id: uuidv4(),
         ledgerId,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     expect(doc).toBeDefined();
@@ -316,6 +318,7 @@ describe("getEntryCategoriesAction", () => {
       .values({
         id: uuidv4(),
         ledgerId,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     expect(doc).toBeDefined();
@@ -365,6 +368,7 @@ describe("getEntryCategoriesAction", () => {
       .values({
         id: uuidv4(),
         ledgerId,
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     expect(activeDoc).toBeDefined();
@@ -378,6 +382,7 @@ describe("getEntryCategoriesAction", () => {
         id: uuidv4(),
         ledgerId,
         deletedAt: new Date(),
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
       })
       .returning();
     expect(deletedDoc).toBeDefined();

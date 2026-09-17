@@ -99,6 +99,8 @@ describe("projection write shape", () => {
         entries: Array.from({ length: count }, (_, index) =>
           entry(`Item ${index}`, { amount: String(index + 1) })
         ),
+        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
       });
 
       expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(1);
@@ -126,6 +128,8 @@ describe("projection write shape", () => {
       ledgerId,
       title: "With file",
       entries: [entry("A"), entry("B")],
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     const file = (
       await db
@@ -230,6 +234,8 @@ describe("projection write shape", () => {
         }),
         entry("Three", { id: "33333333-3333-4333-8333-333333333333" }),
       ],
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     const originalRows = await db
       .select()

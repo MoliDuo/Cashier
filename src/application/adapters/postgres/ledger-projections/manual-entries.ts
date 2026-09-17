@@ -361,8 +361,8 @@ export async function createCompletedProjectionInTransaction(
   input: {
     ledgerId: string;
     sourceDocumentId: string;
-    attributedUserId?: string;
-    createdByUserId?: string;
+    attributedUserId: string;
+    createdByUserId: string;
     revisionId?: string;
     title?: string | null;
     entryDate?: string | null;
@@ -377,12 +377,15 @@ export async function createCompletedProjectionInTransaction(
     .where(eq(sourceDocuments.id, input.sourceDocumentId))
     .then((rows) => rows[0]);
   if (existing != null) throw new ConflictError("Source document already exists");
+  if (input.attributedUserId == null || input.createdByUserId == null) {
+    throw new ValidationError("Member attribution and creator required");
+  }
 
   await tx.insert(sourceDocuments).values({
     id: input.sourceDocumentId,
     ledgerId: input.ledgerId,
-    attributedUserId: input.attributedUserId ?? null,
-    createdByUserId: input.createdByUserId ?? null,
+    attributedUserId: input.attributedUserId,
+    createdByUserId: input.createdByUserId,
     title: input.title ?? null,
     documentDate: input.entryDate ?? null,
   });

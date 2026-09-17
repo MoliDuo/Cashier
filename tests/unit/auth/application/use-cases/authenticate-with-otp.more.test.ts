@@ -8,7 +8,7 @@ const {
   consumeOTPClaimMock,
   releaseOTPClaimMock,
   checkVerifyRateLimitMock,
-  assertRegistrationAllowedMock,
+  assertMemberLoginAllowedMock,
   getClientIPFromHeadersMock,
   dbUserFindFirstMock,
   dbInsertValuesMock,
@@ -20,7 +20,7 @@ const {
   consumeOTPClaimMock: vi.fn(),
   releaseOTPClaimMock: vi.fn(),
   checkVerifyRateLimitMock: vi.fn(),
-  assertRegistrationAllowedMock: vi.fn(),
+  assertMemberLoginAllowedMock: vi.fn(),
   getClientIPFromHeadersMock: vi.fn(),
   dbUserFindFirstMock: vi.fn(),
   dbInsertValuesMock: vi.fn(),
@@ -39,8 +39,8 @@ vi.mock("@/modules/auth/services/otp-rate-limit", () => ({
   checkVerifyRateLimit: checkVerifyRateLimitMock,
 }));
 
-vi.mock("@/modules/auth/application/use-cases/registration-policy", () => ({
-  assertRegistrationAllowed: assertRegistrationAllowedMock,
+vi.mock("@/modules/auth/application/use-cases/member-login-policy", () => ({
+  assertMemberLoginAllowed: assertMemberLoginAllowedMock,
 }));
 
 vi.mock("@/lib/utils/ip", () => ({
@@ -106,7 +106,13 @@ describe("authenticateWithOTP additional coverage", () => {
     verifyOTPWithPolicyMock.mockResolvedValue({ success: true });
     consumeOTPClaimMock.mockResolvedValue(true);
     releaseOTPClaimMock.mockResolvedValue(undefined);
-    assertRegistrationAllowedMock.mockResolvedValue(undefined);
+    assertMemberLoginAllowedMock.mockResolvedValue({
+      id: "existing-user-id",
+      email: "new-user@example.com",
+      name: null,
+      image: null,
+      authVersion: 1,
+    });
     dbUserFindFirstMock.mockResolvedValue(null);
     dbInsertReturningMock.mockResolvedValue([
       {
@@ -122,20 +128,8 @@ describe("authenticateWithOTP additional coverage", () => {
     getClientIPFromHeadersMock.mockReturnValue("127.0.0.1");
   });
 
-  it("creates a user for first sign-in and defaults locale to zh", async () => {
-    const users = {
-      findOrCreate: vi.fn().mockResolvedValue({
-        user: {
-          id: "new-user-id",
-          email: "new-user@example.com",
-          name: null,
-          image: null,
-          authVersion: 1,
-          registrationCompletedAt: null,
-        },
-        isExistingUser: false,
-      }),
-    } as unknown as UserAccountPort;
+  it("returns an existing member without creating an account", async () => {
+    const users = {} as UserAccountPort;
     const result = await authenticateWithOTP(
       {
         email: "NEW-USER@EXAMPLE.COM",
@@ -145,15 +139,13 @@ describe("authenticateWithOTP additional coverage", () => {
       users
     );
 
-    expect(assertRegistrationAllowedMock).toHaveBeenCalledWith("new-user@example.com", users);
+    expect(assertMemberLoginAllowedMock).toHaveBeenCalledWith("new-user@example.com", users);
     expect(result).toEqual({
-      id: "new-user-id",
+      id: "existing-user-id",
       email: "new-user@example.com",
       name: null,
       image: null,
       authVersion: 1,
-      registrationCompletedAt: null,
-      isNewUser: true,
       locale: "zh",
       pendingOtpClaim: { email: "new-user@example.com", tokenHash: "hash" },
     });
@@ -161,19 +153,7 @@ describe("authenticateWithOTP additional coverage", () => {
   });
 
   it("returns the existing user with a pending OTP claim", async () => {
-    const users = {
-      findOrCreate: vi.fn().mockResolvedValue({
-        user: {
-          id: "existing-user-id",
-          email: "new-user@example.com",
-          name: null,
-          image: null,
-          authVersion: 1,
-          registrationCompletedAt: new Date(),
-        },
-        isExistingUser: true,
-      }),
-    } as unknown as UserAccountPort;
+    const users = {} as UserAccountPort;
 
     const result = await authenticateWithOTP(
       { email: "new-user@example.com", otp: "123456", requestHeaders: new Headers() },
@@ -187,11 +167,10 @@ describe("authenticateWithOTP additional coverage", () => {
     expect(consumeOTPClaimMock).not.toHaveBeenCalled();
   });
 
-  it("releases the OTP claim when account setup fails", async () => {
+  it("releases the OTP claim when member lookup fails", async () => {
     const setupError = new Error("user setup unavailable");
-    const users = {
-      findOrCreate: vi.fn().mockRejectedValue(setupError),
-    } as unknown as UserAccountPort;
+    const users = {} as UserAccountPort;
+    assertMemberLoginAllowedMock.mockRejectedValueOnce(setupError);
 
     await expect(
       authenticateWithOTP(

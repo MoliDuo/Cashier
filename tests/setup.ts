@@ -68,6 +68,11 @@ export function getTestPool() {
   return testDatabase.pool;
 }
 
+export function getTestSchemaName(): string {
+  if (testDatabase == null) throw new Error("Test PostgreSQL database is not initialized");
+  return testDatabase.schemaName;
+}
+
 /** TRUNCATE only after all request-bound work has settled. */
 async function truncateAllTables(database: TestDatabase): Promise<void> {
   const tables = await database.pool.query<{ table_name: string }>(

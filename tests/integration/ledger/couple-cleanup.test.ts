@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { eq } from "drizzle-orm";
@@ -24,7 +25,6 @@ async function fixture() {
   const otherId = crypto.randomUUID();
   await createTestUser(db, undefined, partnerId);
   await createTestUser(db, undefined, otherId);
-  await db.update(users).set({ registrationCompletedAt: new Date() });
   const ownerLedgerId = crypto.randomUUID();
   const partnerLedgerId = crypto.randomUUID();
   const otherLedgerId = crypto.randomUUID();
@@ -47,6 +47,7 @@ async function fixture() {
     tokenPrefix: "sk_test",
     tokenSuffix: "suffix",
     name: "other",
+    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${otherLedgerId})`,
   });
   await db.insert(idempotencyRecords).values({
     principalType: "credential",

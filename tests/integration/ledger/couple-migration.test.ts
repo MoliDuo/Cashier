@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { eq } from "drizzle-orm";
@@ -18,7 +19,6 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
-  users,
 } from "@/persistence";
 
 const script = resolve("scripts/migrate-couple-ledger.ts");
@@ -28,7 +28,6 @@ async function fixture(differentCurrency = false) {
   const ownerId = TEST_USER_ID;
   const partnerId = crypto.randomUUID();
   await createTestUser(db, undefined, partnerId);
-  await db.update(users).set({ registrationCompletedAt: new Date() });
   const ownerLedgerId = crypto.randomUUID();
   const partnerLedgerId = crypto.randomUUID();
   await db.insert(ledgers).values([
@@ -53,6 +52,7 @@ async function fixture(differentCurrency = false) {
       tokenHash: computeHash("sk_test_owner_old_key"),
       tokenPrefix: "sk_owner",
       tokenSuffix: "owner",
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ownerLedgerId})`,
     },
     {
       id: partnerCredentialId,
@@ -61,6 +61,7 @@ async function fixture(differentCurrency = false) {
       tokenHash: computeHash("sk_test_partner_old_key"),
       tokenPrefix: "sk_partner",
       tokenSuffix: "partner",
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${partnerLedgerId})`,
     },
     {
       id: revokedCredentialId,
@@ -70,14 +71,18 @@ async function fixture(differentCurrency = false) {
       tokenPrefix: "sk_revoked",
       tokenSuffix: "revoked",
       deletedAt: revokedAt,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${partnerLedgerId})`,
     },
   ]);
   const documentId = crypto.randomUUID();
   const revisionId = crypto.randomUUID();
   const fileId = crypto.randomUUID();
-  await db
-    .insert(sourceDocuments)
-    .values({ id: documentId, ledgerId: partnerLedgerId, documentDate: "2026-01-04" });
+  await db.insert(sourceDocuments).values({
+    id: documentId,
+    ledgerId: partnerLedgerId,
+    documentDate: "2026-01-04",
+    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${partnerLedgerId})`,
+  });
   await db.insert(sourceDocumentRevisions).values({
     id: revisionId,
     ledgerId: partnerLedgerId,
@@ -211,6 +216,7 @@ describe("couple ledger migration", () => {
         tokenHash: computeHash("sk_test_other_old_key"),
         tokenPrefix: "sk_other",
         tokenSuffix: "other",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${otherLedgerId})`,
       });
     data.run(true);
     process.env.COUPLE_OWNER_USER_ID = data.ownerId;

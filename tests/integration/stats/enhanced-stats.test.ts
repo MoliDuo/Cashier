@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach } from "vitest";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { ValidationError } from "@/lib/errors";
@@ -158,6 +159,7 @@ describe("Enhanced Stats Actions", () => {
           ledgerId: testLedgerId,
           documentDate: "2024-01-15",
           createdAt: new Date("2024-03-01"),
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const docA = requireFirst(createdDocA, "source document");
@@ -169,6 +171,7 @@ describe("Enhanced Stats Actions", () => {
           ledgerId: testLedgerId,
           documentDate: "2024-03-15",
           createdAt: new Date("2024-01-01"),
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const docB = requireFirst(createdDocB, "source document");
@@ -215,6 +218,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-03-05",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const doc = requireFirst(createdDoc, "source document");
@@ -262,6 +266,7 @@ describe("Enhanced Stats Actions", () => {
           ledgerId: testLedgerId,
           documentDate: null,
           createdAt: new Date("2024-03-10T22:30:00Z"),
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const doc = requireFirst(createdDoc, "source document");
@@ -308,6 +313,7 @@ describe("Enhanced Stats Actions", () => {
           .values({
             ledgerId: testLedgerId,
             documentDate: date,
+            attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
           })
           .returning();
         const doc = requireFirst(createdDoc, "source document");
@@ -344,6 +350,7 @@ describe("Enhanced Stats Actions", () => {
           .values({
             ledgerId: testLedgerId,
             documentDate: date,
+            attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
           })
           .returning();
         const doc = requireFirst(createdDoc, "source document");
@@ -378,6 +385,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-03-01",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const doc = requireFirst(createdDoc, "source document");
@@ -433,6 +441,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-03-15",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const currentDoc = requireFirst(createdCurrentDoc, "source document");
@@ -453,6 +462,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-02-15",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const prevDoc = requireFirst(createdPrevDoc, "source document");
@@ -487,6 +497,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-03-01",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const doc = requireFirst(createdDoc, "source document");
@@ -519,6 +530,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-03-01",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const doc = requireFirst(createdDoc, "source document");
@@ -569,6 +581,7 @@ describe("Enhanced Stats Actions", () => {
           .values({
             ledgerId: testLedgerId,
             documentDate: entry.date,
+            attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
           })
           .returning();
         const doc = requireFirst(createdDoc, "source document");
@@ -604,6 +617,7 @@ describe("Enhanced Stats Actions", () => {
         .values({
           ledgerId: testLedgerId,
           documentDate: "2024-03-01",
+          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${testLedgerId})`,
         })
         .returning();
       const doc = requireFirst(createdDoc, "source document");

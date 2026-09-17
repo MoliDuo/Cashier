@@ -23,7 +23,7 @@ export function createProxyUploadOperations(dependencies: ResolvedStoredFileAdap
     body: Uint8Array;
   }): Promise<StoredFileContract> {
     const ledgerId = getCoupleConfig()?.ledgerId;
-    if (ledgerId == null || !(await postgresLedgerAdapter.isOwnedByUser(ledgerId, input.userId)))
+    if (ledgerId == null || !(await postgresLedgerAdapter.canAccess(ledgerId, input.userId)))
       throw new NotFoundError("Upload target");
     const ownership = await db
       .select({ ledgerId: uploadSessions.ledgerId })

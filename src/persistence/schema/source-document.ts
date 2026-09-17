@@ -28,7 +28,9 @@ export const sourceDocuments = pgTable(
     ledgerId: uuid("ledger_id")
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
-    attributedUserId: uuid("attributed_user_id").references(() => users.id),
+    attributedUserId: uuid("attributed_user_id")
+      .notNull()
+      .references(() => users.id),
     createdByUserId: uuid("created_by_user_id").references(() => users.id),
     title: text("title"),
     documentDate: date("document_date", { mode: "string" }),

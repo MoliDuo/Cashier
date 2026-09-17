@@ -28,7 +28,6 @@ async function completeSignIn(principal: AuthenticatedPrincipal) {
   return completeInteractiveSignIn(principal, {
     ledgers: serverComposition.ledgers,
     otpTokens: serverComposition.otpTokens,
-    users: serverComposition.userAccounts,
     emailDelivery: serverComposition.email,
   });
 }

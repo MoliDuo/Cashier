@@ -1,5 +1,6 @@
 import type { UserAccountPort } from "@/application/contracts";
-import { DEV_AUTH_EMAIL, DEV_AUTH_NAME, isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
+import { DEV_AUTH_EMAIL, isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
+import { isCoupleMember } from "@/lib/couple-config";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 
 export async function authenticateDevUser(
@@ -8,9 +9,6 @@ export async function authenticateDevUser(
 ): Promise<AuthenticatedPrincipal | null> {
   if (!isDevAuthBypassEnabled()) return null;
   const locale = params.locale ?? "zh-CN";
-  const { user, isExistingUser } = await dependencies.users.findOrCreate(
-    DEV_AUTH_EMAIL,
-    DEV_AUTH_NAME
-  );
-  return { ...user, locale, isNewUser: !isExistingUser };
+  const user = await dependencies.users.findByEmail(DEV_AUTH_EMAIL);
+  return user != null && isCoupleMember(user.id) ? { ...user, locale } : null;
 }

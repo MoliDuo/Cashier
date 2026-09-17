@@ -4,6 +4,7 @@ import { loadLocalEnvironment } from "./load-local-environment.mjs";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { validateCoupleUpgrade } from "./validate-couple-upgrade.mjs";
 
 async function main() {
   loadLocalEnvironment();
@@ -16,6 +17,7 @@ async function main() {
   try {
     await client.query("select pg_advisory_lock($1)", [112835438754]);
     try {
+      await validateCoupleUpgrade(client);
       await migrate(drizzle(client), {
         migrationsFolder: path.resolve("src/persistence/postgres-migrations"),
       });

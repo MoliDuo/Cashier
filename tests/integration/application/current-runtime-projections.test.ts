@@ -26,6 +26,8 @@ describe("current-runtime target adapters", () => {
       title: "Manual",
       entryDate: "2026-07-15",
       entries: [projectionEntry],
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     const originalEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),

@@ -49,6 +49,7 @@ describe("ServiceCredentialSection", () => {
 
     resolveCreate({
       id: "credential-1",
+      attributedUserId: "user-1",
       ledgerId: "ledger-1",
       name: "Automation",
       token: "secret",
@@ -79,6 +80,7 @@ describe("ServiceCredentialSection", () => {
         credentials={[
           {
             id: "credential-1",
+            attributedUserId: "user-1",
             ledgerId: "ledger-1",
             name: "Automation",
             tokenPrefix: "sec",
@@ -115,6 +117,7 @@ describe("ServiceCredentialSection", () => {
         credentials={[
           {
             id: "credential-1",
+            attributedUserId: "user-1",
             ledgerId: "ledger-1",
             name: "Automation",
             tokenPrefix: "sec",

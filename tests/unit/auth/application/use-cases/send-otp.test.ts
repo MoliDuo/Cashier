@@ -102,7 +102,6 @@ function validEmail(email: string) {
 describe("sendOTP use case", () => {
   const originalResendKey = process.env.AUTH_RESEND_KEY;
   const originalEmailFrom = process.env.AUTH_EMAIL_FROM;
-  const originalDisableRegistration = process.env.DISABLE_REGISTRATION;
   const originalOtpExpiresSeconds = process.env.OTP_EXPIRES_SECONDS;
 
   beforeEach(() => {
@@ -147,12 +146,6 @@ describe("sendOTP use case", () => {
       delete process.env.AUTH_EMAIL_FROM;
     } else {
       process.env.AUTH_EMAIL_FROM = originalEmailFrom;
-    }
-
-    if (originalDisableRegistration == null) {
-      delete process.env.DISABLE_REGISTRATION;
-    } else {
-      process.env.DISABLE_REGISTRATION = originalDisableRegistration;
     }
 
     if (originalOtpExpiresSeconds == null) {
@@ -282,7 +275,6 @@ describe("sendOTP use case", () => {
 
   it("returns a virtual success without creating or sending a token for unknown users", async () => {
     process.env.AUTH_RESEND_KEY = "resend-key";
-    process.env.DISABLE_REGISTRATION = "true";
     const findByEmail = vi.fn().mockResolvedValue(null);
 
     const result = await sendOTPUseCase(

@@ -30,22 +30,23 @@ export const postgresUploadSessionRepository: UploadSessionRepository = {
   async create(input) {
     await db.transaction(async (tx) => {
       const ledger = await tx
-        .select({ id: ledgers.id, userId: ledgers.userId })
+        .select({ id: ledgers.id })
         .from(ledgers)
         .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
         .for("update")
         .then((rows) => rows[0]);
       if (ledger == null) throw new NotFoundError("Ledger");
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ledger.userId}, 9173))`);
       const fifteenMinutesAgo = new Date(input.createdAt.getTime() - 15 * 60 * 1000);
       const utcDayStart = new Date(input.createdAt);
       utcDayStart.setUTCHours(0, 0, 0, 0);
       const recentPlans = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(uploadSessions)
-        .innerJoin(ledgers, eq(ledgers.id, uploadSessions.ledgerId))
         .where(
-          and(eq(ledgers.userId, ledger.userId), gte(uploadSessions.createdAt, fifteenMinutesAgo))
+          and(
+            eq(uploadSessions.ledgerId, input.ledgerId),
+            gte(uploadSessions.createdAt, fifteenMinutesAgo)
+          )
         )
         .then((rows) => rows[0]?.count ?? 0);
       const openSessions = await tx
@@ -64,10 +65,9 @@ export const postgresUploadSessionRepository: UploadSessionRepository = {
         })
         .from(uploadSessionFiles)
         .innerJoin(uploadSessions, eq(uploadSessions.id, uploadSessionFiles.uploadSessionId))
-        .innerJoin(ledgers, eq(ledgers.id, uploadSessions.ledgerId))
         .where(
           and(
-            eq(ledgers.userId, ledger.userId),
+            eq(uploadSessions.ledgerId, input.ledgerId),
             gte(uploadSessions.createdAt, utcDayStart),
             inArray(uploadSessions.status, ["open", "finalizing", "finalized"])
           )

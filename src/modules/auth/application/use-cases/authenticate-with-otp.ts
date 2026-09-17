@@ -12,7 +12,7 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { normalizeEmail } from "@/lib/utils/email";
 import { getClientIPFromHeaders, type HeadersLike } from "@/lib/utils/ip";
-import { assertRegistrationAllowed } from "./registration-policy";
+import { assertMemberLoginAllowed } from "./member-login-policy";
 import type { OtpTokenPort, UserAccountPort } from "@/application/contracts";
 import type { RateLimiterPort } from "@/application/contracts";
 
@@ -147,8 +147,7 @@ export async function authenticateWithOTP(
 
   const claim = { email: normalizedEmail, tokenHash: record.tokenHash };
   try {
-    await assertRegistrationAllowed(normalizedEmail, dependencies.userAccounts);
-    const { user, isExistingUser } = await dependencies.userAccounts.findOrCreate(normalizedEmail);
+    const user = await assertMemberLoginAllowed(normalizedEmail, dependencies.userAccounts);
 
     return {
       id: user.id,
@@ -156,8 +155,6 @@ export async function authenticateWithOTP(
       name: user.name,
       image: user.image,
       authVersion: user.authVersion,
-      registrationCompletedAt: user.registrationCompletedAt,
-      isNewUser: !isExistingUser,
       locale,
       pendingOtpClaim: claim,
     };

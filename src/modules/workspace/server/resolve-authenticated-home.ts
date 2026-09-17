@@ -42,16 +42,14 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
   const validSession = session!;
 
   const locale = await getLocale();
-  const home = await resolveHome({ userId, locale }, serverComposition.ledgers);
+  const ledger = await resolveHome(userId, serverComposition.ledgers);
 
-  if (!isValidUuid(home.ledger.id)) {
+  if (!isValidUuid(ledger.id)) {
     throw new NotFoundError("Ledger");
   }
-  const ledger = home.ledger;
 
   const ledgerDto: LedgerDto = {
     id: ledger.id,
-    userId: ledger.userId,
     settings: ledger.settings,
     createdAt: ledger.createdAt,
     updatedAt: ledger.updatedAt,

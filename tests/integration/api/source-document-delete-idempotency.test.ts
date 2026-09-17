@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
@@ -22,7 +23,11 @@ describe("SourceDocument delete CAS", () => {
     const db = getTestDb();
     const [document] = await db
       .insert(sourceDocuments)
-      .values({ ledgerId, documentDate: "2024-03-17" })
+      .values({
+        ledgerId,
+        documentDate: "2024-03-17",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      })
       .returning();
     if (document == null) throw new Error("Expected source document");
     await activateTestSourceDocumentProjection(db, document.id);

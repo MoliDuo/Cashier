@@ -24,6 +24,8 @@ async function createFixture() {
   );
   const created = await port.createManualDocument({
     ledgerId,
+    attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+    createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     expectedMainCurrency: "CNY",
     title: "Long screenshot",
     entryDate: "2026-09-10",

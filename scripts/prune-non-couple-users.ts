@@ -75,12 +75,27 @@ const deleteOrder = [
 const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
 async function inspect(client: PoolClient) {
+  const schema = await client.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema()
+       AND table_name = 'users' AND column_name = 'registration_completed_at'`
+  );
+  const attribution = await client.query<{ table_name: string; is_nullable: string }>(
+    `SELECT table_name, is_nullable FROM information_schema.columns WHERE table_schema = current_schema()
+       AND table_name IN ('source_documents', 'service_credentials') AND column_name = 'attributed_user_id'`
+  );
+  if (
+    attribution.rowCount !== 2 ||
+    attribution.rows.some((row) => row.is_nullable !== (schema.rowCount ? "YES" : "NO"))
+  )
+    throw new Error("Unknown couple attribution schema");
   const people = await client.query<{
     id: string;
     email: string;
     deleted_at: Date | null;
-    registration_completed_at: Date | null;
-  }>("SELECT id, email, deleted_at, registration_completed_at FROM users ORDER BY id");
+    registration_completed_at?: Date | null;
+  }>(
+    `SELECT id, email, deleted_at${schema.rowCount ? ", registration_completed_at" : ""} FROM users ORDER BY id`
+  );
   const owner = people.rows.find((row) => row.id === config.owner);
   const partner = people.rows.find((row) => row.id === config.partner);
   if (
@@ -88,8 +103,7 @@ async function inspect(client: PoolClient) {
     !partner ||
     owner.deleted_at ||
     partner.deleted_at ||
-    !owner.registration_completed_at ||
-    !partner.registration_completed_at
+    (schema.rowCount && (!owner.registration_completed_at || !partner.registration_completed_at))
   )
     throw new Error("Both configured members must be active");
   const ledgers = await client.query<{ id: string; user_id: string; deleted_at: Date | null }>(

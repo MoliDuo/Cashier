@@ -61,7 +61,6 @@ export function createDemoEnvironment(environment = process.env) {
     S3_SECRET_ACCESS_KEY: "cashier-local-only-secret",
     S3_FORCE_PATH_STYLE: "true",
     DEV_AUTH_BYPASS: "true",
-    DISABLE_REGISTRATION: "true",
     COUPLE_OWNER_USER_ID: fixture.user.id,
     COUPLE_PARTNER_USER_ID: fixture.partner.id,
     COUPLE_LEDGER_ID: fixture.ledger.id,
@@ -82,11 +81,15 @@ async function run(command, args, environment) {
 }
 
 /** @testOnly Returns the standalone Compose invocation used by the demo stack. */
-export function createDemoComposeArgs() {
+export function createDemoComposeArgs(environment = process.env) {
+  const project = environment.CASHIER_DEMO_PROJECT ?? "cashier-demo";
+  if (!/^[a-z][a-z0-9-]{0,40}$/.test(project)) {
+    throw new Error("CASHIER_DEMO_PROJECT must be a lowercase Compose project name");
+  }
   return [
     "compose",
     "-p",
-    "cashier-demo",
+    project,
     "-f",
     "docker-compose.demo.yml",
     "up",
@@ -147,7 +150,7 @@ async function main(args = process.argv.slice(2), environment = process.env) {
   const reset = args.includes("--reset");
   const apply = args.includes("--apply");
   const test = args.includes("--test");
-  await run("docker", createDemoComposeArgs(), demoEnv);
+  await run("docker", createDemoComposeArgs(demoEnv), demoEnv);
   await run(process.execPath, ["scripts/migrate-database.mjs"], demoEnv);
   await run(process.execPath, createDemoDataArgs({ reset, apply }), demoEnv);
   if (reset) return;

@@ -11,6 +11,7 @@ test_output*.txt
 
 # next.js
 /.next/
+/.next-cashier-*/
 /out/
 
 # production

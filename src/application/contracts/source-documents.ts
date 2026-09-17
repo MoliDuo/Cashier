@@ -171,11 +171,15 @@ export interface SourceDocumentPort {
     cursor?: string;
     limit?: number;
   }): Promise<{ items: readonly SourceDocumentContract[]; nextCursor: string | null }>;
-  createProcessingRevision(input: {
-    ledgerId: LedgerId;
-    sourceDocumentId?: SourceDocumentId;
-    input: SourceDocumentInputContract;
-  }): Promise<{ document: SourceDocumentContract; revision: SourceDocumentRevisionContract }>;
+  createProcessingRevision(
+    input: {
+      ledgerId: LedgerId;
+      input: SourceDocumentInputContract;
+    } & (
+      | { sourceDocumentId: SourceDocumentId; attributedUserId?: string; createdByUserId?: string }
+      | { sourceDocumentId?: never; attributedUserId: string; createdByUserId: string }
+    )
+  ): Promise<{ document: SourceDocumentContract; revision: SourceDocumentRevisionContract }>;
   markProcessing(input: {
     ledgerId: LedgerId;
     sourceDocumentId: SourceDocumentId;
@@ -206,16 +210,16 @@ export interface SourceDocumentSubmissionResult {
 }
 
 /** Atomically persists submitted evidence and the durable work needed to process it. */
-export interface SourceDocumentSubmissionInput {
+export type SourceDocumentSubmissionInput = {
   ledgerId: LedgerId;
-  attributedUserId?: string;
-  createdByUserId?: string | null;
-  sourceDocumentId?: SourceDocumentId;
   expectedVersion?: number;
   input?: SourceDocumentInputContract;
   inheritInput?: boolean;
   supersedeProcessing?: boolean;
-}
+} & (
+  | { sourceDocumentId: SourceDocumentId; attributedUserId?: string; createdByUserId?: string }
+  | { sourceDocumentId?: never; attributedUserId: string; createdByUserId: string }
+);
 
 export interface SourceDocumentInputContract {
   text: string | null;

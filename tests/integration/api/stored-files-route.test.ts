@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
@@ -30,7 +31,13 @@ function request(): NextRequest {
 
 async function createLinkedStoredFile(ledgerId: string) {
   const db = getTestDb();
-  const [document] = await db.insert(sourceDocuments).values({ ledgerId }).returning();
+  const [document] = await db
+    .insert(sourceDocuments)
+    .values({
+      ledgerId,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+    })
+    .returning();
   const [revision] = await db
     .insert(sourceDocumentRevisions)
     .values({

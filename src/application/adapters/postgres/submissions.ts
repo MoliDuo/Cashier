@@ -159,13 +159,21 @@ async function submitInTransaction(
     throw new ValidationError("Submission text and files cannot both be empty");
   }
 
-  const pending = await createProcessingRevisionInTransaction(tx, {
-    ledgerId: input.ledgerId,
-    ...(input.attributedUserId === undefined ? {} : { attributedUserId: input.attributedUserId }),
-    ...(input.createdByUserId === undefined ? {} : { createdByUserId: input.createdByUserId }),
-    ...(input.sourceDocumentId === undefined ? {} : { sourceDocumentId: input.sourceDocumentId }),
-    input: revisionInput,
-  });
+  const pending = await createProcessingRevisionInTransaction(
+    tx,
+    input.sourceDocumentId == null
+      ? {
+          ledgerId: input.ledgerId,
+          attributedUserId: input.attributedUserId!,
+          createdByUserId: input.createdByUserId!,
+          input: revisionInput,
+        }
+      : {
+          ledgerId: input.ledgerId,
+          sourceDocumentId: input.sourceDocumentId,
+          input: revisionInput,
+        }
+  );
   const job = {
     id: jobId,
     sourceDocumentId: pending.document.id,

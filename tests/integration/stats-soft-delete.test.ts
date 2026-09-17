@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../setup";
@@ -22,7 +23,11 @@ describe("ledger summary soft-delete regression", () => {
     const db = getTestDb();
     const [sourceDocument] = await db
       .insert(sourceDocuments)
-      .values({ ledgerId, documentDate: "2024-01-01" })
+      .values({
+        ledgerId,
+        documentDate: "2024-01-01",
+        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      })
       .returning();
     if (sourceDocument == null) throw new Error("Expected source document");
 

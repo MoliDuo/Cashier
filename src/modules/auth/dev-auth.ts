@@ -1,5 +1,4 @@
 export const DEV_AUTH_EMAIL = "dev@cashier.local";
-export const DEV_AUTH_NAME = "Local Developer";
 
 export function isDevAuthBypassEnabled(): boolean {
   if (process.env.DEV_AUTH_BYPASS !== "true") return false;

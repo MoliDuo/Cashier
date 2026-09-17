@@ -33,6 +33,7 @@ function createWrapper(queryClient: QueryClient) {
 }
 
 const createdCredential: CreatedServiceCredentialDto = {
+  attributedUserId: "user-1",
   id: "credential-1",
   ledgerId: "ledger-1",
   name: "CLI",

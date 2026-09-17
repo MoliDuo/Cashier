@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 /**
  * Cascade Operations Integration Tests
  *
@@ -114,6 +115,7 @@ async function createTestSourceDocument(db: ReturnType<typeof getTestDb>, ledger
   const doc = createSourceDocumentData(ledgerId);
   await db.insert(sourceDocuments).values({
     ...doc,
+    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${doc.ledgerId})`,
   });
   await activateTestSourceDocumentProjection(db, doc.id);
   return doc;

@@ -46,6 +46,8 @@ describe("ledger search", () => {
           exchangeRate: "1.000000",
         },
       ],
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     await postgresLedgerProjectionAdapter.createManual({
       expectedMainCurrency: "CNY",
@@ -63,6 +65,8 @@ describe("ledger search", () => {
           exchangeRate: "1.000000",
         },
       ],
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
 
     const titleMatch = await listStreamPage(ledgerId, { search: "  coffee   receipt ", limit: 20 });

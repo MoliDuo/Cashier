@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -62,7 +63,10 @@ async function setupLedger() {
   await db.insert(ledgers).values(ledger);
   await configureTestCoupleLedger(db, ledger.id);
   await db.insert(entryCategories).values([food, home]);
-  await db.insert(sourceDocuments).values(document);
+  await db.insert(sourceDocuments).values({
+    ...document,
+    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+  });
   const revisionId = await activateTestSourceDocumentProjection(db, document.id);
   return { ledger, food, home, document, revisionId };
 }

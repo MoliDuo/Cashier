@@ -12,6 +12,7 @@ import type { ProcessingJobContract } from "@/application/contracts";
 import {
   processingAttempts,
   processingOutbox,
+  ledgers,
   sourceDocuments,
   sourceDocumentRevisions,
 } from "@/persistence";
@@ -29,6 +30,8 @@ async function pendingIntent(
   const pending = await postgresRevisionAdapter.createProcessingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
+    attributedUserId: userId,
+    createdByUserId: userId,
   });
   return {
     ledgerId,
@@ -276,13 +279,21 @@ describe("Processing Recovery", () => {
     await adapter.dispatch(intent1);
 
     // Create 2 more source documents in the same ledger
+    const [ledgerOwner] = await getTestDb()
+      .select({ userId: ledgers.userId })
+      .from(ledgers)
+      .where(eq(ledgers.id, ledgerId));
     const pending2 = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
+      attributedUserId: ledgerOwner!.userId,
+      createdByUserId: ledgerOwner!.userId,
     });
     const pending3 = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Coffee 5.00 CNY", storedFileIds: [], documentDate: null },
+      attributedUserId: ledgerOwner!.userId,
+      createdByUserId: ledgerOwner!.userId,
     });
 
     const intent2: ProcessingJobContract = {
@@ -498,6 +509,8 @@ describe("Processing retry supersession", () => {
     const first = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
     const processing = new PostgresProcessingJobAdapter();
     const oldClaim = await processing.claim(first.job.id);
@@ -508,6 +521,7 @@ describe("Processing retry supersession", () => {
       sourceDocumentId: first.document.id,
       inheritInput: true,
       supersedeProcessing: true,
+      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
     });
 
     const [document, oldRevision, oldOutbox, oldAttempt] = await Promise.all([

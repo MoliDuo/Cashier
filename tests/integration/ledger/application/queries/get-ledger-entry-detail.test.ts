@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
@@ -31,7 +32,10 @@ describe("getLedgerEntryDetail", () => {
     const entry = createLedgerEntryData(ledger.id, { sourceDocumentId: sourceDocument.id });
 
     await db.insert(ledgers).values(ledger);
-    await db.insert(sourceDocuments).values(sourceDocument);
+    await db.insert(sourceDocuments).values({
+      ...sourceDocument,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${sourceDocument.ledgerId})`,
+    });
     await db.insert(ledgerEntries).values(entry);
     await activateTestSourceDocumentProjection(db, sourceDocument.id);
 
@@ -58,7 +62,10 @@ describe("getLedgerEntryDetail", () => {
 
     await db.insert(ledgers).values(ledger);
     await db.insert(entryCategories).values(category);
-    await db.insert(sourceDocuments).values(sourceDocument);
+    await db.insert(sourceDocuments).values({
+      ...sourceDocument,
+      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${sourceDocument.ledgerId})`,
+    });
     await db.insert(ledgerEntries).values(entry);
     await activateTestSourceDocumentProjection(db, sourceDocument.id, {
       imageUrls: ["https://example.com/a.png", "https://example.com/b.png"],
