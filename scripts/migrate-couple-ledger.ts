@@ -187,16 +187,37 @@ async function inspect(client: DatabaseClient, lock: boolean, config: CoupleIds)
   const ownerNames = new Set(
     categories.rows.filter((row) => row.ledger_id === owner.id).map((row) => row.name)
   );
-  const pending = await client.query<{ count: string }>(
-    `SELECT (
-    (SELECT count(*) FROM processing_attempts WHERE ledger_id = ANY($1::uuid[]) AND status IN ('queued','processing')) +
-    (SELECT count(*) FROM processing_outbox WHERE ledger_id = ANY($1::uuid[]) AND status IN ('pending','claimed')) +
-    (SELECT count(*) FROM category_reclassification_jobs WHERE ledger_id = ANY($1::uuid[]) AND status IN ('preparing','pending','running')) +
-    (SELECT count(*) FROM upload_sessions WHERE ledger_id = ANY($1::uuid[]) AND status IN ('open','finalizing')) +
-    (SELECT count(*) FROM exchange_rate_recalculation_jobs WHERE ledger_id = ANY($1::uuid[]) AND status IN ('pending','claimed'))
-  )::text AS count`,
+  // Report each non-terminal row group so a blocked merge names what to settle
+  // instead of only stating that *something* is active.
+  const pending = await client.query<{ source: string; status: string; count: string }>(
+    `SELECT source, status, count FROM (
+      SELECT 'processing_attempts' AS source, status::text AS status, count(*) AS count
+        FROM processing_attempts WHERE ledger_id = ANY($1::uuid[]) AND status IN ('queued','processing')
+        GROUP BY status
+      UNION ALL
+      SELECT 'processing_outbox', status::text, count(*)
+        FROM processing_outbox WHERE ledger_id = ANY($1::uuid[]) AND status IN ('pending','claimed')
+        GROUP BY status
+      UNION ALL
+      SELECT 'category_reclassification_jobs', status::text, count(*)
+        FROM category_reclassification_jobs WHERE ledger_id = ANY($1::uuid[]) AND status IN ('preparing','pending','running')
+        GROUP BY status
+      UNION ALL
+      SELECT 'upload_sessions', status::text, count(*)
+        FROM upload_sessions WHERE ledger_id = ANY($1::uuid[]) AND status IN ('open','finalizing')
+        GROUP BY status
+      UNION ALL
+      SELECT 'exchange_rate_recalculation_jobs', status::text, count(*)
+        FROM exchange_rate_recalculation_jobs WHERE ledger_id = ANY($1::uuid[]) AND status IN ('pending','claimed')
+        GROUP BY status
+    ) pending WHERE count > 0 ORDER BY source, status`,
     [[owner.id, partner.id]]
   );
+  const pendingWork = pending.rows.map((row) => ({
+    source: row.source,
+    status: row.status,
+    count: Number(row.count),
+  }));
   const fingerprints = await integrityFingerprints(client, [owner.id, partner.id], sameCurrency);
   const originalAttributions = await client.query<{ ledger_id: string; count: string }>(
     `SELECT d.ledger_id, count(*)::text AS count
@@ -222,7 +243,8 @@ async function inspect(client: DatabaseClient, lock: boolean, config: CoupleIds)
     collisionCount: categories.rows.filter(
       (row) => row.ledger_id === partner.id && ownerNames.has(row.name)
     ).length,
-    pendingJobs: Number(pending.rows[0]!.count),
+    pendingJobs: pendingWork.reduce((sum, work) => sum + work.count, 0),
+    pendingWork,
     fingerprints,
     attributionAnomalies:
       originalAttributions.rows.reduce((sum, row) => sum + Number(row.count), 0) +
@@ -233,7 +255,11 @@ async function inspect(client: DatabaseClient, lock: boolean, config: CoupleIds)
 async function merge(client: DatabaseClient, state: Awaited<ReturnType<typeof inspect>>) {
   const { owner, partner } = state;
   if (state.pendingJobs)
-    throw new Error("Active or queued work exists; pause workers and settle jobs");
+    throw new Error(
+      `Active or queued work exists; pause workers and settle jobs: ${state.pendingWork
+        .map((work) => `${work.source} ${work.status} (${work.count})`)
+        .join(", ")}`
+    );
   if (state.attributionAnomalies)
     throw new Error("Existing attribution differs from the original ledger owner");
   // Composite relationships form cycles (documents and revisions). Transactional
@@ -444,6 +470,7 @@ function summarize(state: Awaited<ReturnType<typeof inspect>>) {
     mainCurrencyDiffers: state.owner.main_currency !== state.partner.main_currency,
     categoryConflictCount: state.collisionCount,
     pendingJobs: state.pendingJobs,
+    pendingWork: state.pendingWork,
     attributionAnomalies: state.attributionAnomalies,
     ownerRecords: state.ownerCounts,
     partnerRecords: state.counts,

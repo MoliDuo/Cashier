@@ -19,6 +19,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
+  uploadSessions,
 } from "@/persistence";
 
 const script = resolve("scripts/migrate-couple-ledger.ts");
@@ -314,6 +315,41 @@ describe("couple ledger migration", () => {
       convertedAmount: "1.430",
       exchangeRate: "0.142857142857",
     });
+  });
+
+  it("names the non-terminal work that blocks the merge and requires settling it first", async () => {
+    const data = await fixture();
+    await getTestDb()
+      .insert(uploadSessions)
+      .values({
+        ledgerId: data.partnerLedgerId,
+        finalizationTokenHash: crypto.randomUUID(),
+        status: "open",
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+    const blocked = (() => {
+      try {
+        data.run(true);
+        return null;
+      } catch (error) {
+        return error as { stderr?: string };
+      }
+    })();
+    expect(blocked).not.toBeNull();
+    expect(blocked?.stderr).toContain("upload_sessions open (1)");
+    // The merge transaction rolls back, so the ledgers stay separate.
+    expect((await getTestDb().select().from(sourceDocuments))[0]?.ledgerId).toBe(
+      data.partnerLedgerId
+    );
+    await getTestDb().update(uploadSessions).set({ status: "expired" });
+    expect(JSON.parse(data.run(true))).toMatchObject({
+      mode: "apply",
+      pendingJobs: 0,
+      pendingWork: [],
+    });
+    expect((await getTestDb().select().from(sourceDocuments))[0]?.ledgerId).toBe(
+      data.ownerLedgerId
+    );
   });
 
   it("filters detail pages and summaries by stable member ID after migration", async () => {

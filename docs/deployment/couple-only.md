@@ -225,3 +225,51 @@ If validation after a committed migration fails, keep writers stopped and
 restore the latest pre-migration backup into a clean database with
 `pg_restore`, then restart the recorded previous application version.
 Switching Git branches does not restore database contents.
+
+### Do not run the upgrade inside a platform build
+
+`npm run db:migrate` applies schema migrations and then merges the ledgers as
+two separate transactions. Drizzle commits the schema first; the merge opens
+its own transaction. If the merge stops on active work, the process exits
+non-zero **after** the schema has already committed, and no application is
+serving to drain that work. That is a half-upgraded production: the schema is
+at `0046` while both member ledgers are still separate, and the previously
+deployed app cannot run against it because `0045` dropped
+`users.registration_completed_at` and made `source_documents.attributed_user_id`
+non-null, which the old insert path does not set. Sign-in and document creation
+fail until the merge completes.
+
+Because of that ordering, never put `db:migrate` in a build command
+(`vercel.json`, a package `build`/`postinstall` script, or a platform build
+step). The merge requires a pause in writes that a build cannot express, and a
+failed build leaves the committed schema without the merge. Run the upgrade as
+a deliberate operation against a quiesced database, with writers stopped and no
+non-terminal work:
+
+```sql
+SELECT source, status, count(*) AS rows FROM (
+  SELECT 'processing_attempts' AS source, status::text AS status
+    FROM processing_attempts WHERE status IN ('queued','processing')
+  UNION ALL
+  SELECT 'processing_outbox', status::text
+    FROM processing_outbox WHERE status IN ('pending','claimed')
+  UNION ALL
+  SELECT 'category_reclassification_jobs', status::text
+    FROM category_reclassification_jobs WHERE status IN ('preparing','pending','running')
+  UNION ALL
+  SELECT 'upload_sessions', status::text
+    FROM upload_sessions WHERE status IN ('open','finalizing')
+  UNION ALL
+  SELECT 'exchange_rate_recalculation_jobs', status::text
+    FROM exchange_rate_recalculation_jobs WHERE status IN ('pending','claimed')
+) pending GROUP BY source, status HAVING count(*) > 0 ORDER BY source, status;
+```
+
+The merge refuses to start while any of those rows exist and now names them in
+its error, for example `upload_sessions open (1)`. A leftover `open` upload
+session is the common case: sessions expire after 15 minutes and are settled on
+the next request, so stop the app, let them expire, and confirm the query
+returns nothing. To recover a half-upgraded database, settle the reported rows
+and run `npm run db:migrate` again; the schema step is a no-op and the merge
+retries. `npm run db:couple-preview` reports the same breakdown without
+writing.
