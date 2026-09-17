@@ -4,7 +4,7 @@ import { periodToDateRange, type PeriodParams, type PeriodPreset } from "@/lib/p
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import { resolveActivePreset, type EntryFilterPreset } from "@/modules/ledger/entry-filter-presets";
-import { type EntryFilters } from "@/modules/ledger/filters";
+import { type EntryFilters, type RecordScope } from "@/modules/ledger/filters";
 import { compare, DECIMAL_STRING_PATTERN } from "@/lib/money/decimal";
 
 function normalizeAmountRange(filters: EntryFilters): EntryFilters {
@@ -34,6 +34,9 @@ interface UseEntryFilterDraftOptions {
   showCategory: boolean;
   showCurrency: boolean;
   showStatus: boolean;
+  /** Applied scope, and its setter. Both absent hides the scope section. */
+  recordScope?: RecordScope | undefined;
+  onRecordScopeChange?: ((scope: RecordScope) => void) | undefined;
 }
 
 /** Owns the filter dialog's draft state, independent from the applied `filters` prop. */
@@ -44,12 +47,17 @@ export function useEntryFilterDraft({
   showCategory,
   showCurrency,
   showStatus,
+  recordScope,
+  onRecordScopeChange,
 }: UseEntryFilterDraftOptions) {
   const [open, setOpen] = React.useState(false);
 
   // Internal state for editing before applying - initialized from filters when dialog opens
   const [tempFilters, setTempFilters] = React.useState<EntryFilters>(filters);
   const [tempPeriod, setTempPeriod] = React.useState<EntryFilterPreset | null>(null);
+  const [tempRecordScope, setTempRecordScope] = React.useState<RecordScope>(recordScope ?? "all");
+
+  const showRecordScope = recordScope != null && onRecordScopeChange != null;
 
   // Reset temp filters when the dialog opens (not using useEffect to sync with external filters)
   const handleOpenChange = (isOpen: boolean) => {
@@ -58,6 +66,7 @@ export function useEntryFilterDraft({
       // Initialize draft state from current filters when opening
       setTempFilters(filters);
       setTempPeriod(null);
+      setTempRecordScope(recordScope ?? "all");
     }
   };
 
@@ -74,6 +83,7 @@ export function useEntryFilterDraft({
     showCurrency && filters.currency != null && filters.currency !== "",
     filters.minAmount !== undefined && filters.minAmount !== null,
     filters.maxAmount !== undefined && filters.maxAmount !== null,
+    showRecordScope && recordScope !== "all",
   ].filter((x): x is true => x === true).length;
 
   const handleDatePreset = (preset: EntryFilterPreset) => {
@@ -120,6 +130,9 @@ export function useEntryFilterDraft({
     const normalizedFilters = normalizeAmountRange(tempFilters);
     if (tempPeriod == null) onFiltersChange(normalizedFilters);
     else onFiltersChange(normalizedFilters, tempPeriod);
+    // The scope is committed with everything else: leaving the dialog is what
+    // makes the draft the applied filters.
+    if (showRecordScope && tempRecordScope !== recordScope) onRecordScopeChange?.(tempRecordScope);
     setOpen(false);
   };
 
@@ -137,6 +150,7 @@ export function useEntryFilterDraft({
     };
     setTempFilters(defaultFilters);
     setTempPeriod("thisMonth");
+    setTempRecordScope("all");
   };
 
   const toggleStatus = (status: SourceDocumentProcessingStatus) => {
@@ -165,5 +179,8 @@ export function useEntryFilterDraft({
     handleApply,
     handleReset,
     toggleStatus,
+    showRecordScope,
+    tempRecordScope,
+    setTempRecordScope,
   };
 }

@@ -1,4 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * The record scope is one more filter, so it is picked inside the filter dialog
+ * and committed by its apply. The trigger is named by how many filters are
+ * active, not by the word on it, hence the pattern.
+ */
+async function applyRecordScope(page: Page, scope: "All" | "Me" | "Partner") {
+  await page.getByRole("button", { name: /^(Filter|Active filters)/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Filter" });
+  await dialog
+    .getByRole("group", { name: "Record scope" })
+    .getByRole("button", { name: scope, exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Apply Filters", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 test("partners see the same record under their own logins", async ({ page }) => {
   await page.goto("/en/login");
@@ -33,10 +49,7 @@ test("partners see the same record under their own logins", async ({ page }) => 
   const navigation = page.getByRole("navigation", { name: "Ledger navigation" });
   await navigation.getByRole("button", { name: "Details", exact: true }).click();
   await expect(page.getByText("Shared smoke entry", { exact: true }).first()).toBeVisible();
-  await page
-    .getByRole("group", { name: "Record scope" })
-    .getByRole("button", { name: "Me" })
-    .click();
+  await applyRecordScope(page, "Me");
   await expect(page.getByText("Shared smoke entry", { exact: true })).toHaveCount(0);
   await navigation.getByRole("button", { name: "Stats", exact: true }).click();
   await expect(

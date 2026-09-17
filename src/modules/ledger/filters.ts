@@ -1,5 +1,12 @@
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 
+/**
+ * Whose records a tab is showing: the whole ledger, the signed-in member's, or
+ * the partner's. It narrows the record set exactly like the other filters do,
+ * so it is offered inside the filter dialog rather than beside the toolbar.
+ */
+export type RecordScope = "all" | "mine" | "partner";
+
 export interface EntryFilters {
   startDate?: string;
   endDate?: string;

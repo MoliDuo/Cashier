@@ -13,8 +13,6 @@ import { useDetailsTabFilters } from "./useDetailsTabFilters";
 import { useDetailsBatchController } from "./useDetailsBatchController";
 import { DetailsTabView } from "./DetailsTabView";
 import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
-import { Button } from "@/components/ui/button";
-import { useTranslations } from "next-intl";
 
 interface DetailsTabProps {
   recordScope?: "all" | "mine" | "partner";
@@ -56,7 +54,6 @@ export function DetailsTab({
   const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
   const scope = recordScope ?? localScope;
   const setScope = onRecordScopeChange ?? setLocalScope;
-  const tCommon = useTranslations("Common");
   const attributedUserId = scope === "all" ? undefined : scope === "mine" ? userId : partnerUserId;
   const data = useDetailsTabData({
     ledgerId,
@@ -113,23 +110,6 @@ export function DetailsTab({
   );
   return (
     <>
-      <div className="flex gap-2 px-2 pb-2" role="group" aria-label={tCommon("recordScope")}>
-        {(["all", "mine", "partner"] as const).map((option) => (
-          <Button
-            key={option}
-            size="sm"
-            variant={scope === option ? "default" : "outline"}
-            aria-pressed={scope === option}
-            onClick={() => setScope(option)}
-          >
-            {option === "all"
-              ? tCommon("allMembers")
-              : option === "mine"
-                ? tCommon("myRecords")
-                : tCommon("partnerRecords")}
-          </Button>
-        ))}
-      </div>
       {data.queryStatus === "error" && (
         <LedgerQueryErrorBanner empty={!data.queryHasData} onRetry={retry} />
       )}
@@ -139,6 +119,8 @@ export function DetailsTab({
           {...(ledger === undefined ? {} : { ledger })}
           periodParams={periodParams}
           filters={filters}
+          recordScope={scope}
+          onRecordScopeChange={setScope}
           advancedFilters={advancedFilters}
           onFiltersChange={onFiltersChange}
           entries={data.entries}

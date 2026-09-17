@@ -1,7 +1,6 @@
 import type { Ledger, LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { type PeriodParams } from "@/lib/period-utils";
 import {
@@ -152,25 +151,9 @@ export function LedgerEntriesTab({
 
   return (
     <>
-      <div className="flex gap-2 px-2 pb-2" role="group" aria-label={tCommon("recordScope")}>
-        {(["all", "mine", "partner"] as const).map((option) => (
-          <Button
-            key={option}
-            size="sm"
-            variant={scope === option ? "default" : "outline"}
-            aria-pressed={scope === option}
-            disabled={selection.isSelectionMode}
-            onClick={() => setScope(option)}
-          >
-            {option === "all"
-              ? tCommon("allMembers")
-              : option === "mine"
-                ? tCommon("myRecords")
-                : tCommon("partnerRecords")}
-          </Button>
-        ))}
-      </div>
       <LedgerEntriesToolbar
+        recordScope={scope}
+        onRecordScopeChange={setScope}
         isSelectionMode={selection.isSelectionMode}
         isAllSelected={selection.isAllSelected}
         hasMoreData={

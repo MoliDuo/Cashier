@@ -4,7 +4,7 @@ import { useCallback, type RefCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import type { EntryCategory, Ledger, LedgerEntry } from "@/modules/ledger/contracts";
-import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
+import type { EntryFilters, RecordScope } from "@/modules/ledger/ui/EntryFilterPanel";
 import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
 import { LedgerEntryGroupsView } from "@/modules/ledger/ui/LedgerEntryGroupsView";
 import {
@@ -30,6 +30,8 @@ interface DetailsTabViewProps {
   ledger?: Ledger;
   periodParams: PeriodParams;
   filters: EntryFilters;
+  recordScope: RecordScope;
+  onRecordScopeChange: (scope: RecordScope) => void;
   advancedFilters: {
     categoryId?: string | null;
     currency?: string | null;
@@ -59,6 +61,8 @@ export function DetailsTabView(props: DetailsTabViewProps) {
     ledger,
     periodParams,
     filters,
+    recordScope,
+    onRecordScopeChange,
     advancedFilters,
     onFiltersChange,
     entries,
@@ -165,6 +169,8 @@ export function DetailsTabView(props: DetailsTabViewProps) {
           <EntryFilterPanel
             filters={filters}
             onFiltersChange={onFiltersChange}
+            recordScope={recordScope}
+            onRecordScopeChange={onRecordScopeChange}
             periodParams={periodParams}
             categories={categories}
             preferredCurrencies={ledger?.settings.currencies ?? []}

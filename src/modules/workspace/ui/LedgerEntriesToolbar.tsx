@@ -3,7 +3,11 @@ import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
-import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
+import {
+  EntryFilterPanel,
+  type EntryFilters,
+  type RecordScope,
+} from "@/modules/ledger/ui/EntryFilterPanel";
 import {
   BatchDateDialog,
   batchDateImpactSummary,
@@ -43,6 +47,8 @@ interface LedgerEntriesToolbarProps {
   isProcessing?: boolean;
   filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
+  recordScope: RecordScope;
+  onRecordScopeChange: (scope: RecordScope) => void;
   periodParams: PeriodParams;
   mainCurrency: string;
   filteredTotal?: string;
@@ -74,6 +80,8 @@ export function LedgerEntriesToolbar({
   isProcessing: externallyProcessing = false,
   filters,
   onFiltersChange,
+  recordScope,
+  onRecordScopeChange,
   periodParams,
   mainCurrency,
   filteredTotal,
@@ -212,6 +220,8 @@ export function LedgerEntriesToolbar({
         <EntryFilterPanel
           filters={filters}
           onFiltersChange={onFiltersChange}
+          recordScope={recordScope}
+          onRecordScopeChange={onRecordScopeChange}
           periodParams={periodParams}
           showCategory={false}
           showCurrency={false}

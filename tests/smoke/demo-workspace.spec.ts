@@ -1,4 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * The record scope is one more filter, so it is picked inside the filter dialog
+ * and committed by its apply. The trigger is named by how many filters are
+ * active, not by the word on it, hence the pattern.
+ */
+async function applyRecordScope(page: Page, scope: "All" | "Me" | "Partner") {
+  await page.getByRole("button", { name: /^(Filter|Active filters)/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Filter" });
+  await dialog
+    .getByRole("group", { name: "Record scope" })
+    .getByRole("button", { name: scope, exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Apply Filters", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 test("@demo opens a populated workspace with evidence and statistics", async ({ page }) => {
   const errors: string[] = [];
@@ -31,14 +47,13 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   }
   await detail.getByRole("button", { name: "Close", exact: true }).click();
 
-  const recordScope = page.getByRole("group", { name: "Record scope" });
-  await recordScope.getByRole("button", { name: "Partner", exact: true }).click();
+  await applyRecordScope(page, "Partner");
   await expect(page.getByText("FreshMart", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Harbor Coffee", { exact: true })).toHaveCount(0);
-  await recordScope.getByRole("button", { name: "Me", exact: true }).click();
+  await applyRecordScope(page, "Me");
   await expect(page.getByText("Harbor Coffee", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("FreshMart", { exact: true })).toHaveCount(0);
-  await recordScope.getByRole("button", { name: "All", exact: true }).click();
+  await applyRecordScope(page, "All");
 
   await expect(page.getByText("Regional Rail and Cafe", { exact: true })).toBeVisible();
   await expect(page.getByText("Blurry Parking Receipt", { exact: true })).toBeVisible();
