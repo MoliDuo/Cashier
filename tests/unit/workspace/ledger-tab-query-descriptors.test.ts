@@ -28,6 +28,7 @@ describe("ledger tab query descriptors", () => {
     });
     expect(descriptor.queryKey).toEqual(
       queryKeys.sourceDocumentStream("ledger-1", {
+        attributedUserId: null,
         startDate: "2026-03-01",
         endDate: "2026-03-31",
         minAmount: null,
@@ -38,6 +39,7 @@ describe("ledger tab query descriptors", () => {
     );
     expect(descriptor.totalQueryKey).toEqual(
       queryKeys.sourceDocumentStreamTotal("ledger-1", {
+        attributedUserId: null,
         startDate: "2026-03-01",
         endDate: "2026-03-31",
         minAmount: null,
@@ -69,6 +71,7 @@ describe("ledger tab query descriptors", () => {
     });
     expect(descriptor.summaryQueryKey).toEqual(
       queryKeys.summary("ledger-1", {
+        attributedUserId: null,
         startDate: "2026-03-01",
         endDate: "2026-03-31",
         currency: "USD",
@@ -77,12 +80,29 @@ describe("ledger tab query descriptors", () => {
     );
     expect(descriptor.entriesQueryKey).toEqual(
       queryKeys.ledgerEntries("ledger-1", {
+        attributedUserId: null,
         mode: "infinite",
         startDate: "2026-03-01",
         endDate: "2026-03-31",
         filter: "search:coffee",
       })
     );
+  });
+
+  it("scopes details requests and cache keys to the selected member", () => {
+    const input = {
+      ledgerId: "ledger-1",
+      periodParams: { period: "custom" as const, startDate: "2026-03-01", endDate: "2026-03-31" },
+      mainCurrency: "USD",
+    };
+    const mine = buildDetailsQueryDescriptor({ ...input, attributedUserId: "member-1" });
+    const partner = buildDetailsQueryDescriptor({ ...input, attributedUserId: "member-2" });
+    expect(mine.getEntriesInput()).toEqual(
+      expect.objectContaining({ attributedUserId: "member-1" })
+    );
+    expect(mine.summaryParams.filters.attributedUserId).toBe("member-1");
+    expect(mine.entriesQueryKey).not.toEqual(partner.entriesQueryKey);
+    expect(mine.summaryQueryKey).not.toEqual(partner.summaryQueryKey);
   });
 
   it("uses the same stats date ranges for the key and the request input", () => {
@@ -94,6 +114,7 @@ describe("ledger tab query descriptors", () => {
 
     expect(descriptor.queryKey).toEqual(
       queryKeys.enhancedStats("ledger-1", {
+        attributedUserId: null,
         startDate: descriptor.state.startDateStr,
         endDate: descriptor.state.endDateStr,
         compareStartDate: descriptor.state.prevDateStartStr,

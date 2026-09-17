@@ -10,6 +10,7 @@ import { createServiceCredential } from "@/modules/ledger/application/use-cases/
 import { deleteServiceCredential } from "@/modules/ledger/application/use-cases/delete-service-credential";
 import { listServiceCredentials } from "@/modules/ledger/application/queries/list-service-credentials";
 import { serverComposition } from "@/application/server-composition-root";
+import { requireAuth } from "@/lib/auth-actions";
 
 /** @publicContract Retained server-action boundary for credential management. */
 export const getServiceCredentialsAction = withLedgerAccess(
@@ -23,7 +24,12 @@ export const createServiceCredentialAction = withLedgerAccess(
     data: CreateServiceCredentialInput
   ): Promise<CreatedServiceCredentialDto> => {
     const validated = parseCreateServiceCredentialInput(data);
-    return createServiceCredential(ledgerId, validated, serverComposition.serviceCredentials);
+    return createServiceCredential(
+      ledgerId,
+      validated,
+      serverComposition.serviceCredentials,
+      await requireAuth()
+    );
   }
 );
 

@@ -5,7 +5,7 @@ import { BookkeepingSettings } from "@/modules/ledger/ui/settings/BookkeepingSet
 import { toast } from "sonner";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,

@@ -18,6 +18,8 @@ export type SourceDocumentLedgerEntryDto = LedgerEntryEmbeddedViewDto;
 
 interface SourceDocumentSummaryDto {
   id: string;
+  attributedUserId?: string | null;
+  createdByUserId?: string | null;
   version: number;
   ledgerId: string;
   title: string | null;

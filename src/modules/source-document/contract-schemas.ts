@@ -128,6 +128,7 @@ export const sourceDocumentIdsSchema = z.preprocess(
 );
 
 const sourceDocumentPayloadSchema = strictObjectSchema({
+  attributedUserId: uuidSchema.optional(),
   text: z
     .string()
     .max(MAX_TEXT_CHARACTERS, `Text too long (max ${MAX_TEXT_CHARACTERS} characters)`)
@@ -293,6 +294,7 @@ const streamPageCursorSchema = z
   .regex(/^v\d+\|/, "Invalid stream cursor format")
   .or(z.literal(""));
 const streamFilterInputShape = {
+  attributedUserId: uuidSchema.optional(),
   startDate: optionalDateStringSchema,
   endDate: optionalDateStringSchema,
   minAmount: optionalQueryDecimalSchema,
@@ -416,6 +418,7 @@ export const batchUpdateSourceDocumentsInputSchema = strictObjectSchema({
 });
 
 export const createQuickEntryInputSchema = strictObjectSchema({
+  attributedUserId: uuidSchema.optional(),
   categoryId: uuidSchema,
   amount: positiveDecimalSchema,
   currency: z.string().length(3).optional(),

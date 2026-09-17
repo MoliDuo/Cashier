@@ -4,7 +4,7 @@ import { withLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
 import { ledgers } from "@/persistence";
-import { createTestUser } from "tests/helpers/schema-setup";
+import { configureTestCoupleLedger, createTestUser } from "tests/helpers/schema-setup";
 
 // Mock next-auth
 vi.mock("@/auth", () => ({
@@ -81,6 +81,7 @@ describe("withLedgerAccess", () => {
       id: ledgerId,
       userId: "00000000-0000-0000-0000-000000000000",
     });
+    await configureTestCoupleLedger(db, ledgerId);
 
     const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 

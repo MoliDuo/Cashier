@@ -31,6 +31,15 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   }
   await detail.getByRole("button", { name: "Close", exact: true }).click();
 
+  const recordScope = page.getByRole("group", { name: "Record scope" });
+  await recordScope.getByRole("button", { name: "Partner", exact: true }).click();
+  await expect(page.getByText("FreshMart", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Harbor Coffee", { exact: true })).toHaveCount(0);
+  await recordScope.getByRole("button", { name: "Me", exact: true }).click();
+  await expect(page.getByText("Harbor Coffee", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("FreshMart", { exact: true })).toHaveCount(0);
+  await recordScope.getByRole("button", { name: "All", exact: true }).click();
+
   await expect(page.getByText("Regional Rail and Cafe", { exact: true })).toBeVisible();
   await expect(page.getByText("Blurry Parking Receipt", { exact: true })).toBeVisible();
   await expect(page.getByText("Missing Currency Receipt", { exact: true })).toBeVisible();

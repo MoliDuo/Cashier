@@ -24,6 +24,8 @@ async function listLedgerEntriesFromValidatedInput(
   reads: Pick<LedgerReadPort, "listEntries">
 ): Promise<LedgerEntryPageDto> {
   const filters: Parameters<LedgerReadPort["listEntries"]>[0]["filters"] = {};
+  if (validated.attributedUserId !== undefined)
+    filters.attributedUserId = validated.attributedUserId;
   if (validated.startDate !== undefined) filters.startDate = validated.startDate;
   if (validated.endDate !== undefined) filters.endDate = validated.endDate;
   if (validated.categoryId !== undefined && validated.categoryId !== UNCATEGORIZED_SENTINEL) {

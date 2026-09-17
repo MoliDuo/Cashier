@@ -4,7 +4,10 @@ import { getTestDb } from "../../setup";
 import { currencyRates, ledgerEntries, sourceDocuments, ledgers } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
 import { eq } from "drizzle-orm";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
 
 // Mock auth module
@@ -34,6 +37,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledger = createLedgerData({ userId: testUserId, mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
+      await configureTestCoupleLedger(db, ledger.id);
       const documents = ["2024-03-14", "2024-03-15"].map((documentDate) =>
         createSourceDocumentData(ledger.id, { status: "completed", documentDate })
       );
@@ -81,6 +85,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledger = createLedgerData({ userId: testUserId, mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
+      await configureTestCoupleLedger(db, ledger.id);
       const document = createSourceDocumentData(ledger.id, {
         status: "completed",
         documentDate: "2024-03-14",
@@ -105,6 +110,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
+      await configureTestCoupleLedger(db, ledgerData.id);
 
       // Create multiple documents
       const docData1 = createSourceDocumentData(ledgerData.id);
@@ -141,6 +147,7 @@ describe("Source Document Update Actions", () => {
         mainCurrency: "USD",
       });
       await db.insert(ledgers).values(ledgerData);
+      await configureTestCoupleLedger(db, ledgerData.id);
       const document = createSourceDocumentData(ledgerData.id, {
         status: "completed",
         documentDate: "2024-03-14",
@@ -185,6 +192,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
+      await configureTestCoupleLedger(db, ledgerData.id);
 
       await expect(
         batchUpdateSourceDocumentsAction(ledgerData.id, {
@@ -198,6 +206,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
+      await configureTestCoupleLedger(db, ledgerData.id);
       const docData = createSourceDocumentData(ledgerData.id, { title: "Same title" });
       await db.insert(sourceDocuments).values(docData);
       await activateTestSourceDocumentProjection(db, docData.id);
@@ -222,6 +231,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
+      await configureTestCoupleLedger(db, ledgerData.id);
       const okDoc = createSourceDocumentData(ledgerData.id, { title: "Original A" });
       const staleDoc = createSourceDocumentData(ledgerData.id, { title: "Original B" });
       await db.insert(sourceDocuments).values([okDoc, staleDoc]);

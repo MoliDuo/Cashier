@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LedgerPort } from "@/application/contracts";
-import { ConflictError } from "@/lib/errors";
 import { ensureUserLedger } from "@/modules/workspace/application/use-cases/ensure-user-ledger";
-
-const loggerError = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/logger", () => ({
-  logger: { error: loggerError, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+vi.mock("@/lib/couple-config", () => ({
+  getCoupleConfig: () => ({ ownerId: "user-1", partnerId: "user-2", ledgerId: "shared-ledger" }),
+  isCoupleMember: (id: string) => id === "user-1" || id === "user-2",
 }));
 
 function harness() {
@@ -31,59 +29,25 @@ function ledger(id: string) {
 describe("ensureUserLedger", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns an existing ledger without creating another", async () => {
+  it("resolves the shared ledger for both members without creating one", async () => {
     const test = harness();
-    test.listForUser.mockResolvedValue([ledger("ledger-existing")]);
-    await expect(ensureUserLedger({ userId: "user-1" }, test.port)).resolves.toEqual({
-      ledger: ledger("ledger-existing"),
-      created: false,
-    });
+    test.listForUser.mockResolvedValue([ledger("shared-ledger")]);
+    for (const userId of ["user-1", "user-2"]) {
+      await expect(ensureUserLedger({ userId }, test.port)).resolves.toEqual({
+        ledger: ledger("shared-ledger"),
+        created: false,
+      });
+    }
     expect(test.createDefault).not.toHaveBeenCalled();
   });
 
-  it("creates the configured default ledger when none exists", async () => {
+  it("rejects a third account and a missing shared ledger", async () => {
     const test = harness();
     test.listForUser.mockResolvedValue([]);
-    test.createDefault.mockResolvedValue(ledger("ledger-new"));
-    await expect(ensureUserLedger({ userId: "user-1", locale: "en" }, test.port)).resolves.toEqual({
-      ledger: ledger("ledger-new"),
-      created: true,
-    });
-    expect(test.createDefault).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: "user-1", settings: expect.any(Object) })
+    await expect(ensureUserLedger({ userId: "user-3" }, test.port)).rejects.toThrow();
+    await expect(ensureUserLedger({ userId: "user-1" }, test.port)).rejects.toThrow(
+      "Shared ledger is unavailable"
     );
-  });
-
-  it("logs the invariant when multiple active ledgers exist", async () => {
-    const test = harness();
-    test.listForUser.mockResolvedValue([ledger("ledger-newer"), ledger("ledger-older")]);
-    await ensureUserLedger({ userId: "user-1" }, test.port);
-    expect(loggerError).toHaveBeenCalledWith(
-      {
-        userSubject: expect.stringMatching(/^user:[a-f0-9]{16}$/),
-        ledgerSubjects: [
-          expect.stringMatching(/^ledger:[a-f0-9]{16}$/),
-          expect.stringMatching(/^ledger:[a-f0-9]{16}$/),
-        ],
-      },
-      "Expected one active ledger"
-    );
-  });
-
-  it("recovers an idempotent concurrent creation conflict", async () => {
-    const test = harness();
-    test.listForUser.mockResolvedValueOnce([]).mockResolvedValueOnce([ledger("ledger-race")]);
-    test.createDefault.mockRejectedValue(new ConflictError("already exists"));
-    await expect(ensureUserLedger({ userId: "user-1" }, test.port)).resolves.toEqual({
-      ledger: ledger("ledger-race"),
-      created: false,
-    });
-  });
-
-  it("rethrows a conflict when no concurrent ledger exists", async () => {
-    const test = harness();
-    test.listForUser.mockResolvedValue([]);
-    test.createDefault.mockRejectedValue(new ConflictError("already exists"));
-    await expect(ensureUserLedger({ userId: "user-1" }, test.port)).rejects.toThrow(ConflictError);
+    expect(test.createDefault).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { getTestDb } from "../../setup";
 import { ledgers, users } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
+import { configureTestCoupleLedger } from "../../helpers/schema-setup";
 
 // Override the global auth mock for specific tests
 vi.mock("@/auth", () => ({
@@ -41,6 +42,7 @@ describe("requireLedgerAccess", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("returns userId and ledger when user owns the ledger", async () => {

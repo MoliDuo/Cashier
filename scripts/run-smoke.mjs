@@ -36,6 +36,9 @@ const port = await reservePort();
 const aiPort = await reservePort();
 const baseURL = `http://127.0.0.1:${port}`;
 const password = `Smoke9-${randomUUID()}`;
+const ownerId = randomUUID();
+const partnerId = randomUUID();
+const sharedLedgerId = randomUUID();
 const env = {
   ...process.env,
   NODE_ENV: "production",
@@ -64,6 +67,10 @@ const env = {
   SMOKE_BASE_URL: baseURL,
   SMOKE_EMAIL: "smoke@example.com",
   SMOKE_PASSWORD: password,
+  SMOKE_PARTNER_EMAIL: "smoke-partner@example.com",
+  COUPLE_OWNER_USER_ID: ownerId,
+  COUPLE_PARTNER_USER_ID: partnerId,
+  COUPLE_LEDGER_ID: sharedLedgerId,
 };
 let activeChild;
 let server;
@@ -103,10 +110,26 @@ try {
   try {
     await db.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
     await migrate(drizzle(db), { migrationsFolder: "src/persistence/postgres-migrations" });
+    const hash = await bcrypt.hash(password, 12);
+    for (const [id, email] of [
+      [ownerId, env.SMOKE_EMAIL],
+      [partnerId, env.SMOKE_PARTNER_EMAIL],
+    ]) {
+      await db.query(
+        `INSERT INTO users (id, email, email_verified, password_hash, password_updated_at, registration_completed_at, created_at, updated_at) VALUES ($1, $2, now(), $3, now(), now(), now(), now())`,
+        [id, email, hash]
+      );
+    }
     await db.query(
-      `INSERT INTO users (id, email, email_verified, password_hash, password_updated_at, registration_completed_at, created_at, updated_at) VALUES ($1, $2, now(), $3, now(), now(), now(), now())`,
-      [randomUUID(), env.SMOKE_EMAIL, await bcrypt.hash(password, 12)]
+      `INSERT INTO ledgers (id, user_id, main_currency, created_at, updated_at) VALUES ($1, $2, 'CNY', now(), now())`,
+      [sharedLedgerId, ownerId]
     );
+    for (const [index, name] of ["Food", "Shopping", "Travel"].entries()) {
+      await db.query(
+        `INSERT INTO entry_categories (ledger_id, name, sort_order, created_at, updated_at) VALUES ($1, $2, $3, now(), now())`,
+        [sharedLedgerId, name, index + 1]
+      );
+    }
   } finally {
     await db.end();
   }

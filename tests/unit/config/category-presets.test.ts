@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COMMON_LUCIDE_ICONS } from "@/config/icons";
 import { CATEGORY_PRESET_IDS, getCategoryPreset } from "@/config/category-presets";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 const commonIcons: readonly string[] = COMMON_LUCIDE_ICONS;
 

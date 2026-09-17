@@ -309,6 +309,13 @@
       "when": 1789398651928,
       "tag": "0043_category_assignment_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789400000000,
+      "tag": "0044_couple_attribution",
+      "breakpoints": true
     }
   ]
 }

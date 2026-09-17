@@ -13,6 +13,28 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { serverComposition } from "@/application/server-composition-root";
+import { z } from "zod";
+import { isCoupleMember } from "@/lib/couple-config";
+import { ValidationError } from "@/lib/errors";
+
+export const assignSourceDocumentAttributionAction = withSourceDocumentLedgerAccess(
+  async (
+    { ledgerId },
+    input: { sourceDocumentId: string; expectedVersion: number; attributedUserId: string }
+  ) => {
+    const validated = z
+      .object({
+        sourceDocumentId: z.string().uuid(),
+        expectedVersion: z.number().int().positive(),
+        attributedUserId: z.string().uuid(),
+      })
+      .strict()
+      .parse(input);
+    if (!isCoupleMember(validated.attributedUserId))
+      throw new ValidationError("Invalid member attribution");
+    return serverComposition.sourceDocumentAggregate.assignAttribution({ ledgerId, ...validated });
+  }
+);
 
 /**
  * Batch update multiple source documents.

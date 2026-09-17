@@ -6,6 +6,8 @@ import { logError } from "@/lib/error-handlers";
 import { ledgers, serviceCredentials } from "@/persistence";
 import { createToken, computeHash } from "@/lib/security/service-credential-token";
 import { lockLedgerForUpdate } from "../transaction-locks";
+import { getCoupleConfig, isCoupleMember } from "@/lib/couple-config";
+import { postgresLedgerAdapter } from "./ledger";
 
 import { SERVICE_CREDENTIAL_LAST_USED_STALE_MS, toIso } from "./shared";
 
@@ -18,6 +20,7 @@ export const postgresServiceCredentialAdapter: ServiceCredentialPort = {
       .select({
         id: serviceCredentials.id,
         ledgerId: serviceCredentials.ledgerId,
+        attributedUserId: serviceCredentials.attributedUserId,
         lastUsedAt: serviceCredentials.lastUsedAt,
       })
       .from(serviceCredentials)
@@ -30,7 +33,13 @@ export const postgresServiceCredentialAdapter: ServiceCredentialPort = {
       )
       .then((rows) => rows[0]);
 
-    if (hashMatch) {
+    if (
+      hashMatch &&
+      hashMatch.ledgerId === getCoupleConfig()?.ledgerId &&
+      hashMatch.attributedUserId != null &&
+      isCoupleMember(hashMatch.attributedUserId) &&
+      (await postgresLedgerAdapter.isOwnedByUser(hashMatch.ledgerId, hashMatch.attributedUserId))
+    ) {
       // Throttle the lastUsedAt write: credentials used within the last five
       // minutes skip the UPDATE entirely, so status polling cannot amplify
       // write load for hot credentials.
@@ -71,7 +80,11 @@ export const postgresServiceCredentialAdapter: ServiceCredentialPort = {
       }
       // The authenticated contract is deliberately bounded to id + ledgerId;
       // lastUsedAt is read internally only to throttle the write.
-      return { id: hashMatch.id, ledgerId: hashMatch.ledgerId };
+      return {
+        id: hashMatch.id,
+        ledgerId: hashMatch.ledgerId,
+        attributedUserId: hashMatch.attributedUserId,
+      };
     }
 
     return null;
@@ -95,7 +108,9 @@ export const postgresServiceCredentialAdapter: ServiceCredentialPort = {
     }));
   },
 
-  async create(ledgerId, name) {
+  async create(ledgerId, name, userId) {
+    if (userId == null || !isCoupleMember(userId) || ledgerId !== getCoupleConfig()?.ledgerId)
+      throw new ConflictError("Invalid shared credential owner");
     const { token, hash, prefix, suffix } = createToken();
     const row = await db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, ledgerId);
@@ -110,7 +125,14 @@ export const postgresServiceCredentialAdapter: ServiceCredentialPort = {
       }
       return tx
         .insert(serviceCredentials)
-        .values({ ledgerId, name, tokenHash: hash, tokenPrefix: prefix, tokenSuffix: suffix })
+        .values({
+          ledgerId,
+          name,
+          attributedUserId: userId,
+          tokenHash: hash,
+          tokenPrefix: prefix,
+          tokenSuffix: suffix,
+        })
         .returning()
         .then((rows) => rows[0]);
     });

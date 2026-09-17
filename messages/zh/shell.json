@@ -89,6 +89,15 @@
     "loginWarn": "如果不是您本人登录，请立即保护您的账户安全。"
   },
   "Common": {
+    "recordOwner": "账目归属",
+    "recordedBy": "录入者",
+    "historicalRecord": "历史记录",
+    "recordScope": "账目视角",
+    "statsScope": "统计视角",
+    "allMembers": "全部",
+    "myRecords": "我",
+    "partnerRecords": "对方",
+    "combinedTotal": "合计",
     "today": "今天",
     "yesterday": "昨天",
     "back": "返回",

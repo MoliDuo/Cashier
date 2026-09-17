@@ -230,6 +230,7 @@ const createServiceCredentialInputSchema = strictObjectSchema({
 });
 
 const ledgerEntryQueryShape = {
+  attributedUserId: uuidSchema.optional(),
   startDate: optionalDateStringSchema,
   endDate: optionalDateStringSchema,
   categoryId: categoryFilterSchema,

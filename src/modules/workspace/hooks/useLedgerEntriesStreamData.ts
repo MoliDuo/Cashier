@@ -8,6 +8,7 @@ import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 
 interface UseLedgerEntriesStreamDataOptions {
   ledgerId: string;
+  attributedUserId?: string;
   mainCurrency: string;
   filters: EntryFilters;
   startDateStr: string | undefined;
@@ -20,6 +21,7 @@ interface UseLedgerEntriesStreamDataOptions {
  */
 export function useLedgerEntriesStreamData({
   ledgerId,
+  attributedUserId,
   mainCurrency,
   filters,
   startDateStr,
@@ -29,6 +31,7 @@ export function useLedgerEntriesStreamData({
     () =>
       buildStreamQueryDescriptor({
         ledgerId,
+        ...(attributedUserId == null ? {} : { attributedUserId }),
         startDate: startDateStr,
         endDate: endDateStr,
         minAmount: filters.minAmount,
@@ -37,6 +40,7 @@ export function useLedgerEntriesStreamData({
         search: filters.search,
       }),
     [
+      attributedUserId,
       endDateStr,
       filters.maxAmount,
       filters.minAmount,

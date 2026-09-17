@@ -361,6 +361,8 @@ export async function createCompletedProjectionInTransaction(
   input: {
     ledgerId: string;
     sourceDocumentId: string;
+    attributedUserId?: string;
+    createdByUserId?: string;
     revisionId?: string;
     title?: string | null;
     entryDate?: string | null;
@@ -379,6 +381,8 @@ export async function createCompletedProjectionInTransaction(
   await tx.insert(sourceDocuments).values({
     id: input.sourceDocumentId,
     ledgerId: input.ledgerId,
+    attributedUserId: input.attributedUserId ?? null,
+    createdByUserId: input.createdByUserId ?? null,
     title: input.title ?? null,
     documentDate: input.entryDate ?? null,
   });

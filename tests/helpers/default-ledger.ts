@@ -1,4 +1,4 @@
-import { getCategoryPreset, type PresetCategory } from "./category-presets";
+import { getCategoryPreset, type PresetCategory } from "@/config/category-presets";
 
 /**
  * The `default` category preset, plus the settings a new ledger starts with.

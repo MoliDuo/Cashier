@@ -33,6 +33,10 @@ const SettingsTab = dynamic(
 );
 
 interface LedgerTabPanelsProps {
+  recordScope: "all" | "mine" | "partner";
+  onRecordScopeChange: (scope: "all" | "mine" | "partner") => void;
+  userId: string;
+  partnerUserId: string;
   activeTab: LedgerTab;
   hidden: boolean;
   locale: string;
@@ -61,6 +65,10 @@ interface LedgerTabPanelsProps {
 
 /** Routes to whichever ledger tab is active; inactive tabs stay unmounted. */
 export function LedgerTabPanels({
+  recordScope,
+  onRecordScopeChange,
+  userId,
+  partnerUserId,
   activeTab,
   hidden,
   locale,
@@ -88,6 +96,10 @@ export function LedgerTabPanels({
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           <DeferredFeatureMessages feature="stream" locale={locale} fallback={null}>
             <LedgerEntriesTab
+              recordScope={recordScope}
+              onRecordScopeChange={onRecordScopeChange}
+              userId={userId}
+              partnerUserId={partnerUserId}
               ledgerId={ledgerId}
               ledger={ledger}
               periodParams={periodParams}
@@ -110,6 +122,10 @@ export function LedgerTabPanels({
             fallback={<DetailsTabSkeleton />}
           >
             <DetailsTab
+              recordScope={recordScope}
+              onRecordScopeChange={onRecordScopeChange}
+              userId={userId}
+              partnerUserId={partnerUserId}
               ledgerId={ledgerId}
               categories={categories.length > 0 ? categories : []}
               ledger={ledger}
@@ -128,6 +144,10 @@ export function LedgerTabPanels({
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           <DeferredFeatureMessages feature="stats" locale={locale} fallback={<StatsTabSkeleton />}>
             <StatsTab
+              recordScope={recordScope}
+              onRecordScopeChange={onRecordScopeChange}
+              userId={userId}
+              partnerUserId={partnerUserId}
               ledgerId={ledgerId}
               ledger={ledger}
               onCategoryDrilldown={onCategoryDrilldown}

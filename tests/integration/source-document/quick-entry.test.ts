@@ -11,6 +11,7 @@ import {
 } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
+import { configureTestCoupleLedger } from "../../helpers/schema-setup";
 
 // Mock auth
 vi.mock("@/auth", () => ({
@@ -52,6 +53,7 @@ describe("createQuickEntryAction", () => {
       userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
+    await configureTestCoupleLedger(db, ledgerId);
 
     // Create test category
     categoryId = uuidv4();

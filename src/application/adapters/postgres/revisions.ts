@@ -26,6 +26,8 @@ const MAX_PAGE_SIZE = 100;
 
 export interface CreatePendingRevisionInput {
   ledgerId: string;
+  attributedUserId?: string;
+  createdByUserId?: string | null;
   sourceDocumentId?: string;
   input: {
     text: string | null;
@@ -158,6 +160,8 @@ export async function createProcessingRevisionInTransaction(
           .values({
             id: sourceDocumentId,
             ledgerId: input.ledgerId,
+            attributedUserId: input.attributedUserId ?? null,
+            createdByUserId: input.createdByUserId ?? null,
           })
           .returning()
           .then((rows) => rows[0]!)

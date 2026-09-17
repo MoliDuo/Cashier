@@ -208,6 +208,8 @@ export interface SourceDocumentSubmissionResult {
 /** Atomically persists submitted evidence and the durable work needed to process it. */
 export interface SourceDocumentSubmissionInput {
   ledgerId: LedgerId;
+  attributedUserId?: string;
+  createdByUserId?: string | null;
   sourceDocumentId?: SourceDocumentId;
   expectedVersion?: number;
   input?: SourceDocumentInputContract;

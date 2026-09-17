@@ -4,9 +4,10 @@ import type { CreatedServiceCredentialDto } from "@/modules/ledger/contracts";
 export async function createServiceCredential(
   ledgerId: string,
   input: { name: string },
-  credentials: Pick<ServiceCredentialPort, "create">
+  credentials: Pick<ServiceCredentialPort, "create">,
+  userId?: string
 ): Promise<CreatedServiceCredentialDto> {
-  const credential = await credentials.create(ledgerId, input.name);
+  const credential = await credentials.create(ledgerId, input.name, userId);
   return {
     id: credential.id,
     token: credential.token,

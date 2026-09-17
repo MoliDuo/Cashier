@@ -174,6 +174,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         ledgerId: testLedgerId,
         name: "Ingest Credential",
         tokenHash: hash,
+        attributedUserId: TEST_USER_ID,
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -200,6 +201,8 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     });
     expect(doc).toBeDefined();
     expect(doc?.ledgerId).toBe(testLedgerId);
+    expect(doc?.attributedUserId).toBe(TEST_USER_ID);
+    expect(doc?.createdByUserId).toBe(TEST_USER_ID);
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.sourceDocumentId, data.sourceDocumentId),
     });
@@ -232,6 +235,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         ledgerId: testLedgerId,
         name: "Broken Body Credential",
         tokenHash: hash,
+        attributedUserId: TEST_USER_ID,
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -266,6 +270,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         ledgerId: testLedgerId,
         name: "Timezone Credential",
         tokenHash: hash,
+        attributedUserId: TEST_USER_ID,
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })

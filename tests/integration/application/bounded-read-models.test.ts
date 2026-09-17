@@ -27,10 +27,12 @@ const getSourceDocumentFullQuery = (ledgerId: string, sourceDocumentId: string) 
   getSourceDocumentFullQueryUseCase(ledgerId, sourceDocumentId, queryPorts.documents);
 
 const SOURCE_LIST_KEYS = [
+  "attributedUserId",
   "failureKind",
   "failureMessage",
   "canEdit",
   "createdAt",
+  "createdByUserId",
   "documentDate",
   "errorCode",
   "hasImages",

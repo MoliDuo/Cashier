@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import type { EntryCategory, Ledger, LedgerEntry } from "@/modules/ledger/contracts";
@@ -13,8 +13,14 @@ import { useDetailsTabFilters } from "./useDetailsTabFilters";
 import { useDetailsBatchController } from "./useDetailsBatchController";
 import { DetailsTabView } from "./DetailsTabView";
 import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
+import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface DetailsTabProps {
+  recordScope?: "all" | "mine" | "partner";
+  onRecordScopeChange?: (scope: "all" | "mine" | "partner") => void;
+  userId: string;
+  partnerUserId: string;
   ledgerId: string;
   categories: EntryCategory[];
   ledger?: Ledger;
@@ -33,6 +39,10 @@ interface DetailsTabProps {
 }
 
 export function DetailsTab({
+  recordScope,
+  onRecordScopeChange,
+  userId,
+  partnerUserId,
   ledgerId,
   categories,
   ledger,
@@ -43,8 +53,14 @@ export function DetailsTab({
   onRefresh,
   isRefreshing,
 }: DetailsTabProps) {
+  const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
+  const scope = recordScope ?? localScope;
+  const setScope = onRecordScopeChange ?? setLocalScope;
+  const tCommon = useTranslations("Common");
+  const attributedUserId = scope === "all" ? undefined : scope === "mine" ? userId : partnerUserId;
   const data = useDetailsTabData({
     ledgerId,
+    ...(attributedUserId == null ? {} : { attributedUserId }),
     periodParams,
     advancedFilters,
     ...(timeZone != null ? { timeZone } : {}),
@@ -67,8 +83,9 @@ export function DetailsTab({
         tab: "details",
         period: periodParams,
         filters: advancedFilters,
+        attributedUserId,
       }),
-    [advancedFilters, periodParams]
+    [advancedFilters, attributedUserId, periodParams]
   );
   const batch = useDetailsBatchController(
     ledgerId,
@@ -96,6 +113,23 @@ export function DetailsTab({
   );
   return (
     <>
+      <div className="flex gap-2 px-2 pb-2" role="group" aria-label={tCommon("recordScope")}>
+        {(["all", "mine", "partner"] as const).map((option) => (
+          <Button
+            key={option}
+            size="sm"
+            variant={scope === option ? "default" : "outline"}
+            aria-pressed={scope === option}
+            onClick={() => setScope(option)}
+          >
+            {option === "all"
+              ? tCommon("allMembers")
+              : option === "mine"
+                ? tCommon("myRecords")
+                : tCommon("partnerRecords")}
+          </Button>
+        ))}
+      </div>
       {data.queryStatus === "error" && (
         <LedgerQueryErrorBanner empty={!data.queryHasData} onRetry={retry} />
       )}

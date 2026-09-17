@@ -12,6 +12,10 @@ vi.mock("@/modules/ledger/access", () => ({
   ) => handler,
 }));
 
+vi.mock("@/lib/couple-config", () => ({
+  isCoupleMember: (id: string) => id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+}));
+
 vi.mock("@/modules/source-document/application/use-cases/create-and-queue-source-document", () => ({
   createAndQueueSourceDocument: createAndQueueSourceDocumentMock,
 }));

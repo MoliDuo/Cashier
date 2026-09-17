@@ -13,6 +13,7 @@ import {
 import { serverComposition } from "@/application/server-composition-root";
 import { hashOTP } from "@/modules/auth/services/otp";
 import { completeInteractiveSignIn } from "@/application/use-cases/complete-interactive-sign-in";
+import { createTestUserWithLedger } from "../../helpers/schema-setup";
 
 vi.mock("resend", () => ({
   Resend: class MockResend {
@@ -50,6 +51,7 @@ describe("authenticateWithOTP", () => {
   beforeEach(async () => {
     delete process.env.DISABLE_REGISTRATION;
     delete process.env.OTP_MAX_ATTEMPTS;
+    await createTestUserWithLedger(getTestDb(), TEST_EMAIL);
   });
 
   afterEach(() => {

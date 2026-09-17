@@ -25,8 +25,19 @@ import { SourceDocumentDetailFooterActions } from "./SourceDocumentDetailFooterA
 import { SourceDocumentDetailStatusPanels } from "./SourceDocumentDetailStatusPanels";
 import { SourceDocumentDetailConfirmDialogs } from "./SourceDocumentDetailConfirmDialogs";
 import { SourceDocumentDetailOverlays } from "./SourceDocumentDetailOverlays";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SourceDocumentDetailModalProps {
+  userId?: string;
+  partnerUserId?: string;
+  onAssignAttribution?: (attributedUserId: string) => void;
+  isAssigningAttribution?: boolean;
   sourceDocumentId?: string;
   ledgerId: string;
   sourceDocument: SourceDocument | SourceDocumentLight | null;
@@ -76,6 +87,10 @@ interface SourceDocumentDetailModalProps {
 }
 
 function SourceDocumentDetailEditor({
+  userId,
+  partnerUserId,
+  onAssignAttribution,
+  isAssigningAttribution,
   ledgerId,
   sourceDocument,
   isLoading = false,
@@ -230,6 +245,38 @@ function SourceDocumentDetailEditor({
               <X className="size-4" />
             </Button>
           </DialogHeader>
+          {sourceDocument != null &&
+          sourceDocument.attributedUserId != null &&
+          onAssignAttribution != null &&
+          userId != null &&
+          partnerUserId != null ? (
+            <div className="shrink-0 border-b px-4 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span>{tCommon("recordOwner")}</span>
+                <Select
+                  value={sourceDocument.attributedUserId}
+                  onValueChange={onAssignAttribution}
+                  disabled={status.busy || isAssigningAttribution || editor.isEditMode}
+                >
+                  <SelectTrigger className="w-32" aria-label={tCommon("recordOwner")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={userId}>{tCommon("myRecords")}</SelectItem>
+                    <SelectItem value={partnerUserId}>{tCommon("partnerRecords")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-muted-foreground text-xs">
+                {tCommon("recordedBy")}:{" "}
+                {sourceDocument.createdByUserId === userId
+                  ? tCommon("myRecords")
+                  : sourceDocument.createdByUserId === partnerUserId
+                    ? tCommon("partnerRecords")
+                    : tCommon("historicalRecord")}
+              </div>
+            </div>
+          ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:flex lg:flex-col lg:overflow-hidden">
             <div className="shrink-0">

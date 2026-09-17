@@ -28,6 +28,7 @@ describe("current-runtime target adapters", () => {
       id: credentialId,
       ledgerId,
       tokenHash: computeHash("secret-key"),
+      attributedUserId: userId,
       tokenPrefix: "secret-k",
       tokenSuffix: "-key",
       name: "API",
@@ -42,6 +43,7 @@ describe("current-runtime target adapters", () => {
     await expect(postgresServiceCredentialAdapter.authenticate("secret-key")).resolves.toEqual({
       id: credentialId,
       ledgerId,
+      attributedUserId: userId,
     });
   });
 });

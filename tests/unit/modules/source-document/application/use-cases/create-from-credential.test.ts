@@ -39,7 +39,7 @@ describe("createSourceDocumentFromCredential", () => {
     };
 
     await createSourceDocumentFromCredential(
-      { credential: { id: "cred-1", ledgerId: "ledger-1" }, payload },
+      { credential: { id: "cred-1", ledgerId: "ledger-1", attributedUserId: "user-1" }, payload },
       scheduleProcessing,
       ports
     );
@@ -47,6 +47,8 @@ describe("createSourceDocumentFromCredential", () => {
     const callInput = createAndQueueSourceDocumentMock.mock.calls[0]?.[0];
     expect(callInput).toEqual({
       ledgerId: "ledger-1",
+      attributedUserId: "user-1",
+      createdByUserId: "user-1",
       input: { kind: "inline", images: [preparedImage] },
     });
     expect(callInput).not.toHaveProperty("ledger");
@@ -55,7 +57,7 @@ describe("createSourceDocumentFromCredential", () => {
   it("threads scheduleProcessing through to createAndQueueSourceDocument", async () => {
     await createSourceDocumentFromCredential(
       {
-        credential: { id: "cred-1", ledgerId: "ledger-1" },
+        credential: { id: "cred-1", ledgerId: "ledger-1", attributedUserId: "user-1" },
         payload: { images: [preparedImage] },
       },
       scheduleProcessing,
@@ -65,5 +67,19 @@ describe("createSourceDocumentFromCredential", () => {
     const deps = createAndQueueSourceDocumentMock.mock.calls[0]?.[1];
     expect(deps).toBeDefined();
     expect(deps.scheduleProcessing).toBe(scheduleProcessing);
+  });
+
+  it("rejects credentials without an owner before creating a document", async () => {
+    await expect(
+      createSourceDocumentFromCredential(
+        {
+          credential: { id: "cred-1", ledgerId: "ledger-1" } as never,
+          payload: { images: [preparedImage] },
+        },
+        scheduleProcessing,
+        ports
+      )
+    ).rejects.toThrow("Credential owner is required");
+    expect(createAndQueueSourceDocumentMock).not.toHaveBeenCalled();
   });
 });

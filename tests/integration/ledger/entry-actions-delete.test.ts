@@ -22,7 +22,10 @@ vi.mock("@/application/adapters/postgres/exchange-rate", () => {
   return { ExchangeRateService: rateBook, postgresFxRateBook: rateBook, fetchWithRetry: vi.fn() };
 });
 import { deleteLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -53,6 +56,7 @@ describe("deleteLedgerEntryAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("soft-deletes an entry", async () => {

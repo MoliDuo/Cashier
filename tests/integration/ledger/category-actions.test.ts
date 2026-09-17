@@ -11,7 +11,10 @@ import {
   reorderEntryCategoriesAction,
   getEntryCategoriesAction,
 } from "@/modules/ledger/server-actions/categories";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 
 async function getTargetEntryCategoriesAction(ledgerId: string) {
   const db = getTestDb();
@@ -40,6 +43,7 @@ describe("createEntryCategoryAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("creates a category synchronously with user-provided/default metadata", async () => {
@@ -137,6 +141,7 @@ describe("deleteEntryCategoryAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("soft-deletes the category", async () => {
@@ -215,6 +220,7 @@ describe("reorderEntryCategoriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("updates sortOrder for each category", async () => {
@@ -266,6 +272,7 @@ describe("getEntryCategoriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("returns categories sorted by sortOrder", async () => {

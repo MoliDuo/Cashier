@@ -7,6 +7,8 @@ import { ledgerDetailLeaveGuardKey } from "@/lib/navigation/ledger-detail-key";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 export interface ModalStackRendererProps {
+  userId?: string;
+  partnerUserId?: string;
   categories: EntryCategory[];
   mainCurrency: string;
   preferredCurrencies: string[];
@@ -14,6 +16,8 @@ export interface ModalStackRendererProps {
 }
 
 export function ModalStackRenderer({
+  userId = "",
+  partnerUserId = "",
   categories,
   mainCurrency,
   preferredCurrencies,
@@ -60,6 +64,8 @@ export function ModalStackRenderer({
     const key = `${stackItem.type}:${stackItem.ledgerId}:${stackItem.id}`;
     const isTop = index === stack.length - 1;
     const sharedProps = {
+      userId,
+      partnerUserId,
       id: stackItem.id,
       ledgerId: stackItem.ledgerId,
       open: isTop && open,

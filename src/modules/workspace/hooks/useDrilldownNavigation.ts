@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchDetailsTabQuery } from "../prefetch-ledger-tabs";
 
 interface UseDrilldownNavigationOptions {
+  attributedUserId?: string;
   searchParams: URLSearchParams;
   pathname: string;
   ledgerId: string;
@@ -21,6 +22,7 @@ interface UseDrilldownNavigationResult {
 }
 
 export function useDrilldownNavigation({
+  attributedUserId,
   searchParams,
   pathname,
   ledgerId,
@@ -38,11 +40,12 @@ export function useDrilldownNavigation({
         queryClient,
         ledgerId,
         { period: "custom", startDate, endDate },
-        { categoryId }
+        { categoryId },
+        attributedUserId
       );
       pushLedgerUrl(pathname, params, locale, "drilldown");
     },
-    [ledgerId, locale, pathname, queryClient, searchParams]
+    [attributedUserId, ledgerId, locale, pathname, queryClient, searchParams]
   );
 
   const handleDateDrilldown = useCallback(
@@ -59,11 +62,12 @@ export function useDrilldownNavigation({
         queryClient,
         ledgerId,
         { period: "custom", startDate: date, endDate: date },
-        { categoryId: nextCategoryId, currency: filters?.currency ?? null }
+        { categoryId: nextCategoryId, currency: filters?.currency ?? null },
+        attributedUserId
       );
       pushLedgerUrl(pathname, params, locale, "drilldown");
     },
-    [ledgerId, locale, pathname, queryClient, searchParams]
+    [attributedUserId, ledgerId, locale, pathname, queryClient, searchParams]
   );
 
   return {

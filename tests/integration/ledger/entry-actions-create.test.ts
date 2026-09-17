@@ -3,7 +3,11 @@ import { eq } from "drizzle-orm";
 import { createLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
-import { activateTestSourceDocumentProjection, TEST_USER_ID } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+  TEST_USER_ID,
+} from "../../helpers/schema-setup";
 
 const { getRatesMock } = vi.hoisted(() => ({
   getRatesMock: vi.fn(async () => ({ base: "CNY", date: "2026-01-01", rates: {} })),
@@ -24,6 +28,7 @@ describe("createLedgerEntryAction version CAS", () => {
     ledgerId = crypto.randomUUID();
     sourceDocumentId = crypto.randomUUID();
     await db.insert(ledgers).values({ id: ledgerId, userId: TEST_USER_ID, mainCurrency: "CNY" });
+    await configureTestCoupleLedger(db, ledgerId);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
       ledgerId,

@@ -7,6 +7,8 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
+import { getCoupleConfig } from "@/lib/couple-config";
+import { postgresLedgerAdapter } from "./business-ports/ledger";
 
 type AuthorizedStoredFileRecord = typeof storedFiles.$inferSelect;
 
@@ -59,10 +61,13 @@ export const postgresAuthorizedFileRepository: AuthorizedFileRepository = {
     return rows[0]?.file ?? null;
   },
   async findForUser(userId, fileId) {
+    const ledgerId = getCoupleConfig()?.ledgerId;
+    if (ledgerId == null || !(await postgresLedgerAdapter.isOwnedByUser(ledgerId, userId)))
+      return null;
     const rows = await authorizedFileQuery()
       .where(
         and(
-          eq(ledgers.userId, userId),
+          eq(storedFiles.ledgerId, ledgerId),
           eq(storedFiles.id, fileId),
           isNotNull(storedFiles.finalizedAt),
           isNull(storedFiles.deletedAt),

@@ -6,8 +6,12 @@ import { useSourceDocumentDetailData } from "@/modules/source-document/hooks/use
 import { useSourceDocumentDetailMutations } from "@/modules/source-document/hooks/useSourceDocumentDetailMutations";
 import { useSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useSourceDocumentRecoveryMutations";
 import type { EntryCategory } from "@/modules/ledger/contracts";
+import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
+import { assignSourceDocumentAttributionAction } from "@/modules/source-document/server-actions/update";
 
 interface SourceDocumentDetailWrapperProps {
+  userId: string;
+  partnerUserId: string;
   id: string;
   ledgerId: string;
   open: boolean;
@@ -22,6 +26,8 @@ interface SourceDocumentDetailWrapperProps {
 }
 
 export function SourceDocumentDetailWrapper({
+  userId,
+  partnerUserId,
   id,
   ledgerId,
   open,
@@ -81,8 +87,26 @@ export function SourceDocumentDetailWrapper({
     }
   }, [refetch]);
 
+  const assignment = useLedgerMutation(ledgerId, {
+    invalidates: ["documents", "stats"],
+    mutationFn: (attributedUserId: string) =>
+      assignSourceDocumentAttributionAction(ledgerId, {
+        sourceDocumentId: id,
+        expectedVersion: sourceDocument!.version,
+        attributedUserId,
+      }),
+    onSuccess: async (result) => {
+      if (result.ok) await refetch();
+      else await refetch();
+    },
+  });
+
   return (
     <SourceDocumentDetailModal
+      userId={userId}
+      partnerUserId={partnerUserId}
+      onAssignAttribution={(attributedUserId) => assignment.mutate(attributedUserId)}
+      isAssigningAttribution={assignment.isPending}
       sourceDocumentId={id}
       ledgerId={detailLedgerId}
       sourceDocument={sourceDocument}

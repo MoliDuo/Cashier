@@ -5,6 +5,28 @@ import * as schema from "@/persistence";
 type TestDatabase = NodePgDatabase<typeof schema>;
 
 export const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
+export const TEST_PARTNER_USER_ID = "11111111-1111-4111-8111-111111111111";
+
+export async function configureTestCoupleLedger(
+  db: TestDatabase,
+  ledgerId: string,
+  ownerId = TEST_USER_ID
+): Promise<void> {
+  const partnerId = ownerId === TEST_PARTNER_USER_ID ? TEST_USER_ID : TEST_PARTNER_USER_ID;
+  const partner = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, partnerId))
+    .limit(1);
+  if (partner.length === 0) await createTestUser(db, undefined, partnerId);
+  await db
+    .update(schema.users)
+    .set({ registrationCompletedAt: new Date() })
+    .where(sql`${schema.users.id} IN (${ownerId}, ${partnerId})`);
+  process.env.COUPLE_OWNER_USER_ID = ownerId;
+  process.env.COUPLE_PARTNER_USER_ID = partnerId;
+  process.env.COUPLE_LEDGER_ID = ledgerId;
+}
 
 function requireDefined<T>(value: T | undefined, message: string): T {
   if (value === undefined) {
@@ -59,6 +81,10 @@ export async function createTestUserWithLedger(
     id: ledgerId,
     userId: finalUserId,
   });
+
+  if (finalUserId === TEST_USER_ID) {
+    await configureTestCoupleLedger(db, ledgerId);
+  }
 
   return { userId: finalUserId, ledgerId };
 }

@@ -19,6 +19,7 @@ import {
 import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
+  configureTestCoupleLedger,
   TEST_USER_ID,
 } from "../helpers/schema-setup";
 import { eq, isNull, and } from "drizzle-orm";
@@ -64,6 +65,7 @@ async function createTestLedger(db: ReturnType<typeof getTestDb>, useCurrentUser
 
     const ledgerData = createLedgerData({ userId: TEST_USER_ID });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
     const ledger = await db.query.ledgers.findFirst({
       where: eq(ledgers.id, ledgerData.id),
     });

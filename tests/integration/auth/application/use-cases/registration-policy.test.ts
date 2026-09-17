@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { users } from "@/persistence/schema/auth";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
@@ -8,6 +9,7 @@ import {
   RegistrationDisabledError,
 } from "@/modules/auth/application/use-cases/registration-policy";
 import { serverComposition } from "@/application/server-composition-root";
+import { configureTestCoupleLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
 
 const isRegistrationAllowed = (email: string) =>
   isRegistrationAllowedWithPort(email, serverComposition.userAccounts);
@@ -29,8 +31,8 @@ describe("registration policy use-case", () => {
     }
   });
 
-  it("allows registration when feature flag is not enabled", async () => {
-    await expect(isRegistrationAllowed("new-user@example.com")).resolves.toBe(true);
+  it("blocks registration even when the general feature flag is not enabled", async () => {
+    await expect(isRegistrationAllowed("new-user@example.com")).resolves.toBe(false);
   });
 
   it("blocks new users when registration is disabled", async () => {
@@ -49,13 +51,11 @@ describe("registration policy use-case", () => {
     process.env.DISABLE_REGISTRATION = "true";
     const db = getTestDb();
 
-    await db.insert(users).values({
-      id: crypto.randomUUID(),
-      email: "existing@example.com",
-      name: "Existing",
-      emailVerified: new Date(),
-      registrationCompletedAt: new Date(),
-    });
+    await db
+      .update(users)
+      .set({ email: "existing@example.com", registrationCompletedAt: new Date() })
+      .where(eq(users.id, TEST_USER_ID));
+    await configureTestCoupleLedger(db, crypto.randomUUID());
 
     await expect(isRegistrationAllowed("EXISTING@EXAMPLE.COM")).resolves.toBe(true);
     await expect(assertRegistrationAllowed("EXISTING@EXAMPLE.COM")).resolves.toBeUndefined();

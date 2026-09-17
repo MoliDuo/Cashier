@@ -26,7 +26,10 @@ import {
   batchUpdateLedgerEntryDatesAction,
   previewBatchLedgerEntryDateAction,
 } from "@/modules/ledger/server-actions/entries";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -57,6 +60,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("batch updates categoryId for multiple entries", async () => {

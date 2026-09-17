@@ -15,6 +15,7 @@ import { completeInteractiveSignIn } from "@/application/use-cases/complete-inte
 import { AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { UnauthorizedError } from "@/lib/errors";
+import { isCoupleMember } from "@/lib/couple-config";
 
 class AuthCredentialsSigninError extends CredentialsSignin {
   constructor(code: string) {
@@ -38,6 +39,7 @@ async function authorizeInteractiveSignIn(
   try {
     const principal = await authenticate();
     if (principal == null) return null;
+    if (!isCoupleMember(principal.id)) return null;
     return await completeSignIn(principal);
   } catch (error) {
     if (error instanceof AuthSignInError) {
@@ -172,6 +174,7 @@ export const authOptions = {
     async session({ session, token }) {
       if (token.sub != null && token.sub !== "" && session.user != null) {
         const dbUser = await getSessionUser(token.sub, serverComposition.userAccounts);
+        if (!isCoupleMember(dbUser.id)) throw new UnauthorizedError("Account is not a member");
         const tokenAuthVersion =
           typeof token.authVersion === "number" && Number.isInteger(token.authVersion)
             ? token.authVersion

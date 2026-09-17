@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 import type { CategoryPort, ServiceCredentialPort } from "@/application/contracts";
 import { getLedgerSettingsBootstrap as getBootstrap } from "@/modules/workspace/application/queries/get-ledger-settings-bootstrap";
 

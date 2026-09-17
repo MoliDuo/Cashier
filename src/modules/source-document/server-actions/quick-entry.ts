@@ -8,15 +8,24 @@ import {
 import { withSourceDocumentLedgerAccess } from "./access";
 import { serverComposition } from "@/application/server-composition-root";
 import { convertEntryAmount } from "@/modules/currency/application/use-cases/convert-entry-amount";
+import { isCoupleMember } from "@/lib/couple-config";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Create a quick entry (manual entry without AI parsing).
  * Atomically creates a completed SourceDocument and a LedgerEntry without AI parsing.
  */
 export const createQuickEntryAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId, ledger }, data: CreateQuickEntryInput): Promise<QuickEntryResponseDto> => {
+  async (
+    { ledgerId, ledger, userId },
+    data: CreateQuickEntryInput
+  ): Promise<QuickEntryResponseDto> => {
     const validated = createQuickEntryInputSchema.parse(data);
+    const attributedUserId = validated.attributedUserId ?? userId;
+    if (!isCoupleMember(attributedUserId)) throw new ValidationError("Invalid member attribution");
     const payload = {
+      attributedUserId,
+      createdByUserId: userId,
       categoryId: validated.categoryId,
       amount: validated.amount,
       ...(validated.currency !== undefined ? { currency: validated.currency } : {}),

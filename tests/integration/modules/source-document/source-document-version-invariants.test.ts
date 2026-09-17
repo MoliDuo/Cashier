@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 import { serverComposition } from "@/application/server-composition-root";
 import type { SourceDocumentAggregateWritePort } from "@/modules/source-document/application/ports";
 import { ConflictError, NotFoundError, StaleSourceDocumentVersionError } from "@/lib/errors";
-import { sourceDocuments } from "@/persistence";
+import { ledgers, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
@@ -112,6 +112,28 @@ async function createProcessingDocument(ledgerId: string) {
 }
 
 const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
+  async assignAttribution() {
+    const ledgerId = await newLedger();
+    const { sourceDocumentId } = await createActiveDocument(ledgerId);
+    const db = getTestDb();
+    const [ledger] = await db
+      .select({ userId: ledgers.userId })
+      .from(ledgers)
+      .where(eq(ledgers.id, ledgerId));
+    const input = { ledgerId, sourceDocumentId, attributedUserId: ledger!.userId };
+    expect(await port.assignAttribution({ ...input, expectedVersion: 1 })).toEqual({
+      ok: true,
+      version: 2,
+    });
+    expect(await port.assignAttribution({ ...input, expectedVersion: 2 })).toEqual({
+      ok: true,
+      version: 2,
+    });
+    expect(await port.assignAttribution({ ...input, expectedVersion: 1 })).toEqual({
+      ok: false,
+      currentVersion: 2,
+    });
+  },
   async applyDateOrganization() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);

@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { type InferSelectModel, sql } from "drizzle-orm";
 import { ledgers } from "./ledger";
+import { users } from "./auth";
 
 const sourceDocumentRevisionsReference = pgTable("source_document_revisions", {
   id: uuid("id").notNull(),
@@ -27,6 +28,8 @@ export const sourceDocuments = pgTable(
     ledgerId: uuid("ledger_id")
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
+    attributedUserId: uuid("attributed_user_id").references(() => users.id),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
     title: text("title"),
     documentDate: date("document_date", { mode: "string" }),
     effectiveDate: date("effective_date", { mode: "string" })
@@ -48,6 +51,9 @@ export const sourceDocuments = pgTable(
   },
   (table) => [
     uniqueIndex("uq_source_documents_ledger_id_id").on(table.ledgerId, table.id),
+    index("idx_source_documents_ledger_attribution")
+      .on(table.ledgerId, table.attributedUserId)
+      .where(sql`${table.deletedAt} IS NULL`),
     index("idx_source_documents_active_feed")
       .on(table.ledgerId, table.effectiveDate.desc(), table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} IS NULL`),

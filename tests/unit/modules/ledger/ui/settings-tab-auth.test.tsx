@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Ledger } from "@/modules/ledger/contracts";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 const { queryState, refetchQueries } = vi.hoisted(() => ({
   queryState: { status: "success" },

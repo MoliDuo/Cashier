@@ -4,7 +4,10 @@ import { auth } from "@/auth";
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
 import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
 
@@ -61,6 +64,7 @@ describe("splitSourceDocumentAction", () => {
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
     const ids = Array.from({ length: entryCount }, () => crypto.randomUUID());
     await db.insert(ledgers).values(ledger);
+    await configureTestCoupleLedger(db, ledger.id);
     await db.insert(sourceDocuments).values(document);
     await db.insert(ledgerEntries).values(
       ids.map((id, position) => ({

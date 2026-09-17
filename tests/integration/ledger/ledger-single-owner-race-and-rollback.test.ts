@@ -1,73 +1,114 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUser } from "tests/helpers/schema-setup";
-import { ledgers } from "@/persistence";
+import { createTestSourceDocument, createTestUser } from "tests/helpers/schema-setup";
+import { ledgers, storedFiles, uploadSessionFiles, uploadSessions, users } from "@/persistence";
+import { postgresAuthorizedFileRepository } from "@/application/adapters/postgres/authorized-files";
+import { createStoredFileAdapter } from "@/application/adapters/local/stored-files";
 import { serverComposition } from "@/application/server-composition-root";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
-const createDefaultLedger = (input: { userId: string; locale?: string }) => {
-  const defaults = getDefaultLedger(input.locale ?? "zh");
-  return serverComposition.ledgers.createDefault({
-    userId: input.userId,
-    settings: defaults.settings,
-    categories: defaults.categories,
-  });
+const originalConfig = {
+  owner: process.env.COUPLE_OWNER_USER_ID,
+  partner: process.env.COUPLE_PARTNER_USER_ID,
+  ledger: process.env.COUPLE_LEDGER_ID,
 };
+afterEach(() => {
+  for (const [name, value] of [
+    ["COUPLE_OWNER_USER_ID", originalConfig.owner],
+    ["COUPLE_PARTNER_USER_ID", originalConfig.partner],
+    ["COUPLE_LEDGER_ID", originalConfig.ledger],
+  ] as const) {
+    if (value == null) delete process.env[name];
+    else process.env[name] = value;
+  }
+});
 
-describe("ledger single-owner race and rollback", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("allows recreating a ledger after the previous one is soft deleted", async () => {
+describe("couple ledger provisioning", () => {
+  it("allows both active members but denies a third user and fails closed", async () => {
     const db = getTestDb();
-    const userId = await createTestUser(db, undefined, crypto.randomUUID());
-    const initial = await createDefaultLedger({ userId, locale: "zh" });
-
-    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, initial.id));
-
-    const recreated = await createDefaultLedger({ userId, locale: "en" });
-
-    expect(recreated.id).not.toBe(initial.id);
-    expect(recreated.userId).toBe(userId);
-  });
-
-  it("rolls back createDefaultLedger when category insertion fails", async () => {
-    const db = getTestDb();
-    const userId = await createTestUser(db, undefined, crypto.randomUUID());
-    const defaultLedgerModule = await import("@/config/default-ledger");
-    const getDefaultLedgerSpy = vi.spyOn(defaultLedgerModule, "getDefaultLedger").mockReturnValue({
-      settings: {
-        aiLanguage: "zh-CN",
-        currencies: ["CNY", "USD"],
-        mainCurrency: "CNY",
-        collapseEntriesDefault: false,
-        aiCustomPrompt: "",
-        timeZone: null,
+    const owner = await createTestUser(db);
+    const partner = await createTestUser(db, undefined, crypto.randomUUID());
+    const outsider = await createTestUser(db, undefined, crypto.randomUUID());
+    await db.update(users).set({ registrationCompletedAt: new Date() });
+    const ledgerId = crypto.randomUUID();
+    await db.insert(ledgers).values({ id: ledgerId, userId: owner });
+    process.env.COUPLE_OWNER_USER_ID = owner;
+    process.env.COUPLE_PARTNER_USER_ID = partner;
+    process.env.COUPLE_LEDGER_ID = ledgerId;
+    expect(await serverComposition.ledgers.getOwned(ledgerId, owner)).not.toBeNull();
+    expect(await serverComposition.ledgers.getOwned(ledgerId, partner)).not.toBeNull();
+    expect(await serverComposition.ledgers.getOwned(ledgerId, outsider)).toBeNull();
+    const existingLedger = (await db.select().from(ledgers).where(eq(ledgers.id, ledgerId)))[0]!;
+    const updated = await serverComposition.settings.updateWithCurrencyRecalculation({
+      ledgerId,
+      userId: partner,
+      expectedUpdatedAt: existingLedger.updatedAt.toISOString(),
+      settings: { collapseEntriesDefault: true },
+    });
+    expect(updated?.settings.collapseEntriesDefault).toBe(true);
+    await createTestSourceDocument(db, ledgerId, { imageUrls: ["fixture"] });
+    const file = (await db.select().from(storedFiles))[0]!;
+    expect(await postgresAuthorizedFileRepository.findForUser(partner, file.id)).not.toBeNull();
+    expect(await postgresAuthorizedFileRepository.findForUser(outsider, file.id)).toBeNull();
+    const sessionId = crypto.randomUUID();
+    const targetId = crypto.randomUUID();
+    await db.insert(uploadSessions).values({
+      id: sessionId,
+      ledgerId,
+      finalizationTokenHash: "fixture",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    await db.insert(uploadSessionFiles).values({
+      ledgerId,
+      uploadSessionId: sessionId,
+      targetId,
+      position: 0,
+      expectedContentType: "image/jpeg",
+      expectedByteSize: 1,
+    });
+    const storage = new Map<string, Buffer>();
+    const adapter = createStoredFileAdapter({
+      storage: {
+        async upload(key, bytes) {
+          storage.set(key, bytes);
+        },
+        async download(key) {
+          return storage.get(key)!;
+        },
+        async delete(key) {
+          storage.delete(key);
+          return { success: true };
+        },
       },
-      categories: [
-        {
-          name: "Duplicate category",
-          description: "First duplicate category",
-          icon: "Utensils",
-          sortOrder: 1,
-        },
-        {
-          name: "Duplicate category",
-          description: "Second duplicate category",
-          icon: "Package",
-          sortOrder: 2,
-        },
-      ],
     });
-
-    await expect(createDefaultLedger({ userId })).rejects.toThrow();
-
-    const persisted = await db.query.ledgers.findFirst({
-      where: eq(ledgers.userId, userId),
-    });
-    expect(persisted).toBeUndefined();
-    getDefaultLedgerSpy.mockRestore();
+    const upload = {
+      uploadSessionId: sessionId,
+      targetId,
+      contentType: "image/jpeg",
+      body: new Uint8Array([1]),
+    };
+    await expect(adapter.uploadTargetForUser({ ...upload, userId: outsider })).rejects.toThrow();
+    expect((await adapter.uploadTargetForUser({ ...upload, userId: partner })).ownerLedgerId).toBe(
+      ledgerId
+    );
+    delete process.env.COUPLE_LEDGER_ID;
+    expect(await serverComposition.ledgers.getOwned(ledgerId, owner)).toBeNull();
+    process.env.COUPLE_LEDGER_ID = ledgerId;
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, partner));
+    expect(await serverComposition.ledgers.getOwned(ledgerId, owner)).toBeNull();
+  });
+  it("does not create a third personal ledger", async () => {
+    const db = getTestDb();
+    const userId = await createTestUser(db, undefined, crypto.randomUUID());
+    const defaults = getDefaultLedger();
+    await expect(
+      serverComposition.ledgers.createDefault({
+        userId,
+        settings: defaults.settings,
+        categories: defaults.categories,
+      })
+    ).rejects.toThrow("Shared ledger must be migrated");
+    expect(await db.query.ledgers.findFirst({ where: eq(ledgers.userId, userId) })).toBeUndefined();
   });
 });

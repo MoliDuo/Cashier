@@ -12,7 +12,7 @@ import {
   type DateRangeType,
 } from "@/lib/date-utils";
 import { StatsContentView } from "@/modules/stats/ui/StatsContentView";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { MAX_CHART_POINTS } from "@/modules/stats/lib/chart-points";
 import { MAX_HEATMAP_DAYS } from "@/modules/stats/lib/heatmap-range";
@@ -28,10 +28,16 @@ import {
 } from "@/modules/workspace/ledger-url-params";
 import { pushLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { formatCurrencyAmount } from "@/lib/format/currency";
+import { Button } from "@/components/ui/button";
 
 const STATS_QUERY_DEBOUNCE_MS = 250;
 
 interface StatsTabProps {
+  recordScope?: "all" | "mine" | "partner";
+  onRecordScopeChange?: (scope: "all" | "mine" | "partner") => void;
+  userId: string;
+  partnerUserId: string;
   ledgerId?: string;
   ledger?: Ledger;
   onCategoryDrilldown?: (categoryId: string, startDate: string, endDate: string) => void;
@@ -41,6 +47,10 @@ interface StatsTabProps {
 }
 
 export function StatsTab({
+  recordScope,
+  onRecordScopeChange,
+  userId,
+  partnerUserId,
   ledgerId,
   ledger,
   onCategoryDrilldown,
@@ -49,8 +59,12 @@ export function StatsTab({
   timeZone,
 }: StatsTabProps) {
   const locale = useLocale();
+  const tCommon = useTranslations("Common");
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
+  const scope = recordScope ?? localScope;
+  const setScope = onRecordScopeChange ?? setLocalScope;
   const statsUrlState = useMemo(() => readStatsSearchParams(searchParams), [searchParams]);
   const rangeType: DateRangeType = statsUrlState.range ?? DEFAULT_STATS_RANGE_TYPE;
   const periodOffset = statsUrlState.offset;
@@ -96,6 +110,51 @@ export function StatsTab({
     () =>
       buildStatsQueryDescriptor({
         ledgerId: ledgerId ?? "",
+        ...(scope === "all" ? {} : { attributedUserId: scope === "mine" ? userId : partnerUserId }),
+        currentDate,
+        mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
+        rangeType,
+        currentPeriod: periodOffset === 0,
+      }),
+    [
+      currentDate,
+      ledger?.settings.mainCurrency,
+      ledgerId,
+      partnerUserId,
+      periodOffset,
+      rangeType,
+      scope,
+      userId,
+    ]
+  );
+  const mineDescriptor = useMemo(
+    () =>
+      buildStatsQueryDescriptor({
+        ledgerId: ledgerId ?? "",
+        currentDate,
+        mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
+        rangeType,
+        currentPeriod: periodOffset === 0,
+        attributedUserId: userId,
+      }),
+    [currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType, userId]
+  );
+  const partnerDescriptor = useMemo(
+    () =>
+      buildStatsQueryDescriptor({
+        ledgerId: ledgerId ?? "",
+        currentDate,
+        mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
+        rangeType,
+        currentPeriod: periodOffset === 0,
+        attributedUserId: partnerUserId,
+      }),
+    [currentDate, ledger?.settings.mainCurrency, ledgerId, partnerUserId, periodOffset, rangeType]
+  );
+  const allDescriptor = useMemo(
+    () =>
+      buildStatsQueryDescriptor({
+        ledgerId: ledgerId ?? "",
         currentDate,
         mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
         rangeType,
@@ -103,6 +162,24 @@ export function StatsTab({
       }),
     [currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType]
   );
+  const allQuery = useQuery({
+    queryKey: allDescriptor.queryKey,
+    queryFn: () => getEnhancedStats(allDescriptor.input),
+    enabled: !!ledgerId,
+    staleTime: QUERY.DEFAULT_STALE_TIME_MS,
+  });
+  const mineQuery = useQuery({
+    queryKey: mineDescriptor.queryKey,
+    queryFn: () => getEnhancedStats(mineDescriptor.input),
+    enabled: !!ledgerId,
+    staleTime: QUERY.DEFAULT_STALE_TIME_MS,
+  });
+  const partnerQuery = useQuery({
+    queryKey: partnerDescriptor.queryKey,
+    queryFn: () => getEnhancedStats(partnerDescriptor.input),
+    enabled: !!ledgerId,
+    staleTime: QUERY.DEFAULT_STALE_TIME_MS,
+  });
   const queryDescriptor = useDebouncedValue(statsDescriptor, STATS_QUERY_DEBOUNCE_MS);
   const statsQuery = useQuery({
     queryKey: queryDescriptor.queryKey,
@@ -161,28 +238,74 @@ export function StatsTab({
   }, [contentEndDateStr, contentRangeType, contentStartDateStr, locale]);
 
   return (
-    <StatsContentView
-      rangeType={rangeType}
-      contentRangeType={contentRangeType}
-      onRangeTypeChange={(type) => {
-        updateStatsUrl({ range: type, offset: 0 });
-      }}
-      periodOffset={periodOffset}
-      onPeriodOffsetChange={(offset) => updateStatsUrl({ offset })}
-      label={contentLabel}
-      startDate={contentStartDate}
-      endDate={contentEndDate}
-      startDateStr={contentStartDateStr}
-      endDateStr={contentEndDateStr}
-      stats={hasOversizedResult ? undefined : stats}
-      isLoading={statsQuery.isFetching}
-      isError={isError || hasOversizedResult}
-      onRetry={() => void refetch()}
-      chartView={chartView}
-      onChartViewChange={(view) => updateStatsUrl({ view })}
-      fallbackCurrency={ledger?.settings.mainCurrency ?? "CNY"}
-      {...(onCategoryDrilldown !== undefined ? { onCategoryDrilldown } : {})}
-      {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
-    />
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={tCommon("statsScope")}>
+        {(["all", "mine", "partner"] as const).map((option) => (
+          <Button
+            key={option}
+            size="sm"
+            variant={scope === option ? "default" : "outline"}
+            aria-pressed={scope === option}
+            onClick={() => setScope(option)}
+          >
+            {option === "all"
+              ? tCommon("allMembers")
+              : option === "mine"
+                ? tCommon("myRecords")
+                : tCommon("partnerRecords")}
+          </Button>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2 border-b pb-3 text-sm" aria-live="polite">
+        {(["mine", "partner", "all"] as const).map((kind) => {
+          const result = kind === "mine" ? mineQuery : kind === "partner" ? partnerQuery : allQuery;
+          return (
+            <div key={kind} className="min-w-0">
+              <div className="text-muted-foreground">
+                {kind === "mine"
+                  ? tCommon("myRecords")
+                  : kind === "partner"
+                    ? tCommon("partnerRecords")
+                    : tCommon("combinedTotal")}
+              </div>
+              <div className="truncate font-semibold">
+                {result.data
+                  ? formatCurrencyAmount(
+                      result.data.summary.total,
+                      result.data.summary.currency,
+                      locale
+                    )
+                  : result.isError
+                    ? "—"
+                    : "..."}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <StatsContentView
+        rangeType={rangeType}
+        contentRangeType={contentRangeType}
+        onRangeTypeChange={(type) => {
+          updateStatsUrl({ range: type, offset: 0 });
+        }}
+        periodOffset={periodOffset}
+        onPeriodOffsetChange={(offset) => updateStatsUrl({ offset })}
+        label={contentLabel}
+        startDate={contentStartDate}
+        endDate={contentEndDate}
+        startDateStr={contentStartDateStr}
+        endDateStr={contentEndDateStr}
+        stats={hasOversizedResult ? undefined : stats}
+        isLoading={statsQuery.isFetching}
+        isError={isError || hasOversizedResult}
+        onRetry={() => void refetch()}
+        chartView={chartView}
+        onChartViewChange={(view) => updateStatsUrl({ view })}
+        fallbackCurrency={ledger?.settings.mainCurrency ?? "CNY"}
+        {...(onCategoryDrilldown !== undefined ? { onCategoryDrilldown } : {})}
+        {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
+      />
+    </div>
   );
 }

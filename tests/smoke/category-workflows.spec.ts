@@ -61,7 +61,7 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   const results = page.getByRole("dialog");
   await expect(results.getByText(item, { exact: true })).toBeVisible();
   await expect(results.getByText("Updated", { exact: true })).toBeVisible();
-  await results.getByRole("button", { name: "Close", exact: true }).click();
+  await results.getByRole("button", { name: "Close", exact: true }).first().click();
   await expect(results).toHaveCount(0);
 
   // A finished run reports itself until the reader closes it, and then stays closed.

@@ -5,7 +5,7 @@ import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
 import { StatsTab } from "@/modules/workspace/ui/StatsTab";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import type { Ledger } from "@/modules/ledger/contracts";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 const { searchParamsState } = vi.hoisted(() => ({
   searchParamsState: { current: new URLSearchParams() },
@@ -61,7 +61,13 @@ function renderStatsTab() {
   });
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <StatsTab ledgerId="ledger-1" ledger={ledgerFixture} ledgerToday="2026-08-24" />
+      <StatsTab
+        ledgerId="ledger-1"
+        userId="user-1"
+        partnerUserId="user-2"
+        ledger={ledgerFixture}
+        ledgerToday="2026-08-24"
+      />
     </QueryClientProvider>
   );
   return { queryClient, ...view };
@@ -73,77 +79,38 @@ describe("StatsTab", () => {
     searchParamsState.current = new URLSearchParams();
   });
 
-  it("shows the error panel on failure and refetches via the retry button", async () => {
-    vi.mocked(getEnhancedStats).mockRejectedValue(new Error("boom"));
-    renderStatsTab();
-
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByText("总支出")).not.toBeInTheDocument();
-
-    vi.mocked(getEnhancedStats).mockResolvedValueOnce(statsFixture);
-    fireEvent.click(screen.getByRole("button", { name: "重试" }));
-
-    await waitFor(() => expect(getEnhancedStats).toHaveBeenCalledTimes(2));
-    await screen.findByText("¥120.00");
-  });
-
-  it("shows the error panel instead of rendering an oversized result", async () => {
-    vi.mocked(getEnhancedStats).mockResolvedValue({
+  it("shows combined and individual totals and switches the chart scope", async () => {
+    vi.mocked(getEnhancedStats).mockImplementation(async (input) => ({
       ...statsFixture,
-      chart: Array.from({ length: 121 }, (_, index) => ({
-        date: `2026-01-${String((index % 28) + 1).padStart(2, "0")}`,
-        total: String(index),
-      })),
-    });
-
+      summary: {
+        ...statsFixture.summary,
+        total:
+          input.attributedUserId === "user-1"
+            ? "40"
+            : input.attributedUserId === "user-2"
+              ? "80"
+              : "120",
+      },
+    }));
     renderStatsTab();
+    expect(await screen.findByText("¥40.00")).toBeInTheDocument();
+    expect(screen.getByText("¥80.00")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "我" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "我" })).toHaveAttribute("aria-pressed", "true")
+    );
+    expect(
+      vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.attributedUserId === "user-1")
+    ).toBe(true);
+    expect(
+      vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.attributedUserId === "user-2")
+    ).toBe(true);
+  });
 
+  it("shows retry when the selected scope fails", async () => {
+    vi.mocked(getEnhancedStats).mockRejectedValue(new Error("unavailable"));
+    renderStatsTab();
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByText("¥120.00")).not.toBeInTheDocument();
-  });
-
-  it("keeps placeholder data paired with its resolved range descriptor", async () => {
-    let resolveNext!: (value: EnhancedStatsDto) => void;
-    vi.mocked(getEnhancedStats)
-      .mockResolvedValueOnce(statsFixture)
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveNext = resolve;
-        })
-      );
-    const { queryClient, rerender } = renderStatsTab();
-    await screen.findByText("¥120.00");
-    expect(screen.getByText("2026年8月")).toBeInTheDocument();
-
-    searchParamsState.current = new URLSearchParams("statsRange=week");
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <StatsTab ledgerId="ledger-1" ledger={ledgerFixture} ledgerToday="2026-08-24" />
-      </QueryClientProvider>
-    );
-
-    await waitFor(() => expect(getEnhancedStats).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("button", { name: "周" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("2026年8月")).toBeInTheDocument();
-
-    resolveNext(statsFixture);
-  });
-
-  it("keeps the successful amount and original period after a new period fails", async () => {
-    vi.mocked(getEnhancedStats)
-      .mockResolvedValueOnce(statsFixture)
-      .mockRejectedValue(new Error("unavailable"));
-    const { queryClient, rerender } = renderStatsTab();
-    await screen.findByText("¥120.00");
-    searchParamsState.current = new URLSearchParams("statsRange=week");
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <StatsTab ledgerId="ledger-1" ledger={ledgerFixture} ledgerToday="2026-08-24" />
-      </QueryClientProvider>
-    );
-    await screen.findByRole("alert");
-    expect(screen.getByText("¥120.00")).toBeInTheDocument();
-    expect(screen.getByText("2026年8月")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "周" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
   });
 });

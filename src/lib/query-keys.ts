@@ -28,6 +28,7 @@ export const queryKeys = {
   sourceDocumentStream: (
     ledgerId: string,
     filters?: {
+      attributedUserId?: string | null | undefined;
       startDate?: string | null | undefined;
       endDate?: string | null | undefined;
       minAmount?: string | null | undefined;
@@ -41,6 +42,7 @@ export const queryKeys = {
   sourceDocumentStreamTotal: (
     ledgerId: string,
     filters?: {
+      attributedUserId?: string | null | undefined;
       startDate?: string | null | undefined;
       endDate?: string | null | undefined;
       minAmount?: string | null | undefined;
@@ -85,6 +87,7 @@ export const queryKeys = {
   enhancedStats: (
     ledgerId: string,
     params?: {
+      attributedUserId?: string | null | undefined;
       startDate?: string | null | undefined;
       endDate?: string | null | undefined;
       compareStartDate?: string | null | undefined;

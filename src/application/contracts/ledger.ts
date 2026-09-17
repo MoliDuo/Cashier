@@ -157,6 +157,7 @@ export interface LedgerContract {
 export interface AuthenticatedServiceCredentialContract {
   id: string;
   ledgerId: LedgerId;
+  attributedUserId?: string;
 }
 
 export interface ServiceCredentialContract extends AuthenticatedServiceCredentialContract {
@@ -199,6 +200,8 @@ export interface LedgerProjectionPort {
   }): Promise<boolean>;
   createManual(input: {
     ledgerId: LedgerId;
+    attributedUserId?: string;
+    createdByUserId?: string;
     expectedMainCurrency: string;
     sourceDocumentId?: SourceDocumentId;
     inputText?: string | null;

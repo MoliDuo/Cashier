@@ -4,7 +4,10 @@ import { auth } from "@/auth";
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../../../../setup";
-import { activateTestSourceDocumentProjection } from "../../../../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../../../../helpers/schema-setup";
 import { createLedgerData, createSourceDocumentData } from "../../../../../helpers/factories";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
@@ -27,6 +30,7 @@ describe("saveSourceDocumentChangesAction", () => {
     });
     const entryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
+    await configureTestCoupleLedger(db, ledger.id);
     await db.insert(sourceDocuments).values(document);
     await db.insert(ledgerEntries).values({
       id: entryId,

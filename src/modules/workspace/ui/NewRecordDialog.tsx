@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -8,8 +9,17 @@ import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { NewRecordForms, InputFormLoadingFallback } from "./NewRecordForms";
 import type { NewRecordInputMode } from "./new-record-success-feedback";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface NewRecordDialogProps {
+  userId: string;
+  partnerUserId: string;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   isSubmitting: boolean;
@@ -34,6 +44,8 @@ interface NewRecordDialogProps {
 
 /** The "new record" dialog: AI-parse / quick-entry mode toggle plus the active input form. */
 export function NewRecordDialog({
+  userId,
+  partnerUserId,
   isOpen,
   onOpenChange,
   isSubmitting,
@@ -56,6 +68,8 @@ export function NewRecordDialog({
   effectiveTimeZone,
 }: NewRecordDialogProps) {
   const t = useTranslations("LedgerPage");
+  const tCommon = useTranslations("Common");
+  const [attributedUserId, setAttributedUserId] = useState(userId);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -75,6 +89,24 @@ export function NewRecordDialog({
           <DialogTitle>{t("newRecord")}</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-none sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <label htmlFor="record-owner" className="text-sm">
+              {tCommon("recordOwner")}
+            </label>
+            <Select
+              value={attributedUserId}
+              onValueChange={setAttributedUserId}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="record-owner" className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={userId}>{tCommon("myRecords")}</SelectItem>
+                <SelectItem value={partnerUserId}>{tCommon("partnerRecords")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex gap-1 rounded-md border border-border bg-surface2 p-1">
             <button
               type="button"
@@ -113,6 +145,7 @@ export function NewRecordDialog({
               fallback={<InputFormLoadingFallback />}
             >
               <NewRecordForms
+                attributedUserId={attributedUserId}
                 ledgerId={ledgerId}
                 activeTab={activeTab}
                 committedFilters={committedFilters}

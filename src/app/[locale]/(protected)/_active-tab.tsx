@@ -26,6 +26,7 @@ import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedu
 import { serverComposition } from "@/application/server-composition-root";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
+import { getCoupleConfig } from "@/lib/couple-config";
 
 type PageBootstrapResult = Awaited<ReturnType<typeof getLedgerPageBootstrap>>;
 
@@ -147,6 +148,12 @@ async function ActiveTabBootstrap({
       <ActiveContent
         ledgerId={ledgerId}
         ledgerDto={ledgerDto}
+        userId={session.user!.id}
+        partnerUserId={
+          session.user!.id === getCoupleConfig()?.ownerId
+            ? getCoupleConfig()!.partnerId
+            : getCoupleConfig()!.ownerId
+        }
         initialTab={activeTab}
         {...(pageData?.initialCategories !== undefined
           ? { initialCategories: pageData.initialCategories }

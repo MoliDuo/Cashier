@@ -1,6 +1,7 @@
 import type { Ledger, LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { type PeriodParams } from "@/lib/period-utils";
 import {
@@ -23,6 +24,10 @@ import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/serve
 import { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
 
 interface LedgerEntriesTabProps {
+  recordScope?: "all" | "mine" | "partner";
+  onRecordScopeChange?: (scope: "all" | "mine" | "partner") => void;
+  userId: string;
+  partnerUserId: string;
   ledgerId: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
@@ -35,6 +40,10 @@ interface LedgerEntriesTabProps {
 }
 
 export function LedgerEntriesTab({
+  recordScope,
+  onRecordScopeChange,
+  userId,
+  partnerUserId,
   ledgerId,
   ledger,
   periodParams,
@@ -46,6 +55,9 @@ export function LedgerEntriesTab({
   isRefreshing,
 }: LedgerEntriesTabProps) {
   const t = useTranslations("LedgerEntriesTab");
+  const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
+  const scope = recordScope ?? localScope;
+  const setScope = onRecordScopeChange ?? setLocalScope;
   const tCommon = useTranslations("Common");
   const { filters, startDateStr, endDateStr } = useLedgerEntriesFilters(
     periodParams,
@@ -69,6 +81,7 @@ export function LedgerEntriesTab({
 
   const streamData = useLedgerEntriesStreamData({
     ledgerId,
+    ...(scope === "all" ? {} : { attributedUserId: scope === "mine" ? userId : partnerUserId }),
     mainCurrency,
     filters,
     startDateStr,
@@ -139,6 +152,24 @@ export function LedgerEntriesTab({
 
   return (
     <>
+      <div className="flex gap-2 px-2 pb-2" role="group" aria-label={tCommon("recordScope")}>
+        {(["all", "mine", "partner"] as const).map((option) => (
+          <Button
+            key={option}
+            size="sm"
+            variant={scope === option ? "default" : "outline"}
+            aria-pressed={scope === option}
+            disabled={selection.isSelectionMode}
+            onClick={() => setScope(option)}
+          >
+            {option === "all"
+              ? tCommon("allMembers")
+              : option === "mine"
+                ? tCommon("myRecords")
+                : tCommon("partnerRecords")}
+          </Button>
+        ))}
+      </div>
       <LedgerEntriesToolbar
         isSelectionMode={selection.isSelectionMode}
         isAllSelected={selection.isAllSelected}

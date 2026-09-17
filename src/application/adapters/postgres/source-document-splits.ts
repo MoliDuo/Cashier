@@ -165,6 +165,8 @@ export async function splitSourceDocumentAtomically(input: {
     await tx.insert(sourceDocuments).values({
       id: splitSourceDocumentId,
       ledgerId: input.ledgerId,
+      attributedUserId: lockedDocument.attributedUserId,
+      createdByUserId: lockedDocument.createdByUserId,
       title: effectiveTitle(lockedDocument.title, activeRevision.title),
 
       version: 1,

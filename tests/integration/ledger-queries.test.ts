@@ -4,7 +4,10 @@ import { POST } from "@/app/api/ledger-queries/route";
 import { getTestDb } from "../setup";
 import { ledgers, sourceDocuments, users } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "../helpers/factories";
-import { activateTestSourceDocumentProjection } from "../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../helpers/schema-setup";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
@@ -30,6 +33,7 @@ describe("session ledger query transport", () => {
     const other = createLedgerData({ userId: crypto.randomUUID() });
     await db.insert(users).values({ id: other.userId, email: "other-query@example.com" });
     await db.insert(ledgers).values([ledger, other]);
+    await configureTestCoupleLedger(db, ledger.id);
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
     await db.insert(sourceDocuments).values(document);
     await activateTestSourceDocumentProjection(db, document.id);
@@ -41,8 +45,7 @@ describe("session ledger query transport", () => {
       user: { id: other.userId },
     });
     const foreign = await POST(request("detail", [other.id, document.id]));
-    expect(foreign.status).toBe(200);
-    expect(await foreign.json()).toBeNull();
+    expect(foreign.status).toBe(404);
     vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
       user: { id: crypto.randomUUID() },
     });
@@ -61,6 +64,7 @@ describe("session ledger query transport", () => {
   it("validates each supported read without leaking internal error data", async () => {
     const ledger = createLedgerData({ userId });
     await getTestDb().insert(ledgers).values(ledger);
+    await configureTestCoupleLedger(getTestDb(), ledger.id);
     for (const query of ["detail", "stream", "total", "refresh", "entries", "entry", "summary"]) {
       const response = await POST(request(query, [ledger.id, { unexpected: true }]));
       expect(response.status).toBe(400);

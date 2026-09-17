@@ -7,6 +7,7 @@ import { authenticateWithOTP as authenticateWithOTPUseCase } from "@/modules/aut
 import { serverComposition } from "@/application/server-composition-root";
 import { RegistrationDisabledError } from "@/modules/auth/application/use-cases/registration-policy";
 import { hashOTP } from "@/modules/auth/services/otp";
+import { configureTestCoupleLedger } from "../../helpers/schema-setup";
 
 vi.mock("resend", () => ({
   Resend: class MockResend {
@@ -73,14 +74,16 @@ describe("Registration Policy", () => {
 
   it("allows existing users to sign in when registration is disabled", async () => {
     const db = getTestDb();
+    const memberId = crypto.randomUUID();
 
     await db.insert(users).values({
-      id: "00000000-0000-0000-0000-000000000099",
+      id: memberId,
       email: "existing@example.com",
       name: "Existing User",
       emailVerified: new Date(),
       registrationCompletedAt: new Date(),
     });
+    await configureTestCoupleLedger(db, crypto.randomUUID(), memberId);
 
     await createTestOTP("existing@example.com", "123456");
 
@@ -93,7 +96,7 @@ describe("Registration Policy", () => {
       })
     ).resolves.toMatchObject({
       email: "existing@example.com",
-      id: "00000000-0000-0000-0000-000000000099",
+      id: memberId,
     });
   });
 });

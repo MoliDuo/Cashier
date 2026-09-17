@@ -15,6 +15,8 @@ import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedu
 import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
+import { isCoupleMember } from "@/lib/couple-config";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Create a new source document and trigger processing.
@@ -26,6 +28,8 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     clientSubmissionId: string
   ): Promise<CreateSourceDocumentResponseDto> => {
     const validated = createSourceDocumentInputSchema.parse(input);
+    const attributedUserId = validated.attributedUserId ?? userId;
+    if (!isCoupleMember(attributedUserId)) throw new ValidationError("Invalid member attribution");
     const validatedClientSubmissionId = clientSubmissionIdSchema.parse(clientSubmissionId);
     const payload = omitUndefinedProperties(validated);
     const timezone = payload.timezone ?? ledger.settings.timeZone ?? undefined;
@@ -36,6 +40,8 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     const result = await createAndQueueSourceDocument(
       {
         ledgerId,
+        attributedUserId,
+        createdByUserId: userId,
         input: {
           kind: "stored",
           ...(payload.text == null ? {} : { text: payload.text }),

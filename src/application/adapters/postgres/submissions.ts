@@ -161,6 +161,8 @@ async function submitInTransaction(
 
   const pending = await createProcessingRevisionInTransaction(tx, {
     ledgerId: input.ledgerId,
+    ...(input.attributedUserId === undefined ? {} : { attributedUserId: input.attributedUserId }),
+    ...(input.createdByUserId === undefined ? {} : { createdByUserId: input.createdByUserId }),
     ...(input.sourceDocumentId === undefined ? {} : { sourceDocumentId: input.sourceDocumentId }),
     input: revisionInput,
   });

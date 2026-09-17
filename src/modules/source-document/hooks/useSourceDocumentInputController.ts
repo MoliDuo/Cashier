@@ -41,6 +41,7 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
   });
   const submitMutations = useSourceDocumentSubmitMutations({
     ledgerId,
+    ...(options.attributedUserId == null ? {} : { attributedUserId: options.attributedUserId }),
     ...target,
     messages,
     onSuccess: (result) => {

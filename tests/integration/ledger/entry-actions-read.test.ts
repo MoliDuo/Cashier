@@ -23,7 +23,10 @@ vi.mock("@/application/adapters/postgres/exchange-rate", () => {
 });
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -69,6 +72,7 @@ describe("getLedgerEntriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("returns paginated entries", async () => {

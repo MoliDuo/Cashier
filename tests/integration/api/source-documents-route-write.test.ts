@@ -121,6 +121,7 @@ describe("API v1 source-documents route", () => {
         ledgerId,
         name: "Route Credential",
         tokenHash: computeHash(credentialKey),
+        attributedUserId: TEST_USER_ID,
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })

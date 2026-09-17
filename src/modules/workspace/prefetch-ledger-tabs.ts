@@ -22,7 +22,8 @@ export async function prefetchDetailsTabQuery(
   queryClient: QueryClient,
   ledgerId: string,
   periodParams: PeriodParams,
-  advancedFilters: LedgerAdvancedFilters
+  advancedFilters: LedgerAdvancedFilters,
+  attributedUserId?: string
 ) {
   const { getLedgerEntriesAction, getLedgerStatsAction } =
     await import("@/lib/queries/ledger-query-client");
@@ -30,6 +31,7 @@ export async function prefetchDetailsTabQuery(
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const descriptor = buildDetailsQueryDescriptor({
     ledgerId,
+    ...(attributedUserId == null ? {} : { attributedUserId }),
     periodParams,
     advancedFilters,
     ...(ledger?.settings.timeZone != null ? { timeZone: ledger.settings.timeZone } : {}),

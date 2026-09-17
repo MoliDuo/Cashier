@@ -89,6 +89,15 @@
     "loginWarn": "If you did not sign in, please secure your account immediately."
   },
   "Common": {
+    "recordOwner": "Record owner",
+    "recordedBy": "Recorded by",
+    "historicalRecord": "Historical record",
+    "recordScope": "Record scope",
+    "statsScope": "Statistics scope",
+    "allMembers": "All",
+    "myRecords": "Me",
+    "partnerRecords": "Partner",
+    "combinedTotal": "Total",
     "today": "Today",
     "yesterday": "Yesterday",
     "back": "Back",

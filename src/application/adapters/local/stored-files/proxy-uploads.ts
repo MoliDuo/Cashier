@@ -1,12 +1,14 @@
 import crypto from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { StoredFileContract } from "@/application/contracts";
 import { enqueueObjectCleanup } from "@/application/adapters/postgres/object-cleanup";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { MAX_ORIGINAL_BYTES_PER_FILE } from "@/lib/storage/upload-policy";
-import { ledgers, storedFiles, uploadSessionFiles, uploadSessions } from "@/persistence";
+import { storedFiles, uploadSessionFiles, uploadSessions } from "@/persistence";
+import { getCoupleConfig } from "@/lib/couple-config";
+import { postgresLedgerAdapter } from "@/application/adapters/postgres/business-ports/ledger";
 import { checksum, mapStoredFile } from "./shared";
 import type { ResolvedStoredFileAdapterDependencies } from "./shared";
 
@@ -20,14 +22,17 @@ export function createProxyUploadOperations(dependencies: ResolvedStoredFileAdap
     contentType: string;
     body: Uint8Array;
   }): Promise<StoredFileContract> {
+    const ledgerId = getCoupleConfig()?.ledgerId;
+    if (ledgerId == null || !(await postgresLedgerAdapter.isOwnedByUser(ledgerId, input.userId)))
+      throw new NotFoundError("Upload target");
     const ownership = await db
       .select({ ledgerId: uploadSessions.ledgerId })
       .from(uploadSessions)
-      .innerJoin(ledgers, and(eq(ledgers.id, uploadSessions.ledgerId), isNull(ledgers.deletedAt)))
-      .where(and(eq(uploadSessions.id, input.uploadSessionId), eq(ledgers.userId, input.userId)))
+      .where(
+        and(eq(uploadSessions.id, input.uploadSessionId), eq(uploadSessions.ledgerId, ledgerId))
+      )
       .limit(1);
-    const ledgerId = ownership[0]?.ledgerId;
-    if (ledgerId == null) throw new NotFoundError("Upload target");
+    if (ownership.length === 0) throw new NotFoundError("Upload target");
     return uploadTarget({ ...input, ledgerId });
   }
 

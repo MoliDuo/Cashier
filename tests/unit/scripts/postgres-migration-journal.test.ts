@@ -31,7 +31,7 @@ describe("Postgres migration journal", () => {
     });
 
     expect(observedInversions).toEqual(allowedLegacyInversions);
-    expect(journal.entries.at(-1)?.tag).toBe("0043_category_assignment_v2");
+    expect(journal.entries.at(-1)?.tag).toBe("0044_couple_attribution");
   });
 
   it("keeps the harmful global category reorder migration as an intentional no-op", () => {

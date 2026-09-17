@@ -14,6 +14,8 @@ import type { InlineImageUploader } from "./prepare-inline-images";
 
 export interface CreateAndQueueSourceDocumentInput {
   ledgerId: string;
+  attributedUserId?: string;
+  createdByUserId?: string;
   input:
     | { kind: "stored"; text?: string; storedFileIds: string[] }
     | { kind: "inline"; images: PreparedInlineImage[] };
@@ -74,6 +76,8 @@ export async function createAndQueueSourceDocument(
 
     return {
       ledgerId: input.ledgerId,
+      ...(input.attributedUserId === undefined ? {} : { attributedUserId: input.attributedUserId }),
+      ...(input.createdByUserId === undefined ? {} : { createdByUserId: input.createdByUserId }),
       input: {
         text: storedInput?.text ?? null,
         storedFileIds: [...(storedInput?.storedFileIds ?? []), ...processedImageIds],

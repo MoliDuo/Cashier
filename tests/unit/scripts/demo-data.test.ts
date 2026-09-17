@@ -40,6 +40,7 @@ describe("demo workspace fixture", () => {
   it("covers representative display and accounting edge cases", () => {
     const documents = fixture.documents as Array<{
       title: string | null;
+      attributedTo?: string;
       status: string;
       failureKind?: string;
       failureCode?: string;
@@ -54,6 +55,16 @@ describe("demo workspace fixture", () => {
 
     expect(documents).toHaveLength(29);
     expect(entries).toHaveLength(26);
+    const partnerDocuments = documents.filter((document) => document.attributedTo === "partner");
+    expect(partnerDocuments).toHaveLength(6);
+    expect(partnerDocuments.some((document) => document.title === "FreshMart")).toBe(true);
+    expect(partnerDocuments.some((document) => document.title === "City Taxi")).toBe(true);
+    expect(partnerDocuments.every((document) => document.status === "completed")).toBe(true);
+    expect(
+      documents.every(
+        (document) => document.attributedTo == null || document.attributedTo === "partner"
+      )
+    ).toBe(true);
     expect(documents.some((document) => document.title == null)).toBe(true);
     expect(documents.some((document) => document.status === "cancelled")).toBe(true);
     expect(entries.some((entry) => entry.category == null)).toBe(true);

@@ -5,7 +5,10 @@ import { ledgers, ledgerEntries, entryCategories, users } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { v4 as uuidv4 } from "uuid";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 const OTHER_USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -60,6 +63,7 @@ describe("getLedgerStatsAction", () => {
       userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
+    await configureTestCoupleLedger(db, ledgerId);
   });
 
   it("returns zero values for empty ledger", async () => {

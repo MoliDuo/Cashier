@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { useLedgerSettingsMutation } from "@/modules/ledger/hooks/useLedgerSettingsMutation";
 import type { Ledger } from "@/modules/ledger/contracts";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 const { updateLedgerSettingsAction, toastError } = vi.hoisted(() => ({
   updateLedgerSettingsAction: vi.fn(),

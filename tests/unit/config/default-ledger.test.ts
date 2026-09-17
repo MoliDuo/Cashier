@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDefaultLedger } from "@/config/default-ledger";
+import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 describe("getDefaultLedger", () => {
   it("returns the configured Chinese default categories", () => {

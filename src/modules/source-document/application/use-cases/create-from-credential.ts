@@ -8,6 +8,7 @@ import { createAndQueueSourceDocument } from "./create-and-queue-source-document
 import { createHash } from "crypto";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";
 import type { SourceDocumentCredentialPorts } from "../ports";
+import { ValidationError } from "@/lib/errors";
 
 function contentFingerprint(payload: PreparedApiV1SourceDocumentInput): string {
   const hash = createHash("sha256");
@@ -37,10 +38,14 @@ export async function createSourceDocumentFromCredential(
   scheduleProcessing: (job: ProcessingJobContract) => void,
   ports: SourceDocumentCredentialPorts
 ): Promise<SourceDocumentSubmissionContract> {
+  if (input.credential.attributedUserId == null)
+    throw new ValidationError("Credential owner is required");
   const payload = input.payload;
   return createAndQueueSourceDocument(
     {
       ledgerId: input.credential.ledgerId,
+      attributedUserId: input.credential.attributedUserId,
+      createdByUserId: input.credential.attributedUserId,
       input: { kind: "inline", images: payload.images },
       ...(payload.entryDate == null ? {} : { documentDate: payload.entryDate }),
       ...(input.idempotencyKey == null

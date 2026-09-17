@@ -120,7 +120,9 @@ export default defineConfig({
           globalSetup: ["./tests/setup.postgres-global.ts"],
           setupFiles: ["./tests/setup.ts"],
           pool: "forks",
-          maxWorkers: "50%",
+          // Each integration worker owns a migrated PostgreSQL schema. Keep
+          // concurrent migrations below the container's lock-table capacity.
+          maxWorkers: 2,
           testTimeout: 30000,
         },
       }),

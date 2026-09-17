@@ -27,6 +27,7 @@ import type {
 
 interface SourceDocumentFilterInput {
   ledgerId: string;
+  attributedUserId?: string;
   statuses?: readonly SourceDocumentProcessingStatus[];
   startDate?: string | null;
   endDate?: string | null;
@@ -72,6 +73,12 @@ export type ApplyCategoryAssignmentsResult =
 
 /** The only application-facing boundary for writes that change a document's visible projection. */
 export interface SourceDocumentAggregateWritePort {
+  assignAttribution(input: {
+    ledgerId: string;
+    sourceDocumentId: string;
+    expectedVersion: number;
+    attributedUserId: string;
+  }): Promise<{ ok: true; version: number } | { ok: false; currentVersion: number }>;
   applyCategoryAssignments(
     input: ApplyCategoryAssignmentsInput
   ): Promise<ApplyCategoryAssignmentsResult>;

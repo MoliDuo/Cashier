@@ -12,6 +12,7 @@ export interface EntryFilters {
 }
 
 export interface LedgerEntryFilterParams {
+  attributedUserId?: string;
   startDate?: string | null;
   endDate?: string | null;
   categoryId?: string | null;

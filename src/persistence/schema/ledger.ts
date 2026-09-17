@@ -215,6 +215,7 @@ export const serviceCredentials = pgTable(
     ledgerId: uuid("ledger_id")
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
+    attributedUserId: uuid("attributed_user_id").references(() => users.id),
     name: text("name").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

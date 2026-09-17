@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useMessages, useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/routing";
@@ -29,6 +30,8 @@ import { pushLedgerUrl } from "../ledger-url-navigation";
 
 interface LedgerPageClientProps {
   ledgerId: string;
+  userId: string;
+  partnerUserId: string;
   initialLedger?: LedgerDto;
   initialTab: LedgerTab;
   ledgerToday?: string;
@@ -56,6 +59,8 @@ function getFeatureForTab(activeTab: LedgerTab): keyof typeof FEATURE_MESSAGES {
 
 export function LedgerPageClient({
   ledgerId,
+  userId,
+  partnerUserId,
   initialLedger,
   initialTab,
   ledgerToday,
@@ -65,6 +70,7 @@ export function LedgerPageClient({
   passwordUpdatedAt,
   interfaceLanguage,
 }: LedgerPageClientProps) {
+  const [recordScope, setRecordScope] = useState<"all" | "mine" | "partner">("all");
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
@@ -149,6 +155,9 @@ export function LedgerPageClient({
     pathname,
     ledgerId,
     locale,
+    ...(recordScope === "all"
+      ? {}
+      : { attributedUserId: recordScope === "mine" ? userId : partnerUserId }),
   });
   const handleGoToDetails = (validCategoryIds: readonly string[]) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -215,6 +224,10 @@ export function LedgerPageClient({
         ) : null}
 
         <LedgerTabPanels
+          recordScope={recordScope}
+          onRecordScopeChange={setRecordScope}
+          userId={userId}
+          partnerUserId={partnerUserId}
           activeTab={activeTab}
           hidden={categoriesHaveNoData}
           locale={locale}
@@ -238,6 +251,8 @@ export function LedgerPageClient({
         />
 
         <NewRecordDialog
+          userId={userId}
+          partnerUserId={partnerUserId}
           isOpen={isInputOpen}
           onOpenChange={handleDialogOpenChange}
           isSubmitting={isInputSubmitting}
@@ -271,6 +286,8 @@ export function LedgerPageClient({
         />
 
         <ModalStackGate
+          userId={userId}
+          partnerUserId={partnerUserId}
           categories={categories}
           mainCurrency={mainCurrency}
           preferredCurrencies={preferredCurrencies}

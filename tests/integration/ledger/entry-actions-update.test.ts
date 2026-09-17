@@ -4,7 +4,11 @@ import { updateLedgerEntryAction } from "@/modules/ledger/server-actions/entries
 import { ValidationError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
-import { activateTestSourceDocumentProjection, TEST_USER_ID } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+  TEST_USER_ID,
+} from "../../helpers/schema-setup";
 
 vi.mock("@/application/adapters/postgres/exchange-rate", () => {
   const rateBook = { getRates: vi.fn(), convertBatch: vi.fn() };
@@ -22,6 +26,7 @@ describe("updateLedgerEntryAction version CAS", () => {
     sourceDocumentId = crypto.randomUUID();
     entryId = crypto.randomUUID();
     await db.insert(ledgers).values({ id: ledgerId, userId: TEST_USER_ID, mainCurrency: "CNY" });
+    await configureTestCoupleLedger(db, ledgerId);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
       ledgerId,

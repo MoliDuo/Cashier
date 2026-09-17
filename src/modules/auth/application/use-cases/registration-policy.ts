@@ -1,5 +1,5 @@
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
-import { runtimeEnv } from "@/lib/env/runtime";
+import { isCoupleMember } from "@/lib/couple-config";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import type { UserAccountPort } from "@/application/contracts";
@@ -14,12 +14,11 @@ export async function isRegistrationAllowed(
   email: string,
   users: UserAccountPort
 ): Promise<boolean> {
-  if (!runtimeEnv.disableRegistration) {
-    return true;
-  }
+  // This branch is restricted to the two accounts configured for the shared ledger.
 
   const normalizedEmail = email.toLowerCase();
-  return (await users.findByEmail(normalizedEmail))?.registrationCompletedAt != null;
+  const user = await users.findByEmail(normalizedEmail);
+  return user != null && user.registrationCompletedAt != null && isCoupleMember(user.id);
 }
 
 export async function assertRegistrationAllowed(

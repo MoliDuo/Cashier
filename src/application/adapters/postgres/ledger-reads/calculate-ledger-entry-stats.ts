@@ -69,6 +69,7 @@ export async function calculateLedgerEntryStats({
        AND documents.id = ledger_entries.source_document_id
        AND documents.deleted_at IS NULL
        AND documents.active_revision_id = ledger_entries.source_document_revision_id
+       ${filters.attributedUserId == null ? sql`` : sql`AND documents.attributed_user_id = ${filters.attributedUserId}`}
       LEFT JOIN entry_categories categories
         ON categories.ledger_id = ledger_entries.ledger_id
        AND categories.id = ledger_entries.category_id

@@ -25,7 +25,8 @@ interface AggregatedRow {
 async function fetchAggregatedRows(
   ledgerId: string,
   current: { from: string; to: string },
-  previous: { from: string; to: string }
+  previous: { from: string; to: string },
+  attributedUserId?: string
 ): Promise<AggregatedRow[]> {
   const result = await db.execute<AggregatedRow & Record<string, unknown>>(sql`
     WITH ranges(period, from_date, to_date) AS (
@@ -45,6 +46,7 @@ async function fetchAggregatedRows(
       ON documents.ledger_id = ${ledgerId}
       AND documents.effective_date BETWEEN ranges.from_date AND ranges.to_date
       AND documents.deleted_at IS NULL
+      ${attributedUserId == null ? sql`` : sql`AND documents.attributed_user_id = ${attributedUserId}`}
     JOIN ledger_entries entries
       ON entries.ledger_id = documents.ledger_id
       AND entries.source_document_id = documents.id
@@ -116,8 +118,9 @@ export async function getEnhancedStatsQuery({
   queryRange,
   compareRange,
   comparisonMode,
+  attributedUserId,
 }: GetEnhancedStatsInput): Promise<EnhancedStatsDto> {
-  const rows = await fetchAggregatedRows(ledgerId, queryRange, compareRange);
+  const rows = await fetchAggregatedRows(ledgerId, queryRange, compareRange, attributedUserId);
   const mainCurrency = rows[0]?.mainCurrency ?? "CNY";
   const current = emptyBucket();
   const previous = emptyBucket();

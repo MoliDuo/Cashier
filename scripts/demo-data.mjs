@@ -38,6 +38,9 @@ export function validateDemoEnvironment(environment = process.env) {
   if (fixture.user.email !== "dev@cashier.local") {
     throw new Error("Demo fixture user identity is invalid");
   }
+  if (fixture.partner.email !== "partner@cashier.local") {
+    throw new Error("Demo fixture partner identity is invalid");
+  }
   return { databaseUrl: databaseUrl.toString(), storageUrl: storageUrl.toString() };
 }
 
@@ -166,6 +169,7 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
      ON CONFLICT (id) DO NOTHING`,
     [userId, fixture.user.email, fixture.user.name, now]
   );
+  await ensurePartner(client, now);
   await client.query(
     `INSERT INTO ledgers
       (id, user_id, ai_language, preferred_currencies, main_currency, time_zone, created_at, updated_at)
@@ -234,9 +238,17 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     }
     await client.query(
       `INSERT INTO source_documents
-        (id, ledger_id, title, document_date, version, date_organization_suggestion, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 1, $5, $6, $6)`,
-      [document.id, ledgerId, document.title, documentDate, suggestion, createdAt]
+        (id, ledger_id, attributed_user_id, title, document_date, version, date_organization_suggestion, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $7)`,
+      [
+        document.id,
+        ledgerId,
+        document.attributedTo === "partner" ? fixture.partner.id : userId,
+        document.title,
+        documentDate,
+        suggestion,
+        createdAt,
+      ]
     );
     if (document.retainedResult != null) {
       await client.query(
@@ -367,6 +379,16 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   }
 }
 
+async function ensurePartner(client, now = new Date()) {
+  await client.query(
+    `INSERT INTO users
+      (id, email, name, email_verified, registration_completed_at, preferences, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [fixture.partner.id, fixture.partner.email, fixture.partner.name, now]
+  );
+}
+
 async function runDemoData({ mode = "seed", apply = false, environment = process.env } = {}) {
   const { databaseUrl } = validateDemoEnvironment(environment);
   if (
@@ -401,6 +423,7 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
       [knownIds]
     );
     if (mode === "seed" && present.rowCount === knownIds.length) {
+      await ensurePartner(client);
       console.log("[demo] Demo workspace already exists; existing test changes were preserved.");
       return { status: "existing", ...inspection };
     }

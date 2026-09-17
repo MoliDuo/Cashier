@@ -35,6 +35,8 @@ vi.mock("@/modules/auth/repositories/otp-repository", () => ({
   discardOTPToken: discardOTPTokenMock,
 }));
 
+vi.mock("@/lib/couple-config", () => ({ isCoupleMember: (id: string) => id === "user-1" }));
+
 vi.mock("@/modules/auth/services/otp-rate-limit", () => ({
   acquireResendCooldown: acquireResendCooldownMock,
   checkSendRateLimit: checkSendRateLimitMock,
@@ -80,7 +82,9 @@ import { serverComposition } from "@/application/server-composition-root";
 import type { OtpTokenPort, UserAccountPort } from "@/application/contracts";
 
 const tokens = {} as OtpTokenPort;
-const users = {} as UserAccountPort;
+const users = {
+  findByEmail: vi.fn().mockResolvedValue({ id: "user-1", registrationCompletedAt: new Date() }),
+} as unknown as UserAccountPort;
 const sendOTP = (input: Parameters<typeof sendOTPUseCase>[0]) =>
   sendOTPUseCase(input, {
     emailDelivery: serverComposition.email,

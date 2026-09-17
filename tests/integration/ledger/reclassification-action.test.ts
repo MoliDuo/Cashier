@@ -10,7 +10,11 @@ import {
   createLedgerData,
   createSourceDocumentData,
 } from "../../helpers/factories";
-import { activateTestSourceDocumentProjection, createTestUser } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+  createTestUser,
+} from "../../helpers/schema-setup";
 import { flushAfterCallbacks } from "../../setup.common";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
 
@@ -56,6 +60,7 @@ async function setupLedger() {
   const home = createCategoryData(ledger.id, { name: "居家", sortOrder: 1 });
   const document = createSourceDocumentData(ledger.id);
   await db.insert(ledgers).values(ledger);
+  await configureTestCoupleLedger(db, ledger.id);
   await db.insert(entryCategories).values([food, home]);
   await db.insert(sourceDocuments).values(document);
   const revisionId = await activateTestSourceDocumentProjection(db, document.id);

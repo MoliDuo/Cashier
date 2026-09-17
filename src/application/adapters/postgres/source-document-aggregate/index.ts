@@ -3,7 +3,12 @@ import { postgresLedgerEntryCommandAdapter } from "../ledger-entry-commands";
 import { postgresLedgerProjectionAdapter } from "../ledger-projections";
 import { cancelSourceDocumentProcessing } from "../ledger-projections/cancel-source-document-processing";
 import { postgresSourceDocumentSubmissionAdapter } from "../submissions";
-import { saveChanges, updateDocuments, updateEntryDates } from "../source-document-updates";
+import {
+  assignAttribution,
+  saveChanges,
+  updateDocuments,
+  updateEntryDates,
+} from "../source-document-updates";
 import { splitSourceDocumentAtomically } from "../source-document-splits";
 import { deleteSourceDocumentAtomically } from "../source-document-delete";
 import {
@@ -13,6 +18,7 @@ import {
 import { applyCategoryAssignments } from "./category-assignments";
 
 export const postgresSourceDocumentAggregateAdapter: SourceDocumentAggregateWritePort = {
+  assignAttribution,
   applyCategoryAssignments,
   createProcessingDocument: (input) => postgresSourceDocumentSubmissionAdapter.submit(input),
   createIdempotentProcessingDocument: (idempotency, prepare) =>

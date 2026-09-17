@@ -19,7 +19,10 @@ import {
 } from "../helpers/factories";
 import { v4 as uuidv4 } from "uuid";
 import { NotFoundError } from "@/lib/errors";
-import { activateTestSourceDocumentProjection } from "../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  configureTestCoupleLedger,
+} from "../helpers/schema-setup";
 import { getTargetSourceDocumentAccessContext } from "@/application/adapters/postgres/source-document-reads";
 import { createProcessingRevisionInTransaction } from "@/application/adapters/postgres/revisions";
 
@@ -49,6 +52,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id, {
       title: "Test Receipt",
@@ -72,6 +76,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
@@ -95,6 +100,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id);
     await db.insert(sourceDocuments).values(docData);
@@ -127,6 +133,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id);
     await db.insert(sourceDocuments).values(docData);
@@ -155,6 +162,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
 
     const categoryData = createCategoryData(ledgerData.id);
     await db.insert(entryCategories).values(categoryData);
@@ -190,6 +198,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
+    await configureTestCoupleLedger(db, ledgerData.id);
 
     const result = await getSourceDocumentLightAction(ledgerData.id, uuidv4());
     expect(result).toBeNull();

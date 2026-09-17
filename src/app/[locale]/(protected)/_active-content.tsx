@@ -6,6 +6,8 @@ import type { InterfaceLanguage } from "@/modules/auth/contracts";
 
 interface ActiveContentProps {
   ledgerId: string;
+  userId: string;
+  partnerUserId: string;
   ledgerDto: LedgerDto;
   initialTab: LedgerTab;
   userEmail?: string;
@@ -18,6 +20,8 @@ interface ActiveContentProps {
 
 export function ActiveContent({
   ledgerId,
+  userId,
+  partnerUserId,
   ledgerDto,
   initialTab,
   userEmail,
@@ -30,6 +34,8 @@ export function ActiveContent({
   return (
     <LedgerPageClient
       ledgerId={ledgerId}
+      userId={userId}
+      partnerUserId={partnerUserId}
       initialLedger={ledgerDto}
       initialTab={initialTab}
       {...(initialCategories !== undefined ? { initialCategories } : {})}

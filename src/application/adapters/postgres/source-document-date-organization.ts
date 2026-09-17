@@ -204,6 +204,8 @@ export async function applyDateOrganization(
       await tx.insert(sourceDocuments).values({
         id,
         ledgerId: input.ledgerId,
+        attributedUserId: lockedDocument.attributedUserId,
+        createdByUserId: lockedDocument.createdByUserId,
         title: lockedDocument.title ?? activeRevision.title,
         version: 1,
         documentDate: group.entryDate,

@@ -27,6 +27,10 @@ vi.mock("@/lib/db", () => ({
   db: {},
 }));
 
+vi.mock("@/lib/couple-config", () => ({
+  isCoupleMember: (id: string) => id === "user-authenticate" || id === "db-user",
+}));
+
 vi.mock("@/persistence/schema/auth", () => ({
   users: {},
 }));

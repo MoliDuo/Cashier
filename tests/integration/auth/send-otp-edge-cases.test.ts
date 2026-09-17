@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { render } from "@react-email/render";
 import { otpTokens } from "@/persistence/schema/auth";
 import { getTestDb } from "tests/setup";
+import { users } from "@/persistence";
+import { configureTestCoupleLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
 
 const { headersMock, cookiesMock, resendSendMock } = vi.hoisted(() => ({
   headersMock: vi.fn(),
@@ -36,6 +38,8 @@ describe("sendOTPAction edge cases", () => {
     delete process.env.AUTH_EMAIL_FROM;
 
     const db = getTestDb();
+    await db.update(users).set({ email: testEmail }).where(eq(users.id, TEST_USER_ID));
+    await configureTestCoupleLedger(db, crypto.randomUUID());
     await db.delete(otpTokens).where(eq(otpTokens.email, testEmail));
 
     headersMock.mockResolvedValue({

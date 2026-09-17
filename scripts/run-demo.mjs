@@ -3,9 +3,13 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import net from "node:net";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_PORTS = { app: 3000, postgres: 55433, s3: 59000 };
+const fixture = JSON.parse(
+  readFileSync(new URL("./fixtures/demo-workspace.json", import.meta.url))
+);
 
 function integerPort(name, value, fallback) {
   const parsed = value == null || value === "" ? fallback : Number(value);
@@ -58,6 +62,9 @@ export function createDemoEnvironment(environment = process.env) {
     S3_FORCE_PATH_STYLE: "true",
     DEV_AUTH_BYPASS: "true",
     DISABLE_REGISTRATION: "true",
+    COUPLE_OWNER_USER_ID: fixture.user.id,
+    COUPLE_PARTNER_USER_ID: fixture.partner.id,
+    COUPLE_LEDGER_ID: fixture.ledger.id,
     TRUSTED_PROXY: "",
     TZ: "UTC",
     CASHIER_DEMO_APP_PORT: String(appPort),

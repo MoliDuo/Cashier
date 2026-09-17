@@ -30,6 +30,9 @@ function nonBlank(value: string | null | undefined): string | null {
 function normalizeLedgerQuery(query: LedgerQuery): LedgerQuery {
   const statuses = canonicalizeSourceDocumentProcessingStatuses(query.statuses);
   return {
+    ...(nonBlank(query.attributedUserId) != null
+      ? { attributedUserId: nonBlank(query.attributedUserId)! }
+      : {}),
     ...(nonBlank(query.startDate) != null ? { startDate: nonBlank(query.startDate) } : {}),
     ...(nonBlank(query.endDate) != null ? { endDate: nonBlank(query.endDate) } : {}),
     ...(nonBlank(query.categoryId) != null ? { categoryId: nonBlank(query.categoryId) } : {}),
@@ -47,6 +50,7 @@ function normalizeLedgerQuery(query: LedgerQuery): LedgerQuery {
 export function serializeLedgerQuery(query: LedgerQuery): string {
   const normalized = normalizeLedgerQuery(query);
   return JSON.stringify({
+    attributedUserId: normalized.attributedUserId ?? null,
     startDate: normalized.startDate ?? null,
     endDate: normalized.endDate ?? null,
     categoryId: normalized.categoryId ?? null,

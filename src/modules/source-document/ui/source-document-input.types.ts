@@ -2,6 +2,7 @@ import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 
 interface SourceDocumentInputBaseProps {
   ledgerId: string;
+  attributedUserId?: string;
   onSuccess?: (result: CreatedRecordResult) => void;
   onPendingChange?: (pending: boolean) => void;
   onDirtyChange?: (dirty: boolean) => void;

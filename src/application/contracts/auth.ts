@@ -7,7 +7,11 @@ import type { LedgerId } from "./source-documents";
 export interface ServiceCredentialPort {
   authenticate(key: string): Promise<AuthenticatedServiceCredentialContract | null>;
   list(ledgerId: LedgerId): Promise<readonly ServiceCredentialContract[]>;
-  create(ledgerId: LedgerId, name: string): Promise<CreatedServiceCredentialContract>;
+  create(
+    ledgerId: LedgerId,
+    name: string,
+    userId?: string
+  ): Promise<CreatedServiceCredentialContract>;
   revoke(
     ledgerId: LedgerId,
     credentialId: string
