@@ -158,6 +158,29 @@ describe("API v1 source-documents route", () => {
     expect(created?.ledgerId).toBe(ledgerId);
   });
 
+  it("dates a document from the server clock when the credential sends no date", async () => {
+    const image = await validJpegBase64();
+    const request = new NextRequest("http://localhost/api/v1/source-documents", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${credentialKey}` },
+      body: JSON.stringify({ images: [{ data: image, mimeType: "image/jpeg" }] }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
+    const data = await response.json();
+
+    // An API key belongs to a person but is not that person's device, and
+    // neither member's own zone applies: the record is dated by the server.
+    const created = await getTestDb().query.sourceDocumentRevisions.findFirst({
+      where: eq(sourceDocumentRevisions.id, data.revisionId),
+    });
+    const serverToday = new Intl.DateTimeFormat("sv-SE", {
+      ...(process.env.TZ ? { timeZone: process.env.TZ } : {}),
+    }).format(new Date());
+    expect(created?.inputDocumentDate).toBe(serverToday);
+  });
+
   it("creates one document, revision, and processing job for concurrent idempotent requests", async () => {
     const image = await validJpegBase64();
     const makeRequest = () =>

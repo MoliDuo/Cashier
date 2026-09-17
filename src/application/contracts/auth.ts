@@ -106,3 +106,33 @@ export interface UserPreferencesPort {
     preferences: UserPreferencesContract;
   }): Promise<UserPreferencesContract | null>;
 }
+
+export type MemberGender = "male" | "female";
+
+/**
+ * One of the two people sharing a ledger. `nickname` is what the 我 / 对方
+ * switch is labelled from; `timeZone` is their own zone, null meaning
+ * automatic.
+ */
+export interface MemberProfileContract {
+  id: string;
+  nickname: string;
+  gender: MemberGender;
+  timeZone: string | null;
+}
+
+export interface MemberProfileUpdateContract {
+  nickname: string;
+  gender: MemberGender;
+  timeZone: string | null;
+}
+
+export interface UserProfilePort {
+  /** The two configured members, owner first, or an empty list when unconfigured. */
+  listMembers(): Promise<readonly MemberProfileContract[]>;
+  /** Updates the signed-in member's own row and nothing else. */
+  updateProfile(input: {
+    userId: string;
+    profile: MemberProfileUpdateContract;
+  }): Promise<MemberProfileContract | null>;
+}

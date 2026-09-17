@@ -55,6 +55,12 @@ const optionalSearchSchema = z.preprocess(
   z.string().max(MAX_SEARCH_LENGTH).optional()
 );
 export const UNCATEGORIZED_SENTINEL = "__uncategorized__";
+/** An IANA zone name, or null for "use this device's zone". */
+export const nullableTimeZoneSchema = z
+  .string()
+  .max(50)
+  .refine(isValidTimeZone, "Invalid IANA time zone")
+  .nullable();
 const categoryFilterSchema = z.union([uuidSchema, z.literal(UNCATEGORIZED_SENTINEL)]).optional();
 
 function parseLedgerContract<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -73,12 +79,6 @@ const updateLedgerInputSchema = nonEmptyStrictObjectSchema({
     mainCurrency: optionalCurrencyCodeSchema,
     collapseEntriesDefault: z.boolean().optional(),
     aiCustomPrompt: z.string().max(4000).optional(),
-    timeZone: z
-      .string()
-      .max(50)
-      .refine(isValidTimeZone, "Invalid IANA time zone")
-      .nullable()
-      .optional(),
   }),
 });
 

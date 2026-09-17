@@ -18,7 +18,10 @@ vi.mock("next/dynamic", () => ({
 }));
 
 vi.mock("@/modules/workspace/ui/LedgerEntriesTab", () => ({
-  LedgerEntriesTab: () => null,
+  LedgerEntriesTab: (props: Record<string, unknown>) => {
+    deferredProps.calls.push(props);
+    return null;
+  },
 }));
 
 vi.mock("@/i18n/DeferredFeatureMessages", () => ({
@@ -44,6 +47,10 @@ const ledgerFixture: Ledger = {
 const baseProps = {
   recordScope: "all" as const,
   onRecordScopeChange: vi.fn(),
+  members: [
+    { id: OWNER_ID, nickname: "A", gender: "male" as const, timeZone: null },
+    { id: PARTNER_ID, nickname: "B", gender: "female" as const, timeZone: null },
+  ],
   userId: OWNER_ID,
   partnerUserId: PARTNER_ID,
   hidden: false,
@@ -64,20 +71,28 @@ describe("LedgerTabPanels", () => {
   });
 
   /**
-   * The settings panel renders credentials whose ownership is labelled from
-   * these two ids; dropping them silently degrades every row to its fallback.
+   * The identity a panel needs to label its own rows. 设置 is the one panel
+   * without the member switch, so it never receives the resolved scope.
    */
-  it.each(["details", "stats", "settings"] as const)(
-    "forwards the member identity to the %s panel",
-    (activeTab) => {
-      render(<LedgerTabPanels {...baseProps} activeTab={activeTab} />);
+  it.each([
+    ["details", { scopeOwnerId: null }],
+    ["stats", { userId: OWNER_ID, partnerUserId: PARTNER_ID, scopeOwnerId: null }],
+    ["settings", { userId: OWNER_ID, partnerUserId: PARTNER_ID }],
+  ] as const)("forwards the member identity to the %s panel", (activeTab, expected) => {
+    render(<LedgerTabPanels {...baseProps} activeTab={activeTab} />);
 
-      expect(deferredProps.calls).toHaveLength(1);
-      expect(deferredProps.calls[0]).toMatchObject({
-        userId: OWNER_ID,
-        partnerUserId: PARTNER_ID,
-        ledgerId: "ledger-1",
-      });
-    }
-  );
+    expect(deferredProps.calls).toHaveLength(1);
+    expect(deferredProps.calls[0]).toMatchObject({ ledgerId: "ledger-1", ...expected });
+  });
+
+  it("hands the stream panel the member a narrowed scope resolved to, with their nickname", () => {
+    render(<LedgerTabPanels {...baseProps} activeTab="stream" recordScope="partner" />);
+
+    expect(deferredProps.calls).toHaveLength(1);
+    expect(deferredProps.calls[0]).toMatchObject({
+      scopeOwnerId: PARTNER_ID,
+      scopeNickname: "B",
+      ledgerId: "ledger-1",
+    });
+  });
 });

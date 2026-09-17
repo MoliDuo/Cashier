@@ -16,8 +16,6 @@ const defaultProps = {
   onClearSelection: vi.fn(),
   filters: {} as const,
   onFiltersChange: vi.fn(),
-  recordScope: "all" as const,
-  onRecordScopeChange: vi.fn(),
   periodParams: defaultPeriodParams,
   mainCurrency: "CNY",
   filteredTotal: "123.45",
@@ -87,15 +85,11 @@ describe("LedgerEntriesToolbar", () => {
     expect(screen.getByRole("button", { name: "已启用 1 个筛选" })).toBeDefined();
   });
 
-  it("keeps the member scope inside the filter panel too", async () => {
-    render(<LedgerEntriesToolbar {...defaultProps} />);
+  it("names the member a narrowed list is showing, and offers the strip back", () => {
+    render(<LedgerEntriesToolbar {...defaultProps} memberScopeNickname="B" />);
 
+    expect(screen.getByTestId("member-scope-chip")).toHaveTextContent("仅看 B");
     expect(screen.queryByRole("group", { name: "账目视角" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "筛选" }));
-    expect(
-      (await screen.findByRole("group", { name: "账目视角" })).querySelectorAll("button")
-    ).toHaveLength(3);
   });
 
   it("renders the amount without a redundant label when the prefix is gone", () => {

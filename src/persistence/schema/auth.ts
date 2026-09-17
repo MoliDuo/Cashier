@@ -17,6 +17,11 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name"),
+    /** What the partner sees: 我 / 对方 are labelled from this, never from email. */
+    nickname: text("nickname").notNull(),
+    gender: text("gender").notNull(),
+    /** Null means automatic: the device's own zone decides the day. */
+    timeZone: text("time_zone"),
     email: text("email").notNull(),
     emailVerified: timestamp("email_verified", { withTimezone: true }),
     image: text("image"),
@@ -37,6 +42,12 @@ export const users = pgTable(
   },
   (table) => [
     check("ck_users_auth_version_positive", sql`${table.authVersion} > 0`),
+    check("ck_users_nickname_length", sql`length(btrim(${table.nickname})) BETWEEN 1 AND 20`),
+    check("ck_users_gender", sql`${table.gender} IN ('male', 'female')`),
+    check(
+      "ck_users_time_zone_length",
+      sql`${table.timeZone} IS NULL OR length(${table.timeZone}) <= 50`
+    ),
     uniqueIndex("uniq_users_active_email")
       .on(sql`lower(${table.email})`)
       .where(sql`${table.deletedAt} IS NULL`),

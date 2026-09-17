@@ -65,8 +65,6 @@
     "mainCurrencyChangeTitle": "Change main currency?",
     "mainCurrencyChangeDescription": "This only updates the draft to {currency}. Historical totals are recalculated after you save Bookkeeping rules.",
     "mainCurrencyChangeConfirm": "Use {currency}",
-    "timeZone": "Ledger time zone",
-    "timeZoneDesc": "Used for default dates, ranges, and statistics. Existing entry dates do not change.",
     "collapseEntries": "Collapse records by default",
     "collapseEntriesDesc": "Start with each record's details collapsed in the stream.",
     "timeZoneAuto": "Automatic",
@@ -290,6 +288,18 @@
         "same_email": "Enter an email address different from your current one.",
         "unknown": "Could not update the email address."
       }
-    }
+    },
+    "profile": "Profile",
+    "profileDesc": "Your nickname, gender, and time zone, and your partner's nickname.",
+    "nickname": "Nickname",
+    "nicknameDesc": "1–20 characters. Used for Me / Partner on the stream, details, and stats.",
+    "gender": "Gender",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "myTimeZone": "My time zone",
+    "myTimeZoneDesc": "Affects only your own default dates and statistics. Existing entry dates do not change.",
+    "partner": "Partner's nickname",
+    "partnerDesc": "Changed by your partner in their own settings.",
+    "profileSaveFailed": "Could not save your profile. Try again."
   }
 }

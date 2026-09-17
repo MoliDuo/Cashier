@@ -10,6 +10,8 @@ interface UseDrilldownNavigationOptions {
   searchParams: URLSearchParams;
   pathname: string;
   ledgerId: string;
+  /** The viewer, whose own zone the prefetched details page is dated by. */
+  userId: string;
   locale: string;
 }
 
@@ -26,6 +28,7 @@ export function useDrilldownNavigation({
   searchParams,
   pathname,
   ledgerId,
+  userId,
   locale,
 }: UseDrilldownNavigationOptions): UseDrilldownNavigationResult {
   const queryClient = useQueryClient();
@@ -39,13 +42,14 @@ export function useDrilldownNavigation({
       void prefetchDetailsTabQuery(
         queryClient,
         ledgerId,
+        userId,
         { period: "custom", startDate, endDate },
         { categoryId },
         attributedUserId
       );
       pushLedgerUrl(pathname, params, locale, "drilldown");
     },
-    [attributedUserId, ledgerId, locale, pathname, queryClient, searchParams]
+    [attributedUserId, ledgerId, locale, pathname, queryClient, searchParams, userId]
   );
 
   const handleDateDrilldown = useCallback(
@@ -61,13 +65,14 @@ export function useDrilldownNavigation({
       void prefetchDetailsTabQuery(
         queryClient,
         ledgerId,
+        userId,
         { period: "custom", startDate: date, endDate: date },
         { categoryId: nextCategoryId, currency: filters?.currency ?? null },
         attributedUserId
       );
       pushLedgerUrl(pathname, params, locale, "drilldown");
     },
-    [attributedUserId, ledgerId, locale, pathname, queryClient, searchParams]
+    [attributedUserId, ledgerId, locale, pathname, queryClient, searchParams, userId]
   );
 
   return {

@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { requireLedgerAccessMock, createAndQueueSourceDocumentMock } = vi.hoisted(() => ({
-  requireLedgerAccessMock: vi.fn(),
-  createAndQueueSourceDocumentMock: vi.fn(),
+const { requireLedgerAccessMock, createAndQueueSourceDocumentMock, getCoupleMembersMock } =
+  vi.hoisted(() => ({
+    requireLedgerAccessMock: vi.fn(),
+    createAndQueueSourceDocumentMock: vi.fn(),
+    getCoupleMembersMock: vi.fn(),
+  }));
+
+vi.mock("@/modules/auth/application/queries/get-couple-members", () => ({
+  getCoupleMembers: getCoupleMembersMock,
 }));
 
 vi.mock("@/modules/ledger/access", () => ({
@@ -29,9 +35,20 @@ describe("createSourceDocumentAction omission semantics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireLedgerAccessMock.mockResolvedValue({
-      ledger: { id: "ledger-1", settings: { timeZone: null } },
+      ledger: { id: "ledger-1", settings: { mainCurrency: "CNY" } },
       userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     });
+    // The signed-in member has no zone of their own, so the request's own
+    // zone (when it sends one) is what dates the record.
+    getCoupleMembersMock.mockResolvedValue([
+      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", nickname: "A", gender: "male", timeZone: null },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        nickname: "B",
+        gender: "female",
+        timeZone: "Asia/Tokyo",
+      },
+    ]);
     createAndQueueSourceDocumentMock.mockResolvedValue({
       sourceDocumentId: "doc-1",
       version: 1,
@@ -60,11 +77,21 @@ describe("createSourceDocumentAction omission semantics", () => {
     expect(Object.prototype.hasOwnProperty.call(callInput, "timezone")).toBe(false);
   });
 
-  it("uses the authorized ledger timezone when the request omits one", async () => {
-    requireLedgerAccessMock.mockResolvedValue({
-      ledger: { id: "ledger-1", settings: { timeZone: "Asia/Singapore" } },
-      userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    });
+  it("uses the signed-in member's own timezone when the request omits one", async () => {
+    getCoupleMembersMock.mockResolvedValue([
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        nickname: "A",
+        gender: "male",
+        timeZone: "Asia/Singapore",
+      },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        nickname: "B",
+        gender: "female",
+        timeZone: null,
+      },
+    ]);
 
     await createSourceDocumentAction("ledger-1", { text: "Lunch" }, CLIENT_SUBMISSION_ID);
 

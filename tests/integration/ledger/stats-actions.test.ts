@@ -374,6 +374,8 @@ describe("getLedgerStatsAction", () => {
         id: OTHER_USER_ID,
         email: "other@example.com",
         name: "Other User",
+        nickname: "B",
+        gender: "female",
         emailVerified: new Date(),
       })
       .onConflictDoNothing();

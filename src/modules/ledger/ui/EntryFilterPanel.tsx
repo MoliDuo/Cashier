@@ -9,9 +9,9 @@ import type { EntryCategory } from "@/modules/ledger/contracts";
 import type { PeriodParams, PeriodPreset } from "@/lib/period-utils";
 import { useEntryFilterDraft } from "./EntryFilterPanel/hooks/useEntryFilterDraft";
 import { EntryFilterContent } from "./EntryFilterPanel/components/EntryFilterContent";
-import { type EntryFilters, type RecordScope } from "@/modules/ledger/filters";
+import type { EntryFilters } from "@/modules/ledger/filters";
 
-export type { EntryFilters, RecordScope } from "@/modules/ledger/filters";
+export type { EntryFilters } from "@/modules/ledger/filters";
 
 interface EntryFilterPanelProps {
   filters: EntryFilters;
@@ -24,12 +24,6 @@ interface EntryFilterPanelProps {
   showCategory?: boolean;
   showCurrency?: boolean;
   showStatus?: boolean;
-  /**
-   * The member whose records to show. Supplying both this and its setter adds
-   * the section; a tab without a member list around it simply omits them.
-   */
-  recordScope?: RecordScope | undefined;
-  onRecordScopeChange?: ((scope: RecordScope) => void) | undefined;
   className?: string;
 }
 
@@ -50,8 +44,6 @@ export function EntryFilterPanel({
   showCategory = true,
   showCurrency = true,
   showStatus = true,
-  recordScope,
-  onRecordScopeChange,
   className,
 }: EntryFilterPanelProps) {
   const t = useTranslations("EntryFilterPanel");
@@ -63,8 +55,6 @@ export function EntryFilterPanel({
     showCategory,
     showCurrency,
     showStatus,
-    recordScope,
-    onRecordScopeChange,
   });
   const { open, handleOpenChange, activeFilterCount } = draft;
 

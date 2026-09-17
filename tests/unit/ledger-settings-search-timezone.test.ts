@@ -6,6 +6,7 @@ import {
   parseUpdateLedgerEntryInput,
   parseUpdateLedgerInput,
 } from "@/modules/ledger/contract-schemas";
+import { parseUpdateMyProfileInput } from "@/modules/auth/profile-schemas";
 import { normalizeSearchTerm } from "@/lib/search";
 import { periodToDateRange } from "@/lib/period-utils";
 
@@ -13,16 +14,33 @@ describe("ledger settings, search, and time zones", () => {
   const expectedUpdatedAt = "2026-01-01T00:00:00.000Z";
   afterEach(() => vi.useRealTimers());
 
-  it("accepts automatic and valid IANA time zones and rejects invalid values", () => {
+  it("keeps the ledger's own settings free of a time zone", () => {
+    // The zone belongs to a person now, so the ledger update must not take one.
+    expect(() =>
+      parseUpdateLedgerInput({ expectedUpdatedAt, settings: { timeZone: "America/New_York" } })
+    ).toThrow("Validation failed");
+  });
+
+  it("accepts automatic and valid IANA time zones on a profile and rejects invalid values", () => {
     expect(
-      parseUpdateLedgerInput({ expectedUpdatedAt, settings: { timeZone: null } }).settings?.timeZone
+      parseUpdateMyProfileInput({ nickname: "A", gender: "male", timeZone: null }).timeZone
     ).toBeNull();
     expect(
-      parseUpdateLedgerInput({ expectedUpdatedAt, settings: { timeZone: "America/New_York" } })
-        .settings?.timeZone
+      parseUpdateMyProfileInput({
+        nickname: "A",
+        gender: "male",
+        timeZone: "America/New_York",
+      }).timeZone
     ).toBe("America/New_York");
     expect(() =>
-      parseUpdateLedgerInput({ expectedUpdatedAt, settings: { timeZone: "Mars/Olympus" } })
+      parseUpdateMyProfileInput({ nickname: "A", gender: "male", timeZone: "Mars/Olympus" })
+    ).toThrow("Validation failed");
+    expect(() =>
+      parseUpdateMyProfileInput({
+        nickname: "A",
+        gender: "male",
+        timeZone: "A".repeat(51),
+      })
     ).toThrow("Validation failed");
   });
 
@@ -41,9 +59,6 @@ describe("ledger settings, search, and time zones", () => {
       parseUpdateLedgerInput({ expectedUpdatedAt, settings: { mainCurrency: " usd " } }).settings
         ?.mainCurrency
     ).toBe("USD");
-    expect(() =>
-      parseUpdateLedgerInput({ expectedUpdatedAt, settings: { timeZone: "A".repeat(51) } })
-    ).toThrow("Validation failed");
     expect(() =>
       parseUpdateLedgerInput({ expectedUpdatedAt, settings: { aiCustomPrompt: "x".repeat(4001) } })
     ).toThrow("Validation failed");

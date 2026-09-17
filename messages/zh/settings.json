@@ -65,8 +65,6 @@
     "mainCurrencyChangeTitle": "更改主货币？",
     "mainCurrencyChangeDescription": "这只会将草稿更新为 {currency}。保存“记账规则”后，历史汇总才会重新计算。",
     "mainCurrencyChangeConfirm": "使用 {currency}",
-    "timeZone": "账本时区",
-    "timeZoneDesc": "用于默认日期、区间和统计；不改变已有记录日期。",
     "collapseEntries": "默认折叠记录",
     "collapseEntriesDesc": "进入流水时默认收起每张记录的明细。",
     "timeZoneAuto": "自动",
@@ -290,6 +288,18 @@
         "same_email": "新邮箱必须与当前邮箱不同。",
         "unknown": "无法更新邮箱。"
       }
-    }
+    },
+    "profile": "个人资料",
+    "profileDesc": "你和对方各自的昵称、性别和时区。",
+    "nickname": "昵称",
+    "nicknameDesc": "1–20 个字符，用于流水、明细和统计上的 我 / 对方。",
+    "gender": "性别",
+    "genderMale": "男",
+    "genderFemale": "女",
+    "myTimeZone": "我的时区",
+    "myTimeZoneDesc": "只影响你自己的默认日期和统计；不改变已有记录日期。",
+    "partner": "对方昵称",
+    "partnerDesc": "由对方在自己的设置中修改。",
+    "profileSaveFailed": "资料保存失败，请重试。"
   }
 }

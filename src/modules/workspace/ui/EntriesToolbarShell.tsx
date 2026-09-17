@@ -36,6 +36,9 @@ interface EntriesToolbarShellProps {
   totalLabel?: string | undefined;
   batchActions?: ReactNode | undefined;
   syncStatus?: ReactNode | undefined;
+  /** Which member the list is narrowed to, when it is: a scope left on has to
+   * say so on the page, not only inside the strip that set it. */
+  memberScopeChip?: ReactNode | undefined;
   className?: string;
   /** Manual refresh for the tab. The box is its trigger, so the bar above the
    * tabs carries no button wherever this is passed. */
@@ -49,6 +52,7 @@ export function EntriesToolbarShell({
   totalLabel,
   batchActions,
   syncStatus,
+  memberScopeChip,
   className = "",
   onRefresh,
   isRefreshing = false,
@@ -88,13 +92,16 @@ export function EntriesToolbarShell({
           {syncStatus}
         </div>
       ) : null}
-      {onRefresh != null ? (
+      {onRefresh != null && memberScopeChip == null ? (
         // Doubling as the trigger keeps the refresh reachable by keyboard, which
         // clicking the box is not. Centred on the box rather than between the
-        // controls, because it names a gesture the whole box answers to;
-        // nothing in the row grows, so the middle is always free. While the
-        // refetch runs it spins, the way the refresh button on the other tabs
-        // does; the label stays for screen readers.
+        // controls, because it names a gesture the whole box answers to. While
+        // the refetch runs it spins, the way the refresh button on the other
+        // tabs does; the label stays for screen readers.
+        //
+        // Centre is only free while the right-hand end holds nothing wide. Once
+        // the 仅看 chip is there the hint moves into the row instead — see
+        // below — because a centred one would be read through the chip.
         <button
           type="button"
           data-testid="toolbar-refresh-hint"
@@ -114,8 +121,31 @@ export function EntriesToolbarShell({
           )}
         </button>
       ) : null}
-      {rangeLabel != null || (totalLabel != null && totalLabel !== "") ? (
+      {memberScopeChip != null ||
+      rangeLabel != null ||
+      (totalLabel != null && totalLabel !== "") ? (
         <div className="ml-auto flex min-w-0 items-center gap-2 whitespace-nowrap">
+          {memberScopeChip}
+          {onRefresh != null && memberScopeChip != null ? (
+            // The same hint, kept on the row rather than over the chip. Its
+            // wording would not fit beside the chip on a phone, so it is the
+            // icon there and the button keeps its name for screen readers.
+            <button
+              type="button"
+              data-testid="toolbar-refresh-hint"
+              onClick={() => void refresh()}
+              disabled={isRefreshing}
+              title={t("refresh")}
+              aria-busy={isRefreshing || undefined}
+              className="flex shrink-0 select-none items-center rounded-sm text-micro text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+              />
+              <span className="sr-only">{isRefreshing ? t("refreshing") : t("refresh")}</span>
+            </button>
+          ) : null}
           {rangeLabel != null ? (
             <span className="text-xs text-muted-foreground sm:text-sm">{rangeLabel}</span>
           ) : null}

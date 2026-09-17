@@ -18,6 +18,8 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { LedgerQueryErrorBanner } from "@/modules/workspace/ui/LedgerQueryErrorBanner";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
+import type { MemberProfileContract } from "@/application/contracts";
+import { useCoupleMembers } from "@/modules/auth/hooks/useCoupleMembers";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { textRoleClassName } from "@/components/typography";
 import { LedgerTabPanels } from "./LedgerTabPanels";
@@ -27,6 +29,7 @@ import { ModalStackGate } from "./ModalStackGate";
 import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
 import { CategoryAssignmentStatus } from "@/modules/ledger/ui/CategoryAssignmentStatus";
 import { pushLedgerUrl } from "../ledger-url-navigation";
+import type { RecordScope } from "@/modules/ledger/filters";
 
 interface LedgerPageClientProps {
   ledgerId: string;
@@ -36,6 +39,8 @@ interface LedgerPageClientProps {
   initialTab: LedgerTab;
   ledgerToday?: string;
   initialCategories?: EntryCategoryWithCount[];
+  /** Both member profiles, hydrated by the page bootstrap. */
+  initialMembers?: readonly MemberProfileContract[];
   /** Server-derived user email for the Settings tab (avoids useSession). */
   userEmail?: string;
   hasPassword?: boolean;
@@ -65,12 +70,18 @@ export function LedgerPageClient({
   initialTab,
   ledgerToday,
   initialCategories,
+  initialMembers,
   userEmail,
   hasPassword,
   passwordUpdatedAt,
   interfaceLanguage,
 }: LedgerPageClientProps) {
-  const [recordScope, setRecordScope] = useState<"all" | "mine" | "partner">("all");
+  const [recordScope, setRecordScope] = useState<RecordScope>("all");
+  const { members } = useCoupleMembers({
+    ledgerId,
+    userId,
+    ...(initialMembers !== undefined ? { initialMembers } : {}),
+  });
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
@@ -132,8 +143,10 @@ export function LedgerPageClient({
     dirtyChangeCount,
   } = useLedgerPageEnvironment({
     ledgerId,
+    userId,
     initialLedger,
     initialCategories,
+    ...(initialMembers !== undefined ? { initialMembers } : {}),
     setIsInputOpen,
   });
 
@@ -154,6 +167,7 @@ export function LedgerPageClient({
     searchParams,
     pathname,
     ledgerId,
+    userId,
     locale,
     ...(recordScope === "all"
       ? {}
@@ -228,6 +242,7 @@ export function LedgerPageClient({
           onRecordScopeChange={setRecordScope}
           userId={userId}
           partnerUserId={partnerUserId}
+          members={members ?? []}
           activeTab={activeTab}
           hidden={categoriesHaveNoData}
           locale={locale}

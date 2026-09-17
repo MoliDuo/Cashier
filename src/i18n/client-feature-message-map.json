@@ -9,7 +9,8 @@
     "LedgerQueryError",
     "Metadata",
     "NotFound",
-    "ServiceWorkerUpdate"
+    "ServiceWorkerUpdate",
+    "MemberScope"
   ],
   "stream": [
     "BatchActions",

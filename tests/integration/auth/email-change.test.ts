@@ -129,7 +129,12 @@ describe("email change challenges", () => {
 
   it("checks target-email uniqueness again during verification", async () => {
     const db = getTestDb();
-    await db.insert(users).values({ id: crypto.randomUUID(), email: "taken@example.com" });
+    await db.insert(users).values({
+      id: crypto.randomUUID(),
+      email: "taken@example.com",
+      nickname: "B",
+      gender: "female",
+    });
     await db.insert(emailChangeChallenges).values({
       userId,
       newEmail: "taken@example.com",

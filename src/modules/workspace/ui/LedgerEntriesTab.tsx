@@ -1,6 +1,6 @@
 import type { Ledger, LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { type PeriodParams } from "@/lib/period-utils";
 import {
@@ -23,10 +23,10 @@ import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/serve
 import { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
 
 interface LedgerEntriesTabProps {
-  recordScope?: "all" | "mine" | "partner";
-  onRecordScopeChange?: (scope: "all" | "mine" | "partner") => void;
-  userId: string;
-  partnerUserId: string;
+  /** Which member the list is narrowed to, resolved by the page. */
+  scopeOwnerId: string | null;
+  /** Nickname of that member, for the chip that stands in for the switch. */
+  scopeNickname: string | null;
   ledgerId: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
@@ -39,10 +39,8 @@ interface LedgerEntriesTabProps {
 }
 
 export function LedgerEntriesTab({
-  recordScope,
-  onRecordScopeChange,
-  userId,
-  partnerUserId,
+  scopeOwnerId,
+  scopeNickname,
   ledgerId,
   ledger,
   periodParams,
@@ -54,9 +52,6 @@ export function LedgerEntriesTab({
   isRefreshing,
 }: LedgerEntriesTabProps) {
   const t = useTranslations("LedgerEntriesTab");
-  const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
-  const scope = recordScope ?? localScope;
-  const setScope = onRecordScopeChange ?? setLocalScope;
   const tCommon = useTranslations("Common");
   const { filters, startDateStr, endDateStr } = useLedgerEntriesFilters(
     periodParams,
@@ -80,7 +75,7 @@ export function LedgerEntriesTab({
 
   const streamData = useLedgerEntriesStreamData({
     ledgerId,
-    ...(scope === "all" ? {} : { attributedUserId: scope === "mine" ? userId : partnerUserId }),
+    ...(scopeOwnerId == null ? {} : { attributedUserId: scopeOwnerId }),
     mainCurrency,
     filters,
     startDateStr,
@@ -152,8 +147,7 @@ export function LedgerEntriesTab({
   return (
     <>
       <LedgerEntriesToolbar
-        recordScope={scope}
-        onRecordScopeChange={setScope}
+        {...(scopeNickname != null ? { memberScopeNickname: scopeNickname } : {})}
         isSelectionMode={selection.isSelectionMode}
         isAllSelected={selection.isAllSelected}
         hasMoreData={

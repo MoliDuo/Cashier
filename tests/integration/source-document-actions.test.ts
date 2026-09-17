@@ -229,6 +229,8 @@ describe("getSourceDocumentLightAction", () => {
         id: otherUserId,
         email: "other3@example.com",
         name: "Other User 3",
+        nickname: "B",
+        gender: "female",
         emailVerified: new Date(),
       })
       .onConflictDoNothing();

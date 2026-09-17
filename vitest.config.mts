@@ -52,6 +52,7 @@ const unitDomTypeScriptTests = [
   "tests/unit/modules/currency/useConvertedAmount.test.ts",
   "tests/unit/modules/source-document/hooks/source-document-input-images.test.ts",
   "tests/unit/modules/source-document/hooks/source-document-submission-upload.test.ts",
+  "tests/unit/modules/workspace/pull-reveal.test.ts",
   "tests/unit/modules/workspace/tab-swipe.test.ts",
   "tests/unit/modules/workspace/ui/new-record-success-feedback.test.ts",
   "tests/unit/workspace/ledger-url-navigation.test.ts",

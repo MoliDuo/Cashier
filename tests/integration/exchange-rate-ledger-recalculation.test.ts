@@ -65,7 +65,12 @@ async function seedLedgerWithEntry(input: {
   const sourceDocumentId = crypto.randomUUID();
   const revisionId = crypto.randomUUID();
 
-  await db.insert(users).values({ id: userId, email: `${userId}@example.com` });
+  await db.insert(users).values({
+    id: userId,
+    email: `${userId}@example.com`,
+    nickname: "A",
+    gender: "male",
+  });
   await db.insert(ledgers).values({
     id: ledgerId,
     userId,
@@ -439,10 +444,14 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     await db.insert(users).values({
       id: userId,
       email: `${userId}@example.com`,
+      nickname: "A",
+      gender: "male",
     });
     await db.insert(users).values({
       id: secondUserId,
       email: `${secondUserId}@example.com`,
+      nickname: "B",
+      gender: "female",
     });
     await db.insert(ledgers).values([
       { id: ledgerId, userId, mainCurrency: "JPY" },
@@ -570,7 +579,12 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     const datedRevisionId = crypto.randomUUID();
     const undatedRevisionId = crypto.randomUUID();
 
-    await db.insert(users).values({ id: userId, email: `${userId}@example.com` });
+    await db.insert(users).values({
+      id: userId,
+      email: `${userId}@example.com`,
+      nickname: "A",
+      gender: "male",
+    });
     await db.insert(ledgers).values({ id: ledgerId, userId, mainCurrency: "CNY" });
 
     // Older rates first: undated entries must use the newest stored date.

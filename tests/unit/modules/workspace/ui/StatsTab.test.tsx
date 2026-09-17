@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
 import { StatsTab } from "@/modules/workspace/ui/StatsTab";
@@ -64,6 +64,7 @@ function renderStatsTab() {
         ledgerId="ledger-1"
         userId="user-1"
         partnerUserId="user-2"
+        scopeOwnerId={null}
         ledger={ledgerFixture}
         ledgerToday="2026-08-24"
       />
@@ -78,7 +79,7 @@ describe("StatsTab", () => {
     searchParamsState.current = new URLSearchParams();
   });
 
-  it("shows combined and individual totals and switches the chart scope", async () => {
+  it("shows combined and individual totals, and charts the member the page picked", async () => {
     vi.mocked(getEnhancedStats).mockImplementation(async (input) => ({
       ...statsFixture,
       summary: {
@@ -91,19 +92,29 @@ describe("StatsTab", () => {
               : "120",
       },
     }));
-    renderStatsTab();
+    const { rerender, queryClient } = renderStatsTab();
     expect(await screen.findByText("¥40.00")).toBeInTheDocument();
     expect(screen.getByText("¥80.00")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "我" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "我" })).toHaveAttribute("aria-pressed", "true")
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <StatsTab
+          ledgerId="ledger-1"
+          userId="user-1"
+          partnerUserId="user-2"
+          scopeOwnerId="user-2"
+          ledger={ledgerFixture}
+          ledgerToday="2026-08-24"
+        />
+      </QueryClientProvider>
     );
-    expect(
-      vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.attributedUserId === "user-1")
-    ).toBe(true);
-    expect(
-      vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.attributedUserId === "user-2")
-    ).toBe(true);
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(getEnhancedStats)
+          .mock.calls.some(([input]) => input.attributedUserId === "user-2")
+      ).toBe(true)
+    );
   });
 
   it("shows retry when the selected scope fails", async () => {

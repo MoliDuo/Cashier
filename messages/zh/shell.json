@@ -93,8 +93,6 @@
     "recordOwner": "账目归属",
     "recordedBy": "录入者",
     "historicalRecord": "历史记录",
-    "recordScope": "账目视角",
-    "statsScope": "统计视角",
     "allMembers": "全部",
     "myRecords": "我",
     "partnerRecords": "对方",
@@ -206,5 +204,11 @@
     "focusBlocked": "请先离开输入框，再重新加载应用",
     "batchBlocked": "请先结束批量选择，再重新加载应用",
     "offlineBlocked": "请先恢复网络连接，再重新加载应用"
+  },
+  "MemberScope": {
+    "label": "账目视角",
+    "mine": "{nickname}（我）",
+    "only": "仅看 {nickname}",
+    "current": "当前仅看 {nickname}，打开成员选择"
   }
 }

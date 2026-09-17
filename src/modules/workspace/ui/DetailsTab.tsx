@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import type { EntryCategory, Ledger, LedgerEntry } from "@/modules/ledger/contracts";
@@ -15,10 +15,10 @@ import { DetailsTabView } from "./DetailsTabView";
 import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
 
 interface DetailsTabProps {
-  recordScope?: "all" | "mine" | "partner";
-  onRecordScopeChange?: (scope: "all" | "mine" | "partner") => void;
-  userId: string;
-  partnerUserId: string;
+  /** Which member the list is narrowed to, resolved by the page. */
+  scopeOwnerId: string | null;
+  /** Nickname of that member, for the chip that stands in for the switch. */
+  scopeNickname: string | null;
   ledgerId: string;
   categories: EntryCategory[];
   ledger?: Ledger;
@@ -37,10 +37,8 @@ interface DetailsTabProps {
 }
 
 export function DetailsTab({
-  recordScope,
-  onRecordScopeChange,
-  userId,
-  partnerUserId,
+  scopeOwnerId,
+  scopeNickname,
   ledgerId,
   categories,
   ledger,
@@ -51,10 +49,7 @@ export function DetailsTab({
   onRefresh,
   isRefreshing,
 }: DetailsTabProps) {
-  const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
-  const scope = recordScope ?? localScope;
-  const setScope = onRecordScopeChange ?? setLocalScope;
-  const attributedUserId = scope === "all" ? undefined : scope === "mine" ? userId : partnerUserId;
+  const attributedUserId = scopeOwnerId ?? undefined;
   const data = useDetailsTabData({
     ledgerId,
     ...(attributedUserId == null ? {} : { attributedUserId }),
@@ -119,8 +114,7 @@ export function DetailsTab({
           {...(ledger === undefined ? {} : { ledger })}
           periodParams={periodParams}
           filters={filters}
-          recordScope={scope}
-          onRecordScopeChange={setScope}
+          scopeNickname={scopeNickname}
           advancedFilters={advancedFilters}
           onFiltersChange={onFiltersChange}
           entries={data.entries}

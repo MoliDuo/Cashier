@@ -26,6 +26,8 @@ describe("shared home", () => {
         id: testUserId,
         email: testEmail,
         name: "New User",
+        nickname: "A",
+        gender: "male",
       })
       .onConflictDoNothing();
 

@@ -148,6 +148,8 @@ beforeEach(async () => {
     id: "00000000-0000-0000-0000-000000000000",
     email: "test@example.com",
     name: "Test User",
+    nickname: "A",
+    gender: "male",
     emailVerified: new Date(),
   });
 });

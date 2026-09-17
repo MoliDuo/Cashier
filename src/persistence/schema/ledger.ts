@@ -42,7 +42,6 @@ export const ledgers = pgTable(
     mainCurrency: varchar("main_currency", { length: 3 }).notNull().default("CNY"),
     collapseEntriesDefault: boolean("collapse_entries_default").notNull().default(false),
     aiCustomPrompt: text("ai_custom_prompt").notNull().default(""),
-    timeZone: text("time_zone"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -66,10 +65,6 @@ export const ledgers = pgTable(
     ),
     check("ck_ledgers_ai_language_length", sql`length(${table.aiLanguage}) BETWEEN 2 AND 35`),
     check("ck_ledgers_ai_custom_prompt_length", sql`length(${table.aiCustomPrompt}) <= 4000`),
-    check(
-      "ck_ledgers_time_zone_length",
-      sql`${table.timeZone} IS NULL OR length(${table.timeZone}) <= 50`
-    ),
   ]
 );
 

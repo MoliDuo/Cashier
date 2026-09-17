@@ -178,43 +178,56 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   const asOf = anchorDate(environment);
   const now = new Date(`${asOf}T12:00:00.000Z`);
   if (reset) {
+    // Both members are removed, not just the workspace owner: the partner row
+    // would otherwise survive with whatever migration 0047 backfilled, and the
+    // profile the fixture describes — the nickname the switch is labelled from
+    // — would only ever apply to a brand-new database.
+    const emails = [fixture.user.email, fixture.partner.email];
     await client.query(
       `DELETE FROM revision_files
         WHERE ledger_id IN (
           SELECT l.id FROM ledgers l
           JOIN users u ON u.id = l.user_id
-          WHERE lower(u.email) = $1
+          WHERE lower(u.email) = ANY($1::text[])
         )`,
-      [fixture.user.email]
+      [emails]
     );
     await client.query(
       `DELETE FROM upload_session_files
         WHERE ledger_id IN (
           SELECT l.id FROM ledgers l
           JOIN users u ON u.id = l.user_id
-          WHERE lower(u.email) = $1
+          WHERE lower(u.email) = ANY($1::text[])
         )`,
-      [fixture.user.email]
+      [emails]
     );
     await client.query(
       `DELETE FROM ledgers WHERE user_id IN
-        (SELECT id FROM users WHERE lower(email) = $1)`,
-      [fixture.user.email]
+        (SELECT id FROM users WHERE lower(email) = ANY($1::text[]))`,
+      [emails]
     );
-    await client.query("DELETE FROM users WHERE lower(email) = $1", [fixture.user.email]);
+    await client.query("DELETE FROM users WHERE lower(email) = ANY($1::text[])", [emails]);
   }
   await client.query(
     `INSERT INTO users
-      (id, email, name, email_verified, preferences, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
+      (id, email, name, nickname, gender, time_zone, email_verified, preferences, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, '{"interfaceLanguage":"auto"}'::jsonb, $7, $7)
      ON CONFLICT (id) DO NOTHING`,
-    [userId, fixture.user.email, fixture.user.name, now]
+    [
+      userId,
+      fixture.user.email,
+      fixture.user.name,
+      fixture.user.nickname,
+      fixture.user.gender,
+      fixture.user.timeZone,
+      now,
+    ]
   );
   await ensurePartner(client, now);
   await client.query(
     `INSERT INTO ledgers
-      (id, user_id, ai_language, preferred_currencies, main_currency, time_zone, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+      (id, user_id, ai_language, preferred_currencies, main_currency, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $6)
      ON CONFLICT (id) DO NOTHING`,
     [
       ledgerId,
@@ -222,7 +235,6 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       fixture.ledger.aiLanguage,
       fixture.ledger.preferredCurrencies,
       fixture.ledger.mainCurrency,
-      fixture.ledger.timeZone,
       now,
     ]
   );
@@ -445,10 +457,18 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
 async function ensurePartner(client, now = new Date()) {
   await client.query(
     `INSERT INTO users
-      (id, email, name, email_verified, preferences, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, '{"interfaceLanguage":"auto"}'::jsonb, $4, $4)
+      (id, email, name, nickname, gender, time_zone, email_verified, preferences, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, '{"interfaceLanguage":"auto"}'::jsonb, $7, $7)
      ON CONFLICT (id) DO NOTHING`,
-    [fixture.partner.id, fixture.partner.email, fixture.partner.name, now]
+    [
+      fixture.partner.id,
+      fixture.partner.email,
+      fixture.partner.name,
+      fixture.partner.nickname,
+      fixture.partner.gender,
+      fixture.partner.timeZone,
+      now,
+    ]
   );
 }
 

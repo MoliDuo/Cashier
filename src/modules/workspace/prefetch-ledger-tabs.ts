@@ -9,6 +9,19 @@ import type { LedgerAdvancedFilters } from "./initial-query-state";
 import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
 import { runtimeEnv } from "@/lib/env/runtime";
 import type { StatsUrlState } from "./ledger-url-params";
+import type { MemberProfileContract } from "@/application/contracts";
+
+/**
+ * The signed-in member's own zone, hydrated alongside the ledger. Prefetching
+ * uses the same zone the tab will, so a prefetched page is not a different day
+ * from the one it lands in.
+ */
+function memberTimeZone(queryClient: QueryClient, ledgerId: string, userId: string) {
+  const members = queryClient.getQueryData<readonly MemberProfileContract[]>(
+    queryKeys.coupleMembers(ledgerId)
+  );
+  return members?.find((member) => member.id === userId)?.timeZone ?? runtimeEnv.timeZone;
+}
 import {
   buildDetailsQueryDescriptor,
   buildStatsQueryDescriptor,
@@ -21,6 +34,7 @@ type LedgerEntriesPage = Awaited<
 export async function prefetchDetailsTabQuery(
   queryClient: QueryClient,
   ledgerId: string,
+  userId: string,
   periodParams: PeriodParams,
   advancedFilters: LedgerAdvancedFilters,
   attributedUserId?: string
@@ -34,7 +48,7 @@ export async function prefetchDetailsTabQuery(
     ...(attributedUserId == null ? {} : { attributedUserId }),
     periodParams,
     advancedFilters,
-    ...(ledger?.settings.timeZone != null ? { timeZone: ledger.settings.timeZone } : {}),
+    timeZone: memberTimeZone(queryClient, ledgerId, userId),
     mainCurrency,
   });
 
@@ -67,12 +81,13 @@ export async function prefetchDetailsTabQuery(
 export async function prefetchStatsTabQuery(
   queryClient: QueryClient,
   ledgerId: string,
+  userId: string,
   statsState: StatsUrlState = { range: "month", offset: 0, view: "heatmap" }
 ) {
   const { getEnhancedStats } = await import("@/lib/queries/ledger-query-client");
   const ledger = queryClient.getQueryData<Ledger>(queryKeys.ledger(ledgerId));
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
-  const fixedTimeZone = ledger?.settings.timeZone ?? runtimeEnv.timeZone;
+  const fixedTimeZone = memberTimeZone(queryClient, ledgerId, userId);
   const zonedToday = getDateInTimezone(fixedTimeZone);
   const initialDate = zonedToday != null ? parseDateString(zonedToday) : new Date();
   const descriptor = buildStatsQueryDescriptor({

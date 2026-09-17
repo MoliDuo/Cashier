@@ -9,13 +9,16 @@ import type {
   SourceDocumentReadPort,
   LedgerChangeReadPort,
 } from "@/modules/source-document/application/ports";
-import type { ServiceCredentialPort } from "@/application/contracts";
+import type { ServiceCredentialPort, UserProfilePort } from "@/application/contracts";
+
+const listMembersMock = vi.fn();
 
 const bootstrapDependencies = {
   categories: {
     listWithCount: vi.fn(),
     countUncategorized: vi.fn(),
   } satisfies Pick<CategoryPort, "listWithCount" | "countUncategorized">,
+  profiles: { listMembers: listMembersMock } satisfies Pick<UserProfilePort, "listMembers">,
   ledgerReads: {
     calculateStats: vi.fn(),
     listEntries: vi.fn(),
@@ -40,11 +43,15 @@ const bootstrapDependencies = {
   credentials: { list: vi.fn() } satisfies Pick<ServiceCredentialPort, "list">,
 };
 const getLedgerPageBootstrap = (
-  input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto"> &
-    Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto">>
+  input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto" | "userId"> &
+    Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto" | "userId">>
 ) =>
   getLedgerPageBootstrapUseCase(
-    { ...input, ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto() },
+    {
+      userId: "user-1",
+      ...input,
+      ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto(),
+    },
     bootstrapDependencies
   );
 
@@ -94,6 +101,10 @@ describe("getLedgerPageBootstrap", () => {
     vi.clearAllMocks();
 
     listEntryCategoriesMock.mockResolvedValue([]);
+    listMembersMock.mockResolvedValue([
+      { id: "user-1", nickname: "A", gender: "male", timeZone: null },
+      { id: "user-2", nickname: "B", gender: "female", timeZone: null },
+    ]);
     calculateLedgerStatsMock.mockResolvedValue({});
     listLedgerEntriesMock.mockResolvedValue({ items: [], nextCursor: null });
     getSourceDocumentCountsQueryMock.mockResolvedValue({ processingCount: 0, attentionCount: 0 });

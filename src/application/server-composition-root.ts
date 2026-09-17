@@ -8,6 +8,7 @@ import {
   postgresSettingsAdapter,
   postgresUserAccountAdapter,
   postgresUserPreferencesAdapter,
+  postgresUserProfileAdapter,
   calculateCompletedSourceDocumentTotal,
   getTargetSourceDocument,
   getTargetSourceDocumentAccessContext,
@@ -125,4 +126,5 @@ export const serverComposition = {
   executeSingleProcessingJob,
   userAccounts: postgresUserAccountAdapter,
   userPreferences: postgresUserPreferencesAdapter,
+  userProfiles: postgresUserProfileAdapter,
 } as const;

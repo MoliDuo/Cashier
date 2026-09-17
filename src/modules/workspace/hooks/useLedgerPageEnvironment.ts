@@ -9,6 +9,8 @@ import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contrac
 import { useShellController } from "@/components/providers/shell-controller";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
+import { useCoupleMembers } from "@/modules/auth/hooks/useCoupleMembers";
+import type { MemberProfileContract } from "@/application/contracts";
 
 const STALE_TIME = LEDGER.STALE_TIME_MS;
 const subscribeToDeviceTimeZone = () => () => {};
@@ -17,8 +19,11 @@ const getServerTimeZone = () => undefined;
 
 interface UseLedgerPageEnvironmentOptions {
   ledgerId: string;
+  /** The signed-in member, whose own time zone the page is dated by. */
+  userId: string;
   initialLedger?: LedgerDto | undefined;
   initialCategories?: EntryCategoryWithCount[] | undefined;
+  initialMembers?: readonly MemberProfileContract[] | undefined;
   setIsInputOpen: (open: boolean) => void;
 }
 
@@ -29,8 +34,10 @@ interface UseLedgerPageEnvironmentOptions {
  */
 export function useLedgerPageEnvironment({
   ledgerId,
+  userId,
   initialLedger,
   initialCategories,
+  initialMembers,
   setIsInputOpen,
 }: UseLedgerPageEnvironmentOptions) {
   const { data: ledger } = useQuery({
@@ -51,7 +58,12 @@ export function useLedgerPageEnvironment({
 
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const preferredCurrencies = ledger?.settings.currencies ?? [];
-  const fixedTimeZone = ledger?.settings.timeZone ?? undefined;
+  const { me } = useCoupleMembers({
+    ledgerId,
+    userId,
+    ...(initialMembers !== undefined ? { initialMembers } : {}),
+  });
+  const fixedTimeZone = me?.timeZone ?? undefined;
   const deviceTimeZone = useSyncExternalStore(
     subscribeToDeviceTimeZone,
     getDeviceTimeZone,

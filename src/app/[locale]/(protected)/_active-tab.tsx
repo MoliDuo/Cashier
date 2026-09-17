@@ -71,6 +71,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   const pageDataPromise = getLedgerPageBootstrap(
     {
       ledgerId,
+      userId: session.user!.id,
       initialTab: activeTab,
       periodParams,
       advancedFilters,
@@ -79,6 +80,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
     },
     {
       categories: serverComposition.categories,
+      profiles: serverComposition.userProfiles,
       ledgerReads: serverComposition.ledgerReads,
       stats: serverComposition.stats,
       sourceDocuments: {
@@ -110,7 +112,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
 
   return (
     <NextIntlClientProvider messages={activeMessages} locale={locale}>
-      <ActiveShell ledgerId={ledgerId}>
+      <ActiveShell ledgerId={ledgerId} userId={session.user!.id}>
         <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
           <ActiveTabBootstrap
             pageDataPromise={pageDataPromise}
@@ -159,6 +161,9 @@ async function ActiveTabBootstrap({
           ? { initialCategories: pageData.initialCategories }
           : {})}
         {...(pageData?.ledgerToday !== undefined ? { ledgerToday: pageData.ledgerToday } : {})}
+        {...(pageData?.initialMembers !== undefined
+          ? { initialMembers: pageData.initialMembers }
+          : {})}
         {...(session.user?.email != null ? { userEmail: session.user.email } : {})}
         hasPassword={session.user?.hasPassword ?? false}
         passwordUpdatedAt={session.user?.passwordUpdatedAt ?? null}

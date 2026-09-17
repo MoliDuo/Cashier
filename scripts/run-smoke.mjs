@@ -110,13 +110,13 @@ try {
     await db.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
     await migrate(drizzle(db), { migrationsFolder: "src/persistence/postgres-migrations" });
     const hash = await bcrypt.hash(password, 12);
-    for (const [id, email] of [
-      [ownerId, env.SMOKE_EMAIL],
-      [partnerId, env.SMOKE_PARTNER_EMAIL],
+    for (const [id, email, nickname, gender] of [
+      [ownerId, env.SMOKE_EMAIL, "A", "male"],
+      [partnerId, env.SMOKE_PARTNER_EMAIL, "B", "female"],
     ]) {
       await db.query(
-        `INSERT INTO users (id, email, email_verified, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, now(), $3, now(), now(), now())`,
-        [id, email, hash]
+        `INSERT INTO users (id, email, nickname, gender, email_verified, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, $3, $4, now(), $5, now(), now(), now())`,
+        [id, email, nickname, gender, hash]
       );
     }
     await db.query(

@@ -58,6 +58,8 @@ export async function createTestUser(
     id,
     email: finalEmail,
     name: "Test User",
+    nickname: id === TEST_PARTNER_USER_ID ? "B" : "A",
+    gender: id === TEST_PARTNER_USER_ID ? "female" : "male",
     emailVerified: new Date(),
   });
   return id;

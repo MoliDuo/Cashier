@@ -3,19 +3,24 @@
   "user": {
     "id": "10000000-0000-4000-8000-000000000001",
     "email": "dev@cashier.local",
-    "name": "Local Developer"
+    "name": "Local Developer",
+    "nickname": "Dev",
+    "gender": "male",
+    "timeZone": "Asia/Kuala_Lumpur"
   },
   "partner": {
     "id": "10000000-0000-4000-8000-000000000002",
     "email": "partner@cashier.local",
-    "name": "Local Partner"
+    "name": "Local Partner",
+    "nickname": "Partner",
+    "gender": "female",
+    "timeZone": "Asia/Shanghai"
   },
   "ledger": {
     "id": "20000000-0000-4000-8000-000000000001",
     "mainCurrency": "CNY",
     "preferredCurrencies": ["CNY", "USD", "MYR"],
-    "aiLanguage": "en",
-    "timeZone": "Asia/Kuala_Lumpur"
+    "aiLanguage": "en"
   },
   "categories": [
     {

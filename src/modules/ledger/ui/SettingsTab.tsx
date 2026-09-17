@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
 import { AiSettings } from "./settings/AiSettings";
 import { AccountSettings } from "./settings/AccountSettings";
+import { ProfileSettings } from "./settings/ProfileSettings";
 import { SettingsSection } from "./settings/SettingsSection";
 import { SettingsField } from "./settings/SettingsField";
 import { useCategoryMutations } from "@/modules/ledger/hooks/useCategoryMutations";
@@ -31,11 +32,14 @@ import { queryKeys } from "@/lib/query-keys";
 import { getEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
+import type { MemberProfileContract } from "@/application/contracts";
 
 interface SettingsTabProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   ledgerId: string;
+  /** Both member profiles, hydrated by the page bootstrap. */
+  initialMembers: readonly MemberProfileContract[];
   /** Server-derived identity used to label credential ownership. */
   userId?: string;
   partnerUserId?: string;
@@ -54,6 +58,7 @@ export function SettingsTab({
   ledger,
   initialCategories,
   ledgerId,
+  initialMembers,
   userId,
   partnerUserId,
   userEmail,
@@ -71,7 +76,6 @@ export function SettingsTab({
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [displayEmail, setDisplayEmail] = useState(userEmail ?? "");
-  const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null);
   const [appearanceServer, setAppearanceServer] = useState({
     theme: theme ?? "system",
     language: interfaceLanguage,
@@ -110,17 +114,6 @@ export function SettingsTab({
     useUnsavedChangesStore.getState().setDirty(key, appearanceDirty);
     return () => useUnsavedChangesStore.getState().setDirty(key, false);
   }, [appearanceDirty]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        setDeviceTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || null);
-      } catch {
-        setDeviceTimeZone(null);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   // Use extracted hooks - ledger is reactive and will update with optimistic updates
   const {
@@ -264,6 +257,12 @@ export function SettingsTab({
           </Button>
         </div>
       )}
+      <ProfileSettings
+        ledgerId={ledgerId}
+        initialMembers={initialMembers}
+        {...(userId !== undefined ? { userId } : {})}
+      />
+
       <SettingsSection title={t("appearanceAndLanguage")}>
         <SettingsField title={t("theme")}>
           <Select
@@ -328,7 +327,6 @@ export function SettingsTab({
         settings={settingsLedger.settings}
         categories={categories}
         uncategorizedCount={uncategorizedCount}
-        deviceTimeZone={deviceTimeZone}
         onUpdateSettings={(data) => updateLedgerMutation.mutateAsync(data)}
         onSaveCategories={(input) => saveCategories.mutateAsync(input)}
         onReloadCategories={reloadCategories}

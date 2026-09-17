@@ -80,6 +80,8 @@ describe("createEntryCategoryAction", () => {
         id: otherUserId,
         email: `other-${uuidv4()}@example.com`,
         name: "Other User",
+        nickname: "B",
+        gender: "female",
         emailVerified: new Date(),
       })
       .onConflictDoNothing();

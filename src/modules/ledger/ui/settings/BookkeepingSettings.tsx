@@ -12,13 +12,6 @@ import { CurrencySection } from "../CurrencySection";
 import { CategorySection } from "../CategorySection";
 import { SettingsField } from "./SettingsField";
 import { SettingsSection } from "./SettingsSection";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { SettingsSectionActions } from "./SettingsSectionActions";
 import { useEffect, useMemo, useState } from "react";
@@ -29,7 +22,6 @@ interface BookkeepingSettingsProps {
   settings: Settings;
   categories: EntryCategoryWithCount[];
   uncategorizedCount: number;
-  deviceTimeZone: string | null;
   onUpdateSettings: (data: Partial<Settings>) => Promise<Ledger>;
   onSaveCategories: (input: SaveEntryCategoriesInput) => Promise<EntryCategory[]>;
   onReloadCategories?: () => Promise<EntryCategory[]>;
@@ -45,7 +37,6 @@ export function BookkeepingSettings({
   settings,
   categories,
   uncategorizedCount,
-  deviceTimeZone,
   onUpdateSettings,
   onSaveCategories,
   onReloadCategories,
@@ -139,41 +130,6 @@ export function BookkeepingSettings({
           disabled={status === "saving"}
         />
       </SettingsField>
-      <SettingsField title={t("timeZone")} description={t("timeZoneDesc")}>
-        <Select
-          value={draft.timeZone ?? "auto"}
-          onValueChange={(value) => updateDraft({ timeZone: value === "auto" ? null : value })}
-          disabled={status === "saving"}
-        >
-          <SelectTrigger aria-label={t("timeZone")} className="w-full sm:w-64">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectItem value="auto">
-              {deviceTimeZone == null
-                ? t("timeZoneAuto")
-                : t("timeZoneAutoDetected", { timeZone: deviceTimeZone })}
-            </SelectItem>
-            {[
-              "Asia/Shanghai",
-              "Asia/Tokyo",
-              "Asia/Singapore",
-              "Europe/London",
-              "Europe/Paris",
-              "America/New_York",
-              "America/Chicago",
-              "America/Denver",
-              "America/Los_Angeles",
-              "Australia/Sydney",
-              "UTC",
-            ].map((timeZone) => (
-              <SelectItem key={timeZone} value={timeZone}>
-                {timeZone}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingsField>
       <CurrencySection
         settings={draft}
         onUpdateSettings={updateDraft}
@@ -210,7 +166,6 @@ interface BookkeepingDraft {
   mainCurrency: string;
   currencies: string[];
   collapseEntriesDefault: boolean;
-  timeZone: string | null;
 }
 
 type BookkeepingField = keyof BookkeepingDraft;
@@ -218,7 +173,6 @@ const bookkeepingFields: readonly BookkeepingField[] = [
   "mainCurrency",
   "currencies",
   "collapseEntriesDefault",
-  "timeZone",
 ];
 
 function normalizeBookkeepingSettings(settings: BookkeepingDraft): BookkeepingDraft {
@@ -226,7 +180,6 @@ function normalizeBookkeepingSettings(settings: BookkeepingDraft): BookkeepingDr
     mainCurrency: settings.mainCurrency,
     currencies: [...settings.currencies],
     collapseEntriesDefault: settings.collapseEntriesDefault,
-    timeZone: settings.timeZone,
   };
 }
 
@@ -234,7 +187,6 @@ function bookkeepingSettingsEqual(left: BookkeepingDraft, right: BookkeepingDraf
   return (
     left.mainCurrency === right.mainCurrency &&
     left.collapseEntriesDefault === right.collapseEntriesDefault &&
-    left.timeZone === right.timeZone &&
     left.currencies.length === right.currencies.length &&
     left.currencies.every((currency, index) => currency === right.currencies[index])
   );
@@ -254,9 +206,6 @@ function buildBookkeepingPatch(
     server.collapseEntriesDefault !== draft.collapseEntriesDefault
   ) {
     patch.collapseEntriesDefault = draft.collapseEntriesDefault;
-  }
-  if (touchedFields.has("timeZone") && server.timeZone !== draft.timeZone) {
-    patch.timeZone = draft.timeZone;
   }
   if (
     touchedFields.has("currencies") &&
@@ -291,6 +240,5 @@ function rebaseBookkeepingDraft(
     collapseEntriesDefault: touchedFields.has("collapseEntriesDefault")
       ? draft.collapseEntriesDefault
       : incoming.collapseEntriesDefault,
-    timeZone: touchedFields.has("timeZone") ? draft.timeZone : incoming.timeZone,
   };
 }

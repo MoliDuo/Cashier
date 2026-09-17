@@ -17,13 +17,14 @@ import { scheduleRequestMaintenance } from "@/application/transport/request-main
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
 import { isCoupleMember } from "@/lib/couple-config";
 import { ValidationError } from "@/lib/errors";
+import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
 
 /**
  * Create a new source document and trigger processing.
  */
 export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
-    { ledgerId, ledger, userId },
+    { ledgerId, userId },
     input: CreateSourceDocumentInputContract,
     clientSubmissionId: string
   ): Promise<CreateSourceDocumentResponseDto> => {
@@ -32,7 +33,11 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     if (!isCoupleMember(attributedUserId)) throw new ValidationError("Invalid member attribution");
     const validatedClientSubmissionId = clientSubmissionIdSchema.parse(clientSubmissionId);
     const payload = omitUndefinedProperties(validated);
-    const timezone = payload.timezone ?? ledger.settings.timeZone ?? undefined;
+    // The zone sent with the request wins; otherwise the signed-in member's
+    // own, so a record written from a phone abroad still lands on their day.
+    const members = await getCoupleMembers(serverComposition.userProfiles);
+    const timezone =
+      payload.timezone ?? members.find((member) => member.id === userId)?.timeZone ?? undefined;
     const scheduleProcessing = (job: ProcessingJobContract) => {
       scheduleProcessingAfter(job);
     };

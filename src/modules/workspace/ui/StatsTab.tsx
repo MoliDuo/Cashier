@@ -29,14 +29,14 @@ import {
 import { pushLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { formatCurrencyAmount } from "@/lib/format/currency";
-import { Button } from "@/components/ui/button";
 
 const STATS_QUERY_DEBOUNCE_MS = 250;
 
 interface StatsTabProps {
-  recordScope?: "all" | "mine" | "partner";
-  onRecordScopeChange?: (scope: "all" | "mine" | "partner") => void;
+  /** Which member the charts are narrowed to, resolved by the page. */
+  scopeOwnerId: string | null;
   userId: string;
+  /** The other member, for the per-person totals row. */
   partnerUserId: string;
   ledgerId?: string;
   ledger?: Ledger;
@@ -47,8 +47,7 @@ interface StatsTabProps {
 }
 
 export function StatsTab({
-  recordScope,
-  onRecordScopeChange,
+  scopeOwnerId,
   userId,
   partnerUserId,
   ledgerId,
@@ -62,9 +61,6 @@ export function StatsTab({
   const tCommon = useTranslations("Common");
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [localScope, setLocalScope] = useState<"all" | "mine" | "partner">("all");
-  const scope = recordScope ?? localScope;
-  const setScope = onRecordScopeChange ?? setLocalScope;
   const statsUrlState = useMemo(() => readStatsSearchParams(searchParams), [searchParams]);
   const rangeType: DateRangeType = statsUrlState.range ?? DEFAULT_STATS_RANGE_TYPE;
   const periodOffset = statsUrlState.offset;
@@ -110,22 +106,13 @@ export function StatsTab({
     () =>
       buildStatsQueryDescriptor({
         ledgerId: ledgerId ?? "",
-        ...(scope === "all" ? {} : { attributedUserId: scope === "mine" ? userId : partnerUserId }),
+        ...(scopeOwnerId == null ? {} : { attributedUserId: scopeOwnerId }),
         currentDate,
         mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
         rangeType,
         currentPeriod: periodOffset === 0,
       }),
-    [
-      currentDate,
-      ledger?.settings.mainCurrency,
-      ledgerId,
-      partnerUserId,
-      periodOffset,
-      rangeType,
-      scope,
-      userId,
-    ]
+    [currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType, scopeOwnerId]
   );
   const mineDescriptor = useMemo(
     () =>
@@ -239,23 +226,6 @@ export function StatsTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2" role="group" aria-label={tCommon("statsScope")}>
-        {(["all", "mine", "partner"] as const).map((option) => (
-          <Button
-            key={option}
-            size="sm"
-            variant={scope === option ? "default" : "outline"}
-            aria-pressed={scope === option}
-            onClick={() => setScope(option)}
-          >
-            {option === "all"
-              ? tCommon("allMembers")
-              : option === "mine"
-                ? tCommon("myRecords")
-                : tCommon("partnerRecords")}
-          </Button>
-        ))}
-      </div>
       <div className="grid grid-cols-3 gap-2 border-b pb-3 text-sm" aria-live="polite">
         {(["mine", "partner", "all"] as const).map((kind) => {
           const result = kind === "mine" ? mineQuery : kind === "partner" ? partnerQuery : allQuery;

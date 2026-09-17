@@ -3,11 +3,7 @@ import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
-import {
-  EntryFilterPanel,
-  type EntryFilters,
-  type RecordScope,
-} from "@/modules/ledger/ui/EntryFilterPanel";
+import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import {
   BatchDateDialog,
   batchDateImpactSummary,
@@ -19,6 +15,7 @@ import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
+import { MemberScopeChip } from "./MemberScopeChip";
 import type { ReactNode } from "react";
 import { usePeriodLabel } from "./usePeriodLabel";
 import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
@@ -47,8 +44,8 @@ interface LedgerEntriesToolbarProps {
   isProcessing?: boolean;
   filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
-  recordScope: RecordScope;
-  onRecordScopeChange: (scope: RecordScope) => void;
+  /** Nickname of the member the list is narrowed to, when it is. */
+  memberScopeNickname?: string | undefined;
   periodParams: PeriodParams;
   mainCurrency: string;
   filteredTotal?: string;
@@ -80,8 +77,7 @@ export function LedgerEntriesToolbar({
   isProcessing: externallyProcessing = false,
   filters,
   onFiltersChange,
-  recordScope,
-  onRecordScopeChange,
+  memberScopeNickname,
   periodParams,
   mainCurrency,
   filteredTotal,
@@ -172,6 +168,11 @@ export function LedgerEntriesToolbar({
   return (
     <EntriesToolbarShell
       syncStatus={syncStatus}
+      memberScopeChip={
+        !isSelectionMode && memberScopeNickname != null ? (
+          <MemberScopeChip nickname={memberScopeNickname} />
+        ) : undefined
+      }
       onRefresh={isSelectionMode ? undefined : onRefresh}
       isRefreshing={isRefreshing}
       {...(!isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
@@ -220,8 +221,6 @@ export function LedgerEntriesToolbar({
         <EntryFilterPanel
           filters={filters}
           onFiltersChange={onFiltersChange}
-          recordScope={recordScope}
-          onRecordScopeChange={onRecordScopeChange}
           periodParams={periodParams}
           showCategory={false}
           showCurrency={false}

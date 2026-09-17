@@ -10,6 +10,7 @@ import { serverComposition } from "@/application/server-composition-root";
 import { convertEntryAmount } from "@/modules/currency/application/use-cases/convert-entry-amount";
 import { isCoupleMember } from "@/lib/couple-config";
 import { ValidationError } from "@/lib/errors";
+import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
 
 /**
  * Create a quick entry (manual entry without AI parsing).
@@ -23,9 +24,11 @@ export const createQuickEntryAction = withSourceDocumentLedgerAccess(
     const validated = createQuickEntryInputSchema.parse(data);
     const attributedUserId = validated.attributedUserId ?? userId;
     if (!isCoupleMember(attributedUserId)) throw new ValidationError("Invalid member attribution");
+    const members = await getCoupleMembers(serverComposition.userProfiles);
     const payload = {
       attributedUserId,
       createdByUserId: userId,
+      timeZone: members.find((member) => member.id === userId)?.timeZone ?? null,
       categoryId: validated.categoryId,
       amount: validated.amount,
       ...(validated.currency !== undefined ? { currency: validated.currency } : {}),

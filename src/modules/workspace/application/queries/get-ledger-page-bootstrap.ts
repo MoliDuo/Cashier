@@ -21,6 +21,7 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
 import type { CategoryPort } from "@/application/contracts";
 import type { ServiceCredentialPort } from "@/application/contracts";
+import type { MemberProfileContract, UserProfilePort } from "@/application/contracts";
 import type { LedgerReadPort } from "@/modules/ledger/application/ports";
 import type { StatsReadPort } from "@/modules/stats/application/ports";
 import type {
@@ -35,11 +36,13 @@ import {
   buildStreamQueryDescriptor,
 } from "@/modules/workspace/ledger-tab-query-descriptors";
 import type { StatsUrlState } from "@/modules/workspace/ledger-url-params";
+import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
 
 interface LedgerPageBootstrapResult {
   dehydratedState: DehydratedState;
   ledgerToday: string;
   initialCategories: EntryCategoryWithCountDto[];
+  initialMembers: readonly MemberProfileContract[];
 }
 
 export interface GetLedgerPageBootstrapInput {
@@ -50,12 +53,15 @@ export interface GetLedgerPageBootstrapInput {
   statsState?: StatsUrlState;
   /** Ledger DTO returned by the authenticated page boundary. */
   ledgerDto: LedgerDto;
+  /** The signed-in member; their own time zone is what this page's dates use. */
+  userId: string;
 }
 
 export async function getLedgerPageBootstrap(
   input: GetLedgerPageBootstrapInput,
   dependencies: {
     categories: Pick<CategoryPort, "listWithCount" | "countUncategorized">;
+    profiles: Pick<UserProfilePort, "listMembers">;
     ledgerReads: Pick<
       LedgerReadPort,
       "calculateStats" | "listEntries" | "listEntriesBySourceDocumentIds"
@@ -76,7 +82,12 @@ export async function getLedgerPageBootstrap(
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
 
   const mainCurrency = ledgerDto.settings.mainCurrency;
-  const fixedTimeZone = ledgerDto.settings.timeZone ?? runtimeEnv.timeZone;
+  // The viewer's own zone, not a ledger-wide one: the two members live in
+  // different places, so "today" is a property of who is looking.
+  const members = await getCoupleMembers(dependencies.profiles);
+  queryClient.setQueryData(queryKeys.coupleMembers(input.ledgerId), members);
+  const fixedTimeZone =
+    members.find((member) => member.id === input.userId)?.timeZone ?? runtimeEnv.timeZone;
   const zonedToday = getDateInTimezone(fixedTimeZone);
   const ledgerToday = zonedToday ?? getDateInTimezone("UTC")!;
   const initialStatsDate = parseDateString(ledgerToday);
@@ -230,5 +241,6 @@ export async function getLedgerPageBootstrap(
     dehydratedState: dehydrate(queryClient),
     ledgerToday,
     initialCategories,
+    initialMembers: members,
   };
 }

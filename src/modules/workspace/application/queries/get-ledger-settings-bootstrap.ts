@@ -1,10 +1,16 @@
 import { QueryClient, dehydrate, type DehydratedState } from "@tanstack/react-query";
 import { LEDGER } from "@/lib/constants";
 import { queryKeys } from "@/lib/query-keys";
-import type { CategoryPort, ServiceCredentialPort } from "@/application/contracts";
+import type {
+  CategoryPort,
+  MemberProfileContract,
+  ServiceCredentialPort,
+  UserProfilePort,
+} from "@/application/contracts";
 import type { LedgerDto, EntryCategoryWithCountDto } from "@/modules/ledger/contracts";
 import { listEntryCategories } from "@/modules/ledger/application/queries/list-entry-categories";
 import { getLedgerSettingsView } from "@/modules/ledger/application/queries/get-ledger-settings-view";
+import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
 
 export interface GetLedgerSettingsBootstrapInput {
   ledgerId: string;
@@ -15,6 +21,7 @@ export interface GetLedgerSettingsBootstrapInput {
 export interface LedgerSettingsBootstrapResult {
   dehydratedState: DehydratedState;
   initialCategories: EntryCategoryWithCountDto[];
+  initialMembers: readonly MemberProfileContract[];
 }
 
 export async function getLedgerSettingsBootstrap(
@@ -22,6 +29,7 @@ export async function getLedgerSettingsBootstrap(
   dependencies: {
     categories: Pick<CategoryPort, "listWithCount" | "countUncategorized">;
     credentials: Pick<ServiceCredentialPort, "list">;
+    profiles: Pick<UserProfilePort, "listMembers">;
   }
 ): Promise<LedgerSettingsBootstrapResult | null> {
   if (input.ledgerDto.id !== input.ledgerId) return null;
@@ -29,6 +37,9 @@ export async function getLedgerSettingsBootstrap(
 
   const queryClient = new QueryClient();
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
+
+  const members = await getCoupleMembers(dependencies.profiles);
+  queryClient.setQueryData(queryKeys.coupleMembers(input.ledgerId), members);
 
   const categoriesPromise = queryClient.fetchQuery({
     queryKey: queryKeys.entryCategories(input.ledgerId),
@@ -51,5 +62,6 @@ export async function getLedgerSettingsBootstrap(
   return {
     dehydratedState: dehydrate(queryClient),
     initialCategories: await categoriesPromise,
+    initialMembers: members,
   };
 }

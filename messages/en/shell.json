@@ -93,8 +93,6 @@
     "recordOwner": "Record owner",
     "recordedBy": "Recorded by",
     "historicalRecord": "Historical record",
-    "recordScope": "Record scope",
-    "statsScope": "Statistics scope",
     "allMembers": "All",
     "myRecords": "Me",
     "partnerRecords": "Partner",
@@ -206,5 +204,11 @@
     "focusBlocked": "Leave the text field before reloading the app.",
     "batchBlocked": "Finish selecting entries before reloading the app.",
     "offlineBlocked": "Reconnect to the network before reloading the app."
+  },
+  "MemberScope": {
+    "label": "Record scope",
+    "mine": "{nickname} (Me)",
+    "only": "Only {nickname}",
+    "current": "Showing only {nickname}. Open the member switch"
   }
 }

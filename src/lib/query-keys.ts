@@ -22,6 +22,10 @@ export const queryKeys = {
     ["ledger", ledgerId, "entry", entryId] as const,
   ledgerEntryPrefix: (ledgerId: string) => ["ledger", ledgerId, "entry"] as const,
 
+  // === Members ===
+  /** Both profiles, so a rename shows up in the switch without a fresh page. */
+  coupleMembers: (ledgerId: string) => ["ledger", ledgerId, "members"] as const,
+
   // === Source Documents ===
   sourceDocuments: (ledgerId: string, params?: QueryKeyParams | null) =>
     ["ledger", ledgerId, "source-documents", normalizeQueryParams(params)] as const,

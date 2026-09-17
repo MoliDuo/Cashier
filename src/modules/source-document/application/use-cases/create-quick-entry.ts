@@ -8,6 +8,8 @@ import type { LedgerSettingsContract } from "@/application/contracts";
 export interface CreateQuickEntryPayload {
   attributedUserId: string;
   createdByUserId: string;
+  /** The signed-in member's own zone; null means their device decides. */
+  timeZone?: string | null;
   categoryId: string;
   amount: string;
   currency?: string;
@@ -67,15 +69,17 @@ async function createQuickEntryAtomically(
 
 export async function createQuickEntry(
   ledgerId: string,
-  ledger: { settings: Pick<LedgerSettingsContract, "mainCurrency" | "timeZone"> },
+  ledger: { settings: Pick<LedgerSettingsContract, "mainCurrency"> },
   payload: CreateQuickEntryPayload,
   ports: QuickEntryPorts
 ): Promise<QuickEntryResponseDto> {
   const mainCurrency = ledger.settings.mainCurrency;
   const entryCurrency = payload.currency ?? mainCurrency;
-  const timeZone = ledger.settings.timeZone ?? undefined;
+  // The record is dated by the member who wrote it, not by the book.
   const entryDate =
-    payload.entryDate ?? getDateInTimezone(timeZone) ?? formatDateTimeForApi(new Date());
+    payload.entryDate ??
+    getDateInTimezone(payload.timeZone ?? undefined) ??
+    formatDateTimeForApi(new Date());
 
   const [categoryName, conversion] = await Promise.all([
     getEntryCategoryName(ledgerId, payload.categoryId, ports.categories),

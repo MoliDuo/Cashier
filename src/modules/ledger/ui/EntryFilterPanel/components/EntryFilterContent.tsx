@@ -19,7 +19,7 @@ import {
   type EntryFilterPreset,
 } from "@/modules/ledger/entry-filter-presets";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
-import type { EntryFilters, RecordScope } from "@/modules/ledger/filters";
+import type { EntryFilters } from "@/modules/ledger/filters";
 
 const STATUS_OPTIONS: SourceDocumentProcessingStatus[] = [
   "processing",
@@ -27,8 +27,6 @@ const STATUS_OPTIONS: SourceDocumentProcessingStatus[] = [
   "failed",
   "cancelled",
 ];
-
-const RECORD_SCOPES: RecordScope[] = ["all", "mine", "partner"];
 
 interface EntryFilterContentProps {
   tempFilters: EntryFilters;
@@ -45,9 +43,6 @@ interface EntryFilterContentProps {
   showCategory: boolean;
   showCurrency: boolean;
   showStatus: boolean;
-  showRecordScope: boolean;
-  tempRecordScope: RecordScope;
-  setTempRecordScope: (scope: RecordScope) => void;
 }
 
 export function EntryFilterContent({
@@ -65,25 +60,10 @@ export function EntryFilterContent({
   showCategory,
   showCurrency,
   showStatus,
-  showRecordScope,
-  tempRecordScope,
-  setTempRecordScope,
 }: EntryFilterContentProps) {
   const t = useTranslations("EntryFilterPanel");
-  const tCommon = useTranslations("Common");
   const tDateRange = useTranslations("DateRangeFilter");
   const tSettings = useTranslations("Settings");
-
-  const scopeLabel = (scope: RecordScope) => {
-    switch (scope) {
-      case "all":
-        return tCommon("allMembers");
-      case "mine":
-        return tCommon("myRecords");
-      case "partner":
-        return tCommon("partnerRecords");
-    }
-  };
 
   const statusLabel = (status: SourceDocumentProcessingStatus) => {
     switch (status) {
@@ -115,36 +95,6 @@ export function EntryFilterContent({
   return (
     <div className="flex min-h-0 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        {/* Whose records: the one section that changes the set the other
-            filters narrow, so it leads the panel. */}
-        {showRecordScope ? (
-          <div
-            className="flex gap-1 rounded-lg bg-surface2 p-1"
-            role="group"
-            aria-label={tCommon("recordScope")}
-          >
-            {RECORD_SCOPES.map((scope) => {
-              const isActive = tempRecordScope === scope;
-              return (
-                <button
-                  key={scope}
-                  type="button"
-                  aria-pressed={isActive}
-                  className={cn(
-                    "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors duration-[var(--motion-feedback)]",
-                    isActive
-                      ? "bg-surface text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-text"
-                  )}
-                  onClick={() => setTempRecordScope(scope)}
-                >
-                  {scopeLabel(scope)}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-
         <Input
           type="search"
           name="search"

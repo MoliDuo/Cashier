@@ -1,16 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { formatDateTimeForApiMock, getEntryCategoryNameMock, createManualMock, convertAmountMock } =
-  vi.hoisted(() => ({
-    formatDateTimeForApiMock: vi.fn(),
-    getEntryCategoryNameMock: vi.fn(),
-    createManualMock: vi.fn(),
-    convertAmountMock: vi.fn(),
-  }));
+const {
+  formatDateTimeForApiMock,
+  getDateInTimezoneMock,
+  getEntryCategoryNameMock,
+  createManualMock,
+  convertAmountMock,
+} = vi.hoisted(() => ({
+  formatDateTimeForApiMock: vi.fn(),
+  getDateInTimezoneMock: vi.fn<() => string | undefined>(() => undefined),
+  getEntryCategoryNameMock: vi.fn(),
+  createManualMock: vi.fn(),
+  convertAmountMock: vi.fn(),
+}));
 
 vi.mock("@/lib/date-utils", () => ({
   formatDateTimeForApi: formatDateTimeForApiMock,
-  getDateInTimezone: vi.fn(() => undefined),
+  getDateInTimezone: getDateInTimezoneMock,
 }));
 
 vi.mock("@/application/server-composition-root", () => ({
@@ -58,9 +64,7 @@ describe("createQuickEntry", () => {
   it("uses ledger main currency and current date when payload omits them", async () => {
     const result = await createQuickEntry(
       "ledger-1",
-      {
-        settings: { mainCurrency: "USD", timeZone: null },
-      },
+      { settings: { mainCurrency: "USD" } },
       {
         categoryId: "cat-1",
         attributedUserId: "user-1",
@@ -99,12 +103,32 @@ describe("createQuickEntry", () => {
     });
   });
 
+  it("dates the record by the signed-in member's own zone", async () => {
+    getDateInTimezoneMock.mockReturnValueOnce("2026-03-21");
+
+    await createQuickEntry(
+      "ledger-1",
+      { settings: { mainCurrency: "USD" } },
+      {
+        categoryId: "cat-1",
+        attributedUserId: "user-1",
+        createdByUserId: "user-1",
+        amount: "100",
+        timeZone: "Asia/Shanghai",
+      },
+      ports
+    );
+
+    expect(getDateInTimezoneMock).toHaveBeenCalledWith("Asia/Shanghai");
+    expect(createManualMock).toHaveBeenCalledWith(
+      expect.objectContaining({ entryDate: "2026-03-21" })
+    );
+  });
+
   it("uses provided currency, entryDate, itemName, and description", async () => {
     await createQuickEntry(
       "ledger-1",
-      {
-        settings: { mainCurrency: "USD", timeZone: null },
-      },
+      { settings: { mainCurrency: "USD" } },
       {
         categoryId: "cat-1",
         attributedUserId: "user-1",

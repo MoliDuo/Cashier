@@ -14,6 +14,8 @@ async function createTestUser(email?: string) {
       id,
       email: email ?? `test-${id}@example.com`,
       name: "Test User",
+      nickname: "A",
+      gender: "male",
       emailVerified: new Date(),
     })
     .returning();

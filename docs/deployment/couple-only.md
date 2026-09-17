@@ -190,6 +190,36 @@ still hold a NULL pointer are genuine manual entries with no input to recover.
 Then open a few older documents and confirm the original images render and
 "edit retry" seeds the draft with them.
 
+## Member profiles and per-person time zones (`0047`)
+
+`0047_member_profiles.sql` gives each member a nickname, a gender, and their own
+time zone, and drops the ledger-wide `ledgers.time_zone` that 0045 had left
+serving two people in two places. Both members are editable afterwards in
+设置 → 个人资料; the migration only has to start them out distinct.
+
+The migration numbers the rows by `created_at, id` and gives odd positions
+`A`/`male` and even positions `B`/`female`, so the account created first — the
+configured owner — is A. Deleted accounts are numbered too, so a later cleanup
+cannot shift the two live members. `nickname` is trimmed and must be 1–20
+characters, `gender` is `male` or `female`, and `time_zone` is the ledger's old
+zone or NULL, where NULL still means "use this device's zone".
+
+Three things change for deployments:
+
+- **Date defaults follow the viewer.** `0047` copies the ledger's zone onto
+  every user, so the day a record lands on is now the signed-in member's. If one
+  of you relied on the ledger zone while your device was set elsewhere, set it
+  explicitly in 设置 → 个人资料 → 我的时区.
+- **The ledger settings trigger is redefined.** Its `UPDATE OF` list named
+  `time_zone`, so the migration drops and recreates
+  `trg_ledgers_settings_change_log` without that column before dropping it.
+  The remaining settings columns still publish a settings change.
+- **API keys stay on the server clock.** A record created through
+  `/api/v1/source-documents` is dated by the server, not by either member's
+  zone, because a key is not a device. `npm run db:bootstrap` on a new database
+  creates A/male and B/female directly, matching what an upgraded database
+  starts with.
+
 ## Optional database cleanup
 
 `npm run db:couple-cleanup` previews all accounts outside the two configured
@@ -233,7 +263,7 @@ two separate transactions. Drizzle commits the schema first; the merge opens
 its own transaction. If the merge stops on active work, the process exits
 non-zero **after** the schema has already committed, and no application is
 serving to drain that work. That is a half-upgraded production: the schema is
-at `0046` while both member ledgers are still separate, and the previously
+past `0046` while both member ledgers are still separate, and the previously
 deployed app cannot run against it because `0045` dropped
 `users.registration_completed_at` and made `source_documents.attributed_user_id`
 non-null, which the old insert path does not set. Sign-in and document creation

@@ -61,6 +61,8 @@ describe("requireLedgerAccess", () => {
         id: otherUserId,
         email: "other@example.com",
         name: "Other User",
+        nickname: "B",
+        gender: "female",
         emailVerified: new Date(),
       })
       .onConflictDoNothing();
@@ -91,6 +93,8 @@ describe("requireLedgerAccess", () => {
         id: anotherUserId,
         email: `deleted-ledger-${uuidv4()}@example.com`,
         name: "Another User",
+        nickname: "B",
+        gender: "female",
         emailVerified: new Date(),
       })
       .onConflictDoNothing();

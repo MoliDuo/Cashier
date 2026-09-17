@@ -132,7 +132,6 @@ export interface LedgerSettingsContract {
   mainCurrency: string;
   collapseEntriesDefault: boolean;
   aiCustomPrompt: string;
-  timeZone: string | null;
 }
 
 export interface LedgerContract {

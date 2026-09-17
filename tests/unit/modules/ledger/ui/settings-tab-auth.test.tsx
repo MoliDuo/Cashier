@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 
-const { queryState, refetchQueries } = vi.hoisted(() => ({
+const { queryState, refetchQueries, MEMBERS } = vi.hoisted(() => ({
   queryState: { status: "success" },
   refetchQueries: vi.fn(),
+  MEMBERS: [
+    { id: "user-1", nickname: "A", gender: "male" as const, timeZone: null },
+    { id: "user-2", nickname: "B", gender: "female" as const, timeZone: null },
+  ],
 }));
 
 vi.mock("next-auth/react", () => ({
@@ -33,6 +37,15 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: "system", setTheme: vi.fn() }),
+}));
+
+vi.mock("@/modules/auth/hooks/useCoupleMembers", () => ({
+  useCoupleMembers: () => ({
+    members: MEMBERS,
+    me: MEMBERS[0],
+    partner: MEMBERS[1],
+    membersQuery: { status: "success" },
+  }),
 }));
 
 vi.mock("@/modules/ledger/hooks/useLedgerSettings", () => ({
@@ -102,6 +115,7 @@ describe("SettingsTab account authentication controls", () => {
       <SettingsTab
         ledger={ledger}
         initialCategories={[]}
+        initialMembers={MEMBERS}
         ledgerId="ledger-1"
         userEmail="person@example.com"
       />
@@ -133,6 +147,7 @@ describe("SettingsTab account authentication controls", () => {
         ledger={ledger}
         ledgerId="ledger-1"
         initialCategories={[]}
+        initialMembers={MEMBERS}
         userEmail="person@example.com"
       />
     );

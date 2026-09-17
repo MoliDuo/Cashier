@@ -55,6 +55,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     {
       categories: serverComposition.categories,
       credentials: serverComposition.serviceCredentials,
+      profiles: serverComposition.userProfiles,
     }
   );
   if (pageData == null) {
@@ -76,6 +77,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
           ledger={ledger}
           initialCategories={pageData.initialCategories}
           ledgerId={ledgerId}
+          initialMembers={pageData.initialMembers}
           {...(userId != null ? { userId, partnerUserId: getPartnerUserId(userId) } : {})}
           {...(session?.user?.email != null ? { userEmail: session.user.email } : {})}
           {...(session?.user != null ? { hasPassword: session.user.hasPassword } : {})}

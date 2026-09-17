@@ -24,7 +24,6 @@ const zhLedger = {
     mainCurrency: "CNY",
     collapseEntriesDefault: false,
     aiCustomPrompt: "",
-    timeZone: null,
   },
   categories: seedCategories(getCategoryPreset("default", "zh")),
 };
@@ -36,7 +35,6 @@ const enLedger = {
     mainCurrency: "USD",
     collapseEntriesDefault: false,
     aiCustomPrompt: "",
-    timeZone: null,
   },
   categories: seedCategories(getCategoryPreset("default", "en")),
 };

@@ -7,10 +7,13 @@ import {
 } from "@/components/skeletons/TabSkeletons";
 import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
 import { LedgerEntriesTab } from "@/modules/workspace/ui/LedgerEntriesTab";
+import { MemberScopeReveal } from "@/modules/workspace/ui/MemberScopeReveal";
+import type { MemberProfileContract } from "@/application/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { PeriodParams } from "@/lib/period-utils";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
+import type { RecordScope } from "@/modules/ledger/filters";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
 import type { InterfaceLanguage } from "@/modules/auth/contracts";
 
@@ -33,10 +36,12 @@ const SettingsTab = dynamic(
 );
 
 interface LedgerTabPanelsProps {
-  recordScope: "all" | "mine" | "partner";
-  onRecordScopeChange: (scope: "all" | "mine" | "partner") => void;
+  recordScope: RecordScope;
+  onRecordScopeChange: (scope: RecordScope) => void;
   userId: string;
   partnerUserId: string;
+  /** Both member profiles, for the nickname labels on the switch. */
+  members: readonly MemberProfileContract[];
   activeTab: LedgerTab;
   hidden: boolean;
   locale: string;
@@ -69,6 +74,7 @@ export function LedgerTabPanels({
   onRecordScopeChange,
   userId,
   partnerUserId,
+  members,
   activeTab,
   hidden,
   locale,
@@ -90,16 +96,36 @@ export function LedgerTabPanels({
   isRefreshing,
   onGoToDetails,
 }: LedgerTabPanelsProps) {
+  const me = members.find((member) => member.id === userId);
+  const partner = members.find((member) => member.id === partnerUserId);
+  // Whose records the switch is narrowed to, as an id the tabs filter by and a
+  // nickname the chip shows. 全部 means neither.
+  const scopeOwnerId =
+    recordScope === "mine" ? userId : recordScope === "partner" ? partnerUserId : null;
+  const scopeNickname =
+    recordScope === "mine"
+      ? (me?.nickname ?? null)
+      : recordScope === "partner"
+        ? (partner?.nickname ?? null)
+        : null;
+  const carriesMemberSwitch = activeTab !== "settings";
+
   return (
     <div className={hidden ? "hidden" : undefined} aria-hidden={hidden || undefined}>
+      {carriesMemberSwitch && me != null && partner != null ? (
+        <MemberScopeReveal
+          scope={recordScope}
+          onScopeChange={onRecordScopeChange}
+          myNickname={me.nickname}
+          partnerNickname={partner.nickname}
+        />
+      ) : null}
       {activeTab === "stream" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           <DeferredFeatureMessages feature="stream" locale={locale} fallback={null}>
             <LedgerEntriesTab
-              recordScope={recordScope}
-              onRecordScopeChange={onRecordScopeChange}
-              userId={userId}
-              partnerUserId={partnerUserId}
+              scopeOwnerId={scopeOwnerId}
+              scopeNickname={scopeNickname}
               ledgerId={ledgerId}
               ledger={ledger}
               periodParams={periodParams}
@@ -122,10 +148,8 @@ export function LedgerTabPanels({
             fallback={<DetailsTabSkeleton />}
           >
             <DetailsTab
-              recordScope={recordScope}
-              onRecordScopeChange={onRecordScopeChange}
-              userId={userId}
-              partnerUserId={partnerUserId}
+              scopeOwnerId={scopeOwnerId}
+              scopeNickname={scopeNickname}
               ledgerId={ledgerId}
               categories={categories.length > 0 ? categories : []}
               ledger={ledger}
@@ -144,8 +168,7 @@ export function LedgerTabPanels({
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           <DeferredFeatureMessages feature="stats" locale={locale} fallback={<StatsTabSkeleton />}>
             <StatsTab
-              recordScope={recordScope}
-              onRecordScopeChange={onRecordScopeChange}
+              scopeOwnerId={scopeOwnerId}
               userId={userId}
               partnerUserId={partnerUserId}
               ledgerId={ledgerId}
@@ -170,6 +193,7 @@ export function LedgerTabPanels({
               ledgerId={ledgerId}
               ledger={ledger}
               initialCategories={categories}
+              initialMembers={members}
               userId={userId}
               partnerUserId={partnerUserId}
               {...(userEmail !== undefined ? { userEmail } : {})}

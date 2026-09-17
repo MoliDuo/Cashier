@@ -67,7 +67,17 @@ describe("couple bootstrap command", () => {
     await db.delete(users).where(eq(users.id, TEST_USER_ID));
     const result = runBootstrap(true);
     expect(result.status, result.stderr).toBe(0);
-    expect(await db.select().from(users)).toHaveLength(2);
+    // A fresh database starts from the same A/male and B/female defaults that
+    // migration 0047 gives an existing one, so both are named in 设置 later.
+    expect(
+      (await db.select().from(users)).map((user) => ({
+        nickname: user.nickname,
+        gender: user.gender,
+      }))
+    ).toEqual([
+      { nickname: "A", gender: "male" },
+      { nickname: "B", gender: "female" },
+    ]);
     expect(await db.select().from(ledgers)).toHaveLength(1);
     expect(await db.select().from(entryCategories)).toHaveLength(
       JSON.parse(result.stdout).categories

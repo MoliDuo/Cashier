@@ -19,7 +19,6 @@ export const postgresSettingsAdapter: SettingsPort = {
         mainCurrency: true,
         collapseEntriesDefault: true,
         aiCustomPrompt: true,
-        timeZone: true,
       },
     });
     return ledger == null ? null : mapLedgerSettings(ledger);

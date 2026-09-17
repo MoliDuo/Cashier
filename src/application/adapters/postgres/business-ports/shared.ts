@@ -16,7 +16,6 @@ export function mapLedgerSettings(
     | "mainCurrency"
     | "collapseEntriesDefault"
     | "aiCustomPrompt"
-    | "timeZone"
   >
 ): LedgerSettingsContract {
   return {
@@ -25,7 +24,6 @@ export function mapLedgerSettings(
     mainCurrency: row.mainCurrency,
     collapseEntriesDefault: row.collapseEntriesDefault,
     aiCustomPrompt: row.aiCustomPrompt,
-    timeZone: row.timeZone,
   };
 }
 
@@ -38,7 +36,6 @@ export function settingsColumns(settings: Partial<LedgerSettingsContract>) {
       ? {}
       : { collapseEntriesDefault: settings.collapseEntriesDefault }),
     ...(settings.aiCustomPrompt === undefined ? {} : { aiCustomPrompt: settings.aiCustomPrompt }),
-    ...(settings.timeZone === undefined ? {} : { timeZone: settings.timeZone }),
   };
 }
 

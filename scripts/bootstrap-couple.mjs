@@ -70,14 +70,18 @@ export async function main() {
     const categories = getCategoryPreset("default", "zh");
     if (apply) {
       const now = new Date();
-      for (const [id, email, password] of [
-        [config.ownerId, config.ownerEmail, config.ownerPassword],
-        [config.partnerId, config.partnerEmail, config.partnerPassword],
+      // The two accounts start as A/male and B/female, the same defaults
+      // migration 0047 gives existing rows. Both are renamed in 设置; nothing
+      // here asks for a nickname, so a fresh database and an upgraded one
+      // start from the same place.
+      for (const [id, email, password, nickname, gender] of [
+        [config.ownerId, config.ownerEmail, config.ownerPassword, "A", "male"],
+        [config.partnerId, config.partnerEmail, config.partnerPassword, "B", "female"],
       ]) {
         await client.query(
           `INSERT INTO users (id, email, email_verified, password_hash, password_updated_at,
-            created_at, updated_at) VALUES ($1, $2, $3, $4, $3, $3, $3)`,
-          [id, email, now, await bcrypt.hash(password, 12)]
+            nickname, gender, created_at, updated_at) VALUES ($1, $2, $3, $4, $3, $5, $6, $3, $3)`,
+          [id, email, now, await bcrypt.hash(password, 12), nickname, gender]
         );
       }
       await client.query(

@@ -10,11 +10,14 @@ import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 import { textRoleClassName } from "@/components/typography";
+import type { MemberProfileContract } from "@/application/contracts";
 
 interface SettingsPageClientProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   ledgerId: string;
+  /** Both member profiles, hydrated by the page bootstrap. */
+  initialMembers: readonly MemberProfileContract[];
   userId?: string;
   partnerUserId?: string | null;
   userEmail?: string;
@@ -27,6 +30,7 @@ export function SettingsPageClient({
   ledger,
   initialCategories,
   ledgerId,
+  initialMembers,
   userId,
   partnerUserId,
   userEmail,
@@ -59,6 +63,7 @@ export function SettingsPageClient({
         ledger={ledger}
         initialCategories={initialCategories}
         ledgerId={ledgerId}
+        initialMembers={initialMembers}
         {...(userId !== undefined ? { userId } : {})}
         {...(partnerUserId != null ? { partnerUserId } : {})}
         {...(userEmail !== undefined ? { userEmail } : {})}

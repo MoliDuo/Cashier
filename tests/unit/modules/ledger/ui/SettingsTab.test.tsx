@@ -100,7 +100,6 @@ describe("explicit settings section drafts", () => {
         mainCurrency: "CNY",
         currencies: ["CNY"],
         collapseEntriesDefault: true,
-        timeZone: null,
       },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-02T00:00:00.000Z",
@@ -113,11 +112,9 @@ describe("explicit settings section drafts", () => {
           mainCurrency: "CNY",
           currencies: ["CNY"],
           collapseEntriesDefault: false,
-          timeZone: null,
         }}
         categories={[]}
         uncategorizedCount={0}
-        deviceTimeZone="Asia/Shanghai"
         onUpdateSettings={onUpdateSettings}
         onSaveCategories={() => Promise.resolve([])}
         generatingCategoryIds={new Set()}

@@ -10,7 +10,12 @@ describe("password auth version", () => {
   it("increments authVersion in each successful credential update", async () => {
     const db = getTestDb();
     const userId = crypto.randomUUID();
-    await db.insert(users).values({ id: userId, email: `password-${userId}@example.com` });
+    await db.insert(users).values({
+      id: userId,
+      email: `password-${userId}@example.com`,
+      nickname: "A",
+      gender: "male",
+    });
 
     await setPassword(
       { userId, newPassword: "initial-password-1", confirmPassword: "initial-password-1" },

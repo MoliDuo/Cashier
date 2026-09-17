@@ -32,7 +32,12 @@ describe("session ledger query transport", () => {
     const db = getTestDb();
     const ledger = createLedgerData({ userId });
     const other = createLedgerData({ userId: crypto.randomUUID() });
-    await db.insert(users).values({ id: other.userId, email: "other-query@example.com" });
+    await db.insert(users).values({
+      id: other.userId,
+      email: "other-query@example.com",
+      nickname: "B",
+      gender: "female",
+    });
     await db.insert(ledgers).values([ledger, other]);
     await configureTestCoupleLedger(db, ledger.id);
     const document = createSourceDocumentData(ledger.id, { status: "completed" });

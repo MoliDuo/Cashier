@@ -195,6 +195,8 @@ describe("createQuickEntryAction", () => {
         id: otherUserId,
         email: "other@example.com",
         name: "Other User",
+        nickname: "B",
+        gender: "female",
         emailVerified: new Date(),
       })
       .onConflictDoNothing();

@@ -18,6 +18,8 @@ describe("getSessionUser", () => {
       id: userId,
       email: "session-active@example.com",
       name: "Session Active",
+      nickname: "A",
+      gender: "male",
       image: "https://example.com/avatar.png",
       passwordHash: null,
       passwordUpdatedAt: null,
@@ -25,6 +27,8 @@ describe("getSessionUser", () => {
     });
 
     const result = await getSessionUser(userId);
+    // The session contract is a fixed set of fields; the profile the switch
+    // reads is a separate query, so nickname and gender are not part of it.
     expect(result).toEqual({
       id: userId,
       email: "session-active@example.com",
@@ -45,6 +49,8 @@ describe("getSessionUser", () => {
       id: userId,
       email: "session-deleted@example.com",
       name: "Session Deleted",
+      nickname: "A",
+      gender: "male",
       emailVerified: new Date(),
       deletedAt: new Date(),
     });
