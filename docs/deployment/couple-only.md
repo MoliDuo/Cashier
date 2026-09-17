@@ -78,6 +78,105 @@ When another demo server is running, set `CASHIER_DEMO_PROJECT` and unused
 for `npm run test:demo`; this creates separate containers and volumes instead
 of resetting the active demo workspace.
 
+## Legacy submission credential repair (`0046`)
+
+`0038_source_document_lifecycle.sql` decided `origin = 'submission'` from live
+processing evidence: a processing attempt, an outbox row, a pending-revision
+pointer, or a non-completed outcome. Revisions backfilled from the retired
+SQLite database on 2026-07-14 have none of that evidence and still report a
+completed outcome, so `0038` marked them `manual_edit`. Because
+`latest_submission_revision_id` was only filled from revisions already marked
+`submission`, those documents kept a NULL pointer and every submission-backed
+read returned nothing: original images and text, submission status, and the
+retry / edit-retry actions disappeared from the UI while the rows and objects
+stayed intact.
+
+`0046_restore_legacy_submissions.sql` repairs that classification. For a
+document whose revision 1 is `manual_edit`, has recoverable input (a revision
+file or non-empty text), and has no submission revision at all, it marks the
+revision `submission` / `completed` and points `latest_submission_revision_id`
+at it. It does not bump `source_documents.version`, and it does not touch
+`active_revision_id`, `ledger_entries`, `stored_files`, or object storage, so
+amounts, categories, and later manual edits keep their values. Clients already
+holding a "no credential" snapshot refetch because the change-log trigger on
+`source_document_revisions` and `source_documents` still publishes one change
+batch per affected ledger. Split and date-organization children are excluded
+even though their revision 1 copies a parent's text and files; a document with
+neither image nor text keeps its manual origin. The migration is idempotent.
+
+Verified on 2026-09-17 against `cashier_couple_runtime_20260917` (the restored
+snapshot from the 2026-09-17 backup). A copy named
+`cashier_0046_verify` received the repair directly: 659 revisions moved from
+`manual_edit` to `submission`, 659 documents gained a pointer, a second run
+reported `UPDATE 0` for both statements, `active_revision_id` plus `version`
+were byte-identical for all 1,547 documents, and `input_text`, entry amounts,
+entry categories, revision-file links, and stored-file keys were unchanged.
+`npm run db:migrate` on a separate copy, `cashier_0046_migrate`, recorded
+migration `46`. Before the repair, the sample document holding stored file
+`e394a76c-4df7-4b77-a8ba-25876c137921` returned no files; afterwards the same
+read path returned that image. Counts here come from that snapshot, not from
+live production.
+
+The pre-migration dry run below must report 659 for this snapshot. On live
+production, expect roughly 652 (632 with images, 20 text-only); live production
+drifts as the couple deletes and adds documents. Run it read-only before
+executing the migration, and prefer a Neon branch or PITR snapshot as the
+rollback point.
+
+```sql
+WITH legacy_submission AS (
+  SELECT r.id AS revision_id
+  FROM source_documents AS sd
+  JOIN source_document_revisions AS r
+    ON r.ledger_id = sd.ledger_id
+   AND r.source_document_id = sd.id
+   AND r.revision_number = 1
+  WHERE sd.latest_submission_revision_id IS NULL
+    AND r.origin = 'manual_edit'
+    AND NOT EXISTS (
+      SELECT 1 FROM source_document_revisions AS s
+      WHERE s.source_document_id = sd.id AND s.origin = 'submission'
+    )
+    AND (
+      EXISTS (
+        SELECT 1 FROM revision_files AS rf
+        WHERE rf.ledger_id = r.ledger_id AND rf.revision_id = r.id
+      )
+      OR coalesce(r.input_text, '') <> ''
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM source_document_revisions AS sibling
+      WHERE sibling.origin = 'submission'
+        AND sibling.source_document_id <> sd.id
+        AND coalesce(sibling.input_text, '') = coalesce(r.input_text, '')
+        AND NOT EXISTS (
+          (
+            SELECT rf.stored_file_id FROM revision_files AS rf
+            WHERE rf.revision_id = sibling.id
+            EXCEPT
+            SELECT rf.stored_file_id FROM revision_files AS rf
+            WHERE rf.revision_id = r.id
+          )
+          UNION ALL
+          (
+            SELECT rf.stored_file_id FROM revision_files AS rf
+            WHERE rf.revision_id = r.id
+            EXCEPT
+            SELECT rf.stored_file_id FROM revision_files AS rf
+            WHERE rf.revision_id = sibling.id
+          )
+        )
+    )
+)
+SELECT count(*) FROM legacy_submission;
+```
+
+After the migration, re-run the count and expect 0; the only documents that may
+still hold a NULL pointer are genuine manual entries with no input to recover.
+Then open a few older documents and confirm the original images render and
+"edit retry" seeds the draft with them.
+
 ## Optional database cleanup
 
 `npm run db:couple-cleanup` previews all accounts outside the two configured
