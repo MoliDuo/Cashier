@@ -15,6 +15,8 @@ interface SettingsPageClientProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   ledgerId: string;
+  userId?: string;
+  partnerUserId?: string | null;
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
@@ -25,6 +27,8 @@ export function SettingsPageClient({
   ledger,
   initialCategories,
   ledgerId,
+  userId,
+  partnerUserId,
   userEmail,
   hasPassword,
   passwordUpdatedAt,
@@ -55,6 +59,8 @@ export function SettingsPageClient({
         ledger={ledger}
         initialCategories={initialCategories}
         ledgerId={ledgerId}
+        {...(userId !== undefined ? { userId } : {})}
+        {...(partnerUserId != null ? { partnerUserId } : {})}
         {...(userEmail !== undefined ? { userEmail } : {})}
         {...(hasPassword !== undefined ? { hasPassword } : {})}
         {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}

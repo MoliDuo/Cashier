@@ -12,9 +12,11 @@ import { textRoleClassName } from "@/components/typography";
 export function AuthLoginPage({
   emailAuthEnabled = false,
   devAuthAvailable = false,
+  devPartnerLabel,
 }: {
   emailAuthEnabled?: boolean;
   devAuthAvailable?: boolean;
+  devPartnerLabel?: string;
 }) {
   const t = useTranslations("Auth");
   const searchParams = useSearchParams();
@@ -134,14 +136,26 @@ export function AuthLoginPage({
         {flow.isDevAuthAvailable ? (
           <div className="mt-4 rounded-md border border-dashed border-border bg-surface2/60 p-3 text-center">
             <p className={textRoleClassName("meta")}>{t("devSignInDesc")}</p>
-            <button
-              type="button"
-              onClick={flow.handleDevSignIn}
-              disabled={flow.isLoading}
-              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-surface2 disabled:opacity-50"
-            >
-              {t("devSignIn")}
-            </button>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => flow.handleDevSignIn("dev")}
+                disabled={flow.isLoading}
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-surface2 disabled:opacity-50"
+              >
+                {t("devSignIn")}
+              </button>
+              {devPartnerLabel != null ? (
+                <button
+                  type="button"
+                  onClick={() => flow.handleDevSignIn("partner")}
+                  disabled={flow.isLoading}
+                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-surface2 disabled:opacity-50"
+                >
+                  {t("devSignInAs", { name: devPartnerLabel })}
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>

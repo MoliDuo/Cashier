@@ -15,7 +15,10 @@ npm ci
 npm run dev:demo
 ```
 
-Open the printed loopback URL and select `Continue as dev`. The command uses the standalone
+Open the printed loopback URL and select `Continue as dev`, or the second entry to sign in as the
+other couple member. The startup banner lists the seeded sample API keys — one per member, so the
+settings page shows both an own and a partner credential — and those tokens are valid against the
+local demo only. The command uses the standalone
 `docker-compose.demo.yml` definition to start a dedicated `cashier-demo` PostgreSQL and MinIO stack,
 migrates `cashier_demo`, and seeds fictional receipts and ledger history. It does not require a
 project `.env` file. Every launch restores the fixture, so edits from the previous session are

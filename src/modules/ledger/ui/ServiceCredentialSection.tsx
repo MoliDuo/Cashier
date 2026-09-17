@@ -21,6 +21,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ServiceCredentialSectionProps {
   credentials: ServiceCredential[];
+  /** Server-derived identity used to label which member owns each credential. */
+  userId?: string;
+  partnerUserId?: string;
   onCreateCredential: (name: string) => Promise<CreatedServiceCredentialDto>;
   onDeleteCredential: (id: string) => Promise<void>;
   onCredentialDialogClose?: () => void;
@@ -28,6 +31,8 @@ interface ServiceCredentialSectionProps {
 
 export function ServiceCredentialSection({
   credentials,
+  userId,
+  partnerUserId,
   onCreateCredential,
   onDeleteCredential,
   onCredentialDialogClose,
@@ -86,6 +91,15 @@ export function ServiceCredentialSection({
     onCredentialDialogClose?.();
   };
 
+  // Attribution is backfilled to the ledger owner during migration, so a
+  // credential can outlive the member list and fall outside both members.
+  const ownerLabel = (credential: ServiceCredential) =>
+    credential.attributedUserId === userId
+      ? tCommon("myRecords")
+      : credential.attributedUserId === partnerUserId
+        ? tCommon("partnerRecords")
+        : tCommon("historicalRecord");
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -129,6 +143,11 @@ export function ServiceCredentialSection({
                       }),
                     })}
                   </div>
+                  {userId !== undefined && (
+                    <div className="mt-1 text-micro text-muted-foreground">
+                      {t("owner", { owner: ownerLabel(credential) })}
+                    </div>
+                  )}
                 </div>
               </div>
               <Button

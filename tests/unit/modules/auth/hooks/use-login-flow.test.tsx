@@ -273,4 +273,40 @@ describe("useLoginFlow OTP sending", () => {
     expect(result.current.email).toBe("smoke@example.com");
     expect(result.current.isLoading).toBe(false);
   });
+
+  it("signs in as the dev account by default", async () => {
+    signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin" });
+    const { result } = renderHook(() => useLoginFlow(t, { isDevAuthAvailable: true }));
+
+    await act(() => result.current.handleDevSignIn());
+
+    expect(signInMock).toHaveBeenCalledWith("dev", {
+      member: "dev",
+      locale: "en",
+      redirect: false,
+      callbackUrl: "/",
+    });
+  });
+
+  it("forwards the selected member to the development provider", async () => {
+    signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin" });
+    const { result } = renderHook(() => useLoginFlow(t, { isDevAuthAvailable: true }));
+
+    await act(() => result.current.handleDevSignIn("partner"));
+
+    expect(signInMock).toHaveBeenCalledWith("dev", {
+      member: "partner",
+      locale: "en",
+      redirect: false,
+      callbackUrl: "/",
+    });
+  });
+
+  it("ignores the development sign-in when the entry is unavailable", async () => {
+    const { result } = renderHook(() => useLoginFlow(t));
+
+    await act(() => result.current.handleDevSignIn("partner"));
+
+    expect(signInMock).not.toHaveBeenCalled();
+  });
 });

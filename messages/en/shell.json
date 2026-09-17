@@ -66,6 +66,7 @@
     "errorConfiguration": "Configuration Error",
     "errorConfigurationDesc": "There is a problem with the server configuration. Please contact support.",
     "devSignIn": "Continue as dev",
+    "devSignInAs": "Continue as {name}",
     "devSignInDesc": "Local development only. Opens the single ledger without email delivery.",
     "devSignInFailed": "Failed to start the development session",
     "otpDigitLabel": "Digit {index} of {length}"

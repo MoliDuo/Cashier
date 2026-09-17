@@ -17,6 +17,8 @@ interface AccountSettingsProps {
   passwordUpdatedAt: string | null;
   credentials: ServiceCredential[];
   isPending: boolean;
+  userId?: string;
+  partnerUserId?: string;
   onEmailChanged: (email: string) => void;
   onCreateCredential: (name: string) => Promise<CreatedServiceCredentialDto>;
   onDeleteCredential: (id: string) => Promise<void>;
@@ -32,6 +34,8 @@ export function AccountSettings({
   passwordUpdatedAt,
   credentials,
   isPending,
+  userId,
+  partnerUserId,
   onEmailChanged,
   onCreateCredential,
   onDeleteCredential,
@@ -65,6 +69,8 @@ export function AccountSettings({
       </SettingsField>
       <ServiceCredentialSection
         credentials={credentials}
+        {...(userId !== undefined ? { userId } : {})}
+        {...(partnerUserId !== undefined ? { partnerUserId } : {})}
         onCreateCredential={onCreateCredential}
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}

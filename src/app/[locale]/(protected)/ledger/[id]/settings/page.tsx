@@ -9,6 +9,7 @@ import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedu
 import { serverComposition } from "@/application/server-composition-root";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { getPartnerUserId } from "@/lib/couple-config";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/routing";
 import { textRoleClassName } from "@/components/typography";
@@ -75,6 +76,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
           ledger={ledger}
           initialCategories={pageData.initialCategories}
           ledgerId={ledgerId}
+          {...(userId != null ? { userId, partnerUserId: getPartnerUserId(userId) } : {})}
           {...(session?.user?.email != null ? { userEmail: session.user.email } : {})}
           {...(session?.user != null ? { hasPassword: session.user.hasPassword } : {})}
           {...(session?.user != null ? { passwordUpdatedAt: session.user.passwordUpdatedAt } : {})}

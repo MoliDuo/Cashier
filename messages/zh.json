@@ -757,6 +757,7 @@
     "newCredential": "新建密钥",
     "noCredentials": "暂无服务密钥",
     "createdAt": "创建于 {date}",
+    "owner": "归属：{owner}",
     "createTitle": "新建服务密钥",
     "createDesc": "创建一个新的服务密钥用于外部系统访问此账本。",
     "namePlaceholder": "密钥名称 (例如: 自动记账脚本)",
@@ -916,6 +917,7 @@
     "errorConfiguration": "配置错误",
     "errorConfigurationDesc": "服务器配置存在问题，请联系管理员。",
     "devSignIn": "以开发身份进入",
+    "devSignInAs": "以 {name} 身份进入",
     "devSignInDesc": "仅本地开发使用。无需邮件验证码，直接打开单账本工作台。",
     "devSignInFailed": "开发会话启动失败",
     "otpDigitLabel": "第 {index} 位，共 {length} 位"

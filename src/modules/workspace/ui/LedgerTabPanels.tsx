@@ -170,6 +170,8 @@ export function LedgerTabPanels({
               ledgerId={ledgerId}
               ledger={ledger}
               initialCategories={categories}
+              userId={userId}
+              partnerUserId={partnerUserId}
               {...(userEmail !== undefined ? { userEmail } : {})}
               {...(hasPassword !== undefined ? { hasPassword } : {})}
               {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}

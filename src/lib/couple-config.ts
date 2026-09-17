@@ -22,3 +22,12 @@ export function isCoupleMember(userId: string): boolean {
   const config = getCoupleConfig();
   return config != null && (userId === config.ownerId || userId === config.partnerId);
 }
+
+/** The other configured member, or null when `userId` is not one of them. */
+export function getPartnerUserId(userId: string): string | null {
+  const config = getCoupleConfig();
+  if (config == null) return null;
+  if (userId === config.ownerId) return config.partnerId;
+  if (userId === config.partnerId) return config.ownerId;
+  return null;
+}

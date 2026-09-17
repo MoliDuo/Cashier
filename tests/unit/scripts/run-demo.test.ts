@@ -1,9 +1,16 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { fixtureCredentialToken } from "../../../scripts/demo-data.mjs";
 import {
   createDemoComposeArgs,
   createDemoDataArgs,
   createDemoEnvironment,
+  formatDemoCredentialLines,
 } from "../../../scripts/run-demo.mjs";
+
+const fixture = JSON.parse(
+  readFileSync(new URL("../../../scripts/fixtures/demo-workspace.json", import.meta.url), "utf8")
+);
 
 describe("demo runtime environment", () => {
   it("uses the standalone Compose file that does not require a project .env", () => {
@@ -74,5 +81,31 @@ describe("demo runtime environment", () => {
     expect(() =>
       createDemoEnvironment({ NODE_ENV: "development", CASHIER_DEMO_APP_PORT: port })
     ).toThrow(/CASHIER_DEMO_APP_PORT/);
+  });
+
+  /**
+   * The database only stores a hash of each key and the settings page shows just
+   * the token prefix and suffix, so this banner is the only place a developer
+   * can read the seeded tokens from.
+   */
+  it("prints every seeded sample key with the member that owns it", () => {
+    const lines = formatDemoCredentialLines();
+    const credentials = fixture.serviceCredentials as Array<{
+      name: string;
+      attributedTo: string;
+      tokenBody: string;
+    }>;
+    const credentialLines = lines.slice(1, -1);
+
+    expect(lines[0]).toContain("Sample API keys");
+    expect(lines.at(-1)).toContain("Authorization: Bearer");
+    expect(credentialLines).toHaveLength(credentials.length);
+
+    for (const credential of credentials) {
+      const token = fixtureCredentialToken(credential);
+      const line = credentialLines.find((candidate) => candidate.includes(token));
+      expect(line, credential.name).toContain(credential.name);
+      expect(line).toContain(credential.attributedTo === "partner" ? "partner" : "dev");
+    }
   });
 });

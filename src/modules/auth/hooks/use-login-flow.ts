@@ -8,6 +8,7 @@ import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { sendOTPAction } from "@/modules/auth/server-actions/send-otp";
 import type { SendOTPActionResult } from "@/modules/auth/server-actions/send-otp";
 import { useLoginDraftStore } from "@/modules/auth/login-draft-store";
+import type { DevAuthMember } from "@/modules/auth/dev-auth";
 import { useLoginUrlState, type LoginMode } from "./use-login-url-state";
 import { useOtpContextStorage } from "./use-otp-context-storage";
 
@@ -244,12 +245,12 @@ export function useLoginFlow(
     writeFlowUrl("otp", "email");
   };
 
-  const handleDevSignIn = async () => {
+  const handleDevSignIn = async (member: DevAuthMember = "dev") => {
     if (!isDevAuthAvailable) return;
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await signIn("dev", { locale, redirect: false, callbackUrl }));
+      finishSignIn(await signIn("dev", { member, locale, redirect: false, callbackUrl }));
     } catch {
       setError(t("devSignInFailed"));
       setIsLoading(false);

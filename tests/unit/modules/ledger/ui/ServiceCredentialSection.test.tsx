@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ServiceCredentialSection } from "@/modules/ledger/ui/ServiceCredentialSection";
-import type { CreatedServiceCredentialDto } from "@/modules/ledger/contracts";
+import type { CreatedServiceCredentialDto, ServiceCredentialDto } from "@/modules/ledger/contracts";
 
 const intl = vi.hoisted(() => ({ locale: "en" }));
 
@@ -11,9 +11,24 @@ vi.mock("next-intl", () => ({
       ? `${key}:${String(values.date)}`
       : values?.name != null
         ? `${key}:${String(values.name)}`
-        : key,
+        : values?.owner != null
+          ? `${key}:${String(values.owner)}`
+          : key,
   useLocale: () => intl.locale,
 }));
+
+const credentialFixture = (
+  overrides: Pick<ServiceCredentialDto, "id" | "attributedUserId">
+): ServiceCredentialDto => ({
+  ledgerId: "ledger-1",
+  name: "Automation",
+  tokenPrefix: "sec",
+  tokenSuffix: "ret",
+  createdAt: "2026-08-07T00:00:00.000Z",
+  lastUsedAt: null,
+  deletedAt: null,
+  ...overrides,
+});
 
 describe("ServiceCredentialSection", () => {
   beforeEach(() => {
@@ -133,5 +148,37 @@ describe("ServiceCredentialSection", () => {
     );
 
     expect(screen.getByText(`createdAt:${formatted}`)).toBeInTheDocument();
+  });
+
+  it("labels each shared credential with the member that owns it", () => {
+    render(
+      <ServiceCredentialSection
+        userId="user-1"
+        partnerUserId="user-2"
+        credentials={[
+          credentialFixture({ id: "mine", attributedUserId: "user-1" }),
+          credentialFixture({ id: "theirs", attributedUserId: "user-2" }),
+          credentialFixture({ id: "legacy", attributedUserId: "user-3" }),
+        ]}
+        onCreateCredential={vi.fn()}
+        onDeleteCredential={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("owner:myRecords")).toBeInTheDocument();
+    expect(screen.getByText("owner:partnerRecords")).toBeInTheDocument();
+    expect(screen.getByText("owner:historicalRecord")).toBeInTheDocument();
+  });
+
+  it("omits ownership when the server did not provide an identity", () => {
+    render(
+      <ServiceCredentialSection
+        credentials={[credentialFixture({ id: "mine", attributedUserId: "user-1" })]}
+        onCreateCredential={vi.fn()}
+        onDeleteCredential={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/^owner:/)).not.toBeInTheDocument();
   });
 });

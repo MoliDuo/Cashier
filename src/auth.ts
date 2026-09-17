@@ -133,6 +133,7 @@ if (isDevAuthBypassEnabled()) {
       name: "Development",
       credentials: {
         locale: { type: "text" },
+        member: { type: "text" },
       },
       async authorize(credentials) {
         return authorizeInteractiveSignIn(() =>
@@ -141,6 +142,7 @@ if (isDevAuthBypassEnabled()) {
               locale: resolveSupportedLocale({
                 explicitLocale: typeof credentials?.locale === "string" ? credentials.locale : null,
               }),
+              member: typeof credentials?.member === "string" ? credentials.member : null,
             },
             { users: serverComposition.userAccounts }
           )

@@ -1,7 +1,32 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 const searchState = vi.hoisted(() => ({ query: "" }));
+
+const createDevFlow = (handleDevSignIn: Mock) => ({
+  callbackUrl: "/",
+  mode: "password" as const,
+  step: "email" as const,
+  email: "",
+  password: "",
+  otp: "",
+  isLoading: false,
+  error: null,
+  expiresAt: null,
+  canResendAt: null,
+  isDevAuthAvailable: true,
+  setEmail: vi.fn(),
+  setPassword: vi.fn(),
+  setOtp: vi.fn(),
+  setMode: vi.fn(),
+  handlePasswordLogin: vi.fn(),
+  handleSendOTP: vi.fn(),
+  handleVerifyOTP: vi.fn(),
+  handleResendOTP: vi.fn(),
+  handleChangeEmail: vi.fn(),
+  handleOTPExpired: vi.fn(),
+  handleDevSignIn,
+});
 
 const mockUseLoginFlow = vi.hoisted(() =>
   vi.fn((_t, options?: { initialMode?: "password" | "otp"; isDevAuthAvailable?: boolean }) => ({
@@ -63,35 +88,34 @@ describe("AuthLoginPage", () => {
   });
 
   it("renders the development sign-in action only when enabled", async () => {
-    mockUseLoginFlow.mockReturnValue({
-      callbackUrl: "/",
-      mode: "password",
-      step: "email",
-      email: "",
-      password: "",
-      otp: "",
-      isLoading: false,
-      error: null,
-      expiresAt: null,
-      canResendAt: null,
-      isDevAuthAvailable: true,
-      setEmail: vi.fn(),
-      setPassword: vi.fn(),
-      setOtp: vi.fn(),
-      setMode: vi.fn(),
-      handlePasswordLogin: vi.fn(),
-      handleSendOTP: vi.fn(),
-      handleVerifyOTP: vi.fn(),
-      handleResendOTP: vi.fn(),
-      handleChangeEmail: vi.fn(),
-      handleOTPExpired: vi.fn(),
-      handleDevSignIn: vi.fn(),
-    });
+    mockUseLoginFlow.mockReturnValue(createDevFlow(vi.fn()));
 
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
     render(<AuthLoginPage devAuthAvailable />);
 
     expect(screen.getByRole("button", { name: "以开发身份进入" })).toBeInTheDocument();
+  });
+
+  it("adds the other couple member as a second development entry", async () => {
+    const handleDevSignIn = vi.fn();
+    mockUseLoginFlow.mockReturnValue(createDevFlow(handleDevSignIn));
+
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage devAuthAvailable devPartnerLabel="Local Partner" />);
+
+    expect(screen.getByRole("button", { name: "以开发身份进入" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "以 Local Partner 身份进入" }));
+
+    expect(handleDevSignIn).toHaveBeenCalledWith("partner");
+  });
+
+  it("keeps a single development entry when no partner resolves", async () => {
+    mockUseLoginFlow.mockReturnValue(createDevFlow(vi.fn()));
+
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage devAuthAvailable />);
+
+    expect(screen.getAllByRole("button", { name: /身份进入/ })).toHaveLength(1);
   });
 
   it("presents Cashier as a quiet app entry instead of a marketing page", async () => {

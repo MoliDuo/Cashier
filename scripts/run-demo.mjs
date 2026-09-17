@@ -5,6 +5,7 @@ import { once } from "node:events";
 import net from "node:net";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { fixtureCredentialToken } from "./demo-data.mjs";
 
 const DEFAULT_PORTS = { app: 3000, postgres: 55433, s3: 59000 };
 const fixture = JSON.parse(
@@ -105,6 +106,25 @@ export function createDemoDataArgs({ reset = false, apply = false } = {}) {
   return ["scripts/demo-data.mjs", "reset", ...(!reset || apply ? ["--apply"] : [])];
 }
 
+/**
+ * The tokens live only in the fixture: the database stores a hash and the
+ * settings page shows just the prefix and suffix, so this banner is where a
+ * developer copies them from.
+ *
+ * @testOnly Lists the seeded sample credentials printed once the demo is up.
+ */
+export function formatDemoCredentialLines() {
+  return [
+    "[demo] Sample API keys (valid for this local demo only):",
+    ...fixture.serviceCredentials.map((credential) => {
+      const owner = credential.attributedTo === "partner" ? "partner" : "dev";
+      const columns = `${credential.name.padEnd(24)} ${owner.padEnd(7)}`;
+      return `  ${columns} ${fixtureCredentialToken(credential)}`;
+    }),
+    "[demo] Pass one as an Authorization: Bearer <token> header to /api/v1.",
+  ];
+}
+
 async function isPortAvailable(port) {
   const server = net.createServer();
   try {
@@ -170,7 +190,8 @@ async function main(args = process.argv.slice(2), environment = process.env) {
   try {
     await waitForApp(demoEnv.APP_URL, server);
     console.log(`[demo] Ready: ${demoEnv.APP_URL}/en/login`);
-    console.log('[demo] Select "Continue as dev" to open the seeded workspace.');
+    console.log('[demo] Select "Continue as dev" or the partner entry to open the workspace.');
+    for (const line of formatDemoCredentialLines()) console.log(line);
     if (test) {
       await run(
         process.execPath,

@@ -36,6 +36,9 @@ interface SettingsTabProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   ledgerId: string;
+  /** Server-derived identity used to label credential ownership. */
+  userId?: string;
+  partnerUserId?: string;
   /** Server-derived user email (avoids useSession in a SessionProvider). */
   userEmail?: string;
   hasPassword?: boolean;
@@ -51,6 +54,8 @@ export function SettingsTab({
   ledger,
   initialCategories,
   ledgerId,
+  userId,
+  partnerUserId,
   userEmail,
   hasPassword = false,
   passwordUpdatedAt = null,
@@ -345,6 +350,8 @@ export function SettingsTab({
         passwordUpdatedAt={passwordUpdatedAt}
         credentials={credentials ?? []}
         isPending={isPending}
+        {...(userId !== undefined ? { userId } : {})}
+        {...(partnerUserId !== undefined ? { partnerUserId } : {})}
         onEmailChanged={setDisplayEmail}
         onCreateCredential={(name) => createCredential.mutateAsync(name)}
         onDeleteCredential={(id) => deleteCredential.mutateAsync(id)}

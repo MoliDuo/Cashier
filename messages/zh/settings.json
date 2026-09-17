@@ -10,6 +10,7 @@
     "newCredential": "新建密钥",
     "noCredentials": "暂无服务密钥",
     "createdAt": "创建于 {date}",
+    "owner": "归属：{owner}",
     "createTitle": "新建服务密钥",
     "createDesc": "创建一个新的服务密钥用于外部系统访问此账本。",
     "namePlaceholder": "密钥名称 (例如: 自动记账脚本)",

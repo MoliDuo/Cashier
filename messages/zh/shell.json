@@ -66,6 +66,7 @@
     "errorConfiguration": "配置错误",
     "errorConfigurationDesc": "服务器配置存在问题，请联系管理员。",
     "devSignIn": "以开发身份进入",
+    "devSignInAs": "以 {name} 身份进入",
     "devSignInDesc": "仅本地开发使用。无需邮件验证码，直接打开单账本工作台。",
     "devSignInFailed": "开发会话启动失败",
     "otpDigitLabel": "第 {index} 位，共 {length} 位"

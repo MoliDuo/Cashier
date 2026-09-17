@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getCoupleConfig, isCoupleMember } from "@/lib/couple-config";
+import { getCoupleConfig, getPartnerUserId, isCoupleMember } from "@/lib/couple-config";
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const partner = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -28,16 +28,21 @@ describe("couple configuration", () => {
     expect(isCoupleMember(owner)).toBe(true);
     expect(isCoupleMember(partner)).toBe(true);
     expect(isCoupleMember(ledger)).toBe(false);
+    expect(getPartnerUserId(owner)).toBe(partner);
+    expect(getPartnerUserId(partner)).toBe(owner);
+    expect(getPartnerUserId(ledger)).toBeNull();
   });
 
   it("fails closed when values are missing, repeated or malformed", () => {
     delete process.env.COUPLE_OWNER_USER_ID;
     expect(getCoupleConfig()).toBeNull();
+    expect(getPartnerUserId(partner)).toBeNull();
     process.env.COUPLE_OWNER_USER_ID = owner;
     process.env.COUPLE_PARTNER_USER_ID = owner;
     process.env.COUPLE_LEDGER_ID = ledger;
     expect(getCoupleConfig()).toBeNull();
     process.env.COUPLE_PARTNER_USER_ID = "invalid";
     expect(isCoupleMember(owner)).toBe(false);
+    expect(getPartnerUserId(owner)).toBeNull();
   });
 });

@@ -10,6 +10,7 @@
     "newCredential": "New Credential",
     "noCredentials": "No service credentials yet",
     "createdAt": "Created at {date}",
+    "owner": "Owner: {owner}",
     "createTitle": "Create New Service Credential",
     "createDesc": "Create a new service credential for external systems to access this ledger.",
     "namePlaceholder": "Credential name (e.g., automatic notes script)",

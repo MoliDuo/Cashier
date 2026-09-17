@@ -13,6 +13,39 @@ const FIXTURE_DIR = path.dirname(
 const fixture = JSON.parse(await readFile(path.join(FIXTURE_DIR, "demo-workspace.json"), "utf8"));
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const DEMO_DATABASE = "cashier_demo";
+const CREDENTIAL_DOMAIN_PREFIX = "credential:v1:";
+const CREDENTIAL_DISPLAY_PREFIX_LENGTH = 8;
+const CREDENTIAL_DISPLAY_SUFFIX_LENGTH = 4;
+const CREDENTIAL_TOKEN_PREFIX = "sk_live_";
+
+/**
+ * Demo tokens keep the app's real format so the seeded rows exercise the same
+ * hashing and parsing path, but the prefix is applied here rather than stored in
+ * the fixture: a literal `sk_live_` followed by 48 hex characters is
+ * indistinguishable to GitHub push protection from a real Stripe-shaped key,
+ * and it rejects the push. The composed token is only ever valid against the
+ * local demo database, and it is printed at startup.
+ *
+ * @testOnly Composes a fixture credential's demo token.
+ */
+export function fixtureCredentialToken(credential) {
+  return `${CREDENTIAL_TOKEN_PREFIX}${credential.tokenBody}`;
+}
+
+/**
+ * Mirrors src/lib/security/service-credential-token.ts, which lives behind the
+ * `@/` alias and cannot be imported from this script. The focused test pins
+ * both implementations to the same digest so the rule cannot drift.
+ *
+ * @testOnly Hashes a fixture credential token the way the app does.
+ */
+export function computeCredentialHash(token, pepper) {
+  return crypto
+    .createHmac("sha256", pepper)
+    .update(CREDENTIAL_DOMAIN_PREFIX)
+    .update(token)
+    .digest("hex");
+}
 
 function requiredUrl(name, value) {
   try {
@@ -40,6 +73,9 @@ export function validateDemoEnvironment(environment = process.env) {
   }
   if (fixture.partner.email !== "partner@cashier.local") {
     throw new Error("Demo fixture partner identity is invalid");
+  }
+  if ((environment.API_KEY_PEPPER ?? "").trim() === "") {
+    throw new Error("API_KEY_PEPPER is required to seed demo service credentials");
   }
   return { databaseUrl: databaseUrl.toString(), storageUrl: storageUrl.toString() };
 }
@@ -190,6 +226,28 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       now,
     ]
   );
+
+  // The reset above deletes the ledger, so cascade already removed any earlier
+  // credentials for this workspace; these rows are recreated with it.
+  for (const credential of fixture.serviceCredentials) {
+    const token = fixtureCredentialToken(credential);
+    await client.query(
+      `INSERT INTO service_credentials
+        (id, ledger_id, attributed_user_id, name, token_hash, token_prefix, token_suffix, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        credential.id,
+        ledgerId,
+        credential.attributedTo === "partner" ? fixture.partner.id : userId,
+        credential.name,
+        computeCredentialHash(token, environment.API_KEY_PEPPER),
+        token.slice(0, CREDENTIAL_DISPLAY_PREFIX_LENGTH),
+        token.slice(-CREDENTIAL_DISPLAY_SUFFIX_LENGTH),
+        now,
+      ]
+    );
+  }
 
   const categoryIds = new Map();
   for (const category of fixture.categories) {
@@ -479,6 +537,7 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
           (sum, document) => sum + activeEntries(document).length,
           0
         ),
+        credentials: fixture.serviceCredentials.length,
       })
     );
     return { status: "complete", userId, ledgerId };

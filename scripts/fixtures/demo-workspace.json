@@ -677,5 +677,25 @@
       },
       "entries": []
     }
+  ],
+  "serviceCredentials": [
+    {
+      "id": "80000000-0000-4000-8000-000000000001",
+      "name": "Shortcuts automation",
+      "attributedTo": "user",
+      "tokenBody": "111111111111111111111111111111111111111111111111"
+    },
+    {
+      "id": "80000000-0000-4000-8000-000000000002",
+      "name": "Bank statement importer",
+      "attributedTo": "user",
+      "tokenBody": "222222222222222222222222222222222222222222222222"
+    },
+    {
+      "id": "80000000-0000-4000-8000-000000000003",
+      "name": "Partner shortcut",
+      "attributedTo": "partner",
+      "tokenBody": "333333333333333333333333333333333333333333333333"
+    }
   ]
 }
