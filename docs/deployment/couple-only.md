@@ -23,15 +23,16 @@ The isolated PostgreSQL container `cashier-couple-rehearsal-20260917` listens
 only on loopback port 55439. Neither rehearsal database runs the app, workers,
 email, AI, or object-storage writes. Do not commit the backup or share it.
 
-Against the **local copy only**, run `npm run db:migrate` and then
-`npm run db:couple-preview`. The preview uses a consistent read-only
-snapshot and reports record counts, matching category names, active work, and
-unexpected existing attribution without printing entry data. Stop if active
-work or unexpected attribution is reported. After checking the preview, run
-`npm run db:couple-preview -- --apply` on the isolated copy. A single
-transaction moves ledger-scoped data, preserves unchanged row contents
+Against the **local copy only**, run `npm run db:migrate`. This one command
+applies schema migrations and automatically merges both existing member ledgers.
+It skips the merge on an empty or already merged database, and stops on an
+invalid shared ledger, active work, or unexpected existing attribution. The
+data merge runs in a single transaction and preserves unchanged row contents
 (including original money, revision links, image keys, and credential hashes),
-checks attribution and foreign keys, and rolls back on any mismatch.
+checks attribution and foreign keys, and rolls back the merge on any mismatch.
+Schema migrations commit before the data merge; if the merge fails, correct
+the cause and run `npm run db:migrate` again. Do not start the app until it
+completes successfully.
 Migration `0045_couple_runtime_cleanup.sql` drops the obsolete registration
 column and requires both attribution columns to be non-null. The migration
 runner checks that existing configured members were active and had completed
@@ -41,7 +42,8 @@ owner column stays available for the original-data merge and cleanup tools.
 Both tools recognize the pre-0045 and post-0045 schemas.
 Matching categories with identical properties merge; differing properties
 receive an ID-derived suffix. A different main currency requires valid
-stored exchange rates. Re-running after a successful merge is rejected.
+stored exchange rates. Re-running `npm run db:migrate` after a successful merge
+does not move data again.
 
 For a **new empty database**, configure the three `COUPLE_*_ID` UUIDs and
 `COUPLE_OWNER_EMAIL`, `COUPLE_OWNER_PASSWORD`, `COUPLE_PARTNER_EMAIL`, and
@@ -53,11 +55,12 @@ The Docker runner image was also tested against a separate empty local database:
 preview made no writes, and `--apply` created two users, one ledger, and 13
 default categories.
 
-The second local restore of the same immutable backup successfully applied
-the updated merge: the shared ledger has 1,547 source documents, 2,568
-entries, 1,839 revisions, 1,508 stored-file records, and 3 credentials.
-All foreign keys are valid. These are snapshot counts, not a live production
-baseline.
+The single-command rehearsal restored the immutable backup into
+`cashier_couple_one_command_20260917` and ran `npm run db:migrate` twice.
+The first run merged the ledgers; the second reported `ready`. The shared
+ledger has 1,547 source documents, 2,568 entries, 1,839 revisions,
+1,508 stored-file records, and 3 credentials. There are no unvalidated
+constraints. These are snapshot counts, not a live production baseline.
 
 For the runtime cleanup rehearsal, a new database
 `cashier_couple_runtime_20260917` was restored from the same original dump.
@@ -100,11 +103,11 @@ No production schema upgrade, merge, account cleanup, or deployment is
 included in this rehearsal. Before a future production operation, require
 `npm run check` and `npm run test:smoke` to pass; stop all app/API writers,
 workers, uploads and storage cleanup; confirm there is no active work; take
-and verify a **new** complete database backup; and repeat the preview against
-the paused database. Apply the schema migration and merge only after the
-backup. Verify both logins, per-person and combined accounting totals, API
-key continuity, and old image references before resuming writes. Account
-cleanup is a separate operation with its own preview and verification.
+and verify a **new** complete database backup. Then run `npm run db:migrate`
+to apply the schema and merge both ledgers. Verify both logins, per-person and
+combined accounting totals, API key continuity, and old image references
+before resuming writes. Account cleanup is a separate operation with its
+own preview and verification.
 
 If validation after a committed migration fails, keep writers stopped and
 restore the latest pre-migration backup into a clean database with

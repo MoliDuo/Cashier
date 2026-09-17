@@ -22,6 +22,7 @@ import {
 } from "@/persistence";
 
 const script = resolve("scripts/migrate-couple-ledger.ts");
+const migrateScript = resolve("scripts/migrate-database.mjs");
 
 async function fixture(differentCurrency = false) {
   const db = getTestDb();
@@ -125,6 +126,7 @@ async function fixture(differentCurrency = false) {
     DATABASE_URL: url.toString(),
     COUPLE_OWNER_USER_ID: ownerId,
     COUPLE_PARTNER_USER_ID: partnerId,
+    COUPLE_LEDGER_ID: ownerLedgerId,
   };
   const run = (apply = false) =>
     execFileSync(
@@ -138,8 +140,17 @@ async function fixture(differentCurrency = false) {
         stdio: ["ignore", "pipe", "pipe"],
       }
     );
+  const runMigrate = () =>
+    execFileSync(process.execPath, [migrateScript], {
+      cwd: process.cwd(),
+      env,
+      timeout: 60_000,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   return {
     run,
+    runMigrate,
     ownerId,
     partnerId,
     ownerLedgerId,
@@ -157,6 +168,32 @@ async function fixture(differentCurrency = false) {
 }
 
 describe("couple ledger migration", () => {
+  it("db:migrate merges old ledgers and is safe to repeat", async () => {
+    const data = await fixture();
+    expect(JSON.parse(data.runMigrate())).toMatchObject({
+      status: "complete",
+      couple: "merged",
+    });
+    expect((await getTestDb().select().from(sourceDocuments))[0]).toMatchObject({
+      ledgerId: data.ownerLedgerId,
+      attributedUserId: data.partnerId,
+    });
+    expect(JSON.parse(data.runMigrate())).toMatchObject({ status: "complete", couple: "ready" });
+    expect(await getTestDb().select().from(sourceDocuments)).toHaveLength(1);
+  });
+
+  it("db:migrate rejects incomplete FX without partially merging the ledgers", async () => {
+    const data = await fixture(true);
+    expect(() => data.runMigrate()).toThrow();
+    expect((await getTestDb().select().from(sourceDocuments))[0]?.ledgerId).toBe(
+      data.partnerLedgerId
+    );
+    await getTestDb()
+      .insert(currencyRates)
+      .values({ date: "2026-01-04", base: "USD", rates: { CNY: 7 } });
+    expect(JSON.parse(data.runMigrate())).toMatchObject({ couple: "merged" });
+  });
+
   it("previews without writes, then moves documents, revisions, files and ownership atomically", async () => {
     const data = await fixture();
     expect(JSON.parse(data.run())).toMatchObject({ categoryConflictCount: 1, mode: "preview" });

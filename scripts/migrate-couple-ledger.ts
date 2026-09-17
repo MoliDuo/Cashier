@@ -1,21 +1,30 @@
-import pg, { type PoolClient } from "pg";
+import pg, { type Client, type PoolClient } from "pg";
 import { z } from "zod";
 import Decimal from "decimal.js";
+import { pathToFileURL } from "node:url";
 
 const MoneyDecimal = Decimal.clone({ precision: 40, rounding: Decimal.ROUND_HALF_UP });
 
 const { Pool } = pg;
-const apply = process.argv.includes("--apply");
-if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--apply"))
-  throw new Error("Unknown option");
-const config = z
-  .object({ owner: z.string().uuid(), partner: z.string().uuid(), url: z.string().min(1) })
-  .refine((value) => value.owner !== value.partner)
-  .parse({
-    owner: process.env.COUPLE_OWNER_USER_ID,
-    partner: process.env.COUPLE_PARTNER_USER_ID,
-    url: process.env.DATABASE_URL,
-  });
+type DatabaseClient = Client | PoolClient;
+type CoupleIds = { owner: string; partner: string; ledger: string };
+
+function readConfig() {
+  return z
+    .object({
+      owner: z.string().uuid(),
+      partner: z.string().uuid(),
+      ledger: z.string().uuid(),
+      url: z.string().min(1),
+    })
+    .refine((value) => value.owner !== value.partner)
+    .parse({
+      owner: process.env.COUPLE_OWNER_USER_ID,
+      partner: process.env.COUPLE_PARTNER_USER_ID,
+      ledger: process.env.COUPLE_LEDGER_ID,
+      url: process.env.DATABASE_URL,
+    });
+}
 
 // Unknown ledger-scoped tables stop the migration until their relationships are reviewed.
 const movable = [
@@ -92,7 +101,7 @@ const preservedTables = [
 ] as const;
 
 async function integrityFingerprints(
-  client: PoolClient,
+  client: DatabaseClient,
   ledgerIds: string[],
   sameCurrency: boolean
 ) {
@@ -117,7 +126,7 @@ async function integrityFingerprints(
   return fingerprints;
 }
 
-async function inspect(client: PoolClient, lock: boolean) {
+async function inspect(client: DatabaseClient, lock: boolean, config: CoupleIds) {
   const schema = await client.query<{ column_name: string }>(
     `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema()
        AND table_name = 'users' AND column_name = 'registration_completed_at'`
@@ -144,6 +153,8 @@ async function inspect(client: PoolClient, lock: boolean) {
   if (ledgers.rowCount !== 2) throw new Error("Expected exactly one active ledger per account");
   const owner = ledgers.rows.find((row) => row.user_id === config.owner)!;
   const partner = ledgers.rows.find((row) => row.user_id === config.partner)!;
+  if (owner.id !== config.ledger)
+    throw new Error("Configured shared ledger differs from the owner ledger");
   const sameCurrency = owner.main_currency === partner.main_currency;
   const tables = await client.query<{ table_name: string }>(
     "SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema = current_schema() AND column_name = 'ledger_id' AND table_name <> 'ledgers'"
@@ -219,7 +230,7 @@ async function inspect(client: PoolClient, lock: boolean) {
   };
 }
 
-async function merge(client: PoolClient, state: Awaited<ReturnType<typeof inspect>>) {
+async function merge(client: DatabaseClient, state: Awaited<ReturnType<typeof inspect>>) {
   const { owner, partner } = state;
   if (state.pendingJobs)
     throw new Error("Active or queued work exists; pause workers and settle jobs");
@@ -427,46 +438,57 @@ async function merge(client: PoolClient, state: Awaited<ReturnType<typeof inspec
   }
 }
 
-const pool = new Pool({ connectionString: config.url, max: 1 });
-try {
-  const client = await pool.connect();
+function summarize(state: Awaited<ReturnType<typeof inspect>>) {
+  return {
+    sharedLedgerId: state.owner.id,
+    mainCurrencyDiffers: state.owner.main_currency !== state.partner.main_currency,
+    categoryConflictCount: state.collisionCount,
+    pendingJobs: state.pendingJobs,
+    attributionAnomalies: state.attributionAnomalies,
+    ownerRecords: state.ownerCounts,
+    partnerRecords: state.counts,
+  };
+}
+
+/** Applies the reviewed ledger merge on an existing connection. The caller owns the transaction. */
+export async function mergeCoupleLedger(client: DatabaseClient, config: CoupleIds) {
+  const state = await inspect(client, true, config);
+  await merge(client, state);
+  return summarize(state);
+}
+
+async function main() {
+  const apply = process.argv.includes("--apply");
+  if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--apply"))
+    throw new Error("Unknown option");
+  const config = readConfig();
+  const pool = new Pool({ connectionString: config.url, max: 1 });
   try {
-    await client.query(apply ? "BEGIN" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    const client = await pool.connect();
     try {
-      if (apply) {
-        await client.query("SET LOCAL lock_timeout = '10s'");
-        await client.query(
-          "SELECT pg_advisory_xact_lock(hashtextextended('cashier-couple-merge', 0))"
-        );
+      await client.query(apply ? "BEGIN" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      try {
+        if (apply) {
+          await client.query("SET LOCAL lock_timeout = '10s'");
+          await client.query(
+            "SELECT pg_advisory_xact_lock(hashtextextended('cashier-couple-merge', 0))"
+          );
+        }
+        const summary = apply
+          ? await mergeCoupleLedger(client, config)
+          : summarize(await inspect(client, false, config));
+        await client.query(apply ? "COMMIT" : "ROLLBACK");
+        console.log(JSON.stringify({ ...summary, mode: apply ? "apply" : "preview" }, null, 2));
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
       }
-      const state = await inspect(client, apply);
-      if (apply) {
-        await merge(client, state);
-        await client.query("COMMIT");
-      } else await client.query("ROLLBACK");
-      console.log(
-        JSON.stringify(
-          {
-            sharedLedgerId: state.owner.id,
-            mainCurrencyDiffers: state.owner.main_currency !== state.partner.main_currency,
-            categoryConflictCount: state.collisionCount,
-            pendingJobs: state.pendingJobs,
-            attributionAnomalies: state.attributionAnomalies,
-            ownerRecords: state.ownerCounts,
-            partnerRecords: state.counts,
-            mode: apply ? "apply" : "preview",
-          },
-          null,
-          2
-        )
-      );
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
+    } finally {
+      client.release();
     }
   } finally {
-    client.release();
+    await pool.end();
   }
-} finally {
-  await pool.end();
 }
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
