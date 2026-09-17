@@ -104,24 +104,37 @@ batch per affected ledger. Split and date-organization children are excluded
 even though their revision 1 copies a parent's text and files; a document with
 neither image nor text keeps its manual origin. The migration is idempotent.
 
-Verified on 2026-09-17 against `cashier_couple_runtime_20260917` (the restored
-snapshot from the 2026-09-17 backup). A copy named
+Verified on 2026-09-17 against `cashier_couple_runtime_20260917` (a derived
+rehearsal database, not the original dump). A copy named
 `cashier_0046_verify` received the repair directly: 659 revisions moved from
 `manual_edit` to `submission`, 659 documents gained a pointer, a second run
 reported `UPDATE 0` for both statements, `active_revision_id` plus `version`
 were byte-identical for all 1,547 documents, and `input_text`, entry amounts,
 entry categories, revision-file links, and stored-file keys were unchanged.
 `npm run db:migrate` on a separate copy, `cashier_0046_migrate`, recorded
-migration `46`. Before the repair, the sample document holding stored file
-`e394a76c-4df7-4b77-a8ba-25876c137921` returned no files; afterwards the same
-read path returned that image. Counts here come from that snapshot, not from
-live production.
+migration `46`. Counts from that derived dataset are superseded by the
+original-dump retest below.
 
-The pre-migration dry run below must report 659 for this snapshot. On live
-production, expect roughly 652 (632 with images, 20 text-only); live production
-drifts as the couple deletes and adds documents. Run it read-only before
-executing the migration, and prefer a Neon branch or PITR snapshot as the
-rollback point.
+Retested on 2026-09-17 against `cashier_prod_orig`, a clean restore of the
+immutable `original.dump` taken before any rehearsal work. That is the only
+copy that reflects pre-upgrade production: 664 documents are repair targets
+(644 with images, 20 text-only), all created before 2026-07-18. The pre-migration
+dry run below reports 664 there, and 0 afterwards. The full upgrade
+(`0044` + `0045` + `0046`) on a copy of that dump merged both ledgers into the
+owner's ledger, left `ledger_entries` at 1,631 rows and
+62,303.710 unchanged, reduced live NULL-pointer documents from 666 to 2, and
+made the sample document holding stored file
+`e394a76c-4df7-4b77-a8ba-25876c137921` return that image. The four documents
+created on or after 2026-08-16 are excluded by the content-provenance guard,
+as intended.
+
+Earlier rehearsal copies (`cashier_couple_runtime_20260917` and the derived
+`cashier_0046_verify`) show 659/1,547 because they came from the post-merge,
+pruned rehearsal database rather than the original dump. Treat 659 as an
+artifact of that derived dataset; the 664 figure above is the production
+baseline. Live production drifts as documents are added and deleted, so use
+the dry run as the authority. Run it read-only before executing the migration,
+and prefer a Neon branch or PITR snapshot as the rollback point.
 
 ```sql
 WITH legacy_submission AS (
