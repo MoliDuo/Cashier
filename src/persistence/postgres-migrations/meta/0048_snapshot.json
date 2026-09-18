@@ -4537,6 +4537,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "failed_attempts": {
+          "name": "failed_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -4553,6 +4560,10 @@
         "ck_setup_state_single_row": {
           "name": "ck_setup_state_single_row",
           "value": "\"setup_state\".\"id\""
+        },
+        "ck_setup_state_failed_attempts": {
+          "name": "ck_setup_state_failed_attempts",
+          "value": "\"setup_state\".\"failed_attempts\" >= 0"
         }
       },
       "isRLSEnabled": false

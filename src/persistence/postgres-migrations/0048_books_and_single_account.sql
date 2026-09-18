@@ -32,9 +32,12 @@ DO $$
 DECLARE
   live_ledgers integer;
   live_users integer;
+  live_ledger_id uuid;
   owner_id uuid;
   partner_id uuid;
   stray_owners integer;
+  stray_documents integer;
+  stray_credentials integer;
   owner_email constant text := 'xiangyu.moe.ac@gmail.com';
   partner_email constant text := 'liangyilinhuaxue@163.com';
 BEGIN
@@ -51,6 +54,8 @@ BEGIN
       '0048 requires exactly one live ledger, found %', live_ledgers
       USING HINT = 'Delete or merge the extra ledgers before running this migration.';
   END IF;
+
+  SELECT id INTO live_ledger_id FROM ledgers WHERE deleted_at IS NULL;
 
   SELECT id INTO owner_id FROM users
    WHERE lower(email) = owner_email AND deleted_at IS NULL;
@@ -78,6 +83,25 @@ BEGIN
     RAISE EXCEPTION
       '0048 found % live account(s) with data beyond the two expected members', stray_owners
       USING HINT = 'Reassign or remove those records before running this migration.';
+  END IF;
+
+  -- Books are created for the live ledger only, so a record that sits anywhere
+  -- else has no book the composite keys below could accept. Rows in a
+  -- soft-deleted ledger are the usual case: the old merge left 梁梁's ledger
+  -- behind that way. Counting per table, so the error says what to clean up.
+  SELECT count(*) INTO stray_documents
+    FROM source_documents d
+   WHERE d.ledger_id <> live_ledger_id
+      OR d.attributed_user_id NOT IN (owner_id, partner_id);
+  SELECT count(*) INTO stray_credentials
+    FROM service_credentials c
+   WHERE c.ledger_id <> live_ledger_id
+      OR c.attributed_user_id NOT IN (owner_id, partner_id);
+  IF stray_documents > 0 OR stray_credentials > 0 THEN
+    RAISE EXCEPTION
+      '0048 cannot attribute % source_documents and % service_credentials row(s): they are outside the live ledger or belong to another account',
+      stray_documents, stray_credentials
+      USING HINT = 'Delete or reattribute them first; they most likely live in a soft-deleted ledger.';
   END IF;
 END $$;--> statement-breakpoint
 
@@ -132,11 +156,17 @@ CREATE INDEX "idx_login_emails_user_id" ON "login_emails" ("user_id");--> statem
 -- the database is what they already share. The boolean primary key can only be
 -- true, so the table holds at most one row, and the wizard deletes it as part of
 -- creating the account.
+--
+-- The row is also the code's clock and its lockout counter: `created_at` dates
+-- the code so a log line nobody read cannot lock the instance forever, and
+-- `failed_attempts` retires a code that is being guessed at.
 CREATE TABLE "setup_state" (
   "id" boolean PRIMARY KEY DEFAULT true NOT NULL,
   "code_hash" text NOT NULL,
+  "failed_attempts" integer DEFAULT 0 NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "ck_setup_state_single_row" CHECK ("id")
+  CONSTRAINT "ck_setup_state_single_row" CHECK ("id"),
+  CONSTRAINT "ck_setup_state_failed_attempts" CHECK ("failed_attempts" >= 0)
 );--> statement-breakpoint
 
 -- `attributed_user_id` is now `book_id`: the rename is the backfill, because the
@@ -168,6 +198,9 @@ DECLARE
   live_ledgers integer;
   owner_id uuid;
   partner_id uuid;
+  documents_before integer;
+  documents_after integer;
+  live_ledgers_after integer;
   owner_email constant text := 'xiangyu.moe.ac@gmail.com';
   partner_email constant text := 'liangyilinhuaxue@163.com';
 BEGIN
@@ -221,9 +254,32 @@ BEGIN
   -- away, and the address is what it wanted to add: it cannot outlive its owner.
   DELETE FROM email_change_challenges WHERE user_id = partner_id;
 
+  -- 梁梁's row may own a ledger, live or not: `bootstrap-couple.mjs` set the
+  -- live ledger's owner from `COUPLE_OWNER_USER_ID`, and the old merge left its
+  -- own ledger behind under whoever ran it. `ledgers.user_id` cascades, so the
+  -- DELETE below would take that ledger and every record hanging off it. The
+  -- hand-over must happen first; the partial unique index only covers live
+  -- ledgers, so a soft-deleted one cannot collide with the owner's.
+  UPDATE ledgers SET user_id = owner_id WHERE user_id = partner_id;
+
+  SELECT count(*) INTO documents_before FROM source_documents;
+
   -- Records and keys already point at the person-books, so the row is
   -- unreferenced by the time the composite keys below are validated.
   DELETE FROM users WHERE id = partner_id;
+
+  -- The cascade above is silent when it fires, so prove it did not: the live
+  -- ledger and every record must still be here. Aborting is the only safe
+  -- answer, because the alternative is a database that lost its data and a
+  -- deployment that would otherwise look successful.
+  SELECT count(*) INTO live_ledgers_after FROM ledgers WHERE deleted_at IS NULL;
+  SELECT count(*) INTO documents_after FROM source_documents;
+  IF live_ledgers_after <> live_ledgers OR documents_after <> documents_before THEN
+    RAISE EXCEPTION
+      '0048 lost data while removing the second account: % live ledger(s) (was %) and % source_documents row(s) (was %)',
+      live_ledgers_after, live_ledgers, documents_after, documents_before
+      USING HINT = 'This is a bug in the migration. Restore the backup and report it before retrying.';
+  END IF;
 END $$;--> statement-breakpoint
 
 -- The person-books now hold every record, so the composite keys validate.

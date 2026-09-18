@@ -125,7 +125,10 @@ interface Fixture {
   ledgerId: string;
 }
 
-async function seedCouple(client: PoolClient, override: { partnerTimeZone?: string | null } = {}) {
+async function seedCouple(
+  client: PoolClient,
+  override: { partnerTimeZone?: string | null; owner?: "owner" | "partner" } = {}
+) {
   const ownerId = crypto.randomUUID();
   const partnerId = crypto.randomUUID();
   const ledgerId = crypto.randomUUID();
@@ -141,7 +144,10 @@ async function seedCouple(client: PoolClient, override: { partnerTimeZone?: stri
       override.partnerTimeZone === undefined ? "Asia/Shanghai" : override.partnerTimeZone,
     ]
   );
-  await client.query(`INSERT INTO ledgers (id, user_id) VALUES ($1, $2)`, [ledgerId, ownerId]);
+  // `bootstrap-couple.mjs` took the owner from `COUPLE_OWNER_USER_ID`, so the
+  // live ledger can legitimately belong to either account.
+  const ledgerOwner = override.owner === "partner" ? partnerId : ownerId;
+  await client.query(`INSERT INTO ledgers (id, user_id) VALUES ($1, $2)`, [ledgerId, ledgerOwner]);
   return { ownerId, partnerId, ledgerId };
 }
 
@@ -280,6 +286,88 @@ describe("0048 books and single account migration", () => {
         fixture.partnerId,
       ]);
       expect(partnerBook.rows[0].time_zone).toBeNull();
+    });
+  });
+
+  it("keeps the live ledger when 梁梁 owns it", async () => {
+    await withSchema(async (client) => {
+      // `bootstrap-couple.mjs` set the live ledger's owner from the environment,
+      // so it can point at the account this migration deletes. `ledgers.user_id`
+      // cascades: without the hand-over first, the DELETE would take the ledger
+      // and every record in it.
+      const fixture = await seedCouple(client, { owner: "partner" });
+      await seedData(client, fixture);
+      const before = await client.query(
+        `SELECT count(*)::int AS count FROM source_documents WHERE deleted_at IS NULL`
+      );
+
+      await applyMigration(client);
+
+      const ledgers = await client.query(
+        `SELECT id, user_id FROM ledgers WHERE deleted_at IS NULL`
+      );
+      expect(ledgers.rows).toEqual([{ id: fixture.ledgerId, user_id: fixture.ownerId }]);
+      const after = await client.query(
+        `SELECT count(*)::int AS count FROM source_documents WHERE deleted_at IS NULL`
+      );
+      expect(after.rows[0].count).toBe(before.rows[0].count);
+      // And the records are still attributable: the composite key validated.
+      const books = await client.query(`SELECT count(*)::int AS count FROM books`);
+      expect(books.rows[0].count).toBe(3);
+    });
+  });
+
+  it("keeps 梁梁's soft-deleted ledger instead of cascading it away", async () => {
+    await withSchema(async (client) => {
+      const fixture = await seedCouple(client);
+      await seedData(client, fixture);
+      // The old merge left its own ledger behind, soft-deleted and owned by
+      // 梁梁. It has no records, so it is not a stray that the guard refuses.
+      const staleLedgerId = crypto.randomUUID();
+      await client.query(`INSERT INTO ledgers (id, user_id, deleted_at) VALUES ($1, $2, now())`, [
+        staleLedgerId,
+        fixture.partnerId,
+      ]);
+
+      await applyMigration(client);
+
+      const stale = await client.query(`SELECT user_id, deleted_at FROM ledgers WHERE id = $1`, [
+        staleLedgerId,
+      ]);
+      expect(stale.rows).toHaveLength(1);
+      expect(stale.rows[0].user_id).toBe(fixture.ownerId);
+      expect(stale.rows[0].deleted_at).not.toBeNull();
+    });
+  });
+
+  it("aborts when records sit outside the live ledger", async () => {
+    await withSchema(async (client) => {
+      const fixture = await seedCouple(client);
+      await seedData(client, fixture);
+      // A record in the soft-deleted ledger has no book the composite key could
+      // accept, so the migration must refuse it before the DDL runs.
+      const staleLedgerId = crypto.randomUUID();
+      await client.query(`INSERT INTO ledgers (id, user_id, deleted_at) VALUES ($1, $2, now())`, [
+        staleLedgerId,
+        fixture.ownerId,
+      ]);
+      await client.query(
+        `INSERT INTO source_documents (id, ledger_id, attributed_user_id, title)
+         VALUES ($1, $2, $3, 'orphan')`,
+        [crypto.randomUUID(), staleLedgerId, fixture.ownerId]
+      );
+
+      await client.query("SAVEPOINT guard");
+      await expect(applyMigration(client)).rejects.toThrow(
+        /cannot attribute 1 source_documents and 0 service_credentials row\(s\)/
+      );
+      await client.query("ROLLBACK TO SAVEPOINT guard");
+
+      const books = await client.query(
+        `SELECT count(*)::int AS count FROM information_schema.tables
+          WHERE table_schema = current_schema() AND table_name = 'books'`
+      );
+      expect(books.rows[0].count).toBe(0);
     });
   });
 
