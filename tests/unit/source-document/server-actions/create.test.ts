@@ -78,8 +78,25 @@ describe("createSourceDocumentAction omission semantics", () => {
     );
   });
 
-  it("lets the request's own zone win over the book's", async () => {
+  it("lets the book's zone win over the request's own", async () => {
+    // The book owns the date: the record belongs to it, and the request's zone
+    // is only the device the reader happened to use, so it cannot contradict the
+    // book the record is being filed into.
     resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: "Asia/Singapore" });
+
+    await createSourceDocumentAction(
+      "ledger-1",
+      { text: "Lunch", timezone: "Europe/Paris" },
+      CLIENT_SUBMISSION_ID
+    );
+
+    expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ timezone: "Asia/Singapore" })
+    );
+  });
+
+  it("falls back to the request's zone when the book has none of its own", async () => {
+    resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: null });
 
     await createSourceDocumentAction(
       "ledger-1",

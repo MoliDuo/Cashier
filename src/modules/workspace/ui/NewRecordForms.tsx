@@ -57,6 +57,10 @@ export function InputFormLoadingFallback() {
 
 interface NewRecordFormsProps {
   bookId: string;
+  /** The book being viewed, or null for 总账. */
+  viewedBookId: string | null;
+  /** The book the record goes into, when it is resolvable in the live list. */
+  savedBook: { id: string; name: string } | null;
   ledgerId: string;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
@@ -77,6 +81,8 @@ interface NewRecordFormsProps {
 
 export function NewRecordForms({
   bookId,
+  viewedBookId,
+  savedBook,
   ledgerId,
   activeTab,
   committedFilters,
@@ -105,10 +111,14 @@ export function NewRecordForms({
         result,
         activeTab,
         committedFilters,
+        viewedBookId,
+        savedBook,
         messages: {
           aiSuccess: tSourceDocument("uploadSuccess"),
           quickSuccess: tQuickEntry("quickEntrySuccess"),
           savedMayBeHidden: tSourceDocument("savedMayBeHidden"),
+          savedToOtherBook: (bookName: string) =>
+            tSourceDocument("savedToOtherBook", { book: bookName }),
           viewRecord: tSourceDocument("viewRecord"),
         },
       });
@@ -128,10 +138,12 @@ export function NewRecordForms({
       committedFilters,
       ledgerId,
       quickDirty,
+      savedBook,
       setInputMode,
       setInputOpen,
       tQuickEntry,
       tSourceDocument,
+      viewedBookId,
     ]
   );
 

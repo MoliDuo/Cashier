@@ -42,7 +42,8 @@ interface NewRecordDialogProps {
   setQuickPending: (pending: boolean) => void;
   setAiDirty: (dirty: boolean) => void;
   setQuickDirty: (dirty: boolean) => void;
-  effectiveTimeZone?: string | undefined;
+  /** The device's zone, used when the picked book has none of its own. */
+  deviceTimeZone?: string | undefined;
 }
 
 /** The "new record" dialog: AI-parse / quick-entry mode toggle plus the active input form. */
@@ -68,20 +69,36 @@ export function NewRecordDialog({
   setQuickPending,
   setAiDirty,
   setQuickDirty,
-  effectiveTimeZone,
+  deviceTimeZone,
 }: NewRecordDialogProps) {
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
-  const tBooks = useTranslations("Settings.Books");
+  // The dialog opens from every tab, so the picker labels live in the shell
+  // bundle instead of the 设置 one.
+  const tBookPicker = useTranslations("BookPicker");
   // The picker starts on the book being viewed, or on the 总账 default when
   // reading 总账. It is a per-record choice: changing it does not move the view.
   const defaultBookId = scope ?? books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? "";
   const [bookId, setBookId] = useState(defaultBookId);
-  const [lastDefaultBookId, setLastDefaultBookId] = useState(defaultBookId);
-  if (lastDefaultBookId !== defaultBookId) {
-    setLastDefaultBookId(defaultBookId);
-    setBookId(defaultBookId);
+  // Every opening starts the per-record pick over. A books refetch while the
+  // dialog stays open must not overwrite what the user chose for this record,
+  // so the pick is only reset on the closed-to-open edge.
+  const [lastOpen, setLastOpen] = useState(isOpen);
+  if (isOpen !== lastOpen) {
+    setLastOpen(isOpen);
+    if (isOpen) setBookId(defaultBookId);
   }
+  // An empty pick (the dialog opened before the books arrived) or one whose
+  // book is no longer live resolves to the default book, so the picker and the
+  // submitted book always agree with what the select shows.
+  const selectedBook =
+    books.find((book) => book.id === bookId) ??
+    books.find((book) => book.id === defaultBookId) ??
+    null;
+  const selectedBookId = selectedBook?.id ?? defaultBookId;
+  // The book owns the record's date zone: the picked book's zone decides the
+  // default day, and only a book without one falls back to the device.
+  const recordTimeZone = selectedBook?.timeZone ?? deviceTimeZone;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -105,15 +122,15 @@ export function NewRecordDialog({
             <label htmlFor="record-book" className="text-sm">
               {tCommon("book")}
             </label>
-            <Select value={bookId} onValueChange={setBookId} disabled={isSubmitting}>
+            <Select value={selectedBookId} onValueChange={setBookId} disabled={isSubmitting}>
               <SelectTrigger id="record-book" className="w-40">
-                <SelectValue placeholder={tBooks("namePlaceholder")} />
+                <SelectValue placeholder={tBookPicker("namePlaceholder")} />
               </SelectTrigger>
               <SelectContent position="popper">
                 {books.map((book) => (
                   <SelectItem key={book.id} value={book.id}>
                     {book.name}
-                    {book.isDefault ? ` · ${tBooks("totalBadge")}` : ""}
+                    {book.isDefault ? ` · ${tBookPicker("totalBadge")}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -157,7 +174,9 @@ export function NewRecordDialog({
               fallback={<InputFormLoadingFallback />}
             >
               <NewRecordForms
-                bookId={bookId}
+                bookId={selectedBookId}
+                viewedBookId={scope}
+                savedBook={selectedBook}
                 ledgerId={ledgerId}
                 activeTab={activeTab}
                 committedFilters={committedFilters}
@@ -173,7 +192,7 @@ export function NewRecordDialog({
                 setQuickPending={setQuickPending}
                 setAiDirty={setAiDirty}
                 setQuickDirty={setQuickDirty}
-                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+                {...(recordTimeZone != null ? { timeZone: recordTimeZone } : {})}
               />
             </DeferredFeatureMessages>
           </div>

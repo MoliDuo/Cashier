@@ -20,7 +20,24 @@ interface UseSourceDocumentInputDraftOptions {
 interface InitialDraftSnapshot {
   text: string;
   images: EditableInputImage[];
-  entryDate: number;
+}
+
+interface DraftDateState {
+  entryDate: Date;
+  /** The date the dirty check compares against. */
+  baseline: number;
+  /** True once the user picked a date by hand in this draft. */
+  touched: boolean;
+  /** The zone `entryDate` was resolved for. */
+  timeZone: string | undefined;
+}
+
+function createDraftDateState(
+  initialData: SourceDocumentInputInitialData | undefined,
+  timeZone: string | undefined
+): DraftDateState {
+  const entryDate = resolveInitialEntryDate(initialData?.entryDate, timeZone);
+  return { entryDate, baseline: entryDate.getTime(), touched: false, timeZone };
 }
 
 function areImagesEqual(left: EditableInputImage[], right: EditableInputImage[]) {
@@ -46,24 +63,15 @@ export function useSourceDocumentInputDraft({
   const [images, setImages] = useState<EditableInputImage[]>(() =>
     toEditableImages(initialData?.images)
   );
-  const [entryDate, setEntryDate] = useState<Date>(() =>
-    resolveInitialEntryDate(initialData?.entryDate, timeZone)
+  const [dateState, setDateState] = useState<DraftDateState>(() =>
+    createDraftDateState(initialData, timeZone)
   );
   const [initialDraft, setInitialDraft] = useState<InitialDraftSnapshot>(() => ({
     text: initialData?.text ?? "",
     images: toEditableImages(initialData?.images),
-    entryDate: entryDate.getTime(),
   }));
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const imagesRef = useRef(images);
-  const resetDraft = () => {
-    const nextEntryDate = resolveInitialEntryDate(undefined, timeZone);
-    setText("");
-    replaceImages([]);
-    setEntryDate(nextEntryDate);
-    setInitialDraft({ text: "", images: [], entryDate: nextEntryDate.getTime() });
-    setSelectedImageIndex(null);
-  };
 
   const replaceImages = (update: SetStateAction<EditableInputImage[]>) => {
     setImages((current) => {
@@ -74,6 +82,34 @@ export function useSourceDocumentInputDraft({
       return next;
     });
   };
+
+  const resetDraft = () => {
+    setText("");
+    replaceImages([]);
+    setDateState(createDraftDateState(undefined, timeZone));
+    setInitialDraft({ text: "", images: [] });
+    setSelectedImageIndex(null);
+  };
+
+  // The record's book can change while the dialog stays open, and its zone
+  // owns the default date. An untouched default follows the new zone, while a
+  // hand-picked date or a retry seed keeps its own. The baseline moves with an
+  // untouched default so the form still closes without a discard confirmation.
+  if (dateState.timeZone !== timeZone) {
+    setDateState((current) =>
+      current.timeZone === timeZone
+        ? current
+        : current.touched || initialData?.entryDate != null
+          ? { ...current, timeZone }
+          : createDraftDateState(undefined, timeZone)
+    );
+  }
+
+  const setEntryDate = (date: Date) => {
+    setDateState((current) => ({ ...current, entryDate: date, touched: true }));
+  };
+
+  const entryDate = dateState.entryDate;
 
   useEffect(() => {
     imagesRef.current = images;
@@ -105,7 +141,7 @@ export function useSourceDocumentInputDraft({
     isDirty:
       text !== initialDraft.text ||
       !areImagesEqual(images, initialDraft.images) ||
-      entryDate.getTime() !== initialDraft.entryDate,
+      entryDate.getTime() !== dateState.baseline,
     resetDraft,
   };
 }

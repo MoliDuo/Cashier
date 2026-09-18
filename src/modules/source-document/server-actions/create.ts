@@ -29,11 +29,12 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     const validated = createSourceDocumentInputSchema.parse(input);
     const validatedClientSubmissionId = clientSubmissionIdSchema.parse(clientSubmissionId);
     const payload = omitUndefinedProperties(validated);
-    // The book is what owns the date zone: the record belongs to it, so an
-    // upload through 哞哞的 is dated in that book's zone unless the request sent
-    // its own. The zone is resolved before the write, never inside it.
+    // The book is what owns the date zone: the record belongs to it, so a record
+    // filed into 哞哞的 is dated in that book's zone. The request's own zone is
+    // only a fallback for a book that has none — it is where the reader happened
+    // to be, not where the record belongs. Resolved before the write, never in it.
     const book = await resolveRecordBook(ledgerId, validated.bookId, serverComposition.books);
-    const timezone = payload.timezone ?? book.timeZone;
+    const timezone = book.timeZone ?? payload.timezone;
     const scheduleProcessing = (job: ProcessingJobContract) => {
       scheduleProcessingAfter(job);
     };

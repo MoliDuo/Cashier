@@ -12,7 +12,14 @@ interface NewRecordSuccessMessages {
   aiSuccess: string;
   quickSuccess: string;
   savedMayBeHidden: string;
+  /** Renders the "saved into another book" warning for the given book name. */
+  savedToOtherBook: (bookName: string) => string;
   viewRecord: string;
+}
+
+interface SavedBook {
+  id: string;
+  name: string;
 }
 
 interface ShowNewRecordSuccessFeedbackOptions {
@@ -21,11 +28,26 @@ interface ShowNewRecordSuccessFeedbackOptions {
   result: CreatedRecordResult;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
+  /** The book being viewed, or null for 总账. */
+  viewedBookId: string | null;
+  /** The book the record went into, when it is known. */
+  savedBook: SavedBook | null;
   messages: NewRecordSuccessMessages;
 }
 
 function dateOnly(value: string): string {
   return value.slice(0, 10);
+}
+
+/**
+ * A record saved into a book other than the one being viewed cannot appear in
+ * the current view, no matter what the filters say.
+ */
+export function shouldWarnNewRecordSavedToOtherBook(
+  viewedBookId: string | null,
+  savedBook: SavedBook | null
+): savedBook is SavedBook {
+  return viewedBookId != null && savedBook != null && savedBook.id !== viewedBookId;
 }
 
 export function shouldWarnNewRecordMayBeHidden(
@@ -63,8 +85,25 @@ export function showNewRecordSuccessFeedback({
   result,
   activeTab,
   committedFilters,
+  viewedBookId,
+  savedBook,
   messages,
 }: ShowNewRecordSuccessFeedbackOptions): void {
+  if (shouldWarnNewRecordSavedToOtherBook(viewedBookId, savedBook)) {
+    toast.success(messages.savedToOtherBook(savedBook.name), {
+      action: {
+        label: messages.viewRecord,
+        onClick: () =>
+          openLedgerDetail({
+            type: "source-document",
+            id: result.sourceDocumentId,
+            ledgerId,
+          }),
+      },
+    });
+    return;
+  }
+
   if (shouldWarnNewRecordMayBeHidden(activeTab, committedFilters, result.documentDate)) {
     toast.success(messages.savedMayBeHidden, {
       action: {
