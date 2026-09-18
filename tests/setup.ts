@@ -138,18 +138,15 @@ beforeEach(async () => {
   const database = testDatabase;
   if (database == null) throw new Error("Test PostgreSQL database is not initialized");
 
-  delete process.env.COUPLE_OWNER_USER_ID;
-  delete process.env.COUPLE_PARTNER_USER_ID;
-  delete process.env.COUPLE_LEDGER_ID;
-
   await truncateAllTables(database);
 
   await database.db.insert(schema.users).values({
     id: "00000000-0000-0000-0000-000000000000",
-    email: "test@example.com",
     name: "Test User",
-    nickname: "A",
-    gender: "male",
+  });
+  await database.db.insert(schema.loginEmails).values({
+    userId: "00000000-0000-0000-0000-000000000000",
+    email: "test@example.com",
     emailVerified: new Date(),
   });
 });

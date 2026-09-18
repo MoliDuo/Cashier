@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { eq } from "drizzle-orm";
 import { withAuth, requireAuth, requireRecentAuth } from "@/lib/auth-actions";
 import { withLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
 import { ledgers } from "@/persistence";
-import { configureTestCoupleLedger, createTestUser } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, ensureTestLedgerBooks } from "tests/helpers/schema-setup";
 
 // Mock next-auth
 vi.mock("@/auth", () => ({
@@ -81,30 +82,34 @@ describe("withLedgerAccess", () => {
       id: ledgerId,
       userId: "00000000-0000-0000-0000-000000000000",
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
 
     const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 
     await expect(action(ledgerId)).resolves.toBe(ledgerId);
   });
 
-  it("throws NotFoundError when the current user does not own the ledger", async () => {
+  it("throws NotFoundError for a ledger that is not the single live one", async () => {
     const db = getTestDb();
-    const ledgerId = "00000000-0000-4000-8000-000000000222";
-    const otherUserId = "11111111-1111-4111-8111-111111111111";
     mockAuth.mockResolvedValue({
       user: { id: "00000000-0000-0000-0000-000000000000" },
     } as { user: { id: string } });
-    await createTestUser(db, "other@example.com", otherUserId);
-
-    await db.insert(ledgers).values({
-      id: ledgerId,
-      userId: otherUserId,
-    });
+    const { ledgerId: liveLedgerId } = await createTestUserWithLedger(db);
+    // A ledger row that is not the live one — and, with one live ledger, that
+    // is every other id: the access check no longer asks who owns it.
+    const otherLedgerId = "00000000-0000-4000-8000-000000000222";
+    await db
+      .insert(ledgers)
+      .values({ id: otherLedgerId, userId: "00000000-0000-0000-0000-000000000000" });
+    await ensureTestLedgerBooks(db, otherLedgerId);
+    // Two live ledgers make resolution ambiguous, so neither resolves; the
+    // schema change that lets a second row exist is what 0048 guards against.
+    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, otherLedgerId));
 
     const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 
-    await expect(action(ledgerId)).rejects.toThrow(NotFoundError);
+    await expect(action(otherLedgerId)).rejects.toThrow(NotFoundError);
+    await expect(action(liveLedgerId)).resolves.toBe(liveLedgerId);
   });
 });
 

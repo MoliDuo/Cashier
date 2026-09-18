@@ -33,31 +33,46 @@ function whereSourceDocumentNotDeletedId(ledgerId: string, sourceDocumentId: str
   return and(whereSourceDocumentNotDeleted(ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
 }
 
-export async function assignAttribution(input: {
+export async function getBook(input: {
+  ledgerId: string;
+  sourceDocumentId: string;
+}): Promise<{ bookId: string; version: number } | null> {
+  const row = await db
+    .select({ bookId: sourceDocuments.bookId, version: sourceDocuments.version })
+    .from(sourceDocuments)
+    .where(whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId))
+    .limit(1)
+    .then((rows) => rows[0]);
+  return row ?? null;
+}
+
+export async function assignBook(input: {
   ledgerId: string;
   sourceDocumentId: string;
   expectedVersion: number;
-  attributedUserId: string;
+  bookId: string;
 }): Promise<{ ok: true; version: number } | { ok: false; currentVersion: number }> {
   return db.transaction(async (tx) => {
+    // The ledger row is locked first, like every other aggregate command, so a
+    // concurrent book edit and a concurrent processing write cannot interleave.
     await lockLedgerForUpdate(tx, input.ledgerId);
     const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
     if (document.version !== input.expectedVersion) {
       return { ok: false as const, currentVersion: document.version };
     }
-    if (document.attributedUserId === input.attributedUserId) {
+    if (document.bookId === input.bookId) {
       return { ok: true as const, version: document.version };
     }
     const [updated] = await tx
       .update(sourceDocuments)
       .set({
-        attributedUserId: input.attributedUserId,
+        bookId: input.bookId,
         version: sql`${sourceDocuments.version} + 1`,
         updatedAt: new Date(),
       })
       .where(whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId))
       .returning({ version: sourceDocuments.version });
-    if (updated == null) throw new ConflictError("Source document changed during attribution edit");
+    if (updated == null) throw new ConflictError("Source document changed during book edit");
     return { ok: true as const, version: updated.version };
   });
 }

@@ -56,7 +56,7 @@ export function InputFormLoadingFallback() {
 }
 
 interface NewRecordFormsProps {
-  attributedUserId: string;
+  bookId: string;
   ledgerId: string;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
@@ -76,7 +76,7 @@ interface NewRecordFormsProps {
 }
 
 export function NewRecordForms({
-  attributedUserId,
+  bookId,
   ledgerId,
   activeTab,
   committedFilters,
@@ -139,7 +139,7 @@ export function NewRecordForms({
     <>
       <div className={inputMode === "ai" ? undefined : "hidden"} aria-hidden={inputMode !== "ai"}>
         <SourceDocumentInput
-          attributedUserId={attributedUserId}
+          bookId={bookId}
           key={ledgerId}
           ledgerId={ledgerId}
           isActive={inputMode === "ai"}
@@ -154,7 +154,7 @@ export function NewRecordForms({
         aria-hidden={inputMode !== "quick"}
       >
         <QuickEntryForm
-          attributedUserId={attributedUserId}
+          bookId={bookId}
           key={ledgerId}
           ledgerId={ledgerId}
           categories={categories}

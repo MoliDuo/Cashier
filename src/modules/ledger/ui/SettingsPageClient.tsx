@@ -10,16 +10,16 @@ import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 import { textRoleClassName } from "@/components/typography";
-import type { MemberProfileContract } from "@/application/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 
 interface SettingsPageClientProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   ledgerId: string;
-  /** Both member profiles, hydrated by the page bootstrap. */
-  initialMembers: readonly MemberProfileContract[];
-  userId?: string;
-  partnerUserId?: string | null;
+  /** The switcher's books, hydrated by the page bootstrap. */
+  initialBooks: readonly BookDto[];
+  /** The account's login addresses, hydrated by the server. */
+  initialEmails?: readonly string[];
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
@@ -30,9 +30,8 @@ export function SettingsPageClient({
   ledger,
   initialCategories,
   ledgerId,
-  initialMembers,
-  userId,
-  partnerUserId,
+  initialBooks,
+  initialEmails,
   userEmail,
   hasPassword,
   passwordUpdatedAt,
@@ -63,9 +62,8 @@ export function SettingsPageClient({
         ledger={ledger}
         initialCategories={initialCategories}
         ledgerId={ledgerId}
-        initialMembers={initialMembers}
-        {...(userId !== undefined ? { userId } : {})}
-        {...(partnerUserId != null ? { partnerUserId } : {})}
+        initialBooks={initialBooks}
+        {...(initialEmails !== undefined ? { initialEmails } : {})}
         {...(userEmail !== undefined ? { userEmail } : {})}
         {...(hasPassword !== undefined ? { hasPassword } : {})}
         {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}

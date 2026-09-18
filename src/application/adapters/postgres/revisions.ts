@@ -32,10 +32,7 @@ export type CreatePendingRevisionInput = {
     documentDate: string | null;
     dateReference?: string | null;
   };
-} & (
-  | { sourceDocumentId: string; attributedUserId?: string; createdByUserId?: string }
-  | { sourceDocumentId?: never; attributedUserId: string; createdByUserId: string }
-);
+} & ({ sourceDocumentId: string; bookId?: string } | { sourceDocumentId?: never; bookId: string });
 
 function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
   return and(
@@ -151,11 +148,8 @@ export async function createProcessingRevisionInTransaction(
   if (existingDocument == null && input.sourceDocumentId != null) {
     throw new NotFoundError("Source document");
   }
-  if (
-    existingDocument == null &&
-    (input.attributedUserId == null || input.createdByUserId == null)
-  ) {
-    throw new ValidationError("Member attribution and creator required");
+  if (existingDocument == null && input.bookId == null) {
+    throw new ValidationError("A book is required for a new record");
   }
 
   // Acquire a lock on existing documents or create a new one.
@@ -166,8 +160,7 @@ export async function createProcessingRevisionInTransaction(
           .values({
             id: sourceDocumentId,
             ledgerId: input.ledgerId,
-            attributedUserId: input.attributedUserId!,
-            createdByUserId: input.createdByUserId ?? null,
+            bookId: input.bookId!,
           })
           .returning()
           .then((rows) => rows[0]!)

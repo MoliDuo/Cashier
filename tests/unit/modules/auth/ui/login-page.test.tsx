@@ -96,26 +96,18 @@ describe("AuthLoginPage", () => {
     expect(screen.getByRole("button", { name: "以开发身份进入" })).toBeInTheDocument();
   });
 
-  it("adds the other couple member as a second development entry", async () => {
+  it("offers exactly one development entry, because there is one account", async () => {
     const handleDevSignIn = vi.fn();
     mockUseLoginFlow.mockReturnValue(createDevFlow(handleDevSignIn));
 
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage devAuthAvailable devPartnerLabel="Local Partner" />);
-
-    expect(screen.getByRole("button", { name: "以开发身份进入" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "以 Local Partner 身份进入" }));
-
-    expect(handleDevSignIn).toHaveBeenCalledWith("partner");
-  });
-
-  it("keeps a single development entry when no partner resolves", async () => {
-    mockUseLoginFlow.mockReturnValue(createDevFlow(vi.fn()));
-
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
     render(<AuthLoginPage devAuthAvailable />);
 
-    expect(screen.getAllByRole("button", { name: /身份进入/ })).toHaveLength(1);
+    const entries = screen.getAllByRole("button", { name: /身份进入/ });
+    expect(entries).toHaveLength(1);
+    fireEvent.click(entries[0]!);
+
+    expect(handleDevSignIn).toHaveBeenCalledWith();
   });
 
   it("presents Cashier as a quiet app entry instead of a marketing page", async () => {

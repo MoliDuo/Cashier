@@ -15,9 +15,8 @@ npm ci
 npm run dev:demo
 ```
 
-Open the printed loopback URL and select `Continue as dev`, or the second entry to sign in as the
-other couple member. The startup banner lists the seeded sample API keys — one per member, so the
-settings page shows both an own and a partner credential — and those tokens are valid against the
+Open the printed loopback URL and select `Continue as dev`. The startup banner lists the seeded
+sample API keys, each labelled with the book it writes to, and those tokens are valid against the
 local demo only. The command uses the standalone
 `docker-compose.demo.yml` definition to start a dedicated `cashier-demo` PostgreSQL and MinIO stack,
 migrates `cashier_demo`, and seeds fictional receipts and ledger history. It does not require a
@@ -43,9 +42,9 @@ npm run db:migrate
 npm run dev
 ```
 
-Fill the couple member IDs, shared ledger ID, and AI values in `.env`. On an empty database, run
-`npm run db:bootstrap` to preview and `npm run db:bootstrap -- --apply` to create the two users and
-shared ledger before signing in. Never commit `.env`,
+Fill the AI values in `.env`. Accounts are not configured from the environment: on an empty
+database the server prints a one-time setup code to its logs, and `/{locale}/setup` asks for that
+code plus one login email, one password and the book names. Never commit `.env`,
 provider credentials, real receipts, API keys, or raw personal data.
 
 ## Project layout

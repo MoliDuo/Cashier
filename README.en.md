@@ -61,15 +61,11 @@ Start the bundled stack:
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
-On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. Then
-preview and explicitly initialize the two accounts and shared ledger:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap -- --apply
-```
-
-Open [http://localhost:3000](http://localhost:3000) and sign in as either member.
+On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. It does
+not create an account. Open [http://localhost:3000](http://localhost:3000): every page leads to the
+`/{locale}/setup` wizard, and the server prints a one-time setup code to its logs. Enter that code,
+a sign-in email, a password and your book names (共同支出 is pre-filled as the default) to create the
+account; `/setup` returns 404 afterwards.
 
 `AI_MODEL` defaults to `gpt-4o`. When using another OpenAI-compatible service, set both
 `OPENAI_BASE_URL` and `AI_MODEL`.

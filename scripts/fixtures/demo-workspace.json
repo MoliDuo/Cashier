@@ -3,18 +3,7 @@
   "user": {
     "id": "10000000-0000-4000-8000-000000000001",
     "email": "dev@cashier.local",
-    "name": "Local Developer",
-    "nickname": "Dev",
-    "gender": "male",
-    "timeZone": "Asia/Kuala_Lumpur"
-  },
-  "partner": {
-    "id": "10000000-0000-4000-8000-000000000002",
-    "email": "partner@cashier.local",
-    "name": "Local Partner",
-    "nickname": "Partner",
-    "gender": "female",
-    "timeZone": "Asia/Shanghai"
+    "name": "Local Developer"
   },
   "ledger": {
     "id": "20000000-0000-4000-8000-000000000001",
@@ -22,6 +11,29 @@
     "preferredCurrencies": ["CNY", "USD", "MYR"],
     "aiLanguage": "en"
   },
+  "books": [
+    {
+      "id": "90000000-0000-4000-8000-000000000001",
+      "name": "哞哞的",
+      "timeZone": "Asia/Kuala_Lumpur",
+      "sortOrder": 1,
+      "isDefault": false
+    },
+    {
+      "id": "90000000-0000-4000-8000-000000000002",
+      "name": "梁梁的",
+      "timeZone": "Asia/Shanghai",
+      "sortOrder": 2,
+      "isDefault": false
+    },
+    {
+      "id": "90000000-0000-4000-8000-000000000003",
+      "name": "共同支出",
+      "timeZone": null,
+      "sortOrder": 3,
+      "isDefault": true
+    }
+  ],
   "categories": [
     {
       "id": "30000000-0000-4000-8000-000000000001",
@@ -116,13 +128,13 @@
           "convertedAmount": "-4.00",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000002",
       "revisionId": "50000000-0000-4000-8000-000000000002",
       "title": "City Taxi",
-      "attributedTo": "partner",
       "type": "manual",
       "dayOffset": -1,
       "inputText": "Airport transfer",
@@ -137,13 +149,13 @@
           "convertedAmount": "32.50",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "梁梁的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000003",
       "revisionId": "50000000-0000-4000-8000-000000000003",
       "title": "FreshMart",
-      "attributedTo": "partner",
       "type": "ai_parsed",
       "dayOffset": -3,
       "inputText": "FreshMart grocery receipt with food and household supplies.",
@@ -184,7 +196,8 @@
           "convertedAmount": "22.90",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "梁梁的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000004",
@@ -204,13 +217,13 @@
           "convertedAmount": "71.73",
           "exchangeRate": "7.18"
         }
-      ]
+      ],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000005",
       "revisionId": "50000000-0000-4000-8000-000000000005",
       "title": "City Pharmacy",
-      "attributedTo": "partner",
       "type": "ai_parsed",
       "dayOffset": -15,
       "inputText": "City Pharmacy receipt.",
@@ -234,13 +247,13 @@
           "convertedAmount": "20.00",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "梁梁的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000006",
       "revisionId": "50000000-0000-4000-8000-000000000006",
       "title": "Northstar Books",
-      "attributedTo": "partner",
       "type": "ai_parsed",
       "dayOffset": -32,
       "inputText": "Programming and design books.",
@@ -264,7 +277,8 @@
           "convertedAmount": "49.00",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "梁梁的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000007",
@@ -284,13 +298,13 @@
           "convertedAmount": "680.40",
           "exchangeRate": "1.62"
         }
-      ]
+      ],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000008",
       "revisionId": "50000000-0000-4000-8000-000000000008",
       "title": "Electricity Bill",
-      "attributedTo": "partner",
       "type": "ai_parsed",
       "dayOffset": -120,
       "inputText": "Quarterly electricity bill.",
@@ -314,7 +328,8 @@
           "convertedAmount": "8.00",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "梁梁的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000009",
@@ -327,7 +342,8 @@
       "failureKind": "invalid_input",
       "failureCode": "ai_declared_invalid",
       "failureMessage": "The receipt photo is too blurry to read the merchant and the total.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000010",
@@ -356,7 +372,8 @@
           "convertedAmount": "68.04",
           "exchangeRate": "1.62"
         }
-      ]
+      ],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000011",
@@ -376,13 +393,13 @@
           "convertedAmount": "61.44",
           "exchangeRate": "0.048"
         }
-      ]
+      ],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000012",
       "revisionId": "50000000-0000-4000-8000-000000000012",
       "title": "Home Supply Refund",
-      "attributedTo": "partner",
       "type": "manual",
       "dayOffset": -6,
       "inputText": "Refund for a returned desk lamp.",
@@ -398,7 +415,8 @@
           "convertedAmount": "-259.00",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "梁梁的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000013",
@@ -418,7 +436,8 @@
           "convertedAmount": "18.60",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000014",
@@ -449,7 +468,8 @@
           "convertedAmount": "320.00",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000015",
@@ -469,7 +489,8 @@
           "convertedAmount": "123456.78",
           "exchangeRate": "1"
         }
-      ]
+      ],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000016",
@@ -489,7 +510,8 @@
           "convertedAmount": "288.873",
           "exchangeRate": "23.40"
         }
-      ]
+      ],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000017",
@@ -499,7 +521,8 @@
       "dayOffset": -4,
       "inputText": "Duplicate receipt upload cancelled before processing.",
       "status": "cancelled",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000018",
@@ -512,7 +535,8 @@
       "failureKind": "invalid_input",
       "failureCode": "ai_declared_invalid",
       "failureMessage": "The receipt shows a total but no currency, so the expense cannot be recorded.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000019",
@@ -525,7 +549,8 @@
       "failureKind": "invalid_input",
       "failureCode": "ai_declared_invalid",
       "failureMessage": "The printed total does not match the line items, so the amount is uncertain.",
-      "entries": []
+      "entries": [],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000020",
@@ -538,7 +563,8 @@
       "failureKind": "invalid_input",
       "failureCode": "entry_validation_failed",
       "failureMessage": null,
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000021",
@@ -551,7 +577,8 @@
       "failureKind": "processing_error",
       "failureCode": "ai_provider_unavailable",
       "failureMessage": "The AI provider was unavailable while parsing the receipt.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000022",
@@ -564,7 +591,8 @@
       "failureKind": "processing_error",
       "failureCode": "ai_schema_invalid",
       "failureMessage": "The AI response did not match the required schema.",
-      "entries": []
+      "entries": [],
+      "book": "哞哞的"
     },
     {
       "id": "40000000-0000-4000-8000-000000000023",
@@ -577,7 +605,8 @@
       "failureKind": "processing_error",
       "failureCode": "exchange_rate_failure",
       "failureMessage": "The exchange-rate provider did not return a usable rate.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000024",
@@ -590,7 +619,8 @@
       "failureKind": "processing_error",
       "failureCode": "storage_failure",
       "failureMessage": "The receipt image could not be loaded from object storage.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000025",
@@ -603,7 +633,8 @@
       "failureKind": "processing_error",
       "failureCode": "processing_unavailable",
       "failureMessage": "No processing runtime was available for this request.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000026",
@@ -616,7 +647,8 @@
       "failureKind": "processing_error",
       "failureCode": "database_unavailable",
       "failureMessage": "The parsed result could not be committed to the database.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000027",
@@ -629,7 +661,8 @@
       "failureKind": "processing_error",
       "failureCode": "request_bound_retry_exhausted",
       "failureMessage": "All request-bound processing retries were exhausted.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000028",
@@ -642,7 +675,8 @@
       "failureKind": "processing_error",
       "failureCode": "processing_timeout",
       "failureMessage": "Receipt processing exceeded the allowed time limit.",
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     },
     {
       "id": "40000000-0000-4000-8000-000000000029",
@@ -680,27 +714,28 @@
           }
         ]
       },
-      "entries": []
+      "entries": [],
+      "book": "共同支出"
     }
   ],
   "serviceCredentials": [
     {
       "id": "80000000-0000-4000-8000-000000000001",
       "name": "Shortcuts automation",
-      "attributedTo": "user",
-      "tokenBody": "111111111111111111111111111111111111111111111111"
+      "tokenBody": "111111111111111111111111111111111111111111111111",
+      "book": "哞哞的"
     },
     {
       "id": "80000000-0000-4000-8000-000000000002",
       "name": "Bank statement importer",
-      "attributedTo": "user",
-      "tokenBody": "222222222222222222222222222222222222222222222222"
+      "tokenBody": "222222222222222222222222222222222222222222222222",
+      "book": "哞哞的"
     },
     {
       "id": "80000000-0000-4000-8000-000000000003",
       "name": "Partner shortcut",
-      "attributedTo": "partner",
-      "tokenBody": "333333333333333333333333333333333333333333333333"
+      "tokenBody": "333333333333333333333333333333333333333333333333",
+      "book": "梁梁的"
     }
   ]
 }

@@ -36,8 +36,7 @@ const port = await reservePort();
 const aiPort = await reservePort();
 const baseURL = `http://127.0.0.1:${port}`;
 const password = `Smoke9-${randomUUID()}`;
-const ownerId = randomUUID();
-const partnerId = randomUUID();
+const userId = randomUUID();
 const sharedLedgerId = randomUUID();
 const env = {
   ...process.env,
@@ -66,10 +65,6 @@ const env = {
   SMOKE_BASE_URL: baseURL,
   SMOKE_EMAIL: "smoke@example.com",
   SMOKE_PASSWORD: password,
-  SMOKE_PARTNER_EMAIL: "smoke-partner@example.com",
-  COUPLE_OWNER_USER_ID: ownerId,
-  COUPLE_PARTNER_USER_ID: partnerId,
-  COUPLE_LEDGER_ID: sharedLedgerId,
 };
 let activeChild;
 let server;
@@ -110,18 +105,23 @@ try {
     await db.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
     await migrate(drizzle(db), { migrationsFolder: "src/persistence/postgres-migrations" });
     const hash = await bcrypt.hash(password, 12);
-    for (const [id, email, nickname, gender] of [
-      [ownerId, env.SMOKE_EMAIL, "A", "male"],
-      [partnerId, env.SMOKE_PARTNER_EMAIL, "B", "female"],
-    ]) {
-      await db.query(
-        `INSERT INTO users (id, email, nickname, gender, email_verified, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, $3, $4, now(), $5, now(), now(), now())`,
-        [id, email, nickname, gender, hash]
-      );
-    }
+    // One account with one login address, one ledger and one book: the smoke
+    // suite signs in with the password, and every record it writes lands in 共同支出.
+    await db.query(
+      `INSERT INTO users (id, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, now(), now(), now())`,
+      [userId, hash]
+    );
+    await db.query(
+      `INSERT INTO login_emails (user_id, email, email_verified, created_at, updated_at) VALUES ($1, $2, now(), now(), now())`,
+      [userId, env.SMOKE_EMAIL]
+    );
     await db.query(
       `INSERT INTO ledgers (id, user_id, main_currency, created_at, updated_at) VALUES ($1, $2, 'CNY', now(), now())`,
-      [sharedLedgerId, ownerId]
+      [sharedLedgerId, userId]
+    );
+    await db.query(
+      `INSERT INTO books (ledger_id, name, sort_order, is_default, created_at, updated_at) VALUES ($1, '共同支出', 1, true, now(), now())`,
+      [sharedLedgerId]
     );
     for (const [index, name] of ["Food", "Shopping", "Travel"].entries()) {
       await db.query(

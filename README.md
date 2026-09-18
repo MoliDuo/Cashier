@@ -61,14 +61,10 @@ OPENAI_API_KEY=your-api-key
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
-首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表。然后显式预览并初始化空数据库：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap -- --apply
-```
-
-打开 [http://localhost:3000](http://localhost:3000)，用任一成员的邮箱和密码登录。
+首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表，但不会创建账号。打开
+[http://localhost:3000](http://localhost:3000)：所有页面都会跳到 `/{locale}/setup`
+初始化向导，同时服务端日志会打印一次性初始化代码。在向导中填入该代码、登录邮箱、
+密码和分账名称（默认预填 `共同支出`）即可创建账号，之后 `/setup` 永久返回 404。
 
 `AI_MODEL` 默认为 `gpt-4o`。如果你使用其他 OpenAI 兼容服务，请同时修改
 `OPENAI_BASE_URL` 和 `AI_MODEL`。

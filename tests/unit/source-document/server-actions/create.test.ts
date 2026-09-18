@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { requireLedgerAccessMock, createAndQueueSourceDocumentMock, getCoupleMembersMock } =
+const { requireLedgerAccessMock, createAndQueueSourceDocumentMock, resolveRecordBookMock } =
   vi.hoisted(() => ({
     requireLedgerAccessMock: vi.fn(),
     createAndQueueSourceDocumentMock: vi.fn(),
-    getCoupleMembersMock: vi.fn(),
+    resolveRecordBookMock: vi.fn(),
   }));
-
-vi.mock("@/modules/auth/application/queries/get-couple-members", () => ({
-  getCoupleMembers: getCoupleMembersMock,
-}));
 
 vi.mock("@/modules/ledger/access", () => ({
   requireLedgerAccess: requireLedgerAccessMock,
@@ -18,8 +14,8 @@ vi.mock("@/modules/ledger/access", () => ({
   ) => handler,
 }));
 
-vi.mock("@/lib/couple-config", () => ({
-  isCoupleMember: (id: string) => id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+vi.mock("@/modules/source-document/server/resolve-record-book", () => ({
+  resolveRecordBook: resolveRecordBookMock,
 }));
 
 vi.mock("@/modules/source-document/application/use-cases/create-and-queue-source-document", () => ({
@@ -30,25 +26,19 @@ import { createSourceDocumentAction } from "@/modules/source-document/server-act
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
 
 const CLIENT_SUBMISSION_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const BOOK_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
 describe("createSourceDocumentAction omission semantics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireLedgerAccessMock.mockResolvedValue({
       ledger: { id: "ledger-1", settings: { mainCurrency: "CNY" } },
-      userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      userId: USER_ID,
     });
-    // The signed-in member has no zone of their own, so the request's own
-    // zone (when it sends one) is what dates the record.
-    getCoupleMembersMock.mockResolvedValue([
-      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", nickname: "A", gender: "male", timeZone: null },
-      {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        nickname: "B",
-        gender: "female",
-        timeZone: "Asia/Tokyo",
-      },
-    ]);
+    // The book owns the date zone: a book without one leaves the request's own
+    // zone, or the server date, to decide.
+    resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: null });
     createAndQueueSourceDocumentMock.mockResolvedValue({
       sourceDocumentId: "doc-1",
       version: 1,
@@ -66,6 +56,7 @@ describe("createSourceDocumentAction omission semantics", () => {
 
     expect(callInput).toBeDefined();
     expect(callInput.ledgerId).toBe("ledger-1");
+    expect(callInput.bookId).toBe(BOOK_ID);
     expect(callInput.input).toEqual({
       kind: "stored",
       text: "Lunch 12.50",
@@ -77,27 +68,40 @@ describe("createSourceDocumentAction omission semantics", () => {
     expect(Object.prototype.hasOwnProperty.call(callInput, "timezone")).toBe(false);
   });
 
-  it("uses the signed-in member's own timezone when the request omits one", async () => {
-    getCoupleMembersMock.mockResolvedValue([
-      {
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        nickname: "A",
-        gender: "male",
-        timeZone: "Asia/Singapore",
-      },
-      {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        nickname: "B",
-        gender: "female",
-        timeZone: null,
-      },
-    ]);
+  it("dates the record in the book's zone when the request omits one", async () => {
+    resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: "Asia/Singapore" });
 
     await createSourceDocumentAction("ledger-1", { text: "Lunch" }, CLIENT_SUBMISSION_ID);
 
     expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({ timezone: "Asia/Singapore" })
     );
+  });
+
+  it("lets the request's own zone win over the book's", async () => {
+    resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: "Asia/Singapore" });
+
+    await createSourceDocumentAction(
+      "ledger-1",
+      { text: "Lunch", timezone: "Europe/Paris" },
+      CLIENT_SUBMISSION_ID
+    );
+
+    expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ timezone: "Europe/Paris" })
+    );
+  });
+
+  it("forwards an explicitly chosen book to the resolver", async () => {
+    const otherBookId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+
+    await createSourceDocumentAction(
+      "ledger-1",
+      { text: "Lunch", bookId: otherBookId },
+      CLIENT_SUBMISSION_ID
+    );
+
+    expect(resolveRecordBookMock).toHaveBeenCalledWith("ledger-1", otherBookId, expect.anything());
   });
 
   it("injects scheduleProcessing into use case dependencies", async () => {
@@ -115,7 +119,7 @@ describe("createSourceDocumentAction omission semantics", () => {
       expect.objectContaining({
         idempotency: {
           principalType: "user",
-          principalId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          principalId: USER_ID,
           key: `source-document:create:ledger-1:new:${CLIENT_SUBMISSION_ID}`,
           contentFingerprint: sourceDocumentFingerprint({ text: "Lunch" }),
         },

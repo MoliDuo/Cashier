@@ -16,9 +16,18 @@ export type UpdateLedgerActionResult =
   | { ok: true; ledger: LedgerDto }
   | { ok: false; code: UpdateLedgerActionErrorCode; dates?: string[] };
 
+export type BookDto = {
+  id: string;
+  ledgerId: string;
+  name: string;
+  timeZone: string | null;
+  sortOrder: number;
+  isDefault: boolean;
+};
+
 export type ServiceCredentialDto = {
   id: string;
-  attributedUserId: string;
+  bookId: string;
   tokenPrefix: string;
   tokenSuffix: string;
   ledgerId: string;

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { currencyRates } from "@/persistence/schema/currency";
 import { ledgers } from "@/persistence";
-import { configureTestCoupleLedger } from "../../helpers/schema-setup";
+import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 import {
   batchConvertCurrencyAction,
   convertCurrencyAction,
@@ -24,7 +24,7 @@ describe("currency action composition", () => {
       id: LEDGER_ID,
       userId: "00000000-0000-0000-0000-000000000000",
     });
-    await configureTestCoupleLedger(getTestDb(), LEDGER_ID);
+    await ensureTestLedgerBooks(getTestDb(), LEDGER_ID);
     await insertRates("2026-02-04", { CNY: 7.5, USD: 1.1 });
   });
 

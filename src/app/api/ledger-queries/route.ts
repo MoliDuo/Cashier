@@ -29,8 +29,6 @@ import {
 } from "@/modules/ledger/contract-schemas";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
-import { isCoupleMember } from "@/lib/couple-config";
-import { ValidationError } from "@/lib/errors";
 
 /**
  * The `reclassification` poll below is the recovery driver for a batch AI
@@ -82,8 +80,6 @@ export async function POST(request: Request) {
           break;
         case "stream": {
           const parsed = streamPageInputSchema.parse(input);
-          if (parsed.attributedUserId != null && !isCoupleMember(parsed.attributedUserId))
-            throw new ValidationError("Invalid member attribution");
           result = await listStreamPage(
             ledgerId,
             { ...omitUndefinedProperties(parsed), limit: parsed.limit },
@@ -97,14 +93,6 @@ export async function POST(request: Request) {
           break;
         }
         case "total":
-          if (
-            input != null &&
-            typeof input === "object" &&
-            "attributedUserId" in input &&
-            input.attributedUserId != null &&
-            !isCoupleMember(String(input.attributedUserId))
-          )
-            throw new ValidationError("Invalid member attribution");
           result = await getStreamTotal(
             ledgerId,
             omitUndefinedProperties(streamTotalInputSchema.parse(input)),

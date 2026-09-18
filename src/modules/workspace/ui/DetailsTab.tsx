@@ -15,10 +15,10 @@ import { DetailsTabView } from "./DetailsTabView";
 import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
 
 interface DetailsTabProps {
-  /** Which member the list is narrowed to, resolved by the page. */
-  scopeOwnerId: string | null;
-  /** Nickname of that member, for the chip that stands in for the switch. */
-  scopeNickname: string | null;
+  /** The book the list is narrowed to; undefined means 总账. */
+  bookId?: string | undefined;
+  /** Name of that book, for the chip that stands in for the switcher. */
+  scopeBookName: string | null;
   ledgerId: string;
   categories: EntryCategory[];
   ledger?: Ledger;
@@ -37,8 +37,8 @@ interface DetailsTabProps {
 }
 
 export function DetailsTab({
-  scopeOwnerId,
-  scopeNickname,
+  bookId,
+  scopeBookName,
   ledgerId,
   categories,
   ledger,
@@ -49,10 +49,9 @@ export function DetailsTab({
   onRefresh,
   isRefreshing,
 }: DetailsTabProps) {
-  const attributedUserId = scopeOwnerId ?? undefined;
   const data = useDetailsTabData({
     ledgerId,
-    ...(attributedUserId == null ? {} : { attributedUserId }),
+    ...(bookId == null ? {} : { bookId }),
     periodParams,
     advancedFilters,
     ...(timeZone != null ? { timeZone } : {}),
@@ -75,9 +74,9 @@ export function DetailsTab({
         tab: "details",
         period: periodParams,
         filters: advancedFilters,
-        attributedUserId,
+        bookId,
       }),
-    [advancedFilters, attributedUserId, periodParams]
+    [advancedFilters, bookId, periodParams]
   );
   const batch = useDetailsBatchController(
     ledgerId,
@@ -114,7 +113,7 @@ export function DetailsTab({
           {...(ledger === undefined ? {} : { ledger })}
           periodParams={periodParams}
           filters={filters}
-          scopeNickname={scopeNickname}
+          scopeBookName={scopeBookName}
           advancedFilters={advancedFilters}
           onFiltersChange={onFiltersChange}
           entries={data.entries}

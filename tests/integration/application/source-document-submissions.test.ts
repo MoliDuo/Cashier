@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
@@ -22,7 +21,7 @@ import {
 } from "@/persistence";
 import { ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
 class MemoryFileStore {
@@ -75,16 +74,16 @@ const entry = {
 describe("target source-document submissions", () => {
   it("creates one document, revision, and job for concurrent user submissions", async () => {
     const db = getTestDb();
-    const { userId, ledgerId } = await createTestUserWithLedger(db);
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
     const prepare = vi.fn(async () => ({
       ledgerId,
-      attributedUserId: userId,
-      createdByUserId: userId,
+      bookId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
     }));
     const idempotency = {
       principalType: "user" as const,
-      principalId: userId,
+      principalId: crypto.randomUUID(),
       key: `create:${crypto.randomUUID()}`,
       contentFingerprint: null,
     };
@@ -103,7 +102,8 @@ describe("target source-document submissions", () => {
 
   it("rolls back a fencing loser after an expired idempotency lease is taken over", async () => {
     const db = getTestDb();
-    const { userId, ledgerId } = await createTestUserWithLedger(db);
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
     const credentialId = crypto.randomUUID();
     await db.insert(serviceCredentials).values({
       id: credentialId,
@@ -112,7 +112,7 @@ describe("target source-document submissions", () => {
       tokenHash: "f".repeat(64),
       tokenPrefix: "cashier_test",
       tokenSuffix: "test",
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId,
     });
     const idempotency = {
       principalType: "credential" as const,
@@ -132,8 +132,7 @@ describe("target source-document submissions", () => {
         await gate;
         return {
           ledgerId,
-          attributedUserId: userId,
-          createdByUserId: userId,
+          bookId,
           input: { text: "receipt", storedFileIds: [], documentDate: null },
         };
       }
@@ -148,8 +147,7 @@ describe("target source-document submissions", () => {
       idempotency,
       async () => ({
         ledgerId,
-        attributedUserId: userId,
-        createdByUserId: userId,
+        bookId,
         input: { text: "receipt", storedFileIds: [], documentDate: null },
       })
     );
@@ -171,20 +169,17 @@ describe("target source-document submissions", () => {
     const text = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const imageOnly = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: null, storedFileIds: [image.id], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const mixed = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "Mixed", storedFileIds: [image.id], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     expect(new Set([text.document.id, imageOnly.document.id, mixed.document.id]).size).toBe(3);
@@ -216,8 +211,7 @@ describe("target source-document submissions", () => {
       postgresSourceDocumentSubmissionAdapter.submit({
         ledgerId,
         input: { text: null, storedFileIds: [unfinalized!.id], documentDate: null },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocuments)).toHaveLength(0);
@@ -236,8 +230,7 @@ describe("target source-document submissions", () => {
       const pending = await postgresSourceDocumentSubmissionAdapter.submit({
         ledgerId,
         input: { text: "first parse evidence", storedFileIds: [], documentDate: null },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       });
 
       await expect(
@@ -268,8 +261,7 @@ describe("target source-document submissions", () => {
       expectedMainCurrency: "CNY",
       ledgerId,
       entries: [entry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const activeEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentRevisionId, active.revisionId),
@@ -280,7 +272,7 @@ describe("target source-document submissions", () => {
       sourceDocumentId: active.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
       inheritInput: false,
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -294,7 +286,7 @@ describe("target source-document submissions", () => {
       sourceDocumentId: active.sourceDocumentId,
       input: { text: "anomalous edit retry", storedFileIds: [], documentDate: null },
       inheritInput: false,
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -340,8 +332,7 @@ describe("target source-document submissions", () => {
     const initial = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "original", storedFileIds: [image.id], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -354,7 +345,7 @@ describe("target source-document submissions", () => {
       ledgerId,
       sourceDocumentId: initial.document.id,
       inheritInput: true,
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     await Promise.all([
@@ -393,8 +384,7 @@ describe("target source-document submissions", () => {
         storedFileIds: files.slice(0, MAX_FILES).map((f) => f.id),
         documentDate: null,
       },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -421,7 +411,7 @@ describe("target source-document submissions", () => {
         ledgerId,
         sourceDocumentId: initial.document.id,
         inheritInput: true,
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toThrow(ValidationError);
   });
@@ -442,8 +432,7 @@ describe("target source-document submissions", () => {
     const submitted = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: null, storedFileIds: [second.id, first.id], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     const detail = await getTargetSourceDocument(ledgerId, submitted.document.id);
@@ -463,7 +452,7 @@ describe("target source-document submissions", () => {
         ledgerId,
         sourceDocumentId: submitted.document.id,
         input: { text: null, storedFileIds: [other.id], documentDate: null },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
@@ -471,7 +460,7 @@ describe("target source-document submissions", () => {
         ledgerId: otherLedgerId,
         sourceDocumentId: submitted.document.id,
         inheritInput: true,
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });

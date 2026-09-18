@@ -39,7 +39,7 @@ describe("createSourceDocumentFromCredential", () => {
     };
 
     await createSourceDocumentFromCredential(
-      { credential: { id: "cred-1", ledgerId: "ledger-1", attributedUserId: "user-1" }, payload },
+      { credential: { id: "cred-1", ledgerId: "ledger-1", bookId: "user-1" }, payload },
       scheduleProcessing,
       ports
     );
@@ -47,17 +47,45 @@ describe("createSourceDocumentFromCredential", () => {
     const callInput = createAndQueueSourceDocumentMock.mock.calls[0]?.[0];
     expect(callInput).toEqual({
       ledgerId: "ledger-1",
-      attributedUserId: "user-1",
-      createdByUserId: "user-1",
+      bookId: "user-1",
       input: { kind: "inline", images: [preparedImage] },
     });
     expect(callInput).not.toHaveProperty("ledger");
   });
 
+  it("dates the record in the key's book zone when the book has one", async () => {
+    await createSourceDocumentFromCredential(
+      {
+        credential: { id: "cred-1", ledgerId: "ledger-1", bookId: "book-1" },
+        payload: { images: [preparedImage] },
+        timezone: "Asia/Shanghai",
+      },
+      scheduleProcessing,
+      ports
+    );
+
+    expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ timezone: "Asia/Shanghai" })
+    );
+  });
+
+  it("leaves the date to the server when the key's book has no zone", async () => {
+    await createSourceDocumentFromCredential(
+      {
+        credential: { id: "cred-1", ledgerId: "ledger-1", bookId: "book-1" },
+        payload: { images: [preparedImage] },
+      },
+      scheduleProcessing,
+      ports
+    );
+
+    expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).not.toHaveProperty("timezone");
+  });
+
   it("threads scheduleProcessing through to createAndQueueSourceDocument", async () => {
     await createSourceDocumentFromCredential(
       {
-        credential: { id: "cred-1", ledgerId: "ledger-1", attributedUserId: "user-1" },
+        credential: { id: "cred-1", ledgerId: "ledger-1", bookId: "user-1" },
         payload: { images: [preparedImage] },
       },
       scheduleProcessing,
@@ -69,7 +97,7 @@ describe("createSourceDocumentFromCredential", () => {
     expect(deps.scheduleProcessing).toBe(scheduleProcessing);
   });
 
-  it("rejects credentials without an owner before creating a document", async () => {
+  it("rejects credentials without a book before creating a document", async () => {
     await expect(
       createSourceDocumentFromCredential(
         {
@@ -79,7 +107,7 @@ describe("createSourceDocumentFromCredential", () => {
         scheduleProcessing,
         ports
       )
-    ).rejects.toThrow("Credential owner is required");
+    ).rejects.toThrow("Credential book is required");
     expect(createAndQueueSourceDocumentMock).not.toHaveBeenCalled();
   });
 });

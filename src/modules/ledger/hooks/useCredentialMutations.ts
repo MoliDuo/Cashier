@@ -4,17 +4,21 @@ import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import {
   createServiceCredentialAction,
   deleteServiceCredentialAction,
+  updateServiceCredentialAction,
 } from "@/modules/ledger/server-actions/credentials";
-import type { CreatedServiceCredential } from "@/modules/ledger/contracts";
+import type { CreatedServiceCredential, ServiceCredential } from "@/modules/ledger/contracts";
 import { toast } from "sonner";
 
 export function useCredentialMutations(ledgerId: string) {
   const t = useTranslations("Settings");
   const tCredentials = useTranslations("ServiceCredentials");
   const tCommon = useTranslations("Common");
-  const createCredential = useLedgerMutation<CreatedServiceCredential, string>(ledgerId, {
+  const createCredential = useLedgerMutation<
+    CreatedServiceCredential,
+    { name: string; bookId: string }
+  >(ledgerId, {
     invalidates: ["credentials"],
-    mutationFn: (name) => createServiceCredentialAction(ledgerId, { name }),
+    mutationFn: (input) => createServiceCredentialAction(ledgerId, input),
     successMessage: t("credentialCreated"),
     errorMessage: null,
     onError: (error) => {
@@ -23,6 +27,18 @@ export function useCredentialMutations(ledgerId: string) {
     },
     invalidationErrorMessage: tCommon("savedRefreshFailed"),
   });
+
+  const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>(
+    ledgerId,
+    {
+      invalidates: ["credentials"],
+      mutationFn: (input) =>
+        updateServiceCredentialAction(ledgerId, input.id, { bookId: input.bookId }),
+      successMessage: t("credentialBookChanged"),
+      errorMessage: t("credentialBookChangeFailed"),
+      invalidationErrorMessage: tCommon("savedRefreshFailed"),
+    }
+  );
 
   const deleteCredential = useLedgerMutation<void, string>(ledgerId, {
     invalidates: ["credentials"],
@@ -34,6 +50,7 @@ export function useCredentialMutations(ledgerId: string) {
 
   return {
     createCredential,
+    setCredentialBook,
     deleteCredential,
   };
 }

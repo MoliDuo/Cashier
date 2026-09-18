@@ -43,7 +43,7 @@ interface CreateSubmissionIdentity {
 
 type UseSourceDocumentSubmitMutationsOptions = {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   messages: SourceDocumentInputControllerMessages;
   onSuccess?: (result: CreatedRecordResult) => void;
 } & (
@@ -115,7 +115,7 @@ export function useSourceDocumentSubmitMutations({
   sourceDocumentVersion,
   messages,
   onSuccess,
-  attributedUserId,
+  bookId,
 }: UseSourceDocumentSubmitMutationsOptions) {
   const tCommon = useTranslations("Common");
   const {
@@ -161,7 +161,7 @@ export function useSourceDocumentSubmitMutations({
       const result = await createSourceDocumentAction(
         ledgerId,
         {
-          ...(attributedUserId == null ? {} : { attributedUserId }),
+          ...(bookId == null ? {} : { bookId }),
           ...(uploadedPayload.text == null ? {} : { text: uploadedPayload.text }),
           storedFileIds: uploadedPayload.storedFileIds,
           ...(uploadedPayload.documentDate == null

@@ -37,7 +37,7 @@ describe("Stats Currency Conversion", () => {
       .values({
         ledgerId,
         documentDate: "2024-01-01",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(sourceDoc).toBeDefined();

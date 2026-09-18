@@ -4,7 +4,7 @@ import type { StreamTotalDto } from "../../contracts";
 import { normalizeSearchTerm } from "@/lib/search";
 
 export interface GetStreamTotalInput {
-  attributedUserId?: string;
+  bookId?: string;
   startDate?: string | null;
   endDate?: string | null;
   minAmount?: string;

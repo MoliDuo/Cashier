@@ -11,7 +11,7 @@ import {
 import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
 import { getTestDb } from "../../setup";
 import { createCategoryData, createLedgerData } from "../../helpers/factories";
-import { createTestSourceDocument } from "../../helpers/schema-setup";
+import { createTestSourceDocument, ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
 /**
  * A projected entry used to verify evidence grouping. Each entry needs its own
@@ -64,6 +64,7 @@ describe("loadDocumentGroups", () => {
     const db = getTestDb();
     const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
     return ledger;
   }
 

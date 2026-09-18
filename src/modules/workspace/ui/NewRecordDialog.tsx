@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils";
 import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
+import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
+import type { RecordScope } from "@/modules/ledger/filters";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { NewRecordForms, InputFormLoadingFallback } from "./NewRecordForms";
 import type { NewRecordInputMode } from "./new-record-success-feedback";
@@ -18,8 +19,10 @@ import {
 } from "@/components/ui/select";
 
 interface NewRecordDialogProps {
-  userId: string;
-  partnerUserId: string;
+  /** The book being viewed, or null for 总账. */
+  scope: RecordScope;
+  /** The live books, for the record's book picker. */
+  books: readonly BookDto[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   isSubmitting: boolean;
@@ -44,8 +47,8 @@ interface NewRecordDialogProps {
 
 /** The "new record" dialog: AI-parse / quick-entry mode toggle plus the active input form. */
 export function NewRecordDialog({
-  userId,
-  partnerUserId,
+  scope,
+  books,
   isOpen,
   onOpenChange,
   isSubmitting,
@@ -69,7 +72,16 @@ export function NewRecordDialog({
 }: NewRecordDialogProps) {
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
-  const [attributedUserId, setAttributedUserId] = useState(userId);
+  const tBooks = useTranslations("Settings.Books");
+  // The picker starts on the book being viewed, or on the 总账 default when
+  // reading 总账. It is a per-record choice: changing it does not move the view.
+  const defaultBookId = scope ?? books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? "";
+  const [bookId, setBookId] = useState(defaultBookId);
+  const [lastDefaultBookId, setLastDefaultBookId] = useState(defaultBookId);
+  if (lastDefaultBookId !== defaultBookId) {
+    setLastDefaultBookId(defaultBookId);
+    setBookId(defaultBookId);
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -90,20 +102,20 @@ export function NewRecordDialog({
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-none sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <label htmlFor="record-owner" className="text-sm">
-              {tCommon("recordOwner")}
+            <label htmlFor="record-book" className="text-sm">
+              {tCommon("book")}
             </label>
-            <Select
-              value={attributedUserId}
-              onValueChange={setAttributedUserId}
-              disabled={isSubmitting}
-            >
-              <SelectTrigger id="record-owner" className="w-36">
-                <SelectValue />
+            <Select value={bookId} onValueChange={setBookId} disabled={isSubmitting}>
+              <SelectTrigger id="record-book" className="w-40">
+                <SelectValue placeholder={tBooks("namePlaceholder")} />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={userId}>{tCommon("myRecords")}</SelectItem>
-                <SelectItem value={partnerUserId}>{tCommon("partnerRecords")}</SelectItem>
+              <SelectContent position="popper">
+                {books.map((book) => (
+                  <SelectItem key={book.id} value={book.id}>
+                    {book.name}
+                    {book.isDefault ? ` · ${tBooks("totalBadge")}` : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -145,7 +157,7 @@ export function NewRecordDialog({
               fallback={<InputFormLoadingFallback />}
             >
               <NewRecordForms
-                attributedUserId={attributedUserId}
+                bookId={bookId}
                 ledgerId={ledgerId}
                 activeTab={activeTab}
                 committedFilters={committedFilters}

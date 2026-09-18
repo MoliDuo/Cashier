@@ -4,7 +4,8 @@ import { postgresLedgerProjectionAdapter } from "../ledger-projections";
 import { cancelSourceDocumentProcessing } from "../ledger-projections/cancel-source-document-processing";
 import { postgresSourceDocumentSubmissionAdapter } from "../submissions";
 import {
-  assignAttribution,
+  assignBook,
+  getBook,
   saveChanges,
   updateDocuments,
   updateEntryDates,
@@ -18,7 +19,8 @@ import {
 import { applyCategoryAssignments } from "./category-assignments";
 
 export const postgresSourceDocumentAggregateAdapter: SourceDocumentAggregateWritePort = {
-  assignAttribution,
+  getBook,
+  assignBook,
   applyCategoryAssignments,
   createProcessingDocument: (input) => postgresSourceDocumentSubmissionAdapter.submit(input),
   createIdempotentProcessingDocument: (idempotency, prepare) =>

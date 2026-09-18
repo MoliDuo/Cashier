@@ -9,7 +9,6 @@ import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedu
 import { serverComposition } from "@/application/server-composition-root";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { getPartnerUserId } from "@/lib/couple-config";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/routing";
 import { textRoleClassName } from "@/components/typography";
@@ -55,7 +54,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     {
       categories: serverComposition.categories,
       credentials: serverComposition.serviceCredentials,
-      profiles: serverComposition.userProfiles,
+      books: serverComposition.books,
     }
   );
   if (pageData == null) {
@@ -64,6 +63,8 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     return <LedgerNotFound message={t("notFound")} backLabel={tError("backToHome")} />;
   }
 
+  const loginEmails =
+    userId == null ? [] : await serverComposition.userAccounts.listLoginEmails(userId);
   const allMessages = await getMessages({ locale });
   const settingsMessages = pickMessages(allMessages, [
     ...FEATURE_MESSAGES.shell,
@@ -77,8 +78,8 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
           ledger={ledger}
           initialCategories={pageData.initialCategories}
           ledgerId={ledgerId}
-          initialMembers={pageData.initialMembers}
-          {...(userId != null ? { userId, partnerUserId: getPartnerUserId(userId) } : {})}
+          initialBooks={pageData.initialBooks}
+          initialEmails={loginEmails.map((row) => row.email)}
           {...(session?.user?.email != null ? { userEmail: session.user.email } : {})}
           {...(session?.user != null ? { hasPassword: session.user.hasPassword } : {})}
           {...(session?.user != null ? { passwordUpdatedAt: session.user.passwordUpdatedAt } : {})}

@@ -62,9 +62,6 @@ export function createDemoEnvironment(environment = process.env) {
     S3_SECRET_ACCESS_KEY: "cashier-local-only-secret",
     S3_FORCE_PATH_STYLE: "true",
     DEV_AUTH_BYPASS: "true",
-    COUPLE_OWNER_USER_ID: fixture.user.id,
-    COUPLE_PARTNER_USER_ID: fixture.partner.id,
-    COUPLE_LEDGER_ID: fixture.ledger.id,
     TRUSTED_PROXY: "",
     TZ: "UTC",
     CASHIER_DEMO_APP_PORT: String(appPort),
@@ -117,8 +114,9 @@ export function formatDemoCredentialLines() {
   return [
     "[demo] Sample API keys (valid for this local demo only):",
     ...fixture.serviceCredentials.map((credential) => {
-      const owner = credential.attributedTo === "partner" ? "partner" : "dev";
-      const columns = `${credential.name.padEnd(24)} ${owner.padEnd(7)}`;
+      // Each key writes to its own book, so the banner names the book rather
+      // than a person: an upload through it lands there.
+      const columns = `${credential.name.padEnd(24)} ${credential.book.padEnd(10)}`;
       return `  ${columns} ${fixtureCredentialToken(credential)}`;
     }),
     "[demo] Pass one as an Authorization: Bearer <token> header to /api/v1.",
@@ -171,6 +169,10 @@ async function main(args = process.argv.slice(2), environment = process.env) {
   const apply = args.includes("--apply");
   const test = args.includes("--test");
   await run("docker", createDemoComposeArgs(demoEnv), demoEnv);
+  // The demo workspace is disposable and rebuilt from the fixture on every
+  // launch, so its schema is dropped before migrating: a demo database left
+  // over from an earlier release is not a database 0048 can migrate.
+  await run(process.execPath, ["scripts/demo-data.mjs", "reset-schema"], demoEnv);
   await run(process.execPath, ["scripts/migrate-database.mjs"], demoEnv);
   await run(process.execPath, createDemoDataArgs({ reset, apply }), demoEnv);
   if (reset) return;
@@ -190,7 +192,7 @@ async function main(args = process.argv.slice(2), environment = process.env) {
   try {
     await waitForApp(demoEnv.APP_URL, server);
     console.log(`[demo] Ready: ${demoEnv.APP_URL}/en/login`);
-    console.log('[demo] Select "Continue as dev" or the partner entry to open the workspace.');
+    console.log('[demo] Select "Continue as dev" to open the workspace.');
     for (const line of formatDemoCredentialLines()) console.log(line);
     if (test) {
       await run(

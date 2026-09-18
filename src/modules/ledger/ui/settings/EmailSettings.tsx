@@ -1,0 +1,253 @@
+"use client";
+
+import { useState } from "react";
+import { Loader2, Trash2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { queryKeys } from "@/lib/query-keys";
+import { LEDGER } from "@/lib/constants";
+import {
+  listLoginEmailsAction,
+  removeLoginEmailAction,
+  sendLoginEmailCodeAction,
+  verifyLoginEmailCodeAction,
+} from "@/modules/auth/server-actions/login-emails";
+import type { LoginEmailErrorCode } from "@/modules/auth/server-actions/login-emails";
+import { SettingsField } from "./SettingsField";
+import { SettingsSection } from "./SettingsSection";
+
+interface EmailSettingsProps {
+  /** Hydrated by the server so the list paints on the first frame. */
+  initialEmails?: readonly string[];
+  onRequireReauthentication?: () => void | Promise<void>;
+  onCredentialsChanged?: () => void | Promise<void>;
+}
+
+/**
+ * 登录邮箱: every address here signs in with a code or with the shared password.
+ * An address is added by verifying an OTP sent to it, and the account keeps at
+ * least one, so a removal can be refused with a reason rather than a crash.
+ */
+export function EmailSettings({
+  initialEmails,
+  onRequireReauthentication,
+  onCredentialsChanged,
+}: EmailSettingsProps) {
+  const t = useTranslations("Settings.Emails");
+  const tCommon = useTranslations("Common");
+  const locale = useLocale();
+  const queryClient = useQueryClient();
+  const key = queryKeys.loginEmails();
+  const { data } = useQuery({
+    queryKey: key,
+    queryFn: () => listLoginEmailsAction(),
+    staleTime: LEDGER.STALE_TIME_MS,
+    ...(initialEmails !== undefined ? { initialData: [...initialEmails] } : {}),
+  });
+  const emails = data ?? [];
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+
+  const message = (code: LoginEmailErrorCode) => {
+    switch (code) {
+      case "invalid_email":
+        return t("invalid_email");
+      case "invalid_code":
+        return t("invalid_code");
+      case "expired_code":
+        return t("expired_code");
+      case "email_in_use":
+        return t("email_in_use");
+      case "rate_limited":
+        return t("rate_limited");
+      case "locked":
+        return t("locked");
+      case "reauth_required":
+        return t("reauth_required");
+      case "last_email":
+        return t("lastEmail");
+      default:
+        return t("unknown");
+    }
+  };
+
+  const reset = () => {
+    setEmail("");
+    setCode("");
+    setSent(false);
+    setError(null);
+  };
+
+  const requestCode = async () => {
+    setPending(true);
+    setError(null);
+    const result = await sendLoginEmailCodeAction(email, locale);
+    setPending(false);
+    if (!result.ok) {
+      if (result.code === "reauth_required") {
+        await onRequireReauthentication?.();
+        return;
+      }
+      const text = message(result.code);
+      setError(text);
+      toast.error(text);
+      return;
+    }
+    setSent(true);
+    setCode("");
+    toast.success(t("codeSent"));
+  };
+
+  const verify = async () => {
+    setPending(true);
+    setError(null);
+    const result = await verifyLoginEmailCodeAction(email, code);
+    setPending(false);
+    if (!result.ok) {
+      const text = message(result.code);
+      setError(text);
+      toast.error(text);
+      return;
+    }
+    queryClient.setQueryData<string[]>(key, result.emails);
+    toast.success(t("added"));
+    setIsAddOpen(false);
+    reset();
+    await onCredentialsChanged?.();
+  };
+
+  return (
+    <SettingsSection title={t("title")} description={t("description")}>
+      <SettingsField title={t("title")} stacked>
+        <div className="space-y-2">
+          <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
+            {emails.map((address) => (
+              <li key={address} className="flex items-center justify-between gap-2 p-3">
+                <span className="min-w-0 truncate text-sm text-text">{address}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={emails.length <= 1}
+                  aria-label={t("remove", { email: address })}
+                  title={emails.length <= 1 ? t("lastEmail") : t("remove", { email: address })}
+                  className="shrink-0 text-muted-foreground hover:text-danger"
+                  onClick={() => setRemoveTarget(address)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <Button type="button" variant="outline" size="sm" onClick={() => setIsAddOpen(true)}>
+            {t("add")}
+          </Button>
+        </div>
+      </SettingsField>
+
+      <Dialog open={isAddOpen} onOpenChange={(open) => !pending && setIsAddOpen(open)}>
+        <DialogContent variant="modal">
+          <DialogHeader>
+            <DialogTitle>{t("addTitle")}</DialogTitle>
+            <DialogDescription>{t("addDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="new-login-email">{t("newEmail")}</Label>
+              <Input
+                id="new-login-email"
+                type="email"
+                name="email"
+                autoComplete="email"
+                spellCheck={false}
+                value={email}
+                disabled={pending}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setSent(false);
+                  setCode("");
+                  setError(null);
+                }}
+              />
+            </div>
+            {sent ? (
+              <div className="grid gap-2">
+                <Label htmlFor="login-email-code">{t("verificationCode")}</Label>
+                <Input
+                  id="login-email-code"
+                  name="verificationCode"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  spellCheck={false}
+                  value={code}
+                  disabled={pending}
+                  onChange={(event) => {
+                    setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                    setError(null);
+                  }}
+                />
+              </div>
+            ) : null}
+            {error != null ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsAddOpen(false)} disabled={pending}>
+              {tCommon("cancel")}
+            </Button>
+            <Button
+              disabled={pending || email.trim() === "" || (sent && code.length !== 6)}
+              onClick={() => void (sent ? verify() : requestCode())}
+            >
+              {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
+              {sent ? t("verify") : t("sendCode")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title={t("removeTitle", { email: removeTarget ?? "" })}
+        description={t("removeDesc")}
+        confirmLabel={tCommon("delete")}
+        variant="destructive"
+        onConfirm={async () => {
+          if (removeTarget == null) return false;
+          const result = await removeLoginEmailAction(removeTarget);
+          if (!result.ok) {
+            toast.error(message(result.code));
+            return false;
+          }
+          queryClient.setQueryData<string[]>(key, result.emails);
+          toast.success(t("removed"));
+          setRemoveTarget(null);
+          await onCredentialsChanged?.();
+          return true;
+        }}
+      />
+    </SettingsSection>
+  );
+}

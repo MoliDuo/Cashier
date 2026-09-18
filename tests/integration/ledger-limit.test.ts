@@ -1,24 +1,19 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "@/lib/db";
-import { ledgers, users } from "@/persistence";
-import { eq } from "drizzle-orm";
+import { ledgers, loginEmails, users } from "@/persistence";
+import { eq, sql } from "drizzle-orm";
 
 const LEDGER_ONE_ID = "00000000-0000-4000-8000-000000000001";
 const LEDGER_TWO_ID = "00000000-0000-4000-8000-000000000002";
 
 async function createTestUser(email?: string) {
   const id = crypto.randomUUID();
-  const [user] = await db
-    .insert(users)
-    .values({
-      id,
-      email: email ?? `test-${id}@example.com`,
-      name: "Test User",
-      nickname: "A",
-      gender: "male",
-      emailVerified: new Date(),
-    })
-    .returning();
+  const [user] = await db.insert(users).values({ id, name: "Test User" }).returning();
+  await db.insert(loginEmails).values({
+    userId: id,
+    email: email ?? `test-${id}@example.com`,
+    emailVerified: new Date(),
+  });
   expect(user).toBeDefined();
   if (user === undefined) {
     throw new Error("Expected user insert to return a row");
@@ -51,26 +46,16 @@ describe("Ledger single limit constraint", () => {
     expect(ledger?.userId).toBe(user.id);
   });
 
-  it("should prevent creating second ledger for same user", async () => {
-    const user = await createTestUser();
-
-    // 创建第一个账本
-    await db.insert(ledgers).values({
-      id: LEDGER_ONE_ID,
-      userId: user.id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    // 尝试创建第二个账本应该失败
-    await expect(
-      db.insert(ledgers).values({
-        id: LEDGER_TWO_ID,
-        userId: user.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-    ).rejects.toThrow();
+  it("keeps the one-live-ledger rule in the adapter rather than a constraint", async () => {
+    // `uniq_ledgers_user_id` is gone: a person may now have more than one
+    // ledger row, and "there is exactly one live ledger" is what the access
+    // port enforces. This pins that the constraint really was dropped, so a
+    // future schema change cannot quietly resurrect the old cap.
+    const constraints = await db.execute(
+      sql`SELECT indexname FROM pg_indexes
+           WHERE schemaname = current_schema() AND indexname = 'uniq_ledgers_user_id'`
+    );
+    expect(constraints.rows).toHaveLength(0);
   });
 
   it("should allow different users to each have one ledger", async () => {

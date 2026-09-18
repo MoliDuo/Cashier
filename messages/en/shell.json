@@ -66,7 +66,6 @@
     "errorConfiguration": "Configuration Error",
     "errorConfigurationDesc": "There is a problem with the server configuration. Please contact support.",
     "devSignIn": "Continue as dev",
-    "devSignInAs": "Continue as {name}",
     "devSignInDesc": "Local development only. Opens the single ledger without email delivery.",
     "devSignInFailed": "Failed to start the development session",
     "otpDigitLabel": "Digit {index} of {length}"
@@ -90,12 +89,7 @@
     "loginWarn": "If you did not sign in, please secure your account immediately."
   },
   "Common": {
-    "recordOwner": "Record owner",
-    "recordedBy": "Recorded by",
     "historicalRecord": "Historical record",
-    "allMembers": "All",
-    "myRecords": "Me",
-    "partnerRecords": "Partner",
     "combinedTotal": "Total",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -142,7 +136,9 @@
     "saveAndContinue": "Save and continue",
     "discardAndContinue": "Discard and leave",
     "continueEditing": "Continue editing",
-    "reloadServerData": "Reload latest data"
+    "reloadServerData": "Reload latest data",
+    "book": "Book",
+    "allBooks": "All books"
   },
   "Error": {
     "title": "Application Error",
@@ -205,10 +201,31 @@
     "batchBlocked": "Finish selecting entries before reloading the app.",
     "offlineBlocked": "Reconnect to the network before reloading the app."
   },
-  "MemberScope": {
-    "label": "Record scope",
-    "mine": "{nickname} (Me)",
-    "only": "Only {nickname}",
-    "current": "Showing only {nickname}. Open the member switch"
+  "Setup": {
+    "title": "Set up Cashier",
+    "description": "Create the account, the ledger and your first books. This runs once.",
+    "setupCode": "Setup code",
+    "setupCodeDesc": "Printed to the server's logs when the database is empty.",
+    "email": "Sign-in email",
+    "password": "Password",
+    "passwordDesc": "8–128 characters with at least one letter and one number.",
+    "books": "Books",
+    "bookName": "Book name",
+    "addBook": "Add",
+    "removeBook": "Remove this book",
+    "defaultBook": "Default for the total",
+    "defaultBookDesc": "Records entered while viewing the total land in this book.",
+    "submit": "Create account",
+    "wrongCode": "That setup code is not correct.",
+    "alreadyDone": "Setup has already been completed.",
+    "invalidEmail": "Enter a valid email address.",
+    "weakPassword": "Use 8–128 characters with at least one letter and one number.",
+    "invalidBooks": "Add at least one unique book and pick which one is the default."
+  },
+  "BookScope": {
+    "label": "Book",
+    "all": "All books",
+    "only": "Only {book}",
+    "current": "Showing book {book}. Open the book switcher"
   }
 }

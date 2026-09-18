@@ -13,8 +13,7 @@ import {
 } from "../../helpers/factories";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
-  createTestUser,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { flushAfterCallbacks } from "../../setup.common";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
@@ -61,11 +60,11 @@ async function setupLedger() {
   const home = createCategoryData(ledger.id, { name: "居家", sortOrder: 1 });
   const document = createSourceDocumentData(ledger.id);
   await db.insert(ledgers).values(ledger);
-  await configureTestCoupleLedger(db, ledger.id);
+  await ensureTestLedgerBooks(db, ledger.id);
   await db.insert(entryCategories).values([food, home]);
   await db.insert(sourceDocuments).values({
     ...document,
-    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+    bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
   });
   const revisionId = await activateTestSourceDocumentProjection(db, document.id);
   return { ledger, food, home, document, revisionId };
@@ -186,16 +185,16 @@ describe("startCategoryReclassificationAction", () => {
     });
   });
 
-  it("rejects a ledger the caller does not own", async () => {
+  it("rejects a ledger that is not the single live one", async () => {
     const db = getTestDb();
-    const secondUserId = crypto.randomUUID();
-    await createTestUser(db, undefined, secondUserId);
     const { ledger, food, home } = await setupLedger();
-    const foreign = createLedgerData({ userId: secondUserId });
-    await db.insert(ledgers).values(foreign);
+    // A second ledger row exists but is not live: the wrapper refuses it by id,
+    // because with one live ledger every other id is unreachable.
+    const retired = { ...createLedgerData({ userId }), deletedAt: new Date() };
+    await db.insert(ledgers).values(retired);
 
     await expect(
-      startCategoryReclassificationAction(foreign.id, {
+      startCategoryReclassificationAction(retired.id, {
         ledgerEntryIds: [crypto.randomUUID()],
         candidateCategoryIds: [food.id, home.id],
       })
@@ -222,10 +221,8 @@ describe("startCategoryReclassificationAction", () => {
 
   it("rejects a candidate category that belongs to another ledger", async () => {
     const db = getTestDb();
-    const secondUserId = crypto.randomUUID();
-    await createTestUser(db, undefined, secondUserId);
     const { ledger, food, document, revisionId } = await setupLedger();
-    const foreign = createLedgerData({ userId: secondUserId });
+    const foreign = { ...createLedgerData({ userId }), deletedAt: new Date() };
     const foreignCategory = createCategoryData(foreign.id, { name: "别人的", sortOrder: 0 });
     await db.insert(ledgers).values(foreign);
     await db.insert(entryCategories).values(foreignCategory);

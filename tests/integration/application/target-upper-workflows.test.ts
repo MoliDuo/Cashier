@@ -15,7 +15,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
 const getLedgerEntryDetail = (id: string, ledgerId: string) =>
@@ -63,14 +63,12 @@ describe("target upper workflows", () => {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const pending = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "pending", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.markProcessing({
       ledgerId,
@@ -81,7 +79,7 @@ describe("target upper workflows", () => {
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -122,8 +120,7 @@ describe("target upper workflows", () => {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [{ ...entry, categoryId: category!.id }],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const activeEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
@@ -132,7 +129,7 @@ describe("target upper workflows", () => {
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       input: { text: "failed replacement", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -232,8 +229,7 @@ describe("target upper workflows", () => {
           createdAt: transactionAt,
         },
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     const stream = await listLedgerEntries(ledgerId, { limit: 20 });
@@ -321,8 +317,7 @@ describe("target upper workflows", () => {
         expectedMainCurrency: "CNY",
         ledgerId,
         entries: [{ ...entry, categoryId: otherCategory!.id }],
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocuments)).toHaveLength(0);
@@ -333,8 +328,7 @@ describe("target upper workflows", () => {
       expectedMainCurrency: "CNY",
       ledgerId,
       entries: [entry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const beforeDocument = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
@@ -377,8 +371,7 @@ describe("target upper workflows", () => {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const original = await db.query.ledgerEntries.findFirst({
       where: and(
@@ -435,8 +428,7 @@ describe("target upper workflows", () => {
     const pending = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Lunch", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresLedgerProjectionAdapter.activateRevision({
       ledgerId,

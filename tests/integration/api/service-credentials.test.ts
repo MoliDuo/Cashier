@@ -3,20 +3,21 @@ import { NextRequest } from "next/server";
 import { POST as ledgerEntryPOST } from "@/app/api/v1/source-documents/route";
 import { getTestDb } from "../../setup";
 import {
+  books,
+  ledgers,
   serviceCredentials,
   sourceDocumentRevisions,
   sourceDocuments,
-  ledgers,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
+import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   createServiceCredentialAction,
   deleteServiceCredentialAction,
   getServiceCredentialsAction,
 } from "@/modules/ledger/server-actions/credentials";
 import { getLedgerSettingsAction } from "@/modules/ledger/server-actions/settings";
-import { formatDateTimeForApi } from "@/lib/date-utils";
+import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { ValidationError } from "@/lib/errors";
 import { computeHash } from "@/lib/security/service-credential-token";
 import { postgresServiceCredentialAdapter } from "@/application/adapters/postgres";
@@ -115,6 +116,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     // Create Credential - returns data with one-time token
     const createRes = await createServiceCredentialAction(testLedgerId, {
       name: "Test Credential",
+      bookId: await testBookId(getTestDb(), testLedgerId),
     });
 
     expect(createRes).toBeDefined();
@@ -151,7 +153,10 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
 
   it("rejects blank credential name with ValidationError", async () => {
     await expect(
-      createServiceCredentialAction(testLedgerId, { name: "" } as never)
+      createServiceCredentialAction(testLedgerId, {
+        name: "",
+        bookId: await testBookId(getTestDb(), testLedgerId),
+      } as never)
     ).rejects.toThrow(ValidationError);
   });
 
@@ -174,7 +179,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         ledgerId: testLedgerId,
         name: "Ingest Credential",
         tokenHash: hash,
-        attributedUserId: TEST_USER_ID,
+        bookId: await testBookId(db, testLedgerId),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -201,8 +206,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     });
     expect(doc).toBeDefined();
     expect(doc?.ledgerId).toBe(testLedgerId);
-    expect(doc?.attributedUserId).toBe(TEST_USER_ID);
-    expect(doc?.createdByUserId).toBe(TEST_USER_ID);
+    expect(doc?.bookId).toBe(await testBookId(db, testLedgerId));
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.sourceDocumentId, data.sourceDocumentId),
     });
@@ -235,7 +239,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         ledgerId: testLedgerId,
         name: "Broken Body Credential",
         tokenHash: hash,
-        attributedUserId: TEST_USER_ID,
+        bookId: await testBookId(db, testLedgerId),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -270,7 +274,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         ledgerId: testLedgerId,
         name: "Timezone Credential",
         tokenHash: hash,
-        attributedUserId: TEST_USER_ID,
+        bookId: await testBookId(db, testLedgerId),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -298,7 +302,55 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     });
 
     expect(doc?.documentDate).toBeNull();
+    // The fixture book has no zone of its own, so the server date decides.
     expect(revision?.inputDocumentDate).toBe(formatDateTimeForApi(new Date()));
+  });
+
+  it("dates an upload in its key's book zone", async () => {
+    const db = getTestDb();
+    const knownToken = "sk_book_zone";
+    const { computeHash, prefixSuffix } = await import("@/lib/security/service-credential-token");
+    // Give the key's book a zone so the upload is dated in that book's day.
+    const zonedBookId = crypto.randomUUID();
+    await db.insert(books).values({
+      id: zonedBookId,
+      ledgerId: testLedgerId,
+      name: "Zoned",
+      sortOrder: 9,
+      timeZone: "Pacific/Kiritimati",
+    });
+    const { prefix, suffix } = prefixSuffix(knownToken);
+    const createdCredentials = await db
+      .insert(serviceCredentials)
+      .values({
+        ledgerId: testLedgerId,
+        name: "Zoned Credential",
+        tokenHash: computeHash(knownToken),
+        bookId: zonedBookId,
+        tokenPrefix: prefix,
+        tokenSuffix: suffix,
+      })
+      .returning();
+    requireFirst(createdCredentials, "service credential");
+
+    const req = new NextRequest("http://localhost/api/v1/source-documents", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${knownToken}` },
+      body: JSON.stringify({ images: [{ data: await validJpegBase64(), mimeType: "image/jpeg" }] }),
+    });
+    const res = await ledgerEntryPOST(req);
+    expect(res.status).toBe(201);
+
+    const data = await res.json();
+    const doc = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, data.sourceDocumentId),
+    });
+    // The record went to the key's book, not to the ledger's default one.
+    expect(doc?.bookId).toBe(zonedBookId);
+    const revision = await db.query.sourceDocumentRevisions.findFirst({
+      where: eq(sourceDocumentRevisions.id, doc!.latestSubmissionRevisionId!),
+    });
+    expect(revision?.inputDocumentDate).toBe(getDateInTimezone("Pacific/Kiritimati"));
   });
 
   it("should delete service credential via Action", async () => {
@@ -306,6 +358,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     // Create credential via action to get proper hash
     const createRes = await createServiceCredentialAction(testLedgerId, {
       name: "Delete Credential",
+      bookId: await testBookId(getTestDb(), testLedgerId),
     });
 
     // deleteServiceCredentialAction returns void
@@ -322,6 +375,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const db = getTestDb();
     const credential = await createServiceCredentialAction(testLedgerId, {
       name: "Lifecycle Credential",
+      bookId: await testBookId(getTestDb(), testLedgerId),
     });
     const image = await validJpegBase64();
     const firstResponse = await ledgerEntryPOST(
@@ -361,6 +415,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const db = getTestDb();
     const credential = await createServiceCredentialAction(testLedgerId, {
       name: "Throttle Credential",
+      bookId: await testBookId(getTestDb(), testLedgerId),
     });
     const image = await validJpegBase64();
     const post = () =>
@@ -407,6 +462,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const db = getTestDb();
     const credential = await createServiceCredentialAction(testLedgerId, {
       name: "Fresh Revoke Credential",
+      bookId: await testBookId(getTestDb(), testLedgerId),
     });
     // Mark the credential as recently used so authenticate() takes the
     // write-throttled path (no lastUsedAt UPDATE) and must rely on the fresh
@@ -440,6 +496,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     // Create a credential via action to get proper hash-based credential
     const created = await createServiceCredentialAction(testLedgerId, {
       name: "New Credential",
+      bookId: await testBookId(getTestDb(), testLedgerId),
     });
 
     // Get settings via getLedgerSettingsAction

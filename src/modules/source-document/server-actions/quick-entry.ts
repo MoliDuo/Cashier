@@ -8,27 +8,19 @@ import {
 import { withSourceDocumentLedgerAccess } from "./access";
 import { serverComposition } from "@/application/server-composition-root";
 import { convertEntryAmount } from "@/modules/currency/application/use-cases/convert-entry-amount";
-import { isCoupleMember } from "@/lib/couple-config";
-import { ValidationError } from "@/lib/errors";
-import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
+import { resolveRecordBook } from "../server/resolve-record-book";
 
 /**
  * Create a quick entry (manual entry without AI parsing).
  * Atomically creates a completed SourceDocument and a LedgerEntry without AI parsing.
  */
 export const createQuickEntryAction = withSourceDocumentLedgerAccess(
-  async (
-    { ledgerId, ledger, userId },
-    data: CreateQuickEntryInput
-  ): Promise<QuickEntryResponseDto> => {
+  async ({ ledgerId, ledger }, data: CreateQuickEntryInput): Promise<QuickEntryResponseDto> => {
     const validated = createQuickEntryInputSchema.parse(data);
-    const attributedUserId = validated.attributedUserId ?? userId;
-    if (!isCoupleMember(attributedUserId)) throw new ValidationError("Invalid member attribution");
-    const members = await getCoupleMembers(serverComposition.userProfiles);
+    const book = await resolveRecordBook(ledgerId, validated.bookId, serverComposition.books);
     const payload = {
-      attributedUserId,
-      createdByUserId: userId,
-      timeZone: members.find((member) => member.id === userId)?.timeZone ?? null,
+      bookId: book.id,
+      timeZone: book.timeZone,
       categoryId: validated.categoryId,
       amount: validated.amount,
       ...(validated.currency !== undefined ? { currency: validated.currency } : {}),

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ServiceCredentialSection } from "@/modules/ledger/ui/ServiceCredentialSection";
 import type { CreatedServiceCredentialDto, ServiceCredentialDto } from "@/modules/ledger/contracts";
@@ -11,14 +11,33 @@ vi.mock("next-intl", () => ({
       ? `${key}:${String(values.date)}`
       : values?.name != null
         ? `${key}:${String(values.name)}`
-        : values?.owner != null
-          ? `${key}:${String(values.owner)}`
+        : values?.book != null
+          ? `${key}:${String(values.book)}`
           : key,
   useLocale: () => intl.locale,
 }));
 
+const books = [
+  {
+    id: "book-1",
+    ledgerId: "ledger-1",
+    name: "Shared",
+    timeZone: null,
+    sortOrder: 1,
+    isDefault: true,
+  },
+  {
+    id: "book-2",
+    ledgerId: "ledger-1",
+    name: "Mine",
+    timeZone: null,
+    sortOrder: 2,
+    isDefault: false,
+  },
+];
+
 const credentialFixture = (
-  overrides: Pick<ServiceCredentialDto, "id" | "attributedUserId">
+  overrides: Pick<ServiceCredentialDto, "id" | "bookId">
 ): ServiceCredentialDto => ({
   ledgerId: "ledger-1",
   name: "Automation",
@@ -46,7 +65,9 @@ describe("ServiceCredentialSection", () => {
     render(
       <ServiceCredentialSection
         credentials={[]}
+        books={books}
         onCreateCredential={onCreateCredential}
+        onSetCredentialBook={vi.fn(async () => undefined)}
         onDeleteCredential={vi.fn(async () => undefined)}
       />
     );
@@ -64,7 +85,7 @@ describe("ServiceCredentialSection", () => {
 
     resolveCreate({
       id: "credential-1",
-      attributedUserId: "user-1",
+      bookId: "book-1",
       ledgerId: "ledger-1",
       name: "Automation",
       token: "secret",
@@ -95,7 +116,7 @@ describe("ServiceCredentialSection", () => {
         credentials={[
           {
             id: "credential-1",
-            attributedUserId: "user-1",
+            bookId: "book-1",
             ledgerId: "ledger-1",
             name: "Automation",
             tokenPrefix: "sec",
@@ -105,7 +126,9 @@ describe("ServiceCredentialSection", () => {
             deletedAt: null,
           },
         ]}
+        books={books}
         onCreateCredential={vi.fn()}
+        onSetCredentialBook={vi.fn(async () => undefined)}
         onDeleteCredential={onDeleteCredential}
       />
     );
@@ -132,7 +155,7 @@ describe("ServiceCredentialSection", () => {
         credentials={[
           {
             id: "credential-1",
-            attributedUserId: "user-1",
+            bookId: "book-1",
             ledgerId: "ledger-1",
             name: "Automation",
             tokenPrefix: "sec",
@@ -142,7 +165,11 @@ describe("ServiceCredentialSection", () => {
             deletedAt: null,
           },
         ]}
+        books={books}
         onCreateCredential={vi.fn()}
+
+        onSetCredentialBook={vi.fn(async () => undefined)}
+
         onDeleteCredential={vi.fn()}
       />
     );
@@ -150,35 +177,29 @@ describe("ServiceCredentialSection", () => {
     expect(screen.getByText(`createdAt:${formatted}`)).toBeInTheDocument();
   });
 
-  it("labels each shared credential with the member that owns it", () => {
+  it("names a key's book and lets it change", async () => {
+    const onSetCredentialBook = vi.fn(async () => undefined);
     render(
       <ServiceCredentialSection
-        userId="user-1"
-        partnerUserId="user-2"
         credentials={[
-          credentialFixture({ id: "mine", attributedUserId: "user-1" }),
-          credentialFixture({ id: "theirs", attributedUserId: "user-2" }),
-          credentialFixture({ id: "legacy", attributedUserId: "user-3" }),
+          credentialFixture({ id: "shared", bookId: "book-1" }),
+          credentialFixture({ id: "mine", bookId: "book-2" }),
         ]}
+        books={books}
         onCreateCredential={vi.fn()}
+        onSetCredentialBook={onSetCredentialBook}
         onDeleteCredential={vi.fn()}
       />
     );
 
-    expect(screen.getByText("owner:myRecords")).toBeInTheDocument();
-    expect(screen.getByText("owner:partnerRecords")).toBeInTheDocument();
-    expect(screen.getByText("owner:historicalRecord")).toBeInTheDocument();
-  });
+    expect(screen.getByText("book:Shared")).toBeInTheDocument();
+    expect(screen.getByText("book:Mine")).toBeInTheDocument();
 
-  it("omits ownership when the server did not provide an identity", () => {
-    render(
-      <ServiceCredentialSection
-        credentials={[credentialFixture({ id: "mine", attributedUserId: "user-1" })]}
-        onCreateCredential={vi.fn()}
-        onDeleteCredential={vi.fn()}
-      />
-    );
-
-    expect(screen.queryByText(/^owner:/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("combobox")[0]!);
+    // "Mine" is both the open trigger's current value and an option, so the
+    // option is picked by its listbox role instead of by text.
+    const listbox = await screen.findByRole("listbox");
+    fireEvent.click(within(listbox).getByText("Mine"));
+    await waitFor(() => expect(onSetCredentialBook).toHaveBeenCalledWith("shared", "book-2"));
   });
 });

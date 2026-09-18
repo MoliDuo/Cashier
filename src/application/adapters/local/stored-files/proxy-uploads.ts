@@ -7,8 +7,10 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { MAX_ORIGINAL_BYTES_PER_FILE } from "@/lib/storage/upload-policy";
 import { storedFiles, uploadSessionFiles, uploadSessions } from "@/persistence";
-import { getCoupleConfig } from "@/lib/couple-config";
-import { postgresLedgerAdapter } from "@/application/adapters/postgres/business-ports/ledger";
+import {
+  findSingleLiveLedgerId,
+  postgresLedgerAdapter,
+} from "@/application/adapters/postgres/business-ports/ledger";
 import { checksum, mapStoredFile } from "./shared";
 import type { ResolvedStoredFileAdapterDependencies } from "./shared";
 
@@ -22,7 +24,7 @@ export function createProxyUploadOperations(dependencies: ResolvedStoredFileAdap
     contentType: string;
     body: Uint8Array;
   }): Promise<StoredFileContract> {
-    const ledgerId = getCoupleConfig()?.ledgerId;
+    const ledgerId = await findSingleLiveLedgerId();
     if (ledgerId == null || !(await postgresLedgerAdapter.canAccess(ledgerId, input.userId)))
       throw new NotFoundError("Upload target");
     const ownership = await db

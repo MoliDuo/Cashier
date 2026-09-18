@@ -34,20 +34,24 @@ export async function createSourceDocumentFromCredential(
     credential: AuthenticatedServiceCredentialContract;
     idempotencyKey?: string;
     payload: PreparedApiV1SourceDocumentInput;
+    /**
+     * The key's book zone, resolved by the caller before this runs. A book with
+     * no zone of its own leaves the server date to decide, as today.
+     */
+    timezone?: string;
   },
   scheduleProcessing: (job: ProcessingJobContract) => void,
   ports: SourceDocumentCredentialPorts
 ): Promise<SourceDocumentSubmissionContract> {
-  if (input.credential.attributedUserId == null)
-    throw new ValidationError("Credential owner is required");
+  if (input.credential.bookId == null) throw new ValidationError("Credential book is required");
   const payload = input.payload;
   return createAndQueueSourceDocument(
     {
       ledgerId: input.credential.ledgerId,
-      attributedUserId: input.credential.attributedUserId,
-      createdByUserId: input.credential.attributedUserId,
+      bookId: input.credential.bookId,
       input: { kind: "inline", images: payload.images },
       ...(payload.entryDate == null ? {} : { documentDate: payload.entryDate }),
+      ...(input.timezone == null ? {} : { timezone: input.timezone }),
       ...(input.idempotencyKey == null
         ? {}
         : {

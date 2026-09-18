@@ -1,10 +1,33 @@
 import { relations } from "drizzle-orm";
-import { users } from "./schema/auth";
-import { ledgers, entryCategories, ledgerEntries, serviceCredentials } from "./schema/ledger";
+import { users, loginEmails } from "./schema/auth";
+import {
+  books,
+  ledgers,
+  entryCategories,
+  ledgerEntries,
+  serviceCredentials,
+} from "./schema/ledger";
 import { sourceDocuments } from "./schema/source-document";
 
 export const usersRelations = relations(users, ({ many }) => ({
   ledgers: many(ledgers),
+  loginEmails: many(loginEmails),
+}));
+
+export const loginEmailsRelations = relations(loginEmails, ({ one }) => ({
+  user: one(users, {
+    fields: [loginEmails.userId],
+    references: [users.id],
+  }),
+}));
+
+export const booksRelations = relations(books, ({ one, many }) => ({
+  ledger: one(ledgers, {
+    fields: [books.ledgerId],
+    references: [ledgers.id],
+  }),
+  sourceDocuments: many(sourceDocuments),
+  serviceCredentials: many(serviceCredentials),
 }));
 
 export const ledgersRelations = relations(ledgers, ({ one, many }) => ({
@@ -12,6 +35,7 @@ export const ledgersRelations = relations(ledgers, ({ one, many }) => ({
     fields: [ledgers.userId],
     references: [users.id],
   }),
+  books: many(books),
   ledgerEntries: many(ledgerEntries),
   sourceDocuments: many(sourceDocuments),
   entryCategories: many(entryCategories),
@@ -30,6 +54,10 @@ export const sourceDocumentsRelations = relations(sourceDocuments, ({ one, many 
   ledger: one(ledgers, {
     fields: [sourceDocuments.ledgerId],
     references: [ledgers.id],
+  }),
+  book: one(books, {
+    fields: [sourceDocuments.bookId],
+    references: [books.id],
   }),
   ledgerEntries: many(ledgerEntries),
 }));
@@ -53,5 +81,9 @@ export const serviceCredentialsRelations = relations(serviceCredentials, ({ one 
   ledger: one(ledgers, {
     fields: [serviceCredentials.ledgerId],
     references: [ledgers.id],
+  }),
+  book: one(books, {
+    fields: [serviceCredentials.bookId],
+    references: [books.id],
   }),
 }));

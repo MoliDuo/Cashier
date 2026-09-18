@@ -6,9 +6,9 @@ import type { QuickEntryPorts } from "../ports";
 import type { LedgerSettingsContract } from "@/application/contracts";
 
 export interface CreateQuickEntryPayload {
-  attributedUserId: string;
-  createdByUserId: string;
-  /** The signed-in member's own zone; null means their device decides. */
+  /** The book the record is filed under; also decides its default date zone. */
+  bookId: string;
+  /** That book's zone; null means the server date decides. */
   timeZone?: string | null;
   categoryId: string;
   amount: string;
@@ -24,8 +24,7 @@ interface ConversionResult {
 }
 
 interface QuickEntryInsertData {
-  attributedUserId: string;
-  createdByUserId: string;
+  bookId: string;
   categoryId: string;
   itemName: string | null;
   description: string | null;
@@ -46,8 +45,7 @@ async function createQuickEntryAtomically(
   const itemName = data.itemName ?? categoryName;
   const created = await ports.projections.createManual({
     ledgerId,
-    attributedUserId: data.attributedUserId,
-    createdByUserId: data.createdByUserId,
+    bookId: data.bookId,
     expectedMainCurrency,
     title: itemName,
     entryDate: data.entryDate,
@@ -75,7 +73,7 @@ export async function createQuickEntry(
 ): Promise<QuickEntryResponseDto> {
   const mainCurrency = ledger.settings.mainCurrency;
   const entryCurrency = payload.currency ?? mainCurrency;
-  // The record is dated by the member who wrote it, not by the book.
+  // The record is dated in its book's zone, falling back to the server date.
   const entryDate =
     payload.entryDate ??
     getDateInTimezone(payload.timeZone ?? undefined) ??
@@ -98,8 +96,7 @@ export async function createQuickEntry(
     entryCurrency,
     conversion,
     {
-      attributedUserId: payload.attributedUserId,
-      createdByUserId: payload.createdByUserId,
+      bookId: payload.bookId,
       categoryId: payload.categoryId,
       itemName: payload.itemName ?? null,
       description: payload.description ?? null,

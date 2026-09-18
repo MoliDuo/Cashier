@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
@@ -26,8 +26,7 @@ describe("current-runtime target adapters", () => {
       title: "Manual",
       entryDate: "2026-07-15",
       entries: [projectionEntry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const originalEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),

@@ -5,7 +5,7 @@ import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/
 import { serverComposition } from "@/application/server-composition-root";
 import { getStreamTotal as getStreamTotalUseCase } from "@/modules/source-document/application/queries/get-stream-total";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
 const listLedgerEntries = (
@@ -46,8 +46,7 @@ describe("ledger search", () => {
           exchangeRate: "1.000000",
         },
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(getTestDb(), ledgerId),
     });
     await postgresLedgerProjectionAdapter.createManual({
       expectedMainCurrency: "CNY",
@@ -65,8 +64,7 @@ describe("ledger search", () => {
           exchangeRate: "1.000000",
         },
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(getTestDb(), ledgerId),
     });
 
     const titleMatch = await listStreamPage(ledgerId, { search: "  coffee   receipt ", limit: 20 });

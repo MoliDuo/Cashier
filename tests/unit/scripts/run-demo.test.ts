@@ -44,9 +44,6 @@ describe("demo runtime environment", () => {
       DATABASE_URL: "postgresql://remote.example.com/production",
       S3_ENDPOINT: "https://storage.example.com",
       OPENAI_API_KEY: "real-key",
-      COUPLE_OWNER_USER_ID: "external-owner",
-      COUPLE_PARTNER_USER_ID: "external-partner",
-      COUPLE_LEDGER_ID: "external-ledger",
     });
 
     expect(result).toMatchObject({
@@ -56,9 +53,6 @@ describe("demo runtime environment", () => {
       OPENAI_API_KEY: "demo-unused",
       OPENAI_BASE_URL: "http://127.0.0.1:1/v1",
       DEV_AUTH_BYPASS: "true",
-      COUPLE_OWNER_USER_ID: "10000000-0000-4000-8000-000000000001",
-      COUPLE_PARTNER_USER_ID: "10000000-0000-4000-8000-000000000002",
-      COUPLE_LEDGER_ID: "20000000-0000-4000-8000-000000000001",
     });
   });
 
@@ -88,11 +82,11 @@ describe("demo runtime environment", () => {
    * the token prefix and suffix, so this banner is the only place a developer
    * can read the seeded tokens from.
    */
-  it("prints every seeded sample key with the member that owns it", () => {
+  it("prints every seeded sample key with the book it writes to", () => {
     const lines = formatDemoCredentialLines();
     const credentials = fixture.serviceCredentials as Array<{
       name: string;
-      attributedTo: string;
+      book: string;
       tokenBody: string;
     }>;
     const credentialLines = lines.slice(1, -1);
@@ -105,7 +99,7 @@ describe("demo runtime environment", () => {
       const token = fixtureCredentialToken(credential);
       const line = credentialLines.find((candidate) => candidate.includes(token));
       expect(line, credential.name).toContain(credential.name);
-      expect(line).toContain(credential.attributedTo === "partner" ? "partner" : "dev");
+      expect(line).toContain(credential.book);
     }
   });
 });

@@ -35,8 +35,6 @@ vi.mock("@/modules/auth/repositories/otp-repository", () => ({
   discardOTPToken: discardOTPTokenMock,
 }));
 
-vi.mock("@/lib/couple-config", () => ({ isCoupleMember: (id: string) => id === "user-1" }));
-
 vi.mock("@/modules/auth/services/otp-rate-limit", () => ({
   acquireResendCooldown: acquireResendCooldownMock,
   checkSendRateLimit: checkSendRateLimitMock,

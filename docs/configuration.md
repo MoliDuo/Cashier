@@ -3,25 +3,21 @@
 本地全家桶从 `.env.local.example` 开始；外部数据库和对象存储部署从 `.env.example`
 开始。空字符串会被当作未配置，除非下面另有说明。
 
+账号、账本和分账都不在环境变量里：空库首次启动时，服务端会打印一次性初始化代码，
+在 `/{locale}/setup` 向导中填入代码、邮箱、密码和分账名称即可创建。
+
 ## 应用与 AI
 
-| 变量                             | 必需   | 默认值                      | 说明                                              |
-| -------------------------------- | ------ | --------------------------- | ------------------------------------------------- |
-| `COUPLE_OWNER_USER_ID`           | 是     | 无                          | 第一位成员的稳定 UUID。                           |
-| `COUPLE_PARTNER_USER_ID`         | 是     | 无                          | 第二位成员的稳定 UUID。                           |
-| `COUPLE_LEDGER_ID`               | 是     | 无                          | 共同账本的稳定 UUID。                             |
-| `COUPLE_OWNER_EMAIL`             | 初始化 | 无                          | 空库显式初始化时第一位成员邮箱。                  |
-| `COUPLE_OWNER_PASSWORD`          | 初始化 | 无                          | 空库显式初始化时第一位成员密码。                  |
-| `COUPLE_PARTNER_EMAIL`           | 初始化 | 无                          | 空库显式初始化时第二位成员邮箱。                  |
-| `COUPLE_PARTNER_PASSWORD`        | 初始化 | 无                          | 空库显式初始化时第二位成员密码。                  |
-| `APP_URL`                        | 否     | `http://localhost:3000`     | 用户访问 Cashier 的公开地址。                     |
-| `OPENAI_API_KEY`                 | 是     | 无                          | OpenAI 或兼容服务的 API 密钥。                    |
-| `OPENAI_BASE_URL`                | 否     | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址。                          |
-| `AI_MODEL`                       | 否     | `gpt-4o`                    | 用于票据解析和分类的模型名。                      |
-| `AI_CATEGORY_CONCURRENCY`        | 否     | `100`                       | 部署内批量分类同时占用的账单槽位，范围 1–256。    |
-| `AI_CATEGORY_REQUEST_TIMEOUT_MS` | 否     | `60000`                     | 批量分类单次 AI 请求超时，范围 1000–180000 毫秒。 |
-| `AI_CATEGORY_MAX_ATTEMPTS`       | 否     | `3`                         | 每个分类请求块最多尝试次数，范围 1–5。            |
-| `TZ`                             | 否     | `Asia/Shanghai`             | 服务端默认时区。                                  |
+| 变量                             | 必需 | 默认值                      | 说明                                              |
+| -------------------------------- | ---- | --------------------------- | ------------------------------------------------- |
+| `APP_URL`                        | 否   | `http://localhost:3000`     | 用户访问 Cashier 的公开地址。                     |
+| `OPENAI_API_KEY`                 | 是   | 无                          | OpenAI 或兼容服务的 API 密钥。                    |
+| `OPENAI_BASE_URL`                | 否   | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址。                          |
+| `AI_MODEL`                       | 否   | `gpt-4o`                    | 用于票据解析和分类的模型名。                      |
+| `AI_CATEGORY_CONCURRENCY`        | 否   | `100`                       | 部署内批量分类同时占用的账单槽位，范围 1–256。    |
+| `AI_CATEGORY_REQUEST_TIMEOUT_MS` | 否   | `60000`                     | 批量分类单次 AI 请求超时，范围 1000–180000 毫秒。 |
+| `AI_CATEGORY_MAX_ATTEMPTS`       | 否   | `3`                         | 每个分类请求块最多尝试次数，范围 1–5。            |
+| `TZ`                             | 否   | `Asia/Shanghai`             | 服务端默认时区。                                  |
 
 ## PostgreSQL
 

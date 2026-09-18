@@ -33,7 +33,7 @@ function createWrapper(queryClient: QueryClient) {
 }
 
 const createdCredential: CreatedServiceCredentialDto = {
-  attributedUserId: "user-1",
+  bookId: "user-1",
   id: "credential-1",
   ledgerId: "ledger-1",
   name: "CLI",
@@ -60,7 +60,10 @@ describe("useCredentialMutations", () => {
 
     let returned: CreatedServiceCredentialDto | undefined;
     await act(async () => {
-      returned = await result.current.createCredential.mutateAsync("CLI");
+      returned = await result.current.createCredential.mutateAsync({
+        name: "CLI",
+        bookId: "book-1",
+      });
     });
 
     expect(returned?.token).toBe(createdCredential.token);
@@ -80,7 +83,7 @@ describe("useCredentialMutations", () => {
     });
 
     await act(async () => {
-      await result.current.createCredential.mutateAsync("CLI");
+      await result.current.createCredential.mutateAsync({ name: "CLI", bookId: "book-1" });
     });
     await waitFor(() =>
       expect(result.current.createCredential.data?.token).toBe(createdCredential.token)

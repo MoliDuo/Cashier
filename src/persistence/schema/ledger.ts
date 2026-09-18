@@ -52,9 +52,6 @@ export const ledgers = pgTable(
   },
   (table) => [
     index("idx_ledgers_user_id").on(table.userId),
-    uniqueIndex("uniq_ledgers_user_id")
-      .on(table.userId)
-      .where(sql`${table.deletedAt} IS NULL`),
     check("ck_ledgers_main_currency", sql`${table.mainCurrency} ~ '^[A-Z]{3}$'`),
     check(
       "ck_ledgers_preferred_currencies",
@@ -69,6 +66,52 @@ export const ledgers = pgTable(
 );
 
 export type Ledger = InferSelectModel<typeof ledgers>;
+
+/**
+ * A 分账: the bucket every record belongs to. Reading all of them together is
+ * 总账. `is_default` marks the book that 总账-entered records land in; it is
+ * stored as a flag rather than found by name. `time_zone` null means "use this
+ * device's zone", exactly as the members' own zones did before.
+ */
+export const books = pgTable(
+  "books",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ledgerId: uuid("ledger_id")
+      .notNull()
+      .references(() => ledgers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    timeZone: text("time_zone"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isDefault: boolean("is_default").notNull().default(false),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("uq_books_ledger_id_id").on(table.ledgerId, table.id),
+    index("idx_books_active_sort")
+      .on(table.ledgerId, table.sortOrder, table.createdAt, table.id)
+      .where(sql`${table.archivedAt} IS NULL`),
+    uniqueIndex("uniq_books_active_name")
+      .on(table.ledgerId, table.name)
+      .where(sql`${table.archivedAt} IS NULL`),
+    uniqueIndex("uniq_books_default")
+      .on(table.ledgerId)
+      .where(sql`${table.isDefault} AND ${table.archivedAt} IS NULL`),
+    check("ck_books_name_length", sql`length(btrim(${table.name})) BETWEEN 1 AND 20`),
+    check(
+      "ck_books_time_zone_length",
+      sql`${table.timeZone} IS NULL OR length(${table.timeZone}) <= 50`
+    ),
+  ]
+);
+
+export type Book = InferSelectModel<typeof books>;
 
 export const entryCategories = pgTable(
   "entry_categories",
@@ -210,9 +253,7 @@ export const serviceCredentials = pgTable(
     ledgerId: uuid("ledger_id")
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
-    attributedUserId: uuid("attributed_user_id")
-      .notNull()
-      .references(() => users.id),
+    bookId: uuid("book_id").notNull(),
     name: text("name").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -222,9 +263,15 @@ export const serviceCredentials = pgTable(
   },
   (table) => [
     index("idx_service_credentials_ledger_id").on(table.ledgerId),
+    index("idx_service_credentials_ledger_book").on(table.ledgerId, table.bookId),
     uniqueIndex("uniq_service_credentials_token_hash")
       .on(table.tokenHash)
       .where(sql`${table.tokenHash} IS NOT NULL`),
+    foreignKey({
+      columns: [table.ledgerId, table.bookId],
+      foreignColumns: [books.ledgerId, books.id],
+      name: "fk_service_credentials_book_ledger",
+    }),
     check(
       "ck_active_service_credentials_hashed",
       sql`${table.deletedAt} IS NOT NULL OR (${table.tokenHash} IS NOT NULL AND ${table.tokenPrefix} IS NOT NULL AND ${table.tokenSuffix} IS NOT NULL)`

@@ -15,8 +15,7 @@ import { getTestDb } from "../../setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
-  createTestUser,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 
@@ -68,7 +67,7 @@ describe("applyCategoryPresetAction", () => {
     const travelEntryId = crypto.randomUUID();
 
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values([
       { id: foodId, ledgerId: ledger.id, name: "餐饮", sortOrder: 0 },
       { id: travelId, ledgerId: ledger.id, name: "交通", sortOrder: 1 },
@@ -76,7 +75,7 @@ describe("applyCategoryPresetAction", () => {
     ]);
     await db.insert(sourceDocuments).values({
       ...document,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     const revisionId = await activateTestSourceDocumentProjection(db, document.id);
     await db.insert(ledgerEntries).values([
@@ -149,7 +148,7 @@ describe("applyCategoryPresetAction", () => {
     const foodId = crypto.randomUUID();
 
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values([
       {
         id: otherId,
@@ -185,7 +184,7 @@ describe("applyCategoryPresetAction", () => {
     const ledger = createLedgerData({ userId });
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values({
       id: categoryId,
       ledgerId: ledger.id,
@@ -216,7 +215,7 @@ describe("applyCategoryPresetAction", () => {
     const ledger = createLedgerData({ userId });
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values([
       { id: categoryId, ledgerId: ledger.id, name: "餐饮", sortOrder: 0 },
       { id: crypto.randomUUID(), ledgerId: ledger.id, name: "交通", sortOrder: 1 },
@@ -234,13 +233,18 @@ describe("applyCategoryPresetAction", () => {
 
   it("rejects a category that belongs to another ledger", async () => {
     const db = getTestDb();
-    const secondUserId = crypto.randomUUID();
-    await createTestUser(db, undefined, secondUserId);
     const ledger = createLedgerData({ userId });
-    const otherLedger = createLedgerData({ userId: secondUserId });
+    // A retired ledger: with one live ledger, another ledger row is only
+    // reachable by id, so this is how a category outside the live ledger is
+    // created at all.
+    const otherLedger = {
+      ...createLedgerData({ userId }),
+      deletedAt: new Date(),
+    };
     const foreignId = crypto.randomUUID();
     await db.insert(ledgers).values([ledger, otherLedger]);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db, otherLedger.id);
     await db.insert(entryCategories).values([
       { id: crypto.randomUUID(), ledgerId: ledger.id, name: "餐饮", sortOrder: 0 },
       { id: foreignId, ledgerId: otherLedger.id, name: "别人的", sortOrder: 0 },
@@ -262,7 +266,7 @@ describe("applyCategoryPresetAction", () => {
     const ledger = createLedgerData({ userId });
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values({
       id: categoryId,
       ledgerId: ledger.id,

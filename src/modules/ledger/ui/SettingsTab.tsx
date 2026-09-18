@@ -5,11 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
 import { AiSettings } from "./settings/AiSettings";
 import { AccountSettings } from "./settings/AccountSettings";
-import { ProfileSettings } from "./settings/ProfileSettings";
+import { BookSettings } from "./settings/BookSettings";
 import { SettingsSection } from "./settings/SettingsSection";
 import { SettingsField } from "./settings/SettingsField";
 import { useCategoryMutations } from "@/modules/ledger/hooks/useCategoryMutations";
 import { useCredentialMutations } from "@/modules/ledger/hooks/useCredentialMutations";
+import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { useLedgerSettings } from "@/modules/ledger/hooks/useLedgerSettings";
 import {
   Select,
@@ -32,18 +33,16 @@ import { queryKeys } from "@/lib/query-keys";
 import { getEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
-import type { MemberProfileContract } from "@/application/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 
 interface SettingsTabProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   ledgerId: string;
-  /** Both member profiles, hydrated by the page bootstrap. */
-  initialMembers: readonly MemberProfileContract[];
-  /** Server-derived identity used to label credential ownership. */
-  userId?: string;
-  partnerUserId?: string;
-  /** Server-derived user email (avoids useSession in a SessionProvider). */
+  /** The switcher's books, hydrated by the page bootstrap. */
+  initialBooks: readonly BookDto[];
+  /** The account's login addresses, hydrated by the page bootstrap. */
+  initialEmails?: readonly string[];
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
@@ -58,9 +57,8 @@ export function SettingsTab({
   ledger,
   initialCategories,
   ledgerId,
-  initialMembers,
-  userId,
-  partnerUserId,
+  initialBooks,
+  initialEmails,
   userEmail,
   hasPassword = false,
   passwordUpdatedAt = null,
@@ -75,7 +73,6 @@ export function SettingsTab({
   const { theme, setTheme } = useTheme();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [displayEmail, setDisplayEmail] = useState(userEmail ?? "");
   const [appearanceServer, setAppearanceServer] = useState({
     theme: theme ?? "system",
     language: interfaceLanguage,
@@ -134,7 +131,11 @@ export function SettingsTab({
       onMetadataGenerated: () => setMetadataPollingSession((session) => session + 1),
     });
 
-  const { createCredential, deleteCredential } = useCredentialMutations(ledgerId);
+  const { createCredential, setCredentialBook, deleteCredential } =
+    useCredentialMutations(ledgerId);
+  // The book list is one query: the 分账 section writes it and the API-key
+  // pickers read it, so a rename or reorder lands everywhere at once.
+  const { books } = useBooks({ ledgerId, initialBooks });
   const reloadCategories = async () => {
     const latest = await getEntryCategoriesAction(ledgerId);
     queryClient.setQueryData(queryKeys.entryCategories(ledgerId), latest);
@@ -257,12 +258,6 @@ export function SettingsTab({
           </Button>
         </div>
       )}
-      <ProfileSettings
-        ledgerId={ledgerId}
-        initialMembers={initialMembers}
-        {...(userId !== undefined ? { userId } : {})}
-      />
-
       <SettingsSection title={t("appearanceAndLanguage")}>
         <SettingsField title={t("theme")}>
           <Select
@@ -322,6 +317,8 @@ export function SettingsTab({
         />
       </SettingsSection>
 
+      <BookSettings ledgerId={ledgerId} initialBooks={initialBooks} />
+
       <BookkeepingSettings
         ledgerId={ledgerId}
         settings={settingsLedger.settings}
@@ -343,15 +340,16 @@ export function SettingsTab({
       />
 
       <AccountSettings
-        displayEmail={displayEmail}
+        initialEmails={initialEmails ?? (userEmail == null || userEmail === "" ? [] : [userEmail])}
         hasPassword={hasPassword}
         passwordUpdatedAt={passwordUpdatedAt}
         credentials={credentials ?? []}
         isPending={isPending}
-        {...(userId !== undefined ? { userId } : {})}
-        {...(partnerUserId !== undefined ? { partnerUserId } : {})}
-        onEmailChanged={setDisplayEmail}
-        onCreateCredential={(name) => createCredential.mutateAsync(name)}
+        books={books ?? initialBooks}
+        onCreateCredential={(input) => createCredential.mutateAsync(input)}
+        onSetCredentialBook={(id, bookId) =>
+          setCredentialBook.mutateAsync({ id, bookId }).then(() => undefined)
+        }
         onDeleteCredential={(id) => deleteCredential.mutateAsync(id)}
         onCredentialDialogClose={createCredential.reset}
         onSignOut={handleSignOut}

@@ -14,7 +14,7 @@ const dateRangeSchema = z
 
 const getEnhancedStatsInputSchema = z.object({
   ledgerId: z.string().regex(UUID_REGEX, "Invalid ledgerId"),
-  attributedUserId: z.string().regex(UUID_REGEX, "Invalid member").optional(),
+  bookId: z.string().regex(UUID_REGEX, "Invalid book").optional(),
   queryRange: dateRangeSchema,
   compareRange: dateRangeSchema,
   /** Optional semantic label for the comparison window. */

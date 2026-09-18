@@ -12,8 +12,7 @@ import {
   foreignKey,
 } from "drizzle-orm/pg-core";
 import { type InferSelectModel, sql } from "drizzle-orm";
-import { ledgers } from "./ledger";
-import { users } from "./auth";
+import { ledgers, books } from "./ledger";
 
 const sourceDocumentRevisionsReference = pgTable("source_document_revisions", {
   id: uuid("id").notNull(),
@@ -28,10 +27,7 @@ export const sourceDocuments = pgTable(
     ledgerId: uuid("ledger_id")
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
-    attributedUserId: uuid("attributed_user_id")
-      .notNull()
-      .references(() => users.id),
-    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    bookId: uuid("book_id").notNull(),
     title: text("title"),
     documentDate: date("document_date", { mode: "string" }),
     effectiveDate: date("effective_date", { mode: "string" })
@@ -53,9 +49,14 @@ export const sourceDocuments = pgTable(
   },
   (table) => [
     uniqueIndex("uq_source_documents_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_source_documents_ledger_attribution")
-      .on(table.ledgerId, table.attributedUserId)
+    index("idx_source_documents_ledger_book")
+      .on(table.ledgerId, table.bookId)
       .where(sql`${table.deletedAt} IS NULL`),
+    foreignKey({
+      columns: [table.ledgerId, table.bookId],
+      foreignColumns: [books.ledgerId, books.id],
+      name: "fk_source_documents_book_ledger",
+    }),
     index("idx_source_documents_active_feed")
       .on(table.ledgerId, table.effectiveDate.desc(), table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} IS NULL`),

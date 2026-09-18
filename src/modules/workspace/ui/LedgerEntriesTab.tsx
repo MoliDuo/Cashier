@@ -23,10 +23,10 @@ import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/serve
 import { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
 
 interface LedgerEntriesTabProps {
-  /** Which member the list is narrowed to, resolved by the page. */
-  scopeOwnerId: string | null;
-  /** Nickname of that member, for the chip that stands in for the switch. */
-  scopeNickname: string | null;
+  /** The book the list is narrowed to; undefined means 总账. */
+  bookId?: string | undefined;
+  /** Name of that book, for the chip that stands in for the switcher. */
+  scopeBookName: string | null;
   ledgerId: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
@@ -39,8 +39,8 @@ interface LedgerEntriesTabProps {
 }
 
 export function LedgerEntriesTab({
-  scopeOwnerId,
-  scopeNickname,
+  bookId,
+  scopeBookName,
   ledgerId,
   ledger,
   periodParams,
@@ -75,7 +75,7 @@ export function LedgerEntriesTab({
 
   const streamData = useLedgerEntriesStreamData({
     ledgerId,
-    ...(scopeOwnerId == null ? {} : { attributedUserId: scopeOwnerId }),
+    ...(bookId == null ? {} : { bookId }),
     mainCurrency,
     filters,
     startDateStr,
@@ -147,7 +147,7 @@ export function LedgerEntriesTab({
   return (
     <>
       <LedgerEntriesToolbar
-        {...(scopeNickname != null ? { memberScopeNickname: scopeNickname } : {})}
+        {...(scopeBookName != null ? { scopeBookName } : {})}
         isSelectionMode={selection.isSelectionMode}
         isAllSelected={selection.isAllSelected}
         hasMoreData={

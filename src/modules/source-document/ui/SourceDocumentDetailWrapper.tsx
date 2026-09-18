@@ -1,5 +1,5 @@
 "use client";
-import type { LedgerEntry } from "@/modules/ledger/contracts";
+import type { BookDto, LedgerEntry } from "@/modules/ledger/contracts";
 import { useCallback } from "react";
 import { SourceDocumentDetailModal } from "./SourceDocumentDetailModal";
 import { useSourceDocumentDetailData } from "@/modules/source-document/hooks/useSourceDocumentDetailData";
@@ -7,11 +7,11 @@ import { useSourceDocumentDetailMutations } from "@/modules/source-document/hook
 import { useSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useSourceDocumentRecoveryMutations";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
-import { assignSourceDocumentAttributionAction } from "@/modules/source-document/server-actions/update";
+import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
 
 interface SourceDocumentDetailWrapperProps {
-  userId: string;
-  partnerUserId: string;
+  /** The live books, for this record's own book picker. */
+  books: readonly BookDto[];
   id: string;
   ledgerId: string;
   open: boolean;
@@ -26,8 +26,7 @@ interface SourceDocumentDetailWrapperProps {
 }
 
 export function SourceDocumentDetailWrapper({
-  userId,
-  partnerUserId,
+  books,
   id,
   ledgerId,
   open,
@@ -89,24 +88,22 @@ export function SourceDocumentDetailWrapper({
 
   const assignment = useLedgerMutation(ledgerId, {
     invalidates: ["documents", "stats"],
-    mutationFn: (attributedUserId: string) =>
-      assignSourceDocumentAttributionAction(ledgerId, {
+    mutationFn: (bookId: string) =>
+      assignSourceDocumentBookAction(ledgerId, {
         sourceDocumentId: id,
         expectedVersion: sourceDocument!.version,
-        attributedUserId,
+        bookId,
       }),
-    onSuccess: async (result) => {
-      if (result.ok) await refetch();
-      else await refetch();
+    onSuccess: async () => {
+      await refetch();
     },
   });
 
   return (
     <SourceDocumentDetailModal
-      userId={userId}
-      partnerUserId={partnerUserId}
-      onAssignAttribution={(attributedUserId) => assignment.mutate(attributedUserId)}
-      isAssigningAttribution={assignment.isPending}
+      books={books}
+      onAssignBook={(bookId: string) => assignment.mutate(bookId)}
+      isAssigningBook={assignment.isPending}
       sourceDocumentId={id}
       ledgerId={detailLedgerId}
       sourceDocument={sourceDocument}

@@ -1,6 +1,6 @@
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { emailChangeChallenges, users } from "@/persistence";
+import { emailChangeChallenges, loginEmails, users } from "@/persistence";
 import type { AccountSecurityPort } from "@/modules/auth/application/ports";
 import { verificationChallenges } from "@/modules/auth/services/verification-challenge";
 
@@ -47,27 +47,28 @@ export const postgresAccountSecurityAdapter: AccountSecurityPort = {
     return updated.length === 1;
   },
 
+  /**
+   * A challenge to add an address. `duplicate` covers both an address already on
+   * this account and one on another account: either way the caller must not be
+   * told which, and neither case can be verified into a second row.
+   */
   async createEmailChangeChallenge(input) {
     return db.transaction(async (tx) => {
-      const [current] = await tx
-        .select({ email: users.email })
+      const [account] = await tx
+        .select({ id: users.id })
         .from(users)
         .where(and(eq(users.id, input.userId), isNull(users.deletedAt)))
         .for("update");
-      const duplicate = await tx.query.users.findFirst({
-        where: and(
-          eq(users.email, input.newEmail),
-          ne(users.id, input.userId),
-          isNull(users.deletedAt)
-        ),
+      if (account == null) return "unauthorized" as const;
+
+      const duplicate = await tx.query.loginEmails.findFirst({
+        where: eq(loginEmails.email, input.newEmail),
         columns: { id: true },
       });
       const existing = await tx.query.emailChangeChallenges.findFirst({
         where: eq(emailChangeChallenges.userId, input.userId),
         columns: { createdAt: true, lockedUntil: true },
       });
-      if (current == null) return "unauthorized" as const;
-      if (current.email === input.newEmail) return "same_email" as const;
       if (duplicate != null) return "duplicate" as const;
       if (existing?.lockedUntil != null && existing.lockedUntil > input.now) {
         return "locked" as const;
@@ -149,32 +150,49 @@ export const postgresAccountSecurityAdapter: AccountSecurityPort = {
             attemptsRemaining: failure.attemptsRemaining,
           };
         }
-        const duplicate = await tx.query.users.findFirst({
-          where: and(
-            eq(users.email, input.newEmail),
-            ne(users.id, input.userId),
-            isNull(users.deletedAt)
-          ),
+        const duplicate = await tx.query.loginEmails.findFirst({
+          where: eq(loginEmails.email, input.newEmail),
           columns: { id: true },
         });
         if (duplicate != null) return { status: "duplicate" as const };
-        await tx
-          .update(users)
-          .set({
-            email: input.newEmail,
-            emailVerified: input.now,
-            updatedAt: input.now,
-            authVersion: sql`${users.authVersion} + 1`,
-          })
-          .where(and(eq(users.id, input.userId), isNull(users.deletedAt)));
+        await tx.insert(loginEmails).values({
+          userId: input.userId,
+          email: input.newEmail,
+          emailVerified: input.now,
+          createdAt: input.now,
+          updatedAt: input.now,
+        });
         await tx.delete(emailChangeChallenges).where(eq(emailChangeChallenges.id, challenge.id));
         return { status: "verified" as const, email: input.newEmail };
       });
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "23505") {
-        return { status: "duplicate" as const };
-      }
+      if (isUniqueViolation(error)) return { status: "duplicate" as const };
       throw error;
     }
   },
+
+  async removeLoginEmail(input) {
+    return db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: loginEmails.id, email: loginEmails.email })
+        .from(loginEmails)
+        .where(eq(loginEmails.userId, input.userId))
+        .for("update");
+      if (rows.length <= 1) return "last_email" as const;
+      const target = rows.find((row) => row.email === input.email);
+      if (target == null) return "not_found" as const;
+      await tx.delete(loginEmails).where(eq(loginEmails.id, target.id));
+      // Removing an address must end every session that was opened with it; the
+      // account's other addresses sign in again with the password or an OTP.
+      await tx
+        .update(users)
+        .set({ authVersion: sql`${users.authVersion} + 1`, updatedAt: input.now })
+        .where(eq(users.id, input.userId));
+      return "removed" as const;
+    });
+  },
 };
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "23505";
+}

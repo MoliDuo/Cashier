@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { serverComposition } from "@/application/server-composition-root";
 import {
   PostgresProcessingJobAdapter,
@@ -36,11 +36,11 @@ async function pendingIntent(
 ): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db, ledgerId);
   const pending = await postgresRevisionAdapter.createProcessingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-    attributedUserId: userId,
-    createdByUserId: userId,
+    bookId: bookId,
   });
   return {
     ledgerId,

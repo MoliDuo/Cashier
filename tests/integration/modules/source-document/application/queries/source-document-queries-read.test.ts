@@ -53,7 +53,7 @@ describe("source-document full query", () => {
         ledgerId,
         deletedAt: new Date(),
         documentDate: "2026-03-22",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
 

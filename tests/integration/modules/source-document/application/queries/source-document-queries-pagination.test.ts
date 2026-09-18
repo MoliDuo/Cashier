@@ -66,7 +66,7 @@ describe("source-document-queries", () => {
           createdAt: new Date(
             `2026-03-${String(day).padStart(2, "0")}T${String(10 + (i % 10)).padStart(2, "0")}:00:00Z`
           ),
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
       docs.push({ id: inserted[0]!.id, status });
@@ -126,21 +126,21 @@ describe("source-document-queries", () => {
           title: "null-date-older",
           documentDate: null,
           createdAt: today,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ledgerId,
           title: "null-date-newer",
           documentDate: "2026-03-18",
           createdAt: yesterday,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ledgerId,
           title: "has-explicit-date",
           documentDate: "2026-03-19",
           createdAt: new Date("2026-03-19T12:00:00Z"),
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
       ])
       .returning();
@@ -186,21 +186,21 @@ describe("source-document-queries", () => {
         ledgerId,
         documentDate: sameDate,
         createdAt: sameCreatedAt,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
       {
         id: idB,
         ledgerId,
         documentDate: sameDate,
         createdAt: sameCreatedAt,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
       {
         id: idC,
         ledgerId,
         documentDate: sameDate,
         createdAt: sameCreatedAt,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
     ]);
     for (const id of [idA, idB, idC]) {
@@ -226,25 +226,25 @@ describe("source-document-queries", () => {
           ledgerId,
           title: "completed-in-range",
           documentDate: "2026-03-15",
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ledgerId,
           title: "completed-outside-range",
           documentDate: "2026-03-01",
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ledgerId,
           title: "processing-in-range",
           documentDate: "2026-03-16",
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ledgerId,
           title: "invalid-in-range",
           documentDate: "2026-03-14",
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
       ])
       .returning();

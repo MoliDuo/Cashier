@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   postgresLedgerProjectionAdapter,
   postgresRevisionAdapter,
@@ -40,8 +40,7 @@ describe("current-runtime target adapters", () => {
     const first = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "first", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await expect(postgresRevisionAdapter.get(otherLedgerId, first.document.id)).resolves.toBeNull();
     await expect(
@@ -49,7 +48,7 @@ describe("current-runtime target adapters", () => {
         ledgerId,
         sourceDocumentId: first.document.id,
         input: { text: "duplicate", storedFileIds: [], documentDate: null },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
     await expect(
@@ -74,7 +73,7 @@ describe("current-runtime target adapters", () => {
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "retry", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.markProcessing({
       ledgerId,
@@ -95,7 +94,7 @@ describe("current-runtime target adapters", () => {
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "bad retry", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
@@ -113,8 +112,7 @@ describe("current-runtime target adapters", () => {
     const second = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "second", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const page1 = await postgresRevisionAdapter.list({ ledgerId, limit: 1 });
     const page2 = await postgresRevisionAdapter.list({
@@ -143,8 +141,7 @@ describe("current-runtime target adapters", () => {
     const pending = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "receipt", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     await expect(
@@ -179,7 +176,7 @@ describe("current-runtime target adapters", () => {
       .values({
         ledgerId,
         deletedAt: new Date(),
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
 
@@ -188,7 +185,7 @@ describe("current-runtime target adapters", () => {
         ledgerId,
         sourceDocumentId: legacy!.id,
         input: { text: "receipt", storedFileIds: [], documentDate: null },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
@@ -202,8 +199,7 @@ describe("current-runtime target adapters", () => {
       expectedMainCurrency: "CNY",
       ledgerId,
       entries: [projectionEntry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const [file] = await db
       .insert(storedFiles)
@@ -220,7 +216,7 @@ describe("current-runtime target adapters", () => {
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: null, storedFileIds: [file!.id], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     expect(pending.document.supportedActions).toEqual([
       "cancel_processing",

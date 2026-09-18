@@ -4,14 +4,21 @@ import type {
   ServiceCredentialContract,
 } from "./ledger";
 import type { LedgerId } from "./source-documents";
+
 export interface ServiceCredentialPort {
   authenticate(key: string): Promise<AuthenticatedServiceCredentialContract | null>;
   list(ledgerId: LedgerId): Promise<readonly ServiceCredentialContract[]>;
   create(
     ledgerId: LedgerId,
     name: string,
-    userId: string
+    bookId: string
   ): Promise<CreatedServiceCredentialContract>;
+  /** Rebinds a live key to another book; uploads follow it immediately. */
+  setBook(
+    ledgerId: LedgerId,
+    credentialId: string,
+    bookId: string
+  ): Promise<ServiceCredentialContract | null>;
   revoke(
     ledgerId: LedgerId,
     credentialId: string
@@ -74,11 +81,15 @@ export interface OtpTokenPort {
     now: Date;
     maxAttempts: number;
   }): Promise<boolean>;
-  release(input: { email: string; tokenHash: string }): Promise<boolean>;
+  release(input: { email: string; tokenHash: string }): Promise<void>;
   consume(input: { email: string; tokenHash: string }): Promise<boolean>;
   discard(input: { email: string; tokenHash: string }): Promise<boolean>;
 }
 
+/**
+ * The one account. `email` is the address the caller signed in with or, for a
+ * lookup by id, the account's first login address — never the only one it has.
+ */
 interface UserAccountContract {
   id: string;
   email: string;
@@ -90,9 +101,42 @@ interface UserAccountContract {
   interfaceLanguage: "auto" | "zh" | "en";
 }
 
+export interface LoginEmailContract {
+  email: string;
+  emailVerifiedAt: string | null;
+}
+
 export interface UserAccountPort {
+  /** `email` is one of the account's login addresses. */
   findByEmail(email: string): Promise<UserAccountContract | null>;
   findById(id: string): Promise<UserAccountContract | null>;
+  /** The account's login addresses, oldest first. */
+  listLoginEmails(userId: string): Promise<readonly LoginEmailContract[]>;
+}
+
+/**
+ * First-run setup. It is the only contract that reads and writes the account
+ * without a session, so it stays deliberately small: "is the instance empty"
+ * and "create the whole initial state atomically".
+ */
+export interface SetupContract {
+  bookNames: readonly string[];
+  defaultBookName: string;
+  email: string;
+  password: string;
+  locale: string;
+}
+
+export interface SetupPort {
+  isPending(): Promise<boolean>;
+  /**
+   * The pending setup code, creating it when absent. `created` tells the caller
+   * to print it: only the call that wrote it knows the plaintext.
+   */
+  getOrCreateCode(): Promise<{ code: string; created: boolean }>;
+  /** Constant-time comparison against the stored hash. */
+  verifyCode(code: string): Promise<boolean>;
+  createInitialAccount(input: SetupContract): Promise<{ userId: string; ledgerId: string }>;
 }
 
 export interface UserPreferencesContract {
@@ -105,34 +149,4 @@ export interface UserPreferencesPort {
     userId: string;
     preferences: UserPreferencesContract;
   }): Promise<UserPreferencesContract | null>;
-}
-
-export type MemberGender = "male" | "female";
-
-/**
- * One of the two people sharing a ledger. `nickname` is what the 我 / 对方
- * switch is labelled from; `timeZone` is their own zone, null meaning
- * automatic.
- */
-export interface MemberProfileContract {
-  id: string;
-  nickname: string;
-  gender: MemberGender;
-  timeZone: string | null;
-}
-
-export interface MemberProfileUpdateContract {
-  nickname: string;
-  gender: MemberGender;
-  timeZone: string | null;
-}
-
-export interface UserProfilePort {
-  /** The two configured members, owner first, or an empty list when unconfigured. */
-  listMembers(): Promise<readonly MemberProfileContract[]>;
-  /** Updates the signed-in member's own row and nothing else. */
-  updateProfile(input: {
-    userId: string;
-    profile: MemberProfileUpdateContract;
-  }): Promise<MemberProfileContract | null>;
 }

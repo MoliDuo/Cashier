@@ -1,5 +1,5 @@
 "use client";
-import type { LedgerEntry, EntryCategory } from "@/modules/ledger/contracts";
+import type { BookDto, LedgerEntry, EntryCategory } from "@/modules/ledger/contracts";
 import type {
   PartialBatchCommandResult,
   SourceDocumentLight,
@@ -34,10 +34,10 @@ import {
 } from "@/components/ui/select";
 
 interface SourceDocumentDetailModalProps {
-  userId?: string;
-  partnerUserId?: string;
-  onAssignAttribution?: (attributedUserId: string) => void;
-  isAssigningAttribution?: boolean;
+  /** The live books, so this record's own book can be changed here. */
+  books?: readonly BookDto[];
+  onAssignBook?: (bookId: string) => void;
+  isAssigningBook?: boolean;
   sourceDocumentId?: string;
   ledgerId: string;
   sourceDocument: SourceDocument | SourceDocumentLight | null;
@@ -87,10 +87,9 @@ interface SourceDocumentDetailModalProps {
 }
 
 function SourceDocumentDetailEditor({
-  userId,
-  partnerUserId,
-  onAssignAttribution,
-  isAssigningAttribution,
+  books,
+  onAssignBook,
+  isAssigningBook,
   ledgerId,
   sourceDocument,
   isLoading = false,
@@ -246,35 +245,28 @@ function SourceDocumentDetailEditor({
             </Button>
           </DialogHeader>
           {sourceDocument != null &&
-          sourceDocument.attributedUserId != null &&
-          onAssignAttribution != null &&
-          userId != null &&
-          partnerUserId != null ? (
-            <div className="shrink-0 border-b px-4 py-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span>{tCommon("recordOwner")}</span>
-                <Select
-                  value={sourceDocument.attributedUserId}
-                  onValueChange={onAssignAttribution}
-                  disabled={status.busy || isAssigningAttribution || editor.isEditMode}
-                >
-                  <SelectTrigger className="w-32" aria-label={tCommon("recordOwner")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={userId}>{tCommon("myRecords")}</SelectItem>
-                    <SelectItem value={partnerUserId}>{tCommon("partnerRecords")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-muted-foreground text-xs">
-                {tCommon("recordedBy")}:{" "}
-                {sourceDocument.createdByUserId === userId
-                  ? tCommon("myRecords")
-                  : sourceDocument.createdByUserId === partnerUserId
-                    ? tCommon("partnerRecords")
-                    : tCommon("historicalRecord")}
-              </div>
+          sourceDocument.bookId != null &&
+          onAssignBook != null &&
+          books != null &&
+          books.length > 0 ? (
+            <div className="flex shrink-0 items-center justify-between border-b px-4 py-2 text-sm">
+              <span>{tCommon("book")}</span>
+              <Select
+                value={sourceDocument.bookId}
+                onValueChange={onAssignBook}
+                disabled={status.busy || isAssigningBook || editor.isEditMode}
+              >
+                <SelectTrigger className="w-40" aria-label={tCommon("book")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {books.map((book) => (
+                    <SelectItem key={book.id} value={book.id}>
+                      {book.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : null}
 

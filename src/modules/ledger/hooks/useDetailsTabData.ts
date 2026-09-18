@@ -34,7 +34,7 @@ export interface UseDetailsTabDataReturn {
 
 interface UseDetailsTabDataProps {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
   advancedFilters: {
@@ -49,7 +49,7 @@ interface UseDetailsTabDataProps {
 
 export function useDetailsTabData({
   ledgerId,
-  attributedUserId,
+  bookId,
   ledger,
   periodParams,
   advancedFilters,
@@ -60,13 +60,13 @@ export function useDetailsTabData({
     () =>
       buildDetailsQueryDescriptor({
         ledgerId,
-        ...(attributedUserId == null ? {} : { attributedUserId }),
+        ...(bookId == null ? {} : { bookId }),
         periodParams,
         advancedFilters,
         ...(timeZone !== undefined ? { timeZone } : {}),
         mainCurrency,
       }),
-    [advancedFilters, attributedUserId, ledgerId, mainCurrency, periodParams, timeZone]
+    [advancedFilters, bookId, ledgerId, mainCurrency, periodParams, timeZone]
   );
 
   const summaryQuery = useQuery({

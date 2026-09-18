@@ -26,7 +26,6 @@ import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedu
 import { serverComposition } from "@/application/server-composition-root";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { getCoupleConfig } from "@/lib/couple-config";
 
 type PageBootstrapResult = Awaited<ReturnType<typeof getLedgerPageBootstrap>>;
 
@@ -59,6 +58,8 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   }
 
   const { ledgerId, ledgerDto, session } = context;
+  // 总账 is the default view; a book is only selected in the pull-down switcher,
+  // so the bootstrap always prefetches 总账 and the tabs narrow client-side.
 
   const activeTab = parseLedgerTab(searchParams);
   const filterScope = activeTab === "details" ? "details" : "stream";
@@ -71,7 +72,6 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   const pageDataPromise = getLedgerPageBootstrap(
     {
       ledgerId,
-      userId: session.user!.id,
       initialTab: activeTab,
       periodParams,
       advancedFilters,
@@ -80,7 +80,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
     },
     {
       categories: serverComposition.categories,
-      profiles: serverComposition.userProfiles,
+      books: serverComposition.books,
       ledgerReads: serverComposition.ledgerReads,
       stats: serverComposition.stats,
       sourceDocuments: {
@@ -112,7 +112,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
 
   return (
     <NextIntlClientProvider messages={activeMessages} locale={locale}>
-      <ActiveShell ledgerId={ledgerId} userId={session.user!.id}>
+      <ActiveShell ledgerId={ledgerId}>
         <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
           <ActiveTabBootstrap
             pageDataPromise={pageDataPromise}
@@ -151,19 +151,12 @@ async function ActiveTabBootstrap({
         ledgerId={ledgerId}
         ledgerDto={ledgerDto}
         userId={session.user!.id}
-        partnerUserId={
-          session.user!.id === getCoupleConfig()?.ownerId
-            ? getCoupleConfig()!.partnerId
-            : getCoupleConfig()!.ownerId
-        }
         initialTab={activeTab}
         {...(pageData?.initialCategories !== undefined
           ? { initialCategories: pageData.initialCategories }
           : {})}
         {...(pageData?.ledgerToday !== undefined ? { ledgerToday: pageData.ledgerToday } : {})}
-        {...(pageData?.initialMembers !== undefined
-          ? { initialMembers: pageData.initialMembers }
-          : {})}
+        {...(pageData?.initialBooks !== undefined ? { initialBooks: pageData.initialBooks } : {})}
         {...(session.user?.email != null ? { userEmail: session.user.email } : {})}
         hasPassword={session.user?.hasPassword ?? false}
         passwordUpdatedAt={session.user?.passwordUpdatedAt ?? null}

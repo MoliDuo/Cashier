@@ -12,7 +12,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
+import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
 type UpdateLedgerData = Omit<Parameters<typeof updateLedgerUseCase>[2], "expectedUpdatedAt">;
@@ -50,8 +50,7 @@ describe("target Settings currency workflow", () => {
           exchangeRate: "1.000000",
         },
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(getTestDb(), ledgerId),
     });
     sourceDocumentId = result.sourceDocumentId;
   }
@@ -114,7 +113,7 @@ describe("target Settings currency workflow", () => {
       id: sourceDocumentId,
       ledgerId,
       documentDate: "2026-07-15",
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(sourceDocumentRevisions).values([
       {
@@ -268,7 +267,7 @@ describe("target Settings currency workflow", () => {
         id: sourceDocumentId,
         ledgerId,
         documentDate: entryDate,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
       await db.insert(sourceDocumentRevisions).values({
         id: activeRevisionId,
@@ -397,7 +396,7 @@ describe("settings concurrency invariants", () => {
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
       ledgerId,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(sourceDocumentRevisions).values({
       id: revisionId,
@@ -472,8 +471,7 @@ describe("settings concurrency invariants", () => {
               exchangeRate: "1.000000",
             },
           ],
-          attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-          createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+          bookId: await testBookId(getTestDb(), ledgerId),
         }),
       ]);
 
@@ -550,7 +548,7 @@ describe("settings concurrency invariants", () => {
         .values({
           id: sourceDocumentId,
           ledgerId,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         })
         .returning()
         .then((rows) => rows[0]!);

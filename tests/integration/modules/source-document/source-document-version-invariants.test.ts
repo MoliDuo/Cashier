@@ -18,8 +18,8 @@ import { eq } from "drizzle-orm";
 import { serverComposition } from "@/application/server-composition-root";
 import type { SourceDocumentAggregateWritePort } from "@/modules/source-document/application/ports";
 import { ConflictError, NotFoundError, StaleSourceDocumentVersionError } from "@/lib/errors";
-import { sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, TEST_PARTNER_USER_ID } from "tests/helpers/schema-setup";
+import { books, sourceDocuments } from "@/persistence";
+import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 /**
@@ -38,6 +38,9 @@ type ExistingDocumentCommand = Exclude<
   | "installIdempotentRetry"
   | "completeProcessing"
   | "applyCategoryAssignments"
+  // A read of the document's book, not a versioned command: it has no CAS to
+  // exercise, so it is covered by its own case below.
+  | "getBook"
 >;
 
 const port: SourceDocumentAggregateWritePort = serverComposition.sourceDocumentAggregate;
@@ -86,8 +89,7 @@ async function createActiveDocument(ledgerId: string, count = 1) {
   const created = await port.createManualDocument({
     expectedMainCurrency: "CNY",
     ledgerId,
-    attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-    createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+    bookId: await testBookId(getTestDb(), ledgerId),
     title: "Original",
     entryDate: "2026-08-01",
     entries: Array.from({ length: count }, (_, index) => ({
@@ -108,29 +110,49 @@ async function createActiveDocument(ledgerId: string, count = 1) {
 async function createProcessingDocument(ledgerId: string) {
   const pending = await port.createProcessingDocument({
     ledgerId,
-    attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-    createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+    bookId: await testBookId(getTestDb(), ledgerId),
     input: { text: "Processing fixture", storedFileIds: [], documentDate: null },
   });
   return { sourceDocumentId: pending.document.id, version: pending.document.version };
 }
 
 const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
-  async assignAttribution() {
+  async assignBook() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
-    const input = { ledgerId, sourceDocumentId, attributedUserId: TEST_PARTNER_USER_ID };
-    expect(await port.assignAttribution({ ...input, expectedVersion: 1 })).toEqual({
+    const db = getTestDb();
+    const currentBookId = await testBookId(db, ledgerId);
+    // A move to another book is the observable change: the first command bumps
+    // the version, the replay of it does not, and a stale expectation writes
+    // nothing.
+    const targetBookId = crypto.randomUUID();
+    await db.insert(books).values({
+      id: targetBookId,
+      ledgerId,
+      name: "梁梁的",
+      sortOrder: 2,
+    });
+    const input = { ledgerId, sourceDocumentId, bookId: targetBookId };
+
+    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
+      bookId: currentBookId,
+      version: 1,
+    });
+    expect(await port.assignBook({ ...input, expectedVersion: 1 })).toEqual({
       ok: true,
       version: 2,
     });
-    expect(await port.assignAttribution({ ...input, expectedVersion: 2 })).toEqual({
+    expect(await port.assignBook({ ...input, expectedVersion: 2 })).toEqual({
       ok: true,
       version: 2,
     });
-    expect(await port.assignAttribution({ ...input, expectedVersion: 1 })).toEqual({
+    expect(await port.assignBook({ ...input, expectedVersion: 1 })).toEqual({
       ok: false,
       currentVersion: 2,
+    });
+    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
+      bookId: targetBookId,
+      version: 2,
     });
   },
   async applyDateOrganization() {
@@ -641,4 +663,13 @@ describe("source document aggregate — version invariants", () => {
   >) {
     it(`${name}: +1 on change, no-op or well-defined replay, stale rejected with zero writes`, run);
   }
+
+  it("getBook: reports the record's book and version, and nothing for a missing document", async () => {
+    const ledgerId = await newLedger();
+    const { sourceDocumentId } = await createActiveDocument(ledgerId);
+    const bookId = await testBookId(getTestDb(), ledgerId);
+
+    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({ bookId, version: 1 });
+    expect(await port.getBook({ ledgerId, sourceDocumentId: crypto.randomUUID() })).toBeNull();
+  });
 });

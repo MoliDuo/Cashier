@@ -38,7 +38,7 @@ interface EntriesToolbarShellProps {
   syncStatus?: ReactNode | undefined;
   /** Which member the list is narrowed to, when it is: a scope left on has to
    * say so on the page, not only inside the strip that set it. */
-  memberScopeChip?: ReactNode | undefined;
+  scopeChip?: ReactNode | undefined;
   className?: string;
   /** Manual refresh for the tab. The box is its trigger, so the bar above the
    * tabs carries no button wherever this is passed. */
@@ -52,7 +52,7 @@ export function EntriesToolbarShell({
   totalLabel,
   batchActions,
   syncStatus,
-  memberScopeChip,
+  scopeChip,
   className = "",
   onRefresh,
   isRefreshing = false,
@@ -92,7 +92,7 @@ export function EntriesToolbarShell({
           {syncStatus}
         </div>
       ) : null}
-      {onRefresh != null && memberScopeChip == null ? (
+      {onRefresh != null && scopeChip == null ? (
         // Doubling as the trigger keeps the refresh reachable by keyboard, which
         // clicking the box is not. Centred on the box rather than between the
         // controls, because it names a gesture the whole box answers to. While
@@ -121,12 +121,10 @@ export function EntriesToolbarShell({
           )}
         </button>
       ) : null}
-      {memberScopeChip != null ||
-      rangeLabel != null ||
-      (totalLabel != null && totalLabel !== "") ? (
+      {scopeChip != null || rangeLabel != null || (totalLabel != null && totalLabel !== "") ? (
         <div className="ml-auto flex min-w-0 items-center gap-2 whitespace-nowrap">
-          {memberScopeChip}
-          {onRefresh != null && memberScopeChip != null ? (
+          {scopeChip}
+          {onRefresh != null && scopeChip != null ? (
             // The same hint, kept on the row rather than over the chip. Its
             // wording would not fit beside the chip on a phone, so it is the
             // icon there and the button keeps its name for screen readers.

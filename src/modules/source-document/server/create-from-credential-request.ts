@@ -24,11 +24,20 @@ export async function createSourceDocumentFromCredentialRequest(input: {
     scheduleProcessingAfter(job, input.requestId);
   };
 
+  // The key's book owns the date zone: an upload through 梁梁的 is dated in that
+  // book's day rather than the server's, and a book with no zone of its own
+  // falls back to the server date.
+  const book = await serverComposition.books.get(
+    input.credential.ledgerId,
+    input.credential.bookId
+  );
+
   const result = await createSourceDocumentFromCredential(
     {
       credential: input.credential,
       ...(input.idempotencyKey == null ? {} : { idempotencyKey: input.idempotencyKey }),
       payload: input.payload,
+      ...(book?.timeZone == null ? {} : { timezone: book.timeZone }),
     },
     scheduleProcessing,
     {

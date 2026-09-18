@@ -3,12 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 
-const { queryState, refetchQueries, MEMBERS } = vi.hoisted(() => ({
+const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
   queryState: { status: "success" },
   refetchQueries: vi.fn(),
-  MEMBERS: [
-    { id: "user-1", nickname: "A", gender: "male" as const, timeZone: null },
-    { id: "user-2", nickname: "B", gender: "female" as const, timeZone: null },
+  BOOKS: [
+    {
+      id: "book-1",
+      ledgerId: "ledger-1",
+      name: "共同支出",
+      timeZone: null,
+      sortOrder: 1,
+      isDefault: true,
+    },
   ],
 }));
 
@@ -33,18 +39,33 @@ vi.mock("@tanstack/react-query", () => ({
     invalidateQueries: vi.fn(),
     refetchQueries,
   }),
+  // The login-email list and the book list both read through useQuery; the
+  // books are hydrated from 设置's own props, so only the emails need data here.
+  useQuery: ({ initialData }: { initialData?: unknown }) => ({
+    data: initialData,
+    isPending: false,
+  }),
 }));
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: "system", setTheme: vi.fn() }),
 }));
 
-vi.mock("@/modules/auth/hooks/useCoupleMembers", () => ({
-  useCoupleMembers: () => ({
-    members: MEMBERS,
-    me: MEMBERS[0],
-    partner: MEMBERS[1],
-    membersQuery: { status: "success" },
+vi.mock("@/modules/ledger/hooks/useBooks", () => ({
+  useBooks: () => ({
+    books: BOOKS,
+    defaultBook: BOOKS[0],
+    booksQuery: { status: "success" },
+  }),
+}));
+
+vi.mock("@/modules/ledger/hooks/useBookMutations", () => ({
+  useBookMutations: () => ({
+    createBook: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+    updateBook: { mutate: vi.fn(), isPending: false },
+    reorderBooks: { mutate: vi.fn(), isPending: false },
+    setDefaultBook: { mutate: vi.fn(), isPending: false },
+    archiveBook: { mutate: vi.fn(), isPending: false },
   }),
 }));
 
@@ -76,6 +97,7 @@ vi.mock("@/modules/ledger/hooks/useCategoryMutations", () => ({
 vi.mock("@/modules/ledger/hooks/useCredentialMutations", () => ({
   useCredentialMutations: () => ({
     createCredential: { mutateAsync: vi.fn() },
+    setCredentialBook: { mutateAsync: vi.fn() },
     deleteCredential: { mutate: vi.fn() },
   }),
 }));
@@ -103,7 +125,7 @@ describe("SettingsTab account authentication controls", () => {
     queryState.status = "success";
     vi.clearAllMocks();
   });
-  it("renders email change and sign-out, but not destructive account mutations", () => {
+  it("lists the login emails and sign-out, but no destructive account mutations", () => {
     const ledger: Ledger = {
       id: "ledger-1",
       settings: { ...getDefaultLedger().settings },
@@ -115,19 +137,20 @@ describe("SettingsTab account authentication controls", () => {
       <SettingsTab
         ledger={ledger}
         initialCategories={[]}
-        initialMembers={MEMBERS}
+        initialBooks={BOOKS}
         ledgerId="ledger-1"
         userEmail="person@example.com"
       />
     );
 
-    // Required: email and sign-out command
+    // Required: the address that signs in, the way to add another, and sign-out.
     expect(screen.getAllByText("person@example.com").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: /sign out|退出登录/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add email|添加邮箱/i })).toBeInTheDocument();
+    // The only removal is per-address, and it is disabled while one remains:
+    // the account must keep at least one login email.
+    expect(screen.getByRole("button", { name: /移除 person@example\.com/ })).toBeDisabled();
 
-    expect(
-      screen.getByRole("button", { name: /changeEmailButton|change email|修改邮箱/i })
-    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /clear data|清空数据/i })).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /delete account|删除账户/i })
@@ -147,7 +170,7 @@ describe("SettingsTab account authentication controls", () => {
         ledger={ledger}
         ledgerId="ledger-1"
         initialCategories={[]}
-        initialMembers={MEMBERS}
+        initialBooks={BOOKS}
         userEmail="person@example.com"
       />
     );

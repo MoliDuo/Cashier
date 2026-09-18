@@ -7,7 +7,7 @@ import { createLedgerData, createSourceDocumentData } from "../../helpers/factor
 import { eq } from "drizzle-orm";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
 
@@ -38,14 +38,14 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledger = createLedgerData({ userId: testUserId, mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
-      await configureTestCoupleLedger(db, ledger.id);
+      await ensureTestLedgerBooks(db, ledger.id);
       const documents = ["2024-03-14", "2024-03-15"].map((documentDate) =>
         createSourceDocumentData(ledger.id, { status: "completed", documentDate })
       );
       await db.insert(sourceDocuments).values(
         documents.map((document) => ({
           ...document,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
         }))
       );
       const ids = documents.map(() => crypto.randomUUID());
@@ -91,14 +91,14 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledger = createLedgerData({ userId: testUserId, mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
-      await configureTestCoupleLedger(db, ledger.id);
+      await ensureTestLedgerBooks(db, ledger.id);
       const document = createSourceDocumentData(ledger.id, {
         status: "completed",
         documentDate: "2024-03-14",
       });
       await db.insert(sourceDocuments).values({
         ...document,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
       await activateTestSourceDocumentProjection(db, document.id);
       const convert = vi.spyOn(postgresFxRateBook, "convertBatch");
@@ -119,7 +119,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
-      await configureTestCoupleLedger(db, ledgerData.id);
+      await ensureTestLedgerBooks(db, ledgerData.id);
 
       // Create multiple documents
       const docData1 = createSourceDocumentData(ledgerData.id);
@@ -127,11 +127,11 @@ describe("Source Document Update Actions", () => {
       await db.insert(sourceDocuments).values([
         {
           ...docData1,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData1.ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData1.ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ...docData2,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData2.ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData2.ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
       ]);
       await activateTestSourceDocumentProjection(db, docData1.id);
@@ -165,14 +165,14 @@ describe("Source Document Update Actions", () => {
         mainCurrency: "USD",
       });
       await db.insert(ledgers).values(ledgerData);
-      await configureTestCoupleLedger(db, ledgerData.id);
+      await ensureTestLedgerBooks(db, ledgerData.id);
       const document = createSourceDocumentData(ledgerData.id, {
         status: "completed",
         documentDate: "2024-03-14",
       });
       await db.insert(sourceDocuments).values({
         ...document,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
       const entryId = crypto.randomUUID();
       await db.insert(ledgerEntries).values({
@@ -213,7 +213,7 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
-      await configureTestCoupleLedger(db, ledgerData.id);
+      await ensureTestLedgerBooks(db, ledgerData.id);
 
       await expect(
         batchUpdateSourceDocumentsAction(ledgerData.id, {
@@ -227,11 +227,11 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
-      await configureTestCoupleLedger(db, ledgerData.id);
+      await ensureTestLedgerBooks(db, ledgerData.id);
       const docData = createSourceDocumentData(ledgerData.id, { title: "Same title" });
       await db.insert(sourceDocuments).values({
         ...docData,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
       await activateTestSourceDocumentProjection(db, docData.id);
 
@@ -255,17 +255,17 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ userId: testUserId });
       await db.insert(ledgers).values(ledgerData);
-      await configureTestCoupleLedger(db, ledgerData.id);
+      await ensureTestLedgerBooks(db, ledgerData.id);
       const okDoc = createSourceDocumentData(ledgerData.id, { title: "Original A" });
       const staleDoc = createSourceDocumentData(ledgerData.id, { title: "Original B" });
       await db.insert(sourceDocuments).values([
         {
           ...okDoc,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${okDoc.ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${okDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
           ...staleDoc,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${staleDoc.ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${staleDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
       ]);
       // Advance staleDoc's version out from under the caller's expectation.

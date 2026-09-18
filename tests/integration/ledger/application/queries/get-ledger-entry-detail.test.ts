@@ -9,7 +9,10 @@ import {
 } from "tests/helpers/factories";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { serverComposition } from "@/application/server-composition-root";
-import { activateTestSourceDocumentProjection } from "tests/helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  ensureTestLedgerBooks,
+} from "tests/helpers/schema-setup";
 
 const getLedgerEntryDetail = (id: string, ledgerId: string) =>
   serverComposition.ledgerReads.getEntry(id, ledgerId);
@@ -32,9 +35,10 @@ describe("getLedgerEntryDetail", () => {
     const entry = createLedgerEntryData(ledger.id, { sourceDocumentId: sourceDocument.id });
 
     await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(sourceDocuments).values({
       ...sourceDocument,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${sourceDocument.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${sourceDocument.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values(entry);
     await activateTestSourceDocumentProjection(db, sourceDocument.id);
@@ -61,10 +65,11 @@ describe("getLedgerEntryDetail", () => {
     });
 
     await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values(category);
     await db.insert(sourceDocuments).values({
       ...sourceDocument,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${sourceDocument.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${sourceDocument.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values(entry);
     await activateTestSourceDocumentProjection(db, sourceDocument.id, {

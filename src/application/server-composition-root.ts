@@ -1,14 +1,15 @@
 import "server-only";
 import {
+  postgresBookAdapter,
   postgresCategoryAdapter,
   postgresCurrencyAdapter,
   postgresLedgerAdapter,
   postgresOtpTokenAdapter,
   postgresServiceCredentialAdapter,
   postgresSettingsAdapter,
+  postgresSetupAdapter,
   postgresUserAccountAdapter,
   postgresUserPreferencesAdapter,
-  postgresUserProfileAdapter,
   calculateCompletedSourceDocumentTotal,
   getTargetSourceDocument,
   getTargetSourceDocumentAccessContext,
@@ -86,6 +87,7 @@ const executeSingleProcessingJob = createExecuteSingleProcessingJob({
 /** Composition root for the PostgreSQL-backed Docker runtime. */
 export const serverComposition = {
   accountSecurity: postgresAccountSecurityAdapter,
+  books: postgresBookAdapter,
   rateLimiter: postgresRateLimiter,
   categories: postgresCategoryAdapter,
   currencies: postgresCurrencyAdapter,
@@ -110,6 +112,7 @@ export const serverComposition = {
   otpTokens: postgresOtpTokenAdapter,
   serviceCredentials: postgresServiceCredentialAdapter,
   settings: postgresSettingsAdapter,
+  setup: postgresSetupAdapter,
   storedFiles: storedFileAdapter,
   sourceDocumentAggregate: postgresSourceDocumentAggregateAdapter,
   sourceDocumentReads: {
@@ -126,5 +129,4 @@ export const serverComposition = {
   executeSingleProcessingJob,
   userAccounts: postgresUserAccountAdapter,
   userPreferences: postgresUserPreferencesAdapter,
-  userProfiles: postgresUserProfileAdapter,
 } as const;

@@ -14,8 +14,8 @@ import type { InlineImageUploader } from "./prepare-inline-images";
 
 export interface CreateAndQueueSourceDocumentInput {
   ledgerId: string;
-  attributedUserId: string;
-  createdByUserId: string;
+  /** The book the new record is filed under. */
+  bookId: string;
   input:
     | { kind: "stored"; text?: string; storedFileIds: string[] }
     | { kind: "inline"; images: PreparedInlineImage[] };
@@ -76,8 +76,7 @@ export async function createAndQueueSourceDocument(
 
     return {
       ledgerId: input.ledgerId,
-      attributedUserId: input.attributedUserId,
-      createdByUserId: input.createdByUserId,
+      bookId: input.bookId,
       input: {
         text: storedInput?.text ?? null,
         storedFileIds: [...(storedInput?.storedFileIds ?? []), ...processedImageIds],

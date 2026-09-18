@@ -9,7 +9,11 @@ import {
 } from "tests/helpers/factories";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { serverComposition } from "@/application/server-composition-root";
-import { activateTestSourceDocumentProjection, createTestUser } from "tests/helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  createTestUser,
+  ensureTestLedgerBooks,
+} from "tests/helpers/schema-setup";
 
 const listLedgerEntryViewsBySourceDocumentIds = (
   input: Parameters<typeof serverComposition.ledgerReads.listEntriesBySourceDocumentIds>[0]
@@ -35,19 +39,21 @@ describe("ledger source-document linkage", () => {
     sourceDocumentIds = [firstDoc.id, secondDoc.id];
 
     await db.insert(ledgers).values([ledger, otherLedger]);
+    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db, otherLedger.id);
     await db.insert(entryCategories).values(category);
     await db.insert(sourceDocuments).values([
       {
         ...firstDoc,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${firstDoc.ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${firstDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
       {
         ...secondDoc,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${secondDoc.ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${secondDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
       {
         ...otherDoc,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${otherDoc.ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${otherDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
     ]);
     await db.insert(ledgerEntries).values([

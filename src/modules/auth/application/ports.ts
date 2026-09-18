@@ -18,7 +18,7 @@ export interface AccountSecurityPort {
     expiresAt: Date;
     now: Date;
     minimumIntervalMs: number;
-  }): Promise<"created" | "unauthorized" | "same_email" | "duplicate" | "rate_limited" | "locked">;
+  }): Promise<"created" | "unauthorized" | "duplicate" | "rate_limited" | "locked">;
   discardEmailChangeChallenge(input: {
     userId: string;
     newEmail: string;
@@ -34,4 +34,10 @@ export interface AccountSecurityPort {
     | { status: "not_found" | "locked" | "expired" | "duplicate" }
     | { status: "incorrect"; attemptsRemaining: number; locked: boolean }
   >;
+  /** Removes one login address; `last_email` refuses to leave the account with none. */
+  removeLoginEmail(input: {
+    userId: string;
+    email: string;
+    now: Date;
+  }): Promise<"removed" | "not_found" | "last_email">;
 }

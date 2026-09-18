@@ -71,8 +71,11 @@ export function validateDemoEnvironment(environment = process.env) {
   if (fixture.user.email !== "dev@cashier.local") {
     throw new Error("Demo fixture user identity is invalid");
   }
-  if (fixture.partner.email !== "partner@cashier.local") {
-    throw new Error("Demo fixture partner identity is invalid");
+  if (!Array.isArray(fixture.books) || fixture.books.length === 0) {
+    throw new Error("Demo fixture must define the books its records belong to");
+  }
+  if (fixture.books.filter((book) => book.isDefault).length !== 1) {
+    throw new Error("Demo fixture must mark exactly one book as the total default");
   }
   if ((environment.API_KEY_PEPPER ?? "").trim() === "") {
     throw new Error("API_KEY_PEPPER is required to seed demo service credentials");
@@ -135,12 +138,42 @@ async function uploadFixtureImages(storage, environment, ledgerId) {
   return uploaded;
 }
 
+/**
+ * Empties the disposable demo database before migrations run.
+ *
+ * Every demo launch restores the fixture, and the schema the previous launch
+ * left behind can be any historical shape — including one a data migration
+ * rightly refuses to touch. Since this database is dedicated, loopback-only and
+ * rebuilt from the fixture on each launch, the honest move is to drop its
+ * objects and let the migrations build the current schema from nothing.
+ *
+ * Drizzle's bookkeeping schema goes with it: leaving that behind would make the
+ * runner believe every migration is already applied.
+ *
+ * @testOnly Empties the demo schemas, refusing anything but the demo database.
+ */
+export async function resetDemoSchema(environment = process.env) {
+  const { databaseUrl } = validateDemoEnvironment(environment);
+  const client = new pg.Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    for (const schema of ["public", "drizzle"]) {
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    }
+    await client.query("CREATE SCHEMA public");
+  } finally {
+    await client.end();
+  }
+}
+
 async function findDemoTarget(client) {
+  // The account has no email column any more: its address is a login_emails row.
   const result = await client.query(
     `SELECT u.id AS user_id, l.id AS ledger_id
        FROM users u
+       JOIN login_emails e ON e.user_id = u.id
        LEFT JOIN ledgers l ON l.user_id = u.id AND l.deleted_at IS NULL
-      WHERE lower(u.email) = $1 AND u.deleted_at IS NULL
+      WHERE lower(e.email) = $1 AND u.deleted_at IS NULL
       LIMIT 1`,
     [fixture.user.email]
   );
@@ -178,17 +211,17 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   const asOf = anchorDate(environment);
   const now = new Date(`${asOf}T12:00:00.000Z`);
   if (reset) {
-    // Both members are removed, not just the workspace owner: the partner row
-    // would otherwise survive with whatever migration 0047 backfilled, and the
-    // profile the fixture describes — the nickname the switch is labelled from
-    // — would only ever apply to a brand-new database.
-    const emails = [fixture.user.email, fixture.partner.email];
+    // The single demo account is removed along with its ledger, so a reset
+    // restores the fixture instead of layering onto whatever the last session
+    // left behind.
+    const emails = [fixture.user.email];
+    // The account is found through its login address: `users.email` is gone.
     await client.query(
       `DELETE FROM revision_files
         WHERE ledger_id IN (
           SELECT l.id FROM ledgers l
-          JOIN users u ON u.id = l.user_id
-          WHERE lower(u.email) = ANY($1::text[])
+          JOIN login_emails e ON e.user_id = l.user_id
+          WHERE lower(e.email) = ANY($1::text[])
         )`,
       [emails]
     );
@@ -196,34 +229,35 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       `DELETE FROM upload_session_files
         WHERE ledger_id IN (
           SELECT l.id FROM ledgers l
-          JOIN users u ON u.id = l.user_id
-          WHERE lower(u.email) = ANY($1::text[])
+          JOIN login_emails e ON e.user_id = l.user_id
+          WHERE lower(e.email) = ANY($1::text[])
         )`,
       [emails]
     );
     await client.query(
       `DELETE FROM ledgers WHERE user_id IN
-        (SELECT id FROM users WHERE lower(email) = ANY($1::text[]))`,
+        (SELECT user_id FROM login_emails WHERE lower(email) = ANY($1::text[]))`,
       [emails]
     );
-    await client.query("DELETE FROM users WHERE lower(email) = ANY($1::text[])", [emails]);
+    await client.query(
+      `DELETE FROM users WHERE id IN
+        (SELECT user_id FROM login_emails WHERE lower(email) = ANY($1::text[]))`,
+      [emails]
+    );
   }
   await client.query(
     `INSERT INTO users
-      (id, email, name, nickname, gender, time_zone, email_verified, preferences, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, '{"interfaceLanguage":"auto"}'::jsonb, $7, $7)
+      (id, name, preferences, created_at, updated_at)
+     VALUES ($1, $2, '{"interfaceLanguage":"auto"}'::jsonb, $3, $3)
      ON CONFLICT (id) DO NOTHING`,
-    [
-      userId,
-      fixture.user.email,
-      fixture.user.name,
-      fixture.user.nickname,
-      fixture.user.gender,
-      fixture.user.timeZone,
-      now,
-    ]
+    [userId, fixture.user.name, now]
   );
-  await ensurePartner(client, now);
+  await client.query(
+    `INSERT INTO login_emails (user_id, email, email_verified, created_at, updated_at)
+     VALUES ($1, $2, $3, $3, $3)
+     ON CONFLICT (id) DO NOTHING`,
+    [userId, fixture.user.email, now]
+  );
   await client.query(
     `INSERT INTO ledgers
       (id, user_id, ai_language, preferred_currencies, main_currency, created_at, updated_at)
@@ -239,19 +273,30 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     ]
   );
 
+  const bookIds = new Map();
+  for (const book of fixture.books) {
+    await client.query(
+      `INSERT INTO books (id, ledger_id, name, time_zone, sort_order, is_default, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+       ON CONFLICT (id) DO NOTHING`,
+      [book.id, ledgerId, book.name, book.timeZone, book.sortOrder, book.isDefault, now]
+    );
+    bookIds.set(book.name, book.id);
+  }
+
   // The reset above deletes the ledger, so cascade already removed any earlier
   // credentials for this workspace; these rows are recreated with it.
   for (const credential of fixture.serviceCredentials) {
     const token = fixtureCredentialToken(credential);
     await client.query(
       `INSERT INTO service_credentials
-        (id, ledger_id, attributed_user_id, name, token_hash, token_prefix, token_suffix, created_at)
+        (id, ledger_id, book_id, name, token_hash, token_prefix, token_suffix, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO NOTHING`,
       [
         credential.id,
         ledgerId,
-        credential.attributedTo === "partner" ? fixture.partner.id : userId,
+        bookIds.get(credential.book),
         credential.name,
         computeCredentialHash(token, environment.API_KEY_PEPPER),
         token.slice(0, CREDENTIAL_DISPLAY_PREFIX_LENGTH),
@@ -313,12 +358,12 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     }
     await client.query(
       `INSERT INTO source_documents
-        (id, ledger_id, attributed_user_id, title, document_date, version, date_organization_suggestion, created_at, updated_at)
+        (id, ledger_id, book_id, title, document_date, version, date_organization_suggestion, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $7)`,
       [
         document.id,
         ledgerId,
-        document.attributedTo === "partner" ? fixture.partner.id : userId,
+        bookIds.get(document.book),
         document.title,
         documentDate,
         suggestion,
@@ -454,24 +499,6 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   }
 }
 
-async function ensurePartner(client, now = new Date()) {
-  await client.query(
-    `INSERT INTO users
-      (id, email, name, nickname, gender, time_zone, email_verified, preferences, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, '{"interfaceLanguage":"auto"}'::jsonb, $7, $7)
-     ON CONFLICT (id) DO NOTHING`,
-    [
-      fixture.partner.id,
-      fixture.partner.email,
-      fixture.partner.name,
-      fixture.partner.nickname,
-      fixture.partner.gender,
-      fixture.partner.timeZone,
-      now,
-    ]
-  );
-}
-
 async function runDemoData({ mode = "seed", apply = false, environment = process.env } = {}) {
   const { databaseUrl } = validateDemoEnvironment(environment);
   if (
@@ -506,7 +533,6 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
       [knownIds]
     );
     if (mode === "seed" && present.rowCount === knownIds.length) {
-      await ensurePartner(client);
       console.log("[demo] Demo workspace already exists; existing test changes were preserved.");
       return { status: "existing", ...inspection };
     }
@@ -569,6 +595,11 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
 
 async function main() {
   const args = new Set(process.argv.slice(2));
+  if (args.has("reset-schema")) {
+    await resetDemoSchema();
+    console.log("[demo] Demo schema dropped; the migrations will rebuild it.");
+    return;
+  }
   const mode = args.has("reset") ? "reset" : "seed";
   await runDemoData({ mode, apply: args.has("--apply") });
 }

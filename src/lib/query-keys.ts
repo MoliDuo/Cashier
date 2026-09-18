@@ -22,9 +22,13 @@ export const queryKeys = {
     ["ledger", ledgerId, "entry", entryId] as const,
   ledgerEntryPrefix: (ledgerId: string) => ["ledger", ledgerId, "entry"] as const,
 
-  // === Members ===
-  /** Both profiles, so a rename shows up in the switch without a fresh page. */
-  coupleMembers: (ledgerId: string) => ["ledger", ledgerId, "members"] as const,
+  // === Login emails ===
+  /** The addresses that can sign in, so an add or remove shows without a reload. */
+  loginEmails: () => ["account", "login-emails"] as const,
+
+  // === Books ===
+  /** The switcher's books, so a rename or reorder shows without a fresh page. */
+  books: (ledgerId: string) => ["ledger", ledgerId, "books"] as const,
 
   // === Source Documents ===
   sourceDocuments: (ledgerId: string, params?: QueryKeyParams | null) =>
@@ -32,7 +36,7 @@ export const queryKeys = {
   sourceDocumentStream: (
     ledgerId: string,
     filters?: {
-      attributedUserId?: string | null | undefined;
+      bookId?: string | null | undefined;
       startDate?: string | null | undefined;
       endDate?: string | null | undefined;
       minAmount?: string | null | undefined;
@@ -46,7 +50,7 @@ export const queryKeys = {
   sourceDocumentStreamTotal: (
     ledgerId: string,
     filters?: {
-      attributedUserId?: string | null | undefined;
+      bookId?: string | null | undefined;
       startDate?: string | null | undefined;
       endDate?: string | null | undefined;
       minAmount?: string | null | undefined;
@@ -91,7 +95,7 @@ export const queryKeys = {
   enhancedStats: (
     ledgerId: string,
     params?: {
-      attributedUserId?: string | null | undefined;
+      bookId?: string | null | undefined;
       startDate?: string | null | undefined;
       endDate?: string | null | undefined;
       compareStartDate?: string | null | undefined;

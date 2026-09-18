@@ -164,8 +164,7 @@ async function submitInTransaction(
     input.sourceDocumentId == null
       ? {
           ledgerId: input.ledgerId,
-          attributedUserId: input.attributedUserId!,
-          createdByUserId: input.createdByUserId!,
+          bookId: input.bookId!,
           input: revisionInput,
         }
       : {

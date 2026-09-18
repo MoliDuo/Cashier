@@ -48,7 +48,7 @@ async function insertLegacyDocument(
       .values({
         ledgerId,
         documentDate: "2026-07-17",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
         deletedAt: overrides.deleted === true ? new Date() : null,
       })
       .returning();

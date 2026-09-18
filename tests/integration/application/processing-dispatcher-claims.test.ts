@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   PostgresProcessingJobAdapter,
   postgresRevisionAdapter,
@@ -37,11 +37,11 @@ async function pendingIntent(
 ): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db, ledgerId);
   const pending = await postgresRevisionAdapter.createProcessingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-    attributedUserId: userId,
-    createdByUserId: userId,
+    bookId: bookId,
   });
   return {
     ledgerId,
@@ -213,15 +213,11 @@ describe("PostgresProcessingJobAdapter", () => {
       .where(eq(ledgers.id, ledgerId));
 
     // Create a second revision (retry) after the settings change
-    const [ledgerOwner] = await db
-      .select({ userId: ledgers.userId })
-      .from(ledgers)
-      .where(eq(ledgers.id, ledgerId));
+    const bookId = await testBookId(db, ledgerId);
     const pending2 = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Dinner 25.00 USD", storedFileIds: [], documentDate: null },
-      attributedUserId: ledgerOwner!.userId,
-      createdByUserId: ledgerOwner!.userId,
+      bookId,
     });
 
     const generate2 = vi.fn(async () => ({

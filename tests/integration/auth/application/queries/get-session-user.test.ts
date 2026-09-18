@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getSessionUser as getSessionUserUseCase } from "@/modules/auth/application/queries/get-session-user";
 import { serverComposition } from "@/application/server-composition-root";
 import { getTestDb } from "tests/setup";
-import { users } from "@/persistence/schema/auth";
+import { loginEmails, users } from "@/persistence/schema/auth";
 import { UnauthorizedError } from "@/lib/errors";
 
 const getSessionUser = (userId: string) =>
@@ -16,19 +16,18 @@ describe("getSessionUser", () => {
 
     await db.insert(users).values({
       id: userId,
-      email: "session-active@example.com",
       name: "Session Active",
-      nickname: "A",
-      gender: "male",
       image: "https://example.com/avatar.png",
-      passwordHash: null,
-      passwordUpdatedAt: null,
+    });
+    await db.insert(loginEmails).values({
+      userId: userId,
+      email: "session-active@example.com",
       emailVerified: new Date(),
     });
 
     const result = await getSessionUser(userId);
-    // The session contract is a fixed set of fields; the profile the switch
-    // reads is a separate query, so nickname and gender are not part of it.
+    // The session contract is a fixed set of fields. `email` is the account's
+    // first login address, so it survives the row's own columns being gone.
     expect(result).toEqual({
       id: userId,
       email: "session-active@example.com",
@@ -47,12 +46,12 @@ describe("getSessionUser", () => {
 
     await db.insert(users).values({
       id: userId,
-      email: "session-deleted@example.com",
-      name: "Session Deleted",
-      nickname: "A",
-      gender: "male",
-      emailVerified: new Date(),
       deletedAt: new Date(),
+    });
+    await db.insert(loginEmails).values({
+      userId: userId,
+      email: "session-deleted@example.com",
+      emailVerified: new Date(),
     });
 
     await expect(getSessionUser(userId)).rejects.toThrow(UnauthorizedError);

@@ -25,7 +25,7 @@ vi.mock("@/application/adapters/postgres/exchange-rate", () => {
 import { batchDeleteLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
@@ -37,7 +37,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
       id: uuidv4(),
       ledgerId,
       documentDate: entryDate ?? null,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -59,7 +59,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
       userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("creates one replacement revision when deleting multiple entries from one document", async () => {
@@ -125,7 +125,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
         id: uuidv4(),
         ledgerId,
         documentDate: null,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(doc).toBeDefined();

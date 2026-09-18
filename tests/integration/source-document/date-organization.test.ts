@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { serverComposition } from "@/application/server-composition-root";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 const port = serverComposition.sourceDocumentAggregate;
@@ -24,8 +24,7 @@ async function createFixture() {
   );
   const created = await port.createManualDocument({
     ledgerId,
-    attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-    createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+    bookId: await testBookId(db, ledgerId),
     expectedMainCurrency: "CNY",
     title: "Long screenshot",
     entryDate: "2026-09-10",

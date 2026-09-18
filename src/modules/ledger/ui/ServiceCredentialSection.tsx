@@ -1,10 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Trash2, Copy, Check } from "lucide-react";
-import type { ServiceCredential, CreatedServiceCredentialDto } from "@/modules/ledger/contracts";
+import type {
+  BookDto,
+  ServiceCredential,
+  CreatedServiceCredentialDto,
+} from "@/modules/ledger/contracts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -21,26 +33,33 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ServiceCredentialSectionProps {
   credentials: ServiceCredential[];
-  /** Server-derived identity used to label which member owns each credential. */
-  userId?: string;
-  partnerUserId?: string;
-  onCreateCredential: (name: string) => Promise<CreatedServiceCredentialDto>;
+  /** The live books; a key's book can be picked at creation and changed later. */
+  books: readonly BookDto[];
+  onCreateCredential: (input: {
+    name: string;
+    bookId: string;
+  }) => Promise<CreatedServiceCredentialDto>;
+  onSetCredentialBook: (id: string, bookId: string) => Promise<void>;
   onDeleteCredential: (id: string) => Promise<void>;
   onCredentialDialogClose?: () => void;
 }
 
 export function ServiceCredentialSection({
   credentials,
-  userId,
-  partnerUserId,
+  books,
   onCreateCredential,
+  onSetCredentialBook,
   onDeleteCredential,
   onCredentialDialogClose,
 }: ServiceCredentialSectionProps) {
+  const tBooks = useTranslations("Settings.Books");
   const t = useTranslations("ServiceCredentials");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
   const [newCredName, setNewCredName] = useState("");
+  const [newCredBookId, setNewCredBookId] = useState(
+    () => books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? ""
+  );
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [credentialToDelete, setCredentialToDelete] = useState<ServiceCredential | null>(null);
   const [createdCredential, setCreatedCredential] = useState<CreatedServiceCredentialDto | null>(
@@ -58,11 +77,14 @@ export function ServiceCredentialSection({
   }, [hasCopied]);
 
   const handleCreate = async () => {
-    if (newCredName.trim() === "" || isCreating) return;
+    if (newCredName.trim() === "" || newCredBookId === "" || isCreating) return;
 
     setIsCreating(true);
     try {
-      const newCredential = await onCreateCredential(newCredName.trim());
+      const newCredential = await onCreateCredential({
+        name: newCredName.trim(),
+        bookId: newCredBookId,
+      });
       setCreatedCredential(newCredential);
       setNewCredName("");
       setIsCreateDialogOpen(false);
@@ -91,14 +113,10 @@ export function ServiceCredentialSection({
     onCredentialDialogClose?.();
   };
 
-  // Attribution is backfilled to the ledger owner during migration, so a
-  // credential can outlive the member list and fall outside both members.
-  const ownerLabel = (credential: ServiceCredential) =>
-    credential.attributedUserId === userId
-      ? tCommon("myRecords")
-      : credential.attributedUserId === partnerUserId
-        ? tCommon("partnerRecords")
-        : tCommon("historicalRecord");
+  // A key whose book is gone (archived behind its back) still lists, and says so
+  // rather than showing an empty name.
+  const bookName = (bookId: string) =>
+    books.find((book) => book.id === bookId)?.name ?? tCommon("error");
 
   return (
     <div>
@@ -143,11 +161,30 @@ export function ServiceCredentialSection({
                       }),
                     })}
                   </div>
-                  {userId !== undefined && (
-                    <div className="mt-1 text-micro text-muted-foreground">
-                      {t("owner", { owner: ownerLabel(credential) })}
-                    </div>
-                  )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="shrink-0 text-micro text-muted-foreground">
+                      {t("book", { book: bookName(credential.bookId) })}
+                    </span>
+                    <Select
+                      value={credential.bookId}
+                      onValueChange={(bookId) => void onSetCredentialBook(credential.id, bookId)}
+                      disabled={isCreating || isDeleting}
+                    >
+                      <SelectTrigger
+                        className="h-7 w-36 text-xs"
+                        aria-label={t("changeBook", { name: credential.name })}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        {books.map((book) => (
+                          <SelectItem key={book.id} value={book.id}>
+                            {book.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               <Button
@@ -179,7 +216,7 @@ export function ServiceCredentialSection({
             <DialogTitle>{t("createTitle")}</DialogTitle>
             <DialogDescription>{t("createDesc")}</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="space-y-4 py-4">
             <Input
               placeholder={t("namePlaceholder")}
               aria-label={t("namePlaceholder")}
@@ -190,6 +227,22 @@ export function ServiceCredentialSection({
               onChange={(event) => setNewCredName(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && handleCreate()}
             />
+            <div className="space-y-2">
+              <Label htmlFor="credential-book">{tCommon("book")}</Label>
+              <Select value={newCredBookId} onValueChange={setNewCredBookId} disabled={isCreating}>
+                <SelectTrigger id="credential-book" className="w-full">
+                  <SelectValue placeholder={tBooks("namePlaceholder")} />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {books.map((book) => (
+                    <SelectItem key={book.id} value={book.id}>
+                      {book.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-micro text-muted-foreground">{t("bookDesc")}</p>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -199,7 +252,10 @@ export function ServiceCredentialSection({
             >
               {tCommon("cancel")}
             </Button>
-            <Button onClick={handleCreate} disabled={newCredName.trim() === "" || isCreating}>
+            <Button
+              onClick={handleCreate}
+              disabled={newCredName.trim() === "" || newCredBookId === "" || isCreating}
+            >
               {tCommon("confirm")}
             </Button>
           </DialogFooter>

@@ -29,8 +29,8 @@ import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGu
 
 interface ActiveShellProps {
   ledgerId: string;
-  /** The signed-in member: prefetching reads their own zone, not the ledger's. */
-  userId: string;
+  /** The book being viewed; prefetching reads its zone, falling back to 总账's. */
+  bookId?: string | undefined;
   children: React.ReactNode;
 }
 
@@ -47,17 +47,17 @@ interface ActiveShellProps {
  * become available when LedgerPageClient registers the real handlers via
  * setOpenInput once it mounts.
  */
-export function ActiveShell({ ledgerId, userId, children }: ActiveShellProps) {
+export function ActiveShell({ ledgerId, bookId, children }: ActiveShellProps) {
   return (
     <ShellControllerProvider>
-      <ActiveShellInner ledgerId={ledgerId} userId={userId}>
+      <ActiveShellInner ledgerId={ledgerId} bookId={bookId}>
         {children}
       </ActiveShellInner>
     </ShellControllerProvider>
   );
 }
 
-function ActiveShellInner({ ledgerId, userId, children }: ActiveShellProps) {
+function ActiveShellInner({ ledgerId, bookId, children }: ActiveShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const locale = useLocale();
@@ -107,7 +107,7 @@ function ActiveShellInner({ ledgerId, userId, children }: ActiveShellProps) {
         void prefetchDetailsTabQuery(
           queryClient,
           ledgerId,
-          userId,
+          bookId,
           parsePeriodFromSearchParams(scoped),
           readLedgerFilterParams(searchParams, "details")
         );
@@ -115,12 +115,12 @@ function ActiveShellInner({ ledgerId, userId, children }: ActiveShellProps) {
         void prefetchStatsTabQuery(
           queryClient,
           ledgerId,
-          userId,
+          bookId,
           readStatsSearchParams(searchParams)
         );
       }
     },
-    [ledgerId, preloadTabCode, queryClient, searchParams, userId]
+    [bookId, ledgerId, preloadTabCode, queryClient, searchParams]
   );
 
   return (

@@ -9,18 +9,18 @@ import type { LedgerAdvancedFilters } from "./initial-query-state";
 import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
 import { runtimeEnv } from "@/lib/env/runtime";
 import type { StatsUrlState } from "./ledger-url-params";
-import type { MemberProfileContract } from "@/application/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 
 /**
- * The signed-in member's own zone, hydrated alongside the ledger. Prefetching
+ * The zone the viewed book is read in, hydrated alongside the ledger. Prefetching
  * uses the same zone the tab will, so a prefetched page is not a different day
- * from the one it lands in.
+ * from the one it lands in. 总账 uses the default book's zone.
  */
-function memberTimeZone(queryClient: QueryClient, ledgerId: string, userId: string) {
-  const members = queryClient.getQueryData<readonly MemberProfileContract[]>(
-    queryKeys.coupleMembers(ledgerId)
-  );
-  return members?.find((member) => member.id === userId)?.timeZone ?? runtimeEnv.timeZone;
+function scopeTimeZone(queryClient: QueryClient, ledgerId: string, bookId?: string) {
+  const books = queryClient.getQueryData<readonly BookDto[]>(queryKeys.books(ledgerId));
+  const book =
+    bookId == null ? books?.find((row) => row.isDefault) : books?.find((row) => row.id === bookId);
+  return book?.timeZone ?? runtimeEnv.timeZone;
 }
 import {
   buildDetailsQueryDescriptor,
@@ -34,10 +34,9 @@ type LedgerEntriesPage = Awaited<
 export async function prefetchDetailsTabQuery(
   queryClient: QueryClient,
   ledgerId: string,
-  userId: string,
+  bookId: string | undefined,
   periodParams: PeriodParams,
-  advancedFilters: LedgerAdvancedFilters,
-  attributedUserId?: string
+  advancedFilters: LedgerAdvancedFilters
 ) {
   const { getLedgerEntriesAction, getLedgerStatsAction } =
     await import("@/lib/queries/ledger-query-client");
@@ -45,10 +44,10 @@ export async function prefetchDetailsTabQuery(
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const descriptor = buildDetailsQueryDescriptor({
     ledgerId,
-    ...(attributedUserId == null ? {} : { attributedUserId }),
+    ...(bookId == null ? {} : { bookId }),
     periodParams,
     advancedFilters,
-    timeZone: memberTimeZone(queryClient, ledgerId, userId),
+    timeZone: scopeTimeZone(queryClient, ledgerId, bookId),
     mainCurrency,
   });
 
@@ -81,17 +80,18 @@ export async function prefetchDetailsTabQuery(
 export async function prefetchStatsTabQuery(
   queryClient: QueryClient,
   ledgerId: string,
-  userId: string,
+  bookId: string | undefined,
   statsState: StatsUrlState = { range: "month", offset: 0, view: "heatmap" }
 ) {
   const { getEnhancedStats } = await import("@/lib/queries/ledger-query-client");
   const ledger = queryClient.getQueryData<Ledger>(queryKeys.ledger(ledgerId));
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
-  const fixedTimeZone = memberTimeZone(queryClient, ledgerId, userId);
+  const fixedTimeZone = scopeTimeZone(queryClient, ledgerId, bookId);
   const zonedToday = getDateInTimezone(fixedTimeZone);
   const initialDate = zonedToday != null ? parseDateString(zonedToday) : new Date();
   const descriptor = buildStatsQueryDescriptor({
     ledgerId,
+    ...(bookId == null ? {} : { bookId }),
     currentDate: addPeriod(initialDate, statsState.range, statsState.offset),
     mainCurrency,
     rangeType: statsState.range,

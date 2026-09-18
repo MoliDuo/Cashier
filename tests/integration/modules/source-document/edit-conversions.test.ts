@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { postgresSourceDocumentAggregateAdapter as aggregate } from "@/application/adapters/postgres/source-document-aggregate";
 import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
@@ -10,11 +10,11 @@ afterEach(() => vi.restoreAllMocks());
 
 async function fixture() {
   const db = getTestDb();
-  const { ledgerId, userId } = await createTestUserWithLedger(db);
+  const { ledgerId } = await createTestUserWithLedger(db);
+  const bookId = await testBookId(db, ledgerId);
   const created = await aggregate.createManualDocument({
     ledgerId,
-    attributedUserId: userId,
-    createdByUserId: userId,
+    bookId: bookId,
     expectedMainCurrency: "CNY",
     title: "Original",
     entryDate: "2026-01-01",

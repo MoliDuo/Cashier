@@ -11,22 +11,17 @@ Cashier 提供两种 Docker Compose 部署方式：
 
 ## 本地全家桶
 
-复制本地模板并填写双人账号、账本 UUID 与 AI 配置：
+复制本地模板并填写 AI 配置：
 
 ```bash
 cp .env.local.example .env
 ```
 
 ```dotenv
-COUPLE_OWNER_USER_ID=<UUID>
-COUPLE_PARTNER_USER_ID=<different UUID>
-COUPLE_LEDGER_ID=<UUID>
-COUPLE_OWNER_EMAIL=<first member email>
-COUPLE_OWNER_PASSWORD=<strong password>
-COUPLE_PARTNER_EMAIL=<second member email>
-COUPLE_PARTNER_PASSWORD=<strong password>
 OPENAI_API_KEY=your-api-key
 ```
+
+账号不需要配置：空库第一次启动时，服务端会在日志中打印一次性初始化代码。
 
 启动：
 
@@ -63,9 +58,9 @@ cp .env.example .env
 - `S3_ENDPOINT`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、
   `S3_SECRET_ACCESS_KEY`：S3 或 R2 配置。
 - `S3_PUBLIC_ENDPOINT`：浏览器可以访问的对象存储端点。
-- `COUPLE_*_ID`：固定成员和共同账本的三个 UUID；空库初始化时还需要
-  `COUPLE_*_EMAIL` 与 `COUPLE_*_PASSWORD`。
 - `OPENAI_API_KEY`：AI 服务密钥。
+
+账号、账本和分账由首次启动的向导创建，不需要环境变量。
 
 对象存储桶必须预先创建。然后启动：
 
@@ -84,18 +79,21 @@ docker compose -f docker-compose.yml up -d
 2. 等待 PostgreSQL 并应用 `src/persistence/postgres-migrations/` 中的迁移。
 3. 启动 Cashier；容器不会自动创建账号。
 
-空数据库首次启动后，显式预览并执行双人初始化：
+空数据库首次启动后，打开服务地址：所有页面都会跳转到 `/{locale}/setup`。服务端日志中
+会打印一次性初始化代码，例如：
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec app npm run db:bootstrap -- --apply
+```
+First-run setup is pending. Enter this setup code in the wizard to create the account.
 ```
 
-使用外部服务部署时，将命令中的 `docker compose -f docker-compose.yml -f docker-compose.local.yml`
-替换为 `docker compose -f docker-compose.yml`。已有数据库不要运行初始化命令，
-先阅读 [双人账本迁移说明](./deployment/couple-only.md)。
+在向导中填入该代码、一个登录邮箱、密码，以及一到多个分账名称（默认预填 `共同支出`），
+提交后会一次性创建账号、账本、分账和默认分类，随后 `/setup` 永久返回 404。
 
-初始密码只在创建用户时使用。后续修改 `.env` 不会同步修改现有账号密码。
+初始化代码只保护"数据库为空"到"账号已创建"这段窗口，因此它只存在于进程内存中；
+重启服务会重新生成并再次打印。已有数据的部署不会看到这个向导。
+
+初始密码只在创建账号时使用。后续修改 `.env` 不会同步修改现有账号密码。
+从双人账本升级请阅读 [从双人账本升级](./deployment/single-account-upgrade.md)。
 
 ## 升级
 

@@ -31,7 +31,9 @@ describe("ModalStackRenderer", () => {
   });
 
   it("keeps the stack item mounted until its exit animation completes", async () => {
-    render(<ModalStackRenderer categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />);
+    render(
+      <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
+    );
     act(() => {
       useModalStackStore.getState().push({
         type: "source-document",
@@ -49,7 +51,9 @@ describe("ModalStackRenderer", () => {
   });
 
   it("can reopen the same item after its exit completes", async () => {
-    render(<ModalStackRenderer categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />);
+    render(
+      <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
+    );
     const item = { type: "source-document" as const, id: "document-1", ledgerId: "ledger-1" };
 
     act(() => useModalStackStore.getState().push(item));
@@ -61,7 +65,9 @@ describe("ModalStackRenderer", () => {
   });
 
   it("returns to the previous detail only after the top exit completes", async () => {
-    render(<ModalStackRenderer categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />);
+    render(
+      <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
+    );
     act(() => {
       useModalStackStore
         .getState()
@@ -82,7 +88,9 @@ describe("ModalStackRenderer", () => {
   });
 
   it("keeps lower wrappers mounted while only opening the top wrapper", async () => {
-    render(<ModalStackRenderer categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />);
+    render(
+      <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
+    );
     act(() => {
       useModalStackStore
         .getState()
@@ -120,7 +128,9 @@ describe("ModalStackRenderer", () => {
     document.body.appendChild(fallback);
     const removedTrigger = document.createElement("button");
 
-    render(<ModalStackRenderer categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />);
+    render(
+      <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
+    );
     act(() => {
       useModalStackStore.getState().push({
         type: "source-document",
@@ -149,7 +159,9 @@ describe("ModalStackRenderer", () => {
     useModalStackStore
       .getState()
       .push({ type: "source-document", id: "document-2", ledgerId: "ledger-1" });
-    render(<ModalStackRenderer categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />);
+    render(
+      <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
+    );
     fireEvent.click(screen.getByRole("button", { name: "back" }));
     expect(requestLeave).toHaveBeenCalledTimes(1);
     expect(screen.getAllByTestId("detail-modal")[1]).toHaveAttribute("data-open", "true");

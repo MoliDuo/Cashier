@@ -10,6 +10,7 @@ import { ledgerEntries, sourceDocuments, storedFiles } from "@/persistence";
 import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
+  testBookId,
 } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
@@ -28,12 +29,11 @@ const getSourceDocumentFullQuery = (ledgerId: string, sourceDocumentId: string) 
   getSourceDocumentFullQueryUseCase(ledgerId, sourceDocumentId, queryPorts.documents);
 
 const SOURCE_LIST_KEYS = [
-  "attributedUserId",
+  "bookId",
   "failureKind",
   "failureMessage",
   "canEdit",
   "createdAt",
-  "createdByUserId",
   "documentDate",
   "errorCode",
   "hasImages",
@@ -162,7 +162,7 @@ describe("bounded target read models", () => {
       .values({
         ledgerId,
         documentDate: "2026-09-03",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     await db.insert(ledgerEntries).values({
@@ -248,8 +248,7 @@ describe("bounded target read models", () => {
           storedFileIds: files.map((file) => file.id),
           documentDate: null,
         },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       })
     );
     const ownershipSelects = capture.statements
@@ -280,7 +279,7 @@ describe("bounded target read models", () => {
           updatedAt: createdAt,
         })).map((row) => ({
           ...row,
-          attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${row.ledgerId})`,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${row.ledgerId} ORDER BY sort_order LIMIT 1)`,
         }))
       )
       .returning();
@@ -356,8 +355,7 @@ describe("bounded target read models", () => {
         exchangeRate: "1.000000",
         createdAt,
       })),
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const firstPage = await listLedgerEntries(ledgerId, { limit: 7 });
     const history = await collectLedgerEntryPages(ledgerId, 7);

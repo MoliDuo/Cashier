@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { sql } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { ledgers, ledgerEntries, entryCategories, users } from "@/persistence";
+import { entryCategories, ledgerEntries, ledgers, loginEmails, users } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { v4 as uuidv4 } from "uuid";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
@@ -30,7 +30,7 @@ async function seedEntry(
       id: uuidv4(),
       ledgerId,
       documentDate: opts.entryDate ?? null,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -64,7 +64,7 @@ describe("getLedgerStatsAction", () => {
       userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("returns zero values for empty ledger", async () => {
@@ -368,17 +368,16 @@ describe("getLedgerStatsAction", () => {
   it("throws 'Unauthorized' when ledger belongs to another user", async () => {
     const db = getTestDb();
 
-    await db
-      .insert(users)
-      .values({
-        id: OTHER_USER_ID,
-        email: "other@example.com",
-        name: "Other User",
-        nickname: "B",
-        gender: "female",
-        emailVerified: new Date(),
-      })
-      .onConflictDoNothing();
+    await db.insert(users).values({
+      id: OTHER_USER_ID,
+      name: "Other User",
+    });
+
+    await db.insert(loginEmails).values({
+      userId: OTHER_USER_ID,
+      email: "other@example.com",
+      emailVerified: new Date(),
+    });
 
     const otherLedgerId = uuidv4();
     await db.insert(ledgers).values({

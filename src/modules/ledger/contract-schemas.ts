@@ -227,10 +227,36 @@ const batchUpdateLedgerEntryDatesInputSchema = strictObjectSchema({
 
 const createServiceCredentialInputSchema = strictObjectSchema({
   name: z.string().trim().min(1).max(100),
+  bookId: uuidSchema,
+});
+
+const updateServiceCredentialInputSchema = strictObjectSchema({
+  bookId: uuidSchema,
+});
+
+/** Book names are short labels, not descriptions: 1–20 characters, trimmed. */
+const bookNameSchema = z.string().trim().min(1).max(20);
+const createBookInputSchema = strictObjectSchema({
+  name: bookNameSchema,
+  timeZone: nullableTimeZoneSchema.optional(),
+});
+const updateBookInputSchema = nonEmptyStrictObjectSchema({
+  name: bookNameSchema.optional(),
+  timeZone: nullableTimeZoneSchema.optional(),
+});
+const reorderBooksInputSchema = z.preprocess(
+  (value) => (Array.isArray(value) ? [...new Set(value)] : value),
+  z.array(uuidSchema).min(1).max(100)
+);
+const bookIdSchema = uuidSchema;
+const assignSourceDocumentBookInputSchema = strictObjectSchema({
+  sourceDocumentId: uuidSchema,
+  expectedVersion: z.number().int().positive(),
+  bookId: uuidSchema,
 });
 
 const ledgerEntryQueryShape = {
-  attributedUserId: uuidSchema.optional(),
+  bookId: uuidSchema.optional(),
   startDate: optionalDateStringSchema,
   endDate: optionalDateStringSchema,
   categoryId: categoryFilterSchema,
@@ -320,6 +346,17 @@ export const parseCancelCategoryAssignmentInput = (input: unknown) =>
   parseLedgerContract(cancelCategoryAssignmentInputSchema, input);
 export const parseCreateServiceCredentialInput = (input: unknown) =>
   parseLedgerContract(createServiceCredentialInputSchema, input);
+export const parseUpdateServiceCredentialInput = (input: unknown) =>
+  parseLedgerContract(updateServiceCredentialInputSchema, input);
+export const parseCreateBookInput = (input: unknown) =>
+  parseLedgerContract(createBookInputSchema, input);
+export const parseUpdateBookInput = (input: unknown) =>
+  parseLedgerContract(updateBookInputSchema, input);
+export const parseReorderBooksInput = (input: unknown) =>
+  parseLedgerContract(reorderBooksInputSchema, input);
+export const parseBookId = (input: unknown) => parseLedgerContract(bookIdSchema, input);
+export const parseAssignSourceDocumentBookInput = (input: unknown) =>
+  parseLedgerContract(assignSourceDocumentBookInputSchema, input);
 export const parseServiceCredentialId = (input: unknown) =>
   parseLedgerContract(serviceCredentialIdSchema, input);
 export const parseListLedgerEntriesInput = (input: unknown) =>
@@ -336,6 +373,9 @@ export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntryInputSchema
 export type UpdateLedgerEntryInput = z.infer<typeof updateLedgerEntryInputSchema>;
 export type BatchUpdateLedgerEntriesInput = z.infer<typeof batchUpdateLedgerEntriesInputSchema>;
 export type CreateServiceCredentialInput = z.infer<typeof createServiceCredentialInputSchema>;
+export type UpdateServiceCredentialInput = z.infer<typeof updateServiceCredentialInputSchema>;
+export type CreateBookInput = z.infer<typeof createBookInputSchema>;
+export type UpdateBookInput = z.infer<typeof updateBookInputSchema>;
 export type ListLedgerEntriesInput = z.input<typeof listLedgerEntriesInputSchema>;
 export type ListLedgerEntriesValidatedInput = z.infer<typeof listLedgerEntriesInputSchema>;
 export type LedgerStatsQueryInput = z.infer<typeof ledgerStatsQuerySchema>;

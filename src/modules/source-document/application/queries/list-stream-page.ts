@@ -15,7 +15,7 @@ import {
 const STREAM_PAGE_LIMIT = 20;
 
 export interface ListStreamPageInput {
-  attributedUserId?: string;
+  bookId?: string;
   startDate?: string | null | undefined;
   endDate?: string | null | undefined;
   minAmount?: string;
@@ -63,7 +63,7 @@ function validateCursor(
 
 function filterFingerprint(input: ListStreamPageInput, search: string | undefined): string {
   const normalized = {
-    attributedUserId: input.attributedUserId ?? null,
+    bookId: input.bookId ?? null,
     startDate: input.startDate ?? null,
     endDate: input.endDate ?? null,
     minAmount: input.minAmount ?? null,
@@ -116,7 +116,7 @@ export async function listStreamPage(
 
   const page = await ports.documents.list({
     ledgerId,
-    ...(input.attributedUserId == null ? {} : { attributedUserId: input.attributedUserId }),
+    ...(input.bookId == null ? {} : { bookId: input.bookId }),
     ...(input.statuses != null && input.statuses.length > 0
       ? { statuses: input.statuses as unknown as SourceDocumentProcessingStatus[] }
       : {}),

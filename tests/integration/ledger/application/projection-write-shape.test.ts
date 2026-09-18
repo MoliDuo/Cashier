@@ -4,7 +4,7 @@ import { getTestDb } from "../../../setup";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import type { LedgerProjectionEntryContract } from "@/application/contracts";
-import { createTestUserWithLedger } from "../../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-setup";
 import {
   ledgerEntries,
   ledgerSyncState,
@@ -99,8 +99,7 @@ describe("projection write shape", () => {
         entries: Array.from({ length: count }, (_, index) =>
           entry(`Item ${index}`, { amount: String(index + 1) })
         ),
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       });
 
       expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(1);
@@ -128,8 +127,7 @@ describe("projection write shape", () => {
       ledgerId,
       title: "With file",
       entries: [entry("A"), entry("B")],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const file = (
       await db
@@ -234,8 +232,7 @@ describe("projection write shape", () => {
         }),
         entry("Three", { id: "33333333-3333-4333-8333-333333333333" }),
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const originalRows = await db
       .select()

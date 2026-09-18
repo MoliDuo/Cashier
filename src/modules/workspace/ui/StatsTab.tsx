@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
 import {
@@ -28,16 +28,16 @@ import {
 } from "@/modules/workspace/ledger-url-params";
 import { pushLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import type { BookDto } from "@/modules/ledger/contracts";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 
 const STATS_QUERY_DEBOUNCE_MS = 250;
 
 interface StatsTabProps {
-  /** Which member the charts are narrowed to, resolved by the page. */
-  scopeOwnerId: string | null;
-  userId: string;
-  /** The other member, for the per-person totals row. */
-  partnerUserId: string;
+  /** The book the charts are narrowed to; undefined means 总账. */
+  bookId?: string | undefined;
+  /** The live books, for the per-book totals row. */
+  books: readonly BookDto[];
   ledgerId?: string;
   ledger?: Ledger;
   onCategoryDrilldown?: (categoryId: string, startDate: string, endDate: string) => void;
@@ -47,9 +47,8 @@ interface StatsTabProps {
 }
 
 export function StatsTab({
-  scopeOwnerId,
-  userId,
-  partnerUserId,
+  bookId,
+  books,
   ledgerId,
   ledger,
   onCategoryDrilldown,
@@ -106,37 +105,30 @@ export function StatsTab({
     () =>
       buildStatsQueryDescriptor({
         ledgerId: ledgerId ?? "",
-        ...(scopeOwnerId == null ? {} : { attributedUserId: scopeOwnerId }),
+        ...(bookId == null ? {} : { bookId }),
         currentDate,
         mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
         rangeType,
         currentPeriod: periodOffset === 0,
       }),
-    [currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType, scopeOwnerId]
+    [bookId, currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType]
   );
-  const mineDescriptor = useMemo(
+  // One descriptor per book: the row compares the books and their 总账, the same
+  // way it used to compare the two people.
+  const bookDescriptors = useMemo(
     () =>
-      buildStatsQueryDescriptor({
-        ledgerId: ledgerId ?? "",
-        currentDate,
-        mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
-        rangeType,
-        currentPeriod: periodOffset === 0,
-        attributedUserId: userId,
-      }),
-    [currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType, userId]
-  );
-  const partnerDescriptor = useMemo(
-    () =>
-      buildStatsQueryDescriptor({
-        ledgerId: ledgerId ?? "",
-        currentDate,
-        mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
-        rangeType,
-        currentPeriod: periodOffset === 0,
-        attributedUserId: partnerUserId,
-      }),
-    [currentDate, ledger?.settings.mainCurrency, ledgerId, partnerUserId, periodOffset, rangeType]
+      books.map((book) => ({
+        book,
+        descriptor: buildStatsQueryDescriptor({
+          ledgerId: ledgerId ?? "",
+          bookId: book.id,
+          currentDate,
+          mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
+          rangeType,
+          currentPeriod: periodOffset === 0,
+        }),
+      })),
+    [books, currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType]
   );
   const allDescriptor = useMemo(
     () =>
@@ -155,17 +147,13 @@ export function StatsTab({
     enabled: !!ledgerId,
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
   });
-  const mineQuery = useQuery({
-    queryKey: mineDescriptor.queryKey,
-    queryFn: () => getEnhancedStats(mineDescriptor.input),
-    enabled: !!ledgerId,
-    staleTime: QUERY.DEFAULT_STALE_TIME_MS,
-  });
-  const partnerQuery = useQuery({
-    queryKey: partnerDescriptor.queryKey,
-    queryFn: () => getEnhancedStats(partnerDescriptor.input),
-    enabled: !!ledgerId,
-    staleTime: QUERY.DEFAULT_STALE_TIME_MS,
+  const bookQueries = useQueries({
+    queries: bookDescriptors.map(({ descriptor }) => ({
+      queryKey: descriptor.queryKey,
+      queryFn: () => getEnhancedStats(descriptor.input),
+      enabled: !!ledgerId,
+      staleTime: QUERY.DEFAULT_STALE_TIME_MS,
+    })),
   });
   const queryDescriptor = useDebouncedValue(statsDescriptor, STATS_QUERY_DEBOUNCE_MS);
   const statsQuery = useQuery({
@@ -226,32 +214,30 @@ export function StatsTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2 border-b pb-3 text-sm" aria-live="polite">
-        {(["mine", "partner", "all"] as const).map((kind) => {
-          const result = kind === "mine" ? mineQuery : kind === "partner" ? partnerQuery : allQuery;
-          return (
-            <div key={kind} className="min-w-0">
-              <div className="text-muted-foreground">
-                {kind === "mine"
-                  ? tCommon("myRecords")
-                  : kind === "partner"
-                    ? tCommon("partnerRecords")
-                    : tCommon("combinedTotal")}
-              </div>
-              <div className="truncate font-semibold">
-                {result.data
-                  ? formatCurrencyAmount(
-                      result.data.summary.total,
-                      result.data.summary.currency,
-                      locale
-                    )
-                  : result.isError
-                    ? "—"
-                    : "..."}
-              </div>
+      <div className="flex gap-3 overflow-x-auto border-b pb-3 text-sm" aria-live="polite">
+        {[
+          ...bookDescriptors.map(({ book }, index) => ({
+            key: book.id,
+            label: book.name,
+            result: bookQueries[index],
+          })),
+          { key: "all", label: tCommon("allBooks"), result: allQuery },
+        ].map(({ key, label, result }) => (
+          <div key={key} className="min-w-16 shrink-0">
+            <div className="truncate text-muted-foreground">{label}</div>
+            <div className="truncate font-semibold">
+              {result?.data
+                ? formatCurrencyAmount(
+                    result.data.summary.total,
+                    result.data.summary.currency,
+                    locale
+                  )
+                : result?.isError
+                  ? "—"
+                  : "..."}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
       <StatsContentView
         rangeType={rangeType}

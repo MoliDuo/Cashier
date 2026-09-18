@@ -20,7 +20,7 @@ import {
 import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
   TEST_USER_ID,
 } from "../helpers/schema-setup";
 import { eq, isNull, and } from "drizzle-orm";
@@ -66,7 +66,7 @@ async function createTestLedger(db: ReturnType<typeof getTestDb>, useCurrentUser
 
     const ledgerData = createLedgerData({ userId: TEST_USER_ID });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
     const ledger = await db.query.ledgers.findFirst({
       where: eq(ledgers.id, ledgerData.id),
     });
@@ -115,7 +115,7 @@ async function createTestSourceDocument(db: ReturnType<typeof getTestDb>, ledger
   const doc = createSourceDocumentData(ledgerId);
   await db.insert(sourceDocuments).values({
     ...doc,
-    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${doc.ledgerId})`,
+    bookId: sql`(SELECT id FROM books WHERE ledger_id = ${doc.ledgerId} ORDER BY sort_order LIMIT 1)`,
   });
   await activateTestSourceDocumentProjection(db, doc.id);
   return doc;

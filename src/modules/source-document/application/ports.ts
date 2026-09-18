@@ -27,7 +27,7 @@ import type {
 
 interface SourceDocumentFilterInput {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   statuses?: readonly SourceDocumentProcessingStatus[];
   startDate?: string | null;
   endDate?: string | null;
@@ -73,11 +73,17 @@ export type ApplyCategoryAssignmentsResult =
 
 /** The only application-facing boundary for writes that change a document's visible projection. */
 export interface SourceDocumentAggregateWritePort {
-  assignAttribution(input: {
+  /** The record's current book, for the detail page's book field. */
+  getBook(input: {
+    ledgerId: string;
+    sourceDocumentId: string;
+  }): Promise<{ bookId: string; version: number } | null>;
+  /** Moves one record to another book of the same ledger. */
+  assignBook(input: {
     ledgerId: string;
     sourceDocumentId: string;
     expectedVersion: number;
-    attributedUserId: string;
+    bookId: string;
   }): Promise<{ ok: true; version: number } | { ok: false; currentVersion: number }>;
   applyCategoryAssignments(
     input: ApplyCategoryAssignmentsInput

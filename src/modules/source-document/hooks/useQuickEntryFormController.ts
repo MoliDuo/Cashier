@@ -10,7 +10,7 @@ import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 
 interface UseQuickEntryFormControllerParams {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   categories: EntryCategory[];
   mainCurrency: string;
   timeZone?: string;
@@ -18,7 +18,7 @@ interface UseQuickEntryFormControllerParams {
 }
 
 interface CreateQuickEntryPayload {
-  attributedUserId?: string;
+  bookId?: string;
   categoryId: string;
   amount: string;
   currency: string;
@@ -28,7 +28,7 @@ interface CreateQuickEntryPayload {
 
 export function useQuickEntryFormController({
   ledgerId,
-  attributedUserId,
+  bookId,
   categories,
   mainCurrency,
   timeZone,
@@ -87,7 +87,7 @@ export function useQuickEntryFormController({
     if (selectedCategoryId === null || !Number.isFinite(parsedAmount) || parsedAmount <= 0) return;
     const nextItemName = itemName !== "" ? itemName : undefined;
     mutation.mutate({
-      ...(attributedUserId == null ? {} : { attributedUserId }),
+      ...(bookId == null ? {} : { bookId }),
       categoryId: selectedCategoryId,
       amount,
       currency,

@@ -71,7 +71,7 @@ export async function listLedgerEntryPage({
        AND documents.id = ledger_entries.source_document_id
        AND documents.deleted_at IS NULL
        AND documents.active_revision_id = ledger_entries.source_document_revision_id
-       ${filters.attributedUserId == null ? sql`` : sql`AND documents.attributed_user_id = ${filters.attributedUserId}`}
+       ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     )
     SELECT id, position, effective_date::text AS "effectiveDate",

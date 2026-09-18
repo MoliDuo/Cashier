@@ -11,7 +11,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 describe("cancel source-document processing", () => {
@@ -21,8 +21,7 @@ describe("cancel source-document processing", () => {
     const submission = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "Lunch 12 CNY", storedFileIds: [], documentDate: "2026-09-10" },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     await expect(
@@ -73,8 +72,7 @@ describe("cancel source-document processing", () => {
           exchangeRate: "1",
         },
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, active.sourceDocumentId),
@@ -85,7 +83,7 @@ describe("cancel source-document processing", () => {
       expectedVersion: before!.version,
       supersedeProcessing: true,
       input: { text: "Replacement", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     await cancelSourceDocumentProcessing(ledgerId, active.sourceDocumentId, retry.document.version);

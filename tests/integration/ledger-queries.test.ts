@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@/auth";
 import { POST } from "@/app/api/ledger-queries/route";
 import { getTestDb } from "../setup";
-import { ledgers, sourceDocuments, users } from "@/persistence";
+import { ledgers, sourceDocuments } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "../helpers/factories";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../helpers/schema-setup";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
@@ -28,33 +28,32 @@ describe("session ledger query transport", () => {
     });
   });
 
-  it("returns private scoped detail and rejects foreign documents and ledgers", async () => {
+  it("returns private scoped detail and refuses an unknown ledger or document", async () => {
     const db = getTestDb();
     const ledger = createLedgerData({ userId });
-    const other = createLedgerData({ userId: crypto.randomUUID() });
-    await db.insert(users).values({
-      id: other.userId,
-      email: "other-query@example.com",
-      nickname: "B",
-      gender: "female",
-    });
-    await db.insert(ledgers).values([ledger, other]);
-    await configureTestCoupleLedger(db, ledger.id);
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
     await db.insert(sourceDocuments).values({
       ...document,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, document.id);
+
     const response = await POST(request("detail", [ledger.id, document.id]));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ id: document.id, version: 1 });
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-      user: { id: other.userId },
-    });
-    const foreign = await POST(request("detail", [other.id, document.id]));
-    expect(foreign.status).toBe(404);
+
+    // An id that is not a live ledger, and a document that is not in the live
+    // one: both are 404 rather than a distinguishable "wrong tenant" answer.
+    expect((await POST(request("detail", [crypto.randomUUID(), document.id]))).status).toBe(404);
+    // An unknown document inside the live ledger is an empty read, not an
+    // error: the detail loader reports "no such record" with a null body.
+    const unknownDocument = await POST(request("detail", [ledger.id, crypto.randomUUID()]));
+    expect(unknownDocument.status).toBe(200);
+    expect(await unknownDocument.json()).toBeNull();
+
     vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
       user: { id: crypto.randomUUID() },
     });
@@ -73,7 +72,7 @@ describe("session ledger query transport", () => {
   it("validates each supported read without leaking internal error data", async () => {
     const ledger = createLedgerData({ userId });
     await getTestDb().insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(getTestDb(), ledger.id);
+    await ensureTestLedgerBooks(getTestDb(), ledger.id);
     for (const query of ["detail", "stream", "total", "refresh", "entries", "entry", "summary"]) {
       const response = await POST(request(query, [ledger.id, { unexpected: true }]));
       expect(response.status).toBe(400);

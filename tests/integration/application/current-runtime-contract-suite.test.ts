@@ -1,5 +1,5 @@
 import { applicationContractSuite } from "../../helpers/application-contract-suites";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import { supportedSourceDocumentActions } from "@/application/contracts";
 import type {
@@ -55,8 +55,7 @@ applicationContractSuite("real Postgres/object-storage/in-process adapter compos
     const pending = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "contract processing input", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const actual = {
       ...job,
@@ -125,8 +124,7 @@ applicationContractSuite("real Postgres/object-storage/in-process adapter compos
           storedFileIds: finalized.map((file) => file.id),
           documentDate: null,
         },
-        attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-        createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+        bookId: await testBookId(db, ledgerId),
       });
       return finalized;
     },

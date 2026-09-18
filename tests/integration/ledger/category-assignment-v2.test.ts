@@ -18,7 +18,10 @@ import {
   createLedgerData,
   createSourceDocumentData,
 } from "../../helpers/factories";
-import { activateTestSourceDocumentProjection } from "../../helpers/schema-setup";
+import {
+  activateTestSourceDocumentProjection,
+  ensureTestLedgerBooks,
+} from "../../helpers/schema-setup";
 
 const START = new Date("2030-01-01T00:00:00.000Z");
 const AFTER_EXPIRY = new Date("2030-01-01T00:02:00.000Z");
@@ -29,10 +32,11 @@ async function seedSelection() {
   const category = createCategoryData(ledger.id, { name: "Meals", sortOrder: 0 });
   const document = createSourceDocumentData(ledger.id);
   await db.insert(ledgers).values(ledger);
+  await ensureTestLedgerBooks(db, ledger.id);
   await db.insert(entryCategories).values(category);
   await db.insert(sourceDocuments).values({
     ...document,
-    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+    bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
   });
   const revisionId = await activateTestSourceDocumentProjection(db, document.id);
   const entryId = crypto.randomUUID();

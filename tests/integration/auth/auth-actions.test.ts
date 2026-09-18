@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import { otpTokens } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { configureTestCoupleLedger } from "../../helpers/schema-setup";
+import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
 // Mock Resend before importing actions
 vi.mock("resend", () => ({
@@ -34,7 +34,7 @@ describe("Auth Actions - sendOTPAction", () => {
   beforeEach(async () => {
     // Clean up
     const db = getTestDb();
-    await configureTestCoupleLedger(db, crypto.randomUUID());
+    await ensureTestLedgerBooks(db, crypto.randomUUID());
     await db.delete(otpTokens).where(eq(otpTokens.email, TEST_EMAIL));
   });
 

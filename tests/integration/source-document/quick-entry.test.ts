@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import {
-  ledgers,
-  entryCategories,
-  sourceDocuments,
-  sourceDocumentRevisions,
-  ledgerEntries,
-  users,
   currencyRates,
+  entryCategories,
+  ledgerEntries,
+  ledgers,
+  loginEmails,
+  sourceDocumentRevisions,
+  sourceDocuments,
+  users,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { configureTestCoupleLedger } from "../../helpers/schema-setup";
+import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
 // Mock auth
 vi.mock("@/auth", () => ({
@@ -53,7 +54,7 @@ describe("createQuickEntryAction", () => {
       userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
 
     // Create test category
     categoryId = uuidv4();
@@ -189,17 +190,16 @@ describe("createQuickEntryAction", () => {
 
     const db = getTestDb();
     // Create other user first
-    await db
-      .insert(users)
-      .values({
-        id: otherUserId,
-        email: "other@example.com",
-        name: "Other User",
-        nickname: "B",
-        gender: "female",
-        emailVerified: new Date(),
-      })
-      .onConflictDoNothing();
+    await db.insert(users).values({
+      id: otherUserId,
+      name: "Other User",
+    });
+
+    await db.insert(loginEmails).values({
+      userId: otherUserId,
+      email: "other@example.com",
+      emailVerified: new Date(),
+    });
 
     await db.insert(ledgers).values({
       id: otherLedgerId,

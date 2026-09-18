@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { selectMemberScope } from "./member-switch";
+import { selectBook } from "./book-switch";
 
 test("@demo opens a populated workspace with evidence and statistics", async ({ page }) => {
   const errors: string[] = [];
@@ -32,13 +32,13 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   }
   await detail.getByRole("button", { name: "Close", exact: true }).click();
 
-  await selectMemberScope(page, "partner");
+  await selectBook(page, 1);
   await expect(page.getByText("FreshMart", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Harbor Coffee", { exact: true })).toHaveCount(0);
-  await selectMemberScope(page, "mine");
+  await selectBook(page, 0);
   await expect(page.getByText("Harbor Coffee", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("FreshMart", { exact: true })).toHaveCount(0);
-  await selectMemberScope(page, "all");
+  await selectBook(page, "all");
 
   await expect(page.getByText("Regional Rail and Cafe", { exact: true })).toBeVisible();
   await expect(page.getByText("Blurry Parking Receipt", { exact: true })).toBeVisible();

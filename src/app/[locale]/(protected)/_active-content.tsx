@@ -3,11 +3,11 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { InterfaceLanguage } from "@/modules/auth/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 
 interface ActiveContentProps {
   ledgerId: string;
   userId: string;
-  partnerUserId: string;
   ledgerDto: LedgerDto;
   initialTab: LedgerTab;
   userEmail?: string;
@@ -16,12 +16,12 @@ interface ActiveContentProps {
   interfaceLanguage?: InterfaceLanguage;
   initialCategories?: EntryCategoryWithCount[];
   ledgerToday?: string;
+  initialBooks?: readonly BookDto[];
 }
 
 export function ActiveContent({
   ledgerId,
   userId,
-  partnerUserId,
   ledgerDto,
   initialTab,
   userEmail,
@@ -30,16 +30,17 @@ export function ActiveContent({
   interfaceLanguage,
   initialCategories,
   ledgerToday,
+  initialBooks,
 }: ActiveContentProps) {
   return (
     <LedgerPageClient
       ledgerId={ledgerId}
       userId={userId}
-      partnerUserId={partnerUserId}
       initialLedger={ledgerDto}
       initialTab={initialTab}
       {...(initialCategories !== undefined ? { initialCategories } : {})}
       {...(ledgerToday !== undefined ? { ledgerToday } : {})}
+      {...(initialBooks !== undefined ? { initialBooks } : {})}
       {...(userEmail !== undefined ? { userEmail } : {})}
       {...(hasPassword !== undefined ? { hasPassword } : {})}
       {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}

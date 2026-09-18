@@ -18,8 +18,7 @@ export interface SourceDocumentRow {
   id: string;
   ledgerId: string;
   title: string | null;
-  attributedUserId?: string | null;
-  createdByUserId?: string | null;
+  bookId?: string | null;
   documentDate: string | null;
   effectiveDate: string;
   activeRevisionId: string | null;
@@ -145,8 +144,7 @@ export function mapListItem(
   });
   const item: SourceDocumentListItemDto = {
     id: row.id,
-    attributedUserId: row.attributedUserId ?? null,
-    createdByUserId: row.createdByUserId ?? null,
+    bookId: row.bookId ?? null,
     version: row.version,
     ledgerId: row.ledgerId,
     title: effectiveDocumentTitle(row.title, hydration.revisionTitle),
@@ -187,8 +185,7 @@ export function mapSourceDocumentDetail(
   });
   return {
     id: row.id,
-    attributedUserId: row.attributedUserId ?? null,
-    createdByUserId: row.createdByUserId ?? null,
+    bookId: row.bookId ?? null,
     version: row.version,
     ledgerId: row.ledgerId,
     title: effectiveDocumentTitle(row.title, hydration.revisionTitle),

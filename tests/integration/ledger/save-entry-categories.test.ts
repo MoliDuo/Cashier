@@ -6,7 +6,7 @@ import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categ
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
-import { configureTestCoupleLedger } from "../../helpers/schema-setup";
+import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 
 vi.mock("@/auth", () => ({
@@ -38,14 +38,14 @@ describe("saveEntryCategoriesAction", () => {
     const entryId = crypto.randomUUID();
 
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values([
       { id: keepId, ledgerId: ledger.id, name: "Keep", sortOrder: 0 },
       { id: removeId, ledgerId: ledger.id, name: "Remove", sortOrder: 1 },
     ]);
     await db.insert(sourceDocuments).values({
       ...document,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values({
       id: entryId,
@@ -99,7 +99,7 @@ describe("saveEntryCategoriesAction", () => {
     const editableId = crypto.randomUUID();
     const fixedId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values([
       { id: editableId, ledgerId: ledger.id, name: "Editable", sortOrder: 0 },
       {
@@ -141,7 +141,7 @@ describe("saveEntryCategoriesAction", () => {
     const ledger = createLedgerData({ userId });
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values({
       id: categoryId,
       ledgerId: ledger.id,
@@ -179,7 +179,7 @@ describe("saveEntryCategoriesAction", () => {
       sortOrder: index,
     }));
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(entryCategories).values(categories);
     const expectedRevision = await computeCategoryCollectionRevision(
       await db.query.entryCategories.findMany({

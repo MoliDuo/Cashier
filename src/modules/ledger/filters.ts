@@ -1,11 +1,11 @@
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 
 /**
- * Whose records a tab is showing: the whole ledger, the signed-in member's, or
- * the partner's. It narrows the record set exactly like the other filters do,
- * so it is offered inside the filter dialog rather than beside the toolbar.
+ * Which book a tab is showing. `null` is 总账: every book at once. It narrows
+ * the record set exactly like the other filters do, and it is also the value
+ * the pull-down switcher stores.
  */
-export type RecordScope = "all" | "mine" | "partner";
+export type RecordScope = string | null;
 
 export interface EntryFilters {
   startDate?: string;
@@ -19,7 +19,7 @@ export interface EntryFilters {
 }
 
 export interface LedgerEntryFilterParams {
-  attributedUserId?: string;
+  bookId?: string;
   startDate?: string | null;
   endDate?: string | null;
   categoryId?: string | null;

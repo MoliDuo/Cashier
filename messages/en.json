@@ -58,7 +58,8 @@
     "batchDeleted": "Deleted {count} items",
     "batchUnresolved": "{count} items could not be changed and remain selected",
     "deleteSelectedTitle": "Delete selected items",
-    "deleteSelectedDescription": "Delete the selected {count} items? This cannot be undone."
+    "deleteSelectedDescription": "Delete the selected {count} items? This cannot be undone.",
+    "book": "Book"
   },
   "BatchActions": {
     "selectAll": "Select All",
@@ -272,15 +273,11 @@
     "amountRequired": "Please enter an amount",
     "categoryRequired": "Please select a category",
     "noCategories": "Create a category before adding a quick entry.",
-    "goToSettings": "Go to settings"
+    "goToSettings": "Go to settings",
+    "book": "Book"
   },
   "Common": {
-    "recordOwner": "Record owner",
-    "recordedBy": "Recorded by",
     "historicalRecord": "Historical record",
-    "allMembers": "All",
-    "myRecords": "Me",
-    "partnerRecords": "Partner",
     "combinedTotal": "Total",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -327,7 +324,9 @@
     "saveAndContinue": "Save and continue",
     "discardAndContinue": "Discard and leave",
     "continueEditing": "Continue editing",
-    "reloadServerData": "Reload latest data"
+    "reloadServerData": "Reload latest data",
+    "book": "Book",
+    "allBooks": "All books"
   },
   "SourceDocumentInput": {
     "placeholder": "Enter consumption record, e.g.: lunch 35 dollars… (supports pasting images)",
@@ -465,7 +464,9 @@
       "done": "Finish adjusting",
       "applyFailed": "Application failed. The bill was not changed. Try again.",
       "groupDate": "Group date"
-    }
+    },
+    "book": "Book",
+    "bookDesc": "Move this record to another book."
   },
   "SourceDocumentImageModal": {
     "title": "View Image",
@@ -524,8 +525,6 @@
     "mainCurrencyChangeConfirm": "Use {currency}",
     "collapseEntries": "Collapse records by default",
     "collapseEntriesDesc": "Start with each record's details collapsed in the stream.",
-    "timeZoneAuto": "Automatic",
-    "timeZoneAutoDetected": "Automatic ({timeZone})",
     "preferredCurrencies": "Preferred Currencies",
     "preferredCurrenciesDesc": "List of currencies used in this ledger.",
     "preferredCurrenciesNone": "No currencies selected",
@@ -742,22 +741,77 @@
         "email_in_use": "That email address is already in use.",
         "rate_limited": "Please wait before requesting another code.",
         "locked": "Verification is temporarily locked after too many attempts.",
-        "same_email": "Enter an email address different from your current one.",
         "unknown": "Could not update the email address."
       }
     },
-    "profile": "Profile",
-    "profileDesc": "Your nickname, gender, and time zone, and your partner's nickname.",
-    "nickname": "Nickname",
-    "nicknameDesc": "1–20 characters. Used for Me / Partner on the stream, details, and stats.",
-    "gender": "Gender",
-    "genderMale": "Male",
-    "genderFemale": "Female",
-    "myTimeZone": "My time zone",
-    "myTimeZoneDesc": "Affects only your own default dates and statistics. Existing entry dates do not change.",
-    "partner": "Partner's nickname",
-    "partnerDesc": "Changed by your partner in their own settings.",
-    "profileSaveFailed": "Could not save your profile. Try again."
+    "Books": {
+      "title": "Books",
+      "description": "Each record belongs to one book, and every book is read together as the total.",
+      "name": "Name",
+      "namePlaceholder": "Book name",
+      "add": "Add book",
+      "addTitle": "Add a book",
+      "addDesc": "Give the book a short name. It can be renamed or archived later.",
+      "rename": "Rename",
+      "renameTitle": "Rename book",
+      "default": "Total default",
+      "defaultDesc": "Records entered while viewing the total land in this book.",
+      "setDefault": "Set as default",
+      "timeZone": "Time zone",
+      "timeZoneDesc": "Dates uploads through this book's API keys. Automatic uses the server time.",
+      "timeZoneAuto": "Automatic",
+      "timeZoneAutoDetected": "Automatic ({timeZone})",
+      "moveUp": "Move {name} up",
+      "moveDown": "Move {name} down",
+      "archive": "Archive",
+      "archiveTitle": "Archive {name}?",
+      "archiveDesc": "Only a book with no records can be archived.",
+      "archived": "Book archived",
+      "hasRecords": "This book still has records, so it can only be archived after they are moved.",
+      "lastBook": "The last book cannot be archived.",
+      "defaultCannotArchive": "The total default book cannot be archived.",
+      "nameTaken": "A book with that name already exists.",
+      "createFailed": "Could not add the book.",
+      "saveFailed": "Could not save the book.",
+      "reorderFailed": "Could not save the order.",
+      "recordsCount": "{count} records",
+      "empty": "No books yet.",
+      "totalBadge": "Total",
+      "changeFailed": "Could not save the book.",
+      "cancel": "Cancel"
+    },
+    "Emails": {
+      "title": "Login emails",
+      "description": "Any address listed here can sign in with a code, or with the shared password.",
+      "add": "Add email",
+      "addTitle": "Add a login email",
+      "addDesc": "We send a code to the new address to confirm it before it can sign in.",
+      "newEmail": "New email address",
+      "sendCode": "Send code",
+      "resendCode": "Resend",
+      "verificationCode": "6-digit code",
+      "verify": "Confirm",
+      "remove": "Remove {email}",
+      "removeTitle": "Remove {email}?",
+      "removeDesc": "The address will no longer be able to sign in. The account must keep at least one.",
+      "lastEmail": "The account must keep at least one login email.",
+      "codeSent": "Verification code sent",
+      "added": "Email added",
+      "removed": "Email removed",
+      "addFailed": "Could not add the email.",
+      "removeFailed": "Could not remove the email.",
+      "invalid_email": "Enter a valid email address.",
+      "invalid_code": "The verification code is incorrect.",
+      "expired_code": "The verification code has expired. Request a new one.",
+      "email_in_use": "That email address is already in use.",
+      "rate_limited": "Please wait before requesting another code.",
+      "locked": "Verification is temporarily locked after too many attempts.",
+      "reauth_required": "Sign in again to continue this action.",
+      "unknown": "Something went wrong. Try again.",
+      "verified": "Verified"
+    },
+    "credentialBookChanged": "Key book updated",
+    "credentialBookChangeFailed": "Could not change the key's book"
   },
   "ServiceCredentials": {
     "title": "API keys",
@@ -765,7 +819,6 @@
     "newCredential": "New Credential",
     "noCredentials": "No service credentials yet",
     "createdAt": "Created at {date}",
-    "owner": "Owner: {owner}",
     "createTitle": "Create New Service Credential",
     "createDesc": "Create a new service credential for external systems to access this ledger.",
     "namePlaceholder": "Credential name (e.g., automatic notes script)",
@@ -780,7 +833,10 @@
     "createFailed": "Failed to create credential",
     "maxActive": "A ledger can have at most 20 active service credentials.",
     "deleteFailed": "Failed to delete credential",
-    "copied": "Credential copied to clipboard"
+    "copied": "Credential copied to clipboard",
+    "book": "Writes to {book}",
+    "bookDesc": "Uploads through this key are filed in its book.",
+    "changeBook": "Change the book for {name}"
   },
   "DateRangeFilter": {
     "thisMonth": "This Month",
@@ -925,7 +981,6 @@
     "errorConfiguration": "Configuration Error",
     "errorConfigurationDesc": "There is a problem with the server configuration. Please contact support.",
     "devSignIn": "Continue as dev",
-    "devSignInAs": "Continue as {name}",
     "devSignInDesc": "Local development only. Opens the single ledger without email delivery.",
     "devSignInFailed": "Failed to start the development session",
     "otpDigitLabel": "Digit {index} of {length}"
@@ -993,10 +1048,31 @@
     "retryError": "Retry failed",
     "retryErrorDescription": "The original result was kept. Please try again."
   },
-  "MemberScope": {
-    "label": "Record scope",
-    "mine": "{nickname} (Me)",
-    "only": "Only {nickname}",
-    "current": "Showing only {nickname}. Open the member switch"
+  "BookScope": {
+    "label": "Book",
+    "all": "All books",
+    "only": "Only {book}",
+    "current": "Showing book {book}. Open the book switcher"
+  },
+  "Setup": {
+    "title": "Set up Cashier",
+    "description": "Create the account, the ledger and your first books. This runs once.",
+    "setupCode": "Setup code",
+    "setupCodeDesc": "Printed to the server's logs when the database is empty.",
+    "email": "Sign-in email",
+    "password": "Password",
+    "passwordDesc": "8–128 characters with at least one letter and one number.",
+    "books": "Books",
+    "bookName": "Book name",
+    "addBook": "Add",
+    "removeBook": "Remove this book",
+    "defaultBook": "Default for the total",
+    "defaultBookDesc": "Records entered while viewing the total land in this book.",
+    "submit": "Create account",
+    "wrongCode": "That setup code is not correct.",
+    "alreadyDone": "Setup has already been completed.",
+    "invalidEmail": "Enter a valid email address.",
+    "weakPassword": "Use 8–128 characters with at least one letter and one number.",
+    "invalidBooks": "Add at least one unique book and pick which one is the default."
   }
 }

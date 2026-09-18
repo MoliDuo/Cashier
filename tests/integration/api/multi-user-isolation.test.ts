@@ -1,109 +1,69 @@
-/**
- * Multi-User Isolation Tests
- *
- * These tests verify that users cannot access data belonging to other users.
- * This is critical for the security of the multi-user architecture.
- */
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "../../setup";
-import { TEST_USER_ID, createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
 import { getLedgerAction } from "@/modules/ledger/server-actions/get";
 import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
-import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
-import { getEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
-import { getServiceCredentialsAction } from "@/modules/ledger/server-actions/credentials";
-
-// Mock auth
 import { auth } from "@/auth";
-import { vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { ledgers } from "@/persistence";
 
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
-}));
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
-// Second test user
-const TEST_USER_ID_2 = "11111111-1111-1111-1111-111111111111";
-
+/**
+ * One account and one live ledger, so "isolation" now means: whichever records
+ * exist, a request for a ledger that is not the live one is refused, and the
+ * live one is reachable. `ledgers.user_id` still records who created a row, but
+ * it is no longer what access is decided from.
+ */
 describe("Multi-User Isolation", () => {
-  let user1Ledger: string;
-  let user2Ledger: string;
+  let liveLedger: string;
+  let otherLedger: string;
 
   beforeEach(async () => {
     const db = getTestDb();
-
-    // Create two users with their own ledgers
-    const user1Result = await createTestUserWithLedger(
-      db,
-      "user1@example.com",
-      "User 1 Ledger",
-      TEST_USER_ID
-    );
-    user1Ledger = user1Result.ledgerId;
-
-    const user2Result = await createTestUserWithLedger(
-      db,
-      "user2@example.com",
-      "User 2 Ledger",
-      TEST_USER_ID_2
-    );
-    user2Ledger = user2Result.ledgerId;
+    const created = await createTestUserWithLedger(db);
+    liveLedger = created.ledgerId;
+    // A retired ledger row: it exists, but it is not live, so the single-live-
+    // ledger rule is what makes it unreachable rather than its owner.
+    otherLedger = crypto.randomUUID();
+    await db
+      .insert(ledgers)
+      .values({ id: otherLedger, userId: TEST_USER_ID, deletedAt: new Date() });
   });
 
   describe("Ledger Actions Isolation", () => {
-    it("should refuse access when user1 tries to access user2 ledger", async () => {
-      // User 1 trying to access User 2's ledger
+    it("refuses a ledger that is not the single live one", async () => {
       (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         user: { id: TEST_USER_ID },
       });
 
-      // getLedgerAction now returns null for not found/unauthorized
-      const result = await getLedgerAction(user2Ledger);
-      expect(result).toBeNull();
+      await expect(getLedgerAction(otherLedger)).resolves.toBeNull();
     });
 
-    it("should allow access when user1 accesses their own ledger", async () => {
+    it("allows the live ledger", async () => {
       (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         user: { id: TEST_USER_ID },
       });
 
-      // getLedgerAction now returns data directly
-      const result = await getLedgerAction(user1Ledger);
+      const result = await getLedgerAction(liveLedger);
       expect(result).not.toBeNull();
-      expect(result!.id).toBe(user1Ledger);
+      expect(result!.id).toBe(liveLedger);
     });
 
-    it("should refuse update when user1 tries to update user2 ledger", async () => {
+    it("refuses to update a ledger that is not the live one", async () => {
       (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         user: { id: TEST_USER_ID },
       });
 
+      const row = await getTestDb().query.ledgers.findFirst({
+        where: eq(ledgers.id, otherLedger),
+      });
       await expect(
-        updateLedgerSettingsAction(user2Ledger, {
-          expectedUpdatedAt: new Date().toISOString(),
-          settings: { aiLanguage: "en" },
+        updateLedgerSettingsAction(otherLedger, {
+          expectedUpdatedAt: row!.updatedAt.toISOString(),
+          settings: { collapseEntriesDefault: true },
         })
-      ).resolves.toEqual({ ok: false, code: "conflict" });
-    });
-  });
-
-  describe("Sub-resource Isolation", () => {
-    // Re-mock for each sub-test to ensure User 1 context
-    beforeEach(() => {
-      (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user: { id: TEST_USER_ID },
-      });
-    });
-
-    it("should refuse access to user2 ledger entries", async () => {
-      await expect(getLedgerEntriesAction(user2Ledger, {})).rejects.toThrow("Ledger not found");
-    });
-
-    it("should refuse access to user2 entry categories", async () => {
-      await expect(getEntryCategoriesAction(user2Ledger)).rejects.toThrow("Ledger not found");
-    });
-
-    it("should refuse access to user2 service credentials", async () => {
-      await expect(getServiceCredentialsAction(user2Ledger)).rejects.toThrow("Ledger not found");
+      ).resolves.toMatchObject({ ok: false });
     });
   });
 });

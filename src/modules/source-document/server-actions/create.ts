@@ -10,14 +10,12 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { omitUndefinedProperties } from "@/lib/validation";
 import { createAndQueueSourceDocument } from "../application/use-cases/create-and-queue-source-document";
+import { resolveRecordBook } from "../server/resolve-record-book";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
 import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
-import { isCoupleMember } from "@/lib/couple-config";
-import { ValidationError } from "@/lib/errors";
-import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
 
 /**
  * Create a new source document and trigger processing.
@@ -29,15 +27,13 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     clientSubmissionId: string
   ): Promise<CreateSourceDocumentResponseDto> => {
     const validated = createSourceDocumentInputSchema.parse(input);
-    const attributedUserId = validated.attributedUserId ?? userId;
-    if (!isCoupleMember(attributedUserId)) throw new ValidationError("Invalid member attribution");
     const validatedClientSubmissionId = clientSubmissionIdSchema.parse(clientSubmissionId);
     const payload = omitUndefinedProperties(validated);
-    // The zone sent with the request wins; otherwise the signed-in member's
-    // own, so a record written from a phone abroad still lands on their day.
-    const members = await getCoupleMembers(serverComposition.userProfiles);
-    const timezone =
-      payload.timezone ?? members.find((member) => member.id === userId)?.timeZone ?? undefined;
+    // The book is what owns the date zone: the record belongs to it, so an
+    // upload through 哞哞的 is dated in that book's zone unless the request sent
+    // its own. The zone is resolved before the write, never inside it.
+    const book = await resolveRecordBook(ledgerId, validated.bookId, serverComposition.books);
+    const timezone = payload.timezone ?? book.timeZone;
     const scheduleProcessing = (job: ProcessingJobContract) => {
       scheduleProcessingAfter(job);
     };
@@ -45,15 +41,14 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     const result = await createAndQueueSourceDocument(
       {
         ledgerId,
-        attributedUserId,
-        createdByUserId: userId,
+        bookId: book.id,
         input: {
           kind: "stored",
           ...(payload.text == null ? {} : { text: payload.text }),
           storedFileIds: payload.storedFileIds ?? [],
         },
         ...(payload.documentDate == null ? {} : { documentDate: payload.documentDate }),
-        ...(timezone === undefined ? {} : { timezone }),
+        ...(timezone == null ? {} : { timezone }),
         idempotency: {
           principalType: "user",
           principalId: userId,

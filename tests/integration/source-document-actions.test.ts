@@ -4,12 +4,11 @@ import { eq } from "drizzle-orm";
 import { getSourceDocumentLightAction } from "@/modules/source-document/server/get-document-light";
 import { getTestDb } from "../setup";
 import {
-  ledgers,
-  sourceDocuments,
-  users,
-  ledgerEntries,
   entryCategories,
+  ledgerEntries,
+  ledgers,
   revisionFiles,
+  sourceDocuments,
   storedFiles,
 } from "@/persistence";
 import {
@@ -22,7 +21,8 @@ import { v4 as uuidv4 } from "uuid";
 import { NotFoundError } from "@/lib/errors";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  createTestUserWithLedger,
+  ensureTestLedgerBooks,
 } from "../helpers/schema-setup";
 import { getTargetSourceDocumentAccessContext } from "@/application/adapters/postgres/source-document-reads";
 import { createProcessingRevisionInTransaction } from "@/application/adapters/postgres/revisions";
@@ -53,7 +53,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id, {
       title: "Test Receipt",
@@ -61,7 +61,7 @@ describe("getSourceDocumentLightAction", () => {
     });
     await db.insert(sourceDocuments).values({
       ...docData,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, docData.id, { text: "Lunch for 25.50" });
 
@@ -80,14 +80,14 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
     await db.insert(sourceDocuments).values({
       ...docData,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
@@ -107,12 +107,12 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id);
     await db.insert(sourceDocuments).values({
       ...docData,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     const revisionId = await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
@@ -143,12 +143,12 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
 
     const docData = createSourceDocumentData(ledgerData.id);
     await db.insert(sourceDocuments).values({
       ...docData,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
@@ -175,7 +175,7 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
 
     const categoryData = createCategoryData(ledgerData.id);
     await db.insert(entryCategories).values(categoryData);
@@ -183,7 +183,7 @@ describe("getSourceDocumentLightAction", () => {
     const docData = createSourceDocumentData(ledgerData.id);
     await db.insert(sourceDocuments).values({
       ...docData,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
 
     const entryData = createLedgerEntryData(ledgerData.id, {
@@ -214,38 +214,32 @@ describe("getSourceDocumentLightAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData({ userId: testUserId });
     await db.insert(ledgers).values(ledgerData);
-    await configureTestCoupleLedger(db, ledgerData.id);
+    await ensureTestLedgerBooks(db, ledgerData.id);
 
     const result = await getSourceDocumentLightAction(ledgerData.id, uuidv4());
     expect(result).toBeNull();
   });
 
-  it("documents that inaccessible ledgers surface NotFoundError semantics", async () => {
+  it("surfaces NotFoundError for a ledger that is not the single live one", async () => {
     const db = getTestDb();
-    const otherUserId = "33333333-3333-3333-3333-333333333333";
-    await db
-      .insert(users)
-      .values({
-        id: otherUserId,
-        email: "other3@example.com",
-        name: "Other User 3",
-        nickname: "B",
-        gender: "female",
-        emailVerified: new Date(),
-      })
-      .onConflictDoNothing();
+    const { ledgerId: liveLedgerId } = await createTestUserWithLedger(db);
+    await ensureTestLedgerBooks(db, liveLedgerId);
 
-    const ledgerData = createLedgerData({ userId: otherUserId });
-    await db.insert(ledgers).values(ledgerData);
-
-    const docData = createSourceDocumentData(ledgerData.id);
+    // A second ledger row that is not live: the access wrapper answers NotFound
+    // rather than revealing that the row (and its documents) exist.
+    const otherLedgerId = uuidv4();
+    await db.insert(ledgers).values({ id: otherLedgerId, userId: testUserId });
+    await ensureTestLedgerBooks(db, otherLedgerId);
+    const docData = createSourceDocumentData(otherLedgerId);
     await db.insert(sourceDocuments).values({
       ...docData,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${docData.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
 
-    // withSourceDocumentLedgerAccess preserves ledger-not-found semantics for inaccessible ledgers.
-    await expect(getSourceDocumentLightAction(ledgerData.id, docData.id)).rejects.toBeInstanceOf(
+    await expect(getSourceDocumentLightAction(otherLedgerId, docData.id)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
+    await expect(getSourceDocumentLightAction(uuidv4(), docData.id)).rejects.toBeInstanceOf(
       NotFoundError
     );
   });

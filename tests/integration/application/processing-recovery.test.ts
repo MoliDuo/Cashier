@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   PostgresProcessingJobAdapter,
   postgresSourceDocumentSubmissionAdapter,
@@ -12,7 +12,6 @@ import type { ProcessingJobContract } from "@/application/contracts";
 import {
   processingAttempts,
   processingOutbox,
-  ledgers,
   sourceDocuments,
   sourceDocumentRevisions,
 } from "@/persistence";
@@ -27,11 +26,11 @@ async function pendingIntent(
 ): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db, ledgerId);
   const pending = await postgresRevisionAdapter.createProcessingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-    attributedUserId: userId,
-    createdByUserId: userId,
+    bookId: bookId,
   });
   return {
     ledgerId,
@@ -279,21 +278,16 @@ describe("Processing Recovery", () => {
     await adapter.dispatch(intent1);
 
     // Create 2 more source documents in the same ledger
-    const [ledgerOwner] = await getTestDb()
-      .select({ userId: ledgers.userId })
-      .from(ledgers)
-      .where(eq(ledgers.id, ledgerId));
+    const bookId = await testBookId(getTestDb(), ledgerId);
     const pending2 = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-      attributedUserId: ledgerOwner!.userId,
-      createdByUserId: ledgerOwner!.userId,
+      bookId,
     });
     const pending3 = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: "Coffee 5.00 CNY", storedFileIds: [], documentDate: null },
-      attributedUserId: ledgerOwner!.userId,
-      createdByUserId: ledgerOwner!.userId,
+      bookId,
     });
 
     const intent2: ProcessingJobContract = {
@@ -509,8 +503,7 @@ describe("Processing retry supersession", () => {
     const first = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const processing = new PostgresProcessingJobAdapter();
     const oldClaim = await processing.claim(first.job.id);
@@ -521,7 +514,7 @@ describe("Processing retry supersession", () => {
       sourceDocumentId: first.document.id,
       inheritInput: true,
       supersedeProcessing: true,
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     const [document, oldRevision, oldOutbox, oldAttempt] = await Promise.all([

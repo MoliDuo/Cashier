@@ -84,8 +84,8 @@ export const postgresOtpTokenAdapter: OtpTokenPort = {
       .returning({ id: otpTokens.id });
     return rows.length === 1;
   },
-  async release(input) {
-    const rows = await db
+  async release(input): Promise<void> {
+    await db
       .update(otpTokens)
       .set({ verifiedAt: null })
       .where(
@@ -94,9 +94,7 @@ export const postgresOtpTokenAdapter: OtpTokenPort = {
           eq(otpTokens.tokenHash, input.tokenHash),
           sql`${otpTokens.verifiedAt} is not null`
         )
-      )
-      .returning({ id: otpTokens.id });
-    return rows.length === 1;
+      );
   },
   async consume(input) {
     const rows = await db

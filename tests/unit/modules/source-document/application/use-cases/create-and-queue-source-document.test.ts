@@ -39,8 +39,7 @@ describe("createAndQueueSourceDocument", () => {
       createAndQueueSourceDocument(
         {
           ledgerId: "ledger-1",
-          attributedUserId: "user-1",
-          createdByUserId: "user-1",
+          bookId: "user-1",
           input: { kind: "stored", storedFileIds: [] },
         },
         dependencies
@@ -53,8 +52,7 @@ describe("createAndQueueSourceDocument", () => {
     const result = await createAndQueueSourceDocument(
       {
         ledgerId: "ledger-1",
-        attributedUserId: "user-1",
-        createdByUserId: "user-1",
+        bookId: "user-1",
         input: { kind: "stored", text: "Lunch receipt", storedFileIds: ["file-1"] },
         documentDate: "2026-07-15",
       },
@@ -63,8 +61,7 @@ describe("createAndQueueSourceDocument", () => {
 
     expect(submit).toHaveBeenCalledWith({
       ledgerId: "ledger-1",
-      attributedUserId: "user-1",
-      createdByUserId: "user-1",
+      bookId: "user-1",
       input: {
         text: "Lunch receipt",
         storedFileIds: ["file-1"],
@@ -100,8 +97,7 @@ describe("createAndQueueSourceDocument", () => {
     await createAndQueueSourceDocument(
       {
         ledgerId: "ledger-1",
-        attributedUserId: "user-1",
-        createdByUserId: "user-1",
+        bookId: "user-1",
         input: {
           kind: "inline",
           images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],
@@ -131,8 +127,7 @@ describe("createAndQueueSourceDocument", () => {
     await createAndQueueSourceDocument(
       {
         ledgerId: "ledger-1",
-        attributedUserId: "user-1",
-        createdByUserId: "user-1",
+        bookId: "user-1",
         input: {
           kind: "inline",
           images: [{ bytes, mimeType: "image/jpeg", contentHash: "hash" }],
@@ -171,8 +166,7 @@ describe("createAndQueueSourceDocument", () => {
       createAndQueueSourceDocument(
         {
           ledgerId: "ledger-1",
-          attributedUserId: "user-1",
-          createdByUserId: "user-1",
+          bookId: "user-1",
           input: {
             kind: "inline",
             images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
 import { StatsTab } from "@/modules/workspace/ui/StatsTab";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 
@@ -54,7 +55,26 @@ const statsFixture: EnhancedStatsDto = {
   },
 };
 
-function renderStatsTab() {
+const books: BookDto[] = [
+  {
+    id: "book-1",
+    ledgerId: "ledger-1",
+    name: "Mine",
+    timeZone: null,
+    sortOrder: 1,
+    isDefault: true,
+  },
+  {
+    id: "book-2",
+    ledgerId: "ledger-1",
+    name: "Shared",
+    timeZone: null,
+    sortOrder: 2,
+    isDefault: false,
+  },
+];
+
+function renderStatsTab(bookId?: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -62,9 +82,8 @@ function renderStatsTab() {
     <QueryClientProvider client={queryClient}>
       <StatsTab
         ledgerId="ledger-1"
-        userId="user-1"
-        partnerUserId="user-2"
-        scopeOwnerId={null}
+        books={books}
+        {...(bookId == null ? {} : { bookId })}
         ledger={ledgerFixture}
         ledgerToday="2026-08-24"
       />
@@ -79,17 +98,12 @@ describe("StatsTab", () => {
     searchParamsState.current = new URLSearchParams();
   });
 
-  it("shows combined and individual totals, and charts the member the page picked", async () => {
+  it("shows per-book totals alongside the total, and charts the book the page picked", async () => {
     vi.mocked(getEnhancedStats).mockImplementation(async (input) => ({
       ...statsFixture,
       summary: {
         ...statsFixture.summary,
-        total:
-          input.attributedUserId === "user-1"
-            ? "40"
-            : input.attributedUserId === "user-2"
-              ? "80"
-              : "120",
+        total: input.bookId === "book-1" ? "40" : input.bookId === "book-2" ? "80" : "120",
       },
     }));
     const { rerender, queryClient } = renderStatsTab();
@@ -100,9 +114,8 @@ describe("StatsTab", () => {
       <QueryClientProvider client={queryClient}>
         <StatsTab
           ledgerId="ledger-1"
-          userId="user-1"
-          partnerUserId="user-2"
-          scopeOwnerId="user-2"
+          books={books}
+          bookId="book-2"
           ledger={ledgerFixture}
           ledgerToday="2026-08-24"
         />
@@ -110,9 +123,7 @@ describe("StatsTab", () => {
     );
     await waitFor(() =>
       expect(
-        vi
-          .mocked(getEnhancedStats)
-          .mock.calls.some(([input]) => input.attributedUserId === "user-2")
+        vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.bookId === "book-2")
       ).toBe(true)
     );
   });

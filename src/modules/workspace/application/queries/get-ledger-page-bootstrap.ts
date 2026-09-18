@@ -21,7 +21,8 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
 import type { CategoryPort } from "@/application/contracts";
 import type { ServiceCredentialPort } from "@/application/contracts";
-import type { MemberProfileContract, UserProfilePort } from "@/application/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
+import type { BookPort } from "@/application/contracts";
 import type { LedgerReadPort } from "@/modules/ledger/application/ports";
 import type { StatsReadPort } from "@/modules/stats/application/ports";
 import type {
@@ -29,6 +30,7 @@ import type {
   SourceDocumentReadPort,
 } from "@/modules/source-document/application/ports";
 import { getLedgerSettingsView } from "@/modules/ledger/application/queries/get-ledger-settings-view";
+import { toBookDto } from "@/modules/ledger/application/queries/list-books";
 import type { EntryCategoryWithCountDto } from "@/modules/ledger/contracts";
 import {
   buildDetailsQueryDescriptor,
@@ -36,13 +38,12 @@ import {
   buildStreamQueryDescriptor,
 } from "@/modules/workspace/ledger-tab-query-descriptors";
 import type { StatsUrlState } from "@/modules/workspace/ledger-url-params";
-import { getCoupleMembers } from "@/modules/auth/application/queries/get-couple-members";
 
 interface LedgerPageBootstrapResult {
   dehydratedState: DehydratedState;
   ledgerToday: string;
   initialCategories: EntryCategoryWithCountDto[];
-  initialMembers: readonly MemberProfileContract[];
+  initialBooks: readonly BookDto[];
 }
 
 export interface GetLedgerPageBootstrapInput {
@@ -53,15 +54,15 @@ export interface GetLedgerPageBootstrapInput {
   statsState?: StatsUrlState;
   /** Ledger DTO returned by the authenticated page boundary. */
   ledgerDto: LedgerDto;
-  /** The signed-in member; their own time zone is what this page's dates use. */
-  userId: string;
+  /** The book being viewed, or null for 总账. */
+  bookId?: string | null;
 }
 
 export async function getLedgerPageBootstrap(
   input: GetLedgerPageBootstrapInput,
   dependencies: {
     categories: Pick<CategoryPort, "listWithCount" | "countUncategorized">;
-    profiles: Pick<UserProfilePort, "listMembers">;
+    books: Pick<BookPort, "list">;
     ledgerReads: Pick<
       LedgerReadPort,
       "calculateStats" | "listEntries" | "listEntriesBySourceDocumentIds"
@@ -82,17 +83,22 @@ export async function getLedgerPageBootstrap(
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
 
   const mainCurrency = ledgerDto.settings.mainCurrency;
-  // The viewer's own zone, not a ledger-wide one: the two members live in
-  // different places, so "today" is a property of who is looking.
-  const members = await getCoupleMembers(dependencies.profiles);
-  queryClient.setQueryData(queryKeys.coupleMembers(input.ledgerId), members);
-  const fixedTimeZone =
-    members.find((member) => member.id === input.userId)?.timeZone ?? runtimeEnv.timeZone;
+  // The zone the page is read in is the viewed book's; 总账 uses the default
+  // book's zone, because "today" has to be one day even when the books differ.
+  const books = (await dependencies.books.list(input.ledgerId)).map(toBookDto);
+  queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
+  const viewedBook =
+    books.find((book) => book.id === input.bookId) ??
+    books.find((book) => book.isDefault) ??
+    books[0] ??
+    null;
+  const fixedTimeZone = viewedBook?.timeZone ?? runtimeEnv.timeZone;
   const zonedToday = getDateInTimezone(fixedTimeZone);
   const ledgerToday = zonedToday ?? getDateInTimezone("UTC")!;
   const initialStatsDate = parseDateString(ledgerToday);
   const detailsDescriptor = buildDetailsQueryDescriptor({
     ledgerId: input.ledgerId,
+    ...(input.bookId == null ? {} : { bookId: input.bookId }),
     periodParams: input.periodParams,
     ...(input.advancedFilters !== undefined ? { advancedFilters: input.advancedFilters } : {}),
     ...(fixedTimeZone !== undefined ? { timeZone: fixedTimeZone } : {}),
@@ -110,6 +116,7 @@ export async function getLedgerPageBootstrap(
   });
   const streamDescriptor = buildStreamQueryDescriptor({
     ledgerId: input.ledgerId,
+    ...(input.bookId == null ? {} : { bookId: input.bookId }),
     startDate: detailsDescriptor.startDateStr,
     endDate: detailsDescriptor.endDateStr,
     minAmount: input.advancedFilters?.minAmount,
@@ -241,6 +248,6 @@ export async function getLedgerPageBootstrap(
     dehydratedState: dehydrate(queryClient),
     ledgerToday,
     initialCategories,
-    initialMembers: members,
+    initialBooks: books,
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   postgresCategoryAdapter,
   postgresCurrencyAdapter,
@@ -16,6 +16,7 @@ describe("current-runtime target adapters", () => {
   it("implements ledger, category, currency, settings, auth, and credential ports", async () => {
     const db = getTestDb();
     const { userId, ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
     await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
     await db.insert(entryCategories).values({ ledgerId, name: "Food" });
     await db.insert(currencyRates).values({
@@ -28,7 +29,7 @@ describe("current-runtime target adapters", () => {
       id: credentialId,
       ledgerId,
       tokenHash: computeHash("secret-key"),
-      attributedUserId: userId,
+      bookId: bookId,
       tokenPrefix: "secret-k",
       tokenSuffix: "-key",
       name: "API",
@@ -43,7 +44,7 @@ describe("current-runtime target adapters", () => {
     await expect(postgresServiceCredentialAdapter.authenticate("secret-key")).resolves.toEqual({
       id: credentialId,
       ledgerId,
-      attributedUserId: userId,
+      bookId: bookId,
     });
   });
 });

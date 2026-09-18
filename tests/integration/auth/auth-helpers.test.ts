@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
-import { ledgers, users } from "@/persistence";
+import { ledgers, loginEmails, users } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { configureTestCoupleLedger } from "../../helpers/schema-setup";
+import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
 // Override the global auth mock for specific tests
 vi.mock("@/auth", () => ({
@@ -42,7 +42,7 @@ describe("requireLedgerAccess", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("returns userId and ledger when user owns the ledger", async () => {
@@ -55,17 +55,12 @@ describe("requireLedgerAccess", () => {
     const db = getTestDb();
     const otherUserId = uuidv4();
 
-    await db
-      .insert(users)
-      .values({
-        id: otherUserId,
-        email: "other@example.com",
-        name: "Other User",
-        nickname: "B",
-        gender: "female",
-        emailVerified: new Date(),
-      })
-      .onConflictDoNothing();
+    await db.insert(users).values({ id: otherUserId }).onConflictDoNothing();
+    await db.insert(loginEmails).values({
+      userId: otherUserId,
+      email: "other@example.com",
+      emailVerified: new Date(),
+    });
 
     const otherLedgerId = uuidv4();
     await db.insert(ledgers).values({
@@ -87,17 +82,12 @@ describe("requireLedgerAccess", () => {
 
     // Use a different user to avoid unique constraint violation
     // (TEST_USER_ID already has a ledger from beforeEach)
-    await db
-      .insert(users)
-      .values({
-        id: anotherUserId,
-        email: `deleted-ledger-${uuidv4()}@example.com`,
-        name: "Another User",
-        nickname: "B",
-        gender: "female",
-        emailVerified: new Date(),
-      })
-      .onConflictDoNothing();
+    await db.insert(users).values({ id: anotherUserId }).onConflictDoNothing();
+    await db.insert(loginEmails).values({
+      userId: anotherUserId,
+      email: `deleted-ledger-${uuidv4()}@example.com`,
+      emailVerified: new Date(),
+    });
 
     await db.insert(ledgers).values({
       id: deletedLedgerId,

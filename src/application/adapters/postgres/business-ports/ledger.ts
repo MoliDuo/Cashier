@@ -1,48 +1,54 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { LedgerPort } from "@/application/contracts";
 import { db } from "@/lib/db";
-import { getCoupleConfig, isCoupleMember } from "@/lib/couple-config";
 import { ledgers, users } from "@/persistence";
 
 import { mapLedgerSettings } from "./shared";
 
-async function membersAreActive(ownerId: string, partnerId: string): Promise<boolean> {
+async function accountIsActive(userId: string): Promise<boolean> {
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(inArray(users.id, [ownerId, partnerId]), isNull(users.deletedAt)));
-  return rows.length === 2;
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .limit(1);
+  return rows.length === 1;
+}
+
+/**
+ * There is one account and one ledger, and both are found by query rather than
+ * from configured UUIDs: the `COUPLE_*` config is gone. "Exactly one live row"
+ * is what the lookups enforce, so a second live ledger — or a deleted account —
+ * closes access instead of widening it.
+ */
+async function singleLiveLedger() {
+  const rows = await db.select().from(ledgers).where(isNull(ledgers.deletedAt)).limit(2);
+  return rows.length === 1 ? rows[0]! : null;
+}
+
+/**
+ * The single live ledger's id, for callers that only need to know which ledger
+ * the session is allowed to touch. Exported beside the port so storage adapters
+ * do not have to know how "there is one ledger" is decided.
+ */
+export async function findSingleLiveLedgerId(): Promise<string | null> {
+  const rows = await db
+    .select({ id: ledgers.id })
+    .from(ledgers)
+    .where(isNull(ledgers.deletedAt))
+    .limit(2);
+  return rows.length === 1 ? rows[0]!.id : null;
 }
 
 export const postgresLedgerAdapter: LedgerPort = {
   async canAccess(ledgerId, userId) {
-    const couple = getCoupleConfig();
-    if (
-      couple == null ||
-      ledgerId !== couple.ledgerId ||
-      !isCoupleMember(userId) ||
-      !(await membersAreActive(couple.ownerId, couple.partnerId))
-    )
-      return false;
-    const row = await db
-      .select({ id: ledgers.id })
-      .from(ledgers)
-      .where(and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)))
-      .limit(1);
-    return row.length === 1;
+    if (!(await accountIsActive(userId))) return false;
+    const row = await singleLiveLedger();
+    return row != null && row.id === ledgerId;
   },
 
   async getSharedForMember(userId) {
-    const couple = getCoupleConfig();
-    if (
-      couple == null ||
-      !isCoupleMember(userId) ||
-      !(await membersAreActive(couple.ownerId, couple.partnerId))
-    )
-      return null;
-    const row = await db.query.ledgers.findFirst({
-      where: and(eq(ledgers.id, couple.ledgerId), isNull(ledgers.deletedAt)),
-    });
+    if (!(await accountIsActive(userId))) return null;
+    const row = await singleLiveLedger();
     return row == null
       ? null
       : {

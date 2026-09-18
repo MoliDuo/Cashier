@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
-import { ledgers, ledgerEntries, entryCategories, users } from "@/persistence";
+import { entryCategories, ledgerEntries, ledgers, loginEmails, users } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { v4 as uuidv4 } from "uuid";
 import { eq } from "drizzle-orm";
@@ -14,7 +14,7 @@ import {
 } from "@/modules/ledger/server-actions/categories";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
 async function getTargetEntryCategoriesAction(ledgerId: string) {
@@ -44,7 +44,7 @@ describe("createEntryCategoryAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("creates a category synchronously with user-provided/default metadata", async () => {
@@ -74,17 +74,12 @@ describe("createEntryCategoryAction", () => {
     const otherUserId = uuidv4();
 
     // Create another user first with unique email
-    await db
-      .insert(users)
-      .values({
-        id: otherUserId,
-        email: `other-${uuidv4()}@example.com`,
-        name: "Other User",
-        nickname: "B",
-        gender: "female",
-        emailVerified: new Date(),
-      })
-      .onConflictDoNothing();
+    await db.insert(users).values({ id: otherUserId }).onConflictDoNothing();
+    await db.insert(loginEmails).values({
+      userId: otherUserId,
+      email: `other-${uuidv4()}@example.com`,
+      emailVerified: new Date(),
+    });
 
     await db.insert(ledgers).values({
       id: ledgerId2,
@@ -144,7 +139,7 @@ describe("deleteEntryCategoryAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("soft-deletes the category", async () => {
@@ -180,7 +175,7 @@ describe("deleteEntryCategoryAction", () => {
       .values({
         id: uuidv4(),
         ledgerId,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(doc).toBeDefined();
@@ -224,7 +219,7 @@ describe("reorderEntryCategoriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("updates sortOrder for each category", async () => {
@@ -276,7 +271,7 @@ describe("getEntryCategoriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("returns categories sorted by sortOrder", async () => {
@@ -320,7 +315,7 @@ describe("getEntryCategoriesAction", () => {
       .values({
         id: uuidv4(),
         ledgerId,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(doc).toBeDefined();
@@ -370,7 +365,7 @@ describe("getEntryCategoriesAction", () => {
       .values({
         id: uuidv4(),
         ledgerId,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(activeDoc).toBeDefined();
@@ -384,7 +379,7 @@ describe("getEntryCategoriesAction", () => {
         id: uuidv4(),
         ledgerId,
         deletedAt: new Date(),
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(deletedDoc).toBeDefined();

@@ -176,8 +176,8 @@ export interface SourceDocumentPort {
       ledgerId: LedgerId;
       input: SourceDocumentInputContract;
     } & (
-      | { sourceDocumentId: SourceDocumentId; attributedUserId?: string; createdByUserId?: string }
-      | { sourceDocumentId?: never; attributedUserId: string; createdByUserId: string }
+      | { sourceDocumentId: SourceDocumentId; bookId?: string }
+      | { sourceDocumentId?: never; bookId: string }
     )
   ): Promise<{ document: SourceDocumentContract; revision: SourceDocumentRevisionContract }>;
   markProcessing(input: {
@@ -217,8 +217,8 @@ export type SourceDocumentSubmissionInput = {
   inheritInput?: boolean;
   supersedeProcessing?: boolean;
 } & (
-  | { sourceDocumentId: SourceDocumentId; attributedUserId?: string; createdByUserId?: string }
-  | { sourceDocumentId?: never; attributedUserId: string; createdByUserId: string }
+  | { sourceDocumentId: SourceDocumentId; bookId?: string }
+  | { sourceDocumentId?: never; bookId: string }
 );
 
 export interface SourceDocumentInputContract {

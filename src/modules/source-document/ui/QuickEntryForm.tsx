@@ -24,7 +24,7 @@ import { Link } from "@/i18n/routing";
 
 interface QuickEntryFormProps {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   categories: EntryCategory[];
   mainCurrency?: string;
   preferredCurrencies?: string[];
@@ -36,7 +36,7 @@ interface QuickEntryFormProps {
 
 export function QuickEntryForm({
   ledgerId,
-  attributedUserId,
+  bookId,
   categories,
   mainCurrency = "CNY",
   preferredCurrencies = [],
@@ -64,7 +64,7 @@ export function QuickEntryForm({
     isDirty,
   } = useQuickEntryFormController({
     ledgerId,
-    ...(attributedUserId == null ? {} : { attributedUserId }),
+    ...(bookId == null ? {} : { bookId }),
     categories,
     mainCurrency,
     ...(timeZone != null ? { timeZone } : {}),

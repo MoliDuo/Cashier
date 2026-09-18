@@ -26,7 +26,7 @@ import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
@@ -38,7 +38,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
       id: uuidv4(),
       ledgerId,
       documentDate: entryDate ?? null,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -74,7 +74,7 @@ describe("getLedgerEntriesAction", () => {
       id: ledgerId,
       userId: TEST_USER_ID,
     });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
   });
 
   it("returns paginated entries", async () => {
@@ -389,7 +389,7 @@ describe("getLedgerEntriesAction", () => {
         ledgerId,
         documentDate: "2024-01-15",
         createdAt: new Date("2024-03-01"),
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(docA).toBeDefined();
@@ -405,7 +405,7 @@ describe("getLedgerEntriesAction", () => {
         ledgerId,
         documentDate: "2024-03-15",
         createdAt: new Date("2024-01-01"),
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(docB).toBeDefined();

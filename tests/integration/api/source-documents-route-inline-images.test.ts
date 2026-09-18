@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { POST } from "@/app/api/v1/source-documents/route";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
+import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   ledgers,
   processingOutbox,
@@ -122,7 +122,7 @@ describe("API v1 source-documents route", () => {
         ledgerId,
         name: "Route Credential",
         tokenHash: computeHash(credentialKey),
-        attributedUserId: TEST_USER_ID,
+        bookId: await testBookId(db, ledgerId),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })

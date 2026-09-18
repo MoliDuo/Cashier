@@ -12,8 +12,7 @@ export async function calculateLedgerStats(
     ledgerId,
     filters: {},
   };
-  if (query.attributedUserId !== undefined)
-    payload.filters.attributedUserId = query.attributedUserId;
+  if (query.bookId !== undefined) payload.filters.bookId = query.bookId;
   if (query.startDate !== undefined) payload.filters.startDate = query.startDate;
   if (query.endDate !== undefined) payload.filters.endDate = query.endDate;
   // "__uncategorized__" is only a UI/query sentinel; stats must translate it

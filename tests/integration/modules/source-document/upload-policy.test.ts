@@ -19,7 +19,7 @@ import {
   MAX_FILES,
 } from "@/lib/storage/upload-policy";
 import { sourceDocumentRevisions, storedFiles, uploadSessions } from "@/persistence";
-import { createTestUserWithLedger } from "../../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-setup";
 import { getTestDb } from "../../../setup";
 
 /**
@@ -188,7 +188,8 @@ describe("upload policy integration", () => {
   describe("aggregate byte overflow at revision attachment", () => {
     it("rejects revision attachment when total bytes exceed MAX_NORMALIZED_BYTES_PER_REVISION", async () => {
       const db = getTestDb();
-      const { ledgerId, userId } = await createTestUserWithLedger(db);
+      const { ledgerId } = await createTestUserWithLedger(db);
+      const bookId = await testBookId(db, ledgerId);
       const adapter = createStoredFileAdapter({ storage: new MemoryFileStore() });
 
       // Create enough finalized stored files to overflow the revision aggregate limit.
@@ -212,8 +213,7 @@ describe("upload policy integration", () => {
         db.transaction(async (tx) =>
           createProcessingRevisionInTransaction(tx, {
             ledgerId,
-            attributedUserId: userId,
-            createdByUserId: userId,
+            bookId,
             input: {
               text: null,
               storedFileIds: files.map((f) => f.id),
@@ -230,7 +230,8 @@ describe("upload policy integration", () => {
 
     it("accepts revision attachment when total bytes are within limit", async () => {
       const db = getTestDb();
-      const { ledgerId, userId } = await createTestUserWithLedger(db);
+      const { ledgerId } = await createTestUserWithLedger(db);
+      const bookId = await testBookId(db, ledgerId);
       const adapter = createStoredFileAdapter({ storage: new MemoryFileStore() });
 
       const body = Buffer.from("small-file");
@@ -239,8 +240,7 @@ describe("upload policy integration", () => {
       const result = await db.transaction(async (tx) =>
         createProcessingRevisionInTransaction(tx, {
           ledgerId,
-          attributedUserId: userId,
-          createdByUserId: userId,
+          bookId,
           input: { text: null, storedFileIds: [file.id], documentDate: "2026-07-15" },
         })
       );
@@ -253,7 +253,8 @@ describe("upload policy integration", () => {
   describe("aggregate file count at revision boundary", () => {
     it("rejects revision attachment when file count exceeds MAX_FILES", async () => {
       const db = getTestDb();
-      const { ledgerId, userId } = await createTestUserWithLedger(db);
+      const { ledgerId } = await createTestUserWithLedger(db);
+      const bookId = await testBookId(db, ledgerId);
       const adapter = createStoredFileAdapter({ storage: new MemoryFileStore() });
 
       // Create MAX_FILES + 1 finalized stored files
@@ -266,8 +267,7 @@ describe("upload policy integration", () => {
         db.transaction(async (tx) =>
           createProcessingRevisionInTransaction(tx, {
             ledgerId,
-            attributedUserId: userId,
-            createdByUserId: userId,
+            bookId,
             input: {
               text: null,
               storedFileIds: files.map((f) => f.id),
@@ -284,7 +284,8 @@ describe("upload policy integration", () => {
 
     it("accepts revision attachment at exactly MAX_FILES", async () => {
       const db = getTestDb();
-      const { ledgerId, userId } = await createTestUserWithLedger(db);
+      const { ledgerId } = await createTestUserWithLedger(db);
+      const bookId = await testBookId(db, ledgerId);
       const adapter = createStoredFileAdapter({ storage: new MemoryFileStore() });
 
       const body = Buffer.from("tiny");
@@ -295,8 +296,7 @@ describe("upload policy integration", () => {
       const result = await db.transaction(async (tx) =>
         createProcessingRevisionInTransaction(tx, {
           ledgerId,
-          attributedUserId: userId,
-          createdByUserId: userId,
+          bookId,
           input: {
             text: null,
             storedFileIds: files.map((f) => f.id),
@@ -311,7 +311,8 @@ describe("upload policy integration", () => {
 
     it("rejects revision with duplicate stored-file IDs", async () => {
       const db = getTestDb();
-      const { ledgerId, userId } = await createTestUserWithLedger(db);
+      const { ledgerId } = await createTestUserWithLedger(db);
+      const bookId = await testBookId(db, ledgerId);
       const adapter = createStoredFileAdapter({ storage: new MemoryFileStore() });
 
       const file = await finalizedFile(adapter, ledgerId, Buffer.from("tiny"));
@@ -320,8 +321,7 @@ describe("upload policy integration", () => {
         db.transaction(async (tx) =>
           createProcessingRevisionInTransaction(tx, {
             ledgerId,
-            attributedUserId: userId,
-            createdByUserId: userId,
+            bookId,
             input: {
               text: null,
               storedFileIds: [file.id, file.id],

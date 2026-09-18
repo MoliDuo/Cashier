@@ -9,6 +9,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
+  users,
 } from "@/persistence";
 import * as authModule from "@/auth";
 import { AppError } from "@/lib/errors";
@@ -35,7 +36,7 @@ async function createLinkedStoredFile(ledgerId: string) {
     .insert(sourceDocuments)
     .values({
       ledgerId,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   const [revision] = await db
@@ -94,21 +95,30 @@ describe("GET /api/stored-files/[fileId]", () => {
     expect(body).not.toContain(file.storageKey);
   });
 
-  it("returns 404 for another user without revealing file existence", async () => {
+  it("returns 404 for a deleted account without revealing file existence", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    );
+    const { userId, ledgerId } = await createTestUserWithLedger(db);
     const { file } = await createLinkedStoredFile(ledgerId);
+    // There is one account now, so file reads are scoped by "is the account
+    // live", not by which user created the record.
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, userId));
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
 
     expect(response.status).toBe(404);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(downloadMock).not.toHaveBeenCalled();
+  });
+
+  it("serves a file from the live ledger to the live account", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const { file } = await createLinkedStoredFile(ledgerId);
+
+    const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
+
+    expect(response.status).toBe(200);
+    expect(downloadMock).toHaveBeenCalled();
   });
 
   it("returns 404 after the owning source document is deleted", async () => {

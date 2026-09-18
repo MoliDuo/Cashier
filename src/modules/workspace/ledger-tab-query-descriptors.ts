@@ -28,7 +28,7 @@ export interface StreamQueryDescriptor {
 
 export function buildStreamQueryDescriptor(input: {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   startDate?: string | null | undefined;
   endDate?: string | null | undefined;
   minAmount?: string | null | undefined;
@@ -42,7 +42,7 @@ export function buildStreamQueryDescriptor(input: {
   const statusesKey = canonicalStatuses?.join(",") ?? null;
   const search = normalizeSearchTerm(input.search) ?? null;
   const baseInput = {
-    ...(input.attributedUserId == null ? {} : { attributedUserId: input.attributedUserId }),
+    ...(input.bookId == null ? {} : { bookId: input.bookId }),
     ...(input.startDate != null && input.startDate !== "" ? { startDate: input.startDate } : {}),
     ...(input.endDate != null && input.endDate !== "" ? { endDate: input.endDate } : {}),
     ...(input.minAmount != null ? { minAmount: input.minAmount } : {}),
@@ -51,7 +51,7 @@ export function buildStreamQueryDescriptor(input: {
     ...(search != null ? { search } : {}),
   };
   const keyFilters = {
-    attributedUserId: input.attributedUserId ?? null,
+    bookId: input.bookId ?? null,
     startDate: input.startDate ?? null,
     endDate: input.endDate ?? null,
     minAmount: input.minAmount ?? null,
@@ -81,7 +81,7 @@ export interface StatsQueryDescriptor {
 
 export function buildStatsQueryDescriptor(input: {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   currentDate: Date;
   mainCurrency: string;
   rangeType?: DateRangeType | undefined;
@@ -98,7 +98,7 @@ export function buildStatsQueryDescriptor(input: {
   return {
     state,
     queryKey: queryKeys.enhancedStats(input.ledgerId, {
-      attributedUserId: input.attributedUserId ?? null,
+      bookId: input.bookId ?? null,
       startDate: state.startDateStr,
       endDate: state.endDateStr,
       compareStartDate: state.prevDateStartStr,
@@ -109,7 +109,7 @@ export function buildStatsQueryDescriptor(input: {
     }),
     input: {
       ledgerId: input.ledgerId,
-      ...(input.attributedUserId == null ? {} : { attributedUserId: input.attributedUserId }),
+      ...(input.bookId == null ? {} : { bookId: input.bookId }),
       queryRange: {
         from: state.startDateStr,
         to: state.endDateStr,

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useModalStackStore } from "@/lib/store/modal-stack";
 import { SourceDocumentDetailWrapper } from "@/modules/source-document/ui/SourceDocumentDetailWrapper";
-import type { EntryCategory } from "@/modules/ledger/contracts";
+import type { BookDto, EntryCategory } from "@/modules/ledger/contracts";
 import { closeLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 import { ledgerDetailLeaveGuardKey } from "@/lib/navigation/ledger-detail-key";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 export interface ModalStackRendererProps {
-  userId?: string;
-  partnerUserId?: string;
+  /** The live books, so an open record can be moved between them. */
+  books: readonly BookDto[];
   categories: EntryCategory[];
   mainCurrency: string;
   preferredCurrencies: string[];
@@ -16,8 +16,7 @@ export interface ModalStackRendererProps {
 }
 
 export function ModalStackRenderer({
-  userId = "",
-  partnerUserId = "",
+  books,
   categories,
   mainCurrency,
   preferredCurrencies,
@@ -64,8 +63,7 @@ export function ModalStackRenderer({
     const key = `${stackItem.type}:${stackItem.ledgerId}:${stackItem.id}`;
     const isTop = index === stack.length - 1;
     const sharedProps = {
-      userId,
-      partnerUserId,
+      books,
       id: stackItem.id,
       ledgerId: stackItem.ledgerId,
       open: isTop && open,

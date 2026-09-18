@@ -15,7 +15,6 @@ import {
   releaseResendCooldown,
 } from "@/modules/auth/services/otp-rate-limit";
 import { generateOTP, getResendCooldown } from "@/modules/auth/services/otp";
-import { isMemberLoginAllowed } from "./member-login-policy";
 import type { EmailDeliveryPort, OtpTokenPort, UserAccountPort } from "@/application/contracts";
 import type { RateLimiterPort } from "@/application/contracts";
 
@@ -100,7 +99,7 @@ export async function sendOTP(
   }
   const canResendAt = Math.floor(cooldown.acquiredAt.getTime() / 1000) + getResendCooldown();
 
-  if (!(await isMemberLoginAllowed(normalizedEmail, dependencies.users))) {
+  if ((await dependencies.users.findByEmail(normalizedEmail)) == null) {
     const expiresAt = new Date(cooldown.acquiredAt.getTime() + runtimeEnv.otpExpiresSeconds * 1000);
     return {
       expiresIn: runtimeEnv.otpExpiresSeconds,

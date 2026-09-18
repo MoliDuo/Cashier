@@ -10,7 +10,8 @@
     "Metadata",
     "NotFound",
     "ServiceWorkerUpdate",
-    "MemberScope"
+    "Setup",
+    "BookScope"
   ],
   "stream": [
     "BatchActions",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { users } from "@/persistence";
+import { loginEmails, users } from "@/persistence";
 import { serverComposition } from "@/application/server-composition-root";
 import { setPassword } from "@/modules/auth/application/use-cases/set-password";
 import { changePassword } from "@/modules/auth/application/use-cases/change-password";
@@ -12,9 +12,11 @@ describe("password auth version", () => {
     const userId = crypto.randomUUID();
     await db.insert(users).values({
       id: userId,
+    });
+    await db.insert(loginEmails).values({
+      userId: userId,
       email: `password-${userId}@example.com`,
-      nickname: "A",
-      gender: "male",
+      emailVerified: new Date(),
     });
 
     await setPassword(

@@ -8,7 +8,7 @@ import {
   getTargetSourceDocument,
 } from "@/application/adapters/postgres";
 import { ledgerEntries, processingOutbox, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
 const projectionEntry = {
@@ -28,8 +28,7 @@ describe("local contract release", () => {
     const pending = await postgresSourceDocumentSubmissionAdapter.submit({
       ledgerId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     const created = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, pending.document.id),
@@ -73,7 +72,7 @@ describe("local contract release", () => {
       id: legacyDocumentId,
       ledgerId,
       deletedAt: new Date("2026-07-16T00:00:00.000Z"),
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     const beforeDocument = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, legacyDocumentId),
@@ -84,8 +83,7 @@ describe("local contract release", () => {
       ledgerId,
       title: "Target-only entry",
       entries: [projectionEntry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     expect(
@@ -101,8 +99,7 @@ describe("local contract release", () => {
       ledgerId,
       inputText: "target revision text",
       entries: [projectionEntry],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     await expect(

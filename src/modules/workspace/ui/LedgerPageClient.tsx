@@ -18,8 +18,8 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { LedgerQueryErrorBanner } from "@/modules/workspace/ui/LedgerQueryErrorBanner";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
-import type { MemberProfileContract } from "@/application/contracts";
-import { useCoupleMembers } from "@/modules/auth/hooks/useCoupleMembers";
+import type { BookDto } from "@/modules/ledger/contracts";
+import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { textRoleClassName } from "@/components/typography";
 import { LedgerTabPanels } from "./LedgerTabPanels";
@@ -34,13 +34,12 @@ import type { RecordScope } from "@/modules/ledger/filters";
 interface LedgerPageClientProps {
   ledgerId: string;
   userId: string;
-  partnerUserId: string;
   initialLedger?: LedgerDto;
   initialTab: LedgerTab;
   ledgerToday?: string;
   initialCategories?: EntryCategoryWithCount[];
-  /** Both member profiles, hydrated by the page bootstrap. */
-  initialMembers?: readonly MemberProfileContract[];
+  /** The switcher's books, hydrated by the page bootstrap. */
+  initialBooks?: readonly BookDto[];
   /** Server-derived user email for the Settings tab (avoids useSession). */
   userEmail?: string;
   hasPassword?: boolean;
@@ -64,23 +63,22 @@ function getFeatureForTab(activeTab: LedgerTab): keyof typeof FEATURE_MESSAGES {
 
 export function LedgerPageClient({
   ledgerId,
-  userId,
-  partnerUserId,
   initialLedger,
   initialTab,
   ledgerToday,
   initialCategories,
-  initialMembers,
+  initialBooks,
   userEmail,
   hasPassword,
   passwordUpdatedAt,
   interfaceLanguage,
 }: LedgerPageClientProps) {
-  const [recordScope, setRecordScope] = useState<RecordScope>("all");
-  const { members } = useCoupleMembers({
+  // null is 总账. The switcher is the only writer, so this is where the whole
+  // page's book scope lives.
+  const [recordScope, setRecordScope] = useState<RecordScope>(null);
+  const { books } = useBooks({
     ledgerId,
-    userId,
-    ...(initialMembers !== undefined ? { initialMembers } : {}),
+    ...(initialBooks !== undefined ? { initialBooks } : {}),
   });
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
@@ -143,10 +141,10 @@ export function LedgerPageClient({
     dirtyChangeCount,
   } = useLedgerPageEnvironment({
     ledgerId,
-    userId,
+    scope: recordScope,
     initialLedger,
     initialCategories,
-    ...(initialMembers !== undefined ? { initialMembers } : {}),
+    ...(initialBooks !== undefined ? { initialBooks } : {}),
     setIsInputOpen,
   });
 
@@ -167,11 +165,8 @@ export function LedgerPageClient({
     searchParams,
     pathname,
     ledgerId,
-    userId,
     locale,
-    ...(recordScope === "all"
-      ? {}
-      : { attributedUserId: recordScope === "mine" ? userId : partnerUserId }),
+    ...(recordScope == null ? {} : { bookId: recordScope }),
   });
   const handleGoToDetails = (validCategoryIds: readonly string[]) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -240,9 +235,7 @@ export function LedgerPageClient({
         <LedgerTabPanels
           recordScope={recordScope}
           onRecordScopeChange={setRecordScope}
-          userId={userId}
-          partnerUserId={partnerUserId}
-          members={members ?? []}
+          books={books ?? []}
           activeTab={activeTab}
           hidden={categoriesHaveNoData}
           locale={locale}
@@ -266,8 +259,8 @@ export function LedgerPageClient({
         />
 
         <NewRecordDialog
-          userId={userId}
-          partnerUserId={partnerUserId}
+          scope={recordScope}
+          books={books ?? []}
           isOpen={isInputOpen}
           onOpenChange={handleDialogOpenChange}
           isSubmitting={isInputSubmitting}
@@ -301,8 +294,7 @@ export function LedgerPageClient({
         />
 
         <ModalStackGate
-          userId={userId}
-          partnerUserId={partnerUserId}
+          books={books ?? []}
           categories={categories}
           mainCurrency={mainCurrency}
           preferredCurrencies={preferredCurrencies}

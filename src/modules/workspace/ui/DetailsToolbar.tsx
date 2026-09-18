@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
-import { MemberScopeChip } from "./MemberScopeChip";
+import { BookScopeChip } from "./BookScopeChip";
 
 interface DetailsToolbarProps {
   rangeLabel?: string;
   totalLabel?: string;
   children?: ReactNode;
   batchActions?: ReactNode;
-  /** Which member the list is narrowed to, when it is. */
-  memberScopeNickname?: string | undefined;
+  /** Which book the list is narrowed to, when it is. */
+  scopeBookName?: string | undefined;
   onRefresh?: (() => Promise<unknown> | unknown) | undefined;
   isRefreshing?: boolean | undefined;
 }
@@ -18,7 +18,7 @@ export function DetailsToolbar({
   totalLabel,
   children,
   batchActions,
-  memberScopeNickname,
+  scopeBookName,
   onRefresh,
   isRefreshing,
 }: DetailsToolbarProps) {
@@ -27,9 +27,7 @@ export function DetailsToolbar({
       rangeLabel={rangeLabel}
       totalLabel={totalLabel}
       batchActions={batchActions}
-      {...(memberScopeNickname != null
-        ? { memberScopeChip: <MemberScopeChip nickname={memberScopeNickname} /> }
-        : {})}
+      {...(scopeBookName != null ? { scopeChip: <BookScopeChip name={scopeBookName} /> } : {})}
       onRefresh={onRefresh}
       isRefreshing={isRefreshing}
     >

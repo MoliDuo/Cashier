@@ -1,11 +1,11 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LedgerTabPanels } from "@/modules/workspace/ui/LedgerTabPanels";
-import type { Ledger } from "@/modules/ledger/contracts";
+import type { BookDto, Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 /**
- * The deferred panels are the ones that carry member-scoped UI, so the recorder
+ * The deferred panels are the ones that take the book scope, so the recorder
  * stands in for all three and records whatever each panel is rendered with.
  */
 const deferredProps = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
@@ -34,8 +34,8 @@ vi.mock("@/components/skeletons/TabSkeletons", () => ({
   SettingsTabSkeleton: () => null,
 }));
 
-const OWNER_ID = "10000000-0000-4000-8000-000000000001";
-const PARTNER_ID = "10000000-0000-4000-8000-000000000002";
+const BOOK_ME = "10000000-0000-4000-8000-000000000001";
+const BOOK_SHARED = "10000000-0000-4000-8000-000000000002";
 
 const ledgerFixture: Ledger = {
   id: "ledger-1",
@@ -44,15 +44,29 @@ const ledgerFixture: Ledger = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
+const books: BookDto[] = [
+  {
+    id: BOOK_ME,
+    ledgerId: "ledger-1",
+    name: "Mine",
+    timeZone: null,
+    sortOrder: 1,
+    isDefault: true,
+  },
+  {
+    id: BOOK_SHARED,
+    ledgerId: "ledger-1",
+    name: "Shared",
+    timeZone: null,
+    sortOrder: 2,
+    isDefault: false,
+  },
+];
+
 const baseProps = {
-  recordScope: "all" as const,
+  recordScope: null,
   onRecordScopeChange: vi.fn(),
-  members: [
-    { id: OWNER_ID, nickname: "A", gender: "male" as const, timeZone: null },
-    { id: PARTNER_ID, nickname: "B", gender: "female" as const, timeZone: null },
-  ],
-  userId: OWNER_ID,
-  partnerUserId: PARTNER_ID,
+  books,
   hidden: false,
   locale: "en",
   ledgerId: "ledger-1",
@@ -70,29 +84,34 @@ describe("LedgerTabPanels", () => {
     deferredProps.calls.length = 0;
   });
 
-  /**
-   * The identity a panel needs to label its own rows. 设置 is the one panel
-   * without the member switch, so it never receives the resolved scope.
-   */
+  /** 总账 is the absence of a book, which each panel reads as "no filter". */
   it.each([
-    ["details", { scopeOwnerId: null }],
-    ["stats", { userId: OWNER_ID, partnerUserId: PARTNER_ID, scopeOwnerId: null }],
-    ["settings", { userId: OWNER_ID, partnerUserId: PARTNER_ID }],
-  ] as const)("forwards the member identity to the %s panel", (activeTab, expected) => {
+    ["stream", { bookId: undefined, scopeBookName: null }],
+    ["details", { bookId: undefined, scopeBookName: null }],
+    ["stats", { bookId: undefined }],
+  ] as const)("forwards 总账 to the %s panel", (activeTab, expected) => {
     render(<LedgerTabPanels {...baseProps} activeTab={activeTab} />);
 
     expect(deferredProps.calls).toHaveLength(1);
     expect(deferredProps.calls[0]).toMatchObject({ ledgerId: "ledger-1", ...expected });
   });
 
-  it("hands the stream panel the member a narrowed scope resolved to, with their nickname", () => {
-    render(<LedgerTabPanels {...baseProps} activeTab="stream" recordScope="partner" />);
+  it("hands the stream panel the book id and name the scope resolved to", () => {
+    render(<LedgerTabPanels {...baseProps} activeTab="stream" recordScope={BOOK_SHARED} />);
 
     expect(deferredProps.calls).toHaveLength(1);
     expect(deferredProps.calls[0]).toMatchObject({
-      scopeOwnerId: PARTNER_ID,
-      scopeNickname: "B",
+      bookId: BOOK_SHARED,
+      scopeBookName: "Shared",
       ledgerId: "ledger-1",
     });
+  });
+
+  it("hands 设置 the books it manages and no scope at all", () => {
+    render(<LedgerTabPanels {...baseProps} activeTab="settings" recordScope={BOOK_ME} />);
+
+    expect(deferredProps.calls).toHaveLength(1);
+    expect(deferredProps.calls[0]).toMatchObject({ initialBooks: books });
+    expect(deferredProps.calls[0]).not.toHaveProperty("bookId");
   });
 });

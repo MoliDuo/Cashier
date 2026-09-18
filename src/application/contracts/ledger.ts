@@ -9,6 +9,54 @@ export interface LedgerPort {
   canAccess(ledgerId: LedgerId, userId: string): Promise<boolean>;
   getSharedForMember(userId: string): Promise<LedgerContract | null>;
 }
+
+/**
+ * A 分账. `isDefault` is the book that 总账-entered records land in, stored as a
+ * flag rather than resolved by name. `timeZone` null means the device's zone.
+ */
+export interface BookContract {
+  id: string;
+  ledgerId: LedgerId;
+  name: string;
+  timeZone: string | null;
+  sortOrder: number;
+  isDefault: boolean;
+}
+
+export interface BookCreateContract {
+  name: string;
+  timeZone: string | null;
+  isDefault?: boolean;
+}
+
+export interface BookUpdateContract {
+  name?: string;
+  timeZone?: string | null;
+}
+
+export interface BookPort {
+  /** Live books in switcher order; archived rows only when asked for. */
+  list(
+    ledgerId: LedgerId,
+    options?: { includeArchived?: boolean }
+  ): Promise<readonly BookContract[]>;
+  get(ledgerId: LedgerId, bookId: string): Promise<BookContract | null>;
+  create(ledgerId: LedgerId, input: BookCreateContract): Promise<BookContract>;
+  update(
+    ledgerId: LedgerId,
+    bookId: string,
+    input: BookUpdateContract
+  ): Promise<BookContract | null>;
+  /** Writes the given order; every live book must appear exactly once. */
+  reorder(ledgerId: LedgerId, bookIds: readonly string[]): Promise<readonly BookContract[]>;
+  /** Only a book with no records can be archived. */
+  archive(ledgerId: LedgerId, bookId: string): Promise<"archived" | "has_records" | "not_found">;
+  /** Moves the 总账 default flag onto `bookId`. */
+  setDefault(ledgerId: LedgerId, bookId: string): Promise<readonly BookContract[]>;
+  /** How many live records the book holds; 0 means it can be archived. */
+  countDocuments(ledgerId: LedgerId, bookId: string): Promise<number>;
+}
+
 export interface CategoryPort {
   list(ledgerId: LedgerId): Promise<readonly CategoryContract[]>;
   get(ledgerId: LedgerId, categoryId: string): Promise<CategoryContract | null>;
@@ -144,7 +192,8 @@ export interface LedgerContract {
 export interface AuthenticatedServiceCredentialContract {
   id: string;
   ledgerId: LedgerId;
-  attributedUserId: string;
+  /** Uploads through this key are written to that key's book. */
+  bookId: string;
 }
 
 export interface ServiceCredentialContract extends AuthenticatedServiceCredentialContract {
@@ -187,8 +236,7 @@ export interface LedgerProjectionPort {
   }): Promise<boolean>;
   createManual(input: {
     ledgerId: LedgerId;
-    attributedUserId: string;
-    createdByUserId: string;
+    bookId: string;
     expectedMainCurrency: string;
     sourceDocumentId?: SourceDocumentId;
     inputText?: string | null;

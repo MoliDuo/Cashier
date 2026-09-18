@@ -1,8 +1,12 @@
 "use client";
 
-import type { CreatedServiceCredentialDto, ServiceCredential } from "@/modules/ledger/contracts";
+import type {
+  BookDto,
+  CreatedServiceCredentialDto,
+  ServiceCredential,
+} from "@/modules/ledger/contracts";
 import { useTranslations } from "next-intl";
-import { EmailChangeForm } from "@/modules/auth/ui/EmailChangeForm";
+import { EmailSettings } from "./EmailSettings";
 import { PasswordForm } from "@/modules/auth/ui/PasswordForm";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
 import { SettingsField } from "./SettingsField";
@@ -12,15 +16,18 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface AccountSettingsProps {
-  displayEmail: string;
+  /** The account's login addresses, hydrated by the page bootstrap. */
+  initialEmails: readonly string[];
   hasPassword: boolean;
   passwordUpdatedAt: string | null;
   credentials: ServiceCredential[];
   isPending: boolean;
-  userId?: string;
-  partnerUserId?: string;
-  onEmailChanged: (email: string) => void;
-  onCreateCredential: (name: string) => Promise<CreatedServiceCredentialDto>;
+  books: readonly BookDto[];
+  onCreateCredential: (input: {
+    name: string;
+    bookId: string;
+  }) => Promise<CreatedServiceCredentialDto>;
+  onSetCredentialBook: (id: string, bookId: string) => Promise<void>;
   onDeleteCredential: (id: string) => Promise<void>;
   onCredentialDialogClose: () => void;
   onSignOut: () => void | Promise<void>;
@@ -29,15 +36,14 @@ interface AccountSettingsProps {
 }
 
 export function AccountSettings({
-  displayEmail,
+  initialEmails,
   hasPassword,
   passwordUpdatedAt,
   credentials,
   isPending,
-  userId,
-  partnerUserId,
-  onEmailChanged,
+  books,
   onCreateCredential,
+  onSetCredentialBook,
   onDeleteCredential,
   onCredentialDialogClose,
   onSignOut,
@@ -51,14 +57,12 @@ export function AccountSettings({
 
   return (
     <SettingsSection title={t("account")}>
-      <SettingsField title={ta("emailSection")} description={ta("emailSectionDesc")}>
-        <EmailChangeForm
-          currentEmail={displayEmail}
-          onChanged={onEmailChanged}
-          onRequireReauthentication={onRequireReauthentication}
-          onCredentialsChanged={onCredentialsChanged}
-        />
-      </SettingsField>
+      <EmailSettings
+        initialEmails={initialEmails}
+        onRequireReauthentication={onRequireReauthentication}
+        onCredentialsChanged={onCredentialsChanged}
+      />
+
       <SettingsField title={ta("passwordSection")} description={ta("passwordSectionDesc")}>
         <PasswordForm
           hasPassword={hasPassword}
@@ -69,9 +73,9 @@ export function AccountSettings({
       </SettingsField>
       <ServiceCredentialSection
         credentials={credentials}
-        {...(userId !== undefined ? { userId } : {})}
-        {...(partnerUserId !== undefined ? { partnerUserId } : {})}
+        books={books}
         onCreateCredential={onCreateCredential}
+        onSetCredentialBook={onSetCredentialBook}
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />

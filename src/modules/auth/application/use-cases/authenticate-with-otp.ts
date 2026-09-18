@@ -12,7 +12,6 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { normalizeEmail } from "@/lib/utils/email";
 import { getClientIPFromHeaders, type HeadersLike } from "@/lib/utils/ip";
-import { assertMemberLoginAllowed } from "./member-login-policy";
 import type { OtpTokenPort, UserAccountPort } from "@/application/contracts";
 import type { RateLimiterPort } from "@/application/contracts";
 
@@ -147,7 +146,14 @@ export async function authenticateWithOTP(
 
   const claim = { email: normalizedEmail, tokenHash: record.tokenHash };
   try {
-    const user = await assertMemberLoginAllowed(normalizedEmail, dependencies.userAccounts);
+    const user = await dependencies.userAccounts.findByEmail(normalizedEmail);
+    if (user == null) {
+      logger.warn(
+        { subject: logIdentifier("email", normalizedEmail) },
+        "OTP sign-in denied for an address that is not a login email"
+      );
+      throw new OTPInvalidSignInError();
+    }
 
     return {
       id: user.id,

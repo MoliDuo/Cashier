@@ -7,7 +7,7 @@ import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
   TEST_USER_ID,
 } from "../../helpers/schema-setup";
 
@@ -27,11 +27,11 @@ describe("updateLedgerEntryAction version CAS", () => {
     sourceDocumentId = crypto.randomUUID();
     entryId = crypto.randomUUID();
     await db.insert(ledgers).values({ id: ledgerId, userId: TEST_USER_ID, mainCurrency: "CNY" });
-    await configureTestCoupleLedger(db, ledgerId);
+    await ensureTestLedgerBooks(db, ledgerId);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
       ledgerId,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values({
       id: entryId,

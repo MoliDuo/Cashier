@@ -7,7 +7,7 @@ import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
 import {
   activateTestSourceDocumentProjection,
-  configureTestCoupleLedger,
+  ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
 import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
@@ -65,10 +65,10 @@ describe("splitSourceDocumentAction", () => {
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
     const ids = Array.from({ length: entryCount }, () => crypto.randomUUID());
     await db.insert(ledgers).values(ledger);
-    await configureTestCoupleLedger(db, ledger.id);
+    await ensureTestLedgerBooks(db, ledger.id);
     await db.insert(sourceDocuments).values({
       ...document,
-      attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${document.ledgerId})`,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values(
       ids.map((id, position) => ({

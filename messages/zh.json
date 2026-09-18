@@ -58,7 +58,8 @@
     "batchDeleted": "已删除 {count} 项明细",
     "batchUnresolved": "{count} 项未能修改，已保留选中状态",
     "deleteSelectedTitle": "删除所选明细",
-    "deleteSelectedDescription": "确定删除所选 {count} 项明细吗？此操作无法撤销。"
+    "deleteSelectedDescription": "确定删除所选 {count} 项明细吗？此操作无法撤销。",
+    "book": "分账"
   },
   "BatchActions": {
     "selectAll": "全选",
@@ -272,15 +273,11 @@
     "amountRequired": "请输入金额",
     "categoryRequired": "请选择分类",
     "noCategories": "请先创建分类，再添加快速记录。",
-    "goToSettings": "前往设置"
+    "goToSettings": "前往设置",
+    "book": "分账"
   },
   "Common": {
-    "recordOwner": "账目归属",
-    "recordedBy": "录入者",
     "historicalRecord": "历史记录",
-    "allMembers": "全部",
-    "myRecords": "我",
-    "partnerRecords": "对方",
     "combinedTotal": "合计",
     "today": "今天",
     "yesterday": "昨天",
@@ -327,7 +324,9 @@
     "saveAndContinue": "保存并继续",
     "discardAndContinue": "放弃并离开",
     "continueEditing": "继续编辑",
-    "reloadServerData": "重新加载最新数据"
+    "reloadServerData": "重新加载最新数据",
+    "book": "分账",
+    "allBooks": "总账"
   },
   "SourceDocumentInput": {
     "placeholder": "输入消费记录，例如：午饭 35 元… (支持粘贴图片)",
@@ -465,7 +464,9 @@
       "done": "完成调整",
       "applyFailed": "应用失败，账单未更改。请重试。",
       "groupDate": "分组日期"
-    }
+    },
+    "book": "分账",
+    "bookDesc": "把这条记录移到其他分账。"
   },
   "SourceDocumentImageModal": {
     "title": "查看图片",
@@ -524,8 +525,6 @@
     "mainCurrencyChangeConfirm": "使用 {currency}",
     "collapseEntries": "默认折叠记录",
     "collapseEntriesDesc": "进入流水时默认收起每张记录的明细。",
-    "timeZoneAuto": "自动",
-    "timeZoneAutoDetected": "自动（{timeZone}）",
     "preferredCurrencies": "偏好货币",
     "preferredCurrenciesDesc": "此账本中常用的货币列表。",
     "preferredCurrenciesNone": "未选择币种",
@@ -742,22 +741,77 @@
         "email_in_use": "该邮箱已被使用。",
         "rate_limited": "请求过于频繁，请稍后再试。",
         "locked": "错误次数过多，验证已暂时锁定。",
-        "same_email": "新邮箱必须与当前邮箱不同。",
         "unknown": "无法更新邮箱。"
       }
     },
-    "profile": "个人资料",
-    "profileDesc": "你和对方各自的昵称、性别和时区。",
-    "nickname": "昵称",
-    "nicknameDesc": "1–20 个字符，用于流水、明细和统计上的 我 / 对方。",
-    "gender": "性别",
-    "genderMale": "男",
-    "genderFemale": "女",
-    "myTimeZone": "我的时区",
-    "myTimeZoneDesc": "只影响你自己的默认日期和统计；不改变已有记录日期。",
-    "partner": "对方昵称",
-    "partnerDesc": "由对方在自己的设置中修改。",
-    "profileSaveFailed": "资料保存失败，请重试。"
+    "Books": {
+      "title": "分账",
+      "description": "每笔记录属于一个分账，全部分账合起来就是总账。",
+      "name": "名称",
+      "namePlaceholder": "分账名称",
+      "add": "新增分账",
+      "addTitle": "新增分账",
+      "addDesc": "起一个简短的名字，之后可以重命名或归档。",
+      "rename": "重命名",
+      "renameTitle": "重命名分账",
+      "default": "总账默认",
+      "defaultDesc": "在总账下记账时，记录默认进入这个分账。",
+      "setDefault": "设为默认",
+      "timeZone": "时区",
+      "timeZoneDesc": "该分账的 API 密钥上传的记录按此时区计算日期。自动表示使用服务器日期。",
+      "timeZoneAuto": "自动",
+      "timeZoneAutoDetected": "自动（{timeZone}）",
+      "moveUp": "上移 {name}",
+      "moveDown": "下移 {name}",
+      "archive": "归档",
+      "archiveTitle": "归档「{name}」？",
+      "archiveDesc": "只有没有记录的分账可以归档。",
+      "archived": "分账已归档",
+      "hasRecords": "该分账还有记录，需要先移出记录才能归档。",
+      "lastBook": "最后一个分账不能归档。",
+      "defaultCannotArchive": "总账默认分账不能归档。",
+      "nameTaken": "已有同名分账。",
+      "createFailed": "新增分账失败。",
+      "saveFailed": "保存分账失败。",
+      "reorderFailed": "保存顺序失败。",
+      "recordsCount": "{count} 笔记录",
+      "empty": "还没有分账。",
+      "totalBadge": "总账",
+      "changeFailed": "保存分账失败。",
+      "cancel": "取消"
+    },
+    "Emails": {
+      "title": "登录邮箱",
+      "description": "列表中的任意邮箱都可以用验证码登录，也可以配合共用密码登录。",
+      "add": "添加邮箱",
+      "addTitle": "添加登录邮箱",
+      "addDesc": "我们会向新邮箱发送验证码，确认后它才能用于登录。",
+      "newEmail": "新邮箱地址",
+      "sendCode": "发送验证码",
+      "resendCode": "重新发送",
+      "verificationCode": "6 位验证码",
+      "verify": "确认",
+      "remove": "移除 {email}",
+      "removeTitle": "移除 {email}？",
+      "removeDesc": "该邮箱将无法再登录。账户至少要保留一个邮箱。",
+      "lastEmail": "账户至少要保留一个登录邮箱。",
+      "codeSent": "验证码已发送",
+      "added": "已添加邮箱",
+      "removed": "已移除邮箱",
+      "addFailed": "添加邮箱失败。",
+      "removeFailed": "移除邮箱失败。",
+      "invalid_email": "请输入有效的邮箱地址。",
+      "invalid_code": "验证码不正确。",
+      "expired_code": "验证码已过期，请重新获取。",
+      "email_in_use": "该邮箱已被使用。",
+      "rate_limited": "请稍后再获取验证码。",
+      "locked": "尝试次数过多，验证已暂时锁定。",
+      "reauth_required": "请重新登录后再继续此操作。",
+      "unknown": "出了点问题，请重试。",
+      "verified": "已验证"
+    },
+    "credentialBookChanged": "已更新密钥分账",
+    "credentialBookChangeFailed": "修改密钥分账失败"
   },
   "ServiceCredentials": {
     "title": "API 密钥",
@@ -765,7 +819,6 @@
     "newCredential": "新建密钥",
     "noCredentials": "暂无服务密钥",
     "createdAt": "创建于 {date}",
-    "owner": "归属：{owner}",
     "createTitle": "新建服务密钥",
     "createDesc": "创建一个新的服务密钥用于外部系统访问此账本。",
     "namePlaceholder": "密钥名称 (例如: 自动记账脚本)",
@@ -780,7 +833,10 @@
     "createFailed": "创建密钥失败",
     "maxActive": "每个账本最多可有 20 个有效服务凭据。",
     "deleteFailed": "删除密钥失败",
-    "copied": "密钥已复制到剪贴板"
+    "copied": "密钥已复制到剪贴板",
+    "book": "写入「{book}」",
+    "bookDesc": "通过此密钥上传的记录会归入该分账。",
+    "changeBook": "修改「{name}」的分账"
   },
   "DateRangeFilter": {
     "thisMonth": "本月",
@@ -925,7 +981,6 @@
     "errorConfiguration": "配置错误",
     "errorConfigurationDesc": "服务器配置存在问题，请联系管理员。",
     "devSignIn": "以开发身份进入",
-    "devSignInAs": "以 {name} 身份进入",
     "devSignInDesc": "仅本地开发使用。无需邮件验证码，直接打开单账本工作台。",
     "devSignInFailed": "开发会话启动失败",
     "otpDigitLabel": "第 {index} 位，共 {length} 位"
@@ -993,10 +1048,31 @@
     "retryError": "重试失败",
     "retryErrorDescription": "原结果未改变，请稍后重试。"
   },
-  "MemberScope": {
-    "label": "账目视角",
-    "mine": "{nickname}（我）",
-    "only": "仅看 {nickname}",
-    "current": "当前仅看 {nickname}，打开成员选择"
+  "BookScope": {
+    "label": "分账",
+    "all": "总账",
+    "only": "仅看 {book}",
+    "current": "正在查看 {book}。打开分账切换"
+  },
+  "Setup": {
+    "title": "初始化 Cashier",
+    "description": "创建账户、账本和最初的分账。此操作只执行一次。",
+    "setupCode": "初始化代码",
+    "setupCodeDesc": "数据库为空时，服务端会在日志中打印此代码。",
+    "email": "登录邮箱",
+    "password": "密码",
+    "passwordDesc": "8–128 位，至少包含一个字母和一个数字。",
+    "books": "分账",
+    "bookName": "分账名称",
+    "addBook": "添加",
+    "removeBook": "删除这个分账",
+    "defaultBook": "总账默认分账",
+    "defaultBookDesc": "在总账下记账时，记录默认进入这个分账。",
+    "submit": "创建账户",
+    "wrongCode": "初始化代码不正确。",
+    "alreadyDone": "初始化已完成。",
+    "invalidEmail": "请输入有效的邮箱地址。",
+    "weakPassword": "请使用 8–128 位，且至少包含一个字母和一个数字。",
+    "invalidBooks": "请至少添加一个不重名的分账，并选择默认分账。"
   }
 }

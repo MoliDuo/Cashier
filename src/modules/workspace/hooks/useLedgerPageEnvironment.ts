@@ -9,8 +9,9 @@ import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contrac
 import { useShellController } from "@/components/providers/shell-controller";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
-import { useCoupleMembers } from "@/modules/auth/hooks/useCoupleMembers";
-import type { MemberProfileContract } from "@/application/contracts";
+import { useBooks } from "@/modules/ledger/hooks/useBooks";
+import type { BookDto } from "@/modules/ledger/contracts";
+import type { RecordScope } from "@/modules/ledger/filters";
 
 const STALE_TIME = LEDGER.STALE_TIME_MS;
 const subscribeToDeviceTimeZone = () => () => {};
@@ -19,11 +20,11 @@ const getServerTimeZone = () => undefined;
 
 interface UseLedgerPageEnvironmentOptions {
   ledgerId: string;
-  /** The signed-in member, whose own time zone the page is dated by. */
-  userId: string;
+  /** The book being viewed, or null for 总账. */
+  scope: RecordScope;
   initialLedger?: LedgerDto | undefined;
   initialCategories?: EntryCategoryWithCount[] | undefined;
-  initialMembers?: readonly MemberProfileContract[] | undefined;
+  initialBooks?: readonly BookDto[] | undefined;
   setIsInputOpen: (open: boolean) => void;
 }
 
@@ -34,10 +35,10 @@ interface UseLedgerPageEnvironmentOptions {
  */
 export function useLedgerPageEnvironment({
   ledgerId,
-  userId,
+  scope,
   initialLedger,
   initialCategories,
-  initialMembers,
+  initialBooks,
   setIsInputOpen,
 }: UseLedgerPageEnvironmentOptions) {
   const { data: ledger } = useQuery({
@@ -58,12 +59,14 @@ export function useLedgerPageEnvironment({
 
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const preferredCurrencies = ledger?.settings.currencies ?? [];
-  const { me } = useCoupleMembers({
+  const { books, defaultBook } = useBooks({
     ledgerId,
-    userId,
-    ...(initialMembers !== undefined ? { initialMembers } : {}),
+    ...(initialBooks !== undefined ? { initialBooks } : {}),
   });
-  const fixedTimeZone = me?.timeZone ?? undefined;
+  // The viewed book's zone, or the default book's when reading 总账: a book with
+  // no zone of its own means this device decides, exactly as before.
+  const scopeBook = scope == null ? defaultBook : (books?.find((b) => b.id === scope) ?? null);
+  const fixedTimeZone = scopeBook?.timeZone ?? undefined;
   const deviceTimeZone = useSyncExternalStore(
     subscribeToDeviceTimeZone,
     getDeviceTimeZone,
@@ -96,6 +99,8 @@ export function useLedgerPageEnvironment({
 
   return {
     ledger,
+    books: books ?? [],
+    defaultBook,
     categoriesQuery,
     categories,
     categoriesHaveNoData,

@@ -33,6 +33,7 @@ import { useModalStackStore } from "@/lib/store/modal-stack";
 import { ModalStackGate } from "@/modules/workspace/ui/ModalStackGate";
 
 const props = {
+  books: [],
   categories: [],
   mainCurrency: "CNY",
   preferredCurrencies: [],

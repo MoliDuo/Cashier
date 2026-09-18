@@ -30,7 +30,7 @@ interface DetailsTabViewProps {
   ledger?: Ledger;
   periodParams: PeriodParams;
   filters: EntryFilters;
-  scopeNickname: string | null;
+  scopeBookName: string | null;
   advancedFilters: {
     categoryId?: string | null;
     currency?: string | null;
@@ -60,7 +60,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
     ledger,
     periodParams,
     filters,
-    scopeNickname,
+    scopeBookName,
     advancedFilters,
     onFiltersChange,
     entries,
@@ -114,7 +114,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
               ),
             }
           : {})}
-        {...(scopeNickname != null ? { memberScopeNickname: scopeNickname } : {})}
+        {...(scopeBookName != null ? { scopeBookName } : {})}
         batchActions={
           batch.isSelectionMode ? (
             <LedgerEntriesBatchActionToolbar

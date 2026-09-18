@@ -7,7 +7,7 @@ import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persi
 
 export interface TargetSourceDocumentFilterInput {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   statuses?: readonly SourceDocumentProcessingStatus[];
   startDate?: string | null;
   endDate?: string | null;
@@ -26,8 +26,7 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
     eq(sourceDocuments.ledgerId, input.ledgerId),
     isNull(sourceDocuments.deletedAt),
   ];
-  if (input.attributedUserId != null)
-    conditions.push(eq(sourceDocuments.attributedUserId, input.attributedUserId));
+  if (input.bookId != null) conditions.push(eq(sourceDocuments.bookId, input.bookId));
   if (input.statuses != null && input.statuses.length > 0) {
     conditions.push(
       sql`EXISTS (

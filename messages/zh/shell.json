@@ -66,7 +66,6 @@
     "errorConfiguration": "配置错误",
     "errorConfigurationDesc": "服务器配置存在问题，请联系管理员。",
     "devSignIn": "以开发身份进入",
-    "devSignInAs": "以 {name} 身份进入",
     "devSignInDesc": "仅本地开发使用。无需邮件验证码，直接打开单账本工作台。",
     "devSignInFailed": "开发会话启动失败",
     "otpDigitLabel": "第 {index} 位，共 {length} 位"
@@ -90,12 +89,7 @@
     "loginWarn": "如果不是您本人登录，请立即保护您的账户安全。"
   },
   "Common": {
-    "recordOwner": "账目归属",
-    "recordedBy": "录入者",
     "historicalRecord": "历史记录",
-    "allMembers": "全部",
-    "myRecords": "我",
-    "partnerRecords": "对方",
     "combinedTotal": "合计",
     "today": "今天",
     "yesterday": "昨天",
@@ -142,7 +136,9 @@
     "saveAndContinue": "保存并继续",
     "discardAndContinue": "放弃并离开",
     "continueEditing": "继续编辑",
-    "reloadServerData": "重新加载最新数据"
+    "reloadServerData": "重新加载最新数据",
+    "book": "分账",
+    "allBooks": "总账"
   },
   "Error": {
     "title": "应用错误",
@@ -205,10 +201,31 @@
     "batchBlocked": "请先结束批量选择，再重新加载应用",
     "offlineBlocked": "请先恢复网络连接，再重新加载应用"
   },
-  "MemberScope": {
-    "label": "账目视角",
-    "mine": "{nickname}（我）",
-    "only": "仅看 {nickname}",
-    "current": "当前仅看 {nickname}，打开成员选择"
+  "Setup": {
+    "title": "初始化 Cashier",
+    "description": "创建账户、账本和最初的分账。此操作只执行一次。",
+    "setupCode": "初始化代码",
+    "setupCodeDesc": "数据库为空时，服务端会在日志中打印此代码。",
+    "email": "登录邮箱",
+    "password": "密码",
+    "passwordDesc": "8–128 位，至少包含一个字母和一个数字。",
+    "books": "分账",
+    "bookName": "分账名称",
+    "addBook": "添加",
+    "removeBook": "删除这个分账",
+    "defaultBook": "总账默认分账",
+    "defaultBookDesc": "在总账下记账时，记录默认进入这个分账。",
+    "submit": "创建账户",
+    "wrongCode": "初始化代码不正确。",
+    "alreadyDone": "初始化已完成。",
+    "invalidEmail": "请输入有效的邮箱地址。",
+    "weakPassword": "请使用 8–128 位，且至少包含一个字母和一个数字。",
+    "invalidBooks": "请至少添加一个不重名的分账，并选择默认分账。"
+  },
+  "BookScope": {
+    "label": "分账",
+    "all": "总账",
+    "only": "仅看 {book}",
+    "current": "正在查看 {book}。打开分账切换"
   }
 }

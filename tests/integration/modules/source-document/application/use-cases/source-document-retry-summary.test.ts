@@ -5,10 +5,8 @@ import {
   postgresRevisionAdapter,
 } from "@/application/adapters/postgres/revisions";
 import { getTargetSourceDocument } from "@/application/adapters/postgres/source-document-reads";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
-import { eq } from "drizzle-orm";
-import { ledgers } from "@/persistence";
 
 const activeEntry = {
   categoryId: null,
@@ -29,10 +27,7 @@ async function setupDocumentWithFailedRetry(
   failureKind: "invalid_input" | "processing_error"
 ) {
   // Step 1: Create a document with an active revision and entries
-  const [ledgerOwner] = await db
-    .select({ userId: ledgers.userId })
-    .from(ledgers)
-    .where(eq(ledgers.id, ledgerId));
+  const bookId = await testBookId(db, ledgerId);
   const created = await postgresLedgerProjectionAdapter.createManual({
     expectedMainCurrency: "CNY",
     ledgerId,
@@ -40,8 +35,7 @@ async function setupDocumentWithFailedRetry(
     entryDate: "2026-07-15",
     inputText: "Original text",
     entries: [activeEntry],
-    attributedUserId: ledgerOwner!.userId,
-    createdByUserId: ledgerOwner!.userId,
+    bookId,
   });
 
   // Step 2: Create a pending revision (processing)
@@ -78,15 +72,11 @@ async function setupDocumentWithFirstParseFailure(
   ledgerId: string,
   failureKind: "invalid_input" | "processing_error"
 ) {
-  const [ledgerOwner] = await db
-    .select({ userId: ledgers.userId })
-    .from(ledgers)
-    .where(eq(ledgers.id, ledgerId));
+  const bookId = await testBookId(db, ledgerId);
   const pending = await db.transaction((tx) =>
     createProcessingRevisionInTransaction(tx, {
       ledgerId,
-      attributedUserId: ledgerOwner!.userId,
-      createdByUserId: ledgerOwner!.userId,
+      bookId,
       input: { text: "First parse", storedFileIds: [], documentDate: null },
     })
   );
@@ -182,8 +172,7 @@ describe("retry active result summary", () => {
           exchangeRate: "1.000000",
         },
       ],
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
 
     // Create a failed pending revision

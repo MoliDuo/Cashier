@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
-import type { CategoryPort, ServiceCredentialPort, UserProfilePort } from "@/application/contracts";
+import type { BookPort, CategoryPort, ServiceCredentialPort } from "@/application/contracts";
 import { getLedgerSettingsBootstrap as getBootstrap } from "@/modules/workspace/application/queries/get-ledger-settings-bootstrap";
 
 const listEntryCategoriesMock = vi.hoisted(() => vi.fn());
@@ -13,7 +13,7 @@ vi.mock("@/modules/ledger/application/queries/get-ledger-settings-view", () => (
   getLedgerSettingsView: getLedgerSettingsViewMock,
 }));
 
-const listMembersMock = vi.fn();
+const listBooksMock = vi.fn();
 
 const dependencies = {
   categories: {
@@ -21,7 +21,7 @@ const dependencies = {
     countUncategorized: vi.fn(),
   } satisfies Pick<CategoryPort, "listWithCount" | "countUncategorized">,
   credentials: { list: vi.fn() } satisfies Pick<ServiceCredentialPort, "list">,
-  profiles: { listMembers: listMembersMock } satisfies Pick<UserProfilePort, "listMembers">,
+  books: { list: listBooksMock } satisfies Pick<BookPort, "list">,
 };
 
 const ledgerDto = {
@@ -36,9 +36,15 @@ describe("getLedgerSettingsBootstrap", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     listEntryCategoriesMock.mockResolvedValue([]);
-    listMembersMock.mockResolvedValue([
-      { id: "user-1", nickname: "A", gender: "male", timeZone: null },
-      { id: "user-2", nickname: "B", gender: "female", timeZone: null },
+    listBooksMock.mockResolvedValue([
+      {
+        id: "book-1",
+        ledgerId: "ledger-1",
+        name: "共同支出",
+        timeZone: null,
+        sortOrder: 1,
+        isDefault: true,
+      },
     ]);
     getLedgerSettingsViewMock.mockResolvedValue({
       uncategorizedCount: 0,

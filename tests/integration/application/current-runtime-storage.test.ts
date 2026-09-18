@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { eq, sql } from "drizzle-orm";
 import { getTestDb } from "../../setup";
-import { createTestUserWithLedger } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { postgresRevisionAdapter } from "@/application/adapters/postgres";
 import { createStoredFileAdapter } from "@/application/adapters/storage";
 import {
@@ -156,8 +156,7 @@ describe("current-runtime target adapters", () => {
     const pending = await postgresRevisionAdapter.createProcessingRevision({
       ledgerId,
       input: { text: null, storedFileIds: [uploaded.id], documentDate: null },
-      attributedUserId: process.env.COUPLE_OWNER_USER_ID!,
-      createdByUserId: process.env.COUPLE_OWNER_USER_ID!,
+      bookId: await testBookId(db, ledgerId),
     });
     expect(
       await db.query.sourceDocuments.findFirst({

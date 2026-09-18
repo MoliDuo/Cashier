@@ -5,23 +5,74 @@ import * as schema from "@/persistence";
 type TestDatabase = NodePgDatabase<typeof schema>;
 
 export const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
-export const TEST_PARTNER_USER_ID = "11111111-1111-4111-8111-111111111111";
 
-export async function configureTestCoupleLedger(
+/**
+ * Ensures a ledger has books at all. Fixtures that create their ledger by hand
+ * call this instead of the retired couple-configuration helper.
+ */
+export async function ensureTestLedgerBooks(
   db: TestDatabase,
   ledgerId: string,
-  ownerId = TEST_USER_ID
-): Promise<void> {
-  const partnerId = ownerId === TEST_PARTNER_USER_ID ? TEST_USER_ID : TEST_PARTNER_USER_ID;
-  const partner = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, partnerId))
+  names: readonly string[] = ["共同支出"]
+): Promise<Map<string, string>> {
+  // A fixture may call this for a ledger it deleted in its own setup; there is
+  // nothing to hang a book on then, and the FK rightly refuses.
+  const ledger = await db
+    .select({ id: schema.ledgers.id })
+    .from(schema.ledgers)
+    .where(eq(schema.ledgers.id, ledgerId))
     .limit(1);
-  if (partner.length === 0) await createTestUser(db, undefined, partnerId);
-  process.env.COUPLE_OWNER_USER_ID = ownerId;
-  process.env.COUPLE_PARTNER_USER_ID = partnerId;
-  process.env.COUPLE_LEDGER_ID = ledgerId;
+  if (ledger.length === 0) return new Map();
+  const existing = await db
+    .select({ id: schema.books.id, name: schema.books.name })
+    .from(schema.books)
+    .where(eq(schema.books.ledgerId, ledgerId));
+  if (existing.length > 0) return new Map(existing.map((row) => [row.name, row.id]));
+  return createTestBooks(db, ledgerId, names);
+}
+
+/**
+ * Gives an existing ledger its first book, for fixtures that insert the ledger
+ * themselves rather than going through `createTestUserWithLedger`.
+ */
+/**
+ * The books a test ledger starts with. 共同支出 is the 总账 default, mirroring
+ * what the setup wizard and the 0048 migration both create.
+ */
+export async function createTestBooks(
+  db: TestDatabase,
+  ledgerId: string,
+  names: readonly string[] = ["共同支出"],
+  defaultName = names[0]
+): Promise<Map<string, string>> {
+  const rows = await db
+    .insert(schema.books)
+    .values(
+      names.map((name, index) => ({
+        ledgerId,
+        name,
+        sortOrder: index + 1,
+        isDefault: name === defaultName,
+      }))
+    )
+    .returning({ id: schema.books.id, name: schema.books.name });
+  return new Map(rows.map((row) => [row.name, row.id]));
+}
+
+/**
+ * The id of a ledger's first book, for fixtures that drive a port directly and
+ * need a plain string rather than an insert-time subquery.
+ */
+export async function testBookId(db: TestDatabase, ledgerId: string): Promise<string> {
+  const row = await db
+    .select({ id: schema.books.id })
+    .from(schema.books)
+    .where(eq(schema.books.ledgerId, ledgerId))
+    .orderBy(schema.books.sortOrder)
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (row == null) throw new Error(`Ledger ${ledgerId} has no book fixture`);
+  return row.id;
 }
 
 function requireDefined<T>(value: T | undefined, message: string): T {
@@ -31,13 +82,12 @@ function requireDefined<T>(value: T | undefined, message: string): T {
   return value;
 }
 
-// Helper to create a test user and return the user ID
+// Helper to create a test user and its login address, returning the user ID.
 export async function createTestUser(
   db: TestDatabase,
-  email?: string, // 改为可选，默认使用随机email避免冲突
+  email?: string,
   id = TEST_USER_ID
 ): Promise<string> {
-  // 使用随机email避免唯一约束冲突
   const finalEmail = email ?? `test-${crypto.randomUUID()}@example.com`;
 
   const existing = await db
@@ -46,20 +96,17 @@ export async function createTestUser(
     .where(sql`${schema.users.id} = ${id}`)
     .limit(1);
   if (existing.length !== 0) {
-    // Keep the stable fixture identity while allowing callers to choose a fresh email.
     await db
-      .update(schema.users)
+      .update(schema.loginEmails)
       .set({ email: finalEmail })
-      .where(sql`${schema.users.id} = ${id}`);
+      .where(eq(schema.loginEmails.userId, id));
     return id;
   }
 
-  await db.insert(schema.users).values({
-    id,
+  await db.insert(schema.users).values({ id, name: "Test User" });
+  await db.insert(schema.loginEmails).values({
+    userId: id,
     email: finalEmail,
-    name: "Test User",
-    nickname: id === TEST_PARTNER_USER_ID ? "B" : "A",
-    gender: id === TEST_PARTNER_USER_ID ? "female" : "male",
     emailVerified: new Date(),
   });
   return id;
@@ -68,8 +115,8 @@ export async function createTestUser(
 // Helper to create a test user and ledger together
 export async function createTestUserWithLedger(
   db: TestDatabase,
-  email?: string, // 改为可选，默认使用随机email
-  _ledgerName?: string, // 已废弃，账本名称不再使用
+  email?: string,
+  _ledgerName?: string,
   userId?: string
 ): Promise<{ userId: string; ledgerId: string }> {
   const finalUserId = await createTestUser(db, email, userId ?? TEST_USER_ID);
@@ -79,10 +126,7 @@ export async function createTestUserWithLedger(
     id: ledgerId,
     userId: finalUserId,
   });
-
-  if (finalUserId === TEST_USER_ID) {
-    await configureTestCoupleLedger(db, ledgerId);
-  }
+  await createTestBooks(db, ledgerId);
 
   return { userId: finalUserId, ledgerId };
 }
@@ -109,7 +153,7 @@ export async function createTestSourceDocument(
             ledgerId,
             documentDate: overrides.entryDate,
             title: overrides.title,
-            attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+            bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
           })
           .returning()
       )[0],

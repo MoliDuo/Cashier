@@ -32,7 +32,7 @@ interface DetailsQueryDescriptor {
     startDate?: string;
     endDate?: string;
     filters: {
-      attributedUserId?: string;
+      bookId?: string;
       categoryId?: string;
       currency?: string;
       minAmount?: string;
@@ -45,7 +45,7 @@ interface DetailsQueryDescriptor {
 
 export function buildDetailsQueryDescriptor(input: {
   ledgerId: string;
-  attributedUserId?: string;
+  bookId?: string;
   periodParams: PeriodParams;
   advancedFilters?: LedgerAdvancedFilters | undefined;
   timeZone?: string | undefined;
@@ -55,7 +55,7 @@ export function buildDetailsQueryDescriptor(input: {
   const state = getDetailsInitialQueryState(input.periodParams, filters, input.timeZone);
   const filterKey = buildDetailsFilterKey(filters);
   const detailsFilters = {
-    ...(input.attributedUserId == null ? {} : { attributedUserId: input.attributedUserId }),
+    ...(input.bookId == null ? {} : { bookId: input.bookId }),
     ...(filters.categoryId != null ? { categoryId: filters.categoryId } : {}),
     ...(filters.currency != null ? { currency: filters.currency } : {}),
     ...(filters.minAmount != null ? { minAmount: filters.minAmount } : {}),
@@ -68,14 +68,14 @@ export function buildDetailsQueryDescriptor(input: {
     endDateStr: state.endDateStr,
     filterKey,
     summaryQueryKey: queryKeys.summary(input.ledgerId, {
-      attributedUserId: input.attributedUserId,
+      bookId: input.bookId,
       startDate: state.startDateStr,
       endDate: state.endDateStr,
       currency: input.mainCurrency,
       filter: filterKey,
     }),
     entriesQueryKey: queryKeys.ledgerEntries(input.ledgerId, {
-      attributedUserId: input.attributedUserId,
+      bookId: input.bookId,
       mode: "infinite",
       startDate: state.startDateStr,
       endDate: state.endDateStr,
@@ -87,7 +87,7 @@ export function buildDetailsQueryDescriptor(input: {
       filters: detailsFilters,
     },
     getEntriesInput: (pageParam) => ({
-      ...(input.attributedUserId == null ? {} : { attributedUserId: input.attributedUserId }),
+      ...(input.bookId == null ? {} : { bookId: input.bookId }),
       ...(state.startDateStr != null ? { startDate: state.startDateStr } : {}),
       ...(state.endDateStr != null ? { endDate: state.endDateStr } : {}),
       ...(filters.categoryId != null ? { categoryId: filters.categoryId } : {}),

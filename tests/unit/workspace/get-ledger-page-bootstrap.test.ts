@@ -9,16 +9,16 @@ import type {
   SourceDocumentReadPort,
   LedgerChangeReadPort,
 } from "@/modules/source-document/application/ports";
-import type { ServiceCredentialPort, UserProfilePort } from "@/application/contracts";
+import type { BookPort, ServiceCredentialPort } from "@/application/contracts";
 
-const listMembersMock = vi.fn();
+const listBooksMock = vi.fn();
 
 const bootstrapDependencies = {
   categories: {
     listWithCount: vi.fn(),
     countUncategorized: vi.fn(),
   } satisfies Pick<CategoryPort, "listWithCount" | "countUncategorized">,
-  profiles: { listMembers: listMembersMock } satisfies Pick<UserProfilePort, "listMembers">,
+  books: { list: listBooksMock } satisfies Pick<BookPort, "list">,
   ledgerReads: {
     calculateStats: vi.fn(),
     listEntries: vi.fn(),
@@ -43,12 +43,11 @@ const bootstrapDependencies = {
   credentials: { list: vi.fn() } satisfies Pick<ServiceCredentialPort, "list">,
 };
 const getLedgerPageBootstrap = (
-  input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto" | "userId"> &
-    Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto" | "userId">>
+  input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto"> &
+    Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto">>
 ) =>
   getLedgerPageBootstrapUseCase(
     {
-      userId: "user-1",
       ...input,
       ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto(),
     },
@@ -101,9 +100,15 @@ describe("getLedgerPageBootstrap", () => {
     vi.clearAllMocks();
 
     listEntryCategoriesMock.mockResolvedValue([]);
-    listMembersMock.mockResolvedValue([
-      { id: "user-1", nickname: "A", gender: "male", timeZone: null },
-      { id: "user-2", nickname: "B", gender: "female", timeZone: null },
+    listBooksMock.mockResolvedValue([
+      {
+        id: "book-1",
+        ledgerId: "ledger-1",
+        name: "共同支出",
+        timeZone: null,
+        sortOrder: 1,
+        isDefault: true,
+      },
     ]);
     calculateLedgerStatsMock.mockResolvedValue({});
     listLedgerEntriesMock.mockResolvedValue({ items: [], nextCursor: null });

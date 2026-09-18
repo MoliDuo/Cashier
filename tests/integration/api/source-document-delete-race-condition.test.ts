@@ -26,7 +26,7 @@ describe("SourceDocument delete concurrency", () => {
       .values({
         ledgerId,
         documentDate: "2024-03-17",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     if (document == null) throw new Error("Expected source document");

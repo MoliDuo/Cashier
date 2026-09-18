@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { getTestDb } from "../setup";
+import { createTestBooks, testBookId } from "../helpers/schema-setup";
 import {
   currencyRates,
   exchangeRateRecalculationJobs,
@@ -9,6 +10,7 @@ import {
   ledgers,
   sourceDocumentRevisions,
   sourceDocuments,
+  loginEmails,
   users,
 } from "@/persistence";
 import {
@@ -65,11 +67,11 @@ async function seedLedgerWithEntry(input: {
   const sourceDocumentId = crypto.randomUUID();
   const revisionId = crypto.randomUUID();
 
-  await db.insert(users).values({
-    id: userId,
+  await db.insert(users).values({ id: userId });
+  await db.insert(loginEmails).values({
+    userId: userId,
     email: `${userId}@example.com`,
-    nickname: "A",
-    gender: "male",
+    emailVerified: new Date(),
   });
   await db.insert(ledgers).values({
     id: ledgerId,
@@ -77,12 +79,15 @@ async function seedLedgerWithEntry(input: {
     ...(input.mainCurrency != null ? { mainCurrency: input.mainCurrency } : {}),
     ...(input.deleted === true ? { deletedAt: new Date() } : {}),
   });
+  // A soft-deleted ledger still needs its book: the document rows below are
+  // inserted under the same ledger and the composite key must find one.
+  await createTestBooks(db, ledgerId, ["共同支出"]);
   await db.insert(sourceDocuments).values({
     id: sourceDocumentId,
     ledgerId,
     documentDate: input.entryDate,
     ...(input.deleted === true ? { deletedAt: new Date() } : {}),
-    attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+    bookId: await testBookId(db, ledgerId),
   });
   await db.insert(sourceDocumentRevisions).values({
     id: revisionId,
@@ -441,34 +446,36 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     const secondSourceDocumentId = crypto.randomUUID();
     const secondRevisionId = crypto.randomUUID();
 
-    await db.insert(users).values({
-      id: userId,
+    await db.insert(users).values({ id: userId });
+    await db.insert(loginEmails).values({
+      userId: userId,
       email: `${userId}@example.com`,
-      nickname: "A",
-      gender: "male",
+      emailVerified: new Date(),
     });
-    await db.insert(users).values({
-      id: secondUserId,
+    await db.insert(users).values({ id: secondUserId });
+    await db.insert(loginEmails).values({
+      userId: secondUserId,
       email: `${secondUserId}@example.com`,
-      nickname: "B",
-      gender: "female",
+      emailVerified: new Date(),
     });
     await db.insert(ledgers).values([
       { id: ledgerId, userId, mainCurrency: "JPY" },
       { id: secondLedgerId, userId: secondUserId, mainCurrency: "USD" },
     ]);
+    await createTestBooks(db, ledgerId, ["共同支出"]);
+    await createTestBooks(db, secondLedgerId, ["共同支出"]);
     await db.insert(sourceDocuments).values([
       {
         id: sourceDocumentId,
         ledgerId,
         documentDate: "2026-03-01",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: await testBookId(db, ledgerId),
       },
       {
         id: secondSourceDocumentId,
         ledgerId: secondLedgerId,
         documentDate: "2026-03-01",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${secondLedgerId})`,
+        bookId: await testBookId(db, secondLedgerId),
       },
     ]);
     await db.insert(sourceDocumentRevisions).values([
@@ -579,13 +586,14 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     const datedRevisionId = crypto.randomUUID();
     const undatedRevisionId = crypto.randomUUID();
 
-    await db.insert(users).values({
-      id: userId,
+    await db.insert(users).values({ id: userId });
+    await db.insert(loginEmails).values({
+      userId: userId,
       email: `${userId}@example.com`,
-      nickname: "A",
-      gender: "male",
+      emailVerified: new Date(),
     });
     await db.insert(ledgers).values({ id: ledgerId, userId, mainCurrency: "CNY" });
+    await createTestBooks(db, ledgerId, ["共同支出"]);
 
     // Older rates first: undated entries must use the newest stored date.
     await db.insert(currencyRates).values({
@@ -604,13 +612,13 @@ describe("exchange-rate ledger recalculation orchestration", () => {
         id: datedSourceDocumentId,
         ledgerId,
         documentDate: "2026-06-01",
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: await testBookId(db, ledgerId),
       },
       {
         id: undatedSourceDocumentId,
         ledgerId,
         documentDate: null,
-        attributedUserId: sql`(SELECT user_id FROM ledgers WHERE id = ${ledgerId})`,
+        bookId: await testBookId(db, ledgerId),
       },
     ]);
     await db.insert(sourceDocumentRevisions).values([
