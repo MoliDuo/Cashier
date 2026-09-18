@@ -11,7 +11,8 @@
     "NotFound",
     "ServiceWorkerUpdate",
     "Setup",
-    "BookScope"
+    "BookScope",
+    "BookPicker"
   ],
   "stream": [
     "BatchActions",

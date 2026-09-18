@@ -29,7 +29,9 @@ export function AuthLoginPage({
       ? t("reauthRequiredNotice")
       : notice === "credentials_changed"
         ? t("credentialsChangedNotice")
-        : null;
+        : notice === "setup_complete"
+          ? t("setupCompleteNotice")
+          : null;
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8">
