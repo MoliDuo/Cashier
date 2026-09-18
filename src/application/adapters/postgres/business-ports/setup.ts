@@ -6,7 +6,11 @@ import { db } from "@/lib/db";
 import { AppError, ConflictError } from "@/lib/errors";
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
 import { hashPassword } from "@/modules/auth/services/password";
-import { generateSetupCode } from "@/modules/setup/setup-code";
+import {
+  generateSetupCode,
+  SETUP_CODE_MAX_ATTEMPTS,
+  SETUP_CODE_TTL_MS,
+} from "@/modules/setup/setup-code";
 import { getCategoryPreset } from "@/config/category-presets";
 
 /**
@@ -35,6 +39,10 @@ function setupCodeMatches(code: string, stored: string): boolean {
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
+function isExpired(issuedAt: Date): boolean {
+  return Date.now() - issuedAt.getTime() >= SETUP_CODE_TTL_MS;
+}
+
 /**
  * First-run setup: the one write path that runs without a session.
  *
@@ -47,19 +55,53 @@ export const postgresSetupAdapter: SetupPort = {
   async getOrCreateCode() {
     return db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cashier-first-run-setup'))`);
-      const existing = await tx.query.setupState.findFirst({ columns: { codeHash: true } });
+      const existing = await tx.query.setupState.findFirst({
+        columns: { codeHash: true, createdAt: true },
+      });
       // An existing hash cannot be turned back into the code the operator needs
-      // to read, so a stored row means the code was already printed.
-      if (existing != null) return { code: "", created: false };
+      // to read, so the only way to hand out a readable code is to have just
+      // written it. A stored code past its lifetime is replaced for that reason:
+      // otherwise a code whose log line was missed would refuse every attempt
+      // and there would be no way left to finish setup.
+      if (existing != null && !isExpired(existing.createdAt)) {
+        return { code: "", created: false, issuedAt: existing.createdAt };
+      }
       const code = generateSetupCode();
-      await tx.insert(setupState).values({ codeHash: hashSetupCode(code) });
-      return { code, created: true };
+      const issuedAt = new Date();
+      if (existing == null) {
+        await tx.insert(setupState).values({ codeHash: hashSetupCode(code), createdAt: issuedAt });
+      } else {
+        // The lockout counter belongs to the retired code, so it starts over.
+        await tx
+          .update(setupState)
+          .set({ codeHash: hashSetupCode(code), createdAt: issuedAt, failedAttempts: 0 });
+      }
+      return { code, created: true, issuedAt };
     });
   },
 
   async verifyCode(code) {
-    const row = await db.query.setupState.findFirst({ columns: { codeHash: true } });
-    return row != null && setupCodeMatches(code, row.codeHash);
+    return db.transaction(async (tx) => {
+      // Two guesses racing must not both read the same counter, or a burst of
+      // parallel attempts could spend more than the allowance.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cashier-first-run-setup'))`);
+      const row = await tx.query.setupState.findFirst({
+        columns: { codeHash: true, createdAt: true, failedAttempts: true },
+      });
+      if (row == null) return "expired";
+      if (isExpired(row.createdAt)) return "expired";
+      if (setupCodeMatches(code, row.codeHash)) return "accepted";
+
+      const attempts = row.failedAttempts + 1;
+      if (attempts >= SETUP_CODE_MAX_ATTEMPTS) {
+        // Retire it: the next visit issues and prints a fresh code, so the
+        // operator is never left with a code that can no longer be accepted.
+        await tx.delete(setupState);
+        return "locked_out";
+      }
+      await tx.update(setupState).set({ failedAttempts: attempts });
+      return "mismatch";
+    });
   },
 
   async isPending() {

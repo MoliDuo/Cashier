@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { resolveSupportedLocale } from "@/i18n/resolve-locale";
-import { ConflictError, ValidationError } from "@/lib/errors";
+import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { normalizeEmail } from "@/lib/utils/email";
 import { parseSetupInput } from "../contract-schemas";
@@ -12,6 +12,8 @@ import { serverComposition } from "@/application/server-composition-root";
 export type SetupErrorCode =
   | "already_done"
   | "wrong_code"
+  | "code_expired"
+  | "code_locked_out"
   | "invalid_email"
   | "weak_password"
   | "invalid_books"
@@ -19,6 +21,11 @@ export type SetupErrorCode =
 
 export type SetupActionResult =
   { ok: true; ledgerId: string } | { ok: false; code: SetupErrorCode };
+
+/** `PASSWORD_TOO_SHORT` and `PASSWORD_REQUIREMENTS_NOT_MET` are the policy's own codes. */
+function isPasswordPolicyError(error: AppError): boolean {
+  return error.code.startsWith("password_");
+}
 
 /**
  * The only unauthenticated write in the app. The setup code is what stands in
@@ -29,8 +36,13 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
   try {
     if (!(await serverComposition.setup.isPending())) return { ok: false, code: "already_done" };
     const parsed = parseSetupInput(input);
-    if (!(await serverComposition.setup.verifyCode(parsed.setupCode))) {
-      logger.warn({}, "First-run setup rejected: incorrect setup code");
+    const verdict = await serverComposition.setup.verifyCode(parsed.setupCode);
+    if (verdict !== "accepted") {
+      // Logged without the attempted value: the point is to show a lockout is
+      // happening, not to record what was guessed.
+      logger.warn({ verdict }, "First-run setup rejected: the setup code was not accepted");
+      if (verdict === "expired") return { ok: false, code: "code_expired" };
+      if (verdict === "locked_out") return { ok: false, code: "code_locked_out" };
       return { ok: false, code: "wrong_code" };
     }
     const requestHeaders = await headers();
@@ -55,6 +67,11 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
     return { ok: true, ledgerId: result.ledgerId };
   } catch (error) {
     if (error instanceof ConflictError) return { ok: false, code: "already_done" };
+    // The password policy reports its own `AppError` codes; without this the
+    // wizard would answer "weak password" with a generic failure.
+    if (error instanceof AppError && isPasswordPolicyError(error)) {
+      return { ok: false, code: "weak_password" };
+    }
     if (error instanceof ValidationError) {
       const fields = (error.details?.issues as { path?: unknown[] }[] | undefined)?.map((issue) =>
         String(issue.path?.[0] ?? "")

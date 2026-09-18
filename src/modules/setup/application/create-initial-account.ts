@@ -29,13 +29,14 @@ export async function createInitialAccount(
   if (new Set(names).size !== names.length) {
     throw new ValidationError("Book names must be unique");
   }
-  if (!names.includes(input.defaultBookName)) {
+  const defaultBookName = input.defaultBookName.trim();
+  if (!names.includes(defaultBookName)) {
     throw new ValidationError("The default book must be one of the books");
   }
   validatePassword(input.password);
   return setup.createInitialAccount({
     bookNames: names,
-    defaultBookName: input.defaultBookName,
+    defaultBookName,
     email: input.email.trim().toLowerCase(),
     password: input.password,
     locale: input.locale,

@@ -7,6 +7,7 @@ import { postgresAccountSecurityAdapter } from "@/application/adapters/postgres/
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
 import { createInitialAccount } from "@/modules/setup/application/create-initial-account";
 import { postgresSetupAdapter } from "@/application/adapters/postgres/business-ports/setup";
+import { SETUP_CODE_MAX_ATTEMPTS, SETUP_CODE_TTL_MS } from "@/modules/setup/setup-code";
 import { hashOTP } from "@/modules/auth/services/otp";
 
 /**
@@ -194,15 +195,68 @@ describe("first-run setup", () => {
     // knows a code is pending but cannot reproduce it, so the wizard must not
     // print a second banner with a code that no longer matches.
     const second = await postgresSetupAdapter.getOrCreateCode();
-    expect(second).toEqual({ code: "", created: false });
+    expect(second.created).toBe(false);
+    expect(second.code).toBe("");
+    expect(second.issuedAt).toEqual(first.issuedAt);
 
-    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe(true);
-    expect(await postgresSetupAdapter.verifyCode("00000000")).toBe(false);
-    expect(await postgresSetupAdapter.verifyCode("")).toBe(false);
+    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe("accepted");
+    expect(await postgresSetupAdapter.verifyCode("00000000")).toBe("mismatch");
+    expect(await postgresSetupAdapter.verifyCode("")).toBe("mismatch");
     // A stored hash is not the code, and the row is not a second row.
     const rows = await db.select().from(setupState);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.codeHash).not.toContain(first.code);
+  });
+
+  it("issues a fresh code once the printed one has expired", async () => {
+    const db = getTestDb();
+    await db.delete(loginEmails);
+    await db.delete(users);
+
+    const first = await postgresSetupAdapter.getOrCreateCode();
+    expect(first.created).toBe(true);
+
+    // Age the stored code past its lifetime. A code nobody read out of the logs
+    // must not refuse the wizard forever, so the next visit replaces it.
+    await db
+      .update(setupState)
+      .set({ createdAt: new Date(Date.now() - SETUP_CODE_TTL_MS - 1_000) });
+
+    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe("expired");
+
+    const second = await postgresSetupAdapter.getOrCreateCode();
+    expect(second.created).toBe(true);
+    expect(second.code).toMatch(/^\d{8}$/);
+    expect(second.code).not.toBe(first.code);
+    // The replacement is what the wizard accepts, and the old code is dead.
+    expect(await postgresSetupAdapter.verifyCode(second.code)).toBe("accepted");
+    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe("mismatch");
+  });
+
+  it("retires the code after five wrong guesses and issues a new one", async () => {
+    const db = getTestDb();
+    await db.delete(loginEmails);
+    await db.delete(users);
+
+    const { code } = await postgresSetupAdapter.getOrCreateCode();
+    // Eight digits is not much of a secret; the attempt counter is what makes
+    // guessing impractical.
+    for (let attempt = 1; attempt < SETUP_CODE_MAX_ATTEMPTS; attempt += 1) {
+      expect(await postgresSetupAdapter.verifyCode("00000000")).toBe("mismatch");
+      const rows = await db.select().from(setupState);
+      expect(rows[0]?.failedAttempts).toBe(attempt);
+    }
+
+    expect(await postgresSetupAdapter.verifyCode("00000000")).toBe("locked_out");
+    // The row is gone, so the operator's correct code is retired with it: the
+    // wizard must print a new one rather than leave a code that cannot work.
+    expect(await db.select().from(setupState)).toHaveLength(0);
+    expect(await postgresSetupAdapter.verifyCode(code)).toBe("expired");
+
+    const replacement = await postgresSetupAdapter.getOrCreateCode();
+    expect(replacement.created).toBe(true);
+    // The counter belongs to the retired code, not to the instance.
+    expect(await postgresSetupAdapter.verifyCode(replacement.code)).toBe("accepted");
   });
 
   it("clears the pending code once the account exists", async () => {
@@ -224,7 +278,7 @@ describe("first-run setup", () => {
 
     expect(await db.select().from(setupState)).toHaveLength(0);
     // A retired code cannot be replayed against a later, empty database either.
-    expect(await postgresSetupAdapter.verifyCode(code)).toBe(false);
+    expect(await postgresSetupAdapter.verifyCode(code)).toBe("expired");
   });
 
   it("rejects a default book that is not one of the books", async () => {

@@ -13,12 +13,16 @@ export interface ServiceCredentialPort {
     name: string,
     bookId: string
   ): Promise<CreatedServiceCredentialContract>;
-  /** Rebinds a live key to another book; uploads follow it immediately. */
+  /**
+   * Rebinds a live key to another book; uploads follow it immediately. Throws
+   * `NotFoundError` for a missing key and `ConflictError` for a book outside the
+   * ledger, so the result is never null.
+   */
   setBook(
     ledgerId: LedgerId,
     credentialId: string,
     bookId: string
-  ): Promise<ServiceCredentialContract | null>;
+  ): Promise<ServiceCredentialContract>;
   revoke(
     ledgerId: LedgerId,
     credentialId: string
@@ -130,14 +134,26 @@ export interface SetupContract {
 export interface SetupPort {
   isPending(): Promise<boolean>;
   /**
-   * The pending setup code, creating it when absent. `created` tells the caller
-   * to print it: only the call that wrote it knows the plaintext.
+   * The pending setup code, issuing one when none exists or the stored one has
+   * expired. `created` tells the caller to print it: only the call that issued
+   * it knows the plaintext.
    */
-  getOrCreateCode(): Promise<{ code: string; created: boolean }>;
-  /** Constant-time comparison against the stored hash. */
-  verifyCode(code: string): Promise<boolean>;
+  getOrCreateCode(): Promise<{ code: string; created: boolean; issuedAt: Date | null }>;
+  /**
+   * Constant-time comparison against the stored hash, counting failures. Once
+   * the attempts are used up the code is retired, so a fresh one is issued and
+   * printed on the next visit instead of the guess being retried forever.
+   */
+  verifyCode(code: string): Promise<SetupCodeVerdict>;
   createInitialAccount(input: SetupContract): Promise<{ userId: string; ledgerId: string }>;
 }
+
+/**
+ * `mismatch` is a wrong code that still has attempts left; `locked_out` means
+ * this guess used the last one and retired the code; `expired` means the stored
+ * code is past its lifetime, so a new one has to be issued and printed.
+ */
+export type SetupCodeVerdict = "accepted" | "mismatch" | "locked_out" | "expired";
 
 export interface UserPreferencesContract {
   interfaceLanguage: "auto" | "zh" | "en";

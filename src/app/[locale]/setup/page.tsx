@@ -12,8 +12,10 @@ export const dynamic = "force-dynamic";
 export default async function SetupPage() {
   if (!(await serverComposition.setup.isPending())) notFound();
   // Reading the code here — rather than lazily on submit — means the operator
-  // sees it in the logs from the first visit to this page. Only the call that
-  // created the code prints it, so a refresh does not repeat the banner.
+  // sees it in the logs from the first visit to this page. It is printed only
+  // when this call issues it, so a refresh does not repeat the banner, and a
+  // code past its 30-minute lifetime is replaced and printed again rather than
+  // leaving the wizard with a secret nobody can read.
   await getSetupCodeForDisplay(serverComposition.setup);
   return <SetupForm />;
 }
