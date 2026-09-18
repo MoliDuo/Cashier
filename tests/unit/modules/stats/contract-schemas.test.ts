@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
+import { parseEnhancedStatsInput, parseGetBookTotalsInput } from "@/modules/stats/contract-schemas";
 
 const ledgerId = "00000000-0000-4000-8000-000000000001";
 
@@ -27,5 +27,25 @@ describe("parseEnhancedStatsInput", () => {
         compareRange: { from: "2006-01-04", to: "2016-01-02" },
       })
     ).toEqual(expect.objectContaining({ ledgerId }));
+  });
+});
+
+describe("parseGetBookTotalsInput", () => {
+  it("accepts one range and rejects a malformed ledger or oversized range", () => {
+    expect(
+      parseGetBookTotalsInput({ ledgerId, queryRange: { from: "2024-03-01", to: "2024-03-31" } })
+    ).toEqual(expect.objectContaining({ ledgerId }));
+    expect(() =>
+      parseGetBookTotalsInput({
+        ledgerId: "nope",
+        queryRange: { from: "2024-03-01", to: "2024-03-31" },
+      })
+    ).toThrow();
+    expect(() =>
+      parseGetBookTotalsInput({
+        ledgerId,
+        queryRange: { from: "2000-01-01", to: "2026-01-01" },
+      })
+    ).toThrow(expect.objectContaining({ code: "STATS_RANGE_TOO_LARGE" }));
   });
 });

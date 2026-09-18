@@ -18,6 +18,7 @@ import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import {
   getScopedLedgerSearchParams,
   readLedgerFilterParams,
+  readRecordScopeSearchParams,
   readStatsSearchParams,
 } from "@/modules/workspace/ledger-url-params";
 import {
@@ -29,8 +30,6 @@ import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGu
 
 interface ActiveShellProps {
   ledgerId: string;
-  /** The book being viewed; prefetching reads its zone, falling back to 总账's. */
-  bookId?: string | undefined;
   children: React.ReactNode;
 }
 
@@ -47,17 +46,15 @@ interface ActiveShellProps {
  * become available when LedgerPageClient registers the real handlers via
  * setOpenInput once it mounts.
  */
-export function ActiveShell({ ledgerId, bookId, children }: ActiveShellProps) {
+export function ActiveShell({ ledgerId, children }: ActiveShellProps) {
   return (
     <ShellControllerProvider>
-      <ActiveShellInner ledgerId={ledgerId} bookId={bookId}>
-        {children}
-      </ActiveShellInner>
+      <ActiveShellInner ledgerId={ledgerId}>{children}</ActiveShellInner>
     </ShellControllerProvider>
   );
 }
 
-function ActiveShellInner({ ledgerId, bookId, children }: ActiveShellProps) {
+function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const locale = useLocale();
@@ -65,6 +62,12 @@ function ActiveShellInner({ ledgerId, bookId, children }: ActiveShellProps) {
   const queryClient = useQueryClient();
   const { ready, onInputIntent, onOpenInput } = useShellController();
   const { leaveConfirmOpen, attemptLeave, confirmLeave, cancelLeave } = useSettingsLeaveGuard();
+
+  // The viewed book is URL state, the same value LedgerTabPanels hands each tab,
+  // and a scope change is a client-side history entry with no server render
+  // behind it. So the hover prefetch has to read it live here — a book passed
+  // down from the server would be the book the last full page load viewed.
+  const bookId = readRecordScopeSearchParams(searchParams) ?? undefined;
 
   // Derive the active tab from the URL — keeps the shell and the inner
   // content in sync without duplicating state.

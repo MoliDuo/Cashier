@@ -12,10 +12,13 @@ import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
+import {
+  getDeviceTimeZone as readDeviceTimeZone,
+  writeDeviceTimeZoneCookie,
+} from "@/lib/time-zone-cookie";
 
 const STALE_TIME = LEDGER.STALE_TIME_MS;
 const subscribeToDeviceTimeZone = () => () => {};
-const getDeviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const getServerTimeZone = () => undefined;
 
 interface UseLedgerPageEnvironmentOptions {
@@ -67,12 +70,18 @@ export function useLedgerPageEnvironment({
   // no zone of its own means this device decides, exactly as before.
   const scopeBook = scope == null ? defaultBook : (books?.find((b) => b.id === scope) ?? null);
   const fixedTimeZone = scopeBook?.timeZone ?? undefined;
-  const deviceTimeZone = useSyncExternalStore(
-    subscribeToDeviceTimeZone,
-    getDeviceTimeZone,
-    getServerTimeZone
-  );
+  const deviceTimeZone =
+    useSyncExternalStore(subscribeToDeviceTimeZone, readDeviceTimeZone, getServerTimeZone) ??
+    undefined;
   const effectiveTimeZone = fixedTimeZone ?? deviceTimeZone;
+
+  // The server prefetches the page and the hovered tab, and it has no device.
+  // The zone resolved here is written where a server render can read it, so a
+  // book without a zone of its own is dated the same on both sides.
+  useEffect(() => {
+    if (deviceTimeZone == null) return;
+    writeDeviceTimeZoneCookie(deviceTimeZone);
+  }, [deviceTimeZone]);
 
   const dirtyChangeCount = useUnsavedChangesStore((state) => state.dirtyKeys.size);
 
@@ -107,6 +116,7 @@ export function useLedgerPageEnvironment({
     mainCurrency,
     preferredCurrencies,
     effectiveTimeZone,
+    deviceTimeZone,
     dirtyChangeCount,
   };
 }

@@ -42,6 +42,12 @@ vi.mock("@/i18n/routing", () => ({
   }),
 }));
 
+// The page reads the device zone cookie before it prefetches; there is no
+// request scope in a unit test, and the zone is optional by design.
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ get: () => undefined })),
+}));
+
 vi.mock("next-intl/server", () => ({
   getMessages: getMessagesMock,
   getLocale: vi.fn(() => Promise.resolve("en")),

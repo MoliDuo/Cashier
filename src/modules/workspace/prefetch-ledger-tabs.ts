@@ -8,19 +8,22 @@ import type { Ledger } from "@/modules/ledger/contracts";
 import type { LedgerAdvancedFilters } from "./initial-query-state";
 import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
 import { runtimeEnv } from "@/lib/env/runtime";
+import { getDeviceTimeZone } from "@/lib/time-zone-cookie";
 import type { StatsUrlState } from "./ledger-url-params";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 /**
- * The zone the viewed book is read in, hydrated alongside the ledger. Prefetching
- * uses the same zone the tab will, so a prefetched page is not a different day
- * from the one it lands in. 总账 uses the default book's zone.
+ * The zone the viewed book is read in, hydrated alongside the ledger. A book
+ * without a zone of its own dates by this device, exactly as the tab will; only
+ * a browser that cannot name its zone falls back to the deployment's.
+ * Prefetching must use the same zone the tab will, so a prefetched page is not
+ * a different day from the one it lands in.
  */
 function scopeTimeZone(queryClient: QueryClient, ledgerId: string, bookId?: string) {
   const books = queryClient.getQueryData<readonly BookDto[]>(queryKeys.books(ledgerId));
   const book =
     bookId == null ? books?.find((row) => row.isDefault) : books?.find((row) => row.id === bookId);
-  return book?.timeZone ?? runtimeEnv.timeZone;
+  return book?.timeZone ?? getDeviceTimeZone() ?? runtimeEnv.timeZone;
 }
 import {
   buildDetailsQueryDescriptor,

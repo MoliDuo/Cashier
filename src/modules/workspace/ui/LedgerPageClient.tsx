@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useMessages, useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/routing";
@@ -14,6 +13,7 @@ import { usePeriodFilter } from "../hooks/usePeriodFilter";
 import { useActiveTabQueryState } from "../hooks/useActiveTabQueryState";
 import { useNewRecordDialogState } from "../hooks/useNewRecordDialogState";
 import { useLedgerPageEnvironment } from "../hooks/useLedgerPageEnvironment";
+import { useRecordScope } from "../hooks/useRecordScope";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { LedgerQueryErrorBanner } from "@/modules/workspace/ui/LedgerQueryErrorBanner";
@@ -29,7 +29,6 @@ import { ModalStackGate } from "./ModalStackGate";
 import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
 import { CategoryAssignmentStatus } from "@/modules/ledger/ui/CategoryAssignmentStatus";
 import { pushLedgerUrl } from "../ledger-url-navigation";
-import type { RecordScope } from "@/modules/ledger/filters";
 
 interface LedgerPageClientProps {
   ledgerId: string;
@@ -73,18 +72,24 @@ export function LedgerPageClient({
   passwordUpdatedAt,
   interfaceLanguage,
 }: LedgerPageClientProps) {
-  // null is 总账. The switcher is the only writer, so this is where the whole
-  // page's book scope lives.
-  const [recordScope, setRecordScope] = useState<RecordScope>(null);
-  const { books } = useBooks({
-    ledgerId,
-    ...(initialBooks !== undefined ? { initialBooks } : {}),
-  });
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { books } = useBooks({
+    ledgerId,
+    ...(initialBooks !== undefined ? { initialBooks } : {}),
+  });
+  // null is 总账. The scope lives in the URL because the server prefetches with
+  // it and the shell prefetches the hovered tab with it; the switcher and the
+  // archived/deleted reset below are its only writers.
+  const { recordScope, onRecordScopeChange: handleRecordScopeChange } = useRecordScope({
+    books,
+    searchParams,
+    pathname,
+    locale,
+  });
   const categoryAssignment = useCategoryAssignmentJob(ledgerId);
 
   const { activeTab, handleTabChange: _handleTabChange } = useLedgerTabs({
@@ -138,6 +143,7 @@ export function LedgerPageClient({
     mainCurrency,
     preferredCurrencies,
     effectiveTimeZone,
+    deviceTimeZone,
     dirtyChangeCount,
   } = useLedgerPageEnvironment({
     ledgerId,
@@ -234,7 +240,7 @@ export function LedgerPageClient({
 
         <LedgerTabPanels
           recordScope={recordScope}
-          onRecordScopeChange={setRecordScope}
+          onRecordScopeChange={handleRecordScopeChange}
           books={books ?? []}
           activeTab={activeTab}
           hidden={categoriesHaveNoData}
@@ -280,7 +286,7 @@ export function LedgerPageClient({
           setQuickPending={setQuickPending}
           setAiDirty={setAiDirty}
           setQuickDirty={setQuickDirty}
-          effectiveTimeZone={effectiveTimeZone}
+          deviceTimeZone={deviceTimeZone}
         />
 
         <ConfirmDialog

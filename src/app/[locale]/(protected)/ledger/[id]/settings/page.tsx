@@ -79,6 +79,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
           initialCategories={pageData.initialCategories}
           ledgerId={ledgerId}
           initialBooks={pageData.initialBooks}
+          initialBooksIncludingArchived={pageData.initialBooksIncludingArchived}
           initialEmails={loginEmails.map((row) => row.email)}
           {...(session?.user?.email != null ? { userEmail: session.user.email } : {})}
           {...(session?.user != null ? { hasPassword: session.user.hasPassword } : {})}

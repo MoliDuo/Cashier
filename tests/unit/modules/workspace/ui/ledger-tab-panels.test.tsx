@@ -52,6 +52,7 @@ const books: BookDto[] = [
     timeZone: null,
     sortOrder: 1,
     isDefault: true,
+    archivedAt: null,
   },
   {
     id: BOOK_SHARED,
@@ -60,6 +61,7 @@ const books: BookDto[] = [
     timeZone: null,
     sortOrder: 2,
     isDefault: false,
+    archivedAt: null,
   },
 ];
 

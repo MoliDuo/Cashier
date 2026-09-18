@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { openBookReveal } from "@/lib/store/book-reveal";
+import { toggleBookReveal, useBookRevealStore } from "@/lib/store/book-reveal";
 
 interface BookScopeChipProps {
   /** The book the current view is narrowed to. */
@@ -15,16 +15,19 @@ interface BookScopeChipProps {
  *
  * The chip carries `data-pull-reveal-ignore` so the strip's tap-outside closer
  * leaves the tap alone, and it is a button, so it does not trigger the toolbar's
- * own refresh gesture either.
+ * own refresh gesture either. `aria-expanded` mirrors the strip, so the control
+ * says what its press did.
  */
 export function BookScopeChip({ name }: BookScopeChipProps) {
   const t = useTranslations("BookScope");
+  const open = useBookRevealStore((state) => state.open);
   return (
     <button
       type="button"
       data-pull-reveal-ignore
       data-testid="book-scope-chip"
-      onClick={openBookReveal}
+      aria-expanded={open}
+      onClick={(event) => toggleBookReveal(event.currentTarget)}
       aria-label={t("current", { book: name })}
       className="shrink-0 rounded-sm border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
     >

@@ -16,7 +16,10 @@ export interface GetLedgerSettingsBootstrapInput {
 export interface LedgerSettingsBootstrapResult {
   dehydratedState: DehydratedState;
   initialCategories: EntryCategoryWithCountDto[];
+  /** Live books, for the switcher and the API-key pickers. */
   initialBooks: readonly BookDto[];
+  /** The same list plus the archived rows, for the 分账 section. */
+  initialBooksIncludingArchived: readonly BookDto[];
 }
 
 export async function getLedgerSettingsBootstrap(
@@ -33,8 +36,17 @@ export async function getLedgerSettingsBootstrap(
   const queryClient = new QueryClient();
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
 
+  // Both views are hydrated: the API-key pickers take the live books, and the
+  // 分账 section shows the archived ones alongside them.
   const books = await listBooks(input.ledgerId, dependencies.books);
+  const booksIncludingArchived = await listBooks(input.ledgerId, dependencies.books, {
+    includeArchived: true,
+  });
   queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
+  queryClient.setQueryData(
+    queryKeys.booksIncludingArchived(input.ledgerId),
+    booksIncludingArchived
+  );
 
   const categoriesPromise = queryClient.fetchQuery({
     queryKey: queryKeys.entryCategories(input.ledgerId),
@@ -58,5 +70,6 @@ export async function getLedgerSettingsBootstrap(
     dehydratedState: dehydrate(queryClient),
     initialCategories: await categoriesPromise,
     initialBooks: books,
+    initialBooksIncludingArchived: booksIncludingArchived,
   };
 }

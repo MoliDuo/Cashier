@@ -1,10 +1,16 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { usePullReveal } from "@/modules/workspace/hooks/usePullReveal";
 import { revealRows } from "@/modules/workspace/pull-reveal";
-import { useBookRevealStore } from "@/lib/store/book-reveal";
+import {
+  clearBookRevealTrigger,
+  hasBookRevealTrigger,
+  restoreBookRevealFocus,
+  useBookRevealStore,
+} from "@/lib/store/book-reveal";
 import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 
@@ -25,16 +31,41 @@ interface BookRevealProps {
  * The grid does the animation: one auto row from `0fr` to `1fr`, with the strip
  * itself `overflow-hidden`. While it is closed the whole thing is `inert`, so
  * nothing inside is reachable by tab or by a screen reader.
+ *
+ * The toolbar trigger cannot hand focus to the strip by itself — the strip
+ * renders above the whole tab — so opening moves focus to the picked option,
+ * and Escape (already the strip's own close) hands it back to the trigger.
  */
 export function BookReveal({ books, scope, onScopeChange }: BookRevealProps) {
   const t = useTranslations("BookScope");
   const open = useBookRevealStore((state) => state.open);
   const setOpen = useBookRevealStore((state) => state.setOpen);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef(new Map<string, HTMLButtonElement>());
   const { height, dragging, closeAfterPick } = usePullReveal({
     enabled: true,
     open,
     onOpenChange: setOpen,
   });
+
+  // Focus follows the strip, but only when a control opened it: the strip
+  // renders above the whole tab, so a keyboard user who pressed the chip or the
+  // 分账 button would otherwise have to tab through the page to reach it. A
+  // gesture-opened strip leaves focus exactly where it was. On close, focus goes
+  // back to the trigger whenever it was still inside the strip.
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open) {
+      wasOpenRef.current = true;
+      if (hasBookRevealTrigger()) optionRefs.current.get(scope ?? "all")?.focus();
+      return;
+    }
+    if (!wasOpenRef.current) return;
+    wasOpenRef.current = false;
+    const active = document.activeElement;
+    if (stripRef.current?.contains(active) === true) restoreBookRevealFocus();
+    else clearBookRevealTrigger();
+  }, [open, scope]);
 
   const options: readonly { scope: RecordScope; label: string }[] = [
     { scope: null, label: t("all") },
@@ -56,6 +87,7 @@ export function BookReveal({ books, scope, onScopeChange }: BookRevealProps) {
     >
       <div className="min-h-0">
         <div
+          ref={stripRef}
           className="flex h-14 items-stretch gap-1 overflow-x-auto rounded-lg bg-surface2 p-1"
           role="group"
           aria-label={t("label")}
@@ -64,6 +96,11 @@ export function BookReveal({ books, scope, onScopeChange }: BookRevealProps) {
             <button
               key={option.scope ?? "all"}
               type="button"
+              ref={(node) => {
+                const key = option.scope ?? "all";
+                if (node == null) optionRefs.current.delete(key);
+                else optionRefs.current.set(key, node);
+              }}
               aria-pressed={scope === option.scope}
               className={cn(
                 "min-w-0 shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--motion-feedback)]",

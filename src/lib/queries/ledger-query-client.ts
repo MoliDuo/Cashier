@@ -15,6 +15,7 @@ type QueryActions = {
   entries: typeof import("@/modules/ledger/server/list-entries").getLedgerEntriesAction;
   summary: typeof import("@/modules/ledger/server/stats").getLedgerStatsAction;
   stats: typeof import("@/modules/stats/server/get-enhanced-stats").getEnhancedStats;
+  "book-totals": typeof import("@/modules/stats/server/get-book-totals").getBookTotals;
   reclassification: typeof import("@/modules/ledger/server/get-category-reclassification-job").getCategoryReclassificationJobAction;
   "category-assignment-results": typeof import("@/modules/ledger/server/get-category-reclassification-job").getCategoryAssignmentResultsAction;
 };
@@ -43,5 +44,6 @@ export const getStreamRefreshAction = query("refresh");
 export const getLedgerEntriesAction = query("entries");
 export const getLedgerStatsAction = query("summary");
 export const getEnhancedStats = query("stats");
+export const getBookTotals = query("book-totals");
 export const getCategoryReclassificationJobAction = query("reclassification");
 export const getCategoryAssignmentResultsAction = query("category-assignment-results");

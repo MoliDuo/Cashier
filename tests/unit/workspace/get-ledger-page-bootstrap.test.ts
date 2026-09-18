@@ -496,6 +496,125 @@ describe("getLedgerPageBootstrap", () => {
     expect(result).not.toBeNull();
   });
 
+  describe("book zone precedence", () => {
+    it("dates the page by the viewed book's own zone", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-06T16:30:00Z"));
+      try {
+        listBooksMock.mockResolvedValue([
+          {
+            id: "book-1",
+            ledgerId: "ledger-1",
+            name: "共同支出",
+            timeZone: "Asia/Shanghai",
+            sortOrder: 1,
+            isDefault: true,
+          },
+        ]);
+        const result = await getLedgerPageBootstrap({
+          ledgerId: "ledger-1",
+          initialTab: "stream",
+          periodParams: { period: "thisMonth" },
+          ledgerDto: createPreAuthorizedLedgerDto(),
+          deviceTimeZone: "Europe/London",
+        });
+
+        // 16:30 UTC is 00:30 in Shanghai (the next day) but still 17:30 in
+        // London. The book's own zone beats the device's.
+        expect(result?.ledgerToday).toBe("2026-08-07");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("dates a book with no zone of its own by the device zone", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-06T16:30:00Z"));
+      try {
+        const result = await getLedgerPageBootstrap({
+          ledgerId: "ledger-1",
+          initialTab: "stats",
+          periodParams: { period: "thisMonth" },
+          ledgerDto: createPreAuthorizedLedgerDto(),
+          deviceTimeZone: "Asia/Tokyo",
+        });
+
+        // 16:30 UTC is 01:30 in Tokyo (the next day) but still 00:30 in the
+        // deployment default (Asia/Shanghai). The device is what the tab uses.
+        expect(result?.ledgerToday).toBe("2026-08-07");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("falls back to the deployment zone when neither book nor device knows one", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-06T16:30:00Z"));
+      try {
+        const result = await getLedgerPageBootstrap({
+          ledgerId: "ledger-1",
+          initialTab: "stream",
+          periodParams: { period: "thisMonth" },
+          ledgerDto: createPreAuthorizedLedgerDto(),
+        });
+
+        // No book zone and no cookie is the API-upload shape: the server's own
+        // zone (Asia/Shanghai by default) decides.
+        expect(result?.ledgerToday).toBe("2026-08-07");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("prefetches the stats tab for the book in the URL, not only for 总账", async () => {
+      const result = await getLedgerPageBootstrap({
+        ledgerId: "ledger-1",
+        initialTab: "stats",
+        periodParams: { period: "thisMonth" },
+        statsState: { range: "month", offset: 0, view: "heatmap" },
+        ledgerDto: createPreAuthorizedLedgerDto(),
+        bookId: "book-1",
+      });
+
+      const statsQuery = result?.dehydratedState.queries.find(
+        (query) =>
+          query.queryKey[0] === "ledger" &&
+          query.queryKey[1] === "ledger-1" &&
+          query.queryKey[2] === "enhanced-stats"
+      );
+      expect(statsQuery?.queryKey[3]).toMatchObject({ bookId: "book-1" });
+      expect(getEnhancedStatsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ bookId: "book-1" }),
+        bootstrapDependencies.stats
+      );
+    });
+
+    it("prefetches 总账 when the URL names a book that is no longer live", async () => {
+      const result = await getLedgerPageBootstrap({
+        ledgerId: "ledger-1",
+        initialTab: "stats",
+        periodParams: { period: "thisMonth" },
+        statsState: { range: "month", offset: 0, view: "heatmap" },
+        ledgerDto: createPreAuthorizedLedgerDto(),
+        // The live list holds only book-1; this id was archived after the link
+        // was made. The client resets the scope, and the prefetch must match it.
+        bookId: "book-archived",
+      });
+
+      const statsQuery = result?.dehydratedState.queries.find(
+        (query) =>
+          query.queryKey[0] === "ledger" &&
+          query.queryKey[1] === "ledger-1" &&
+          query.queryKey[2] === "enhanced-stats"
+      );
+      expect(statsQuery?.queryKey[3]).toMatchObject({ bookId: null });
+      expect(getEnhancedStatsMock).toHaveBeenCalledWith(
+        expect.not.objectContaining({ bookId: expect.any(String) }),
+        bootstrapDependencies.stats
+      );
+    });
+  });
+
   it("does not prefetch a multi-ledger list for the single-ledger workspace", async () => {
     const result = await getLedgerPageBootstrap({
       ledgerId: "ledger-1",

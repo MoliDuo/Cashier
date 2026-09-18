@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getLocale, getMessages } from "next-intl/server";
+import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "@/i18n/routing";
@@ -16,8 +17,10 @@ import { pickMessages, FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
 import {
   getScopedLedgerSearchParams,
   readLedgerFilterParams,
+  readRecordScopeSearchParams,
   readStatsSearchParams,
 } from "@/modules/workspace/ledger-url-params";
+import { DEVICE_TIME_ZONE_COOKIE, parseDeviceTimeZoneCookie } from "@/lib/time-zone-cookie";
 import { ActiveContent } from "./_active-content";
 import { ActiveShell } from "./_active-shell";
 import { LedgerBootstrapFallback } from "./_ledger-bootstrap-fallback";
@@ -58,12 +61,20 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   }
 
   const { ledgerId, ledgerDto, session } = context;
-  // 总账 is the default view; a book is only selected in the pull-down switcher,
-  // so the bootstrap always prefetches 总账 and the tabs narrow client-side.
 
   const activeTab = parseLedgerTab(searchParams);
   const filterScope = activeTab === "details" ? "details" : "stream";
   const urlSearchParams = toUrlSearchParams(searchParams);
+  // The viewed book travels in the URL, so the server prefetches the same scope
+  // the tabs are about to render. 总账 is the parameter being absent.
+  const bookId = readRecordScopeSearchParams(urlSearchParams);
+  // The device zone the browser reported, written by the client after its first
+  // render. It only breaks ties for a book without a zone of its own; an API
+  // upload has no device and keeps the server zone.
+  const cookieStore = await cookies();
+  const deviceTimeZone = parseDeviceTimeZoneCookie(
+    cookieStore.get(DEVICE_TIME_ZONE_COOKIE)?.value ?? null
+  );
   const periodParams = parsePeriodFromSearchParams(
     getScopedLedgerSearchParams(urlSearchParams, filterScope)
   );
@@ -77,6 +88,8 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
       advancedFilters,
       statsState,
       ledgerDto,
+      ...(bookId == null ? {} : { bookId }),
+      ...(deviceTimeZone == null ? {} : { deviceTimeZone }),
     },
     {
       categories: serverComposition.categories,
