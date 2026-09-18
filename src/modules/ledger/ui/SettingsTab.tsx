@@ -41,6 +41,8 @@ interface SettingsTabProps {
   ledgerId: string;
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
+  /** The same list plus the archived rows, for the 分账 section. */
+  initialBooksIncludingArchived?: readonly BookDto[];
   /** The account's login addresses, hydrated by the page bootstrap. */
   initialEmails?: readonly string[];
   userEmail?: string;
@@ -58,6 +60,7 @@ export function SettingsTab({
   initialCategories,
   ledgerId,
   initialBooks,
+  initialBooksIncludingArchived,
   initialEmails,
   userEmail,
   hasPassword = false,
@@ -317,7 +320,10 @@ export function SettingsTab({
         />
       </SettingsSection>
 
-      <BookSettings ledgerId={ledgerId} initialBooks={initialBooks} />
+      <BookSettings
+        ledgerId={ledgerId}
+        initialBooks={initialBooksIncludingArchived ?? initialBooks}
+      />
 
       <BookkeepingSettings
         ledgerId={ledgerId}
@@ -339,8 +345,12 @@ export function SettingsTab({
         onUpdateSettings={(data) => updateLedgerMutation.mutateAsync(data)}
       />
 
+      {/* Removing a login email bumps auth_version server-side, so every device
+          was signed out, not only this one; EmailSettings announces that before
+          leaving and then reuses the same credentials-changed sign-out. */}
       <AccountSettings
-        initialEmails={initialEmails ?? (userEmail == null || userEmail === "" ? [] : [userEmail])}
+        {...(initialEmails !== undefined ? { initialEmails } : {})}
+        {...(userEmail !== undefined ? { userEmail } : {})}
         hasPassword={hasPassword}
         passwordUpdatedAt={passwordUpdatedAt}
         credentials={credentials ?? []}
@@ -355,6 +365,7 @@ export function SettingsTab({
         onSignOut={handleSignOut}
         onRequireReauthentication={handleRequireReauthentication}
         onCredentialsChanged={handleCredentialsChanged}
+        onAllSessionsEnded={handleCredentialsChanged}
       />
     </div>
   );

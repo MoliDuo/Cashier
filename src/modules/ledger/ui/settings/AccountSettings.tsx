@@ -16,8 +16,10 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface AccountSettingsProps {
-  /** The account's login addresses, hydrated by the page bootstrap. */
-  initialEmails: readonly string[];
+  /** The account's full login-email list, hydrated by the server when available. */
+  initialEmails?: readonly string[];
+  /** The address this session signed in with, for the list's first frame. */
+  userEmail?: string;
   hasPassword: boolean;
   passwordUpdatedAt: string | null;
   credentials: ServiceCredential[];
@@ -32,11 +34,15 @@ interface AccountSettingsProps {
   onCredentialDialogClose: () => void;
   onSignOut: () => void | Promise<void>;
   onRequireReauthentication: () => void | Promise<void>;
+  /** A password change bumps auth_version, so the session must sign in again. */
   onCredentialsChanged: () => void | Promise<void>;
+  /** Removing a login email bumps auth_version, so every session signs in again. */
+  onAllSessionsEnded: () => void | Promise<void>;
 }
 
 export function AccountSettings({
   initialEmails,
+  userEmail,
   hasPassword,
   passwordUpdatedAt,
   credentials,
@@ -49,6 +55,7 @@ export function AccountSettings({
   onSignOut,
   onRequireReauthentication,
   onCredentialsChanged,
+  onAllSessionsEnded,
 }: AccountSettingsProps) {
   const t = useTranslations("Settings");
   const ta = useTranslations("Settings.Account");
@@ -58,9 +65,10 @@ export function AccountSettings({
   return (
     <SettingsSection title={t("account")}>
       <EmailSettings
-        initialEmails={initialEmails}
+        {...(initialEmails !== undefined ? { initialEmails } : {})}
+        {...(userEmail !== undefined ? { userEmail } : {})}
         onRequireReauthentication={onRequireReauthentication}
-        onCredentialsChanged={onCredentialsChanged}
+        onAllSessionsEnded={onAllSessionsEnded}
       />
 
       <SettingsField title={ta("passwordSection")} description={ta("passwordSectionDesc")}>

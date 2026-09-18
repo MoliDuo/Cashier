@@ -18,6 +18,8 @@ interface SettingsPageClientProps {
   ledgerId: string;
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
+  /** The same list plus the archived rows, for the 分账 section. */
+  initialBooksIncludingArchived: readonly BookDto[];
   /** The account's login addresses, hydrated by the server. */
   initialEmails?: readonly string[];
   userEmail?: string;
@@ -31,6 +33,7 @@ export function SettingsPageClient({
   initialCategories,
   ledgerId,
   initialBooks,
+  initialBooksIncludingArchived,
   initialEmails,
   userEmail,
   hasPassword,
@@ -63,6 +66,7 @@ export function SettingsPageClient({
         initialCategories={initialCategories}
         ledgerId={ledgerId}
         initialBooks={initialBooks}
+        initialBooksIncludingArchived={initialBooksIncludingArchived}
         {...(initialEmails !== undefined ? { initialEmails } : {})}
         {...(userEmail !== undefined ? { userEmail } : {})}
         {...(hasPassword !== undefined ? { hasPassword } : {})}

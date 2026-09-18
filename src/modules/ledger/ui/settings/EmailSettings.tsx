@@ -30,10 +30,13 @@ import { SettingsField } from "./SettingsField";
 import { SettingsSection } from "./SettingsSection";
 
 interface EmailSettingsProps {
-  /** Hydrated by the server so the list paints on the first frame. */
+  /** The account's full login-email list, hydrated by the server when available. */
   initialEmails?: readonly string[];
+  /** The address this session signed in with, painted until the full list arrives. */
+  userEmail?: string;
   onRequireReauthentication?: () => void | Promise<void>;
-  onCredentialsChanged?: () => void | Promise<void>;
+  /** Removing an address bumps auth_version, so every session has to sign in again. */
+  onAllSessionsEnded?: () => void | Promise<void>;
 }
 
 /**
@@ -43,8 +46,9 @@ interface EmailSettingsProps {
  */
 export function EmailSettings({
   initialEmails,
+  userEmail,
   onRequireReauthentication,
-  onCredentialsChanged,
+  onAllSessionsEnded,
 }: EmailSettingsProps) {
   const t = useTranslations("Settings.Emails");
   const tCommon = useTranslations("Common");
@@ -57,7 +61,10 @@ export function EmailSettings({
     staleTime: LEDGER.STALE_TIME_MS,
     ...(initialEmails !== undefined ? { initialData: [...initialEmails] } : {}),
   });
-  const emails = data ?? [];
+  // The in-page tab only knows the signed-in address, so the query fills in the
+  // full list; until it answers (or if it fails) the address still paints, which
+  // keeps the last-email rule's disabled Remove correct.
+  const emails = data ?? (userEmail == null || userEmail === "" ? [] : [userEmail]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -99,39 +106,56 @@ export function EmailSettings({
   const requestCode = async () => {
     setPending(true);
     setError(null);
-    const result = await sendLoginEmailCodeAction(email, locale);
-    setPending(false);
-    if (!result.ok) {
-      if (result.code === "reauth_required") {
-        await onRequireReauthentication?.();
+    try {
+      const result = await sendLoginEmailCodeAction(email, locale);
+      if (!result.ok) {
+        if (result.code === "reauth_required") {
+          await onRequireReauthentication?.();
+          return;
+        }
+        const text = message(result.code);
+        setError(text);
+        toast.error(text);
         return;
       }
-      const text = message(result.code);
+      setSent(true);
+      setCode("");
+      toast.success(t("codeSent"));
+    } catch {
+      const text = message("unknown");
       setError(text);
       toast.error(text);
-      return;
+    } finally {
+      setPending(false);
     }
-    setSent(true);
-    setCode("");
-    toast.success(t("codeSent"));
   };
 
   const verify = async () => {
     setPending(true);
     setError(null);
-    const result = await verifyLoginEmailCodeAction(email, code);
-    setPending(false);
-    if (!result.ok) {
-      const text = message(result.code);
+    try {
+      const result = await verifyLoginEmailCodeAction(email, code);
+      if (!result.ok) {
+        if (result.code === "reauth_required") {
+          await onRequireReauthentication?.();
+          return;
+        }
+        const text = message(result.code);
+        setError(text);
+        toast.error(text);
+        return;
+      }
+      queryClient.setQueryData<string[]>(key, result.emails);
+      toast.success(t("added"));
+      setIsAddOpen(false);
+      reset();
+    } catch {
+      const text = message("unknown");
       setError(text);
       toast.error(text);
-      return;
+    } finally {
+      setPending(false);
     }
-    queryClient.setQueryData<string[]>(key, result.emails);
-    toast.success(t("added"));
-    setIsAddOpen(false);
-    reset();
-    await onCredentialsChanged?.();
   };
 
   return (
@@ -238,13 +262,19 @@ export function EmailSettings({
           if (removeTarget == null) return false;
           const result = await removeLoginEmailAction(removeTarget);
           if (!result.ok) {
+            if (result.code === "reauth_required") {
+              await onRequireReauthentication?.();
+              return false;
+            }
             toast.error(message(result.code));
             return false;
           }
           queryClient.setQueryData<string[]>(key, result.emails);
-          toast.success(t("removed"));
+          // Removing an address bumps auth_version, so every session was ended,
+          // not only this one; the login screen repeats the notice after sign-out.
+          toast.success(t("sessionsEnded"));
           setRemoveTarget(null);
-          await onCredentialsChanged?.();
+          await onAllSessionsEnded?.();
           return true;
         }}
       />
