@@ -42,16 +42,9 @@ cd Cashier
 cp .env.local.example .env
 ```
 
-编辑 `.env`，配置两个固定成员的 ID、登录邮箱和密码及 AI 密钥：
+编辑 `.env`，填入 AI 密钥即可。账号、账本和分账都不在这里配置，由初始化向导创建：
 
 ```dotenv
-COUPLE_OWNER_USER_ID=<UUID>
-COUPLE_PARTNER_USER_ID=<different UUID>
-COUPLE_LEDGER_ID=<UUID>
-COUPLE_OWNER_EMAIL=<first member email>
-COUPLE_OWNER_PASSWORD=<strong password>
-COUPLE_PARTNER_EMAIL=<second member email>
-COUPLE_PARTNER_PASSWORD=<strong password>
 OPENAI_API_KEY=your-api-key
 ```
 

@@ -42,16 +42,10 @@ cd Cashier
 cp .env.local.example .env
 ```
 
-Configure two fixed members and the AI key in `.env`:
+Fill in the AI key in `.env`. The account, ledger and books are not configured here; the first-run
+wizard creates them:
 
 ```dotenv
-COUPLE_OWNER_USER_ID=<UUID>
-COUPLE_PARTNER_USER_ID=<different UUID>
-COUPLE_LEDGER_ID=<UUID>
-COUPLE_OWNER_EMAIL=<first member email>
-COUPLE_OWNER_PASSWORD=<strong password>
-COUPLE_PARTNER_EMAIL=<second member email>
-COUPLE_PARTNER_PASSWORD=<strong password>
 OPENAI_API_KEY=your-api-key
 ```
 
