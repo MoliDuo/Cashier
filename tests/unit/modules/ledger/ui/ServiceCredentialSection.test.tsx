@@ -25,6 +25,7 @@ const books = [
     timeZone: null,
     sortOrder: 1,
     isDefault: true,
+    archivedAt: null,
   },
   {
     id: "book-2",
@@ -33,6 +34,7 @@ const books = [
     timeZone: null,
     sortOrder: 2,
     isDefault: false,
+    archivedAt: null,
   },
 ];
 
@@ -201,5 +203,46 @@ describe("ServiceCredentialSection", () => {
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText("Mine"));
     await waitFor(() => expect(onSetCredentialBook).toHaveBeenCalledWith("shared", "book-2"));
+  });
+
+  it("starts the create dialog from the default book every time it opens", async () => {
+    render(
+      <ServiceCredentialSection
+        credentials={[]}
+        books={books}
+        onCreateCredential={vi.fn()}
+        onSetCredentialBook={vi.fn(async () => undefined)}
+        onDeleteCredential={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "newCredential" }));
+    expect(screen.getByRole("combobox")).toHaveTextContent("Shared");
+
+    fireEvent.click(screen.getByRole("combobox"));
+    const listbox = await screen.findByRole("listbox");
+    fireEvent.click(within(listbox).getByText("Mine"));
+    expect(screen.getByRole("combobox")).toHaveTextContent("Mine");
+
+    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "newCredential" }));
+    expect(screen.getByRole("combobox")).toHaveTextContent("Shared");
+  });
+
+  it("labels a key whose book is archived or unresolvable", () => {
+    render(
+      <ServiceCredentialSection
+        credentials={[credentialFixture({ id: "orphan", bookId: "book-archived" })]}
+        books={books}
+        onCreateCredential={vi.fn()}
+        onSetCredentialBook={vi.fn(async () => undefined)}
+        onDeleteCredential={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("book:archivedBook")).toBeInTheDocument();
+    expect(screen.queryByText("book:error")).not.toBeInTheDocument();
   });
 });

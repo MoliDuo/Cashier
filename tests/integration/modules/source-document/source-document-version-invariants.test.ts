@@ -148,8 +148,29 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     expect(await port.assignBook({ ...input, expectedVersion: 1 })).toEqual({
       ok: false,
+      reason: "stale",
       currentVersion: 2,
     });
+    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
+      bookId: targetBookId,
+      version: 2,
+    });
+
+    // A book archived while the form sat open must not receive the record: the
+    // composite key would accept it, so the check has to be here.
+    const thirdBookId = crypto.randomUUID();
+    await db.insert(books).values({
+      id: thirdBookId,
+      ledgerId,
+      name: "已归档的",
+      sortOrder: 3,
+      archivedAt: new Date(),
+    });
+    expect(await port.assignBook({ ...input, bookId: thirdBookId, expectedVersion: 2 })).toEqual({
+      ok: false,
+      reason: "book_unavailable",
+    });
+    // Nothing was written, so the record is still where it was.
     expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
       bookId: targetBookId,
       version: 2,

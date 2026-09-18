@@ -78,13 +78,21 @@ export interface SourceDocumentAggregateWritePort {
     ledgerId: string;
     sourceDocumentId: string;
   }): Promise<{ bookId: string; version: number } | null>;
-  /** Moves one record to another book of the same ledger. */
+  /**
+   * Moves one record to another book of the same ledger. A target that is gone
+   * or archived is refused rather than written: the record would otherwise be
+   * filed somewhere the reader cannot see it.
+   */
   assignBook(input: {
     ledgerId: string;
     sourceDocumentId: string;
     expectedVersion: number;
     bookId: string;
-  }): Promise<{ ok: true; version: number } | { ok: false; currentVersion: number }>;
+  }): Promise<
+    | { ok: true; version: number }
+    | { ok: false; reason: "stale"; currentVersion: number }
+    | { ok: false; reason: "book_unavailable" }
+  >;
   applyCategoryAssignments(
     input: ApplyCategoryAssignmentsInput
   ): Promise<ApplyCategoryAssignmentsResult>;

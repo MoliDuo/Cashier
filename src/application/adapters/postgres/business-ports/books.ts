@@ -1,8 +1,8 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { BookContract, BookPort } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
-import { books, sourceDocuments } from "@/persistence";
+import { books, serviceCredentials, sourceDocuments } from "@/persistence";
 
 type BookRow = typeof books.$inferSelect;
 
@@ -14,6 +14,7 @@ function toBook(row: BookRow): BookContract {
     timeZone: row.timeZone,
     sortOrder: row.sortOrder,
     isDefault: row.isDefault,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
   };
 }
 
@@ -26,31 +27,62 @@ function duplicateNameError() {
 }
 
 /**
- * The archive rules the product states, in one place: a book that still holds
- * records can only be archived, and the last active book and the 总账 default
- * book cannot be archived at all. Archiving is therefore only reachable for an
- * empty book that is not the default.
+ * The books that are still in use. A retired book may share a name with a live
+ * one and may keep a stale default flag, so the counts that decide what is
+ * allowed always ask about the live rows only.
  */
-async function assertArchivable(
+async function countLiveBooks(tx: Pick<typeof db, "select">, ledgerId: string): Promise<number> {
+  const rows = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(books)
+    .where(liveBooksWhere(ledgerId));
+  return Number(rows[0]?.count ?? 0);
+}
+
+/** Whether any API key — revoked ones included — still points at the book. */
+async function countCredentials(
   tx: Pick<typeof db, "select">,
   ledgerId: string,
   bookId: string
-): Promise<BookRow> {
-  const book = await tx
-    .select()
-    .from(books)
-    .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId)))
-    .limit(1)
-    .then((rows) => rows[0]);
-  if (book == null || book.archivedAt != null) throw new NotFoundError("Book");
-  if (book.isDefault) throw new ValidationError("The default book cannot be archived");
-  const live = await tx
+): Promise<number> {
+  const rows = await tx
     .select({ count: sql<number>`count(*)::int` })
-    .from(books)
-    .where(liveBooksWhere(ledgerId))
-    .then((rows) => Number(rows[0]?.count ?? 0));
-  if (live <= 1) throw new ValidationError("The last active book cannot be archived");
-  return book;
+    .from(serviceCredentials)
+    .where(and(eq(serviceCredentials.ledgerId, ledgerId), eq(serviceCredentials.bookId, bookId)));
+  return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * Every record the book ever held, soft-deleted ones included. Deleting the book
+ * would have to break the records' foreign key, so this is the count that
+ * decides whether a delete is possible at all.
+ */
+async function countDocumentsIncludingDeleted(
+  tx: Pick<typeof db, "select">,
+  ledgerId: string,
+  bookId: string
+): Promise<number> {
+  const rows = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(sourceDocuments)
+    .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.bookId, bookId)));
+  return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * The refusals shared by archive and delete: the default book is where 总账
+ * records land, and the last live book would leave the instance with nowhere to
+ * file anything. Both throw, because the caller maps them to a code.
+ */
+async function assertNotDefaultOrLast(
+  tx: Pick<typeof db, "select">,
+  ledgerId: string,
+  book: BookRow
+): Promise<void> {
+  if (book.isDefault) throw new ValidationError("The default book cannot be archived");
+  if ((await countLiveBooks(tx, ledgerId)) <= 1) {
+    throw new ValidationError("The last active book cannot be archived");
+  }
 }
 
 export const postgresBookAdapter: BookPort = {
@@ -70,6 +102,18 @@ export const postgresBookAdapter: BookPort = {
       .select()
       .from(books)
       .where(and(eq(books.ledgerId, ledgerId), eq(books.id, bookId), isNull(books.archivedAt)))
+      .limit(1)
+      .then((rows) => rows[0]);
+    return row == null ? null : toBook(row);
+  },
+
+  async getIncludingArchived(ledgerId, bookId) {
+    // Display only: a record may still point at a book that has since been
+    // retired, and the detail page has to name it instead of showing a blank.
+    const row = await db
+      .select()
+      .from(books)
+      .where(and(eq(books.ledgerId, ledgerId), eq(books.id, bookId)))
       .limit(1)
       .then((rows) => rows[0]);
     return row == null ? null : toBook(row);
@@ -148,24 +192,78 @@ export const postgresBookAdapter: BookPort = {
 
   async archive(ledgerId, bookId) {
     return db.transaction(async (tx) => {
-      await assertArchivable(tx, ledgerId, bookId);
-      const records = await tx
-        .select({ count: sql<number>`count(*)::int` })
-        .from(sourceDocuments)
-        .where(
-          and(
-            eq(sourceDocuments.ledgerId, ledgerId),
-            eq(sourceDocuments.bookId, bookId),
-            isNull(sourceDocuments.deletedAt)
-          )
-        )
-        .then((rows) => Number(rows[0]?.count ?? 0));
-      if (records > 0) return "has_records" as const;
-      await tx
+      const book = await tx
+        .select()
+        .from(books)
+        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId)))
+        .limit(1)
+        .then((rows) => rows[0]);
+      if (book == null || book.archivedAt != null) return { status: "not_found" as const };
+      // A key bound to the book would keep uploading into a retired book, so it
+      // has to be rebound first. Checked before the default/last rules, because
+      // the reader can act on this one.
+      if ((await countCredentials(tx, ledgerId, bookId)) > 0) {
+        return { status: "has_credentials" as const };
+      }
+      await assertNotDefaultOrLast(tx, ledgerId, book);
+      const archived = await tx
         .update(books)
         .set({ archivedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNull(books.archivedAt)));
-      return "archived" as const;
+        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNull(books.archivedAt)))
+        .returning()
+        .then((rows) => rows[0]);
+      if (archived == null) return { status: "not_found" as const };
+      return { status: "archived" as const, book: toBook(archived) };
+    });
+  },
+
+  async restore(ledgerId, bookId) {
+    return db.transaction(async (tx) => {
+      const restored = await tx
+        .update(books)
+        .set({ archivedAt: null, updatedAt: new Date() })
+        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNotNull(books.archivedAt)))
+        .returning()
+        .then((rows) => rows[0])
+        .catch((error: unknown) => {
+          // Bringing a book back can collide with a live book that took its
+          // name while it was retired.
+          if (isUniqueViolation(error)) throw duplicateNameError();
+          throw error;
+        });
+      if (restored == null) throw new NotFoundError("Book");
+      return toBook(restored);
+    });
+  },
+
+  async delete(ledgerId, bookId) {
+    return db.transaction(async (tx) => {
+      const book = await tx
+        .select()
+        .from(books)
+        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId)))
+        .limit(1)
+        .then((rows) => rows[0]);
+      if (book == null) return { status: "not_found" as const };
+      // Soft-deleted records count too: the foreign key still points at this
+      // book, so removing the row would fail or orphan them.
+      if ((await countDocumentsIncludingDeleted(tx, ledgerId, bookId)) > 0) {
+        return { status: "has_records" as const };
+      }
+      if ((await countCredentials(tx, ledgerId, bookId)) > 0) {
+        return { status: "has_credentials" as const };
+      }
+      // Deleting is only offered for a live book; an archived one is restored
+      // first, so a retired book cannot vanish without the reader seeing it.
+      if (book.archivedAt != null) return { status: "not_found" as const };
+      await assertNotDefaultOrLast(tx, ledgerId, book);
+      const removed = await tx
+        .delete(books)
+        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId)))
+        .returning({ id: books.id })
+        .then((rows) => rows[0]);
+      if (removed == null) return { status: "not_found" as const };
+      return { status: "deleted" as const };
     });
   },
 
@@ -209,8 +307,29 @@ export const postgresBookAdapter: BookPort = {
       );
     return Number(rows[0]?.count ?? 0);
   },
+
+  async hasCredentials(ledgerId, bookId) {
+    return (await countCredentials(db, ledgerId, bookId)) > 0;
+  },
 };
 
+/**
+ * Drizzle wraps driver failures in a `DrizzleQueryError` whose `cause` is the
+ * original Postgres error, so the SQLSTATE is one level down from what the
+ * caller catches. Only the live-name index matters here: the default flag is
+ * moved by `setDefault`, which clears it first.
+ */
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "23505";
+  let candidate: unknown = error;
+  for (let depth = 0; depth < 4 && candidate != null; depth += 1) {
+    if (
+      candidate instanceof Error &&
+      "code" in candidate &&
+      (candidate as { code?: unknown }).code === "23505"
+    ) {
+      return true;
+    }
+    candidate = (candidate as { cause?: unknown }).cause;
+  }
+  return false;
 }

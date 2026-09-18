@@ -1,5 +1,44 @@
-import { expect, test } from "@playwright/test";
-import { selectBook } from "./book-switch";
+import { expect, test, type Page } from "@playwright/test";
+import { openBookScope, selectBook } from "./book-switch";
+
+/**
+ * Switches tab by keyboard. The demo runner serves `next dev`, whose error
+ * overlay sits over the bottom-left nav on a phone and swallows the click that
+ * "Stream" needs; focusing the tab and pressing Enter is the same path a
+ * keyboard user takes, and the overlay does not intercept it.
+ */
+async function switchTab(page: Page, name: string) {
+  const tab = page
+    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("button", { name, exact: true });
+  await tab.focus();
+  await page.keyboard.press("Enter");
+}
+
+/** Picks a book from the switcher by name, rather than by its position. */
+async function selectBookByName(page: Page, name: string) {
+  await openBookScope(page);
+  await page
+    .getByRole("group", { name: "Book" })
+    .getByRole("button")
+    .filter({ hasText: name })
+    .click();
+  await expect(page.getByTestId("book-reveal")).toHaveAttribute("data-pull-reveal", "closed");
+}
+
+/**
+ * The row of the 分账 list that names `name`. Matched on the exact name, not a
+ * substring, so one book cannot be confused with another that starts the same.
+ */
+function bookRow(page: Page, name: string) {
+  return page.getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
+}
+
+/** Archives through the confirmation, which is the only path that may retire a book. */
+async function archiveBook(page: Page, name: string) {
+  await bookRow(page, name).getByRole("button", { name: "Archive", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Archive", exact: true }).click();
+}
 
 /**
  * The book switcher and the per-book bookkeeping that replaced the member
@@ -109,6 +148,105 @@ test("@demo manages books and the book each API key writes to", async ({ page })
   await expect(
     page.getByRole("button", { name: "Remove dev@cashier.local", exact: true })
   ).toBeDisabled();
+
+  expect(errors).toEqual([]);
+});
+
+test("@demo deletes, archives and restores a book it creates for itself", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  // The demo workspace is shared by every project in this file, so this test
+  // brings its own book and removes it again instead of retiring a seeded one.
+  // The rules that need a book with records or a bound key are pinned in
+  // tests/integration/ledger/books-adapter.test.ts, where fixtures are free.
+  const bookName = "临时甲账";
+
+  await page.goto("/en");
+  await page.getByRole("button", { name: "Continue as dev", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+  await page
+    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  await expect(page.getByRole("heading", { name: "Books", exact: true })).toBeVisible();
+
+  // A key is still bound to 梁梁的, so archiving it is refused with the reason,
+  // and the refusal changes nothing.
+  await archiveBook(page, "梁梁的");
+  await expect(page.getByText(/Rebind them first/)).toBeVisible();
+  await expect(bookRow(page, "梁梁的").getByRole("button", { name: "Archive" })).toBeEnabled();
+
+  // Create the book this test owns.
+  await page.getByRole("button", { name: "Add book", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("Name", { exact: true }).fill(bookName);
+  await page.getByRole("dialog").getByRole("button", { name: "Add book", exact: true }).click();
+  await expect(bookRow(page, bookName)).toBeVisible();
+
+  // Archive it: it leaves the live list and appears under the archived heading,
+  // which is also where it is brought back from.
+  await archiveBook(page, bookName);
+  await expect(page.getByRole("heading", { name: "Archived books", exact: true })).toBeVisible();
+  await expect(bookRow(page, bookName).getByText("Archived", { exact: true })).toBeVisible();
+  // Only the archived row offers Restore, so this is the row that must be there —
+  // and no live row may keep offering Archive for the same book.
+  await expect(bookRow(page, bookName).getByRole("button", { name: "Restore" })).toBeVisible();
+  await expect(bookRow(page, bookName).getByRole("button", { name: "Archive" })).toHaveCount(0);
+  await bookRow(page, bookName).getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(bookRow(page, bookName).getByRole("button", { name: "Archive" })).toBeVisible();
+
+  // An empty book can be deleted outright, and deletion is final.
+  await bookRow(page, bookName).getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(bookRow(page, bookName)).toHaveCount(0);
+
+  expect(errors).toEqual([]);
+});
+
+test("@demo archiving the book being viewed falls back to the ledger total", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const bookName = "临时乙账";
+
+  await page.goto("/en");
+  await page.getByRole("button", { name: "Continue as dev", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+
+  await page
+    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Add book", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("Name", { exact: true }).fill(bookName);
+  await page.getByRole("dialog").getByRole("button", { name: "Add book", exact: true }).click();
+  await expect(bookRow(page, bookName)).toBeVisible();
+
+  // Narrow the records view to that book.
+  await switchTab(page, "Stream");
+  await selectBookByName(page, bookName);
+  await expect(page.getByTestId("book-scope-chip")).toContainText(bookName);
+
+  // Retiring it from Settings drops the scope: it can no longer name a live
+  // book, so the records view falls back to 总账 rather than keeping a book that
+  // is gone.
+  await page
+    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  await archiveBook(page, bookName);
+  await expect(page.getByRole("heading", { name: "Archived books", exact: true })).toBeVisible();
+  await switchTab(page, "Stream");
+  // 总账 renders no chip, so the dead scope is gone exactly when the chip is.
+  await expect(page.getByTestId("book-scope-chip")).toHaveCount(0);
+
+  // Leave the workspace as it was found: restore the book, then remove it.
+  await page
+    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  await bookRow(page, bookName).getByRole("button", { name: "Restore", exact: true }).click();
+  await bookRow(page, bookName).getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(bookRow(page, bookName)).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });

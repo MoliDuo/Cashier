@@ -9,6 +9,7 @@ export function toBookDto(book: BookContract): BookDto {
     timeZone: book.timeZone,
     sortOrder: book.sortOrder,
     isDefault: book.isDefault,
+    archivedAt: book.archivedAt,
   };
 }
 
@@ -16,10 +17,15 @@ export function toBookDto(book: BookContract): BookDto {
  * The switcher's list: 总账 is not a row, it is the absence of a selection, so
  * this returns the books only. An empty list means the ledger has no live book,
  * which the setup wizard and the archive rules between them do not allow.
+ *
+ * `includeArchived` is a separate view on purpose: 设置 and the detail page need a
+ * retired book named, while the switcher and the record pickers must not offer
+ * one as a target.
  */
 export async function listBooks(
   ledgerId: string,
-  books: Pick<BookPort, "list">
+  books: Pick<BookPort, "list">,
+  options?: { includeArchived?: boolean }
 ): Promise<BookDto[]> {
-  return (await books.list(ledgerId)).map(toBookDto);
+  return (await books.list(ledgerId, options)).map(toBookDto);
 }

@@ -70,8 +70,10 @@ export type Ledger = InferSelectModel<typeof ledgers>;
 /**
  * A 分账: the bucket every record belongs to. Reading all of them together is
  * 总账. `is_default` marks the book that 总账-entered records land in; it is
- * stored as a flag rather than found by name. `time_zone` null means "use this
- * device's zone", exactly as the members' own zones did before.
+ * stored as a flag rather than found by name. `time_zone` null means "no zone
+ * of this book's own": a record entered in the web app is then dated in the
+ * device's zone, while one uploaded through an API key — which has no device —
+ * is dated in the server's.
  */
 export const books = pgTable(
   "books",

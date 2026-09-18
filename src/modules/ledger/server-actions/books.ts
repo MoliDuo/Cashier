@@ -12,19 +12,27 @@ import {
 } from "@/modules/ledger/contract-schemas";
 import { listBooks, toBookDto } from "@/modules/ledger/application/queries/list-books";
 import { serverComposition } from "@/application/server-composition-root";
-import { AppError } from "@/lib/errors";
+import { ValidationError, AppError } from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
 
 export type BookMutationErrorCode =
   | "name_taken"
+  | "invalid_name"
   | "not_found"
   | "has_records"
+  | "has_credentials"
   | "last_book"
   | "default_book"
   | "invalid_order"
   | "unexpected";
 export type BookMutationResult =
   { ok: true; books: BookDto[]; book?: BookDto } | { ok: false; code: BookMutationErrorCode };
+
+/** Whether a validation failure was about the name the reader typed. */
+function blamesName(error: ValidationError): boolean {
+  const issues = error.details?.issues as { path?: unknown[] }[] | undefined;
+  return issues?.some((issue) => issue.path?.[0] === "name") ?? false;
+}
 
 /**
  * The expected refusals are returned as codes rather than thrown: a server
@@ -36,9 +44,13 @@ function toBookMutationErrorCode(error: unknown): BookMutationErrorCode {
   if (error.code === "CONFLICT") return "name_taken";
   if (error.code === "NOT_FOUND") return "not_found";
   if (error.code !== "VALIDATION_ERROR") return "unexpected";
+  // The contract rejects a bad name before the port runs, and the port rejects
+  // an empty or over-long one too; both are about the value, not the save.
+  if (error instanceof ValidationError && blamesName(error)) return "invalid_name";
   if (error.message.includes("last active book")) return "last_book";
   if (error.message.includes("default book")) return "default_book";
   if (error.message.includes("Reorder")) return "invalid_order";
+  if (error.message.includes("name")) return "invalid_name";
   return "unexpected";
 }
 
@@ -54,9 +66,34 @@ async function runBookMutation(
   }
 }
 
+/** 设置 shows archived books too; the switcher and the pickers do not. */
+function listBooksIncludingArchived(ledgerId: string): Promise<BookDto[]> {
+  return listBooks(ledgerId, serverComposition.books, { includeArchived: true });
+}
+
 /** The switcher's books, in order. The caller has already been authorized. */
 export const getBooksAction = withLedgerAccess(async (ledgerId: string): Promise<BookDto[]> =>
   listBooks(ledgerId, serverComposition.books)
+);
+
+/**
+ * The same list plus the archived rows: 设置 and the detail page have to show a
+ * retired book, while the switcher and the pickers must not.
+ */
+export const getBooksIncludingArchivedAction = withLedgerAccess(
+  async (ledgerId: string): Promise<BookDto[]> => listBooksIncludingArchived(ledgerId)
+);
+
+/**
+ * One book by id, archived ones included. The detail page uses this to name a
+ * record's book when that book has been retired since the record was filed.
+ */
+export const getBookAction = withLedgerAccess(
+  async (ledgerId: string, bookId: string): Promise<BookDto | null> => {
+    const validatedId = parseBookId(bookId);
+    const book = await serverComposition.books.getIncludingArchived(ledgerId, validatedId);
+    return book == null ? null : toBookDto(book);
+  }
 );
 
 export const createBookAction = withLedgerAccess(
@@ -69,7 +106,7 @@ export const createBookAction = withLedgerAccess(
       });
       return {
         book: toBookDto(created),
-        books: await listBooks(ledgerId, serverComposition.books),
+        books: await listBooksIncludingArchived(ledgerId),
       };
     })
 );
@@ -86,7 +123,7 @@ export const updateBookAction = withLedgerAccess(
       if (updated == null) throw new AppError("Book not found", "NOT_FOUND", 404);
       return {
         book: toBookDto(updated),
-        books: await listBooks(ledgerId, serverComposition.books),
+        books: await listBooksIncludingArchived(ledgerId),
       };
     })
 );
@@ -96,7 +133,7 @@ export const reorderBooksAction = withLedgerAccess(
     runBookMutation(async () => {
       const validated = parseReorderBooksInput(bookIds);
       await serverComposition.books.reorder(ledgerId, validated);
-      return { books: await listBooks(ledgerId, serverComposition.books) };
+      return { books: await listBooksIncludingArchived(ledgerId) };
     })
 );
 
@@ -105,20 +142,58 @@ export const setDefaultBookAction = withLedgerAccess(
     runBookMutation(async () => {
       const validatedId = parseBookId(bookId);
       await serverComposition.books.setDefault(ledgerId, validatedId);
-      return { books: await listBooks(ledgerId, serverComposition.books) };
+      return { books: await listBooksIncludingArchived(ledgerId) };
     })
 );
 
+/**
+ * Retires a book that still holds records. Refused while an API key is bound to
+ * it, and for the default or last live book; those come back as codes so 设置 can
+ * say which one it is.
+ */
 export const archiveBookAction = withLedgerAccess(
   async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
       const result = await serverComposition.books.archive(ledgerId, validatedId);
-      if (result !== "archived") return { ok: false, code: result };
-      return { ok: true, books: await listBooks(ledgerId, serverComposition.books) };
+      if (result.status !== "archived") return { ok: false, code: result.status };
+      return { ok: true, books: await listBooksIncludingArchived(ledgerId) };
     } catch (error) {
       const code = toBookMutationErrorCode(error);
       if (code === "unexpected") logError("books:archive", error);
+      return { ok: false, code };
+    }
+  }
+);
+
+export const restoreBookAction = withLedgerAccess(
+  async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
+    try {
+      const validatedId = parseBookId(bookId);
+      const restored = await serverComposition.books.restore(ledgerId, validatedId);
+      return {
+        ok: true,
+        book: toBookDto(restored),
+        books: await listBooksIncludingArchived(ledgerId),
+      };
+    } catch (error) {
+      const code = toBookMutationErrorCode(error);
+      if (code === "unexpected") logError("books:restore", error);
+      return { ok: false, code };
+    }
+  }
+);
+
+export const deleteBookAction = withLedgerAccess(
+  async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
+    try {
+      const validatedId = parseBookId(bookId);
+      const result = await serverComposition.books.delete(ledgerId, validatedId);
+      if (result.status !== "deleted") return { ok: false, code: result.status };
+      return { ok: true, books: await listBooksIncludingArchived(ledgerId) };
+    } catch (error) {
+      const code = toBookMutationErrorCode(error);
+      if (code === "unexpected") logError("books:delete", error);
       return { ok: false, code };
     }
   }

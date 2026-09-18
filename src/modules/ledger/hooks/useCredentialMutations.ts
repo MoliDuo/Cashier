@@ -23,7 +23,12 @@ export function useCredentialMutations(ledgerId: string) {
     errorMessage: null,
     onError: (error) => {
       const code = (error as Error & { code?: unknown }).code;
-      toast.error(code === "CONFLICT" ? tCredentials("maxActive") : t("createFailed"));
+      // Two different conflicts reach here: the 20-key cap and a book that is
+      // gone or archived. Reporting both as the cap hid the real reason the
+      // reader could not add a key.
+      if (code === "BOOK_UNAVAILABLE") toast.error(tCredentials("bookUnavailable"));
+      else if (code === "CONFLICT") toast.error(tCredentials("maxActive"));
+      else toast.error(t("createFailed"));
     },
     invalidationErrorMessage: tCommon("savedRefreshFailed"),
   });

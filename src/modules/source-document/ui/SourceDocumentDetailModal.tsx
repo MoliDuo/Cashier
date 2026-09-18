@@ -36,6 +36,12 @@ import {
 interface SourceDocumentDetailModalProps {
   /** The live books, so this record's own book can be changed here. */
   books?: readonly BookDto[];
+  /**
+   * The record's own book, already labelled, when it is no longer among the live
+   * ones. It is shown as the selected option, read-only, so a retired book names
+   * itself instead of leaving the picker blank.
+   */
+  archivedBookLabel?: string;
   onAssignBook?: (bookId: string) => void;
   isAssigningBook?: boolean;
   sourceDocumentId?: string;
@@ -88,6 +94,7 @@ interface SourceDocumentDetailModalProps {
 
 function SourceDocumentDetailEditor({
   books,
+  archivedBookLabel,
   onAssignBook,
   isAssigningBook,
   ledgerId,
@@ -265,6 +272,9 @@ function SourceDocumentDetailEditor({
                       {book.name}
                     </SelectItem>
                   ))}
+                  {archivedBookLabel != null ? (
+                    <SelectItem value={sourceDocument.bookId}>{archivedBookLabel}</SelectItem>
+                  ) : null}
                 </SelectContent>
               </Select>
             </div>

@@ -8,6 +8,11 @@ import { useSourceDocumentRecoveryMutations } from "@/modules/source-document/ho
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
+import { getBookAction } from "@/modules/ledger/server-actions/books";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { LEDGER } from "@/lib/constants";
+import { useTranslations } from "next-intl";
 
 interface SourceDocumentDetailWrapperProps {
   /** The live books, for this record's own book picker. */
@@ -39,6 +44,7 @@ export function SourceDocumentDetailWrapper({
   ledgerEntries: initialLedgerEntries,
   timeZone,
 }: SourceDocumentDetailWrapperProps) {
+  const t = useTranslations("Common");
   const {
     sourceDocument,
     currentLedgerEntries,
@@ -86,8 +92,25 @@ export function SourceDocumentDetailWrapper({
     }
   }, [refetch]);
 
+  // A record whose book was archived after it was filed is not in the live list,
+  // so the picker resolves it separately rather than rendering blank. The query
+  // only runs in that case.
+  const recordBookId = sourceDocument?.bookId ?? null;
+  const recordBookIsLive = recordBookId != null && books.some((book) => book.id === recordBookId);
+  const { data: archivedRecordBook } = useQuery({
+    queryKey: queryKeys.book(ledgerId, recordBookId ?? ""),
+    queryFn: () => getBookAction(ledgerId, recordBookId!),
+    enabled: open && recordBookId != null && !recordBookIsLive,
+    staleTime: LEDGER.STALE_TIME_MS,
+  });
+  const archivedBookLabel =
+    archivedRecordBook == null ? null : t("archivedBookOption", { name: archivedRecordBook.name });
+
   const assignment = useLedgerMutation(ledgerId, {
     invalidates: ["documents", "stats"],
+    // A failed change used to be silent: the picker snapped back with no
+    // explanation. A conflict or an archived target now says so.
+    errorMessage: t("bookChangeFailed"),
     mutationFn: (bookId: string) =>
       assignSourceDocumentBookAction(ledgerId, {
         sourceDocumentId: id,
@@ -102,6 +125,7 @@ export function SourceDocumentDetailWrapper({
   return (
     <SourceDocumentDetailModal
       books={books}
+      {...(archivedBookLabel == null ? {} : { archivedBookLabel })}
       onAssignBook={(bookId: string) => assignment.mutate(bookId)}
       isAssigningBook={assignment.isPending}
       sourceDocumentId={id}

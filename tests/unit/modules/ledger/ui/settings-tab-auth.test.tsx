@@ -14,6 +14,7 @@ const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
       timeZone: null,
       sortOrder: 1,
       isDefault: true,
+      archivedAt: null,
     },
   ],
 }));
@@ -66,6 +67,8 @@ vi.mock("@/modules/ledger/hooks/useBookMutations", () => ({
     reorderBooks: { mutate: vi.fn(), isPending: false },
     setDefaultBook: { mutate: vi.fn(), isPending: false },
     archiveBook: { mutate: vi.fn(), isPending: false },
+    restoreBook: { mutate: vi.fn(), isPending: false },
+    deleteBook: { mutate: vi.fn(), isPending: false },
   }),
 }));
 

@@ -73,6 +73,19 @@ export class StaleSourceDocumentVersionError extends ConflictError {
 }
 
 /**
+ * A record or key was pointed at a book it cannot use: unknown, archived, or
+ * belonging to another ledger. Distinct from `ConflictError` so callers can tell
+ * "this book is not available" apart from a ledger-level conflict such as the
+ * active-credential cap, which is what an indistinguishable status code used to
+ * conflate.
+ */
+export class BookUnavailableError extends AppError {
+  constructor(message: string = "Book is not available") {
+    super(message, "BOOK_UNAVAILABLE", 409);
+  }
+}
+
+/**
  * Rate limit error (429)
  */
 export class RateLimitError extends AppError {

@@ -56,10 +56,9 @@ export function ServiceCredentialSection({
   const t = useTranslations("ServiceCredentials");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
+  const defaultBookId = books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? "";
   const [newCredName, setNewCredName] = useState("");
-  const [newCredBookId, setNewCredBookId] = useState(
-    () => books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? ""
-  );
+  const [newCredBookId, setNewCredBookId] = useState(defaultBookId);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [credentialToDelete, setCredentialToDelete] = useState<ServiceCredential | null>(null);
   const [createdCredential, setCreatedCredential] = useState<CreatedServiceCredentialDto | null>(
@@ -68,6 +67,12 @@ export function ServiceCredentialSection({
   const [hasCopied, setHasCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const openCreateDialog = () => {
+    // Each opening starts from the current default book, not the last choice.
+    setNewCredBookId(defaultBookId);
+    setIsCreateDialogOpen(true);
+  };
 
   useEffect(() => {
     if (!hasCopied) return;
@@ -113,10 +118,10 @@ export function ServiceCredentialSection({
     onCredentialDialogClose?.();
   };
 
-  // A key whose book is gone (archived behind its back) still lists, and says so
-  // rather than showing an empty name.
+  // A key whose book is gone (archived behind its back) still lists, and says
+  // so rather than showing an empty name or a generic error.
   const bookName = (bookId: string) =>
-    books.find((book) => book.id === bookId)?.name ?? tCommon("error");
+    books.find((book) => book.id === bookId)?.name ?? t("archivedBook");
 
   return (
     <div>
@@ -125,11 +130,7 @@ export function ServiceCredentialSection({
           <h3 className="text-sm font-medium text-text">{t("title")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
         </div>
-        <Button
-          onClick={() => setIsCreateDialogOpen(true)}
-          size="sm"
-          disabled={isCreating || isDeleting}
-        >
+        <Button onClick={openCreateDialog} size="sm" disabled={isCreating || isDeleting}>
           {t("newCredential")}
         </Button>
       </div>

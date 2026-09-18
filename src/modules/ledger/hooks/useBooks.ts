@@ -3,24 +3,36 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
-import { getBooksAction } from "@/modules/ledger/server-actions/books";
+import {
+  getBooksAction,
+  getBooksIncludingArchivedAction,
+} from "@/modules/ledger/server-actions/books";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 interface UseBooksOptions {
   ledgerId: string;
   /** Hydrated from the page bootstrap, so the switcher paints on the first frame. */
   initialBooks?: readonly BookDto[];
+  /** 设置 and the detail page need the archived rows; the switcher must not. */
+  includeArchived?: boolean;
 }
 
 /**
  * The ledger's books, in switcher order. The switcher, the record pickers and
  * the 设置 list all read this one query, so a rename or reorder made in 设置 shows
  * everywhere without a reload and a cached page cannot keep showing a stale name.
+ *
+ * `includeArchived` reads a separate cache entry rather than filtering the
+ * switcher's list: a retired book must never appear in the switcher, not even
+ * between a fetch and a render.
  */
-export function useBooks({ ledgerId, initialBooks }: UseBooksOptions) {
+export function useBooks({ ledgerId, initialBooks, includeArchived }: UseBooksOptions) {
   const booksQuery = useQuery({
-    queryKey: queryKeys.books(ledgerId),
-    queryFn: () => getBooksAction(ledgerId),
+    queryKey: includeArchived
+      ? queryKeys.booksIncludingArchived(ledgerId)
+      : queryKeys.books(ledgerId),
+    queryFn: () =>
+      includeArchived ? getBooksIncludingArchivedAction(ledgerId) : getBooksAction(ledgerId),
     staleTime: LEDGER.STALE_TIME_MS,
     ...(initialBooks !== undefined ? { initialData: [...initialBooks] } : {}),
   });

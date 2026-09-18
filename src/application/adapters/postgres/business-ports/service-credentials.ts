@@ -1,7 +1,12 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import type { ServiceCredentialPort } from "@/application/contracts";
 import { db } from "@/lib/db";
-import { ConflictError, NotFoundError, RateLimitUnavailableError } from "@/lib/errors";
+import {
+  BookUnavailableError,
+  ConflictError,
+  NotFoundError,
+  RateLimitUnavailableError,
+} from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
 import { books, ledgers, serviceCredentials } from "@/persistence";
 import { createToken, computeHash } from "@/lib/security/service-credential-token";
@@ -11,7 +16,12 @@ import { SERVICE_CREDENTIAL_LAST_USED_STALE_MS, toIso } from "./shared";
 
 const MAX_ACTIVE_CREDENTIALS = 20;
 
-/** A key may only be bound to a live book of the same ledger. */
+/**
+ * A key may only be bound to a live book of the same ledger. The failure is
+ * `BookUnavailableError` rather than a plain conflict: the client has to tell a
+ * bad or archived book apart from the active-credential cap, which is also a
+ * conflict, or it reports the wrong reason.
+ */
 async function assertBookInLedger(
   executor: Pick<typeof db, "select">,
   ledgerId: string,
@@ -23,7 +33,7 @@ async function assertBookInLedger(
     .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNull(books.archivedAt)))
     .limit(1)
     .then((rows) => rows[0]);
-  if (row == null) throw new ConflictError("Book does not belong to this ledger");
+  if (row == null) throw new BookUnavailableError("Book does not belong to this ledger");
 }
 
 export const postgresServiceCredentialAdapter: ServiceCredentialPort = {

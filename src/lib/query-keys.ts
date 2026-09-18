@@ -29,6 +29,14 @@ export const queryKeys = {
   // === Books ===
   /** The switcher's books, so a rename or reorder shows without a fresh page. */
   books: (ledgerId: string) => ["ledger", ledgerId, "books"] as const,
+  /**
+   * The same list plus the archived rows. 设置 and the detail page need them,
+   * the switcher must not see them, so they are a separate cache entry.
+   */
+  booksIncludingArchived: (ledgerId: string) =>
+    ["ledger", ledgerId, "books", "including-archived"] as const,
+  /** One book by id; the detail page uses it to name a retired book. */
+  book: (ledgerId: string, bookId: string) => ["ledger", ledgerId, "book", bookId] as const,
 
   // === Source Documents ===
   sourceDocuments: (ledgerId: string, params?: QueryKeyParams | null) =>
@@ -106,6 +114,11 @@ export const queryKeys = {
     }
   ) => ["ledger", ledgerId, "enhanced-stats", normalizeQueryParams(params)] as const,
   enhancedStatsPrefix: (ledgerId: string) => ["ledger", ledgerId, "enhanced-stats"] as const,
+  /** The per-book totals 统计 shows under its strip, for one period. */
+  bookTotals: (
+    ledgerId: string,
+    params?: { startDate?: string | null | undefined; endDate?: string | null | undefined }
+  ) => ["ledger", ledgerId, "enhanced-stats", "book-totals", normalizeQueryParams(params)] as const,
 
   // === Currency ===
   convert: (ledgerId: string, amount: string, from: string, to: string, date: string) =>

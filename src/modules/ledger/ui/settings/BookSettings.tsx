@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, Archive, Plus, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, Archive, ArchiveRestore, Plus, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,21 +53,31 @@ interface BookSettingsProps {
 }
 
 /**
- * 分账: reorder, add, rename, archive, pick the 总账 default and set a zone. The
- * order here is the order of the pull-down switcher.
+ * 分账: reorder, add, rename, archive, restore, delete, pick the 总账 default and
+ * set a zone. The order here is the order of the pull-down switcher, and the
+ * archived books are listed apart from the live ones because they are no longer
+ * part of it.
  */
 export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
   const t = useTranslations("Settings.Books");
   const tCommon = useTranslations("Common");
   const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null);
-  const { books } = useBooks({ ledgerId, initialBooks });
-  const { createBook, updateBook, reorderBooks, setDefaultBook, archiveBook } =
-    useBookMutations(ledgerId);
+  const { books } = useBooks({ ledgerId, initialBooks, includeArchived: true });
+  const {
+    createBook,
+    updateBook,
+    reorderBooks,
+    setDefaultBook,
+    archiveBook,
+    restoreBook,
+    deleteBook,
+  } = useBookMutations(ledgerId);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [renameTarget, setRenameTarget] = useState<BookDto | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [archiveTarget, setArchiveTarget] = useState<BookDto | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BookDto | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -80,13 +90,17 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const list = books ?? [];
+  const all = books ?? [];
+  const list = all.filter((book) => book.archivedAt == null);
+  const archived = all.filter((book) => book.archivedAt != null);
   const busy =
     createBook.isPending ||
     updateBook.isPending ||
     reorderBooks.isPending ||
     setDefaultBook.isPending ||
-    archiveBook.isPending;
+    archiveBook.isPending ||
+    restoreBook.isPending ||
+    deleteBook.isPending;
 
   const move = (index: number, delta: number) => {
     const next = [...list];
@@ -101,6 +115,19 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
   // 自动 resolves to the device on this screen, so the reader sees which zone a
   // null book actually means before saving anything.
   const deviceZoneOption = deviceTimeZone ?? t("timeZoneAuto");
+
+  /**
+   * A zone that the migration carried over from the old per-person column can be
+   * any IANA name, not one of the eleven offered here. Without the extra option
+   * the picker would render the empty placeholder and silently invite the reader
+   * to overwrite a zone they never chose.
+   */
+  const zoneOptionsFor = (book: BookDto) => {
+    const zone = book.timeZone;
+    return zone != null && !(TIME_ZONES as readonly string[]).includes(zone)
+      ? [zone, ...TIME_ZONES]
+      : TIME_ZONES;
+  };
 
   return (
     <SettingsSection title={t("title")} description={t("description")}>
@@ -183,6 +210,18 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
                     >
                       <Archive className="size-4" />
                     </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={busy || book.isDefault}
+                      aria-label={t("delete")}
+                      title={t("delete")}
+                      className="text-muted-foreground hover:text-danger"
+                      onClick={() => setDeleteTarget(book)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
                   </div>
                   <div className="w-full sm:w-56">
                     <Select
@@ -202,7 +241,7 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
                         <SelectItem value="auto">
                           {t("timeZoneAutoDetected", { timeZone: deviceZoneOption })}
                         </SelectItem>
-                        {TIME_ZONES.map((timeZone) => (
+                        {zoneOptionsFor(book).map((timeZone) => (
                           <SelectItem key={timeZone} value={timeZone}>
                             {timeZone}
                           </SelectItem>
@@ -229,6 +268,41 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
           </Button>
         </div>
       </SettingsField>
+
+      {archived.length > 0 ? (
+        <SettingsField title={t("archivedSection")} stacked>
+          <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
+            {archived.map((book) => (
+              <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-muted-foreground">
+                      {book.name}
+                    </span>
+                    <span className="shrink-0 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-micro font-medium text-muted-foreground">
+                      {t("archivedBadge")}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-micro text-muted-foreground">
+                    {book.timeZone ?? deviceZoneOption}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => restoreBook.mutate(book.id)}
+                >
+                  <ArchiveRestore className="mr-1 size-4" />
+                  {t("restore")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </SettingsField>
+      ) : null}
+
       <SettingsField title={t("default")} description={t("defaultDesc")}>
         <p className="text-sm text-text sm:text-right">
           {list.find((book) => book.isDefault)?.name ?? "—"}
@@ -329,6 +403,21 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
           if (archiveTarget == null) return false;
           archiveBook.mutate(archiveTarget.id);
           setArchiveTarget(null);
+          return true;
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={t("deleteTitle", { name: deleteTarget?.name ?? "" })}
+        description={t("deleteDesc")}
+        confirmLabel={t("delete")}
+        variant="destructive"
+        onConfirm={() => {
+          if (deleteTarget == null) return false;
+          deleteBook.mutate(deleteTarget.id);
+          setDeleteTarget(null);
           return true;
         }}
       />

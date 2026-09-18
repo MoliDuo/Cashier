@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare, round } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
-import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, books, sourceDocuments } from "@/persistence";
 import type { LedgerProjectionEntryContract } from "@/application/contracts";
 import type {
   BatchUpdateSourceDocumentsResultDto,
@@ -46,23 +46,45 @@ export async function getBook(input: {
   return row ?? null;
 }
 
+export type AssignBookResult =
+  | { ok: true; version: number }
+  | { ok: false; reason: "stale"; currentVersion: number }
+  | { ok: false; reason: "book_unavailable" };
+
 export async function assignBook(input: {
   ledgerId: string;
   sourceDocumentId: string;
   expectedVersion: number;
   bookId: string;
-}): Promise<{ ok: true; version: number } | { ok: false; currentVersion: number }> {
+}): Promise<AssignBookResult> {
   return db.transaction(async (tx) => {
     // The ledger row is locked first, like every other aggregate command, so a
     // concurrent book edit and a concurrent processing write cannot interleave.
     await lockLedgerForUpdate(tx, input.ledgerId);
     const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
     if (document.version !== input.expectedVersion) {
-      return { ok: false as const, currentVersion: document.version };
+      return { ok: false as const, reason: "stale" as const, currentVersion: document.version };
     }
     if (document.bookId === input.bookId) {
       return { ok: true as const, version: document.version };
     }
+    // Checked inside the transaction, not by the caller: a book archived while
+    // the form sat open must not silently receive the record, and only here is
+    // the row known to still be live. The composite key would accept an
+    // archived book, so the archived check cannot be left to the database.
+    const target = await tx
+      .select({ id: books.id })
+      .from(books)
+      .where(
+        and(
+          eq(books.id, input.bookId),
+          eq(books.ledgerId, input.ledgerId),
+          isNull(books.archivedAt)
+        )
+      )
+      .limit(1)
+      .then((rows) => rows[0]);
+    if (target == null) return { ok: false as const, reason: "book_unavailable" as const };
     const [updated] = await tx
       .update(sourceDocuments)
       .set({

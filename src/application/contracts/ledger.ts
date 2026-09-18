@@ -13,6 +13,8 @@ export interface LedgerPort {
 /**
  * A 分账. `isDefault` is the book that 总账-entered records land in, stored as a
  * flag rather than resolved by name. `timeZone` null means the device's zone.
+ * `archivedAt` set means the book is retired: its records still count in 总账,
+ * but it is no longer offered as a target for new ones.
  */
 export interface BookContract {
   id: string;
@@ -21,6 +23,7 @@ export interface BookContract {
   timeZone: string | null;
   sortOrder: number;
   isDefault: boolean;
+  archivedAt: string | null;
 }
 
 export interface BookCreateContract {
@@ -40,7 +43,13 @@ export interface BookPort {
     ledgerId: LedgerId,
     options?: { includeArchived?: boolean }
   ): Promise<readonly BookContract[]>;
+  /** A live book, or null. Write paths use this: an archived book is no target. */
   get(ledgerId: LedgerId, bookId: string): Promise<BookContract | null>;
+  /**
+   * Resolves a retired book as well. Display only, so a record that still points
+   * at an archived book can be named instead of rendering a blank picker.
+   */
+  getIncludingArchived(ledgerId: LedgerId, bookId: string): Promise<BookContract | null>;
   create(ledgerId: LedgerId, input: BookCreateContract): Promise<BookContract>;
   update(
     ledgerId: LedgerId,
@@ -49,13 +58,38 @@ export interface BookPort {
   ): Promise<BookContract | null>;
   /** Writes the given order; every live book must appear exactly once. */
   reorder(ledgerId: LedgerId, bookIds: readonly string[]): Promise<readonly BookContract[]>;
-  /** Only a book with no records can be archived. */
-  archive(ledgerId: LedgerId, bookId: string): Promise<"archived" | "has_records" | "not_found">;
+  /**
+   * Retires a book that still holds records; those records keep counting in
+   * 总账. Refused for the default book, the last active book, and a book that
+   * still has API keys bound to it.
+   */
+  archive(ledgerId: LedgerId, bookId: string): Promise<ArchiveBookResult>;
+  /** Brings an archived book back; the name must be free among the live books. */
+  restore(ledgerId: LedgerId, bookId: string): Promise<BookContract>;
+  /**
+   * Removes a book for good. Only reachable for a book with no records at all —
+   * soft-deleted ones included — because the records reference it, and for a
+   * book with no API keys bound to it.
+   */
+  delete(ledgerId: LedgerId, bookId: string): Promise<DeleteBookResult>;
   /** Moves the 总账 default flag onto `bookId`. */
   setDefault(ledgerId: LedgerId, bookId: string): Promise<readonly BookContract[]>;
   /** How many live records the book holds; 0 means it can be archived. */
   countDocuments(ledgerId: LedgerId, bookId: string): Promise<number>;
+  /** Whether any API key is still bound to the book. */
+  hasCredentials(ledgerId: LedgerId, bookId: string): Promise<boolean>;
 }
+
+export type ArchiveBookResult =
+  | { status: "archived"; book: BookContract }
+  | { status: "not_found" }
+  | { status: "has_credentials" };
+
+export type DeleteBookResult =
+  | { status: "deleted" }
+  | { status: "not_found" }
+  | { status: "has_records" }
+  | { status: "has_credentials" };
 
 export interface CategoryPort {
   list(ledgerId: LedgerId): Promise<readonly CategoryContract[]>;
