@@ -57,8 +57,9 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
 On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. It does
 not create an account. Open [http://localhost:3000](http://localhost:3000): every page leads to the
-`/{locale}/setup` wizard, and the server prints a one-time setup code to its logs. Enter that code,
-a sign-in email, a password and your book names (共同支出 is pre-filled as the default) to create the
+`/{locale}/setup` wizard. The server logs (the container logs or the `npm run dev` terminal) print a
+one-time setup code, on a line starting with `First-run setup is pending`. Enter that code, a
+sign-in email, a password and your book names (共同支出 is pre-filled as the default) to create the
 account; `/setup` returns 404 afterwards.
 
 `AI_MODEL` defaults to `gpt-4o`. When using another OpenAI-compatible service, set both

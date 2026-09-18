@@ -36,7 +36,7 @@ interface EntriesToolbarShellProps {
   totalLabel?: string | undefined;
   batchActions?: ReactNode | undefined;
   syncStatus?: ReactNode | undefined;
-  /** Which member the list is narrowed to, when it is: a scope left on has to
+  /** Which book the list is narrowed to, when it is: a scope left on has to
    * say so on the page, not only inside the strip that set it. */
   scopeChip?: ReactNode | undefined;
   className?: string;

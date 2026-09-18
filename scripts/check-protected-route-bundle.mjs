@@ -4,7 +4,14 @@ import zlib from "node:zlib";
 
 const manifestPath = ".next/server/app/[locale]/(protected)/page_client-reference-manifest.js";
 const routeKey = "/[locale]/(protected)/page";
-const maximumGzipBytes = 220_000;
+// The protected route is the app's largest client bundle, so this is a ratchet:
+// lower it whenever a change frees weight, and raise it only for work that has
+// to ship. The 单账户 + 分账 change is the latter — it adds the book scope chip and
+// the archived-book controls to the ledger page, measured at 220_223 gzip bytes
+// against the previous budget of 220_000 (HEAD had only 735 bytes of room). The
+// raise is kept to the smallest round number that fits, so the next regression
+// still trips it.
+const maximumGzipBytes = 221_000;
 
 if (!fs.existsSync(manifestPath)) {
   throw new Error(`Protected-route client manifest is missing: ${manifestPath}`);

@@ -44,7 +44,7 @@ interface LedgerEntriesToolbarProps {
   isProcessing?: boolean;
   filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
-  /** Nickname of the member the list is narrowed to, when it is. */
+  /** Name of the book the list is narrowed to, when it is. */
   scopeBookName?: string | undefined;
   periodParams: PeriodParams;
   mainCurrency: string;

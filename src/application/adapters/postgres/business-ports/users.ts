@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { UserAccountPort, UserPreferencesPort } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { loginEmails, users } from "@/persistence";
@@ -68,7 +68,9 @@ export const postgresUserAccountAdapter: UserAccountPort = {
       })
       .from(loginEmails)
       .innerJoin(users, and(eq(users.id, loginEmails.userId), isNull(users.deletedAt)))
-      .where(eq(loginEmails.email, email))
+      // Matching the `uniq_login_emails_email` index on `lower(email)` keeps the
+      // lookup case-insensitive without making every caller normalize first.
+      .where(sql`lower(${loginEmails.email}) = lower(${email})`)
       .limit(1)
       .then((rows) => rows[0]);
     return row == null ? null : toAccount(row, row.loginEmail);

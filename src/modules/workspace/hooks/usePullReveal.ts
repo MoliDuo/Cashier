@@ -37,7 +37,7 @@ export interface PullRevealController {
 }
 
 /**
- * Drives the hidden member switch. Touch and pen pull the page down at the top;
+ * Drives the hidden book switch. Touch and pen pull the page down at the top;
  * a mouse wheel scrolls up there. The strip is painted by the caller from
  * `height`, so the same numbers decide both the gesture and what is shown.
  */

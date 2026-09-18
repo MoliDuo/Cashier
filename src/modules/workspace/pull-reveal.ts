@@ -1,5 +1,5 @@
 /**
- * The pull-down member switch: thresholds and rules for the strip that hides
+ * The pull-down book switch: thresholds and rules for the strip that hides
  * above 流水 / 明细 / 统计 until you pull the page down at the top.
  *
  * Kept out of the hook so both gestures — touch drag and mouse wheel — and the
