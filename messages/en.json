@@ -584,7 +584,6 @@
     "confirmEnable": "Confirm Enable",
     "aiPrompt": "Ledger Prompt",
     "aiPromptDesc": "Add parsing, categorization, and writing rules for this ledger. These can override default title style and content organization, but cannot override the output language or hard constraints.",
-    "aiPromptPlaceholder": "e.g.:\n• Split service fees into a separate item\n• Classify taxi as Transport\n• Use concise merchant-first titles",
     "notifications": "Notifications",
     "pushNotifications": "Push Notifications",
     "pushNotificationsDesc": "Receive real-time updates when your bills are processed.",

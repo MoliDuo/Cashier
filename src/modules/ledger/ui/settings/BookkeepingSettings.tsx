@@ -179,7 +179,6 @@ export function BookkeepingSettings({
             onChange={(event) => updateDraft({ aiCustomPrompt: event.target.value })}
             disabled={status === "saving"}
             aria-label={t("aiPrompt")}
-            placeholder={t("aiPromptPlaceholder")}
             maxLength={4000}
             className="min-h-[100px] w-full resize-y"
           />

@@ -584,7 +584,6 @@
     "confirmEnable": "确认开启",
     "aiPrompt": "账本提示词",
     "aiPromptDesc": "补充此账本的解析、分类和文案规则。可覆盖默认标题风格和内容组织，但不能覆盖输出语言和硬性约束。",
-    "aiPromptPlaceholder": "例如：\n• 服务费单独拆分为一项\n• 打车费用归为交通类\n• 标题简短并以商户名开头",
     "notifications": "通知设置",
     "pushNotifications": "推送通知",
     "pushNotificationsDesc": "当您的账单处理完成时接收实时通知。",
