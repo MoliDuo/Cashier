@@ -130,64 +130,70 @@ export function BookkeepingSettings({
   };
 
   return (
-    <SettingsSection
-      title={t("bookkeepingRules")}
-      actions={
-        <SettingsSectionActions
-          dirty={dirty}
-          pending={status === "saving"}
-          error={error}
-          serverChanged={serverChanged}
-          saveDisabled={serverChanged}
-          onSave={() => void handleSave()}
-          onCancel={handleCancel}
-        />
-      }
-    >
-      <SettingsField title={t("collapseEntries")}>
-        <Switch
-          aria-label={t("collapseEntries")}
-          checked={draft.collapseEntriesDefault}
-          onCheckedChange={(checked) => updateDraft({ collapseEntriesDefault: checked })}
+    <>
+      <SettingsSection
+        title={t("bookkeepingRules")}
+        actions={
+          <SettingsSectionActions
+            dirty={dirty}
+            pending={status === "saving"}
+            error={error}
+            serverChanged={serverChanged}
+            saveDisabled={serverChanged}
+            onSave={() => void handleSave()}
+            onCancel={handleCancel}
+          />
+        }
+      >
+        <SettingsField title={t("collapseEntries")}>
+          <Switch
+            aria-label={t("collapseEntries")}
+            checked={draft.collapseEntriesDefault}
+            onCheckedChange={(checked) => updateDraft({ collapseEntriesDefault: checked })}
+            disabled={status === "saving"}
+          />
+        </SettingsField>
+        <SettingsField title={t("aiLanguage")}>
+          <Select
+            value={draft.aiLanguage}
+            onValueChange={(value) => updateDraft({ aiLanguage: value })}
+            disabled={status === "saving"}
+          >
+            <SelectTrigger aria-label={t("aiLanguage")} className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {AI_LANGUAGES.map((lang) => (
+                <SelectItem key={lang.value} value={lang.value}>
+                  {lang.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingsField>
+        <SettingsField title={t("aiPrompt")} stacked>
+          <Textarea
+            value={draft.aiCustomPrompt}
+            name="aiCustomPrompt"
+            autoComplete="off"
+            onChange={(event) => updateDraft({ aiCustomPrompt: event.target.value })}
+            disabled={status === "saving"}
+            aria-label={t("aiPrompt")}
+            placeholder={t("aiPromptPlaceholder")}
+            maxLength={4000}
+            className="min-h-[100px] w-full resize-y"
+          />
+        </SettingsField>
+        <CurrencySection
+          settings={draft}
+          onUpdateSettings={updateDraft}
           disabled={status === "saving"}
         />
-      </SettingsField>
-      <SettingsField title={t("aiLanguage")}>
-        <Select
-          value={draft.aiLanguage}
-          onValueChange={(value) => updateDraft({ aiLanguage: value })}
-          disabled={status === "saving"}
-        >
-          <SelectTrigger aria-label={t("aiLanguage")} className="w-full sm:w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {AI_LANGUAGES.map((lang) => (
-              <SelectItem key={lang.value} value={lang.value}>
-                {lang.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingsField>
-      <SettingsField title={t("aiPrompt")} stacked>
-        <Textarea
-          value={draft.aiCustomPrompt}
-          name="aiCustomPrompt"
-          autoComplete="off"
-          onChange={(event) => updateDraft({ aiCustomPrompt: event.target.value })}
-          disabled={status === "saving"}
-          aria-label={t("aiPrompt")}
-          placeholder={t("aiPromptPlaceholder")}
-          maxLength={4000}
-          className="min-h-[100px] w-full resize-y"
-        />
-      </SettingsField>
-      <CurrencySection
-        settings={draft}
-        onUpdateSettings={updateDraft}
-        disabled={status === "saving"}
-      />
+      </SettingsSection>
+      {/*
+        分类 saves through a draft of its own — 管理分类 holds the edit session and
+        its 保存 — so it is a card next to 记账规则 rather than a field inside it.
+      */}
       <CategorySection
         ledgerId={ledgerId}
         categories={categories}
@@ -200,7 +206,7 @@ export function BookkeepingSettings({
         isSaving={isSavingCategories}
         {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
-    </SettingsSection>
+    </>
   );
 }
 

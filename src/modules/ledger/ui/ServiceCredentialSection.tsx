@@ -30,7 +30,7 @@ import { formatInstantDateLabel } from "@/lib/date-utils";
 import { copyToClipboard } from "@/lib/utils";
 import { UI } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SettingsField } from "./settings/SettingsField";
+import { SettingsSection } from "./settings/SettingsSection";
 
 interface ServiceCredentialSectionProps {
   credentials: ServiceCredential[];
@@ -125,9 +125,8 @@ export function ServiceCredentialSection({
     books.find((book) => book.id === bookId)?.name ?? t("archivedBook");
 
   return (
-    <SettingsField
+    <SettingsSection
       title={t("title")}
-      stacked
       actions={
         <Button onClick={openCreateDialog} size="sm" disabled={isCreating || isDeleting}>
           {t("newCredential")}
@@ -322,6 +321,6 @@ export function ServiceCredentialSection({
           }
         }}
       />
-    </SettingsField>
+    </SettingsSection>
   );
 }

@@ -15,6 +15,7 @@ import { useCategoryManagementDraft } from "@/modules/ledger/hooks/useCategoryMa
 import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPresetSwitch";
 import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
+import { SettingsSection } from "./settings/SettingsSection";
 import { toast } from "sonner";
 import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
 import { isCategoryAssignmentJobActive } from "@/modules/ledger/ui/category-assignment-status-visibility";
@@ -83,13 +84,11 @@ export function CategorySection({
   } = useCategoryManagementDraft({ categories, onSaveCategories, onReloadCategories, isSaving, t });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium text-text">{t("categories")}</h3>
-        </div>
-        {!managing ? (
-          <div className="flex shrink-0 gap-2">
+    <SettingsSection
+      title={t("categories")}
+      actions={
+        managing ? null : (
+          <div className="flex shrink-0 flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
@@ -107,9 +106,9 @@ export function CategorySection({
               {t("manageCategories")}
             </Button>
           </div>
-        ) : null}
-      </div>
-
+        )
+      }
+    >
       {categoryAssignmentActive ? (
         <div
           className="border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
@@ -235,7 +234,7 @@ export function CategorySection({
       </div>
 
       {managing ? (
-        <>
+        <div className="space-y-3">
           <div className="flex gap-2">
             <Input
               value={newCategoryName}
@@ -261,9 +260,11 @@ export function CategorySection({
               {t("addCategory")}
             </Button>
           </div>
-          <div aria-live="polite" className="text-sm">
-            {saveError == null ? null : <p className="text-destructive">{saveError}</p>}
-          </div>
+          {saveError == null ? null : (
+            <p role="alert" aria-live="polite" className="text-sm text-destructive">
+              {saveError}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button
               type="button"
@@ -286,7 +287,7 @@ export function CategorySection({
               {isSaving ? t("saving") : common("save")}
             </Button>
           </div>
-        </>
+        </div>
       ) : null}
 
       <CategoryEditDialog
@@ -329,6 +330,6 @@ export function CategorySection({
         confirmLabel={common("discard")}
         onConfirm={() => setEditSession(null)}
       />
-    </div>
+    </SettingsSection>
   );
 }

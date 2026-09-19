@@ -63,22 +63,17 @@ export function AccountSettings({
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
   return (
-    <SettingsSection title={t("account")}>
-      <EmailSettings
-        {...(initialEmails !== undefined ? { initialEmails } : {})}
-        {...(userEmail !== undefined ? { userEmail } : {})}
-        onRequireReauthentication={onRequireReauthentication}
-        onAllSessionsEnded={onAllSessionsEnded}
-      />
-
-      <SettingsField title={ta("passwordSection")}>
+    <>
+      {/* 密码 and API 密钥 each save on their own, so each is a card of its own
+          rather than a field inside this one, the way 分账 and 记账规则 are. */}
+      <SettingsSection title={ta("passwordSection")}>
         <PasswordForm
           hasPassword={hasPassword}
           passwordUpdatedAt={passwordUpdatedAt}
           onRequireReauthentication={onRequireReauthentication}
           onCredentialsChanged={onCredentialsChanged}
         />
-      </SettingsField>
+      </SettingsSection>
       <ServiceCredentialSection
         credentials={credentials}
         books={books}
@@ -87,35 +82,43 @@ export function AccountSettings({
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />
-      <SettingsField title={t("signOut")}>
-        <Button
-          variant="destructive"
-          size="sm"
-          disabled={isPending || isSigningOut}
-          onClick={() => setSignOutConfirmOpen(true)}
-        >
-          {t("signOut")}
-        </Button>
-        <ConfirmDialog
-          open={signOutConfirmOpen}
-          onOpenChange={setSignOutConfirmOpen}
-          title={t("signOutConfirmTitle")}
-          description={t("signOutConfirmDescription")}
-          confirmLabel={t("signOut")}
-          variant="destructive"
-          onConfirm={async () => {
-            if (isSigningOut) return false;
-            setIsSigningOut(true);
-            try {
-              await onSignOut();
-              return true;
-            } finally {
-              setIsSigningOut(false);
-            }
-          }}
+      <SettingsSection title={t("account")}>
+        <EmailSettings
+          {...(initialEmails !== undefined ? { initialEmails } : {})}
+          {...(userEmail !== undefined ? { userEmail } : {})}
+          onRequireReauthentication={onRequireReauthentication}
+          onAllSessionsEnded={onAllSessionsEnded}
         />
-      </SettingsField>
-    </SettingsSection>
+        <SettingsField title={t("signOut")}>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={isPending || isSigningOut}
+            onClick={() => setSignOutConfirmOpen(true)}
+          >
+            {t("signOut")}
+          </Button>
+          <ConfirmDialog
+            open={signOutConfirmOpen}
+            onOpenChange={setSignOutConfirmOpen}
+            title={t("signOutConfirmTitle")}
+            description={t("signOutConfirmDescription")}
+            confirmLabel={t("signOut")}
+            variant="destructive"
+            onConfirm={async () => {
+              if (isSigningOut) return false;
+              setIsSigningOut(true);
+              try {
+                await onSignOut();
+                return true;
+              } finally {
+                setIsSigningOut(false);
+              }
+            }}
+          />
+        </SettingsField>
+      </SettingsSection>
+    </>
   );
 }
 

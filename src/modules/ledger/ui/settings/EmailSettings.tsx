@@ -43,8 +43,8 @@ interface EmailSettingsProps {
  * An address is added by verifying an OTP sent to it, and the account keeps at
  * least one, so a removal can be refused with a reason rather than a crash.
  *
- * It is one field of the account section, like 密码 and API 密钥, so it takes the
- * same heading as those rather than a card of its own inside the card.
+ * It is the field 账户 is about, so it keeps a field heading inside that card:
+ * 密码 and API 密钥 stand alone as cards because each saves on its own.
  */
 export function EmailSettings({
   initialEmails,
