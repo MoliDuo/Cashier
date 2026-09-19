@@ -32,10 +32,12 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   }
   await detail.getByRole("button", { name: "Close", exact: true }).click();
 
-  await selectBook(page, 1);
+  // The strip runs 总账 / 共同支出 / 哞哞 / 梁梁; FreshMart is in 梁梁 and
+  // Harbor Coffee in 哞哞.
+  await selectBook(page, 2);
   await expect(page.getByText("FreshMart", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Harbor Coffee", { exact: true })).toHaveCount(0);
-  await selectBook(page, 0);
+  await selectBook(page, 1);
   await expect(page.getByText("Harbor Coffee", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("FreshMart", { exact: true })).toHaveCount(0);
   await selectBook(page, "all");

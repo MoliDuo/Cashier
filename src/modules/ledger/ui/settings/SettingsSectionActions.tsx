@@ -30,30 +30,32 @@ export function SettingsSectionActions({
   const [discardOpen, setDiscardOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-h-5 text-sm" aria-live="polite">
-        {error === null ? null : <p className="text-destructive">{error}</p>}
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setDiscardOpen(true)}
-          disabled={!dirty || pending}
-        >
-          {t("cancel")}
-        </Button>
-        <Button
-          type="button"
-          onClick={() => {
-            if (serverChanged || saveDisabled) toast.error(t("updateConflict"));
-            else onSave();
-          }}
-          disabled={!dirty || pending}
-        >
-          {pending ? t("saving") : t("save")}
-        </Button>
-      </div>
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {error === null ? null : (
+        <p className="text-sm text-destructive" aria-live="polite">
+          {error}
+        </p>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setDiscardOpen(true)}
+        disabled={!dirty || pending}
+      >
+        {t("cancel")}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => {
+          if (serverChanged || saveDisabled) toast.error(t("updateConflict"));
+          else onSave();
+        }}
+        disabled={!dirty || pending}
+      >
+        {pending ? t("saving") : t("save")}
+      </Button>
       <ConfirmDialog
         open={discardOpen}
         onOpenChange={setDiscardOpen}

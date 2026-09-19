@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, Archive, ArchiveRestore, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Archive, ArchiveRestore, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -139,159 +139,159 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
   };
 
   return (
-    <SettingsSection title={t("title")} description={t("description")}>
-      <SettingsField title={t("name")} stacked>
-        <div className="space-y-2">
-          {booksRefreshFailed ? (
-            <div
-              role="alert"
-              className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
-            >
-              <span>{tQueryError("description")}</span>
-              <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
-                <RefreshCw className="size-4" />
-                {tQueryError("retry")}
-              </Button>
-            </div>
-          ) : null}
-          {booksLoadFailed ? (
-            <div
-              role="alert"
-              className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
-            >
-              <span>{tQueryError("description")}</span>
-              <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
-                <RefreshCw className="size-4" />
-                {tQueryError("retry")}
-              </Button>
-            </div>
-          ) : isLoadingBooks ? (
-            <ul
-              role="status"
-              aria-label={tCommon("loading")}
-              className="divide-y divide-border rounded-[var(--radius)] border border-border"
-            >
-              {[0, 1].map((row) => (
-                <li key={row} className="p-3">
-                  <span className="block h-4 w-24 animate-pulse rounded-sm bg-surface2" />
-                </li>
-              ))}
-            </ul>
-          ) : list.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("empty")}</p>
-          ) : (
-            <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
-              {list.map((book, index) => (
-                <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
-                  <div className="min-w-0 flex-1">
-                    <span className="truncate text-sm font-medium text-text">{book.name}</span>
-                    <p className="mt-0.5 text-micro text-muted-foreground">
-                      {book.timeZone ?? deviceZoneOption}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={busy || index === 0}
-                      aria-label={t("moveUp", { name: book.name })}
-                      onClick={() => move(index, -1)}
-                    >
-                      <ArrowUp className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={busy || index === list.length - 1}
-                      aria-label={t("moveDown", { name: book.name })}
-                      onClick={() => move(index, 1)}
-                    >
-                      <ArrowDown className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => {
-                        setRenameTarget(book);
-                        setRenameDraft(book.name);
-                      }}
-                    >
-                      {t("rename")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={busy}
-                      aria-label={t("archive")}
-                      title={t("archive")}
-                      className="text-muted-foreground hover:text-danger"
-                      onClick={() => setArchiveTarget(book)}
-                    >
-                      <Archive className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={busy}
-                      aria-label={t("delete")}
-                      title={t("delete")}
-                      className="text-muted-foreground hover:text-danger"
-                      onClick={() => setDeleteTarget(book)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                  <div className="w-full sm:w-56">
-                    <Select
-                      value={book.timeZone ?? "auto"}
-                      onValueChange={(value) =>
-                        updateBook.mutate({
-                          bookId: book.id,
-                          timeZone: value === "auto" ? null : value,
-                        })
-                      }
-                      disabled={busy}
-                    >
-                      <SelectTrigger aria-label={t("timeZone")} className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectItem value="auto">
-                          {t("timeZoneAutoDetected", { timeZone: deviceZoneOption })}
-                        </SelectItem>
-                        {zoneOptionsFor(book).map((timeZone) => (
-                          <SelectItem key={timeZone} value={timeZone}>
-                            {timeZone}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={() => {
-              setNewName("");
-              setIsAddOpen(true);
-            }}
+    <SettingsSection
+      title={t("title")}
+      actions={
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy}
+          onClick={() => {
+            setNewName("");
+            setIsAddOpen(true);
+          }}
+        >
+          {t("add")}
+        </Button>
+      }
+    >
+      <div className="space-y-2">
+        {booksRefreshFailed ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
           >
-            <Plus className="mr-1 size-4" />
-            {t("add")}
-          </Button>
-        </div>
-      </SettingsField>
+            <span>{tQueryError("description")}</span>
+            <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
+              <RefreshCw className="size-4" />
+              {tQueryError("retry")}
+            </Button>
+          </div>
+        ) : null}
+        {booksLoadFailed ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
+          >
+            <span>{tQueryError("description")}</span>
+            <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
+              <RefreshCw className="size-4" />
+              {tQueryError("retry")}
+            </Button>
+          </div>
+        ) : isLoadingBooks ? (
+          <ul
+            role="status"
+            aria-label={tCommon("loading")}
+            className="divide-y divide-border rounded-[var(--radius)] border border-border"
+          >
+            {[0, 1].map((row) => (
+              <li key={row} className="p-3">
+                <span className="block h-4 w-24 animate-pulse rounded-sm bg-surface2" />
+              </li>
+            ))}
+          </ul>
+        ) : list.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
+            {list.map((book, index) => (
+              <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
+                <div className="min-w-0 flex-1">
+                  <span className="truncate text-sm font-medium text-text">{book.name}</span>
+                  <p className="mt-0.5 text-micro text-muted-foreground">
+                    {book.timeZone ?? deviceZoneOption}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy || index === 0}
+                    aria-label={t("moveUp", { name: book.name })}
+                    onClick={() => move(index, -1)}
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy || index === list.length - 1}
+                    aria-label={t("moveDown", { name: book.name })}
+                    onClick={() => move(index, 1)}
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      setRenameTarget(book);
+                      setRenameDraft(book.name);
+                    }}
+                  >
+                    {t("rename")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy}
+                    aria-label={t("archive")}
+                    title={t("archive")}
+                    className="text-muted-foreground hover:text-danger"
+                    onClick={() => setArchiveTarget(book)}
+                  >
+                    <Archive className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy}
+                    aria-label={t("delete")}
+                    title={t("delete")}
+                    className="text-muted-foreground hover:text-danger"
+                    onClick={() => setDeleteTarget(book)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+                <div className="w-full sm:w-56">
+                  <Select
+                    value={book.timeZone ?? "auto"}
+                    onValueChange={(value) =>
+                      updateBook.mutate({
+                        bookId: book.id,
+                        timeZone: value === "auto" ? null : value,
+                      })
+                    }
+                    disabled={busy}
+                  >
+                    <SelectTrigger aria-label={t("timeZone")} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="auto">
+                        {t("timeZoneAutoDetected", { timeZone: deviceZoneOption })}
+                      </SelectItem>
+                      {zoneOptionsFor(book).map((timeZone) => (
+                        <SelectItem key={timeZone} value={timeZone}>
+                          {timeZone}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {archived.length > 0 ? (
         <SettingsField title={t("archivedSection")} stacked>
@@ -347,7 +347,7 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
           </div>
           <DialogFooter>
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => setIsAddOpen(false)}
               disabled={createBook.isPending}
             >
@@ -388,7 +388,7 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
           </div>
           <DialogFooter>
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => setRenameTarget(null)}
               disabled={updateBook.isPending}
             >

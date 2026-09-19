@@ -45,8 +45,8 @@ export function RefreshButton({ onRefresh, isRefreshing, disabled = false }: Ref
     <Button
       type="button"
       variant="ghost"
-      size="icon"
-      className="h-8 w-8 shrink-0"
+      size="icon-sm"
+      className="shrink-0"
       onClick={() => void refresh()}
       disabled={disabled || isRefreshing || manualRefreshing}
       aria-label={t("refresh")}

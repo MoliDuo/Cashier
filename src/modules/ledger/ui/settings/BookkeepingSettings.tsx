@@ -13,6 +13,15 @@ import { CategorySection } from "../CategorySection";
 import { SettingsField } from "./SettingsField";
 import { SettingsSection } from "./SettingsSection";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { AI_LANGUAGES } from "@/config/languages";
 import { SettingsSectionActions } from "./SettingsSectionActions";
 import { useEffect, useMemo, useState } from "react";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
@@ -121,8 +130,21 @@ export function BookkeepingSettings({
   };
 
   return (
-    <SettingsSection title={t("bookkeepingRules")}>
-      <SettingsField title={t("collapseEntries")} description={t("collapseEntriesDesc")}>
+    <SettingsSection
+      title={t("bookkeepingRules")}
+      actions={
+        <SettingsSectionActions
+          dirty={dirty}
+          pending={status === "saving"}
+          error={error}
+          serverChanged={serverChanged}
+          saveDisabled={serverChanged}
+          onSave={() => void handleSave()}
+          onCancel={handleCancel}
+        />
+      }
+    >
+      <SettingsField title={t("collapseEntries")}>
         <Switch
           aria-label={t("collapseEntries")}
           checked={draft.collapseEntriesDefault}
@@ -130,19 +152,41 @@ export function BookkeepingSettings({
           disabled={status === "saving"}
         />
       </SettingsField>
+      <SettingsField title={t("aiLanguage")}>
+        <Select
+          value={draft.aiLanguage}
+          onValueChange={(value) => updateDraft({ aiLanguage: value })}
+          disabled={status === "saving"}
+        >
+          <SelectTrigger aria-label={t("aiLanguage")} className="w-full sm:w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            {AI_LANGUAGES.map((lang) => (
+              <SelectItem key={lang.value} value={lang.value}>
+                {lang.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingsField>
+      <SettingsField title={t("aiPrompt")} stacked>
+        <Textarea
+          value={draft.aiCustomPrompt}
+          name="aiCustomPrompt"
+          autoComplete="off"
+          onChange={(event) => updateDraft({ aiCustomPrompt: event.target.value })}
+          disabled={status === "saving"}
+          aria-label={t("aiPrompt")}
+          placeholder={t("aiPromptPlaceholder")}
+          maxLength={4000}
+          className="min-h-[100px] w-full resize-y"
+        />
+      </SettingsField>
       <CurrencySection
         settings={draft}
         onUpdateSettings={updateDraft}
         disabled={status === "saving"}
-      />
-      <SettingsSectionActions
-        dirty={dirty}
-        pending={status === "saving"}
-        error={error}
-        serverChanged={serverChanged}
-        saveDisabled={serverChanged}
-        onSave={() => void handleSave()}
-        onCancel={handleCancel}
       />
       <CategorySection
         ledgerId={ledgerId}
@@ -166,6 +210,8 @@ interface BookkeepingDraft {
   mainCurrency: string;
   currencies: string[];
   collapseEntriesDefault: boolean;
+  aiLanguage: string;
+  aiCustomPrompt: string;
 }
 
 type BookkeepingField = keyof BookkeepingDraft;
@@ -173,6 +219,8 @@ const bookkeepingFields: readonly BookkeepingField[] = [
   "mainCurrency",
   "currencies",
   "collapseEntriesDefault",
+  "aiLanguage",
+  "aiCustomPrompt",
 ];
 
 function normalizeBookkeepingSettings(settings: BookkeepingDraft): BookkeepingDraft {
@@ -180,6 +228,8 @@ function normalizeBookkeepingSettings(settings: BookkeepingDraft): BookkeepingDr
     mainCurrency: settings.mainCurrency,
     currencies: [...settings.currencies],
     collapseEntriesDefault: settings.collapseEntriesDefault,
+    aiLanguage: settings.aiLanguage,
+    aiCustomPrompt: settings.aiCustomPrompt,
   };
 }
 
@@ -187,6 +237,8 @@ function bookkeepingSettingsEqual(left: BookkeepingDraft, right: BookkeepingDraf
   return (
     left.mainCurrency === right.mainCurrency &&
     left.collapseEntriesDefault === right.collapseEntriesDefault &&
+    left.aiLanguage === right.aiLanguage &&
+    left.aiCustomPrompt === right.aiCustomPrompt &&
     left.currencies.length === right.currencies.length &&
     left.currencies.every((currency, index) => currency === right.currencies[index])
   );
@@ -214,6 +266,12 @@ function buildBookkeepingPatch(
   ) {
     patch.currencies = draft.currencies;
   }
+  if (touchedFields.has("aiLanguage") && server.aiLanguage !== draft.aiLanguage) {
+    patch.aiLanguage = draft.aiLanguage;
+  }
+  if (touchedFields.has("aiCustomPrompt") && server.aiCustomPrompt !== draft.aiCustomPrompt) {
+    patch.aiCustomPrompt = draft.aiCustomPrompt;
+  }
   return patch;
 }
 
@@ -240,5 +298,9 @@ function rebaseBookkeepingDraft(
     collapseEntriesDefault: touchedFields.has("collapseEntriesDefault")
       ? draft.collapseEntriesDefault
       : incoming.collapseEntriesDefault,
+    aiLanguage: touchedFields.has("aiLanguage") ? draft.aiLanguage : incoming.aiLanguage,
+    aiCustomPrompt: touchedFields.has("aiCustomPrompt")
+      ? draft.aiCustomPrompt
+      : incoming.aiCustomPrompt,
   };
 }

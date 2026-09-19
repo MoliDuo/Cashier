@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openBookScope, selectBook } from "./book-switch";
+import { currentBookOption, openBookSwitcher, selectBook } from "./book-switch";
 
 /**
  * The multi-book flows the production runner can actually exercise: a real
@@ -81,7 +81,7 @@ async function archiveBook(page: Page, name: string) {
 
 /** The pull-down switcher, picking by name so a leftover book cannot shift the pick. */
 async function selectBookByName(page: Page, name: string) {
-  await openBookScope(page);
+  await openBookSwitcher(page);
   // By accessible name, not `hasText`: that comparison ignores case, so a book
   // named Eta would otherwise also find Theta and the click would be ambiguous.
   await page
@@ -89,7 +89,7 @@ async function selectBookByName(page: Page, name: string) {
     .getByRole("button", { name, exact: true })
     .click();
   await expect(page.getByTestId("book-reveal")).toHaveAttribute("data-pull-reveal", "closed");
-  await expect(page.getByTestId("book-scope-chip")).toContainText(name);
+  await expect(currentBookOption(page)).toHaveText(name);
 }
 
 /** Opens 记一笔, files one quick entry into `book`, and waits for it to be gone. */
@@ -114,11 +114,6 @@ async function recordQuickEntry(
 /** The stream's total for the settled period, read off its own toolbar. */
 function streamTotal(page: Page) {
   return page.getByTestId("entries-toolbar").first();
-}
-
-/** The per-book totals row on 统计, one row per live book with 总账 leading it. */
-function statsTotalsRow(page: Page, label: string) {
-  return page.locator('div[aria-live="polite"] > div').filter({ hasText: label });
 }
 
 function statsHero(page: Page) {
@@ -239,11 +234,9 @@ test("books production scopes the stream, the details and the stats to one book"
 
   await selectBookByName(page, bookA);
   await openTab(page, "Stats");
-  // The hero is the scope's own total; the row above it breaks the same period
-  // down per book, so a wrong scope cannot pass by summing to the same number.
+  // The hero is the scope's own total, so a wrong scope cannot pass by summing
+  // the books to the same number.
   await expect(statsHero(page).getByText("¥111.11", { exact: true })).toBeVisible();
-  await expect(statsTotalsRow(page, bookA)).toContainText("¥111.11");
-  await expect(statsTotalsRow(page, bookB)).toContainText("¥222.22");
 
   await selectBookByName(page, bookB);
   await expect(statsHero(page).getByText("¥222.22", { exact: true })).toBeVisible();
@@ -295,8 +288,9 @@ test("books production moves a record from one book to another", async ({ page }
   await selectBookByName(page, bookA);
   await expect(streamTotal(page)).toContainText("¥0.00");
   await openTab(page, "Stats");
-  await expect(statsTotalsRow(page, bookA)).toContainText("¥0.00");
-  await expect(statsTotalsRow(page, bookB)).toContainText("¥333.33");
+  await expect(statsHero(page).getByText("¥0.00", { exact: true })).toBeVisible();
+  await selectBookByName(page, bookB);
+  await expect(statsHero(page).getByText("¥333.33", { exact: true })).toBeVisible();
 
   await openTab(page, "Settings");
   await archiveBook(page, bookA);
@@ -339,7 +333,7 @@ test("books production keeps the viewed book and the record picker apart", async
   ).toBeVisible();
 
   // Saving elsewhere changed the picker's memory, not what is being viewed.
-  await expect(page.getByTestId("book-scope-chip")).toContainText(bookA);
+  await expect(currentBookOption(page)).toHaveText(bookA);
   await expect(page.getByText(item, { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "New Record", exact: true }).click();
   dialog = page.getByRole("dialog").last();
@@ -361,19 +355,19 @@ test("books production keeps the viewed book per browser, not per account", asyn
   page.on("pageerror", (error) => errors.push(error.message));
 
   await login(page);
-  await expect(page.getByTestId("book-scope-chip")).toHaveCount(0);
+  await expect(currentBookOption(page)).toHaveText("All books");
   await selectBookByName(page, "旅行支出");
 
   await page.reload();
-  await expect(page.getByTestId("book-scope-chip")).toContainText("旅行支出");
+  await expect(currentBookOption(page)).toHaveText("旅行支出");
 
   // Another browser signs in as the same account and still opens on 总账.
   const other = await newDevice(page);
   try {
-    await expect(other.page.getByTestId("book-scope-chip")).toHaveCount(0);
+    await expect(currentBookOption(other.page)).toHaveText("All books");
     await selectBookByName(other.page, "共同支出");
     await page.reload();
-    await expect(page.getByTestId("book-scope-chip")).toContainText("旅行支出");
+    await expect(currentBookOption(page)).toHaveText("旅行支出");
   } finally {
     await other.context.close();
   }
@@ -453,8 +447,8 @@ test("books production falls back to 总账 when the viewed book is archived", a
   await openTab(page, "Settings");
   await archiveBook(page, bookName);
   await openTab(page, "Stream");
-  // 总账 paints no chip, so the dead scope is gone exactly when the chip is.
-  await expect(page.getByTestId("book-scope-chip")).toHaveCount(0);
+  // The dead scope is gone once the strip marks 总账 again.
+  await expect(currentBookOption(page)).toHaveText("All books");
 
   await openTab(page, "Settings");
   await bookRow(page, bookName).getByRole("button", { name: "Restore", exact: true }).click();
@@ -492,7 +486,9 @@ test("books production files an API upload into the book its key is bound to", a
   const token = tokenMatch?.[0];
   expect(token).toBeTruthy();
   await tokenDialog.getByRole("button", { name: "I've saved it", exact: true }).click();
-  await expect(page.getByText(`Writes to ${bookName}`, { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: `Change the book for ${credentialName}`, exact: true })
+  ).toHaveText(bookName);
 
   const headers = { Authorization: `Bearer ${token!}` };
   const created = await page.request.post(`${apiBase()}/api/v1/source-documents`, {

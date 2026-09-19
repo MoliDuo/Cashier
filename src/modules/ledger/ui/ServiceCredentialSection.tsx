@@ -30,6 +30,7 @@ import { formatInstantDateLabel } from "@/lib/date-utils";
 import { copyToClipboard } from "@/lib/utils";
 import { UI } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SettingsField } from "./settings/SettingsField";
 
 interface ServiceCredentialSectionProps {
   credentials: ServiceCredential[];
@@ -124,84 +125,81 @@ export function ServiceCredentialSection({
     books.find((book) => book.id === bookId)?.name ?? t("archivedBook");
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-medium text-text">{t("title")}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t("description")}</p>
-        </div>
+    <SettingsField
+      title={t("title")}
+      stacked
+      actions={
         <Button onClick={openCreateDialog} size="sm" disabled={isCreating || isDeleting}>
           {t("newCredential")}
         </Button>
-      </div>
-
-      <div className="space-y-3">
-        {credentials.length === 0 ? (
-          <div className="rounded-[var(--radius)] border border-dashed border-border py-8 text-center text-muted-foreground">
-            {t("noCredentials")}
-          </div>
-        ) : (
-          credentials.map((credential) => (
-            <div
-              key={credential.id}
-              className="flex items-center justify-between rounded-[var(--radius)] border border-border bg-surface2 p-4"
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{credential.name}</div>
-                  <div className="truncate font-mono text-xs text-muted-foreground">
+      }
+    >
+      {credentials.length === 0 ? (
+        <div className="rounded-[var(--radius)] border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+          {t("noCredentials")}
+        </div>
+      ) : (
+        <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
+          {credentials.map((credential) => (
+            <li key={credential.id} className="flex items-center gap-3 p-3">
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-text">
+                  {credential.name}
+                </span>
+                <p className="mt-0.5 truncate text-micro">
+                  <span className="font-mono">
                     {credential.tokenPrefix && credential.tokenSuffix
                       ? `${credential.tokenPrefix}...${credential.tokenSuffix}`
                       : "******"}
-                  </div>
-                  <div className="mt-1 text-micro text-muted-foreground">
-                    {t("createdAt", {
-                      date: formatInstantDateLabel(credential.createdAt, locale, {
-                        today: tCommon("today"),
-                        yesterday: tCommon("yesterday"),
-                      }),
-                    })}
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="shrink-0 text-micro text-muted-foreground">
-                      {t("book", { book: bookName(credential.bookId) })}
-                    </span>
-                    <Select
-                      value={credential.bookId}
-                      onValueChange={(bookId) => void onSetCredentialBook(credential.id, bookId)}
-                      disabled={isCreating || isDeleting}
-                    >
-                      <SelectTrigger
-                        className="h-7 w-36 text-xs"
-                        aria-label={t("changeBook", { name: credential.name })}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        {books.map((book) => (
-                          <SelectItem key={book.id} value={book.id}>
-                            {book.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                  </span>
+                  <span aria-hidden> · </span>
+                  {t("createdAt", {
+                    date: formatInstantDateLabel(credential.createdAt, locale, {
+                      today: tCommon("today"),
+                      yesterday: tCommon("yesterday"),
+                    }),
+                  })}
+                </p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={isCreating || isDeleting}
-                onClick={() => setCredentialToDelete(credential)}
-                aria-label={t("deleteButton", { name: credential.name })}
-                className="shrink-0 text-muted-foreground hover:text-danger"
-              >
-                <Trash2 size={16} />
-              </Button>
-            </div>
-          ))
-        )}
-      </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {/* The picker names its own book, so the row states it once; a key
+                    whose book is gone still names itself as archived here. */}
+                <Select
+                  value={credential.bookId}
+                  onValueChange={(bookId) => void onSetCredentialBook(credential.id, bookId)}
+                  disabled={isCreating || isDeleting}
+                >
+                  <SelectTrigger
+                    className="max-w-40"
+                    aria-label={t("changeBook", { name: credential.name })}
+                  >
+                    <SelectValue>{bookName(credential.bookId)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {books.map((book) => (
+                      <SelectItem key={book.id} value={book.id}>
+                        {book.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={isCreating || isDeleting}
+                  onClick={() => setCredentialToDelete(credential)}
+                  aria-label={t("deleteButton", { name: credential.name })}
+                  title={t("deleteButton", { name: credential.name })}
+                  className="text-muted-foreground hover:text-danger"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Dialog
         open={isCreateDialogOpen}
@@ -247,7 +245,7 @@ export function ServiceCredentialSection({
           </div>
           <DialogFooter>
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => setIsCreateDialogOpen(false)}
               disabled={isCreating}
             >
@@ -324,6 +322,6 @@ export function ServiceCredentialSection({
           }
         }}
       />
-    </div>
+    </SettingsField>
   );
 }

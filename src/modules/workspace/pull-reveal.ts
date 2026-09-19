@@ -6,8 +6,8 @@
  * component that paints them can be tested without a browser.
  */
 
-/** How tall the strip is when it is fully open. */
-export const PULL_REVEAL_HEIGHT = 56;
+/** How tall the strip is when it is fully open: `BookReveal`'s `h-9` box. */
+export const PULL_REVEAL_HEIGHT = 36;
 /** The finger travels twice as far as the strip grows, so a short pull is enough. */
 export const PULL_REVEAL_DAMPING = 0.5;
 /** 60% of the full height is where a release opens the strip instead of snapping back. */

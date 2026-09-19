@@ -115,7 +115,6 @@ export const ConfirmDialog = memo(function ConfirmDialog({
             {hasThreeButtonLayout && onSave ? (
               <Button
                 type="button"
-                className="bg-success text-white hover:bg-success/90"
                 disabled={isPending}
                 onClick={async (e) => {
                   e.stopPropagation();

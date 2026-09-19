@@ -45,7 +45,7 @@ export function CredentialChangeDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline">{triggerLabel}</Button>
+        <Button size="sm">{triggerLabel}</Button>
       </DialogTrigger>
       <DialogContent
         variant="detail"

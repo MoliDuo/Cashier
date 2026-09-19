@@ -192,10 +192,12 @@ describe("ServiceCredentialSection", () => {
       />
     );
 
-    expect(screen.getByText("book:Shared")).toBeInTheDocument();
-    expect(screen.getByText("book:Mine")).toBeInTheDocument();
+    // Each picker prints the book it writes to, so the row states it once.
+    const pickers = screen.getAllByRole("combobox");
+    expect(pickers[0]).toHaveTextContent("Shared");
+    expect(pickers[1]).toHaveTextContent("Mine");
 
-    fireEvent.click(screen.getAllByRole("combobox")[0]!);
+    fireEvent.click(pickers[0]!);
     // "Mine" is both the open trigger's current value and an option, so the
     // option is picked by its listbox role instead of by text.
     const listbox = await screen.findByRole("listbox");
@@ -229,7 +231,7 @@ describe("ServiceCredentialSection", () => {
     expect(screen.getByRole("combobox")).toHaveTextContent("Shared");
   });
 
-  it("labels a key whose book is archived or unresolvable", () => {
+  it("labels a key whose book is archived or unresolvable", async () => {
     render(
       <ServiceCredentialSection
         credentials={[credentialFixture({ id: "orphan", bookId: "book-archived" })]}
@@ -240,7 +242,13 @@ describe("ServiceCredentialSection", () => {
       />
     );
 
-    expect(screen.getByText("book:archivedBook")).toBeInTheDocument();
+    // The picker names the archived book rather than going blank, and still
+    // offers somewhere to move the key.
+    expect(screen.getByRole("combobox")).toHaveTextContent("archivedBook");
     expect(screen.queryByText("book:error")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("combobox"));
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).getByText("Shared")).toBeInTheDocument();
   });
 });

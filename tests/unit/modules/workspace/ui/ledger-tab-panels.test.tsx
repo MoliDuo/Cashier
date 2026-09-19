@@ -82,8 +82,8 @@ describe("LedgerTabPanels", () => {
 
   /** 总账 is the absence of a book, which each panel reads as "no filter". */
   it.each([
-    ["stream", { bookId: undefined, scopeBookName: null }],
-    ["details", { bookId: undefined, scopeBookName: null }],
+    ["stream", { bookId: undefined }],
+    ["details", { bookId: undefined }],
     ["stats", { bookId: undefined }],
   ] as const)("forwards 总账 to the %s panel", (activeTab, expected) => {
     render(<LedgerTabPanels {...baseProps} activeTab={activeTab} />);
@@ -92,13 +92,12 @@ describe("LedgerTabPanels", () => {
     expect(deferredProps.calls[0]).toMatchObject({ ledgerId: "ledger-1", ...expected });
   });
 
-  it("hands the stream panel the book id and name the scope resolved to", () => {
+  it("hands the stream panel the book id the scope resolved to", () => {
     render(<LedgerTabPanels {...baseProps} activeTab="stream" recordScope={BOOK_SHARED} />);
 
     expect(deferredProps.calls).toHaveLength(1);
     expect(deferredProps.calls[0]).toMatchObject({
       bookId: BOOK_SHARED,
-      scopeBookName: "Shared",
       ledgerId: "ledger-1",
     });
   });

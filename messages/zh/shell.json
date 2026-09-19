@@ -228,9 +228,7 @@
   },
   "BookScope": {
     "label": "分账",
-    "all": "总账",
-    "only": "仅看 {book}",
-    "current": "正在查看 {book}。打开分账切换"
+    "all": "总账"
   },
   "BookPicker": {
     "namePlaceholder": "分账名称"

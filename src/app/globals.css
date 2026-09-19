@@ -209,6 +209,21 @@ body {
   touch-action: pan-y;
 }
 
+/*
+ * Radix locks page scroll while a Select or Dialog is open by injecting
+ * `body[data-scroll-locked] { overflow: hidden !important }`. That makes the
+ * body a non-scrolling scroll container, so the shell header's
+ * `position: sticky` resolves against it and scrolls out of view with the
+ * page. `clip` keeps the page unlocked for scrolling without creating the
+ * container, leaving the header pinned.
+ *
+ * The library appends its own rule to <head> at runtime, so the extra `html`
+ * selector is what wins the cascade between two `!important` declarations.
+ */
+html body[data-scroll-locked] {
+  overflow: clip !important;
+}
+
 @keyframes startup-progress {
   0% {
     transform: translateX(-100%);

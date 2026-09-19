@@ -27,7 +27,6 @@ import {
 } from "@/modules/auth/server-actions/login-emails";
 import type { LoginEmailErrorCode } from "@/modules/auth/server-actions/login-emails";
 import { SettingsField } from "./SettingsField";
-import { SettingsSection } from "./SettingsSection";
 
 interface EmailSettingsProps {
   /** The account's full login-email list, hydrated by the server when available. */
@@ -43,6 +42,9 @@ interface EmailSettingsProps {
  * 登录邮箱: every address here signs in with a code or with the shared password.
  * An address is added by verifying an OTP sent to it, and the account keeps at
  * least one, so a removal can be refused with a reason rather than a crash.
+ *
+ * It is one field of the account section, like 密码 and API 密钥, so it takes the
+ * same heading as those rather than a card of its own inside the card.
  */
 export function EmailSettings({
   initialEmails,
@@ -159,32 +161,35 @@ export function EmailSettings({
   };
 
   return (
-    <SettingsSection title={t("title")} description={t("description")}>
-      <SettingsField title={t("title")} stacked>
-        <div className="space-y-2">
-          <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
-            {emails.map((address) => (
-              <li key={address} className="flex items-center justify-between gap-2 p-3">
-                <span className="min-w-0 truncate text-sm text-text">{address}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={emails.length <= 1}
-                  aria-label={t("remove", { email: address })}
-                  title={emails.length <= 1 ? t("lastEmail") : t("remove", { email: address })}
-                  className="shrink-0 text-muted-foreground hover:text-danger"
-                  onClick={() => setRemoveTarget(address)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <Button type="button" variant="outline" size="sm" onClick={() => setIsAddOpen(true)}>
+    <>
+      <SettingsField
+        title={t("title")}
+        stacked
+        actions={
+          <Button type="button" size="sm" onClick={() => setIsAddOpen(true)}>
             {t("add")}
           </Button>
-        </div>
+        }
+      >
+        <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
+          {emails.map((address) => (
+            <li key={address} className="flex items-center justify-between gap-2 p-3">
+              <span className="min-w-0 truncate text-sm text-text">{address}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={emails.length <= 1}
+                aria-label={t("remove", { email: address })}
+                title={emails.length <= 1 ? t("lastEmail") : t("remove", { email: address })}
+                className="shrink-0 text-muted-foreground hover:text-danger"
+                onClick={() => setRemoveTarget(address)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
       </SettingsField>
 
       <Dialog open={isAddOpen} onOpenChange={(open) => !pending && setIsAddOpen(open)}>
@@ -237,7 +242,7 @@ export function EmailSettings({
             ) : null}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsAddOpen(false)} disabled={pending}>
+            <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={pending}>
               {tCommon("cancel")}
             </Button>
             <Button
@@ -278,6 +283,6 @@ export function EmailSettings({
           return true;
         }}
       />
-    </SettingsSection>
+    </>
   );
 }

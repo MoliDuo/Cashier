@@ -169,7 +169,7 @@ describe("demo workspace fixture", () => {
     for (const book of books) {
       expect(documents.some((document) => document.book === book.name)).toBe(true);
     }
-    const partnerDocuments = documents.filter((document) => document.book === "梁梁的");
+    const partnerDocuments = documents.filter((document) => document.book === "梁梁");
     expect(partnerDocuments.some((document) => document.title === "FreshMart")).toBe(true);
     expect(partnerDocuments.some((document) => document.title === "City Taxi")).toBe(true);
     expect(partnerDocuments.every((document) => document.status === "completed")).toBe(true);
@@ -239,8 +239,8 @@ describe("demo workspace fixture", () => {
     // Every key names a real book, so an upload through it has somewhere to go.
     const bookNames = new Set((fixture.books as Array<{ name: string }>).map((book) => book.name));
     expect(credentials.every((credential) => bookNames.has(credential.book))).toBe(true);
-    expect(credentials.filter((credential) => credential.book === "哞哞的")).toHaveLength(2);
-    expect(credentials.filter((credential) => credential.book === "梁梁的")).toHaveLength(1);
+    expect(credentials.filter((credential) => credential.book === "哞哞")).toHaveLength(2);
+    expect(credentials.filter((credential) => credential.book === "梁梁")).toHaveLength(1);
     expect(new Set(credentials.map((credential) => credential.id)).size).toBe(credentials.length);
     expect(new Set(credentials.map((credential) => fixtureCredentialToken(credential))).size).toBe(
       credentials.length

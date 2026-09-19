@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AiSettings } from "@/modules/ledger/ui/settings/AiSettings";
 import { BookkeepingSettings } from "@/modules/ledger/ui/settings/BookkeepingSettings";
+import type { ComponentProps } from "react";
 import { toast } from "sonner";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
@@ -18,6 +18,26 @@ vi.mock("@/modules/ledger/ui/CurrencySection", () => ({
 vi.mock("@/modules/ledger/ui/CategorySection", () => ({
   CategorySection: () => <div>category-section</div>,
 }));
+
+type BookkeepingProps = ComponentProps<typeof BookkeepingSettings>;
+
+/**
+ * 记账规则 owns the AI fields too, so the draft cases render that one section
+ * and override only the props the case cares about.
+ */
+const bookkeepingProps = (overrides: Partial<BookkeepingProps>): BookkeepingProps => ({
+  ledgerId: "ledger-1",
+  settings: getDefaultLedger().settings,
+  categories: [],
+  uncategorizedCount: 0,
+  onUpdateSettings: () => Promise.reject(new Error("unexpected save")),
+  onSaveCategories: () => Promise.resolve([]),
+  generatingCategoryIds: new Set(),
+  failedCategoryIds: new Set(),
+  onRetryMetadata: () => {},
+  isSavingCategories: false,
+  ...overrides,
+});
 
 describe("explicit settings section drafts", () => {
   beforeEach(() => {
@@ -37,13 +57,15 @@ describe("explicit settings section drafts", () => {
       updatedAt: "2026-01-02T00:00:00.000Z",
     });
     render(
-      <AiSettings
-        settings={{
-          ...getDefaultLedger().settings,
-          aiLanguage: "zh-CN",
-          aiCustomPrompt: "Server prompt",
-        }}
-        onUpdateSettings={onUpdateSettings}
+      <BookkeepingSettings
+        {...bookkeepingProps({
+          settings: {
+            ...getDefaultLedger().settings,
+            aiLanguage: "zh-CN",
+            aiCustomPrompt: "Server prompt",
+          },
+          onUpdateSettings,
+        })}
       />
     );
 
@@ -60,21 +82,22 @@ describe("explicit settings section drafts", () => {
 
   it("confirms before restoring the AI server snapshot on Cancel", async () => {
     render(
-      <AiSettings
-        settings={{
-          ...getDefaultLedger().settings,
-          aiLanguage: "zh-CN",
-          aiCustomPrompt: "Server prompt",
-        }}
-        onUpdateSettings={() =>
-          Promise.resolve({
-            id: "ledger-1",
-            userId: "user-1",
-            settings: { ...getDefaultLedger().settings },
-            createdAt: "2026-01-01T00:00:00.000Z",
-            updatedAt: "2026-01-01T00:00:00.000Z",
-          })
-        }
+      <BookkeepingSettings
+        {...bookkeepingProps({
+          settings: {
+            ...getDefaultLedger().settings,
+            aiLanguage: "zh-CN",
+            aiCustomPrompt: "Server prompt",
+          },
+          onUpdateSettings: () =>
+            Promise.resolve({
+              id: "ledger-1",
+              userId: "user-1",
+              settings: { ...getDefaultLedger().settings },
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            }),
+        })}
       />
     );
 
@@ -136,18 +159,22 @@ describe("explicit settings section drafts", () => {
   it("keeps edits without a server-update banner and reports conflict only on Save", () => {
     const onUpdateSettings = vi.fn();
     const { rerender } = render(
-      <AiSettings
-        settings={{ ...getDefaultLedger().settings, aiCustomPrompt: "Server prompt" }}
-        onUpdateSettings={onUpdateSettings}
+      <BookkeepingSettings
+        {...bookkeepingProps({
+          settings: { ...getDefaultLedger().settings, aiCustomPrompt: "Server prompt" },
+          onUpdateSettings,
+        })}
       />
     );
     fireEvent.change(screen.getByRole("textbox", { name: "aiPrompt" }), {
       target: { value: "Draft prompt" },
     });
     rerender(
-      <AiSettings
-        settings={{ ...getDefaultLedger().settings, aiCustomPrompt: "New server prompt" }}
-        onUpdateSettings={onUpdateSettings}
+      <BookkeepingSettings
+        {...bookkeepingProps({
+          settings: { ...getDefaultLedger().settings, aiCustomPrompt: "New server prompt" },
+          onUpdateSettings,
+        })}
       />
     );
     expect(screen.getByRole("textbox", { name: "aiPrompt" })).toHaveValue("Draft prompt");

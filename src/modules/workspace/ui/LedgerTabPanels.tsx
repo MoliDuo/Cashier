@@ -100,9 +100,6 @@ export function LedgerTabPanels({
   isRefreshing,
   onGoToDetails,
 }: LedgerTabPanelsProps) {
-  // The book the tabs narrow to, and the name the toolbar chip shows. null means
-  // 总账, which shows no chip: the switcher's first option already says it.
-  const scopeBookName = books.find((book) => book.id === recordScope)?.name ?? null;
   const carriesBookSwitch = activeTab !== "settings" && books.length > 0;
 
   return (
@@ -116,7 +113,6 @@ export function LedgerTabPanels({
             <DeferredFeatureMessages feature="stream" locale={locale} fallback={null}>
               <LedgerEntriesTab
                 bookId={recordScope ?? undefined}
-                scopeBookName={scopeBookName}
                 ledgerId={ledgerId}
                 ledger={ledger}
                 periodParams={periodParams}
@@ -144,7 +140,6 @@ export function LedgerTabPanels({
             >
               <DetailsTab
                 bookId={recordScope ?? undefined}
-                scopeBookName={scopeBookName}
                 ledgerId={ledgerId}
                 categories={categories.length > 0 ? categories : []}
                 ledger={ledger}
@@ -172,7 +167,6 @@ export function LedgerTabPanels({
             >
               <StatsTab
                 bookId={recordScope ?? undefined}
-                books={books}
                 ledgerId={ledgerId}
                 ledger={ledger}
                 onCategoryDrilldown={onCategoryDrilldown}

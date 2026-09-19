@@ -17,8 +17,6 @@ import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-na
 interface DetailsTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
-  /** Name of that book, for the chip that stands in for the switcher. */
-  scopeBookName: string | null;
   ledgerId: string;
   categories: EntryCategory[];
   ledger?: Ledger;
@@ -38,7 +36,6 @@ interface DetailsTabProps {
 
 export function DetailsTab({
   bookId,
-  scopeBookName,
   ledgerId,
   categories,
   ledger,
@@ -113,7 +110,6 @@ export function DetailsTab({
           {...(ledger === undefined ? {} : { ledger })}
           periodParams={periodParams}
           filters={filters}
-          scopeBookName={scopeBookName}
           advancedFilters={advancedFilters}
           onFiltersChange={onFiltersChange}
           entries={data.entries}

@@ -114,11 +114,6 @@ export const queryKeys = {
     }
   ) => ["ledger", ledgerId, "enhanced-stats", normalizeQueryParams(params)] as const,
   enhancedStatsPrefix: (ledgerId: string) => ["ledger", ledgerId, "enhanced-stats"] as const,
-  /** The per-book totals 统计 shows under its strip, for one period. */
-  bookTotals: (
-    ledgerId: string,
-    params?: { startDate?: string | null | undefined; endDate?: string | null | undefined }
-  ) => ["ledger", ledgerId, "enhanced-stats", "book-totals", normalizeQueryParams(params)] as const,
 
   // === Currency ===
   convert: (ledgerId: string, amount: string, from: string, to: string, date: string) =>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
@@ -32,7 +32,7 @@ const category: EntryCategoryWithCount = {
   entryCount: 3,
 };
 
-function renderSection() {
+function renderSection(props: { uncategorizedCount?: number } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
@@ -47,6 +47,7 @@ function renderSection() {
       ledgerId="ledger-1"
       categories={[category]}
       onSaveCategories={onSaveCategories}
+      {...props}
     />,
     { wrapper }
   );
@@ -125,5 +126,23 @@ describe("CategorySection", () => {
       locale: "zh",
       mappings: [{ fromCategoryId: "category-1", toPresetIndex: 0 }],
     });
+  });
+
+  it("holds 未分类 in the last slot with nothing to press", async () => {
+    renderSection({ uncategorizedCount: 2 });
+
+    const row = await screen.findByTestId("uncategorized-row");
+    expect(row).toHaveTextContent("uncategorized");
+    expect(row).toHaveTextContent("categoryItemCount");
+
+    // Below the last category, and out of reach of the editor: managing the
+    // list adds no control to it, because there is no category behind it.
+    const list = row.parentElement!;
+    expect(list.lastElementChild).toBe(row);
+
+    fireEvent.click(screen.getByRole("button", { name: "manageCategories" }));
+
+    expect(screen.getByTestId("uncategorized-row")).toBe(list.lastElementChild);
+    expect(within(row).queryAllByRole("button")).toHaveLength(0);
   });
 });

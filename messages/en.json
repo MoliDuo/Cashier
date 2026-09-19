@@ -630,8 +630,7 @@
     "generatingMetadata": "Generating description and icon...",
     "retryMetadata": "Retry metadata",
     "categoryItemCount": "{count} {count, plural, one {item} other {items}}",
-    "uncategorized": "Uncategorized Items",
-    "uncategorizedDesc": "{count} {count, plural, one {entry} other {entries}} not yet categorized",
+    "uncategorized": "Uncategorized",
     "confirm": "Confirm",
     "signOut": "Sign Out",
     "signOutDesc": "Sign out of your current account",
@@ -1046,9 +1045,7 @@
   },
   "BookScope": {
     "label": "Book",
-    "all": "All books",
-    "only": "Only {book}",
-    "current": "Showing book {book}. Open the book switcher"
+    "all": "All books"
   },
   "Setup": {
     "title": "Set up Cashier",

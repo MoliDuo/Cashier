@@ -3,7 +3,6 @@ import type { EntryCategoryWithCount, Ledger } from "@/modules/ledger/contracts"
 import { useRouter, usePathname } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
-import { AiSettings } from "./settings/AiSettings";
 import { AccountSettings } from "./settings/AccountSettings";
 import { BookSettings } from "./settings/BookSettings";
 import { SettingsSection } from "./settings/SettingsSection";
@@ -269,7 +268,20 @@ export function SettingsTab({
           </Button>
         </div>
       )}
-      <SettingsSection title={t("appearanceAndLanguage")}>
+      <SettingsSection
+        title={t("appearanceAndLanguage")}
+        actions={
+          <SettingsSectionActions
+            dirty={appearanceDirty}
+            pending={appearanceStatus === "saving"}
+            error={appearanceError}
+            serverChanged={appearanceServerChanged}
+            saveDisabled={appearanceServerChanged}
+            onSave={() => void handleSaveAppearance()}
+            onCancel={handleCancelAppearance}
+          />
+        }
+      >
         <SettingsField title={t("theme")}>
           <Select
             value={appearanceDraft.theme}
@@ -317,15 +329,6 @@ export function SettingsTab({
             </SelectContent>
           </Select>
         </SettingsField>
-        <SettingsSectionActions
-          dirty={appearanceDirty}
-          pending={appearanceStatus === "saving"}
-          error={appearanceError}
-          serverChanged={appearanceServerChanged}
-          saveDisabled={appearanceServerChanged}
-          onSave={() => void handleSaveAppearance()}
-          onCancel={handleCancelAppearance}
-        />
       </SettingsSection>
 
       <BookSettings
@@ -348,11 +351,6 @@ export function SettingsTab({
         onRetryMetadata={retryCategoryMetadata}
         isSavingCategories={saveCategories.isPending}
         {...(onGoToDetails == null ? {} : { onGoToDetails })}
-      />
-
-      <AiSettings
-        settings={settingsLedger.settings}
-        onUpdateSettings={(data) => updateLedgerMutation.mutateAsync(data)}
       />
 
       {/* Removing a login email bumps auth_version server-side, so every device

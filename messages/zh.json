@@ -630,8 +630,7 @@
     "generatingMetadata": "正在生成描述和图标...",
     "retryMetadata": "重试生成",
     "categoryItemCount": "{count} 条明细",
-    "uncategorized": "未分类物品",
-    "uncategorizedDesc": "有 {count} 条记录尚未分类",
+    "uncategorized": "未分类",
     "confirm": "确认",
     "signOut": "退出登录",
     "signOutDesc": "退出当前账户登录状态",
@@ -1046,9 +1045,7 @@
   },
   "BookScope": {
     "label": "分账",
-    "all": "总账",
-    "only": "仅看 {book}",
-    "current": "正在查看 {book}。打开分账切换"
+    "all": "总账"
   },
   "Setup": {
     "title": "初始化 Cashier",

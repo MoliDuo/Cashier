@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  PULL_REVEAL_DAMPING,
   PULL_REVEAL_HEIGHT,
+  PULL_REVEAL_OPEN_RATIO,
   applyPullDamping,
   createWheelRevealAccumulator,
   isBatchSelectionActive,
@@ -27,9 +29,11 @@ describe("pull reveal", () => {
   });
 
   it("opens past 60% of the height, or on a flick that was fast enough", () => {
-    // 0.6 * 56 = 33.6px of strip, which is 67.2px of finger.
-    expect(resolvePullRevealOpen(68, 0)).toBe(true);
-    expect(resolvePullRevealOpen(60, 0)).toBe(false);
+    // The pull is damped by half, so reaching 60% of the strip takes twice that
+    // much finger travel.
+    const fingerToOpen = (PULL_REVEAL_HEIGHT * PULL_REVEAL_OPEN_RATIO) / PULL_REVEAL_DAMPING;
+    expect(resolvePullRevealOpen(fingerToOpen, 0)).toBe(true);
+    expect(resolvePullRevealOpen(fingerToOpen - 5, 0)).toBe(false);
     expect(resolvePullRevealOpen(20, 0.4)).toBe(true);
     expect(resolvePullRevealOpen(20, 0.2)).toBe(false);
     // A flick with nothing revealed is not a pull.

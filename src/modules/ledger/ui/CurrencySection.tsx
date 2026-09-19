@@ -60,6 +60,7 @@ function PreferredCurrenciesMenu({
         <Button
           type="button"
           variant="outline"
+          size="sm"
           className="w-full justify-between font-normal sm:w-64"
           aria-label={t("preferredCurrencies")}
           disabled={disabled}
@@ -149,7 +150,6 @@ export function CurrencySection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h3 className="text-sm font-medium text-text">{t("mainCurrency")}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t("mainCurrencyDesc")}</p>
         </div>
         <Select value={mainCurrency} onValueChange={updateMainCurrency} disabled={disabled}>
           <SelectTrigger aria-label={t("mainCurrency")} className="w-full sm:w-44">
@@ -170,7 +170,6 @@ export function CurrencySection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h3 className="text-sm font-medium text-text">{t("preferredCurrencies")}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t("preferredCurrenciesDesc")}</p>
         </div>
         <PreferredCurrenciesMenu
           initialCurrencies={

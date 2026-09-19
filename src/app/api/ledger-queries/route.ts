@@ -28,9 +28,7 @@ import {
   parseLedgerEntryId,
 } from "@/modules/ledger/contract-schemas";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
-import { getBookTotals } from "@/modules/stats/server/get-book-totals";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
-import { parseGetBookTotalsInput } from "@/modules/stats/contract-schemas";
 
 /**
  * The `reclassification` poll below is the recovery driver for a batch AI
@@ -50,7 +48,6 @@ const requestSchema = z
       "entry",
       "summary",
       "stats",
-      "book-totals",
       "reclassification",
       "category-assignment-results",
     ]),
@@ -69,9 +66,6 @@ export async function POST(request: Request) {
     if (payload.query === "stats") {
       const input = parseEnhancedStatsInput(payload.args[0]);
       result = await getEnhancedStats(input);
-    } else if (payload.query === "book-totals") {
-      const input = parseGetBookTotalsInput(payload.args[0]);
-      result = await getBookTotals(input);
     } else {
       const ledgerId = z.string().uuid().parse(payload.args[0]);
       if (["stream", "total", "refresh"].includes(payload.query))

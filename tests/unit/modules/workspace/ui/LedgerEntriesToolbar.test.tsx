@@ -85,13 +85,6 @@ describe("LedgerEntriesToolbar", () => {
     expect(screen.getByRole("button", { name: "已启用 1 个筛选" })).toBeDefined();
   });
 
-  it("names the book a narrowed list is showing, and offers the switcher back", () => {
-    render(<LedgerEntriesToolbar {...defaultProps} scopeBookName="B" />);
-
-    expect(screen.getByTestId("book-scope-chip")).toHaveTextContent("仅看 B");
-    expect(screen.queryByRole("group", { name: "分账" })).not.toBeInTheDocument();
-  });
-
   it("renders the amount without a redundant label when the prefix is gone", () => {
     render(<LedgerEntriesToolbar {...defaultProps} />);
 

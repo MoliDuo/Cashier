@@ -71,7 +71,7 @@ export function AccountSettings({
         onAllSessionsEnded={onAllSessionsEnded}
       />
 
-      <SettingsField title={ta("passwordSection")} description={ta("passwordSectionDesc")}>
+      <SettingsField title={ta("passwordSection")}>
         <PasswordForm
           hasPassword={hasPassword}
           passwordUpdatedAt={passwordUpdatedAt}
@@ -89,7 +89,8 @@ export function AccountSettings({
       />
       <SettingsField title={t("signOut")}>
         <Button
-          variant="outline"
+          variant="destructive"
+          size="sm"
           disabled={isPending || isSigningOut}
           onClick={() => setSignOutConfirmOpen(true)}
         >
@@ -101,6 +102,7 @@ export function AccountSettings({
           title={t("signOutConfirmTitle")}
           description={t("signOutConfirmDescription")}
           confirmLabel={t("signOut")}
+          variant="destructive"
           onConfirm={async () => {
             if (isSigningOut) return false;
             setIsSigningOut(true);

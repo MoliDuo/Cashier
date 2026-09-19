@@ -23,32 +23,6 @@ const getEnhancedStatsInputSchema = z.object({
 
 export type GetEnhancedStatsInput = z.infer<typeof getEnhancedStatsInputSchema>;
 
-const getBookTotalsInputSchema = z.object({
-  ledgerId: z.string().regex(UUID_REGEX, "Invalid ledgerId"),
-  queryRange: dateRangeSchema,
-});
-
-export type GetBookTotalsInput = z.infer<typeof getBookTotalsInputSchema>;
-
-export function parseGetBookTotalsInput(input: unknown): GetBookTotalsInput {
-  const result = getBookTotalsInputSchema.safeParse(input);
-  if (!result.success) {
-    throw new ValidationError("Validation failed", { issues: result.error.issues });
-  }
-
-  const toEpochDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`) / 86_400_000;
-  const queryDays = toEpochDay(result.data.queryRange.to) - toEpochDay(result.data.queryRange.from);
-  if (queryDays + 1 > 3660) {
-    throw new AppError(
-      "Stats ranges must be no longer than 3660 days",
-      "STATS_RANGE_TOO_LARGE",
-      422
-    );
-  }
-
-  return result.data;
-}
-
 export function parseEnhancedStatsInput(input: unknown): GetEnhancedStatsInput {
   const result = getEnhancedStatsInputSchema.safeParse(input);
   if (!result.success) {

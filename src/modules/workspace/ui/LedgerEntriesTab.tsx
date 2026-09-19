@@ -25,8 +25,6 @@ import { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-docum
 interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
-  /** Name of that book, for the chip that stands in for the switcher. */
-  scopeBookName: string | null;
   ledgerId: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
@@ -40,7 +38,6 @@ interface LedgerEntriesTabProps {
 
 export function LedgerEntriesTab({
   bookId,
-  scopeBookName,
   ledgerId,
   ledger,
   periodParams,
@@ -147,7 +144,6 @@ export function LedgerEntriesTab({
   return (
     <>
       <LedgerEntriesToolbar
-        {...(scopeBookName != null ? { scopeBookName } : {})}
         isSelectionMode={selection.isSelectionMode}
         isAllSelected={selection.isAllSelected}
         hasMoreData={

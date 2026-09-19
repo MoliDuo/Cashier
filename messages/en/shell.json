@@ -228,9 +228,7 @@
   },
   "BookScope": {
     "label": "Book",
-    "all": "All books",
-    "only": "Only {book}",
-    "current": "Showing book {book}. Open the book switcher"
+    "all": "All books"
   },
   "BookPicker": {
     "namePlaceholder": "Book name"

@@ -15,7 +15,7 @@ import {
 const CLOSE_AFTER_PICK_MS = 150;
 /** How long a finger-driven height stays before the strip takes over again. */
 const SETTLE_MS = 180;
-/** The strip and the chip that reopens it: their own taps must not close it. */
+/** The strip's own taps must not close it. */
 const OWN_GESTURE_SELECTOR = "[data-pull-reveal], [data-pull-reveal-ignore]";
 
 interface UsePullRevealOptions {

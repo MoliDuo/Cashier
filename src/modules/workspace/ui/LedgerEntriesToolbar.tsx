@@ -15,7 +15,6 @@ import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
-import { BookScopeChip } from "./BookScopeChip";
 import type { ReactNode } from "react";
 import { usePeriodLabel } from "./usePeriodLabel";
 import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
@@ -44,8 +43,6 @@ interface LedgerEntriesToolbarProps {
   isProcessing?: boolean;
   filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
-  /** Name of the book the list is narrowed to, when it is. */
-  scopeBookName?: string | undefined;
   periodParams: PeriodParams;
   mainCurrency: string;
   filteredTotal?: string;
@@ -77,7 +74,6 @@ export function LedgerEntriesToolbar({
   isProcessing: externallyProcessing = false,
   filters,
   onFiltersChange,
-  scopeBookName,
   periodParams,
   mainCurrency,
   filteredTotal,
@@ -168,11 +164,6 @@ export function LedgerEntriesToolbar({
   return (
     <EntriesToolbarShell
       syncStatus={syncStatus}
-      scopeChip={
-        !isSelectionMode && scopeBookName != null ? (
-          <BookScopeChip name={scopeBookName} />
-        ) : undefined
-      }
       onRefresh={isSelectionMode ? undefined : onRefresh}
       isRefreshing={isRefreshing}
       {...(!isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}

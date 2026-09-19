@@ -62,18 +62,18 @@ export async function openBookSwitcher(page: Page) {
 }
 
 /**
- * Opens the strip without picking. Once a book is selected the toolbar chip is
- * the reliable way back in; on a fresh page the pull is what reveals it.
+ * The strip's options, in the order it paints them: 总账 first, then the books.
  */
-export async function openBookScope(page: Page) {
-  const chip = page.getByTestId("book-scope-chip");
-  if ((await chip.count()) > 0) await chip.click();
-  else await openBookSwitcher(page);
-}
-
-/** The strip's options, in the order it paints them: 总账 first, then the books. */
 export function bookOptions(page: Page) {
   return page.getByRole("group", { name: "Book" }).getByRole("button").filter({ visible: true });
+}
+
+/**
+ * The option the strip marks as the scope the view is showing. The strip stays
+ * mounted while it is closed, so this reads the scope without reopening it.
+ */
+export function currentBookOption(page: Page) {
+  return page.locator('[data-testid="book-reveal"] button[aria-pressed="true"]');
 }
 
 /**
@@ -82,7 +82,7 @@ export function bookOptions(page: Page) {
  * another test may already have renamed one.
  */
 export async function selectBook(page: Page, option: BookOption) {
-  await openBookScope(page);
+  await openBookSwitcher(page);
   const options = bookOptions(page);
   if (option === "all") await options.first().click();
   else await options.nth(option + 1).click();

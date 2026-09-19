@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleSlash, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type {
   EntryCategory,
@@ -87,13 +87,11 @@ export function CategorySection({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-medium text-text">{t("categories")}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t("categoriesDesc")}</p>
         </div>
         {!managing ? (
           <div className="flex shrink-0 gap-2">
             <Button
               type="button"
-              variant="outline"
               size="sm"
               disabled={isSaving || preset.isPending || categoryAssignmentActive}
               onClick={preset.openDialog}
@@ -102,7 +100,6 @@ export function CategorySection({
             </Button>
             <Button
               type="button"
-              variant="outline"
               size="sm"
               disabled={categoryAssignmentActive}
               onClick={enterManagement}
@@ -122,18 +119,6 @@ export function CategorySection({
           <Button asChild size="sm" variant="outline" className="mt-2">
             <a href="#category-assignment-status">{t("categoryAssignmentViewTask")}</a>
           </Button>
-        </div>
-      ) : null}
-
-      {uncategorizedCount > 0 ? (
-        <div className="flex items-start gap-3 rounded-md border border-warning/25 bg-warning/10 p-3">
-          <span className="mt-1 size-2 shrink-0 rounded-full bg-warning" aria-hidden />
-          <div>
-            <div className="text-sm font-medium text-warning">{t("uncategorized")}</div>
-            <div className="text-xs text-warning/80">
-              {t("uncategorizedDesc", { count: uncategorizedCount })}
-            </div>
-          </div>
         </div>
       ) : null}
 
@@ -183,8 +168,7 @@ export function CategorySection({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="size-11"
+                  size="icon-sm"
                   disabled={index === 0 || isSaving}
                   onClick={() => move(index, -1)}
                   aria-label={t("moveCategoryUp", { name: category.name })}
@@ -194,8 +178,7 @@ export function CategorySection({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="size-11"
+                  size="icon-sm"
                   disabled={index === displayedCategories.length - 1 || isSaving}
                   onClick={() => move(index, 1)}
                   aria-label={t("moveCategoryDown", { name: category.name })}
@@ -205,8 +188,7 @@ export function CategorySection({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="size-11"
+                  size="icon-sm"
                   disabled={isSaving}
                   onClick={() => startEditing(category)}
                   aria-label={t("editCategory", { name: category.name })}
@@ -216,8 +198,8 @@ export function CategorySection({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="size-11 text-danger"
+                  size="icon-sm"
+                  className="text-muted-foreground hover:text-danger"
                   disabled={isSaving}
                   onClick={() => setDeleteTarget(category)}
                   aria-label={t("deleteCategory", { name: category.name })}
@@ -228,6 +210,28 @@ export function CategorySection({
             ) : null}
           </div>
         ))}
+        {/* 未分类 is not a category: it is the absence of one, and it is the same
+            state 流水 and 明细 already draw with a slashed circle. So it holds the
+            last slot with nothing to press — no rename, no reorder, no delete —
+            and only the count says what currently sits in it. */}
+        <div
+          className="flex min-h-14 items-center gap-3 rounded-md bg-surface2 p-3"
+          data-testid="uncategorized-row"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+            <CircleSlash aria-hidden="true" className="h-5 w-5 opacity-60" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="min-w-0 truncate text-sm font-medium">{t("uncategorized")}</span>
+              {uncategorizedCount > 0 ? (
+                <span className="text-micro text-warning/80">
+                  {t("categoryItemCount", { count: uncategorizedCount })}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </div>
 
       {managing ? (
@@ -250,6 +254,7 @@ export function CategorySection({
             />
             <Button
               type="button"
+              size="sm"
               onClick={createCategory}
               disabled={newCategoryName.trim() === "" || isSaving}
             >
@@ -260,11 +265,18 @@ export function CategorySection({
             {saveError == null ? null : <p className="text-destructive">{saveError}</p>}
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" disabled={isSaving} onClick={cancelManagement}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSaving}
+              onClick={cancelManagement}
+            >
               {common("cancel")}
             </Button>
             <Button
               type="button"
+              size="sm"
               disabled={!dirty || isSaving}
               onClick={() => {
                 if (revisionConflict || serverChanged) toast.error(t("updateConflict"));
