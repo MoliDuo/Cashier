@@ -11,7 +11,6 @@ import {
   deleteBookAction,
   reorderBooksAction,
   restoreBookAction,
-  setDefaultBookAction,
   updateBookAction,
   type BookMutationErrorCode,
   type BookMutationResult,
@@ -42,8 +41,6 @@ export function useBookMutations(ledgerId: string) {
         return t("hasCredentials");
       case "last_book":
         return t("lastBook");
-      case "default_book":
-        return t("defaultCannotArchive");
       case "not_found":
         return t("notFound");
       default:
@@ -94,13 +91,6 @@ export function useBookMutations(ledgerId: string) {
     },
   });
 
-  const setDefaultBook = useMutation({
-    mutationFn: (bookId: string) => setDefaultBookAction(ledgerId, bookId),
-    onSuccess: (result) => {
-      writeBooks(unwrap(result));
-    },
-  });
-
   const archiveBook = useMutation({
     mutationFn: (bookId: string) => archiveBookAction(ledgerId, bookId),
     onSuccess: (result) => {
@@ -129,7 +119,6 @@ export function useBookMutations(ledgerId: string) {
     createBook,
     updateBook,
     reorderBooks,
-    setDefaultBook,
     archiveBook,
     restoreBook,
     deleteBook,

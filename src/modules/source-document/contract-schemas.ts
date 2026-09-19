@@ -425,6 +425,8 @@ export const createQuickEntryInputSchema = strictObjectSchema({
   itemName: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(500).nullable().optional(),
   entryDate: optionalDateStringSchema,
+  /** The device zone, a fallback for a book without one of its own. */
+  timezone: timezoneSchema,
 });
 
 function parseSourceDocumentContract<T>(schema: z.ZodType<T>, input: unknown): T {

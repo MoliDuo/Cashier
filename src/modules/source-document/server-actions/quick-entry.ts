@@ -18,9 +18,12 @@ export const createQuickEntryAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId, ledger }, data: CreateQuickEntryInput): Promise<QuickEntryResponseDto> => {
     const validated = createQuickEntryInputSchema.parse(data);
     const book = await resolveRecordBook(ledgerId, validated.bookId, serverComposition.books);
+    // The book owns the record's date zone, exactly as the AI path resolves it;
+    // the request's own zone is only a fallback for a book without one.
+    const zone = book.timeZone ?? validated.timezone;
     const payload = {
       bookId: book.id,
-      timeZone: book.timeZone,
+      ...(zone != null ? { timeZone: zone } : {}),
       categoryId: validated.categoryId,
       amount: validated.amount,
       ...(validated.currency !== undefined ? { currency: validated.currency } : {}),

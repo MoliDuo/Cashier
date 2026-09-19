@@ -19,7 +19,7 @@ import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-st
 import type { PeriodParams } from "@/lib/period-utils";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
+import { addPeriod, getDateInTimezone, isValidTimeZone, parseDateString } from "@/lib/date-utils";
 import type { CategoryPort } from "@/application/contracts";
 import type { ServiceCredentialPort } from "@/application/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
@@ -42,9 +42,25 @@ import type { StatsUrlState } from "@/modules/workspace/ledger-url-params";
 
 interface LedgerPageBootstrapResult {
   dehydratedState: DehydratedState;
-  ledgerToday: string;
+  /**
+   * Today in the zone the page is read in, absent when the request named neither
+   * a book zone nor a device zone. The date reads are then left to the client,
+   * which knows the browser's zone by the time it mounts them.
+   */
+  ledgerToday?: string;
   initialCategories: EntryCategoryWithCountDto[];
   initialBooks: readonly BookDto[];
+  /**
+   * The book the page is narrowed to after the live-list check, null for 总账.
+   * The client seeds its scope memory with it, so the first paint already shows
+   * the same book the prefetch filled.
+   */
+  initialBookId: string | null;
+}
+
+/** A zone is usable when it is present and this runtime can format with it. */
+function isUsableTimeZone(timeZone: string | null | undefined): boolean {
+  return timeZone != null && timeZone !== "" && isValidTimeZone(timeZone);
 }
 
 export interface GetLedgerPageBootstrapInput {
@@ -89,58 +105,80 @@ export async function getLedgerPageBootstrap(
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
 
   const mainCurrency = ledgerDto.settings.mainCurrency;
-  // The zone the page is read in is the viewed book's; a book without one dates
-  // by the device that asked, and only a request with neither (an API upload, a
-  // client that has not reported yet) falls back to the deployment's zone.
   const books = (await dependencies.books.list(input.ledgerId)).map(toBookDto);
   queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
-  // A stale URL can name a book that has since been archived or deleted. The
-  // live list is the authority: the scope resets to 总账 on the client, and the
-  // server must not prefetch the dead book's records in the meantime.
+  // The remembered scope can name a book that has since been archived or
+  // deleted. The live list is the authority: the scope resets to 总账 on the
+  // client, and the server must not prefetch the dead book's records in the
+  // meantime.
   const bookId =
     input.bookId != null && books.some((book) => book.id === input.bookId) ? input.bookId : null;
-  const viewedBook =
-    books.find((book) => book.id === bookId) ??
-    books.find((book) => book.isDefault) ??
-    books[0] ??
-    null;
-  const fixedTimeZone = resolveRequestTimeZone({
-    bookTimeZone: viewedBook?.timeZone,
-    deviceTimeZone: input.deviceTimeZone,
-    fallbackTimeZone: runtimeEnv.timeZone,
-  });
-  const zonedToday = getDateInTimezone(fixedTimeZone);
-  const ledgerToday = zonedToday ?? getDateInTimezone("UTC")!;
-  const initialStatsDate = parseDateString(ledgerToday);
-  const detailsDescriptor = buildDetailsQueryDescriptor({
-    ledgerId: input.ledgerId,
-    ...(bookId == null ? {} : { bookId }),
-    periodParams: input.periodParams,
-    ...(input.advancedFilters !== undefined ? { advancedFilters: input.advancedFilters } : {}),
-    ...(fixedTimeZone !== undefined ? { timeZone: fixedTimeZone } : {}),
-    mainCurrency,
-  });
-  const statsDescriptor = buildStatsQueryDescriptor({
-    ledgerId: input.ledgerId,
-    ...(bookId == null ? {} : { bookId }),
-    currentDate:
-      input.statsState == null
-        ? initialStatsDate
-        : addPeriod(initialStatsDate, input.statsState.range, input.statsState.offset),
-    mainCurrency,
-    ...(input.statsState != null ? { rangeType: input.statsState.range } : {}),
-    ...(input.statsState != null ? { currentPeriod: input.statsState.offset === 0 } : {}),
-  });
-  const streamDescriptor = buildStreamQueryDescriptor({
-    ledgerId: input.ledgerId,
-    ...(bookId == null ? {} : { bookId }),
-    startDate: detailsDescriptor.startDateStr,
-    endDate: detailsDescriptor.endDateStr,
-    minAmount: input.advancedFilters?.minAmount,
-    maxAmount: input.advancedFilters?.maxAmount,
-    statuses: input.advancedFilters?.statuses,
-    search: input.advancedFilters?.search,
-  });
+  const viewedBook = bookId == null ? null : (books.find((book) => book.id === bookId) ?? null);
+  // The zone the page is read in is the viewed book's; on 总账 it is the device
+  // that asked, since no single book owns that view.
+  //
+  // A page can only be dated once that zone is known. With neither a book zone
+  // nor a reported device zone this is the first visit, before the client has
+  // written its cookie: dating it by the deployment's zone would prefetch a day
+  // (or a month) the tab never asks for, because the tab dates by the device.
+  // The date reads below wait for the browser to answer; the ledger, books,
+  // categories and settings loads do not.
+  const timeZoneReady =
+    isUsableTimeZone(viewedBook?.timeZone) || isUsableTimeZone(input.deviceTimeZone);
+  const fixedTimeZone = timeZoneReady
+    ? resolveRequestTimeZone({
+        bookTimeZone: viewedBook?.timeZone,
+        deviceTimeZone: input.deviceTimeZone,
+        fallbackTimeZone: runtimeEnv.timeZone,
+      })
+    : undefined;
+  const ledgerToday = timeZoneReady
+    ? (getDateInTimezone(fixedTimeZone) ?? getDateInTimezone("UTC"))
+    : undefined;
+  const detailsDescriptor =
+    ledgerToday == null
+      ? null
+      : buildDetailsQueryDescriptor({
+          ledgerId: input.ledgerId,
+          ...(bookId == null ? {} : { bookId }),
+          periodParams: input.periodParams,
+          ...(input.advancedFilters !== undefined
+            ? { advancedFilters: input.advancedFilters }
+            : {}),
+          ...(fixedTimeZone !== undefined ? { timeZone: fixedTimeZone } : {}),
+          mainCurrency,
+        });
+  const statsDescriptor =
+    ledgerToday == null
+      ? null
+      : buildStatsQueryDescriptor({
+          ledgerId: input.ledgerId,
+          ...(bookId == null ? {} : { bookId }),
+          currentDate:
+            input.statsState == null
+              ? parseDateString(ledgerToday)
+              : addPeriod(
+                  parseDateString(ledgerToday),
+                  input.statsState.range,
+                  input.statsState.offset
+                ),
+          mainCurrency,
+          ...(input.statsState != null ? { rangeType: input.statsState.range } : {}),
+          ...(input.statsState != null ? { currentPeriod: input.statsState.offset === 0 } : {}),
+        });
+  const streamDescriptor =
+    detailsDescriptor == null
+      ? null
+      : buildStreamQueryDescriptor({
+          ledgerId: input.ledgerId,
+          ...(bookId == null ? {} : { bookId }),
+          startDate: detailsDescriptor.startDateStr,
+          endDate: detailsDescriptor.endDateStr,
+          minAmount: input.advancedFilters?.minAmount,
+          maxAmount: input.advancedFilters?.maxAmount,
+          statuses: input.advancedFilters?.statuses,
+          search: input.advancedFilters?.search,
+        });
 
   const categoriesPromise = queryClient.fetchQuery({
     queryKey: queryKeys.entryCategories(input.ledgerId),
@@ -148,7 +186,7 @@ export async function getLedgerPageBootstrap(
     staleTime: LEDGER.STALE_TIME_MS,
   });
   await Promise.all([
-    ...(input.initialTab === "stream"
+    ...(input.initialTab === "stream" && streamDescriptor != null
       ? [
           // First stream page (all-statuses, filtered by period+amount, paginated)
           queryClient.prefetchInfiniteQuery({
@@ -188,7 +226,7 @@ export async function getLedgerPageBootstrap(
           }),
         ]
       : []),
-    ...(input.initialTab === "details"
+    ...(input.initialTab === "details" && detailsDescriptor != null
       ? [
           queryClient.prefetchQuery({
             queryKey: detailsDescriptor.summaryQueryKey,
@@ -223,7 +261,7 @@ export async function getLedgerPageBootstrap(
           }),
         ]
       : []),
-    ...(input.initialTab === "stats"
+    ...(input.initialTab === "stats" && statsDescriptor != null
       ? [
           queryClient.prefetchQuery({
             queryKey: statsDescriptor.queryKey,
@@ -247,7 +285,7 @@ export async function getLedgerPageBootstrap(
       : []),
     categoriesPromise,
   ]);
-  if (input.initialTab === "stream") {
+  if (input.initialTab === "stream" && streamDescriptor != null) {
     const stream = queryClient.getQueryData<InfiniteData<StreamPage>>(streamDescriptor.queryKey);
     const firstPage = stream?.pages[0];
     if (firstPage != null && !firstPage.restartRequired) {
@@ -263,8 +301,9 @@ export async function getLedgerPageBootstrap(
 
   return {
     dehydratedState: dehydrate(queryClient),
-    ledgerToday,
+    ...(ledgerToday != null ? { ledgerToday } : {}),
     initialCategories,
     initialBooks: books,
+    initialBookId: bookId,
   };
 }

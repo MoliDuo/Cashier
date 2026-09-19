@@ -22,7 +22,6 @@ export type BookDto = {
   name: string;
   timeZone: string | null;
   sortOrder: number;
-  isDefault: boolean;
   /** Set while the book is retired; the switcher hides those rows. */
   archivedAt: string | null;
 };

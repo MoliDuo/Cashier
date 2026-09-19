@@ -8,7 +8,7 @@ import type { LedgerSettingsContract } from "@/application/contracts";
 export interface CreateQuickEntryPayload {
   /** The book the record is filed under; also decides its default date zone. */
   bookId: string;
-  /** That book's zone; null means the server date decides. */
+  /** The zone the record dates by; null means the server's date decides. */
   timeZone?: string | null;
   categoryId: string;
   amount: string;
@@ -73,7 +73,9 @@ export async function createQuickEntry(
 ): Promise<QuickEntryResponseDto> {
   const mainCurrency = ledger.settings.mainCurrency;
   const entryCurrency = payload.currency ?? mainCurrency;
-  // The record is dated in its book's zone, falling back to the server date.
+  // An explicit entryDate wins; without one the payload's zone — the book's,
+  // falling back to the device that asked — dates the record, and a request
+  // with neither falls back to the server date.
   const entryDate =
     payload.entryDate ??
     getDateInTimezone(payload.timeZone ?? undefined) ??

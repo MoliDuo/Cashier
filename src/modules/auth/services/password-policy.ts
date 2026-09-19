@@ -1,31 +1,24 @@
-import bcrypt from "bcryptjs";
 import { AppError } from "@/lib/errors";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
+import {
+  getPasswordRuleViolation,
+  PASSWORD_RULE_MESSAGES,
+  type PasswordRuleViolation,
+} from "@/modules/auth/password-rules";
 
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 128;
-const HAS_LETTER_AND_NUMBER = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+/**
+ * The code each rule reports. The messages and codes are the API's contract, so
+ * they stay exactly as they were; only the rule itself moved to the shared
+ * module, where the wizard can read the same verdict.
+ */
+const VIOLATION_CODES: Record<PasswordRuleViolation, string> = {
+  length: AUTH_ERROR_CODES.PASSWORD_TOO_SHORT,
+  bytes: AUTH_ERROR_CODES.PASSWORD_REQUIREMENTS_NOT_MET,
+  composition: AUTH_ERROR_CODES.PASSWORD_REQUIREMENTS_NOT_MET,
+};
 
 export function validatePassword(password: string): void {
-  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    throw new AppError(
-      "Password must be between 8 and 128 characters",
-      AUTH_ERROR_CODES.PASSWORD_TOO_SHORT,
-      400
-    );
-  }
-  if (bcrypt.truncates(password)) {
-    throw new AppError(
-      "Password must be at most 72 UTF-8 bytes",
-      AUTH_ERROR_CODES.PASSWORD_REQUIREMENTS_NOT_MET,
-      400
-    );
-  }
-  if (!HAS_LETTER_AND_NUMBER.test(password)) {
-    throw new AppError(
-      "Password must contain at least one letter and one number",
-      AUTH_ERROR_CODES.PASSWORD_REQUIREMENTS_NOT_MET,
-      400
-    );
-  }
+  const violation = getPasswordRuleViolation(password);
+  if (violation == null) return;
+  throw new AppError(PASSWORD_RULE_MESSAGES[violation], VIOLATION_CODES[violation], 400);
 }

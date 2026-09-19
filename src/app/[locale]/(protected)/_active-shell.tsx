@@ -18,13 +18,13 @@ import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import {
   getScopedLedgerSearchParams,
   readLedgerFilterParams,
-  readRecordScopeSearchParams,
   readStatsSearchParams,
 } from "@/modules/workspace/ledger-url-params";
 import {
   prefetchDetailsTabQuery,
   prefetchStatsTabQuery,
 } from "@/modules/workspace/prefetch-ledger-tabs";
+import { useBookScopeStore } from "@/lib/store/book-scope";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 
@@ -63,11 +63,12 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
   const { ready, onInputIntent, onOpenInput } = useShellController();
   const { leaveConfirmOpen, attemptLeave, confirmLeave, cancelLeave } = useSettingsLeaveGuard();
 
-  // The viewed book is URL state, the same value LedgerTabPanels hands each tab,
-  // and a scope change is a client-side history entry with no server render
-  // behind it. So the hover prefetch has to read it live here — a book passed
-  // down from the server would be the book the last full page load viewed.
-  const bookId = readRecordScopeSearchParams(searchParams) ?? undefined;
+  // The viewed book is the page's shared scope, published by LedgerPageClient
+  // into the store, and a scope change is a client-side update with no server
+  // render behind it. So the hover prefetch has to read it live here — a book
+  // passed down from the server would be the book the last full page load
+  // viewed.
+  const bookId = useBookScopeStore((state) => state.bookId) ?? undefined;
 
   // Derive the active tab from the URL — keeps the shell and the inner
   // content in sync without duplicating state.

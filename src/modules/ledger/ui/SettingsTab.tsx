@@ -41,7 +41,12 @@ interface SettingsTabProps {
   ledgerId: string;
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
-  /** The same list plus the archived rows, for the 分账 section. */
+  /**
+   * The same list plus the archived rows, for the 分账 section. Absent when the
+   * page was opened from the workspace, whose bootstrap only knows the live
+   * books: a partial list must not seed the archived-inclusive query, or the
+   * archived rows stay invisible for the whole stale window.
+   */
   initialBooksIncludingArchived?: readonly BookDto[];
   /** The account's login addresses, hydrated by the page bootstrap. */
   initialEmails?: readonly string[];
@@ -252,7 +257,10 @@ export function SettingsTab({
                 predicate: ({ queryKey: key }) =>
                   key[0] === "ledger" &&
                   key[1] === ledgerId &&
-                  (key.length === 2 || key[2] === "categories" || key[2] === "settings"),
+                  (key.length === 2 ||
+                    key[2] === "categories" ||
+                    key[2] === "settings" ||
+                    key[2] === "books"),
               });
             }}
           >
@@ -322,7 +330,9 @@ export function SettingsTab({
 
       <BookSettings
         ledgerId={ledgerId}
-        initialBooks={initialBooksIncludingArchived ?? initialBooks}
+        {...(initialBooksIncludingArchived !== undefined
+          ? { initialBooks: initialBooksIncludingArchived }
+          : {})}
       />
 
       <BookkeepingSettings

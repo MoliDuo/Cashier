@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { screen } from "@testing-library/react";
 import { LedgerTabPanels } from "@/modules/workspace/ui/LedgerTabPanels";
 import type { BookDto, Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
@@ -28,12 +29,6 @@ vi.mock("@/i18n/DeferredFeatureMessages", () => ({
   DeferredFeatureMessages: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("@/components/skeletons/TabSkeletons", () => ({
-  DetailsTabSkeleton: () => null,
-  StatsTabSkeleton: () => null,
-  SettingsTabSkeleton: () => null,
-}));
-
 const BOOK_ME = "10000000-0000-4000-8000-000000000001";
 const BOOK_SHARED = "10000000-0000-4000-8000-000000000002";
 
@@ -51,7 +46,6 @@ const books: BookDto[] = [
     name: "Mine",
     timeZone: null,
     sortOrder: 1,
-    isDefault: true,
     archivedAt: null,
   },
   {
@@ -60,7 +54,6 @@ const books: BookDto[] = [
     name: "Shared",
     timeZone: null,
     sortOrder: 2,
-    isDefault: false,
     archivedAt: null,
   },
 ];
@@ -77,6 +70,7 @@ const baseProps = {
   periodParams: { period: "all" as const },
   onFiltersChange: vi.fn(),
   advancedFilters: {},
+  timeZoneReady: true,
   onCategoryDrilldown: vi.fn(),
   onDateDrilldown: vi.fn(),
 };
@@ -115,5 +109,34 @@ describe("LedgerTabPanels", () => {
     expect(deferredProps.calls).toHaveLength(1);
     expect(deferredProps.calls[0]).toMatchObject({ initialBooks: books });
     expect(deferredProps.calls[0]).not.toHaveProperty("bookId");
+  });
+
+  /**
+   * Until the reader's zone is known a dated panel would query the wrong day,
+   * so the skeleton stands in and no query is mounted at all.
+   */
+  it.each([
+    ["stream", "entries-tab-skeleton"],
+    ["details", "details-tab-skeleton"],
+    ["stats", "stats-tab-skeleton"],
+  ] as const)("holds the %s panel on its skeleton until the zone is known", (activeTab, testId) => {
+    render(
+      <LedgerTabPanels
+        {...baseProps}
+        activeTab={activeTab}
+        recordScope={BOOK_SHARED}
+        timeZoneReady={false}
+      />
+    );
+
+    expect(screen.getByTestId(testId)).toBeInTheDocument();
+    expect(deferredProps.calls).toHaveLength(0);
+  });
+
+  it("mounts 设置 while the zone is still unknown", () => {
+    render(<LedgerTabPanels {...baseProps} activeTab="settings" timeZoneReady={false} />);
+
+    expect(deferredProps.calls).toHaveLength(1);
+    expect(deferredProps.calls[0]).toMatchObject({ initialBooks: books });
   });
 });

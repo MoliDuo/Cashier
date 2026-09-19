@@ -22,7 +22,7 @@ export type SetupErrorCode =
 export type SetupActionResult =
   { ok: true; ledgerId: string } | { ok: false; code: SetupErrorCode };
 
-/** `PASSWORD_TOO_SHORT` and `PASSWORD_REQUIREMENTS_NOT_MET` are the policy's own codes. */
+/** `password_too_short` and `password_requirements_not_met` are the policy's own codes. */
 function isPasswordPolicyError(error: AppError): boolean {
   return error.code.startsWith("password_");
 }
@@ -53,7 +53,6 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
     const result = await createInitialAccount(
       {
         bookNames: parsed.books,
-        defaultBookName: parsed.defaultBook,
         email: normalizeEmail(parsed.email),
         password: parsed.password,
         locale,
@@ -76,11 +75,12 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
       const fields = (error.details?.issues as { path?: unknown[] }[] | undefined)?.map((issue) =>
         String(issue.path?.[0] ?? "")
       );
+      // The setup code is the gate: a request that did not carry a plausible
+      // one is a wrong code, whether it was absent, blank, or the wrong shape.
+      if (fields?.includes("setupCode")) return { ok: false, code: "wrong_code" };
       if (fields?.includes("email")) return { ok: false, code: "invalid_email" };
       if (fields?.includes("password")) return { ok: false, code: "weak_password" };
-      if (fields?.some((field) => field === "books" || field === "defaultBook")) {
-        return { ok: false, code: "invalid_books" };
-      }
+      if (fields?.includes("books")) return { ok: false, code: "invalid_books" };
       return { ok: false, code: "unexpected" };
     }
     logger.error({ error }, "First-run setup failed");

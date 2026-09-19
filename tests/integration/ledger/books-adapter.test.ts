@@ -10,62 +10,51 @@ import { createTestSourceDocument } from "../../helpers/schema-setup";
 /**
  * The 分账 rules the product states, checked against the real adapter: order is
  * the switcher's order, a book with records may only be archived, and the last
- * active book and the 总账 default cannot be archived at all.
+ * active book cannot be archived or deleted at all.
  */
 describe("postgres book adapter", () => {
   async function fixture() {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const defaultBookId = await testBookId(db, ledgerId);
+    const firstBookId = await testBookId(db, ledgerId);
     const created = await postgresBookAdapter.create(ledgerId, {
       name: "梁梁的",
       timeZone: "Asia/Shanghai",
     });
-    return { db, ledgerId, defaultBookId, secondBookId: created.id };
+    return { db, ledgerId, firstBookId, secondBookId: created.id };
   }
 
   it("lists books in switcher order and appends new ones at the end", async () => {
-    const { ledgerId, defaultBookId } = await fixture();
+    const { ledgerId, firstBookId } = await fixture();
     const third = await postgresBookAdapter.create(ledgerId, { name: "哞哞的", timeZone: null });
 
     const listed = await postgresBookAdapter.list(ledgerId);
-    expect(listed.map((book) => book.id)).toEqual([defaultBookId, expect.any(String), third.id]);
+    expect(listed.map((book) => book.id)).toEqual([firstBookId, expect.any(String), third.id]);
     expect(listed.map((book) => book.sortOrder)).toEqual([1, 2, 3]);
     expect(listed[0]?.name).toBe("共同支出");
-    expect(listed[0]?.isDefault).toBe(true);
 
     const reordered = await postgresBookAdapter.reorder(ledgerId, [
       third.id,
-      defaultBookId,
+      firstBookId,
       listed[1]!.id,
     ]);
-    expect(reordered.map((book) => book.id)).toEqual([third.id, defaultBookId, listed[1]!.id]);
+    expect(reordered.map((book) => book.id)).toEqual([third.id, firstBookId, listed[1]!.id]);
     expect(await postgresBookAdapter.list(ledgerId)).toEqual(reordered);
   });
 
   it("refuses a reorder that does not list every active book exactly once", async () => {
-    const { ledgerId, defaultBookId, secondBookId } = await fixture();
+    const { ledgerId, firstBookId, secondBookId } = await fixture();
 
-    await expect(postgresBookAdapter.reorder(ledgerId, [defaultBookId])).rejects.toThrow(
-      /every active book/
-    );
+    await expect(postgresBookAdapter.reorder(ledgerId, [firstBookId])).rejects.toMatchObject({
+      code: "BOOK_ORDER_INVALID",
+    });
     await expect(
-      postgresBookAdapter.reorder(ledgerId, [defaultBookId, secondBookId, secondBookId])
-    ).rejects.toThrow();
+      postgresBookAdapter.reorder(ledgerId, [firstBookId, secondBookId, secondBookId])
+    ).rejects.toMatchObject({ code: "BOOK_ORDER_INVALID" });
   });
 
-  it("moves the 总账 default flag and keeps exactly one", async () => {
-    const { ledgerId, defaultBookId, secondBookId } = await fixture();
-
-    const booksAfter = await postgresBookAdapter.setDefault(ledgerId, secondBookId);
-    expect(booksAfter.filter((book) => book.isDefault).map((book) => book.id)).toEqual([
-      secondBookId,
-    ]);
-    expect(booksAfter.find((book) => book.id === defaultBookId)?.isDefault).toBe(false);
-  });
-
-  it("archives a book that holds records and refuses the default", async () => {
-    const { db, ledgerId, defaultBookId } = await fixture();
+  it("archives a book that holds records, even the former 总账 default", async () => {
+    const { db, ledgerId, firstBookId } = await fixture();
     const holding = await postgresBookAdapter.create(ledgerId, { name: "哞哞的", timeZone: null });
     await createTestSourceDocument(db, ledgerId);
     await db
@@ -74,34 +63,41 @@ describe("postgres book adapter", () => {
       .where(eq(sourceDocuments.ledgerId, ledgerId));
     expect(await postgresBookAdapter.countDocuments(ledgerId, holding.id)).toBe(1);
 
-    // Archiving the 总账 default would leave records entered from 总账 with
-    // nowhere to go, so it is refused.
-    await expect(postgresBookAdapter.archive(ledgerId, defaultBookId)).rejects.toThrow(
-      /default book cannot be archived/
-    );
+    // The first book is nothing special any more: 总账 is a view over every
+    // book, so any book but the last can be retired.
+    expect(await postgresBookAdapter.archive(ledgerId, firstBookId)).toMatchObject({
+      status: "archived",
+    });
 
     // A book that still holds records is what archiving is for: its records keep
     // counting in 总账 while the book leaves the switcher.
-    expect(await postgresBookAdapter.archive(ledgerId, holding.id)).toMatchObject({
-      status: "archived",
-    });
-    expect(await postgresBookAdapter.get(ledgerId, holding.id)).toBeNull();
+    expect(await postgresBookAdapter.list(ledgerId)).toHaveLength(2);
     expect(await postgresBookAdapter.list(ledgerId)).not.toContainEqual(
-      expect.objectContaining({ id: holding.id })
+      expect.objectContaining({ id: firstBookId })
     );
     // 设置 asks for the archived rows and gets them, with their records intact.
     const withArchived = await postgresBookAdapter.list(ledgerId, { includeArchived: true });
-    expect(withArchived.find((book) => book.id === holding.id)?.archivedAt).not.toBeNull();
+    expect(withArchived.find((book) => book.id === firstBookId)?.archivedAt).not.toBeNull();
     // The name is free again once the book is archived.
-    const reused = await postgresBookAdapter.create(ledgerId, { name: "哞哞的", timeZone: null });
-    expect(reused.id).not.toBe(holding.id);
+    const reused = await postgresBookAdapter.create(ledgerId, { name: "共同支出", timeZone: null });
+    expect(reused.id).not.toBe(firstBookId);
     // ...and the retired book can be resolved by id, so the detail page can name it.
-    expect((await postgresBookAdapter.getIncludingArchived(ledgerId, holding.id))?.name).toBe(
-      "哞哞的"
+    expect((await postgresBookAdapter.getIncludingArchived(ledgerId, firstBookId))?.name).toBe(
+      "共同支出"
     );
   });
 
-  it("refuses to archive a book that still has API keys bound to it", async () => {
+  it("refuses to archive the last live book, with the port's own code", async () => {
+    const { ledgerId, firstBookId, secondBookId } = await fixture();
+    expect(await postgresBookAdapter.archive(ledgerId, firstBookId)).toMatchObject({
+      status: "archived",
+    });
+    await expect(postgresBookAdapter.archive(ledgerId, secondBookId)).rejects.toMatchObject({
+      code: "BOOK_LAST_ACTIVE",
+    });
+  });
+
+  it("refuses to archive a book that still has an active API key bound to it", async () => {
     const { ledgerId, secondBookId } = await fixture();
     await postgresServiceCredentialAdapter.create(ledgerId, "Bound", secondBookId);
 
@@ -112,13 +108,35 @@ describe("postgres book adapter", () => {
     expect(await postgresBookAdapter.get(ledgerId, secondBookId)).not.toBeNull();
   });
 
-  it("deletes only an empty book with no keys, and never the last one", async () => {
-    const { db, ledgerId, defaultBookId, secondBookId } = await fixture();
-
-    // The default and the last book are refused, like archiving.
-    await expect(postgresBookAdapter.delete(ledgerId, defaultBookId)).rejects.toThrow(
-      /default book cannot be archived/
+  it("archives a book whose keys are all revoked, but still refuses to delete it", async () => {
+    const { ledgerId, secondBookId } = await fixture();
+    const created = await postgresServiceCredentialAdapter.create(
+      ledgerId,
+      "Revoked",
+      secondBookId
     );
+    await postgresServiceCredentialAdapter.revoke(ledgerId, created.id);
+
+    // A revoked key cannot upload and cannot be rebound, so it must not retire
+    // the book forever.
+    expect(await postgresBookAdapter.archive(ledgerId, secondBookId)).toMatchObject({
+      status: "archived",
+    });
+
+    // The row still references the book, so the hard delete stays impossible —
+    // and the refusal is the "archive it instead" one, not an impossible
+    // rebinding ask.
+    const restored = await postgresBookAdapter.restore(ledgerId, secondBookId);
+    expect(restored.archivedAt).toBeNull();
+    expect(await postgresBookAdapter.delete(ledgerId, secondBookId)).toEqual({
+      status: "has_records",
+    });
+  });
+
+  it("deletes only an empty book with no keys", async () => {
+    const { db, ledgerId, secondBookId } = await fixture();
+
+    // An empty, unkeyed book is removable for good.
     const third = await postgresBookAdapter.create(ledgerId, { name: "第三个", timeZone: null });
     expect(await postgresBookAdapter.delete(ledgerId, third.id)).toEqual({ status: "deleted" });
     expect(await postgresBookAdapter.getIncludingArchived(ledgerId, third.id)).toBeNull();
@@ -145,6 +163,14 @@ describe("postgres book adapter", () => {
     });
   });
 
+  it("refuses to delete the last live book, with the port's own code", async () => {
+    const { ledgerId, firstBookId, secondBookId } = await fixture();
+    await postgresBookAdapter.archive(ledgerId, firstBookId);
+    await expect(postgresBookAdapter.delete(ledgerId, secondBookId)).rejects.toMatchObject({
+      code: "BOOK_LAST_ACTIVE",
+    });
+  });
+
   it("restores an archived book and refuses a name that is taken by then", async () => {
     const { ledgerId, secondBookId } = await fixture();
     expect(await postgresBookAdapter.archive(ledgerId, secondBookId)).toMatchObject({
@@ -153,9 +179,9 @@ describe("postgres book adapter", () => {
 
     // While it is retired another book takes its name, so restoring collides.
     await postgresBookAdapter.create(ledgerId, { name: "梁梁的", timeZone: null });
-    await expect(postgresBookAdapter.restore(ledgerId, secondBookId)).rejects.toThrow(
-      /already exists/
-    );
+    await expect(postgresBookAdapter.restore(ledgerId, secondBookId)).rejects.toMatchObject({
+      code: "BOOK_NAME_TAKEN",
+    });
 
     // Renaming the live book frees the name, and the restore then works.
     const live = (await postgresBookAdapter.list(ledgerId)).find((book) => book.name === "梁梁的")!;
@@ -172,19 +198,19 @@ describe("postgres book adapter", () => {
 
     await expect(
       postgresBookAdapter.create(ledgerId, { name: "共同支出", timeZone: null })
-    ).rejects.toThrow(/already exists/);
+    ).rejects.toMatchObject({ code: "BOOK_NAME_TAKEN" });
   });
 
   it("binds a service credential to a book and follows it to another", async () => {
-    const { ledgerId, defaultBookId, secondBookId } = await fixture();
+    const { ledgerId, firstBookId, secondBookId } = await fixture();
     const created = await postgresServiceCredentialAdapter.create(
       ledgerId,
       "Automation",
-      defaultBookId
+      firstBookId
     );
 
     const authenticated = await postgresServiceCredentialAdapter.authenticate(created.token);
-    expect(authenticated).toMatchObject({ id: created.id, ledgerId, bookId: defaultBookId });
+    expect(authenticated).toMatchObject({ id: created.id, ledgerId, bookId: firstBookId });
 
     const moved = await postgresServiceCredentialAdapter.setBook(
       ledgerId,
@@ -198,14 +224,14 @@ describe("postgres book adapter", () => {
   });
 
   it("refuses a credential pointed at another ledger's book", async () => {
-    const { ledgerId, defaultBookId } = await fixture();
+    const { ledgerId, firstBookId } = await fixture();
     const other = await createTestUserWithLedger(getTestDb());
     const otherBookId = await testBookId(getTestDb(), other.ledgerId);
 
     await expect(
       postgresServiceCredentialAdapter.create(ledgerId, "Wrong ledger", otherBookId)
     ).rejects.toThrow(/does not belong to this ledger/);
-    const created = await postgresServiceCredentialAdapter.create(ledgerId, "Fine", defaultBookId);
+    const created = await postgresServiceCredentialAdapter.create(ledgerId, "Fine", firstBookId);
     await expect(
       postgresServiceCredentialAdapter.setBook(ledgerId, created.id, otherBookId)
     ).rejects.toThrow(/does not belong to this ledger/);

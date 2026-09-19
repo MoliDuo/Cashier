@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import {
+  EntriesTabSkeleton,
   DetailsTabSkeleton,
   StatsTabSkeleton,
   SettingsTabSkeleton,
@@ -50,6 +51,12 @@ interface LedgerTabPanelsProps {
   onFiltersChange: (filters: EntryFilters) => void;
   advancedFilters: LedgerAdvancedFilters;
   effectiveTimeZone?: string | undefined;
+  /**
+   * False while the reader's zone is still unknown. The three date-driven tabs
+   * then show their own skeleton instead of mounting a query for the wrong day;
+   * 设置 is not dated, so it is unaffected.
+   */
+  timeZoneReady: boolean;
   ledgerToday?: string | undefined;
   onCategoryDrilldown: (categoryId: string, startDate: string, endDate: string) => void;
   onDateDrilldown: (
@@ -81,6 +88,7 @@ export function LedgerTabPanels({
   onFiltersChange,
   advancedFilters,
   effectiveTimeZone,
+  timeZoneReady,
   ledgerToday,
   onCategoryDrilldown,
   onDateDrilldown,
@@ -104,62 +112,78 @@ export function LedgerTabPanels({
       ) : null}
       {activeTab === "stream" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
-          <DeferredFeatureMessages feature="stream" locale={locale} fallback={null}>
-            <LedgerEntriesTab
-              bookId={recordScope ?? undefined}
-              scopeBookName={scopeBookName}
-              ledgerId={ledgerId}
-              ledger={ledger}
-              periodParams={periodParams}
-              onFiltersChange={onFiltersChange}
-              advancedFilters={advancedFilters}
-              collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
-              {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-              onRefresh={onRefresh}
-              isRefreshing={isRefreshing}
-            />
-          </DeferredFeatureMessages>
+          {timeZoneReady ? (
+            <DeferredFeatureMessages feature="stream" locale={locale} fallback={null}>
+              <LedgerEntriesTab
+                bookId={recordScope ?? undefined}
+                scopeBookName={scopeBookName}
+                ledgerId={ledgerId}
+                ledger={ledger}
+                periodParams={periodParams}
+                onFiltersChange={onFiltersChange}
+                advancedFilters={advancedFilters}
+                collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
+                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+                onRefresh={onRefresh}
+                isRefreshing={isRefreshing}
+              />
+            </DeferredFeatureMessages>
+          ) : (
+            <EntriesTabSkeleton />
+          )}
         </div>
       )}
 
       {activeTab === "details" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
-          <DeferredFeatureMessages
-            feature="details"
-            locale={locale}
-            fallback={<DetailsTabSkeleton />}
-          >
-            <DetailsTab
-              bookId={recordScope ?? undefined}
-              scopeBookName={scopeBookName}
-              ledgerId={ledgerId}
-              categories={categories.length > 0 ? categories : []}
-              ledger={ledger}
-              periodParams={periodParams}
-              onFiltersChange={onFiltersChange}
-              advancedFilters={advancedFilters}
-              {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-              onRefresh={onRefresh}
-              isRefreshing={isRefreshing}
-            />
-          </DeferredFeatureMessages>
+          {timeZoneReady ? (
+            <DeferredFeatureMessages
+              feature="details"
+              locale={locale}
+              fallback={<DetailsTabSkeleton />}
+            >
+              <DetailsTab
+                bookId={recordScope ?? undefined}
+                scopeBookName={scopeBookName}
+                ledgerId={ledgerId}
+                categories={categories.length > 0 ? categories : []}
+                ledger={ledger}
+                periodParams={periodParams}
+                onFiltersChange={onFiltersChange}
+                advancedFilters={advancedFilters}
+                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+                onRefresh={onRefresh}
+                isRefreshing={isRefreshing}
+              />
+            </DeferredFeatureMessages>
+          ) : (
+            <DetailsTabSkeleton />
+          )}
         </div>
       )}
 
       {activeTab === "stats" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
-          <DeferredFeatureMessages feature="stats" locale={locale} fallback={<StatsTabSkeleton />}>
-            <StatsTab
-              bookId={recordScope ?? undefined}
-              books={books}
-              ledgerId={ledgerId}
-              ledger={ledger}
-              onCategoryDrilldown={onCategoryDrilldown}
-              onDateDrilldown={onDateDrilldown}
-              {...(ledgerToday !== undefined ? { ledgerToday } : {})}
-              {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-            />
-          </DeferredFeatureMessages>
+          {timeZoneReady ? (
+            <DeferredFeatureMessages
+              feature="stats"
+              locale={locale}
+              fallback={<StatsTabSkeleton />}
+            >
+              <StatsTab
+                bookId={recordScope ?? undefined}
+                books={books}
+                ledgerId={ledgerId}
+                ledger={ledger}
+                onCategoryDrilldown={onCategoryDrilldown}
+                onDateDrilldown={onDateDrilldown}
+                {...(ledgerToday !== undefined ? { ledgerToday } : {})}
+                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+              />
+            </DeferredFeatureMessages>
+          ) : (
+            <StatsTabSkeleton />
+          )}
         </div>
       )}
 

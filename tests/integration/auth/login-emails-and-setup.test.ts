@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+// The setup action reads the request headers to pick a locale. There is no
+// request in a unit-run integration test, so the boundary is stood in for.
+vi.mock("next/headers", () => ({
+  headers: vi.fn(async () => new Headers({ "accept-language": "zh-CN" })),
+}));
 import { and, eq, isNull } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUser } from "../../helpers/schema-setup";
@@ -7,8 +12,10 @@ import { postgresAccountSecurityAdapter } from "@/application/adapters/postgres/
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
 import { createInitialAccount } from "@/modules/setup/application/create-initial-account";
 import { postgresSetupAdapter } from "@/application/adapters/postgres/business-ports/setup";
+import { completeSetupAction } from "@/modules/setup/server-actions/setup";
 import { SETUP_CODE_MAX_ATTEMPTS, SETUP_CODE_TTL_MS } from "@/modules/setup/setup-code";
 import { hashOTP } from "@/modules/auth/services/otp";
+import { verifyPassword } from "@/modules/auth/services/password";
 
 /**
  * The one account and its login addresses. Every address signs in; the password
@@ -138,7 +145,6 @@ describe("first-run setup", () => {
     const result = await createInitialAccount(
       {
         bookNames: ["共同支出", "哞哞的"],
-        defaultBookName: "共同支出",
         email: "Owner@Example.com",
         password: "setup-pass-1",
         locale: "zh",
@@ -158,10 +164,7 @@ describe("first-run setup", () => {
       where: eq(books.ledgerId, result.ledgerId),
       orderBy: [books.sortOrder],
     });
-    expect(ledgerBooks.map((book) => [book.name, book.isDefault])).toEqual([
-      ["共同支出", true],
-      ["哞哞的", false],
-    ]);
+    expect(ledgerBooks.map((book) => book.name)).toEqual(["共同支出", "哞哞的"]);
     const categories = await db.query.entryCategories.findMany({
       where: eq(entryCategories.ledgerId, result.ledgerId),
     });
@@ -172,7 +175,6 @@ describe("first-run setup", () => {
       createInitialAccount(
         {
           bookNames: ["另一个"],
-          defaultBookName: "另一个",
           email: "second@example.com",
           password: "setup-pass-2",
           locale: "zh",
@@ -268,7 +270,6 @@ describe("first-run setup", () => {
     await createInitialAccount(
       {
         bookNames: ["共同支出"],
-        defaultBookName: "共同支出",
         email: "owner@example.com",
         password: "setup-pass-1",
         locale: "zh",
@@ -281,25 +282,6 @@ describe("first-run setup", () => {
     expect(await postgresSetupAdapter.verifyCode(code)).toBe("expired");
   });
 
-  it("rejects a default book that is not one of the books", async () => {
-    const db = getTestDb();
-    await db.delete(loginEmails);
-    await db.delete(users);
-
-    await expect(
-      createInitialAccount(
-        {
-          bookNames: ["共同支出"],
-          defaultBookName: "别的",
-          email: "owner@example.com",
-          password: "setup-pass-1",
-          locale: "zh",
-        },
-        postgresSetupAdapter
-      )
-    ).rejects.toThrow(/default book must be one of the books/);
-  });
-
   it("rejects duplicate book names and a password that does not meet the policy", async () => {
     const db = getTestDb();
     await db.delete(loginEmails);
@@ -309,7 +291,6 @@ describe("first-run setup", () => {
       createInitialAccount(
         {
           bookNames: ["共同支出", "共同支出"],
-          defaultBookName: "共同支出",
           email: "owner@example.com",
           password: "setup-pass-1",
           locale: "zh",
@@ -322,7 +303,6 @@ describe("first-run setup", () => {
       createInitialAccount(
         {
           bookNames: ["共同支出"],
-          defaultBookName: "共同支出",
           email: "owner@example.com",
           password: "short",
           locale: "zh",
@@ -330,5 +310,129 @@ describe("first-run setup", () => {
         postgresSetupAdapter
       )
     ).rejects.toThrow(/8 and 128/);
+  });
+
+  /**
+   * The rules the wizard and the policy share, at the boundaries that used to be
+   * checked in only one of the two places: the 72-byte limit bcrypt imposes was
+   * missing from the form, and a password can be short enough in characters and
+   * still too long in bytes once it holds anything but ASCII.
+   */
+  it("refuses a password the shared rules refuse, naming the rule that was broken", async () => {
+    const db = getTestDb();
+    await db.delete(loginEmails);
+    await db.delete(users);
+
+    const account = { bookNames: ["共同支出"], email: "owner@example.com", locale: "zh" };
+
+    // 100 ASCII characters: a character count alone calls this fine.
+    await expect(
+      createInitialAccount({ ...account, password: "a".repeat(99) + "1" }, postgresSetupAdapter)
+    ).rejects.toThrow(/72 UTF-8 bytes/);
+
+    // 27 characters, 77 bytes: three-byte characters are what a byte limit is
+    // for, and this one is well inside the 8–128 character window.
+    await expect(
+      createInitialAccount({ ...account, password: "测".repeat(25) + "a1" }, postgresSetupAdapter)
+    ).rejects.toThrow(/72 UTF-8 bytes/);
+
+    await expect(
+      createInitialAccount({ ...account, password: "12345678" }, postgresSetupAdapter)
+    ).rejects.toThrow(/letter and one number/);
+
+    // Every refusal happened before anything was written.
+    expect(await postgresSetupAdapter.isPending()).toBe(true);
+  });
+
+  it("accepts a password that is exactly at the byte limit and signs in with it", async () => {
+    const db = getTestDb();
+    await db.delete(loginEmails);
+    await db.delete(users);
+
+    const password = "a".repeat(71) + "1";
+    expect(new TextEncoder().encode(password)).toHaveLength(72);
+
+    const result = await createInitialAccount(
+      { bookNames: ["共同支出"], email: "boundary@example.com", password, locale: "zh" },
+      postgresSetupAdapter
+    );
+
+    const user = await db.query.users.findFirst({ where: eq(users.id, result.userId) });
+    await expect(verifyPassword(password, user?.passwordHash ?? "")).resolves.toBe(true);
+  });
+
+  /**
+   * The action is what the browser can reach, and its job is to turn every
+   * rejection into a code the wizard can show. A setup code is the gate, so a
+   * request that did not carry a plausible one is a wrong code — not a generic
+   * failure, and not a validation error the form cannot read.
+   */
+  describe("the setup action's verdicts", () => {
+    const payload = {
+      email: "owner@example.com",
+      password: "setup-pass-1",
+      locale: "zh",
+      books: ["共同支出"],
+    };
+
+    it("answers a blank, short, or malformed code with wrong_code and creates nothing", async () => {
+      const db = getTestDb();
+      await db.delete(loginEmails);
+      await db.delete(users);
+      // A code is pending, so the answers below are about the shape of what was
+      // sent rather than about there being nothing to compare it with.
+      await postgresSetupAdapter.getOrCreateCode();
+
+      for (const setupCode of ["", "   ", "12345", "not-a-code"]) {
+        await expect(completeSetupAction({ ...payload, setupCode })).resolves.toEqual({
+          ok: false,
+          code: "wrong_code",
+        });
+      }
+      // A missing field is the same answer as a blank one.
+      await expect(completeSetupAction(payload)).resolves.toEqual({
+        ok: false,
+        code: "wrong_code",
+      });
+
+      expect(await postgresSetupAdapter.isPending()).toBe(true);
+      expect(await db.select({ id: users.id }).from(users)).toHaveLength(0);
+    });
+
+    it("creates the account for the code it issued, and refuses it afterwards", async () => {
+      const db = getTestDb();
+      await db.delete(loginEmails);
+      await db.delete(users);
+      const { code } = await postgresSetupAdapter.getOrCreateCode();
+
+      const result = await completeSetupAction({ ...payload, setupCode: code });
+      if (!result.ok) throw new Error(`expected setup to succeed, got ${result.code}`);
+
+      expect(await postgresSetupAdapter.isPending()).toBe(false);
+      expect(
+        await db.query.ledgers.findFirst({
+          where: and(eq(ledgers.id, result.ledgerId), isNull(ledgers.deletedAt)),
+        })
+      ).toBeDefined();
+      // The action is the unauthenticated write, so a second call must not
+      // create a second account.
+      await expect(completeSetupAction({ ...payload, setupCode: code })).resolves.toEqual({
+        ok: false,
+        code: "already_done",
+      });
+    });
+
+    it("answers a password the shared rules refuse with weak_password", async () => {
+      const db = getTestDb();
+      await db.delete(loginEmails);
+      await db.delete(users);
+      const { code } = await postgresSetupAdapter.getOrCreateCode();
+
+      await expect(
+        completeSetupAction({ ...payload, setupCode: code, password: "a".repeat(99) + "1" })
+      ).resolves.toEqual({ ok: false, code: "weak_password" });
+
+      expect(await postgresSetupAdapter.isPending()).toBe(true);
+    });
   });
 });

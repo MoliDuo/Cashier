@@ -8,6 +8,7 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
+import { readLastNewRecordBookId } from "../new-record-book-memory";
 import { NewRecordForms, InputFormLoadingFallback } from "./NewRecordForms";
 import type { NewRecordInputMode } from "./new-record-success-feedback";
 import {
@@ -76,26 +77,30 @@ export function NewRecordDialog({
   // The dialog opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
   const tBookPicker = useTranslations("BookPicker");
-  // The picker starts on the book being viewed, or on the 总账 default when
-  // reading 总账. It is a per-record choice: changing it does not move the view.
-  const defaultBookId = scope ?? books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? "";
-  const [bookId, setBookId] = useState(defaultBookId);
+  // The picker opens on this device's last pick, falling back to the first
+  // book in 设置 order. It is a per-record choice: changing it does not move
+  // the view, and only a saved record updates the memory.
+  const [bookId, setBookId] = useState("");
   // Every opening starts the per-record pick over. A books refetch while the
   // dialog stays open must not overwrite what the user chose for this record,
   // so the pick is only reset on the closed-to-open edge.
   const [lastOpen, setLastOpen] = useState(isOpen);
   if (isOpen !== lastOpen) {
     setLastOpen(isOpen);
-    if (isOpen) setBookId(defaultBookId);
+    if (isOpen) {
+      const remembered = readLastNewRecordBookId();
+      setBookId(
+        remembered != null && books.some((book) => book.id === remembered)
+          ? remembered
+          : (books[0]?.id ?? "")
+      );
+    }
   }
-  // An empty pick (the dialog opened before the books arrived) or one whose
-  // book is no longer live resolves to the default book, so the picker and the
-  // submitted book always agree with what the select shows.
-  const selectedBook =
-    books.find((book) => book.id === bookId) ??
-    books.find((book) => book.id === defaultBookId) ??
-    null;
-  const selectedBookId = selectedBook?.id ?? defaultBookId;
+  // A pick whose book is no longer live (archived between the save and now,
+  // say) resolves to the first book, so the picker and the submitted book
+  // always agree with what the select shows.
+  const selectedBook = books.find((book) => book.id === bookId) ?? books[0] ?? null;
+  const selectedBookId = selectedBook?.id ?? "";
   // The book owns the record's date zone: the picked book's zone decides the
   // default day, and only a book without one falls back to the device.
   const recordTimeZone = selectedBook?.timeZone ?? deviceTimeZone;
@@ -130,7 +135,6 @@ export function NewRecordDialog({
                 {books.map((book) => (
                   <SelectItem key={book.id} value={book.id}>
                     {book.name}
-                    {book.isDefault ? ` · ${tBookPicker("totalBadge")}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>

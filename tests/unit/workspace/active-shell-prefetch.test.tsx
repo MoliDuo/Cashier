@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
@@ -76,6 +76,7 @@ vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
 }));
 
 import { ActiveShell } from "@/app/[locale]/(protected)/_active-shell";
+import { useBookScopeStore } from "@/lib/store/book-scope";
 
 const BOOK_ID = "10000000-0000-4000-8000-000000000001";
 
@@ -84,6 +85,7 @@ describe("ActiveShell tab-hover prefetch", () => {
     vi.clearAllMocks();
     searchParamsState.current = new URLSearchParams();
     onTabIntentRef.current = null;
+    useBookScopeStore.getState().setBookId(null);
   });
 
   function renderShell() {
@@ -98,13 +100,13 @@ describe("ActiveShell tab-hover prefetch", () => {
     return render(shell);
   }
 
-  it("reads the viewed book out of the URL, so a client-side book switch reaches the prefetch", async () => {
+  it("reads the viewed book out of the shared scope store, so a client-side book switch reaches the prefetch", async () => {
     const { rerender } = renderShell();
-    // The scope change is a history update from LedgerPageClient with no server
-    // render behind it: the shell has to read the live URL, not a prop captured
-    // at hydration. useSearchParams re-renders the shell on the change, which is
-    // what this rerender stands in for.
-    searchParamsState.current = new URLSearchParams(`bookId=${BOOK_ID}`);
+    // The scope change is a store update from LedgerPageClient with no server
+    // render behind it: the shell has to read the store, not a prop captured
+    // at hydration. The store subscription re-renders the shell on the change,
+    // which is what this rerender stands in for.
+    act(() => useBookScopeStore.getState().setBookId(BOOK_ID));
     rerender(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
@@ -121,7 +123,7 @@ describe("ActiveShell tab-hover prefetch", () => {
     expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[2]).toBe(BOOK_ID);
   });
 
-  it("prefetches 总账 with no book when the URL holds none", async () => {
+  it("prefetches 总账 with no book when the store holds none", async () => {
     renderShell();
 
     onTabIntentRef.current?.("stats");

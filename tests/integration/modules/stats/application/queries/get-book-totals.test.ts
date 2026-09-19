@@ -32,15 +32,15 @@ describe("getBookTotalsQuery", () => {
     const db = getTestDb();
     const setup = await createTestUserWithLedger(db, undefined, "Books Ledger");
     ledgerId = setup.ledgerId;
-    // The fixture already created the 总账 default; these two are the book under
+    // The fixture already created the first book; these two are the book under
     // test and one that is archived before a read.
     const existing = await ensureTestLedgerBooks(db, ledgerId);
     firstBookId = existing.get("共同支出")!;
     const rows = await db.execute<{ id: string; name: string }>(sql`
-      INSERT INTO books (ledger_id, name, sort_order, is_default)
+      INSERT INTO books (ledger_id, name, sort_order)
       VALUES
-        (${ledgerId}, '旅行', 2, false),
-        (${ledgerId}, '已归档的', 3, false)
+        (${ledgerId}, '旅行', 2),
+        (${ledgerId}, '已归档的', 3)
       RETURNING id, name
     `);
     secondBookId = rows.rows.find((row) => row.name === "旅行")!.id;

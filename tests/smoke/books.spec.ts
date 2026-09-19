@@ -72,13 +72,13 @@ test("@demo files a record into a book and moves it to another", async ({ page }
   await expect(page.getByText("Harbor Coffee", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("FreshMart", { exact: true }).first()).toBeVisible();
 
-  // Recording from 总账 lands in the default book, 共同支出, unless the picker
-  // is changed for that one record.
+  // Recording from 总账 opens the picker on the first book in 设置 order,
+  // 哞哞的, unless it is changed for that one record.
   await page.getByRole("button", { name: "New Record", exact: true }).click();
   const create = page.getByRole("dialog");
   await create.getByRole("button", { name: "Quick Entry", exact: true }).click();
   const bookPicker = create.getByLabel("Book", { exact: true });
-  await expect(bookPicker).toHaveText(/共同支出/);
+  await expect(bookPicker).toHaveText(/哞哞的/);
   // Radix sets `pointer-events: none` on the trigger while its listbox is open
   // and portals the listbox to the body, so it is opened with the keyboard and
   // the option is read from the page rather than from inside the dialog.
@@ -132,11 +132,18 @@ test("@demo manages books and the book each API key writes to", async ({ page })
     .getByRole("button", { name: "Settings", exact: true })
     .click();
 
-  // 分账 section: the three seeded books, each with its zone, and the 总账
-  // default marked on 共同支出.
+  // 分账 section: the three seeded books, each with its zone. 总账 is a view
+  // over all of them, so nothing here marks a default any more.
   await expect(page.getByRole("heading", { name: "Books", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Move 梁梁的 up", exact: true })).toBeVisible();
   await expect(page.getByText("Asia/Shanghai", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Set as default", exact: true })).toHaveCount(0);
+  await expect(bookRow(page, "共同支出").getByText("Total", { exact: true })).toHaveCount(0);
+  // The former 总账 default is an ordinary book: nothing stops retiring it
+  // (it is not clicked, the demo workspace is shared).
+  await expect(
+    bookRow(page, "共同支出").getByRole("button", { name: "Archive", exact: true })
+  ).toBeEnabled();
 
   // Each key names the book it writes to, because uploads follow the key.
   await expect(page.getByText("Writes to 哞哞的", { exact: true }).first()).toBeVisible();
@@ -148,6 +155,81 @@ test("@demo manages books and the book each API key writes to", async ({ page })
   await expect(
     page.getByRole("button", { name: "Remove dev@cashier.local", exact: true })
   ).toBeDisabled();
+
+  expect(errors).toEqual([]);
+});
+
+test("@demo the view remembers the device's last choice", async ({ page, context }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await page.goto("/en");
+  await page.getByRole("button", { name: "Continue as dev", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+
+  // A first visit shows 总账: no chip, every book's records together.
+  await expect(page.getByTestId("book-scope-chip")).toHaveCount(0);
+
+  // Switching to 梁梁的 is remembered by the device, not by the URL.
+  await selectBookByName(page, "梁梁的");
+  await expect(page.getByTestId("book-scope-chip")).toContainText("梁梁的");
+
+  // A reload stays on it, and so does a second tab of the same browser.
+  await page.reload();
+  await expect(page.getByTestId("book-scope-chip")).toContainText("梁梁的");
+  const secondTab = await context.newPage();
+  await secondTab.goto("/en");
+  await expect(secondTab.getByTestId("book-scope-chip")).toContainText("梁梁的");
+  await secondTab.close();
+
+  expect(errors).toEqual([]);
+});
+
+test("@demo the record picker remembers the book a record was saved into", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const item = `Picker memory ${Date.now()}`;
+
+  await page.goto("/en");
+  await page.getByRole("button", { name: "Continue as dev", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+
+  const openDialog = async () => {
+    await page.getByRole("button", { name: "New Record", exact: true }).click();
+    return page.getByRole("dialog");
+  };
+
+  // A first open selects the first book in 设置 order, 哞哞的.
+  let create = await openDialog();
+  await create.getByRole("button", { name: "Quick Entry", exact: true }).click();
+  let bookPicker = create.getByLabel("Book", { exact: true });
+  await expect(bookPicker).toHaveText(/哞哞的/);
+
+  // Save one record into 共同支出.
+  await bookPicker.press("ArrowDown");
+  await page.getByRole("option", { name: "共同支出" }).click();
+  await create.getByRole("textbox", { name: "Item name (optional)", exact: true }).fill(item);
+  await create.getByRole("group").getByRole("button").first().click();
+  await create.getByRole("textbox", { name: "Amount", exact: true }).fill("12.00");
+  await create.getByRole("button", { name: "Record", exact: true }).click();
+  await expect(create).toHaveCount(0);
+
+  // The next open starts from that save.
+  create = await openDialog();
+  bookPicker = create.getByLabel("Book", { exact: true });
+  await expect(bookPicker).toHaveText(/共同支出/);
+
+  // Changing the pick and cancelling is not "the last choice".
+  await bookPicker.press("ArrowDown");
+  await page.getByRole("option", { name: "哞哞的" }).click();
+  await expect(bookPicker).toHaveText(/哞哞的/);
+  await page.keyboard.press("Escape");
+  await expect(create).toHaveCount(0);
+
+  create = await openDialog();
+  await expect(create.getByLabel("Book", { exact: true })).toHaveText(/共同支出/);
+  await page.keyboard.press("Escape");
+  await expect(create).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });

@@ -1,10 +1,17 @@
 import { z } from "zod";
 import { ValidationError } from "@/lib/errors";
 import { SUPPORTED_LOCALES } from "@/i18n/locales";
+import { getPasswordRuleViolation, PASSWORD_RULE_MESSAGES } from "@/modules/auth/password-rules";
 
 const bookNameSchema = z.string().trim().min(1).max(20);
 const emailSchema = z.string().trim().min(3).max(254).email("Enter a valid email address");
-const passwordSchema = z.string().min(8).max(128);
+// The wizard and the server policy read the same rule, so a password the form
+// accepts cannot be one the API rejects.
+const passwordSchema = z.string().superRefine((password, context) => {
+  const violation = getPasswordRuleViolation(password);
+  if (violation == null) return;
+  context.addIssue({ code: "custom", message: PASSWORD_RULE_MESSAGES[violation] });
+});
 const setupCodeSchema = z.string().trim().min(6).max(32);
 
 /**
@@ -13,14 +20,13 @@ const setupCodeSchema = z.string().trim().min(6).max(32);
  * dropping the empties is therefore part of reading the input, and it happens
  * before validation so the checks below see only names that were meant.
  */
-function normalizeBookNames(input: unknown): { books: unknown; defaultBook: unknown } {
-  const { books, defaultBook } = input as { books?: unknown; defaultBook?: unknown };
+function normalizeBookNames(input: unknown): { books: unknown } {
+  const { books } = input as { books?: unknown };
   const trimmed = Array.isArray(books)
     ? books.map((name) => (typeof name === "string" ? name.trim() : name))
     : books;
   return {
     books: Array.isArray(trimmed) ? trimmed.filter((name) => name !== "") : trimmed,
-    defaultBook: typeof defaultBook === "string" ? defaultBook.trim() : defaultBook,
   };
 }
 
@@ -35,13 +41,8 @@ export const setupInputSchema = z
       .min(1, "Add at least one book")
       .max(20)
       .refine((names) => new Set(names).size === names.length, "Book names must be unique"),
-    defaultBook: bookNameSchema,
   })
-  .strict()
-  .refine((value) => value.books.includes(value.defaultBook), {
-    message: "The default book must be one of the books",
-    path: ["defaultBook"],
-  });
+  .strict();
 
 export type SetupInputContract = z.infer<typeof setupInputSchema>;
 
@@ -51,11 +52,10 @@ export function parseSetupInput(input: unknown): SetupInputContract {
       issues: [{ code: "custom", path: [], message: "Expected an object" }],
     });
   }
-  const { books, defaultBook } = normalizeBookNames(input);
+  const { books } = normalizeBookNames(input);
   const result = setupInputSchema.safeParse({
     ...(input as Record<string, unknown>),
     ...(books === undefined ? {} : { books }),
-    ...(defaultBook === undefined ? {} : { defaultBook }),
   });
   if (!result.success) {
     throw new ValidationError("Validation failed", { issues: result.error.issues });

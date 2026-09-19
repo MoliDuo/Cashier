@@ -69,11 +69,10 @@ export type Ledger = InferSelectModel<typeof ledgers>;
 
 /**
  * A 分账: the bucket every record belongs to. Reading all of them together is
- * 总账. `is_default` marks the book that 总账-entered records land in; it is
- * stored as a flag rather than found by name. `time_zone` null means "no zone
- * of this book's own": a record entered in the web app is then dated in the
- * device's zone, while one uploaded through an API key — which has no device —
- * is dated in the server's.
+ * 总账, which is a view over every book rather than a designated one, so no row
+ * here is special. `time_zone` null means "no zone of this book's own": a
+ * record entered in the web app is then dated in the device's zone, while one
+ * uploaded through an API key — which has no device — is dated in the server's.
  */
 export const books = pgTable(
   "books",
@@ -85,7 +84,6 @@ export const books = pgTable(
     name: text("name").notNull(),
     timeZone: text("time_zone"),
     sortOrder: integer("sort_order").notNull().default(0),
-    isDefault: boolean("is_default").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -102,9 +100,6 @@ export const books = pgTable(
     uniqueIndex("uniq_books_active_name")
       .on(table.ledgerId, table.name)
       .where(sql`${table.archivedAt} IS NULL`),
-    uniqueIndex("uniq_books_default")
-      .on(table.ledgerId)
-      .where(sql`${table.isDefault} AND ${table.archivedAt} IS NULL`),
     check("ck_books_name_length", sql`length(btrim(${table.name})) BETWEEN 1 AND 20`),
     check(
       "ck_books_time_zone_length",

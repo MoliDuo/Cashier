@@ -13,16 +13,15 @@ import type { StatsUrlState } from "./ledger-url-params";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 /**
- * The zone the viewed book is read in, hydrated alongside the ledger. A book
- * without a zone of its own dates by this device, exactly as the tab will; only
- * a browser that cannot name its zone falls back to the deployment's.
- * Prefetching must use the same zone the tab will, so a prefetched page is not
- * a different day from the one it lands in.
+ * The zone the viewed book is read in, hydrated alongside the ledger. On 总账,
+ * and for a book without a zone of its own, it is this device's zone — exactly
+ * as the tab will date it; only a browser that cannot name its zone falls back
+ * to the deployment's. Prefetching must use the same zone the tab will, so a
+ * prefetched page is not a different day from the one it lands in.
  */
 function scopeTimeZone(queryClient: QueryClient, ledgerId: string, bookId?: string) {
   const books = queryClient.getQueryData<readonly BookDto[]>(queryKeys.books(ledgerId));
-  const book =
-    bookId == null ? books?.find((row) => row.isDefault) : books?.find((row) => row.id === bookId);
+  const book = bookId == null ? null : books?.find((row) => row.id === bookId);
   return book?.timeZone ?? getDeviceTimeZone() ?? runtimeEnv.timeZone;
 }
 import {

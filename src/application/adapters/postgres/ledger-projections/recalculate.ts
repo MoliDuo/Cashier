@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare as compareDecimal } from "@/lib/money/decimal";
 import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import {
+  lockBookForShare,
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   lockSourceDocumentsForUpdate,
@@ -91,6 +92,11 @@ export const postgresLedgerProjectionAdapter: LedgerProjectionPort = {
       if (ledger.mainCurrency !== input.expectedMainCurrency) {
         throw new ConflictError("Ledger currency changed before quick entry commit");
       }
+
+      // The book was resolved outside this transaction; the ledger lock makes
+      // the re-read authoritative, so a book archived while the form was open
+      // refuses here instead of gaining a record after retirement.
+      await lockBookForShare(tx, input.ledgerId, input.bookId);
 
       const sourceDocumentId = input.sourceDocumentId ?? crypto.randomUUID();
       const revisionId = await createCompletedProjectionInTransaction(tx, {

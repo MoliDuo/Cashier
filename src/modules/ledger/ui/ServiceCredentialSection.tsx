@@ -56,9 +56,9 @@ export function ServiceCredentialSection({
   const t = useTranslations("ServiceCredentials");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
-  const defaultBookId = books.find((book) => book.isDefault)?.id ?? books[0]?.id ?? "";
+  const firstBookId = books[0]?.id ?? "";
   const [newCredName, setNewCredName] = useState("");
-  const [newCredBookId, setNewCredBookId] = useState(defaultBookId);
+  const [newCredBookId, setNewCredBookId] = useState(firstBookId);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [credentialToDelete, setCredentialToDelete] = useState<ServiceCredential | null>(null);
   const [createdCredential, setCreatedCredential] = useState<CreatedServiceCredentialDto | null>(
@@ -69,8 +69,8 @@ export function ServiceCredentialSection({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const openCreateDialog = () => {
-    // Each opening starts from the current default book, not the last choice.
-    setNewCredBookId(defaultBookId);
+    // Each opening starts from the first book in 设置 order, not the last choice.
+    setNewCredBookId(firstBookId);
     setIsCreateDialogOpen(true);
   };
 

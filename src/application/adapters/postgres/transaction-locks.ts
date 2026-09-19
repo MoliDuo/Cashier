@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { ledgers, sourceDocuments } from "@/persistence";
+import { books, ledgers, sourceDocuments } from "@/persistence";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 
 /** Drizzle transaction client type used by all Postgres adapters. */
@@ -32,6 +32,34 @@ export async function lockLedgerForUpdate(
 
   if (rows.length === 0) {
     throw new NotFoundError("Ledger");
+  }
+
+  return rows[0]!;
+}
+
+/**
+ * Re-read the book a record is being filed into under a `FOR SHARE` lock, so
+ * the write transaction sees a stable answer: a concurrent archive holds the
+ * ledger row (locked first by the caller) while it works, so this either runs
+ * before it and sees a live book, or after it and refuses. A shared lock is
+ * enough — the caller only needs the row not to change underneath, not to edit
+ * it — and lets two records into the same book commit in parallel.
+ * Throws {@link NotFoundError} when the book does not exist, belongs to another
+ * ledger, or was archived before this transaction took the ledger lock.
+ */
+export async function lockBookForShare(
+  tx: PostgresTransaction,
+  ledgerId: string,
+  bookId: string
+): Promise<typeof books.$inferSelect> {
+  const rows = await tx
+    .select()
+    .from(books)
+    .where(and(eq(books.ledgerId, ledgerId), eq(books.id, bookId), isNull(books.archivedAt)))
+    .for("share");
+
+  if (rows.length === 0) {
+    throw new NotFoundError("Book");
   }
 
   return rows[0]!;

@@ -1,8 +1,9 @@
 import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { BookContract, BookPort } from "@/application/contracts";
 import { db } from "@/lib/db";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
+import { AppError, NotFoundError } from "@/lib/errors";
 import { books, serviceCredentials, sourceDocuments } from "@/persistence";
+import { lockLedgerForUpdate } from "../transaction-locks";
 
 type BookRow = typeof books.$inferSelect;
 
@@ -13,7 +14,6 @@ function toBook(row: BookRow): BookContract {
     name: row.name,
     timeZone: row.timeZone,
     sortOrder: row.sortOrder,
-    isDefault: row.isDefault,
     archivedAt: row.archivedAt?.toISOString() ?? null,
   };
 }
@@ -22,14 +22,10 @@ function liveBooksWhere(ledgerId: string) {
   return and(eq(books.ledgerId, ledgerId), isNull(books.archivedAt))!;
 }
 
-function duplicateNameError() {
-  return new ConflictError("A book with that name already exists");
-}
-
 /**
  * The books that are still in use. A retired book may share a name with a live
- * one and may keep a stale default flag, so the counts that decide what is
- * allowed always ask about the live rows only.
+ * one, so the counts that decide what is allowed always ask about the live rows
+ * only.
  */
 async function countLiveBooks(tx: Pick<typeof db, "select">, ledgerId: string): Promise<number> {
   const rows = await tx
@@ -39,16 +35,28 @@ async function countLiveBooks(tx: Pick<typeof db, "select">, ledgerId: string): 
   return Number(rows[0]?.count ?? 0);
 }
 
-/** Whether any API key — revoked ones included — still points at the book. */
+/**
+ * API keys pointing at the book. Revoked keys (`deleted_at` set) are dead: they
+ * cannot upload, they are not listed anywhere, and nothing can be rebound onto
+ * them — so only the live ones make a book un-archivable. A hard delete is
+ * different: the rows still reference the book either way.
+ */
 async function countCredentials(
   tx: Pick<typeof db, "select">,
   ledgerId: string,
-  bookId: string
+  bookId: string,
+  options?: { activeOnly?: boolean }
 ): Promise<number> {
   const rows = await tx
     .select({ count: sql<number>`count(*)::int` })
     .from(serviceCredentials)
-    .where(and(eq(serviceCredentials.ledgerId, ledgerId), eq(serviceCredentials.bookId, bookId)));
+    .where(
+      and(
+        eq(serviceCredentials.ledgerId, ledgerId),
+        eq(serviceCredentials.bookId, bookId),
+        ...(options?.activeOnly === true ? [isNull(serviceCredentials.deletedAt)] : [])
+      )
+    );
   return Number(rows[0]?.count ?? 0);
 }
 
@@ -70,19 +78,19 @@ async function countDocumentsIncludingDeleted(
 }
 
 /**
- * The refusals shared by archive and delete: the default book is where 总账
- * records land, and the last live book would leave the instance with nowhere to
- * file anything. Both throw, because the caller maps them to a code.
+ * The refusal shared by archive and delete: the last live book would leave the
+ * instance with nowhere to file anything. Thrown as the port's own code rather
+ * than matched on message text, so rewording it cannot break the caller's error
+ * mapping.
  */
-async function assertNotDefaultOrLast(
-  tx: Pick<typeof db, "select">,
-  ledgerId: string,
-  book: BookRow
-): Promise<void> {
-  if (book.isDefault) throw new ValidationError("The default book cannot be archived");
+async function assertNotLast(tx: Pick<typeof db, "select">, ledgerId: string): Promise<void> {
   if ((await countLiveBooks(tx, ledgerId)) <= 1) {
-    throw new ValidationError("The last active book cannot be archived");
+    throw new AppError("The last active book cannot be archived", "BOOK_LAST_ACTIVE", 409);
   }
+}
+
+function duplicateNameError() {
+  return new AppError("A book with that name already exists", "BOOK_NAME_TAKEN", 409);
 }
 
 export const postgresBookAdapter: BookPort = {
@@ -133,7 +141,6 @@ export const postgresBookAdapter: BookPort = {
           name: input.name,
           timeZone: input.timeZone,
           sortOrder: next,
-          isDefault: input.isDefault === true,
         })
         .onConflictDoNothing()
         .returning()
@@ -166,7 +173,11 @@ export const postgresBookAdapter: BookPort = {
       const live = await tx.select({ id: books.id }).from(books).where(liveBooksWhere(ledgerId));
       const liveIds = new Set(live.map((row) => row.id));
       if (liveIds.size !== bookIds.length || bookIds.some((id) => !liveIds.has(id))) {
-        throw new ValidationError("Reorder must list every active book exactly once");
+        throw new AppError(
+          "Reorder must list every active book exactly once",
+          "BOOK_ORDER_INVALID",
+          400
+        );
       }
       // One statement rather than one UPDATE per row. Positions come from a
       // VALUES list whose order is the caller's order, so no row can briefly
@@ -192,6 +203,10 @@ export const postgresBookAdapter: BookPort = {
 
   async archive(ledgerId, bookId) {
     return db.transaction(async (tx) => {
+      // Serialises with the record-create paths and with credential rebinds,
+      // which all take the same lock: a record filed mid-archive cannot leave
+      // the book both retired and freshly written to.
+      await lockLedgerForUpdate(tx, ledgerId);
       const book = await tx
         .select()
         .from(books)
@@ -199,13 +214,15 @@ export const postgresBookAdapter: BookPort = {
         .limit(1)
         .then((rows) => rows[0]);
       if (book == null || book.archivedAt != null) return { status: "not_found" as const };
-      // A key bound to the book would keep uploading into a retired book, so it
-      // has to be rebound first. Checked before the default/last rules, because
-      // the reader can act on this one.
-      if ((await countCredentials(tx, ledgerId, bookId)) > 0) {
+      // An active key bound to the book would keep uploading into a retired
+      // book, so it has to be rebound first. Checked before the last-book rule,
+      // because the reader can act on this one. Revoked keys stay out: they
+      // cannot upload and cannot be rebound, so they would retire the book
+      // forever.
+      if ((await countCredentials(tx, ledgerId, bookId, { activeOnly: true })) > 0) {
         return { status: "has_credentials" as const };
       }
-      await assertNotDefaultOrLast(tx, ledgerId, book);
+      await assertNotLast(tx, ledgerId);
       const archived = await tx
         .update(books)
         .set({ archivedAt: new Date(), updatedAt: new Date() })
@@ -219,6 +236,7 @@ export const postgresBookAdapter: BookPort = {
 
   async restore(ledgerId, bookId) {
     return db.transaction(async (tx) => {
+      await lockLedgerForUpdate(tx, ledgerId);
       const restored = await tx
         .update(books)
         .set({ archivedAt: null, updatedAt: new Date() })
@@ -238,6 +256,10 @@ export const postgresBookAdapter: BookPort = {
 
   async delete(ledgerId, bookId) {
     return db.transaction(async (tx) => {
+      // The same lock the record-create paths take: without it a record filed
+      // between the "no records" check and the DELETE would trip the foreign
+      // key and surface as an unexpected failure.
+      await lockLedgerForUpdate(tx, ledgerId);
       const book = await tx
         .select()
         .from(books)
@@ -250,13 +272,19 @@ export const postgresBookAdapter: BookPort = {
       if ((await countDocumentsIncludingDeleted(tx, ledgerId, bookId)) > 0) {
         return { status: "has_records" as const };
       }
-      if ((await countCredentials(tx, ledgerId, bookId)) > 0) {
+      if ((await countCredentials(tx, ledgerId, bookId, { activeOnly: true })) > 0) {
         return { status: "has_credentials" as const };
+      }
+      // Revoked keys still reference the book, so they block a hard delete —
+      // but the reader cannot rebind what the UI never lists, so the refusal is
+      // the "archive it instead" one rather than an impossible rebinding ask.
+      if ((await countCredentials(tx, ledgerId, bookId)) > 0) {
+        return { status: "has_records" as const };
       }
       // Deleting is only offered for a live book; an archived one is restored
       // first, so a retired book cannot vanish without the reader seeing it.
       if (book.archivedAt != null) return { status: "not_found" as const };
-      await assertNotDefaultOrLast(tx, ledgerId, book);
+      await assertNotLast(tx, ledgerId);
       const removed = await tx
         .delete(books)
         .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId)))
@@ -264,33 +292,6 @@ export const postgresBookAdapter: BookPort = {
         .then((rows) => rows[0]);
       if (removed == null) return { status: "not_found" as const };
       return { status: "deleted" as const };
-    });
-  },
-
-  async setDefault(ledgerId, bookId) {
-    return db.transaction(async (tx) => {
-      const target = await tx
-        .select({ id: books.id })
-        .from(books)
-        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNull(books.archivedAt)))
-        .limit(1)
-        .then((rows) => rows[0]);
-      if (target == null) throw new NotFoundError("Book");
-      // Clear first: the partial unique index only tolerates one flagged row.
-      await tx
-        .update(books)
-        .set({ isDefault: false, updatedAt: new Date() })
-        .where(and(eq(books.ledgerId, ledgerId), eq(books.isDefault, true)));
-      await tx
-        .update(books)
-        .set({ isDefault: true, updatedAt: new Date() })
-        .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId)));
-      const rows = await tx
-        .select()
-        .from(books)
-        .where(liveBooksWhere(ledgerId))
-        .orderBy(asc(books.sortOrder), asc(books.createdAt), asc(books.id));
-      return rows.map(toBook);
     });
   },
 
@@ -309,15 +310,15 @@ export const postgresBookAdapter: BookPort = {
   },
 
   async hasCredentials(ledgerId, bookId) {
-    return (await countCredentials(db, ledgerId, bookId)) > 0;
+    return (await countCredentials(db, ledgerId, bookId, { activeOnly: true })) > 0;
   },
 };
 
 /**
  * Drizzle wraps driver failures in a `DrizzleQueryError` whose `cause` is the
  * original Postgres error, so the SQLSTATE is one level down from what the
- * caller catches. Only the live-name index matters here: the default flag is
- * moved by `setDefault`, which clears it first.
+ * caller catches. The live-name unique index is the only one an UPDATE here can
+ * trip.
  */
 function isUniqueViolation(error: unknown): boolean {
   let candidate: unknown = error;

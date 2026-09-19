@@ -6,15 +6,11 @@ import {
   migrateLegacyLedgerSearchParams,
   normalizeLedgerUrlSearchParams,
   readLedgerFilterParams,
-  readRecordScopeSearchParams,
   readStatsSearchParams,
-  setRecordScopeSearchParams,
   setStatsSearchParams,
   updateLedgerSearchParams,
 } from "@/modules/workspace/ledger-url-params";
 import { pushLedgerUrl, replaceLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
-
-const BOOK_ID = "10000000-0000-4000-8000-000000000001";
 
 describe("ledger-url-params", () => {
   beforeEach(() => {
@@ -354,36 +350,13 @@ describe("ledger-url-params", () => {
   });
 
   describe("book scope", () => {
-    it("reads a live-looking book id and rejects anything else", () => {
-      expect(readRecordScopeSearchParams(new URLSearchParams(`bookId=${BOOK_ID}`))).toBe(BOOK_ID);
-      expect(readRecordScopeSearchParams(new URLSearchParams(""))).toBeNull();
-      expect(readRecordScopeSearchParams(new URLSearchParams("bookId=not-a-book"))).toBeNull();
-      expect(readRecordScopeSearchParams(new URLSearchParams("bookId="))).toBeNull();
-    });
-
-    it("sets and clears the book without dropping the rest of the query", () => {
-      const set = setRecordScopeSearchParams(
-        new URLSearchParams("tab=stats&period=month"),
-        BOOK_ID
-      );
-      expect(set.get("bookId")).toBe(BOOK_ID);
-      expect(set.get("tab")).toBe("stats");
-      expect(set.get("period")).toBe("month");
-
-      const cleared = setRecordScopeSearchParams(set, null);
-      expect(cleared.get("bookId")).toBeNull();
-      expect(cleared.get("tab")).toBe("stats");
-    });
-
-    it("drops a malformed book id when the URL is normalized", () => {
-      const normalized = normalizeLedgerUrlSearchParams(
-        new URLSearchParams("tab=stream&bookId=nonsense")
-      );
-      expect(normalized?.get("bookId")).toBeNull();
-      expect(normalized?.get("tab")).toBe("stream");
-
-      // A well-formed id is left exactly as it was.
-      expect(normalizeLedgerUrlSearchParams(new URLSearchParams(`bookId=${BOOK_ID}`))).toBeNull();
+    it("ignores the legacy ?bookId URL parameter entirely", () => {
+      // The scope moved to a device cookie; a link that still carries the old
+      // parameter is read as 总账 and the parameter is not even cleaned up.
+      expect(readLedgerFilterParams(new URLSearchParams("bookId=nonsense"))).toBeDefined();
+      expect(
+        normalizeLedgerUrlSearchParams(new URLSearchParams(`bookId=${"1".repeat(36)}`))
+      ).toBeNull();
     });
   });
 });

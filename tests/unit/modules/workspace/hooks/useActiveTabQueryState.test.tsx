@@ -35,4 +35,47 @@ describe("active tab refresh", () => {
     });
     expect(queryClient.getQueryData(["ledger", "ledger-1", "enhanced-stats"])).toBe("stats");
   });
+
+  it("refreshes both book lists for 设置 and never another ledger's", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const ledger = vi.fn().mockResolvedValue("ledger");
+    const categories = vi.fn().mockResolvedValue("categories");
+    const liveBooks = vi.fn().mockResolvedValue("books");
+    const archivedBooks = vi.fn().mockResolvedValue("books-with-archived");
+    const otherLedgerBooks = vi.fn().mockResolvedValue("other-books");
+    const stream = vi.fn().mockResolvedValue("stream");
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(
+      () => {
+        useQuery({ queryKey: ["ledger", "ledger-1"], queryFn: ledger });
+        useQuery({ queryKey: ["ledger", "ledger-1", "categories"], queryFn: categories });
+        useQuery({ queryKey: ["ledger", "ledger-1", "books"], queryFn: liveBooks });
+        useQuery({
+          queryKey: ["ledger", "ledger-1", "books", "including-archived"],
+          queryFn: archivedBooks,
+        });
+        useQuery({ queryKey: ["ledger", "ledger-2", "books"], queryFn: otherLedgerBooks });
+        useQuery({
+          queryKey: ["ledger", "ledger-1", "source-documents", "stream"],
+          queryFn: stream,
+        });
+        return useActiveTabQueryState({ ledgerId: "ledger-1", activeTab: "settings" });
+      },
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+    await act(() => result.current.refreshActiveTab());
+    // 设置 shows the archived rows, so its refresh has to reach the list the
+    // 分账 section reads as well as the switcher's live one.
+    expect(archivedBooks).toHaveBeenCalledTimes(2);
+    expect(liveBooks).toHaveBeenCalledTimes(2);
+    expect(ledger).toHaveBeenCalledTimes(2);
+    expect(categories).toHaveBeenCalledTimes(2);
+    expect(otherLedgerBooks).toHaveBeenCalledTimes(1);
+    expect(stream).toHaveBeenCalledTimes(1);
+  });
 });

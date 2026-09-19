@@ -36,14 +36,12 @@ export async function ensureTestLedgerBooks(
  * themselves rather than going through `createTestUserWithLedger`.
  */
 /**
- * The books a test ledger starts with. 共同支出 is the 总账 default, mirroring
- * what the setup wizard and the 0048 migration both create.
+ * The books a test ledger starts with, in switcher order.
  */
 export async function createTestBooks(
   db: TestDatabase,
   ledgerId: string,
-  names: readonly string[] = ["共同支出"],
-  defaultName = names[0]
+  names: readonly string[] = ["共同支出"]
 ): Promise<Map<string, string>> {
   const rows = await db
     .insert(schema.books)
@@ -52,7 +50,6 @@ export async function createTestBooks(
         ledgerId,
         name,
         sortOrder: index + 1,
-        isDefault: name === defaultName,
       }))
     )
     .returning({ id: schema.books.id, name: schema.books.name });

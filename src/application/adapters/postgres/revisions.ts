@@ -16,7 +16,11 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "./transaction-locks";
+import {
+  lockBookForShare,
+  lockLedgerForUpdate,
+  lockSourceDocumentForUpdate,
+} from "./transaction-locks";
 import type { PostgresTransaction } from "./transaction-locks";
 import { completeProcessingLeaseInTransaction } from "./processing-terminal";
 import { softDeleteSourceDocumentInTransaction } from "./source-document-delete";
@@ -127,6 +131,33 @@ async function latestSubmissionStatuses(rows: readonly (typeof sourceDocuments.$
   return result;
 }
 
+/**
+ * Insert the source document a new submission starts, under the locks that
+ * make the ledger and the target book's liveness final for this transaction.
+ *
+ * The checks the caller already ran happened outside any lock, so an archive or
+ * a ledger delete can commit between them and the insert. Lock the ledger first
+ * and then the book — the documented ledger → book order — so the insert either
+ * sees both live or refuses with the port's own error.
+ */
+async function insertNewSourceDocument(
+  tx: PostgresTransaction,
+  input: CreatePendingRevisionInput,
+  sourceDocumentId: string
+): Promise<typeof sourceDocuments.$inferSelect> {
+  await lockLedgerForUpdate(tx, input.ledgerId);
+  await lockBookForShare(tx, input.ledgerId, input.bookId!);
+  const rows = await tx
+    .insert(sourceDocuments)
+    .values({
+      id: sourceDocumentId,
+      ledgerId: input.ledgerId,
+      bookId: input.bookId!,
+    })
+    .returning();
+  return rows[0]!;
+}
+
 export async function createProcessingRevisionInTransaction(
   tx: PostgresTransaction,
   input: CreatePendingRevisionInput
@@ -155,15 +186,7 @@ export async function createProcessingRevisionInTransaction(
   // Acquire a lock on existing documents or create a new one.
   const document =
     existingDocument == null
-      ? await tx
-          .insert(sourceDocuments)
-          .values({
-            id: sourceDocumentId,
-            ledgerId: input.ledgerId,
-            bookId: input.bookId!,
-          })
-          .returning()
-          .then((rows) => rows[0]!)
+      ? await insertNewSourceDocument(tx, input, sourceDocumentId)
       : await lockSourceDocumentForUpdate(tx, input.ledgerId, sourceDocumentId);
 
   if (document.latestSubmissionRevisionId != null) {

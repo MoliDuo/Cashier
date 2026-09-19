@@ -1,11 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import bcrypt from "bcryptjs";
 import type { UserAccountPort } from "@/application/contracts";
+import { AppError } from "@/lib/errors";
 import { authenticateWithPassword } from "@/modules/auth/application/use-cases/authenticate-with-password";
 import { changePassword } from "@/modules/auth/application/use-cases/change-password";
+import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
+import {
+  getPasswordRuleViolation,
+  PASSWORD_RULE_MESSAGES,
+  type PasswordRuleViolation,
+} from "@/modules/auth/password-rules";
 import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
 import { validatePassword } from "@/modules/auth/services/password-policy";
 import type { AccountSecurityPort } from "@/modules/auth/application/ports";
+import { collectImportSpecifiers } from "../../../../scripts/architecture-imports.mjs";
 
 describe("password authentication", () => {
   const rateLimiter = {
@@ -316,5 +326,138 @@ describe("password authentication", () => {
     );
 
     expect(getPasswordHash).toHaveBeenCalledTimes(increment.mock.calls[0]![1]);
+  });
+});
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(process.cwd(), relativePath), "utf8");
+}
+
+/**
+ * Resolve a `@/…` or relative specifier to a repository-relative `src/…` path,
+ * or null when the specifier leaves the source tree (a package, for instance).
+ */
+function resolveSourceModule(specifier: string, fromFile: string): string | null {
+  const base = specifier.startsWith("@/")
+    ? path.posix.join("src", specifier.slice(2))
+    : specifier.startsWith(".")
+      ? path.posix.join(path.posix.dirname(fromFile), specifier)
+      : null;
+  if (base == null) return null;
+  for (const candidate of [base + ".ts", base + ".tsx", path.posix.join(base, "index.ts")]) {
+    const absolute = path.join(process.cwd(), candidate);
+    if (existsSync(absolute) && statSync(absolute).isFile()) return candidate;
+  }
+  return null;
+}
+
+/** Everything the given entry modules pull in, split into source files and packages. */
+function importClosure(entries: string[]): { files: string[]; external: string[] } {
+  const files = new Set<string>();
+  const external = new Set<string>();
+  const pending = [...entries];
+  while (pending.length > 0) {
+    const file = pending.pop()!;
+    if (files.has(file)) continue;
+    files.add(file);
+    for (const specifier of collectImportSpecifiers(readSource(file), file)) {
+      const resolved = resolveSourceModule(specifier, file);
+      if (resolved == null) external.add(specifier);
+      else pending.push(resolved);
+    }
+  }
+  return { files: [...files].sort(), external: [...external].sort() };
+}
+
+/**
+ * The first-run wizard and the server policy used to state the rules separately
+ * and had drifted: the form accepted a 100-character password the policy then
+ * refused, because bcrypt only hashes the first 72 bytes. These cases pin the
+ * single rule both sides now read, at the byte boundaries that decide it.
+ */
+describe("shared password rules", () => {
+  const cases: Array<[string, string, PasswordRuleViolation | null]> = [
+    ["seven characters", "abcdef1", "length"],
+    ["eight characters", "abcdefg1", null],
+    ["129 characters", "a".repeat(128) + "1", "length"],
+    ["72 encoded bytes", "a".repeat(71) + "1", null],
+    ["73 encoded bytes", "a".repeat(72) + "1", "bytes"],
+    ["100 ASCII characters", "a".repeat(98) + "1x", "bytes"],
+    ["Chinese characters below the byte cap", "\u6d4b".repeat(20) + "a1", null],
+    ["Chinese characters above the byte cap", "\u6d4b".repeat(25), "bytes"],
+    ["emoji above the byte cap", "\u{1f600}".repeat(20), "bytes"],
+    ["four emoji with a short suffix", "\u{1f600}".repeat(4) + "a1", null],
+    ["digits only", "12345678", "composition"],
+    ["letters only", "abcdefgh", "composition"],
+    ["spaces kept as typed", "  abcd1 ", null],
+  ];
+
+  it.each(cases)("reads %s as %s", (_label, password, expected) => {
+    expect(getPasswordRuleViolation(password)).toBe(expected);
+  });
+
+  it.each(cases)("holds the policy to the same verdict for %s", (_label, password, expected) => {
+    if (expected == null) {
+      expect(() => validatePassword(password)).not.toThrow();
+      return;
+    }
+    let rejection: unknown;
+    try {
+      validatePassword(password);
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(AppError);
+    expect((rejection as AppError).message).toBe(PASSWORD_RULE_MESSAGES[expected]);
+    expect((rejection as AppError).code).toBe(
+      expected === "length"
+        ? AUTH_ERROR_CODES.PASSWORD_TOO_SHORT
+        : AUTH_ERROR_CODES.PASSWORD_REQUIREMENTS_NOT_MET
+    );
+  });
+
+  it("keeps the messages the API already answered with", () => {
+    expect(PASSWORD_RULE_MESSAGES.length).toBe("Password must be between 8 and 128 characters");
+    expect(PASSWORD_RULE_MESSAGES.bytes).toBe("Password must be at most 72 UTF-8 bytes");
+    expect(PASSWORD_RULE_MESSAGES.composition).toBe(
+      "Password must contain at least one letter and one number"
+    );
+  });
+
+  it("leaves the shared module with no imports and no environment reads", () => {
+    const source = readSource("src/modules/auth/password-rules.ts");
+    expect(collectImportSpecifiers(source, "src/modules/auth/password-rules.ts")).toEqual([]);
+    expect(source).not.toContain("process.env");
+    expect(importClosure(["src/modules/auth/password-rules.ts"])).toEqual({
+      files: ["src/modules/auth/password-rules.ts"],
+      external: [],
+    });
+  });
+
+  it("keeps bcrypt, the database and the policy out of the browser's dependency graph", () => {
+    const closure = importClosure([
+      "src/modules/auth/password-rules.ts",
+      "src/modules/setup/contract-schemas.ts",
+    ]);
+
+    // The closure has to be walked at all before the exclusions mean anything.
+    expect(closure.files).toContain("src/lib/errors.ts");
+    expect(closure.external).toContain("zod");
+    expect(closure.files).not.toContain("src/modules/auth/services/password-policy.ts");
+    for (const forbidden of [
+      "bcryptjs",
+      "bcrypt",
+      "pg",
+      "server-only",
+      "drizzle-orm",
+      "next/headers",
+    ]) {
+      expect(closure.external).not.toContain(forbidden);
+    }
+    for (const file of closure.files) {
+      expect(file.startsWith("src/application/")).toBe(false);
+      expect(file.startsWith("src/persistence/")).toBe(false);
+      expect(file).not.toBe("src/lib/db.ts");
+    }
   });
 });

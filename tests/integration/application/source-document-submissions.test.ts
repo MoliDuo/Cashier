@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
+import { Pool, type PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
 import {
   PostgresProcessingJobAdapter,
+  postgresBookAdapter,
   postgresLedgerProjectionAdapter,
   postgresRevisionAdapter,
   postgresSourceDocumentSubmissionAdapter,
@@ -10,6 +12,7 @@ import {
 } from "@/application/adapters/postgres";
 import {
   ledgerEntries,
+  ledgers,
   idempotencyRecords,
   processingAttempts,
   processingOutbox,
@@ -21,8 +24,8 @@ import {
 } from "@/persistence";
 import { ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
-import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { getTestDb } from "../../setup";
+import { createTestBooks, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
+import { getTestDb, getTestSchemaName } from "../../setup";
 
 class MemoryFileStore {
   readonly files = new Map<string, Buffer>();
@@ -463,5 +466,265 @@ describe("target source-document submissions", () => {
         bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+/**
+ * A pool of its own, so a case can hold a transaction open without starving the
+ * pool the shared `db` uses for the code under test.
+ */
+function racePool(): Pool {
+  const schema = getTestSchemaName();
+  if (!/^[a-zA-Z0-9_]+$/.test(schema)) throw new Error("Unexpected test schema name");
+  return new Pool({
+    connectionString: process.env.DATABASE_URL,
+    options: `-c search_path=${schema},public`,
+    max: 4,
+  });
+}
+
+/**
+ * Takes the ledger row lock the archive and delete paths take, and returns the
+ * transaction id other sessions will block on. The id is read from `pg_locks`
+ * rather than `pg_current_xact_id()` because only the former is the same 32-bit
+ * value a waiter's lock entry names.
+ */
+async function lockLedgerRow(client: PoolClient, ledgerId: string): Promise<string> {
+  await client.query("BEGIN");
+  await client.query("SELECT id FROM ledgers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [
+    ledgerId,
+  ]);
+  const held = await client.query<{ xid: string }>(
+    `SELECT transactionid::text AS xid
+       FROM pg_locks
+      WHERE pid = pg_backend_pid() AND locktype = 'transactionid' AND granted`
+  );
+  const xid = held.rows[0]?.xid;
+  if (xid == null) throw new Error("The blocking transaction holds no row lock");
+  return xid;
+}
+
+/**
+ * Waits until another session is genuinely waiting on the lock `holderXid`
+ * holds. Polling the exact blocking transaction — rather than sleeping a fixed
+ * time — is what makes the race cases deterministic.
+ */
+async function waitUntilBlockedOn(pool: Pool, holderXid: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const { rows } = await pool.query<{ waiting: number }>(
+      `SELECT count(*)::int AS waiting
+         FROM pg_locks
+        WHERE NOT granted AND locktype = 'transactionid' AND transactionid::text = $1`,
+      [holderXid]
+    );
+    if (Number(rows[0]?.waiting ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("Timed out waiting for the competing transaction to block on the ledger lock");
+}
+
+async function expectNoRecordRows(db: ReturnType<typeof getTestDb>): Promise<void> {
+  expect(await db.select().from(sourceDocuments)).toHaveLength(0);
+  expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
+  expect(await db.select().from(processingOutbox)).toHaveLength(0);
+}
+
+/**
+ * The new-record path resolves its book before the write transaction opens, so
+ * only the lock the insert takes can make that choice final. These cases drive
+ * the real ports across two connections.
+ */
+describe("new-record submission against a concurrent archive or ledger delete", () => {
+  it("refuses a new record for a book archived before the insert", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
+    expect(await postgresBookAdapter.archive(ledgerId, travel)).toMatchObject({
+      status: "archived",
+    });
+
+    await expect(
+      postgresSourceDocumentSubmissionAdapter.submit({
+        ledgerId,
+        bookId: travel,
+        input: { text: "late", storedFileIds: [], documentDate: null },
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND", message: "Book not found" });
+    await expectNoRecordRows(db);
+  });
+
+  it("refuses a new record for a ledger deleted before the insert", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
+    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, ledgerId));
+
+    await expect(
+      postgresSourceDocumentSubmissionAdapter.submit({
+        ledgerId,
+        bookId,
+        input: { text: "late", storedFileIds: [], documentDate: null },
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND", message: "Ledger not found" });
+    await expectNoRecordRows(db);
+  });
+
+  it("refuses a book that belongs to another ledger", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const other = await createTestUserWithLedger(
+      db,
+      "other@example.com",
+      undefined,
+      crypto.randomUUID()
+    );
+    const foreignBookId = await testBookId(db, ledgerId);
+
+    await expect(
+      postgresSourceDocumentSubmissionAdapter.submit({
+        ledgerId: other.ledgerId,
+        bookId: foreignBookId,
+        input: { text: "cross-ledger", storedFileIds: [], documentDate: null },
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND", message: "Book not found" });
+    expect(await db.select().from(sourceDocuments)).toHaveLength(0);
+  });
+
+  it("refuses the insert an archive that already holds the ledger lock", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
+    const pool = racePool();
+    const blocker = await pool.connect();
+    try {
+      const holderXid = await lockLedgerRow(blocker, ledgerId);
+      await blocker.query(
+        "UPDATE books SET archived_at = now(), updated_at = now() WHERE ledger_id = $1 AND id = $2",
+        [ledgerId, travel]
+      );
+      const insert = postgresSourceDocumentSubmissionAdapter
+        .submit({
+          ledgerId,
+          bookId: travel,
+          input: { text: "late", storedFileIds: [], documentDate: null },
+        })
+        .then(
+          () => null,
+          (error: unknown) => error
+        );
+      await waitUntilBlockedOn(pool, holderXid);
+      await blocker.query("COMMIT");
+      expect(await insert).toMatchObject({ code: "NOT_FOUND", message: "Book not found" });
+    } finally {
+      blocker.release();
+      await pool.end();
+    }
+    await expectNoRecordRows(db);
+  });
+
+  it("refuses the insert a ledger delete that already holds the lock", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
+    const pool = racePool();
+    const blocker = await pool.connect();
+    try {
+      const holderXid = await lockLedgerRow(blocker, ledgerId);
+      await blocker.query("UPDATE ledgers SET deleted_at = now() WHERE id = $1", [ledgerId]);
+      const insert = postgresSourceDocumentSubmissionAdapter
+        .submit({
+          ledgerId,
+          bookId,
+          input: { text: "late", storedFileIds: [], documentDate: null },
+        })
+        .then(
+          () => null,
+          (error: unknown) => error
+        );
+      await waitUntilBlockedOn(pool, holderXid);
+      await blocker.query("COMMIT");
+      expect(await insert).toMatchObject({ code: "NOT_FOUND", message: "Ledger not found" });
+    } finally {
+      blocker.release();
+      await pool.end();
+    }
+    await expectNoRecordRows(db);
+  });
+
+  it("makes an archive wait for the insert and still retries the existing record", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
+    const pool = racePool();
+    const holder = await pool.connect();
+    const documentId = crypto.randomUUID();
+    try {
+      // The lock sequence a new submission takes, held open on purpose so the
+      // archive is the transaction that has to wait.
+      const holderXid = await lockLedgerRow(holder, ledgerId);
+      await holder.query(
+        "SELECT id FROM books WHERE ledger_id = $1 AND id = $2 AND archived_at IS NULL FOR SHARE",
+        [ledgerId, travel]
+      );
+      await holder.query(
+        "INSERT INTO source_documents (id, ledger_id, book_id, created_at, updated_at)" +
+          " VALUES ($1, $2, $3, now(), now())",
+        [documentId, ledgerId, travel]
+      );
+
+      const archive = postgresBookAdapter.archive(ledgerId, travel).then(
+        (result) => result,
+        (error: unknown) => error
+      );
+      await waitUntilBlockedOn(pool, holderXid);
+      await holder.query("COMMIT");
+      expect(await archive).toMatchObject({ status: "archived" });
+    } finally {
+      holder.release();
+      await pool.end();
+    }
+
+    const retry = await postgresSourceDocumentSubmissionAdapter.submit({
+      ledgerId,
+      sourceDocumentId: documentId,
+      input: { text: "retry", storedFileIds: [], documentDate: null },
+    });
+    expect(retry.document.id).toBe(documentId);
+    expect(await db.select().from(sourceDocuments)).toHaveLength(1);
+    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
+    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+  });
+
+  it("replays a completed idempotent submission without a second document", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
+    const idempotency = {
+      principalType: "user" as const,
+      principalId: crypto.randomUUID(),
+      key: `create:${crypto.randomUUID()}`,
+      contentFingerprint: null,
+    };
+    const prepare = async () => ({
+      ledgerId,
+      bookId,
+      input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
+    });
+
+    const created = await postgresSourceDocumentSubmissionAdapter.submitIdempotently!(
+      idempotency,
+      prepare
+    );
+    const replay = await postgresSourceDocumentSubmissionAdapter.submitIdempotently!(
+      idempotency,
+      prepare
+    );
+
+    expect(replay.document.id).toBe(created.document.id);
+    expect(replay.idempotencyReplay).toBe(true);
+    expect(await db.select().from(sourceDocuments)).toHaveLength(1);
+    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
+    expect(await db.select().from(processingOutbox)).toHaveLength(1);
   });
 });

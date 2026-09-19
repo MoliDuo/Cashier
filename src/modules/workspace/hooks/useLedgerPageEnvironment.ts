@@ -3,6 +3,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
+import { runtimeEnv } from "@/lib/env/runtime";
 import { getLedgerAction } from "@/modules/ledger/server-actions/get";
 import { getEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
@@ -19,7 +20,9 @@ import {
 
 const STALE_TIME = LEDGER.STALE_TIME_MS;
 const subscribeToDeviceTimeZone = () => () => {};
-const getServerTimeZone = () => undefined;
+const getDeviceTimeZoneSnapshot = () => readDeviceTimeZone() ?? undefined;
+const getHydratedSnapshot = () => true;
+const getServerSnapshotFalse = () => false;
 
 interface UseLedgerPageEnvironmentOptions {
   ledgerId: string;
@@ -28,6 +31,12 @@ interface UseLedgerPageEnvironmentOptions {
   initialLedger?: LedgerDto | undefined;
   initialCategories?: EntryCategoryWithCount[] | undefined;
   initialBooks?: readonly BookDto[] | undefined;
+  /**
+   * The device zone the server read from this browser's cookie, null when it had
+   * none. It is the server's own answer, so the first client render matches the
+   * markup the server sent.
+   */
+  initialDeviceTimeZone: string | null;
   setIsInputOpen: (open: boolean) => void;
 }
 
@@ -42,6 +51,7 @@ export function useLedgerPageEnvironment({
   initialLedger,
   initialCategories,
   initialBooks,
+  initialDeviceTimeZone,
   setIsInputOpen,
 }: UseLedgerPageEnvironmentOptions) {
   const { data: ledger } = useQuery({
@@ -62,18 +72,41 @@ export function useLedgerPageEnvironment({
 
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const preferredCurrencies = ledger?.settings.currencies ?? [];
-  const { books, defaultBook } = useBooks({
+  const { books, booksQuery } = useBooks({
     ledgerId,
     ...(initialBooks !== undefined ? { initialBooks } : {}),
   });
-  // The viewed book's zone, or the default book's when reading 总账: a book with
-  // no zone of its own means this device decides, exactly as before.
-  const scopeBook = scope == null ? defaultBook : (books?.find((b) => b.id === scope) ?? null);
-  const fixedTimeZone = scopeBook?.timeZone ?? undefined;
+  // The viewed book's zone decides; on 总账 — every book at once — the device's
+  // own zone does, since no single book owns the view.
+  const scopeBook = scope == null ? null : (books?.find((b) => b.id === scope) ?? null);
+  const fixedTimeZone =
+    scopeBook?.timeZone != null && scopeBook.timeZone !== "" ? scopeBook.timeZone : undefined;
+  // Before hydration this is the zone the server rendered with; after it, it is
+  // the browser's own, which the effect below writes back as the cookie that
+  // dates the next request. Reading it only after hydration is what stops the
+  // first client render from disagreeing with the markup it is hydrating.
   const deviceTimeZone =
-    useSyncExternalStore(subscribeToDeviceTimeZone, readDeviceTimeZone, getServerTimeZone) ??
-    undefined;
-  const effectiveTimeZone = fixedTimeZone ?? deviceTimeZone;
+    useSyncExternalStore(
+      subscribeToDeviceTimeZone,
+      getDeviceTimeZoneSnapshot,
+      () => initialDeviceTimeZone ?? undefined
+    ) ?? undefined;
+  const isHydrated = useSyncExternalStore(
+    subscribeToDeviceTimeZone,
+    getHydratedSnapshot,
+    getServerSnapshotFalse
+  );
+  // A viewed book cannot be dated until the list naming it has answered — its own
+  // zone may be the answer. A list that failed has answered too, in the sense that
+  // the tab must not wait on it for ever: it dates by the device zone, and the
+  // failed read keeps the retry it already has. A browser that cannot name a zone
+  // is dated by the deployment's, exactly as the server would have; waiting for it
+  // would never end.
+  const bookScopeResolved = scope == null || books !== undefined || booksQuery.isError;
+  const timeZoneReady =
+    fixedTimeZone != null || (bookScopeResolved && (deviceTimeZone != null || isHydrated));
+  const effectiveTimeZone =
+    fixedTimeZone ?? deviceTimeZone ?? (isHydrated ? runtimeEnv.timeZone : undefined);
 
   // The server prefetches the page and the hovered tab, and it has no device.
   // The zone resolved here is written where a server render can read it, so a
@@ -109,7 +142,6 @@ export function useLedgerPageEnvironment({
   return {
     ledger,
     books: books ?? [],
-    defaultBook,
     categoriesQuery,
     categories,
     categoriesHaveNoData,
@@ -117,6 +149,7 @@ export function useLedgerPageEnvironment({
     preferredCurrencies,
     effectiveTimeZone,
     deviceTimeZone,
+    timeZoneReady,
     dirtyChangeCount,
   };
 }

@@ -39,6 +39,14 @@ interface LedgerPageClientProps {
   initialCategories?: EntryCategoryWithCount[];
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks?: readonly BookDto[];
+  /** The book this device's cookie resolved to, null for 总账. */
+  initialBookId?: string | null;
+  /**
+   * The device zone the server read from this browser's cookie. The tabs date by
+   * it when the viewed book has no zone of its own, so a page that arrives
+   * without one mounts its date queries only after the browser has answered.
+   */
+  initialDeviceTimeZone?: string | null;
   /** Server-derived user email for the Settings tab (avoids useSession). */
   userEmail?: string;
   hasPassword?: boolean;
@@ -67,6 +75,8 @@ export function LedgerPageClient({
   ledgerToday,
   initialCategories,
   initialBooks,
+  initialBookId,
+  initialDeviceTimeZone,
   userEmail,
   hasPassword,
   passwordUpdatedAt,
@@ -81,14 +91,12 @@ export function LedgerPageClient({
     ledgerId,
     ...(initialBooks !== undefined ? { initialBooks } : {}),
   });
-  // null is 总账. The scope lives in the URL because the server prefetches with
-  // it and the shell prefetches the hovered tab with it; the switcher and the
-  // archived/deleted reset below are its only writers.
+  // null is 总账. The scope is this device's remembered choice — seeded from
+  // what the server resolved out of the scope cookie, written back to it on
+  // every change — so a reload or a new tab picks up where the reader left off.
   const { recordScope, onRecordScopeChange: handleRecordScopeChange } = useRecordScope({
     books,
-    searchParams,
-    pathname,
-    locale,
+    initialScope: initialBookId ?? null,
   });
   const categoryAssignment = useCategoryAssignmentJob(ledgerId);
 
@@ -144,6 +152,7 @@ export function LedgerPageClient({
     preferredCurrencies,
     effectiveTimeZone,
     deviceTimeZone,
+    timeZoneReady,
     dirtyChangeCount,
   } = useLedgerPageEnvironment({
     ledgerId,
@@ -151,6 +160,7 @@ export function LedgerPageClient({
     initialLedger,
     initialCategories,
     ...(initialBooks !== undefined ? { initialBooks } : {}),
+    initialDeviceTimeZone: initialDeviceTimeZone ?? null,
     setIsInputOpen,
   });
 
@@ -252,6 +262,7 @@ export function LedgerPageClient({
           onFiltersChange={handleFiltersChange}
           advancedFilters={advancedFilters}
           effectiveTimeZone={effectiveTimeZone}
+          timeZoneReady={timeZoneReady}
           ledgerToday={ledgerToday}
           onCategoryDrilldown={handleCategoryDrilldown}
           onDateDrilldown={handleDateDrilldown}

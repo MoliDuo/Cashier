@@ -21,7 +21,12 @@ export function useActiveTabQueryState({
       }
       if (activeTab === "details") return key[2] === "entries" || key[2] === "summary";
       if (activeTab === "stats") return key[2] === "enhanced-stats";
-      return key.length === 2 || key[2] === "categories" || key[2] === "settings";
+      // 设置 owns the ledger itself, its categories, its settings and both book
+      // lists — the switcher's live one and the archived-inclusive one the 分账
+      // section reads — so a refresh has to cover every one of them.
+      return (
+        key.length === 2 || key[2] === "categories" || key[2] === "settings" || key[2] === "books"
+      );
     },
     [activeTab, ledgerId]
   );

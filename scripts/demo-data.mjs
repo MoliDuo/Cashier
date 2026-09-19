@@ -19,6 +19,21 @@ const CREDENTIAL_DISPLAY_SUFFIX_LENGTH = 4;
 const CREDENTIAL_TOKEN_PREFIX = "sk_live_";
 
 /**
+ * The two schemas every demo rebuild drops, and the rows inside `public` that
+ * decide what the rebuild would replace. Nothing here names a business column:
+ * a preview has to describe a demo database a previous release left behind,
+ * whose tables may not have the columns the current schema expects.
+ */
+const DEMO_RESET_SCHEMAS = { data: "public", migrations: "drizzle" };
+const DEMO_RESET_DATA_TABLES = [
+  "users",
+  "ledgers",
+  "source_documents",
+  "ledger_entries",
+  "stored_files",
+];
+
+/**
  * Demo tokens keep the app's real format so the seeded rows exercise the same
  * hashing and parsing path, but the prefix is applied here rather than stored in
  * the fixture: a literal `sk_live_` followed by 48 hex characters is
@@ -73,9 +88,6 @@ export function validateDemoEnvironment(environment = process.env) {
   }
   if (!Array.isArray(fixture.books) || fixture.books.length === 0) {
     throw new Error("Demo fixture must define the books its records belong to");
-  }
-  if (fixture.books.filter((book) => book.isDefault).length !== 1) {
-    throw new Error("Demo fixture must mark exactly one book as the total default");
   }
   if ((environment.API_KEY_PEPPER ?? "").trim() === "") {
     throw new Error("API_KEY_PEPPER is required to seed demo service credentials");
@@ -276,10 +288,10 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   const bookIds = new Map();
   for (const book of fixture.books) {
     await client.query(
-      `INSERT INTO books (id, ledger_id, name, time_zone, sort_order, is_default, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+      `INSERT INTO books (id, ledger_id, name, time_zone, sort_order, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $6)
        ON CONFLICT (id) DO NOTHING`,
-      [book.id, ledgerId, book.name, book.timeZone, book.sortOrder, book.isDefault, now]
+      [book.id, ledgerId, book.name, book.timeZone, book.sortOrder, now]
     );
     bookIds.set(book.name, book.id);
   }
@@ -499,6 +511,138 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   }
 }
 
+function quoteIdentifier(value) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+async function schemaExists(client, schema) {
+  /**
+   * What one schema of a demo database holds. `rows` maps a counted table to its
+   * row count, or to null when the schema exists but that table does not.
+   *
+   * @typedef {{ exists: boolean, tables: string[], rows: Record<string, number | null> }} DemoResetSchema
+   */
+
+  /**
+   * Just enough of a database client to describe a schema: the preview never
+   * opens a pool, and a test can record every statement by standing in with this
+   * shape.
+   *
+   * @typedef {{ query: (sql: string, values?: unknown[]) => Promise<{ rows: any[] }> }} DemoResetClient
+   */
+
+  const result = await client.query("SELECT 1 FROM pg_namespace WHERE nspname = $1", [schema]);
+  return result.rows.length > 0;
+}
+
+async function listSchemaTables(client, schema) {
+  const result = await client.query(
+    `SELECT c.relname AS name
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')
+      ORDER BY c.relname`,
+    [schema]
+  );
+  return result.rows.map((row) => row.name);
+}
+
+/**
+ * @param {DemoResetClient} client
+ * @param {string} schema
+ * @param {readonly string[] | null} countedTables
+ * @returns {Promise<DemoResetSchema>}
+ */
+async function describeSchema(client, schema, countedTables) {
+  if (!(await schemaExists(client, schema))) {
+    // A preview of a database that is not there yet is still a preview: the
+    // targets are named, and every one of them is absent rather than zero.
+    return {
+      exists: false,
+      tables: [],
+      rows: Object.fromEntries((countedTables ?? []).map((table) => [table, null])),
+    };
+  }
+  const tables = await listSchemaTables(client, schema);
+  const existing = new Set(tables);
+  // The data tables are asked about by name, so an un-migrated database reports
+  // them as absent; the bookkeeping schema is whatever Drizzle created there.
+  const targets = countedTables ?? tables;
+  const rows = {};
+  for (const table of targets) {
+    if (!existing.has(table)) {
+      rows[table] = null;
+      continue;
+    }
+    const counted = await client.query(
+      `SELECT count(*)::int AS count FROM ${quoteIdentifier(schema)}.${quoteIdentifier(table)}`
+    );
+    rows[table] = counted.rows[0].count;
+  }
+  return { exists: true, tables, rows };
+}
+
+/**
+ * Reads what a demo rebuild would replace — schemas, tables and row counts —
+ * and writes nothing.
+ *
+ * Everything goes through the catalog, so a demo database a previous release
+ * left behind can still be described; and the transaction is opened READ ONLY,
+ * so a write added here by accident fails instead of quietly turning the
+ * preview into a rebuild.
+ *
+ * @testOnly Reports the demo reset targets from a live connection, read-only.
+ * @param {DemoResetClient} client
+ * @param {{ dataSchema?: string, migrationsSchema?: string }} [options]
+ */
+export async function inspectDemoResetTargets(client, options = {}) {
+  const dataSchema = options.dataSchema ?? DEMO_RESET_SCHEMAS.data;
+  const migrationsSchema = options.migrationsSchema ?? DEMO_RESET_SCHEMAS.migrations;
+  await client.query("BEGIN READ ONLY");
+  try {
+    const schemas = {
+      [dataSchema]: await describeSchema(client, dataSchema, DEMO_RESET_DATA_TABLES),
+      [migrationsSchema]: await describeSchema(client, migrationsSchema, null),
+    };
+    await client.query("COMMIT");
+    return { schemas };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
+/**
+ * Answers "what would a reset replace?" without replacing anything.
+ *
+ * The connection string never reaches the log — it carries the demo database's
+ * credentials, and this output exists to be read and pasted around — and no
+ * object storage client is built, so no object can be written or deleted.
+ *
+ * @testOnly Prints the reset preview; refuses every non-demo target.
+ * @param {NodeJS.ProcessEnv} [environment]
+ */
+export async function previewDemoReset(environment = process.env) {
+  const { databaseUrl } = validateDemoEnvironment(environment);
+  const target = new URL(databaseUrl);
+  const client = new pg.Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const preview = {
+      mode: "preview-reset",
+      apply: false,
+      database: `${target.host}${target.pathname}`,
+      ...(await inspectDemoResetTargets(client)),
+    };
+    console.log(JSON.stringify(preview));
+    console.log("[demo] Preview only: nothing was dropped, migrated or seeded.");
+    console.log("[demo] Run `npm run demo:reset -- --apply` to rebuild the demo workspace.");
+    return preview;
+  } finally {
+    await client.end();
+  }
+}
+
 async function runDemoData({ mode = "seed", apply = false, environment = process.env } = {}) {
   const { databaseUrl } = validateDemoEnvironment(environment);
   if (
@@ -595,6 +739,12 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
 
 async function main() {
   const args = new Set(process.argv.slice(2));
+  // Checked before anything else: `preview-reset` has to answer without the
+  // schema drop, the migrations or the seed that follow it ever running.
+  if (args.has("preview-reset")) {
+    await previewDemoReset();
+    return;
+  }
   if (args.has("reset-schema")) {
     await resetDemoSchema();
     console.log("[demo] Demo schema dropped; the migrations will rebuild it.");

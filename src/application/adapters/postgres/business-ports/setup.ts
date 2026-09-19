@@ -156,7 +156,6 @@ export const postgresSetupAdapter: SetupPort = {
           name,
           timeZone: null,
           sortOrder: index + 1,
-          isDefault: name === input.defaultBookName,
         }))
       );
 

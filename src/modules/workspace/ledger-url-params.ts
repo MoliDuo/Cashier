@@ -2,12 +2,8 @@ import type { SourceDocumentProcessingStatus } from "@/modules/source-document/t
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from "@/i18n/locales";
 import { DECIMAL_STRING_PATTERN, normalize as normalizeDecimal } from "@/lib/money/decimal";
 import { isValidDateString } from "@/lib/date-utils";
-import { isValidUuid } from "@/lib/validation";
 
 const STATUSES_URL_PARAM = "statuses";
-/** The book a page is narrowed to. It is in the URL because the server
- * prefetches with it; 总账 is the parameter being absent. */
-const RECORD_SCOPE_URL_PARAM = "bookId";
 export type LedgerFilterScope = "stream" | "details";
 /** Only records have a detail sheet; an entry URL is no longer a valid target
  * and parses to null, so a stale `detailType=ledger-entry` link is dropped. */
@@ -204,30 +200,6 @@ export function setLedgerDetailSearchParams(
   return params;
 }
 
-/**
- * The book the page is narrowed to, or null for 总账. A malformed or
- * non-version-4 id is 总账 too: the tabs and the bootstrap only ever pass it
- * back into validated queries, so a foreign value must not travel.
- */
-export function readRecordScopeSearchParams(
-  searchParams: Pick<URLSearchParams, "get">
-): string | null {
-  const raw = searchParams.get(RECORD_SCOPE_URL_PARAM);
-  if (raw == null || !isValidUuid(raw)) return null;
-  return raw;
-}
-
-/** Narrows the page to a book, or clears the narrowing for 总账. */
-export function setRecordScopeSearchParams(
-  current: SearchParamsStringLike,
-  bookId: string | null
-): URLSearchParams {
-  const params = new URLSearchParams(current.toString());
-  if (bookId == null || bookId === "") params.delete(RECORD_SCOPE_URL_PARAM);
-  else params.set(RECORD_SCOPE_URL_PARAM, bookId);
-  return params;
-}
-
 export function readStatsSearchParams(searchParams: Pick<URLSearchParams, "get">): StatsUrlState {
   const rawRange = searchParams.get("statsRange");
   const rawView = searchParams.get("statsView");
@@ -292,14 +264,6 @@ export function normalizeLedgerUrlSearchParams(current: SearchParamsLike): URLSe
       params.delete(endKey);
       changed = true;
     }
-  }
-
-  if (
-    params.has(RECORD_SCOPE_URL_PARAM) &&
-    params.get(RECORD_SCOPE_URL_PARAM) !== readRecordScopeSearchParams(params)
-  ) {
-    params.delete(RECORD_SCOPE_URL_PARAM);
-    changed = true;
   }
 
   if (detail == null && (params.has("detailType") || params.has("detailId"))) {

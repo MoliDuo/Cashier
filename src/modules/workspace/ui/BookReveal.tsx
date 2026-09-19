@@ -25,8 +25,10 @@ interface BookRevealProps {
  * until the page is pulled down at its top, so switching books does not take a
  * row of controls on every visit.
  *
- * 总账 comes first and is the default, then the books in their configured order.
- * The strip scrolls sideways once there are more books than fit.
+ * 总账 comes first, then the books in their configured order. The view itself
+ * follows this device's last choice — the first visit shows 总账 — and picking
+ * here is what the page remembers. The strip scrolls sideways once there are
+ * more books than fit.
  *
  * The grid does the animation: one auto row from `0fr` to `1fr`, with the strip
  * itself `overflow-hidden`. While it is closed the whole thing is `inert`, so

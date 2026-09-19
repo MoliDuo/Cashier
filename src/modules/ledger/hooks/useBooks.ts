@@ -39,7 +39,6 @@ export function useBooks({ ledgerId, initialBooks, includeArchived }: UseBooksOp
   const books = booksQuery.data;
   return {
     books,
-    defaultBook: books?.find((book) => book.isDefault) ?? null,
     booksQuery,
   };
 }

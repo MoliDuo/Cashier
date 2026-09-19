@@ -11,10 +11,10 @@ export interface LedgerPort {
 }
 
 /**
- * A 分账. `isDefault` is the book that 总账-entered records land in, stored as a
- * flag rather than resolved by name. `timeZone` null means the device's zone.
- * `archivedAt` set means the book is retired: its records still count in 总账,
- * but it is no longer offered as a target for new ones.
+ * A 分账. Reading every book together is 总账, a view over all of them rather
+ * than a designated one. `timeZone` null means the device's zone. `archivedAt`
+ * set means the book is retired: its records still count in 总账, but it is no
+ * longer offered as a target for new ones.
  */
 export interface BookContract {
   id: string;
@@ -22,14 +22,12 @@ export interface BookContract {
   name: string;
   timeZone: string | null;
   sortOrder: number;
-  isDefault: boolean;
   archivedAt: string | null;
 }
 
 export interface BookCreateContract {
   name: string;
   timeZone: string | null;
-  isDefault?: boolean;
 }
 
 export interface BookUpdateContract {
@@ -60,8 +58,8 @@ export interface BookPort {
   reorder(ledgerId: LedgerId, bookIds: readonly string[]): Promise<readonly BookContract[]>;
   /**
    * Retires a book that still holds records; those records keep counting in
-   * 总账. Refused for the default book, the last active book, and a book that
-   * still has API keys bound to it.
+   * 总账. Refused for the last active book, and for a book that still has an
+   * active API key bound to it.
    */
   archive(ledgerId: LedgerId, bookId: string): Promise<ArchiveBookResult>;
   /** Brings an archived book back; the name must be free among the live books. */
@@ -72,8 +70,6 @@ export interface BookPort {
    * book with no API keys bound to it.
    */
   delete(ledgerId: LedgerId, bookId: string): Promise<DeleteBookResult>;
-  /** Moves the 总账 default flag onto `bookId`. */
-  setDefault(ledgerId: LedgerId, bookId: string): Promise<readonly BookContract[]>;
   /** How many live records the book holds; 0 means it can be archived. */
   countDocuments(ledgerId: LedgerId, bookId: string): Promise<number>;
   /** Whether any API key is still bound to the book. */

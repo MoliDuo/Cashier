@@ -125,7 +125,6 @@ export interface UserAccountPort {
  */
 export interface SetupContract {
   bookNames: readonly string[];
-  defaultBookName: string;
   email: string;
   password: string;
   locale: string;

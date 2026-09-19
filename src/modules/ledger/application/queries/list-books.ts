@@ -8,7 +8,6 @@ export function toBookDto(book: BookContract): BookDto {
     name: book.name,
     timeZone: book.timeZone,
     sortOrder: book.sortOrder,
-    isDefault: book.isDefault,
     archivedAt: book.archivedAt,
   };
 }

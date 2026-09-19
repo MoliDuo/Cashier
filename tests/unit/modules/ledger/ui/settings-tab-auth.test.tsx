@@ -13,7 +13,6 @@ const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
       name: "共同支出",
       timeZone: null,
       sortOrder: 1,
-      isDefault: true,
       archivedAt: null,
     },
   ],
@@ -55,7 +54,6 @@ vi.mock("next-themes", () => ({
 vi.mock("@/modules/ledger/hooks/useBooks", () => ({
   useBooks: () => ({
     books: BOOKS,
-    defaultBook: BOOKS[0],
     booksQuery: { status: "success" },
   }),
 }));
@@ -65,7 +63,6 @@ vi.mock("@/modules/ledger/hooks/useBookMutations", () => ({
     createBook: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
     updateBook: { mutate: vi.fn(), isPending: false },
     reorderBooks: { mutate: vi.fn(), isPending: false },
-    setDefaultBook: { mutate: vi.fn(), isPending: false },
     archiveBook: { mutate: vi.fn(), isPending: false },
     restoreBook: { mutate: vi.fn(), isPending: false },
     deleteBook: { mutate: vi.fn(), isPending: false },
@@ -184,5 +181,20 @@ describe("SettingsTab account authentication controls", () => {
       type: "active",
       predicate: expect.any(Function),
     });
+    const { predicate } = refetchQueries.mock.calls[0]![0] as {
+      predicate: (query: { queryKey: readonly unknown[] }) => boolean;
+    };
+    // Retrying has to reach both book lists — the switcher's live one and the
+    // archived-inclusive one the 分账 section reads — while leaving the rest of
+    // the ledger alone.
+    expect(predicate({ queryKey: ["ledger", "ledger-1", "books"] })).toBe(true);
+    expect(predicate({ queryKey: ["ledger", "ledger-1", "books", "including-archived"] })).toBe(
+      true
+    );
+    expect(predicate({ queryKey: ["ledger", "ledger-2", "books"] })).toBe(false);
+    expect(predicate({ queryKey: ["ledger", "ledger-1", "source-documents", "stream"] })).toBe(
+      false
+    );
+    expect(predicate({ queryKey: ["ledger", "ledger-1", "categories"] })).toBe(true);
   });
 });

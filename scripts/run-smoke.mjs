@@ -8,6 +8,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { prepareTestPostgres } from "./prepare-test-postgres.mjs";
 import { createDemoAiServer } from "./demo-ai-server.mjs";
+import { createSmokeObjectStorage } from "./smoke-object-storage.mjs";
 
 const adminUrl = new URL(
   process.env.TEST_DATABASE_URL ?? "postgresql://cashier:cashier@127.0.0.1:55432/cashier_test"
@@ -34,7 +35,12 @@ const reservePort = async () => {
 };
 const port = await reservePort();
 const aiPort = await reservePort();
+const storagePort = await reservePort();
 const baseURL = `http://127.0.0.1:${port}`;
+// The upload path is part of what production does, so the run points it at an
+// in-memory S3 endpoint instead of a bucket: the image still travels through
+// the real client, and nothing leaves this machine or outlives the run.
+const storageEndpoint = `http://127.0.0.1:${storagePort}`;
 const password = `Smoke9-${randomUUID()}`;
 const userId = randomUUID();
 const sharedLedgerId = randomUUID();
@@ -54,11 +60,12 @@ const env = {
   OPENAI_API_KEY: "smoke-unused",
   OPENAI_BASE_URL: `http://127.0.0.1:${aiPort}/v1`,
   AI_MAX_RETRIES: "0",
-  S3_ENDPOINT: "http://127.0.0.1:1",
-  S3_PUBLIC_ENDPOINT: "http://127.0.0.1:1",
-  S3_BUCKET: "smoke-unused",
+  S3_ENDPOINT: storageEndpoint,
+  S3_PUBLIC_ENDPOINT: storageEndpoint,
+  S3_BUCKET: "smoke-objects",
   S3_ACCESS_KEY_ID: "smoke-unused",
   S3_SECRET_ACCESS_KEY: "smoke-unused",
+  S3_FORCE_PATH_STYLE: "true",
   DEV_AUTH_BYPASS: "false",
   TRUSTED_PROXY: "",
   TZ: "UTC",
@@ -71,6 +78,9 @@ let server;
 const aiServer = createDemoAiServer({ latencyMs: 3_000 });
 aiServer.listen(aiPort, "127.0.0.1");
 await once(aiServer, "listening");
+const storageServer = createSmokeObjectStorage({ log: console.log });
+storageServer.listen(storagePort, "127.0.0.1");
+await once(storageServer, "listening");
 let created = false;
 let interrupted = false;
 const run = async (args) => {
@@ -105,8 +115,9 @@ try {
     await db.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
     await migrate(drizzle(db), { migrationsFolder: "src/persistence/postgres-migrations" });
     const hash = await bcrypt.hash(password, 12);
-    // One account with one login address, one ledger and one book: the smoke
-    // suite signs in with the password, and every record it writes lands in 共同支出.
+    // One account with one login address and one ledger with two books: the
+    // smoke suite signs in with the password, and a record written from 总账
+    // lands in whichever book the writer picked (or the first one, 共同支出).
     await db.query(
       `INSERT INTO users (id, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, now(), now(), now())`,
       [userId, hash]
@@ -120,7 +131,11 @@ try {
       [sharedLedgerId, userId]
     );
     await db.query(
-      `INSERT INTO books (ledger_id, name, sort_order, is_default, created_at, updated_at) VALUES ($1, '共同支出', 1, true, now(), now())`,
+      `INSERT INTO books (ledger_id, name, sort_order, created_at, updated_at) VALUES ($1, '共同支出', 1, now(), now())`,
+      [sharedLedgerId]
+    );
+    await db.query(
+      `INSERT INTO books (ledger_id, name, sort_order, created_at, updated_at) VALUES ($1, '旅行支出', 2, now(), now())`,
       [sharedLedgerId]
     );
     for (const [index, name] of ["Food", "Shopping", "Travel"].entries()) {
@@ -153,6 +168,7 @@ try {
   await stop(activeChild);
   await stop(server);
   if (aiServer.listening) await new Promise((resolve) => aiServer.close(resolve));
+  if (storageServer.listening) await new Promise((resolve) => storageServer.close(resolve));
   if (created && /^smoke_[a-f0-9]{32}$/.test(databaseName)) {
     const target = await admin.query("SELECT datname FROM pg_database WHERE datname = $1", [
       databaseName,

@@ -12,7 +12,7 @@ import {
 } from "@/modules/ledger/contract-schemas";
 import { listBooks, toBookDto } from "@/modules/ledger/application/queries/list-books";
 import { serverComposition } from "@/application/server-composition-root";
-import { ValidationError, AppError } from "@/lib/errors";
+import { AppError, ValidationError } from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
 
 export type BookMutationErrorCode =
@@ -22,7 +22,6 @@ export type BookMutationErrorCode =
   | "has_records"
   | "has_credentials"
   | "last_book"
-  | "default_book"
   | "invalid_order"
   | "unexpected";
 export type BookMutationResult =
@@ -37,21 +36,27 @@ function blamesName(error: ValidationError): boolean {
 /**
  * The expected refusals are returned as codes rather than thrown: a server
  * action's thrown message is not a stable contract, and every one of these is
- * something the 设置 UI has to explain to the reader.
+ * something the 设置 UI has to explain to the reader. The port raises its own
+ * `AppError` codes, so the mapping never matches on message text.
  */
 function toBookMutationErrorCode(error: unknown): BookMutationErrorCode {
   if (!(error instanceof AppError)) return "unexpected";
-  if (error.code === "CONFLICT") return "name_taken";
-  if (error.code === "NOT_FOUND") return "not_found";
-  if (error.code !== "VALIDATION_ERROR") return "unexpected";
-  // The contract rejects a bad name before the port runs, and the port rejects
-  // an empty or over-long one too; both are about the value, not the save.
-  if (error instanceof ValidationError && blamesName(error)) return "invalid_name";
-  if (error.message.includes("last active book")) return "last_book";
-  if (error.message.includes("default book")) return "default_book";
-  if (error.message.includes("Reorder")) return "invalid_order";
-  if (error.message.includes("name")) return "invalid_name";
-  return "unexpected";
+  switch (error.code) {
+    case "BOOK_NAME_TAKEN":
+      return "name_taken";
+    case "BOOK_LAST_ACTIVE":
+      return "last_book";
+    case "BOOK_ORDER_INVALID":
+      return "invalid_order";
+    case "NOT_FOUND":
+      return "not_found";
+    case "VALIDATION_ERROR":
+      // The contract rejects a bad name before the port runs, and both sides
+      // point the issue at the `name` field.
+      return error instanceof ValidationError && blamesName(error) ? "invalid_name" : "unexpected";
+    default:
+      return "unexpected";
+  }
 }
 
 async function runBookMutation(
@@ -137,18 +142,9 @@ export const reorderBooksAction = withLedgerAccess(
     })
 );
 
-export const setDefaultBookAction = withLedgerAccess(
-  (ledgerId: string, bookId: string): Promise<BookMutationResult> =>
-    runBookMutation(async () => {
-      const validatedId = parseBookId(bookId);
-      await serverComposition.books.setDefault(ledgerId, validatedId);
-      return { books: await listBooksIncludingArchived(ledgerId) };
-    })
-);
-
 /**
- * Retires a book that still holds records. Refused while an API key is bound to
- * it, and for the default or last live book; those come back as codes so 设置 can
+ * Retires a book that still holds records. Refused while an active API key is
+ * bound to it, or for the last live book; those come back as codes so 设置 can
  * say which one it is.
  */
 export const archiveBookAction = withLedgerAccess(

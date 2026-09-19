@@ -17,10 +17,10 @@ import { pickMessages, FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
 import {
   getScopedLedgerSearchParams,
   readLedgerFilterParams,
-  readRecordScopeSearchParams,
   readStatsSearchParams,
 } from "@/modules/workspace/ledger-url-params";
 import { DEVICE_TIME_ZONE_COOKIE, parseDeviceTimeZoneCookie } from "@/lib/time-zone-cookie";
+import { BOOK_SCOPE_COOKIE, parseBookScopeCookie } from "@/lib/book-scope-cookie";
 import { ActiveContent } from "./_active-content";
 import { ActiveShell } from "./_active-shell";
 import { LedgerBootstrapFallback } from "./_ledger-bootstrap-fallback";
@@ -38,6 +38,18 @@ interface ActiveTabBootstrapProps {
   ledgerDto: LedgerDto;
   activeTab: LedgerTab;
   session: AuthenticatedHomeContext["session"];
+  /**
+   * The book this device's cookie names, validated as a UUID but not yet
+   * against the live list. It is the fallback scope for a bootstrap that answers
+   * nothing: losing it would quietly reset the reader to 总账.
+   */
+  rememberedBookId: string | null;
+  /**
+   * The device zone the server read from this browser's cookie, validated but
+   * possibly absent. It survives a failed bootstrap so the page still dates by
+   * the device the first time it renders.
+   */
+  initialDeviceTimeZone: string | null;
 }
 
 interface ActiveTabProps {
@@ -65,13 +77,16 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   const activeTab = parseLedgerTab(searchParams);
   const filterScope = activeTab === "details" ? "details" : "stream";
   const urlSearchParams = toUrlSearchParams(searchParams);
-  // The viewed book travels in the URL, so the server prefetches the same scope
-  // the tabs are about to render. 总账 is the parameter being absent.
-  const bookId = readRecordScopeSearchParams(urlSearchParams);
+  // The viewed book is this device's remembered choice, not a URL parameter:
+  // the cookie lets the server resolve the right scope on the first request,
+  // so the prefetch already fills the view the reader left off at. 总账 is the
+  // cookie being absent, `all`, or naming a book that is no longer live — the
+  // bootstrap checks it against the live books.
+  const cookieStore = await cookies();
+  const bookScopeCookie = parseBookScopeCookie(cookieStore.get(BOOK_SCOPE_COOKIE)?.value ?? null);
   // The device zone the browser reported, written by the client after its first
   // render. It only breaks ties for a book without a zone of its own; an API
   // upload has no device and keeps the server zone.
-  const cookieStore = await cookies();
   const deviceTimeZone = parseDeviceTimeZoneCookie(
     cookieStore.get(DEVICE_TIME_ZONE_COOKIE)?.value ?? null
   );
@@ -88,7 +103,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
       advancedFilters,
       statsState,
       ledgerDto,
-      ...(bookId == null ? {} : { bookId }),
+      ...(bookScopeCookie == null ? {} : { bookId: bookScopeCookie }),
       ...(deviceTimeZone == null ? {} : { deviceTimeZone }),
     },
     {
@@ -133,6 +148,8 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
             ledgerDto={ledgerDto}
             activeTab={activeTab}
             session={session}
+            rememberedBookId={bookScopeCookie}
+            initialDeviceTimeZone={deviceTimeZone}
           />
         </Suspense>
       </ActiveShell>
@@ -146,6 +163,8 @@ async function ActiveTabBootstrap({
   ledgerDto,
   activeTab,
   session,
+  rememberedBookId,
+  initialDeviceTimeZone,
 }: ActiveTabBootstrapProps) {
   let pageData: PageBootstrapResult;
   try {
@@ -170,6 +189,8 @@ async function ActiveTabBootstrap({
           : {})}
         {...(pageData?.ledgerToday !== undefined ? { ledgerToday: pageData.ledgerToday } : {})}
         {...(pageData?.initialBooks !== undefined ? { initialBooks: pageData.initialBooks } : {})}
+        initialBookId={pageData != null ? pageData.initialBookId : rememberedBookId}
+        initialDeviceTimeZone={initialDeviceTimeZone}
         {...(session.user?.email != null ? { userEmail: session.user.email } : {})}
         hasPassword={session.user?.hasPassword ?? false}
         passwordUpdatedAt={session.user?.passwordUpdatedAt ?? null}

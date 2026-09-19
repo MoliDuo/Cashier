@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BookDto } from "@/modules/ledger/contracts";
+import { writeLastNewRecordBookId } from "@/modules/workspace/new-record-book-memory";
 
 vi.mock("@/i18n/DeferredFeatureMessages", () => ({
   DeferredFeatureMessages: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -59,15 +60,16 @@ vi.mock("@/components/ui/select", () => ({
 import { NewRecordDialog } from "@/modules/workspace/ui/NewRecordDialog";
 
 const ledgerId = "ledger-1";
+const BOOK_A = "10000000-0000-4000-8000-000000000001";
+const BOOK_B = "10000000-0000-4000-8000-000000000002";
 
 function createBook(overrides: Partial<BookDto>): BookDto {
   return {
-    id: "book-a",
+    id: BOOK_A,
     ledgerId,
     name: "Daily",
     timeZone: "Asia/Shanghai",
     sortOrder: 0,
-    isDefault: true,
     archivedAt: null,
     ...overrides,
   };
@@ -76,12 +78,10 @@ function createBook(overrides: Partial<BookDto>): BookDto {
 const defaultBooks: BookDto[] = [
   createBook({}),
   createBook({
-    id: "book-b",
+    id: BOOK_B,
     name: "Travel",
     timeZone: "America/Los_Angeles",
     sortOrder: 1,
-    isDefault: false,
-    archivedAt: null,
   }),
 ];
 
@@ -130,23 +130,33 @@ function formsAttrs() {
 }
 
 describe("NewRecordDialog book picker", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("opens on the first book in 设置 order when nothing is remembered", () => {
+    const { open } = renderDialog({});
+    open();
+
+    expect(formsAttrs()).toMatchObject({ bookId: BOOK_A, savedBook: `${BOOK_A}:Daily` });
+  });
+
   it("gives the forms the picked book's zone, not the viewed book's", () => {
-    const { open } = renderDialog({ scope: "book-b" });
+    const { open } = renderDialog({ scope: BOOK_B });
     open();
 
     expect(formsAttrs()).toMatchObject({
-      bookId: "book-b",
-      viewedBookId: "book-b",
-      savedBook: "book-b:Travel",
-      timeZone: "America/Los_Angeles",
+      bookId: BOOK_A,
+      viewedBookId: BOOK_B,
+      timeZone: "Asia/Shanghai",
     });
 
-    fireEvent.change(screen.getByTestId("book-select"), { target: { value: "book-a" } });
+    fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_B } });
 
     expect(formsAttrs()).toMatchObject({
-      bookId: "book-a",
-      savedBook: "book-a:Daily",
-      timeZone: "Asia/Shanghai",
+      bookId: BOOK_B,
+      savedBook: `${BOOK_B}:Travel`,
+      timeZone: "America/Los_Angeles",
     });
   });
 
@@ -158,22 +168,30 @@ describe("NewRecordDialog book picker", () => {
     expect(formsAttrs().timeZone).toBe("Europe/Berlin");
   });
 
-  it("resets the pick to the default book every time the dialog opens", () => {
-    const { view, props, open } = renderDialog({ scope: "book-a" });
-    open();
-    fireEvent.change(screen.getByTestId("book-select"), { target: { value: "book-b" } });
-    expect(formsAttrs().bookId).toBe("book-b");
-
-    view.rerender(<NewRecordDialog {...props} isOpen={false} />);
+  it("opens on the last saved book when it is still live", () => {
+    writeLastNewRecordBookId(BOOK_B);
+    const { open } = renderDialog({});
     open();
 
-    expect(formsAttrs().bookId).toBe("book-a");
+    expect(formsAttrs()).toMatchObject({
+      bookId: BOOK_B,
+      savedBook: `${BOOK_B}:Travel`,
+      timeZone: "America/Los_Angeles",
+    });
+  });
+
+  it("falls back to the first book when the remembered book is gone", () => {
+    writeLastNewRecordBookId("10000000-0000-4000-8000-00000000dead");
+    const { open } = renderDialog({});
+    open();
+
+    expect(formsAttrs().bookId).toBe(BOOK_A);
   });
 
   it("keeps the pick when the books refetch while the dialog stays open", () => {
-    const { view, props, open } = renderDialog({ scope: "book-a" });
+    const { view, props, open } = renderDialog({ scope: BOOK_A });
     open();
-    fireEvent.change(screen.getByTestId("book-select"), { target: { value: "book-b" } });
+    fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_B } });
 
     view.rerender(
       <NewRecordDialog
@@ -183,18 +201,31 @@ describe("NewRecordDialog book picker", () => {
       />
     );
 
-    expect(formsAttrs()).toMatchObject({ bookId: "book-b", savedBook: "book-b:Travel" });
+    expect(formsAttrs()).toMatchObject({ bookId: BOOK_B, savedBook: `${BOOK_B}:Travel` });
   });
 
-  it("resolves to the default book when the pick is not (yet) live", () => {
+  it("resets to the remembered pick every time the dialog opens", () => {
+    writeLastNewRecordBookId(BOOK_B);
+    const { view, props, open } = renderDialog({});
+    open();
+    fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_A } });
+    expect(formsAttrs().bookId).toBe(BOOK_A);
+
+    view.rerender(<NewRecordDialog {...props} isOpen={false} />);
+    open();
+
+    expect(formsAttrs().bookId).toBe(BOOK_B);
+  });
+
+  it("resolves to the first book when the pick is not (yet) live", () => {
     const { view, props, open } = renderDialog({ books: [] });
     open();
 
     view.rerender(<NewRecordDialog {...props} isOpen books={defaultBooks} />);
 
     expect(formsAttrs()).toMatchObject({
-      bookId: "book-a",
-      savedBook: "book-a:Daily",
+      bookId: BOOK_A,
+      savedBook: `${BOOK_A}:Daily`,
       timeZone: "Asia/Shanghai",
     });
   });

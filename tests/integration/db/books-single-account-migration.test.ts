@@ -8,6 +8,19 @@ const migration = readFileSync(
   "utf8"
 );
 
+const defaultBookDrop = readFileSync(
+  "src/persistence/postgres-migrations/0049_drop_book_default.sql",
+  "utf8"
+);
+
+/** Applies 0049 the way the migration runner does, statement by statement. */
+async function applyDefaultBookDrop(client: PoolClient): Promise<void> {
+  for (const statement of defaultBookDrop.split("--> statement-breakpoint")) {
+    const trimmed = statement.trim();
+    if (trimmed !== "") await client.query(trimmed);
+  }
+}
+
 function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
@@ -497,6 +510,35 @@ describe("0048 books and single account migration", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT guard");
       expect(fixture.ownerId).toBeTruthy();
+    });
+  });
+  it("drops the 总账 default column and index in 0049, keeping the books", async () => {
+    await withSchema(async (client) => {
+      const fixture = await seedCouple(client);
+      await applyMigration(client);
+
+      // 0048 left 共同支出 as the default; 0049 retires the concept without
+      // touching the rows.
+      const before = await client.query(
+        `SELECT count(*)::int AS count FROM books WHERE is_default`
+      );
+      expect(before.rows[0].count).toBe(1);
+      await applyDefaultBookDrop(client);
+
+      const columns = await client.query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'books'
+            AND column_name = 'is_default'`
+      );
+      expect(columns.rows).toHaveLength(0);
+      const index = await client.query(
+        `SELECT indexname FROM pg_indexes
+          WHERE schemaname = current_schema() AND indexname = 'uniq_books_default'`
+      );
+      expect(index.rows).toHaveLength(0);
+      const books = await client.query(`SELECT count(*)::int AS count FROM books`);
+      expect(books.rows[0].count).toBe(3);
+      expect(fixture.ledgerId).toBeTruthy();
     });
   });
 });

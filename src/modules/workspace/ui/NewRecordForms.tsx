@@ -8,6 +8,7 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/filters";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
+import { writeLastNewRecordBookId } from "../new-record-book-memory";
 import {
   showNewRecordSuccessFeedback,
   type NewRecordInputMode,
@@ -105,6 +106,10 @@ export function NewRecordForms({
 
   const handleSuccess = useCallback(
     (mode: NewRecordInputMode, result: CreatedRecordResult) => {
+      // Only a saved record counts as the picker's "last choice": a pick that
+      // was changed and then cancelled must not become the next default.
+      if (savedBook != null) writeLastNewRecordBookId(savedBook.id);
+
       showNewRecordSuccessFeedback({
         mode,
         ledgerId,

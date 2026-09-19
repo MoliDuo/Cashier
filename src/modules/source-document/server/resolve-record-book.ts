@@ -2,10 +2,11 @@ import type { BookPort } from "@/application/contracts";
 import { ValidationError } from "@/lib/errors";
 
 /**
- * Which book a manually entered record lands in. The picker sends a book
- * explicitly; without one the 总账 default book is used, falling back to the
- * first book in switcher order. A ledger with no live book cannot accept a
- * manual record, so that is a validation failure rather than a silent default.
+ * Which book a manually entered record lands in. The web forms always send the
+ * book the picker showed; without one (an older client, or an API call that
+ * leaves it out) the first live book in switcher order is used. A ledger with
+ * no live book cannot accept a manual record, so that is a validation failure
+ * rather than a silent default.
  */
 export async function resolveRecordBook(
   ledgerId: string,
@@ -18,7 +19,7 @@ export async function resolveRecordBook(
     return { id: requested.id, timeZone: requested.timeZone };
   }
   const live = await books.list(ledgerId);
-  const fallback = live.find((row) => row.isDefault) ?? live[0] ?? null;
+  const fallback = live[0] ?? null;
   if (fallback == null) throw new ValidationError("A book is required");
   return { id: fallback.id, timeZone: fallback.timeZone };
 }

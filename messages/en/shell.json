@@ -211,13 +211,11 @@
     "setupCodeDesc": "Printed to the server's logs when the database is empty; valid for 30 minutes.",
     "email": "Sign-in email",
     "password": "Password",
-    "passwordDesc": "8–128 characters with at least one letter and one number.",
+    "passwordDesc": "Use 8–128 characters with at least one ASCII letter and one number, and no more than 72 UTF-8 bytes.",
     "books": "Books",
     "bookName": "Book name",
     "addBook": "Add",
     "removeBook": "Remove this book",
-    "defaultBook": "Default for the total",
-    "defaultBookDesc": "Records entered while viewing the total land in this book.",
     "submit": "Create account",
     "wrongCode": "That setup code is not correct.",
     "codeExpired": "That setup code has expired. Reload this page and the server will print a new one to its logs.",
@@ -225,8 +223,8 @@
     "sharedBookName": "共同支出",
     "alreadyDone": "Setup has already been completed.",
     "invalidEmail": "Enter a valid email address.",
-    "weakPassword": "Use 8–128 characters with at least one letter and one number.",
-    "invalidBooks": "Add at least one unique book and pick which one is the default."
+    "weakPassword": "Use 8–128 characters with at least one ASCII letter and one number, and no more than 72 UTF-8 bytes.",
+    "invalidBooks": "Add at least one unique book."
   },
   "BookScope": {
     "label": "Book",
@@ -235,7 +233,6 @@
     "current": "Showing book {book}. Open the book switcher"
   },
   "BookPicker": {
-    "namePlaceholder": "Book name",
-    "totalBadge": "Total"
+    "namePlaceholder": "Book name"
   }
 }

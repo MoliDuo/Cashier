@@ -7,15 +7,9 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { textRoleClassName } from "@/components/typography";
 import { completeSetupAction, type SetupErrorCode } from "@/modules/setup/server-actions/setup";
+import { getPasswordRuleViolation } from "@/modules/auth/password-rules";
 
 interface BookRow {
   id: number;
@@ -39,7 +33,6 @@ export function SetupForm() {
   // One row per book, each with a stable id: keying by name would remount the
   // input (and drop the caret) as soon as two rows traded names.
   const [bookRows, setBookRows] = useState<BookRow[]>(() => [{ id: 0, name: t("sharedBookName") }]);
-  const [defaultBookId, setDefaultBookId] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,31 +62,20 @@ export function SetupForm() {
 
   /**
    * The server enforces the real policy; this only saves the reader a round trip
-   * and a generic-looking failure when the password obviously cannot pass. The
-   * rule mirrors `validatePassword`: 8–128 characters with a letter and a digit.
+   * and a generic-looking failure when the password obviously cannot pass. It is
+   * the same rule the policy applies — including the 72-byte limit, which a
+   * browser-only length check used to miss.
    */
-  const passwordLooksValid =
-    password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
-  const showPasswordHint = password !== "" && !passwordLooksValid;
+  const showPasswordHint = password !== "" && getPasswordRuleViolation(password) != null;
 
   const removeRow = (id: number) => {
-    setBookRows((current) => {
-      const next = current.filter((row) => row.id !== id);
-      // The default has to keep pointing at a row that exists. Removing it
-      // moves the flag to the first remaining row rather than leaving the
-      // select bound to a value that is no longer in the list.
-      if (id === defaultBookId && next[0] != null) setDefaultBookId(next[0].id);
-      return next;
-    });
+    setBookRows((current) => current.filter((row) => row.id !== id));
   };
-
-  const defaultRow = bookRows.find((row) => row.id === defaultBookId);
-  const defaultBookName = defaultRow?.name.trim() ?? "";
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
-    if (!passwordLooksValid) {
+    if (getPasswordRuleViolation(password) != null) {
       setError(t("weakPassword"));
       return;
     }
@@ -105,7 +87,6 @@ export function SetupForm() {
       password,
       locale,
       books: bookRows.map((row) => row.name),
-      defaultBook: defaultBookName,
     });
     if (!result.ok) {
       setError(message(result.code));
@@ -214,28 +195,6 @@ export function SetupForm() {
               </Button>
             </div>
           ))}
-          <div className="grid gap-2">
-            <Label htmlFor="setup-default-book">{t("defaultBook")}</Label>
-            <Select
-              value={defaultRow == null ? "" : String(defaultRow.id)}
-              onValueChange={(value) => setDefaultBookId(Number(value))}
-              disabled={pending}
-            >
-              <SelectTrigger id="setup-default-book" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {bookRows
-                  .filter((row) => row.name.trim() !== "")
-                  .map((row) => (
-                    <SelectItem key={row.id} value={String(row.id)}>
-                      {row.name.trim()}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <p className="text-micro text-muted-foreground">{t("defaultBookDesc")}</p>
-          </div>
         </div>
 
         {error != null ? (

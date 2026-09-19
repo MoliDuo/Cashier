@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, Archive, ArchiveRestore, Plus, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Archive, ArchiveRestore, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,29 +49,32 @@ const TIME_ZONES = [
 
 interface BookSettingsProps {
   ledgerId: string;
-  initialBooks: readonly BookDto[];
+  /**
+   * A list that already contains the archived rows. Leaving it undefined means
+   * 设置 was opened without one — the workspace switcher only carries the live
+   * books — and the complete list is fetched rather than seeded with a partial
+   * one, which the archived-inclusive query would then trust for ten minutes.
+   */
+  initialBooks?: readonly BookDto[] | undefined;
 }
 
 /**
- * 分账: reorder, add, rename, archive, restore, delete, pick the 总账 default and
- * set a zone. The order here is the order of the pull-down switcher, and the
- * archived books are listed apart from the live ones because they are no longer
- * part of it.
+ * 分账: reorder, add, rename, archive, restore, delete and set a zone. The
+ * order here is the order of the pull-down switcher, and the archived books are
+ * listed apart from the live ones because they are no longer part of it.
  */
 export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
   const t = useTranslations("Settings.Books");
   const tCommon = useTranslations("Common");
+  const tQueryError = useTranslations("LedgerQueryError");
   const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null);
-  const { books } = useBooks({ ledgerId, initialBooks, includeArchived: true });
-  const {
-    createBook,
-    updateBook,
-    reorderBooks,
-    setDefaultBook,
-    archiveBook,
-    restoreBook,
-    deleteBook,
-  } = useBookMutations(ledgerId);
+  const { books, booksQuery } = useBooks({
+    ledgerId,
+    ...(initialBooks !== undefined ? { initialBooks } : {}),
+    includeArchived: true,
+  });
+  const { createBook, updateBook, reorderBooks, archiveBook, restoreBook, deleteBook } =
+    useBookMutations(ledgerId);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [renameTarget, setRenameTarget] = useState<BookDto | null>(null);
@@ -93,11 +96,17 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
   const all = books ?? [];
   const list = all.filter((book) => book.archivedAt == null);
   const archived = all.filter((book) => book.archivedAt != null);
+  // Three distinct states, and none of them may be mistaken for "no books":
+  // nothing has arrived yet, nothing arrived and the request failed, or the
+  // list is showing while a background refresh failed.
+  const isLoadingBooks = books === undefined && booksQuery.isPending;
+  const booksLoadFailed = books === undefined && booksQuery.isLoadingError;
+  const booksRefreshFailed = books !== undefined && booksQuery.isRefetchError;
+  const retryBooks = () => void booksQuery.refetch();
   const busy =
     createBook.isPending ||
     updateBook.isPending ||
     reorderBooks.isPending ||
-    setDefaultBook.isPending ||
     archiveBook.isPending ||
     restoreBook.isPending ||
     deleteBook.isPending;
@@ -133,21 +142,49 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
     <SettingsSection title={t("title")} description={t("description")}>
       <SettingsField title={t("name")} stacked>
         <div className="space-y-2">
-          {list.length === 0 ? (
+          {booksRefreshFailed ? (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
+            >
+              <span>{tQueryError("description")}</span>
+              <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
+                <RefreshCw className="size-4" />
+                {tQueryError("retry")}
+              </Button>
+            </div>
+          ) : null}
+          {booksLoadFailed ? (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
+            >
+              <span>{tQueryError("description")}</span>
+              <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
+                <RefreshCw className="size-4" />
+                {tQueryError("retry")}
+              </Button>
+            </div>
+          ) : isLoadingBooks ? (
+            <ul
+              role="status"
+              aria-label={tCommon("loading")}
+              className="divide-y divide-border rounded-[var(--radius)] border border-border"
+            >
+              {[0, 1].map((row) => (
+                <li key={row} className="p-3">
+                  <span className="block h-4 w-24 animate-pulse rounded-sm bg-surface2" />
+                </li>
+              ))}
+            </ul>
+          ) : list.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("empty")}</p>
           ) : (
             <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
               {list.map((book, index) => (
                 <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-text">{book.name}</span>
-                      {book.isDefault ? (
-                        <span className="shrink-0 rounded-sm border border-primary/40 bg-primary/5 px-1.5 py-0.5 text-micro font-medium text-primary">
-                          {t("totalBadge")}
-                        </span>
-                      ) : null}
-                    </div>
+                    <span className="truncate text-sm font-medium text-text">{book.name}</span>
                     <p className="mt-0.5 text-micro text-muted-foreground">
                       {book.timeZone ?? deviceZoneOption}
                     </p>
@@ -185,24 +222,11 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
                     >
                       {t("rename")}
                     </Button>
-                    {!book.isDefault ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={busy}
-                        aria-label={t("setDefault")}
-                        title={t("setDefault")}
-                        onClick={() => setDefaultBook.mutate(book.id)}
-                      >
-                        <Star className="size-4" />
-                      </Button>
-                    ) : null}
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      disabled={busy || book.isDefault}
+                      disabled={busy}
                       aria-label={t("archive")}
                       title={t("archive")}
                       className="text-muted-foreground hover:text-danger"
@@ -214,7 +238,7 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      disabled={busy || book.isDefault}
+                      disabled={busy}
                       aria-label={t("delete")}
                       title={t("delete")}
                       className="text-muted-foreground hover:text-danger"
@@ -302,12 +326,6 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
           </ul>
         </SettingsField>
       ) : null}
-
-      <SettingsField title={t("default")} description={t("defaultDesc")}>
-        <p className="text-sm text-text sm:text-right">
-          {list.find((book) => book.isDefault)?.name ?? "—"}
-        </p>
-      </SettingsField>
 
       <Dialog open={isAddOpen} onOpenChange={(open) => !createBook.isPending && setIsAddOpen(open)}>
         <DialogContent variant="modal">

@@ -16,22 +16,19 @@
       "id": "90000000-0000-4000-8000-000000000001",
       "name": "哞哞的",
       "timeZone": "Asia/Kuala_Lumpur",
-      "sortOrder": 1,
-      "isDefault": false
+      "sortOrder": 1
     },
     {
       "id": "90000000-0000-4000-8000-000000000002",
       "name": "梁梁的",
       "timeZone": "Asia/Shanghai",
-      "sortOrder": 2,
-      "isDefault": false
+      "sortOrder": 2
     },
     {
       "id": "90000000-0000-4000-8000-000000000003",
       "name": "共同支出",
       "timeZone": null,
-      "sortOrder": 3,
-      "isDefault": true
+      "sortOrder": 3
     }
   ],
   "categories": [

@@ -80,22 +80,26 @@ async function run(command, args, environment) {
 
 /** @testOnly Returns the standalone Compose invocation used by the demo stack. */
 export function createDemoComposeArgs(environment = process.env) {
+  return [...composeProjectArgs(environment), "up", "-d", "postgres", "minio", "storage-bootstrap"];
+}
+
+/**
+ * The services a preview needs, which is only the database it reads: bringing up
+ * MinIO and its bucket bootstrap would create the very objects a preview promises
+ * not to touch.
+ *
+ * @testOnly Returns the database-only Compose invocation the preview uses.
+ */
+export function createDemoPreviewComposeArgs(environment = process.env) {
+  return [...composeProjectArgs(environment), "up", "-d", "postgres"];
+}
+
+function composeProjectArgs(environment) {
   const project = environment.CASHIER_DEMO_PROJECT ?? "cashier-demo";
   if (!/^[a-z][a-z0-9-]{0,40}$/.test(project)) {
     throw new Error("CASHIER_DEMO_PROJECT must be a lowercase Compose project name");
   }
-  return [
-    "compose",
-    "-p",
-    project,
-    "-f",
-    "docker-compose.demo.yml",
-    "up",
-    "-d",
-    "postgres",
-    "minio",
-    "storage-bootstrap",
-  ];
+  return ["compose", "-p", project, "-f", "docker-compose.demo.yml"];
 }
 
 /** @testOnly Returns the fixture command while preserving reset preview semantics. */
@@ -163,19 +167,46 @@ async function stop(child) {
   clearTimeout(timeout);
 }
 
-async function main(args = process.argv.slice(2), environment = process.env) {
+/**
+ * Runs the disposable demo stack up to the point where the app can start.
+ *
+ * `npm run demo:reset` is a question rather than a command: it has to say what
+ * a rebuild would replace before anything has dropped a schema, migrated,
+ * seeded or written to object storage. Only `--apply`, or a normal
+ * `dev:demo`/`test:demo` launch, runs the destructive path.
+ *
+ * @testOnly Exposes the demo command sequence to an injected executor.
+ * @param {{ args?: string[], environment?: Record<string, string | undefined>, execute?: (command: string, args: string[], environment: Record<string, string | undefined>) => Promise<unknown> }} [options]
+ */
+export async function runDemoCommands({
+  args = [],
+  environment = process.env,
+  execute = run,
+} = {}) {
   const demoEnv = createDemoEnvironment(environment);
   const reset = args.includes("--reset");
   const apply = args.includes("--apply");
-  const test = args.includes("--test");
-  await run("docker", createDemoComposeArgs(demoEnv), demoEnv);
+  if (reset && !apply) {
+    await execute("docker", createDemoPreviewComposeArgs(demoEnv), demoEnv);
+    await execute(process.execPath, ["scripts/demo-data.mjs", "preview-reset"], demoEnv);
+    return { mode: "preview-reset", environment: demoEnv };
+  }
+  await execute("docker", createDemoComposeArgs(demoEnv), demoEnv);
   // The demo workspace is disposable and rebuilt from the fixture on every
   // launch, so its schema is dropped before migrating: a demo database left
   // over from an earlier release is not a database 0048 can migrate.
-  await run(process.execPath, ["scripts/demo-data.mjs", "reset-schema"], demoEnv);
-  await run(process.execPath, ["scripts/migrate-database.mjs"], demoEnv);
-  await run(process.execPath, createDemoDataArgs({ reset, apply }), demoEnv);
-  if (reset) return;
+  await execute(process.execPath, ["scripts/demo-data.mjs", "reset-schema"], demoEnv);
+  await execute(process.execPath, ["scripts/migrate-database.mjs"], demoEnv);
+  await execute(process.execPath, createDemoDataArgs({ reset, apply }), demoEnv);
+  return { mode: reset ? "reset" : "seed", environment: demoEnv };
+}
+
+async function main(args = process.argv.slice(2), environment = process.env) {
+  const test = args.includes("--test");
+  const { mode, environment: demoEnv } = await runDemoCommands({ args, environment });
+  // A preview stops at its report, and a reset asked for by name stops once the
+  // rebuild is done; only a normal launch goes on to start the app.
+  if (mode !== "seed") return;
 
   const appPort = Number(demoEnv.CASHIER_DEMO_APP_PORT);
   if (!(await isPortAvailable(appPort))) {

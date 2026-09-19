@@ -727,7 +727,7 @@
     },
     "Books": {
       "title": "Books",
-      "description": "Each record belongs to one book, and every book is read together as the total.",
+      "description": "Every record belongs to one book; the total view always summarizes all of them — nothing to set up.",
       "name": "Name",
       "namePlaceholder": "Book name",
       "add": "Add book",
@@ -735,9 +735,6 @@
       "addDesc": "Give the book a short name. It can be renamed or archived later.",
       "rename": "Rename",
       "renameTitle": "Rename book",
-      "default": "Total default",
-      "defaultDesc": "Records entered while viewing the total land in this book.",
-      "setDefault": "Set as default",
       "timeZone": "Time zone",
       "timeZoneDesc": "Dates uploads through this book's API keys. Automatic uses the server time.",
       "timeZoneAuto": "Automatic",
@@ -763,14 +760,12 @@
       "invalidName": "A book name must be 1–20 characters.",
       "notFound": "That book no longer exists.",
       "lastBook": "The last book cannot be archived or deleted.",
-      "defaultCannotArchive": "The total default book cannot be archived or deleted.",
       "nameTaken": "A book with that name already exists.",
       "createFailed": "Could not add the book.",
       "saveFailed": "Could not save the book.",
       "reorderFailed": "Could not save the order.",
       "recordsCount": "{count} records",
       "empty": "No books yet.",
-      "totalBadge": "Total",
       "changeFailed": "Could not save the book.",
       "cancel": "Cancel"
     },
@@ -1047,8 +1042,7 @@
     "retryErrorDescription": "The original result was kept. Please try again."
   },
   "BookPicker": {
-    "namePlaceholder": "Book name",
-    "totalBadge": "Total"
+    "namePlaceholder": "Book name"
   },
   "BookScope": {
     "label": "Book",
@@ -1063,13 +1057,11 @@
     "setupCodeDesc": "Printed to the server's logs when the database is empty; valid for 30 minutes.",
     "email": "Sign-in email",
     "password": "Password",
-    "passwordDesc": "8–128 characters with at least one letter and one number.",
+    "passwordDesc": "Use 8–128 characters with at least one ASCII letter and one number, and no more than 72 UTF-8 bytes.",
     "books": "Books",
     "bookName": "Book name",
     "addBook": "Add",
     "removeBook": "Remove this book",
-    "defaultBook": "Default for the total",
-    "defaultBookDesc": "Records entered while viewing the total land in this book.",
     "submit": "Create account",
     "wrongCode": "That setup code is not correct.",
     "codeExpired": "That setup code has expired. Reload this page and the server will print a new one to its logs.",
@@ -1077,7 +1069,7 @@
     "sharedBookName": "共同支出",
     "alreadyDone": "Setup has already been completed.",
     "invalidEmail": "Enter a valid email address.",
-    "weakPassword": "Use 8–128 characters with at least one letter and one number.",
-    "invalidBooks": "Add at least one unique book and pick which one is the default."
+    "weakPassword": "Use 8–128 characters with at least one ASCII letter and one number, and no more than 72 UTF-8 bytes.",
+    "invalidBooks": "Add at least one unique book."
   }
 }

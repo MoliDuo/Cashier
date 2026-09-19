@@ -9,7 +9,6 @@ const books: BookDto[] = [
     name: "共同支出",
     timeZone: null,
     sortOrder: 1,
-    isDefault: true,
     archivedAt: null,
   },
 ];

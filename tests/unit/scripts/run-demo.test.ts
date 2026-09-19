@@ -5,7 +5,9 @@ import {
   createDemoComposeArgs,
   createDemoDataArgs,
   createDemoEnvironment,
+  createDemoPreviewComposeArgs,
   formatDemoCredentialLines,
+  runDemoCommands,
 } from "../../../scripts/run-demo.mjs";
 
 const fixture = JSON.parse(
@@ -25,6 +27,19 @@ describe("demo runtime environment", () => {
       "postgres",
       "minio",
       "storage-bootstrap",
+    ]);
+  });
+
+  it("brings up only the database a preview reads", () => {
+    expect(createDemoPreviewComposeArgs()).toEqual([
+      "compose",
+      "-p",
+      "cashier-demo",
+      "-f",
+      "docker-compose.demo.yml",
+      "up",
+      "-d",
+      "postgres",
     ]);
   });
 
@@ -101,5 +116,106 @@ describe("demo runtime environment", () => {
       expect(line, credential.name).toContain(credential.name);
       expect(line).toContain(credential.book);
     }
+  });
+});
+
+describe("demo command sequencing", () => {
+  /** @returns {{ command: string, args: string[] }[]} */
+  function recorder() {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    return {
+      calls,
+      execute: async (command: string, args: string[]) => {
+        calls.push({ command, args });
+      },
+    };
+  }
+
+  const flat = (calls: Array<{ command: string; args: string[] }>) =>
+    calls.map((call) => [call.command, ...call.args].join(" ")).join("\n");
+
+  it("answers a bare reset with a preview instead of a rebuild", async () => {
+    const { calls, execute } = recorder();
+
+    const result = await runDemoCommands({ args: ["--reset"], environment: {}, execute });
+
+    expect(result.mode).toBe("preview-reset");
+    // Only the database the preview reads, and only the read-only report: no
+    // schema drop, no migration, no seed, no object storage, no Next.js.
+    expect(calls).toEqual([
+      {
+        command: "docker",
+        args: [
+          "compose",
+          "-p",
+          "cashier-demo",
+          "-f",
+          "docker-compose.demo.yml",
+          "up",
+          "-d",
+          "postgres",
+        ],
+      },
+      { command: process.execPath, args: ["scripts/demo-data.mjs", "preview-reset"] },
+    ]);
+    const sequence = flat(calls);
+    expect(sequence).not.toContain("reset-schema");
+    expect(sequence).not.toContain("migrate-database");
+    expect(sequence).not.toContain("minio");
+    expect(sequence).not.toContain("storage-bootstrap");
+    expect(sequence).not.toContain("next");
+  });
+
+  it("rebuilds the demo environment when the reset is confirmed", async () => {
+    const { calls, execute } = recorder();
+
+    const result = await runDemoCommands({
+      args: ["--reset", "--apply"],
+      environment: {},
+      execute,
+    });
+
+    expect(result.mode).toBe("reset");
+    expect(calls.map((call) => [call.command, ...call.args])).toEqual([
+      [
+        "docker",
+        "compose",
+        "-p",
+        "cashier-demo",
+        "-f",
+        "docker-compose.demo.yml",
+        "up",
+        "-d",
+        "postgres",
+        "minio",
+        "storage-bootstrap",
+      ],
+      [process.execPath, "scripts/demo-data.mjs", "reset-schema"],
+      [process.execPath, "scripts/migrate-database.mjs"],
+      [process.execPath, "scripts/demo-data.mjs", "reset", "--apply"],
+    ]);
+  });
+
+  it("rebuilds before every normal demo launch", async () => {
+    const { calls, execute } = recorder();
+
+    const result = await runDemoCommands({ args: [], environment: {}, execute });
+
+    expect(result.mode).toBe("seed");
+    expect(flat(calls)).toContain("scripts/demo-data.mjs reset --apply");
+  });
+
+  it("reuses the isolated demo environment rather than the caller's", async () => {
+    const { execute } = recorder();
+
+    const result = await runDemoCommands({
+      args: [],
+      environment: { DATABASE_URL: "postgresql://remote.example.com/production" },
+      execute,
+    });
+
+    expect(result.environment?.DATABASE_URL).toBe(
+      "postgresql://cashier:cashier-local-only@127.0.0.1:55433/cashier_demo"
+    );
   });
 });

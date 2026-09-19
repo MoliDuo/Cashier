@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 import { getLedgerPageBootstrap as getLedgerPageBootstrapUseCase } from "@/modules/workspace/application/queries/get-ledger-page-bootstrap";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
@@ -42,12 +42,21 @@ const bootstrapDependencies = {
   },
   credentials: { list: vi.fn() } satisfies Pick<ServiceCredentialPort, "list">,
 };
+/**
+ * The zone a repeat visit arrives with: the browser has already written its
+ * cookie, so every date read below has an answer to date by. The first visit —
+ * a request that names neither a book zone nor a device zone — has its own
+ * cases, which pass `deviceTimeZone: null` to take the zone away again.
+ */
+const REPORTED_DEVICE_TIME_ZONE = "Asia/Shanghai";
+
 const getLedgerPageBootstrap = (
   input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto"> &
     Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto">>
 ) =>
   getLedgerPageBootstrapUseCase(
     {
+      deviceTimeZone: REPORTED_DEVICE_TIME_ZONE,
       ...input,
       ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto(),
     },
@@ -107,7 +116,6 @@ describe("getLedgerPageBootstrap", () => {
         name: "共同支出",
         timeZone: null,
         sortOrder: 1,
-        isDefault: true,
       },
     ]);
     calculateLedgerStatsMock.mockResolvedValue({});
@@ -508,7 +516,6 @@ describe("getLedgerPageBootstrap", () => {
             name: "共同支出",
             timeZone: "Asia/Shanghai",
             sortOrder: 1,
-            isDefault: true,
           },
         ]);
         const result = await getLedgerPageBootstrap({
@@ -517,17 +524,18 @@ describe("getLedgerPageBootstrap", () => {
           periodParams: { period: "thisMonth" },
           ledgerDto: createPreAuthorizedLedgerDto(),
           deviceTimeZone: "Europe/London",
+          bookId: "book-1",
         });
 
         // 16:30 UTC is 00:30 in Shanghai (the next day) but still 17:30 in
-        // London. The book's own zone beats the device's.
+        // London. The viewed book's own zone beats the device's.
         expect(result?.ledgerToday).toBe("2026-08-07");
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it("dates a book with no zone of its own by the device zone", async () => {
+    it("dates 总账 by the device zone", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-08-06T16:30:00Z"));
       try {
@@ -540,33 +548,47 @@ describe("getLedgerPageBootstrap", () => {
         });
 
         // 16:30 UTC is 01:30 in Tokyo (the next day) but still 00:30 in the
-        // deployment default (Asia/Shanghai). The device is what the tab uses.
+        // deployment default (Asia/Shanghai). No single book owns 总账, so the
+        // device that asked is what the tab uses.
         expect(result?.ledgerToday).toBe("2026-08-07");
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it("falls back to the deployment zone when neither book nor device knows one", async () => {
+    it("reads no dates at all when neither the book nor the request names a zone", async () => {
+      vi.stubEnv("TZ", "UTC");
       vi.useFakeTimers();
-      vi.setSystemTime(new Date("2026-08-06T16:30:00Z"));
+      vi.setSystemTime(new Date("2026-09-30T16:30:00Z"));
       try {
         const result = await getLedgerPageBootstrap({
           ledgerId: "ledger-1",
           initialTab: "stream",
           periodParams: { period: "thisMonth" },
           ledgerDto: createPreAuthorizedLedgerDto(),
+          // A device that has not reported yet, which is every first visit.
+          deviceTimeZone: null,
         });
 
-        // No book zone and no cookie is the API-upload shape: the server's own
-        // zone (Asia/Shanghai by default) decides.
-        expect(result?.ledgerToday).toBe("2026-08-07");
+        // 16:30 UTC on the 30th is already the 1st of October for the device
+        // that is about to load this page. Dating the prefetch by the
+        // deployment's own zone would spend a round trip on September data
+        // the tab never asks for.
+        expect(result?.ledgerToday).toBeUndefined();
+        expect(listStreamPageMock).not.toHaveBeenCalled();
+        expect(getStreamTotalMock).not.toHaveBeenCalled();
+        expect(calculateLedgerStatsMock).not.toHaveBeenCalled();
+        expect(getEnhancedStatsMock).not.toHaveBeenCalled();
+        // Everything undated still loads, so the shell is usable meanwhile.
+        expect(result?.initialBooks).toHaveLength(1);
+        expect(listEntryCategoriesMock).toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
+        vi.unstubAllEnvs();
       }
     });
 
-    it("prefetches the stats tab for the book in the URL, not only for 总账", async () => {
+    it("prefetches the stats tab for the remembered book, not only for 总账", async () => {
       const result = await getLedgerPageBootstrap({
         ledgerId: "ledger-1",
         initialTab: "stats",
@@ -587,17 +609,19 @@ describe("getLedgerPageBootstrap", () => {
         expect.objectContaining({ bookId: "book-1" }),
         bootstrapDependencies.stats
       );
+      expect(result?.initialBookId).toBe("book-1");
     });
 
-    it("prefetches 总账 when the URL names a book that is no longer live", async () => {
+    it("prefetches 总账 when the remembered book is no longer live", async () => {
       const result = await getLedgerPageBootstrap({
         ledgerId: "ledger-1",
         initialTab: "stats",
         periodParams: { period: "thisMonth" },
         statsState: { range: "month", offset: 0, view: "heatmap" },
         ledgerDto: createPreAuthorizedLedgerDto(),
-        // The live list holds only book-1; this id was archived after the link
-        // was made. The client resets the scope, and the prefetch must match it.
+        // The live list holds only book-1; this id was archived after the
+        // choice was made. The client resets the scope, and the prefetch must
+        // match it.
         bookId: "book-archived",
       });
 
@@ -612,6 +636,7 @@ describe("getLedgerPageBootstrap", () => {
         expect.not.objectContaining({ bookId: expect.any(String) }),
         bootstrapDependencies.stats
       );
+      expect(result?.initialBookId).toBeNull();
     });
   });
 
@@ -652,6 +677,138 @@ describe("getLedgerPageBootstrap", () => {
     expect(streamQuery?.state.data).toEqual({
       pages: [{ items: [], nextCursor: null, generation: "1" }],
       pageParams: [undefined],
+    });
+  });
+
+  /**
+   * The product rule the deferral above serves: the viewed book's fixed zone
+   * wins, then the device's, then the deployment's. The first visit has no
+   * device answer yet, and 16:30 UTC on the 30th is a different day — and a
+   * different month for a monthly period — in Shanghai than it is in UTC.
+   */
+  describe("the zone a first visit is dated by", () => {
+    beforeEach(() => {
+      vi.stubEnv("TZ", "UTC");
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-30T16:30:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
+
+    it("uses the device zone the browser reported rather than the deployment's", async () => {
+      const result = await getLedgerPageBootstrap({
+        ledgerId: "ledger-1",
+        initialTab: "stream",
+        periodParams: { period: "thisMonth" },
+        ledgerDto: createPreAuthorizedLedgerDto(),
+        deviceTimeZone: "Asia/Shanghai",
+      });
+
+      // October for the device, where the deployment's UTC would still say
+      // September: the range the client is about to ask for, so hydration is a
+      // cache hit instead of a second request for the wrong month.
+      expect(result?.ledgerToday).toBe("2026-10-01");
+      expect(listStreamPageMock).toHaveBeenCalledWith(
+        "ledger-1",
+        { startDate: "2026-10-01", endDate: "2026-10-31", cursor: undefined, limit: 20 },
+        bootstrapDependencies.sourceDocuments
+      );
+      expect(getStreamTotalMock).toHaveBeenCalledWith(
+        "ledger-1",
+        { startDate: "2026-10-01", endDate: "2026-10-31" },
+        bootstrapDependencies.sourceDocuments.documents
+      );
+      const streamQuery = result?.dehydratedState.queries.find(
+        (query) => query.queryKey[2] === "source-documents" && query.queryKey[3] === "stream"
+      );
+      expect(streamQuery?.queryKey[4]).toMatchObject({
+        startDate: "2026-10-01",
+        endDate: "2026-10-31",
+      });
+    });
+
+    it("treats a device zone the runtime cannot format with as no zone at all", async () => {
+      const result = await getLedgerPageBootstrap({
+        ledgerId: "ledger-1",
+        initialTab: "stream",
+        periodParams: { period: "thisMonth" },
+        ledgerDto: createPreAuthorizedLedgerDto(),
+        // A forged or stale cookie is external input; it is not handed to the
+        // date formatters and it does not stand in for a known zone.
+        deviceTimeZone: "Not/AZone",
+      });
+
+      expect(result?.ledgerToday).toBeUndefined();
+      expect(listStreamPageMock).not.toHaveBeenCalled();
+    });
+
+    it("dates 总账 by the device and does not inherit a book's fixed zone", async () => {
+      listBooksMock.mockResolvedValue([
+        {
+          id: "book-1",
+          ledgerId: "ledger-1",
+          name: "共同支出",
+          timeZone: "Asia/Shanghai",
+          sortOrder: 1,
+        },
+      ]);
+
+      const result = await getLedgerPageBootstrap({
+        ledgerId: "ledger-1",
+        initialTab: "stream",
+        periodParams: { period: "thisMonth" },
+        ledgerDto: createPreAuthorizedLedgerDto(),
+        deviceTimeZone: "Europe/London",
+        // No book: 总账 shows every book at once, so no single book's zone owns
+        // the view.
+      });
+
+      expect(result?.ledgerToday).toBe("2026-09-30");
+      expect(result?.initialBookId).toBeNull();
+      expect(listStreamPageMock).toHaveBeenCalledWith(
+        "ledger-1",
+        { startDate: "2026-09-01", endDate: "2026-09-30", cursor: undefined, limit: 20 },
+        bootstrapDependencies.sourceDocuments
+      );
+    });
+
+    it("lets a viewed book's fixed zone beat the device zone across the month boundary", async () => {
+      listBooksMock.mockResolvedValue([
+        {
+          id: "book-1",
+          ledgerId: "ledger-1",
+          name: "共同支出",
+          timeZone: "Europe/London",
+          sortOrder: 1,
+        },
+      ]);
+
+      const result = await getLedgerPageBootstrap({
+        ledgerId: "ledger-1",
+        initialTab: "stream",
+        periodParams: { period: "thisMonth" },
+        ledgerDto: createPreAuthorizedLedgerDto(),
+        deviceTimeZone: "Asia/Shanghai",
+        bookId: "book-1",
+      });
+
+      // Shanghai is already into October; the book the page is narrowed to is
+      // not, and the book is the authority for its own records.
+      expect(result?.ledgerToday).toBe("2026-09-30");
+      expect(listStreamPageMock).toHaveBeenCalledWith(
+        "ledger-1",
+        {
+          bookId: "book-1",
+          startDate: "2026-09-01",
+          endDate: "2026-09-30",
+          cursor: undefined,
+          limit: 20,
+        },
+        bootstrapDependencies.sourceDocuments
+      );
     });
   });
 

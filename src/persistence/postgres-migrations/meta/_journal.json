@@ -344,6 +344,13 @@
       "when": 1789700200000,
       "tag": "0048_books_and_single_account",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1789785600000,
+      "tag": "0049_drop_book_default",
+      "breakpoints": true
     }
   ]
 }

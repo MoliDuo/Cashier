@@ -64,7 +64,6 @@ const books: BookDto[] = [
     name: "Mine",
     timeZone: null,
     sortOrder: 1,
-    isDefault: true,
     archivedAt: null,
   },
   {
@@ -73,7 +72,6 @@ const books: BookDto[] = [
     name: "Shared",
     timeZone: null,
     sortOrder: 2,
-    isDefault: false,
     archivedAt: null,
   },
 ];
