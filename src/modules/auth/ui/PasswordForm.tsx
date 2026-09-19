@@ -146,8 +146,10 @@ export function PasswordForm({
   const canSubmit = matches && (!savedHasPassword || currentPassword !== "");
 
   return (
-    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-sm text-muted-foreground">
+    // One line at every width: the status and its one button are a single
+    // reading row, so a narrow screen wraps the text instead of the button.
+    <div className="flex w-full items-center justify-between gap-3">
+      <span className="min-w-0 text-sm text-muted-foreground">
         {savedPasswordUpdatedAt == null
           ? t("passwordNotSet")
           : t("passwordLastChanged", {
@@ -157,66 +159,68 @@ export function PasswordForm({
               }),
             })}
       </span>
-      <CredentialChangeDialog
-        open={open}
-        onOpenChange={(nextOpen) => {
-          setOpen(nextOpen);
-          if (!nextOpen) reset();
-        }}
-        pending={isLoading}
-        triggerLabel={savedHasPassword ? t("changePasswordButton") : t("setPasswordButton")}
-        title={savedHasPassword ? t("changePasswordTitle") : t("setPasswordTitle")}
-        description={t("passwordRequirements")}
-        desktopWidth="md"
-        footer={
-          <>
-            <Button variant="outline" onClick={close} disabled={isLoading}>
-              {t("cancel")}
-            </Button>
-            <Button onClick={submit} disabled={!canSubmit || isLoading}>
-              {isLoading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : null}
-              {t("savePassword")}
-            </Button>
-          </>
-        }
-      >
-        {savedHasPassword ? (
+      <div className="shrink-0">
+        <CredentialChangeDialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            setOpen(nextOpen);
+            if (!nextOpen) reset();
+          }}
+          pending={isLoading}
+          triggerLabel={savedHasPassword ? t("changePasswordButton") : t("setPasswordButton")}
+          title={savedHasPassword ? t("changePasswordTitle") : t("setPasswordTitle")}
+          description={t("passwordRequirements")}
+          desktopWidth="md"
+          footer={
+            <>
+              <Button variant="outline" onClick={close} disabled={isLoading}>
+                {t("cancel")}
+              </Button>
+              <Button onClick={submit} disabled={!canSubmit || isLoading}>
+                {isLoading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : null}
+                {t("savePassword")}
+              </Button>
+            </>
+          }
+        >
+          {savedHasPassword ? (
+            <PasswordField
+              id="current-password"
+              label={t("currentPassword")}
+              value={currentPassword}
+              onChange={setCurrentPassword}
+              autoComplete="current-password"
+              disabled={isLoading}
+            />
+          ) : null}
           <PasswordField
-            id="current-password"
-            label={t("currentPassword")}
-            value={currentPassword}
-            onChange={setCurrentPassword}
-            autoComplete="current-password"
+            id="new-password"
+            label={t("newPassword")}
+            value={newPassword}
+            onChange={setNewPassword}
+            autoComplete="new-password"
             disabled={isLoading}
           />
-        ) : null}
-        <PasswordField
-          id="new-password"
-          label={t("newPassword")}
-          value={newPassword}
-          onChange={setNewPassword}
-          autoComplete="new-password"
-          disabled={isLoading}
-        />
-        <PasswordField
-          id="confirm-password"
-          label={t("confirmPassword")}
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          autoComplete="new-password"
-          disabled={isLoading}
-        />
-        {confirmPassword !== "" && !matches ? (
-          <p role="alert" className="text-sm text-destructive">
-            {t("passwordsDoNotMatch")}
-          </p>
-        ) : null}
-        {error != null ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </CredentialChangeDialog>
+          <PasswordField
+            id="confirm-password"
+            label={t("confirmPassword")}
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+            disabled={isLoading}
+          />
+          {confirmPassword !== "" && !matches ? (
+            <p role="alert" className="text-sm text-destructive">
+              {t("passwordsDoNotMatch")}
+            </p>
+          ) : null}
+          {error != null ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+        </CredentialChangeDialog>
+      </div>
     </div>
   );
 }

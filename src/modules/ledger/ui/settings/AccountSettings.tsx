@@ -89,35 +89,41 @@ export function AccountSettings({
           onRequireReauthentication={onRequireReauthentication}
           onAllSessionsEnded={onAllSessionsEnded}
         />
-        <SettingsField title={t("signOut")}>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={isPending || isSigningOut}
-            onClick={() => setSignOutConfirmOpen(true)}
-          >
-            {t("signOut")}
-          </Button>
-          <ConfirmDialog
-            open={signOutConfirmOpen}
-            onOpenChange={setSignOutConfirmOpen}
-            title={t("signOutConfirmTitle")}
-            description={t("signOutConfirmDescription")}
-            confirmLabel={t("signOut")}
-            variant="destructive"
-            onConfirm={async () => {
-              if (isSigningOut) return false;
-              setIsSigningOut(true);
-              try {
-                await onSignOut();
-                return true;
-              } finally {
-                setIsSigningOut(false);
-              }
-            }}
-          />
-        </SettingsField>
+        {/* The button sits on the heading row at every width, like 添加邮箱 and
+            新建密钥, instead of dropping under its own label on a phone. */}
+        <SettingsField
+          title={t("signOut")}
+          stacked
+          actions={
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isPending || isSigningOut}
+              onClick={() => setSignOutConfirmOpen(true)}
+            >
+              {t("signOut")}
+            </Button>
+          }
+        />
       </SettingsSection>
+      <ConfirmDialog
+        open={signOutConfirmOpen}
+        onOpenChange={setSignOutConfirmOpen}
+        title={t("signOutConfirmTitle")}
+        description={t("signOutConfirmDescription")}
+        confirmLabel={t("signOut")}
+        variant="destructive"
+        onConfirm={async () => {
+          if (isSigningOut) return false;
+          setIsSigningOut(true);
+          try {
+            await onSignOut();
+            return true;
+          } finally {
+            setIsSigningOut(false);
+          }
+        }}
+      />
     </>
   );
 }

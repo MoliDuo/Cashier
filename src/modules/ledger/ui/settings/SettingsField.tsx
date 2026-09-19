@@ -6,7 +6,11 @@ interface SettingsFieldProps {
   /** Buttons that act on this whole field, aligned with its heading. */
   actions?: ReactNode;
   stacked?: boolean;
-  children: ReactNode;
+  /**
+   * Omitted when the heading and its actions are the whole field — 退出登录 has
+   * nothing under its button — so no empty row is left behind.
+   */
+  children?: ReactNode;
 }
 
 export function SettingsField({ title, actions, stacked = false, children }: SettingsFieldProps) {
@@ -23,7 +27,7 @@ export function SettingsField({ title, actions, stacked = false, children }: Set
         </div>
         {actions != null && <div className="shrink-0">{actions}</div>}
       </div>
-      <div className={cn(stacked ? "w-full" : "sm:max-w-md")}>{children}</div>
+      {children != null && <div className={cn(stacked ? "w-full" : "sm:max-w-md")}>{children}</div>}
     </div>
   );
 }
