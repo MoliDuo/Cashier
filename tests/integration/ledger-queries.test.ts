@@ -81,6 +81,9 @@ describe("session ledger query transport", () => {
       "entries",
       "entry",
       "ledger",
+      "books",
+      "books-including-archived",
+      "book",
       "categories",
       "summary",
       "settings",
@@ -123,5 +126,39 @@ describe("session ledger query transport", () => {
     expect(await foreignLedgerRead.json()).toBeNull();
     expect((await POST(request("categories", [retiredLedgerId]))).status).toBe(404);
     expect((await POST(request("settings", [retiredLedgerId]))).status).toBe(404);
+  });
+
+  it("serves the books reads over the same scoped transport", async () => {
+    const db = getTestDb();
+    const ledger = createLedgerData({ userId });
+    await db.insert(ledgers).values(ledger);
+    const books = await ensureTestLedgerBooks(db, ledger.id, ["共同支出", "旧账"]);
+    const liveBookId = books.get("共同支出")!;
+    const retiredBookId = books.get("旧账")!;
+    await db.execute(sql`UPDATE books SET archived_at = now() WHERE id = ${retiredBookId}`);
+
+    const live = await POST(request("books", [ledger.id]));
+    expect(live.status).toBe(200);
+    expect(live.headers.get("cache-control")).toBe("private, no-store");
+    expect((await live.json()).map((book: { id: string }) => book.id)).toEqual([liveBookId]);
+
+    // The retired book is named on its own and listed beside the live one, but
+    // never in the switcher's list.
+    const withArchived = await POST(request("books-including-archived", [ledger.id]));
+    expect(withArchived.status).toBe(200);
+    expect(withArchived.headers.get("cache-control")).toBe("private, no-store");
+    expect((await withArchived.json()).map((book: { id: string }) => book.id).sort()).toEqual(
+      [liveBookId, retiredBookId].sort()
+    );
+
+    const retired = await POST(request("book", [ledger.id, retiredBookId]));
+    expect(retired.status).toBe(200);
+    expect(await retired.json()).toMatchObject({ id: retiredBookId, name: "旧账" });
+    expect(await (await POST(request("book", [ledger.id, crypto.randomUUID()]))).json()).toBeNull();
+    expect((await POST(request("book", [ledger.id, "not-a-uuid"]))).status).toBe(400);
+
+    // Another account's ledger, and more arguments than a read takes.
+    expect((await POST(request("books", [crypto.randomUUID()]))).status).toBe(404);
+    expect((await POST(request("books", [ledger.id, ledger.id]))).status).toBe(400);
   });
 });

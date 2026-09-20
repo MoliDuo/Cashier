@@ -1,14 +1,12 @@
 import { withLedgerAccess } from "../access";
 import { calculateLedgerStats } from "@/modules/ledger/application/queries/calculate-ledger-stats";
 import { serverComposition } from "@/application/server-composition-root";
-import {
-  parseLedgerStatsQuery,
-  type LedgerStatsQueryInput,
-} from "@/modules/ledger/contract-schemas";
 
+/**
+ * The ledger's totals. The query parses its own filters, so an unvalidated
+ * object can never reach the read port through this wrapper.
+ */
 export const getLedgerStatsAction = withLedgerAccess(
-  async (ledgerId: string, query: LedgerStatsQueryInput = {}) => {
-    const validated = parseLedgerStatsQuery(query);
-    return calculateLedgerStats(ledgerId, validated, serverComposition.ledgerReads);
-  }
+  async (ledgerId: string, query: unknown = {}) =>
+    calculateLedgerStats(ledgerId, query, serverComposition.ledgerReads)
 );

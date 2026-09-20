@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
@@ -57,19 +57,22 @@ function renderStatus(props: Partial<React.ComponentProps<typeof CategoryAssignm
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
+  const onTaskRegistered = vi.fn();
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  return render(
+  const view = render(
     <CategoryAssignmentStatus
       ledgerId="ledger-1"
       job={job()}
       isReadError={false}
       onRefresh={vi.fn()}
+      onTaskRegistered={onTaskRegistered}
       {...props}
     />,
     { wrapper }
   );
+  return { ...view, queryClient, onTaskRegistered };
 }
 
 describe("CategoryAssignmentStatus", () => {
@@ -103,6 +106,28 @@ describe("CategoryAssignmentStatus", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /categoryViewResults/ }));
     expect(screen.getByRole("button", { name: /categoryRetryLatest/ })).toBeEnabled();
+  });
+
+  it("hands the run a retry restarted back to the page", async () => {
+    const { retryCategoryAssignmentLatestAction } =
+      await import("@/modules/ledger/server-actions/reclassification");
+    const restarted = job({ id: "job-2", status: "running", processedCount: 0 });
+    vi.mocked(retryCategoryAssignmentLatestAction).mockResolvedValue(restarted);
+    const { onTaskRegistered, queryClient } = renderStatus({
+      job: job({ status: "partial", conflictCount: 1 }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /categoryViewResults/ }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /categoryRetryLatest/ }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(onTaskRegistered).toHaveBeenCalledWith(restarted);
+    // The page owns the cache write now, so the band must not also make one.
+    expect(
+      queryClient.getQueryData(["ledger", "ledger-1", "category-reclassification"])
+    ).toBeUndefined();
   });
 
   it("lets a finished run's band be closed", () => {

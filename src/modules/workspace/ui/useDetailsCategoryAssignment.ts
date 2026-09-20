@@ -1,13 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
-import { invalidateLedgerQueries } from "@/lib/mutations/ledger-invalidation";
-import { queryKeys } from "@/lib/query-keys";
-import { getCategoryReclassificationJobAction } from "@/lib/queries/ledger-query-client";
 import {
   appendCategoryAssignmentSelectionAction,
   beginCategoryAssignmentAction,
@@ -21,21 +17,12 @@ import type {
   EntryCategory,
   LedgerEntry,
 } from "@/modules/ledger/contracts";
+import { useCategoryAssignment } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { selectionMatches } from "./selection-snapshot";
 
 /** One pick is written through as-is; a longer selection is uploaded in chunks. */
 const DIRECT_ASSIGNMENT_LIMIT = 100;
 const SELECTION_CHUNK_SIZE = 1000;
-
-/**
- * A run takes a couple of minutes over up to 100 entries, so the default
- * polling schedule — five rounds, about three and a half minutes — would be
- * spent before a slow run finished. The index advances on every response,
- * not only on a change, so the tail has to be long enough to outlast the run.
- */
-function isReclassificationActive(job: CategoryReclassificationJob): boolean {
-  return job.status === "preparing" || job.status === "pending" || job.status === "running";
-}
 
 /** The selection the open dialog is asking about, fixed at the moment it opened. */
 interface CategorySnapshot {
@@ -58,11 +45,11 @@ interface UseDetailsCategoryAssignmentOptions {
 }
 
 /**
- * Owns the whole lifecycle of a category assignment asked from the batch
- * toolbar: the dialog and its picks, the selection it was opened on, the
- * persistent run it may start, and the completion notice that run reports
- * later. A run outlives the dialog, so none of it may live in the dialog's
- * open/closed state.
+ * Owns the dialog of a category assignment asked from the batch toolbar: its
+ * picks, the selection it was opened on, and the persistent run it may start.
+ * The run itself outlives the dialog — and this tab — so the page follows it
+ * through `useCategoryAssignment`, and this hook only reports back the run it
+ * started.
  */
 export function useDetailsCategoryAssignment({
   ledgerId,
@@ -76,7 +63,6 @@ export function useDetailsCategoryAssignment({
 }: UseDetailsCategoryAssignmentOptions) {
   const tBatch = useTranslations("BatchActions");
   const tCommon = useTranslations("Common");
-  const queryClient = useQueryClient();
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pickedCategoryIds, setPickedCategoryIds] = useState<string[]>([]);
   const [clearCategoryPicked, setClearCategoryPicked] = useState(false);
@@ -89,18 +75,13 @@ export function useDetailsCategoryAssignment({
     total: number;
   } | null>(null);
   const categoryRequestKeyRef = useRef<string | null>(null);
-  const announcedJobRef = useRef<string | null>(null);
-  const announcedJobsRef = useRef(new Set<string>());
-
-  const reclassification = useQuery<CategoryReclassificationJob | null>({
-    queryKey: queryKeys.categoryReclassification(ledgerId),
-    queryFn: () => getCategoryReclassificationJobAction(ledgerId),
-    refetchInterval: (query) =>
-      query.state.data != null && isReclassificationActive(query.state.data) ? 3_000 : false,
-  });
-  const reclassificationJob = reclassification.data ?? null;
-  const isReclassifying =
-    reclassificationJob != null && isReclassificationActive(reclassificationJob);
+  // The run outlives this tab, so the page follows it and the dialog only reads
+  // it: nothing here polls, and nothing here announces what the page started.
+  const {
+    job: reclassificationJob,
+    isActive: isReclassifying,
+    registerSubmittedJob,
+  } = useCategoryAssignment();
   const categorySelectionChanged =
     categorySnapshot != null &&
     (categorySnapshot.ledgerId !== ledgerId ||
@@ -110,32 +91,6 @@ export function useDetailsCategoryAssignment({
         categorySnapshot.entries.map((entry) => entry.ledgerEntryId),
         selectedIds
       ));
-
-  // Announce a finished run only if this client watched it run. A terminal job
-  // left over from an earlier visit is history, not news — but a run this page
-  // picked up mid-flight (a reload) is watched from the first poll onwards.
-  useEffect(() => {
-    const job = reclassificationJob;
-    if (job == null) return;
-    if (isReclassifying) {
-      announcedJobRef.current = job.id;
-      return;
-    }
-    if (announcedJobRef.current !== job.id || announcedJobsRef.current.has(job.id)) return;
-    announcedJobsRef.current.add(job.id);
-    if (job.status === "succeeded") {
-      toast.success(
-        tBatch("aiCategoryDone", {
-          applied: job.appliedCount,
-          confirmed: job.confirmedCount,
-          issues: job.failedCount + job.conflictCount + job.skippedCount,
-        })
-      );
-      void invalidateLedgerQueries(queryClient, ledgerId, ["documents", "stats"]);
-      return;
-    }
-    toast.error(tBatch("aiCategoryFailed"));
-  }, [reclassificationJob, isReclassifying, ledgerId, queryClient, tBatch]);
 
   // Opening captures the selection and drops the picks of the previous visit;
   // closing drops both. A snapshot that no longer matches the selection can
@@ -225,16 +180,14 @@ export function useDetailsCategoryAssignment({
     invalidationErrorMessage: tCommon("savedRefreshFailed"),
     errorMessage: tBatch("aiCategoryFailed"),
     onSuccess: (job) => {
-      // Watch this run even if its first poll already reports it finished.
-      announcedJobRef.current = job.id;
+      // Hand the run to the page before it can finish: a run whose first answer
+      // already reports it over still has to say so, once, to this reader.
+      registerSubmittedJob(job);
       toast.success(tBatch("aiCategoryRunning"));
       clearSelection();
       setSelectionUploadProgress(null);
       categoryRequestKeyRef.current = null;
       setCategoryDialogVisibility(false);
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.categoryReclassification(ledgerId),
-      });
     },
     onError: (error) => {
       if (error instanceof Error && error.message.includes("CONFLICT")) {

@@ -50,21 +50,15 @@ export function useCategoryManagementDraft({
 
   const hasCategoryDraft = dirty || newCategoryName.trim() !== "" || editDirty;
 
-  const {
-    incomingDraft,
-    serverChanged,
-    setServerChanged,
-    revisionConflict,
-    setRevisionConflict,
-    resetSyncState,
-  } = useCategoryDraftSync({
-    categories,
-    managing,
-    serverDraft,
-    setServerDraft,
-    setDraftOrder,
-    hasCategoryDraft,
-  });
+  const { incomingDraft, revisionConflict, setRevisionConflict, resetSyncState } =
+    useCategoryDraftSync({
+      categories,
+      managing,
+      serverDraft,
+      setServerDraft,
+      setDraftOrder,
+      hasCategoryDraft,
+    });
 
   useEffect(() => {
     const key = "settings:categories";
@@ -134,7 +128,7 @@ export function useCategoryManagementDraft({
   };
 
   const handleSave = async () => {
-    if (!dirty || isSaving || revisionConflict || serverChanged) return;
+    if (!dirty || isSaving || revisionConflict) return;
     setSaveError(null);
     try {
       const expectedRevision = await computeCategoryCollectionRevision(categories);
@@ -160,7 +154,6 @@ export function useCategoryManagementDraft({
           : undefined;
       if (errorCode === "CONFLICT") {
         setRevisionConflict(true);
-        setServerChanged(true);
         setSaveError(t("updateConflict"));
       } else {
         setSaveError(t("saveCategoriesFailed"));
@@ -197,7 +190,6 @@ export function useCategoryManagementDraft({
     setDiscardManagementOpen,
     discardEditOpen,
     setDiscardEditOpen,
-    serverChanged,
     revisionConflict,
     saveError,
     dirty,

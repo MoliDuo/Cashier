@@ -1,5 +1,6 @@
 import type { ServiceCredentialPort } from "@/application/contracts";
 import type { CreatedServiceCredentialDto } from "@/modules/ledger/contracts";
+import { toServiceCredentialDto } from "../queries/list-service-credentials";
 
 export async function createServiceCredential(
   ledgerId: string,
@@ -7,16 +8,10 @@ export async function createServiceCredential(
   credentials: Pick<ServiceCredentialPort, "create">
 ): Promise<CreatedServiceCredentialDto> {
   const credential = await credentials.create(ledgerId, input.name, input.bookId);
+  // The plaintext token is shown once, here, and never reaches the browser's
+  // view of the ledger's keys.
   return {
-    id: credential.id,
-    bookId: credential.bookId,
+    ...toServiceCredentialDto(credential),
     token: credential.token,
-    tokenPrefix: credential.tokenPrefix,
-    tokenSuffix: credential.tokenSuffix,
-    ledgerId: credential.ledgerId,
-    name: credential.name,
-    createdAt: credential.createdAt,
-    lastUsedAt: credential.lastUsedAt,
-    deletedAt: null,
   };
 }

@@ -52,9 +52,6 @@ vi.mock("@/modules/ledger/application/use-cases/create-entry-category", () => ({
 vi.mock("@/modules/ledger/application/use-cases/create-service-credential", () => ({
   createServiceCredential: vi.fn(),
 }));
-vi.mock("@/modules/ledger/application/use-cases/delete-entry-category", () => ({
-  deleteEntryCategory: vi.fn(),
-}));
 vi.mock("@/modules/ledger/application/use-cases/delete-service-credential", () => ({
   deleteServiceCredential: vi.fn(),
 }));

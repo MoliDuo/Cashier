@@ -3,10 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
-import {
-  getBooksAction,
-  getBooksIncludingArchivedAction,
-} from "@/modules/ledger/server-actions/books";
+import { getBooksAction, getBooksIncludingArchivedAction } from "@/lib/queries/ledger-query-client";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 interface UseBooksOptions {

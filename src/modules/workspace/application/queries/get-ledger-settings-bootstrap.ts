@@ -36,35 +36,39 @@ export async function getLedgerSettingsBootstrap(
   const queryClient = new QueryClient();
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
 
-  // Both views are hydrated: the API-key pickers take the live books, and the
-  // 分账 section shows the archived ones alongside them.
-  const books = await listBooks(input.ledgerId, dependencies.books);
-  const booksIncludingArchived = await listBooks(input.ledgerId, dependencies.books, {
-    includeArchived: true,
-  });
-  queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
-  queryClient.setQueryData(
-    queryKeys.booksIncludingArchived(input.ledgerId),
-    booksIncludingArchived
-  );
-
+  // The three loads below are independent, so they run together rather than one
+  // after the other; each joins this chain immediately, so a failure reaches the
+  // page boundary instead of being left unhandled.
   const categoriesPromise = queryClient.fetchQuery({
     queryKey: queryKeys.entryCategories(input.ledgerId),
     queryFn: () => listEntryCategories(input.ledgerId, dependencies.categories),
     staleTime: LEDGER.STALE_TIME_MS,
   });
-  await Promise.all([
+  const booksPromise = listBooks(input.ledgerId, dependencies.books, { includeArchived: true });
+  const settingsPromise = queryClient.prefetchQuery({
+    queryKey: queryKeys.ledgerSettings(input.ledgerId),
+    queryFn: () =>
+      getLedgerSettingsView(input.ledgerId, {
+        categories: dependencies.categories,
+        credentials: dependencies.credentials,
+      }),
+    staleTime: LEDGER.STALE_TIME_MS,
+  });
+  const [booksIncludingArchived] = await Promise.all([
+    booksPromise,
     categoriesPromise,
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.ledgerSettings(input.ledgerId),
-      queryFn: () =>
-        getLedgerSettingsView(input.ledgerId, {
-          categories: dependencies.categories,
-          credentials: dependencies.credentials,
-        }),
-      staleTime: LEDGER.STALE_TIME_MS,
-    }),
+    settingsPromise,
   ]);
+
+  // Both views are hydrated: the API-key pickers take the live books, and the
+  // 分账 section shows the archived ones alongside them. One read answers both —
+  // the switcher's list is this one without its retired rows.
+  const books = booksIncludingArchived.filter((book) => book.archivedAt == null);
+  queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
+  queryClient.setQueryData(
+    queryKeys.booksIncludingArchived(input.ledgerId),
+    booksIncludingArchived
+  );
 
   return {
     dehydratedState: dehydrate(queryClient),

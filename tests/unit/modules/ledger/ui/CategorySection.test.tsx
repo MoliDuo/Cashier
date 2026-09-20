@@ -15,8 +15,16 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
   applyCategoryPresetAction: applyPresetAction,
 }));
-vi.mock("@/modules/ledger/hooks/useCategoryAssignmentJob", () => ({
-  useCategoryAssignmentJob: () => ({ job: null, isReadError: false, refresh: vi.fn() }),
+vi.mock("@/modules/ledger/ui/CategoryAssignmentProvider", () => ({
+  useCategoryAssignment: () => ({
+    ledgerId: "ledger-1",
+    job: null,
+    isActive: false,
+    isReadError: false,
+    refresh: vi.fn(),
+    dismiss: vi.fn(),
+    registerSubmittedJob: vi.fn(),
+  }),
 }));
 
 const category: EntryCategoryWithCount = {

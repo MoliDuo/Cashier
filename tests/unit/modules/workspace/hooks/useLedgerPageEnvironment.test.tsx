@@ -22,8 +22,6 @@ const { getLedgerActionMock, getEntryCategoriesActionMock, getBooksActionMock, b
 vi.mock("@/lib/queries/ledger-query-client", () => ({
   getLedgerAction: getLedgerActionMock,
   getEntryCategoriesAction: getEntryCategoriesActionMock,
-}));
-vi.mock("@/modules/ledger/server-actions/books", () => ({
   getBooksAction: getBooksActionMock,
   getBooksIncludingArchivedAction: getBooksActionMock,
 }));

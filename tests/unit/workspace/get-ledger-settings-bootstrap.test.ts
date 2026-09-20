@@ -82,4 +82,58 @@ describe("getLedgerSettingsBootstrap", () => {
     ).resolves.toBeNull();
     expect(listEntryCategoriesMock).not.toHaveBeenCalled();
   });
+
+  it("reads the books once and derives the switcher's list from it", async () => {
+    listBooksMock.mockResolvedValue([
+      {
+        id: "book-1",
+        ledgerId: "ledger-1",
+        name: "共同支出",
+        timeZone: null,
+        sortOrder: 1,
+        archivedAt: null,
+      },
+      {
+        id: "book-2",
+        ledgerId: "ledger-1",
+        name: "旧账",
+        timeZone: null,
+        sortOrder: 2,
+        archivedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    const result = await getBootstrap({ ledgerId: "ledger-1", ledgerDto }, dependencies);
+
+    expect(listBooksMock).toHaveBeenCalledTimes(1);
+    expect(listBooksMock).toHaveBeenCalledWith("ledger-1", { includeArchived: true });
+    expect(result?.initialBooks.map((book) => book.id)).toEqual(["book-1"]);
+    expect(result?.initialBooksIncludingArchived.map((book) => book.id)).toEqual([
+      "book-1",
+      "book-2",
+    ]);
+    const booksQuery = result?.dehydratedState.queries.find(
+      (query) => String(query.queryKey[2]) === "books"
+    );
+    expect((booksQuery?.state.data as { id: string }[]).map((book) => book.id)).toEqual(["book-1"]);
+  });
+
+  it("starts the categories and settings loads without waiting for the books", async () => {
+    let releaseBooks!: (books: unknown[]) => void;
+    listBooksMock.mockReturnValue(
+      new Promise((resolve) => {
+        releaseBooks = resolve;
+      })
+    );
+
+    const pending = getBootstrap({ ledgerId: "ledger-1", ledgerDto }, dependencies);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listEntryCategoriesMock).toHaveBeenCalledTimes(1);
+    expect(getLedgerSettingsViewMock).toHaveBeenCalledTimes(1);
+
+    releaseBooks([]);
+    await expect(pending).resolves.not.toBeNull();
+  });
 });

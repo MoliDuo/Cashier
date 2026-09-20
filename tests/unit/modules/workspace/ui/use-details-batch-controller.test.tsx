@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDetailsBatchController } from "@/modules/workspace/ui/useDetailsBatchController";
+import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 
 const {
   batchDeleteLedgerEntriesActionMock,
@@ -30,6 +31,15 @@ const {
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => "zh",
+  useMessages: () => ({}),
+  NextIntlClientProvider: ({ children }: PropsWithChildren) => <>{children}</>,
+}));
+
+// The run is reported by the page that owns it; the messages it needs are
+// loaded by that boundary in production, so here it renders straight through.
+vi.mock("@/i18n/DeferredFeatureMessages", () => ({
+  DeferredFeatureMessages: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 
 vi.mock("sonner", () => ({
@@ -66,7 +76,9 @@ function setup() {
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
   const wrapper = ({ children }: PropsWithChildren) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <CategoryAssignmentProvider ledgerId="ledger-1">{children}</CategoryAssignmentProvider>
+    </QueryClientProvider>
   );
   return { queryClient, wrapper };
 }
@@ -697,7 +709,7 @@ describe("useDetailsBatchController", () => {
     expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
   });
 
-  it("keeps a run reporting after its dialog is closed", async () => {
+  it("keeps following a run after its dialog is closed", async () => {
     const { wrapper, queryClient } = setup();
     const running = assignmentJob("running");
     reclassificationJobMock.mockResolvedValueOnce(null).mockImplementation(async () => ({
@@ -720,6 +732,7 @@ describe("useDetailsBatchController", () => {
     });
     await waitFor(() => expect(result.current.categoryDialogOpen).toBe(false));
 
+    // The dialog is gone but the run is not: the page still reports it.
     await waitFor(() => expect(result.current.isReclassifying).toBe(true));
     reclassificationJobMock.mockImplementation(async () => succeededJob());
     await act(async () => {
@@ -729,7 +742,6 @@ describe("useDetailsBatchController", () => {
     });
 
     await waitFor(() => expect(result.current.isReclassifying).toBe(false));
-    expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryDone");
   });
 
   it("ignores a date preview that lands after the dialog was reopened", async () => {

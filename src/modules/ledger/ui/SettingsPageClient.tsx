@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 import { textRoleClassName } from "@/components/typography";
 import type { BookDto } from "@/modules/ledger/contracts";
+import { CategoryAssignmentProvider } from "./CategoryAssignmentProvider";
 
 interface SettingsPageClientProps {
   ledger: Ledger;
@@ -61,18 +62,22 @@ export function SettingsPageClient({
         <h1 className={textRoleClassName("pageTitle", "truncate")}>{t("title")}</h1>
       </div>
 
-      <SettingsTab
-        ledger={ledger}
-        initialCategories={initialCategories}
-        ledgerId={ledgerId}
-        initialBooks={initialBooks}
-        initialBooksIncludingArchived={initialBooksIncludingArchived}
-        {...(initialEmails !== undefined ? { initialEmails } : {})}
-        {...(userEmail !== undefined ? { userEmail } : {})}
-        {...(hasPassword !== undefined ? { hasPassword } : {})}
-        {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
-        {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
-      />
+      {/* The run the settings page starts is followed here too: 分类 has to warn
+          about it, and the reader may leave this page while it is still going. */}
+      <CategoryAssignmentProvider key={ledgerId} ledgerId={ledgerId}>
+        <SettingsTab
+          ledger={ledger}
+          initialCategories={initialCategories}
+          ledgerId={ledgerId}
+          initialBooks={initialBooks}
+          initialBooksIncludingArchived={initialBooksIncludingArchived}
+          {...(initialEmails !== undefined ? { initialEmails } : {})}
+          {...(userEmail !== undefined ? { userEmail } : {})}
+          {...(hasPassword !== undefined ? { hasPassword } : {})}
+          {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
+          {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
+        />
+      </CategoryAssignmentProvider>
       <ConfirmDialog
         open={leaveConfirmOpen}
         onOpenChange={(open) => (open ? undefined : cancelLeave())}

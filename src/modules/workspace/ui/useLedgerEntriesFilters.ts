@@ -2,28 +2,6 @@ import { useMemo } from "react";
 import { type PeriodParams } from "@/lib/period-utils";
 import { buildLedgerEntryFilters } from "../ledger-filter-state";
 import type { LedgerAdvancedFilters } from "../initial-query-state";
-import { canonicalizeSourceDocumentProcessingStatuses } from "@/modules/source-document/types";
-
-/** @testOnly Exported for strict stream query descriptor tests. */
-export function buildStreamTotalQuery(
-  filters: ReturnType<typeof buildLedgerEntryFilters>,
-  startDate: string | undefined,
-  endDate: string | undefined
-) {
-  const statuses = canonicalizeSourceDocumentProcessingStatuses(filters.statuses);
-
-  return {
-    input: {
-      ...(startDate != null && startDate !== "" ? { startDate } : {}),
-      ...(endDate != null && endDate !== "" ? { endDate } : {}),
-      ...(filters.minAmount != null ? { minAmount: filters.minAmount } : {}),
-      ...(filters.maxAmount != null ? { maxAmount: filters.maxAmount } : {}),
-      ...(statuses != null ? { statuses } : {}),
-      ...(filters.search != null && filters.search !== "" ? { search: filters.search } : {}),
-    },
-    statusesKey: statuses?.join(",") ?? null,
-  };
-}
 
 export function useLedgerEntriesFilters(
   periodParams: PeriodParams,

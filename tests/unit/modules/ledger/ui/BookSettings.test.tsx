@@ -14,7 +14,7 @@ const { getBooksAction, getBooksIncludingArchivedAction } = vi.hoisted(() => ({
   getBooksIncludingArchivedAction: vi.fn(),
 }));
 
-vi.mock("@/modules/ledger/server-actions/books", () => ({
+vi.mock("@/lib/queries/ledger-query-client", () => ({
   getBooksAction,
   getBooksIncludingArchivedAction,
 }));

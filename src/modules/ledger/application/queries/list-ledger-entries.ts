@@ -1,48 +1,24 @@
-import {
-  type ListLedgerEntriesInput,
-  type ListLedgerEntriesValidatedInput,
-  UNCATEGORIZED_SENTINEL,
-  parseListLedgerEntriesInput,
-} from "@/modules/ledger/contract-schemas";
+import { parseListLedgerEntriesInput } from "@/modules/ledger/contract-schemas";
 import type { LedgerEntryPageDto } from "@/modules/ledger/contracts";
 import type { LedgerReadPort } from "../ports";
+import { toLedgerEntryFilters } from "./to-ledger-entry-filters";
 
+/**
+ * The ledger's entries, one page at a time. This is the single entry point for
+ * the query — the session route and the server-side prefetch both reach it — so
+ * it validates its own input and returns the page currency the client expects.
+ */
 export async function listLedgerEntries(
   ledgerId: string,
-  params: ListLedgerEntriesInput,
+  params: unknown,
   reads: Pick<LedgerReadPort, "listEntries">
 ): Promise<LedgerEntryPageDto> {
   const validated = parseListLedgerEntriesInput(params);
-  const uncategorizedOnly = validated.categoryId === UNCATEGORIZED_SENTINEL;
-  return listLedgerEntriesFromValidatedInput(ledgerId, validated, { uncategorizedOnly }, reads);
-}
-
-async function listLedgerEntriesFromValidatedInput(
-  ledgerId: string,
-  validated: ListLedgerEntriesValidatedInput,
-  options: { uncategorizedOnly?: boolean } | undefined,
-  reads: Pick<LedgerReadPort, "listEntries">
-): Promise<LedgerEntryPageDto> {
-  const filters: Parameters<LedgerReadPort["listEntries"]>[0]["filters"] = {};
-  if (validated.bookId !== undefined) filters.bookId = validated.bookId;
-  if (validated.startDate !== undefined) filters.startDate = validated.startDate;
-  if (validated.endDate !== undefined) filters.endDate = validated.endDate;
-  if (validated.categoryId !== undefined && validated.categoryId !== UNCATEGORIZED_SENTINEL) {
-    filters.categoryId = validated.categoryId;
-  }
-  if (validated.currency !== undefined) filters.currency = validated.currency;
-  if (validated.minAmount !== undefined) filters.minAmount = validated.minAmount;
-  if (validated.maxAmount !== undefined) filters.maxAmount = validated.maxAmount;
-  if (validated.search !== undefined) filters.search = validated.search;
-  if (options?.uncategorizedOnly) {
-    filters.uncategorizedOnly = true;
-  }
-
   const result = await reads.listEntries({
     ledgerId,
     limit: validated.limit,
     cursor: validated.cursor ?? null,
-    filters,
+    filters: toLedgerEntryFilters(validated),
   });
 
   return {

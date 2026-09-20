@@ -135,4 +135,59 @@ describe("ledger tab query descriptors", () => {
       comparisonMode: descriptor.state.mode,
     });
   });
+
+  it("omits amount filters the reader cleared from the stream requests", () => {
+    const descriptor = buildStreamQueryDescriptor({
+      ledgerId: "ledger-1",
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      minAmount: null,
+      maxAmount: null,
+      statuses: [],
+    });
+
+    expect(descriptor.getPageInput()).toEqual({
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      limit: 20,
+    });
+    expect(descriptor.totalInput).toEqual({
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+    });
+  });
+
+  it("canonicalizes the status ordering once, for both requests and keys", () => {
+    const descriptor = buildStreamQueryDescriptor({
+      ledgerId: "ledger-1",
+      minAmount: "10",
+      maxAmount: "20",
+      statuses: ["failed", "cancelled", "failed"],
+    });
+
+    expect(descriptor.getPageInput()).toEqual({
+      minAmount: "10",
+      maxAmount: "20",
+      statuses: ["cancelled", "failed"],
+      limit: 20,
+    });
+    expect(descriptor.totalInput).toEqual({
+      minAmount: "10",
+      maxAmount: "20",
+      statuses: ["cancelled", "failed"],
+    });
+    const keyFilters = {
+      bookId: null,
+      startDate: null,
+      endDate: null,
+      minAmount: "10",
+      maxAmount: "20",
+      statuses: "cancelled,failed",
+      search: null,
+    };
+    expect(descriptor.queryKey).toEqual(queryKeys.sourceDocumentStream("ledger-1", keyFilters));
+    expect(descriptor.totalQueryKey).toEqual(
+      queryKeys.sourceDocumentStreamTotal("ledger-1", keyFilters)
+    );
+  });
 });

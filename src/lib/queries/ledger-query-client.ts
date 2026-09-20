@@ -12,10 +12,29 @@ type QueryActions = {
     ledgerId: string,
     input: import("@/modules/source-document/contract-refresh").LedgerRefreshRequest
   ) => Promise<import("@/modules/source-document/contract-refresh").LedgerRefreshResult>;
-  entries: typeof import("@/modules/ledger/server/list-entries").getLedgerEntriesAction;
+  /**
+   * Listing and totals validate the input they are handed, so the server side of
+   * both takes it untyped and the browser is the side that declares its shape.
+   */
+  entries: (
+    ledgerId: string,
+    input: import("@/modules/ledger/contract-schemas").ListLedgerEntriesInput
+  ) => Promise<import("@/modules/ledger/contracts").LedgerEntryPageDto>;
+  summary: (
+    ledgerId: string,
+    input: import("@/modules/ledger/contract-schemas").LedgerStatsQueryInput
+  ) => Promise<import("@/modules/ledger/contracts").LedgerSummaryDto>;
   ledger: typeof import("@/modules/ledger/server/get-ledger").getLedgerAction;
+  /** The three book reads the switcher, 设置 and the detail page use. */
+  books: (ledgerId: string) => Promise<import("@/modules/ledger/contracts").BookDto[]>;
+  "books-including-archived": (
+    ledgerId: string
+  ) => Promise<import("@/modules/ledger/contracts").BookDto[]>;
+  book: (
+    ledgerId: string,
+    bookId: string
+  ) => Promise<import("@/modules/ledger/contracts").BookDto | null>;
   categories: typeof import("@/modules/ledger/server/list-categories").getEntryCategoriesAction;
-  summary: typeof import("@/modules/ledger/server/stats").getLedgerStatsAction;
   settings: typeof import("@/modules/ledger/server/get-ledger-settings").getLedgerSettingsAction;
   stats: typeof import("@/modules/stats/server/get-enhanced-stats").getEnhancedStats;
   reclassification: typeof import("@/modules/ledger/server/get-category-reclassification-job").getCategoryReclassificationJobAction;
@@ -45,6 +64,9 @@ export const getStreamTotalAction = query("total");
 export const getStreamRefreshAction = query("refresh");
 export const getLedgerEntriesAction = query("entries");
 export const getLedgerAction = query("ledger");
+export const getBooksAction = query("books");
+export const getBooksIncludingArchivedAction = query("books-including-archived");
+export const getBookAction = query("book");
 export const getEntryCategoriesAction = query("categories");
 export const getLedgerStatsAction = query("summary");
 export const getLedgerSettingsAction = query("settings");

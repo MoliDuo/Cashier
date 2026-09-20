@@ -21,6 +21,8 @@ interface CategoryAssignmentStatusProps {
   isReadError: boolean;
   onRefresh: () => Promise<unknown>;
   onDismiss?: () => void;
+  /** Hands a restarted run to the page, which reports its outcome once it ends. */
+  onTaskRegistered: (job: CategoryReclassificationJob) => void;
 }
 
 export function CategoryAssignmentStatus({
@@ -29,6 +31,7 @@ export function CategoryAssignmentStatus({
   isReadError,
   onRefresh,
   onDismiss,
+  onTaskRegistered,
 }: CategoryAssignmentStatusProps) {
   const t = useTranslations("BatchActions");
   const tCommon = useTranslations("Common");
@@ -50,7 +53,7 @@ export function CategoryAssignmentStatus({
       return retryCategoryAssignmentLatestAction(ledgerId, retryLatestKeyRef.current);
     },
     onSuccess: (saved) => {
-      queryClient.setQueryData(queryKeys.categoryReclassification(ledgerId), saved);
+      onTaskRegistered(saved);
       retryLatestKeyRef.current = null;
       setResultsOpen(false);
     },
@@ -63,7 +66,7 @@ export function CategoryAssignmentStatus({
       return retryCategoryAssignmentFailuresAction(ledgerId, retryKeyRef.current);
     },
     onSuccess: (saved) => {
-      queryClient.setQueryData(queryKeys.categoryReclassification(ledgerId), saved);
+      onTaskRegistered(saved);
       retryKeyRef.current = null;
       setResultsOpen(false);
     },

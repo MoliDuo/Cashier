@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
 import type { LedgerReadPort } from "@/modules/ledger/application/ports";
@@ -11,13 +11,17 @@ const calculateLedgerStats = (
 ) => calculateLedgerStatsUseCase(ledgerId, query, reads);
 
 describe("calculateLedgerStats", () => {
+  beforeEach(() => {
+    calculateStats.mockReset();
+  });
+
   it("passes through only provided filters", async () => {
     calculateStats.mockResolvedValueOnce({ total: "ok" });
 
     const result = await calculateLedgerStats("ledger-1", {
       startDate: "2026-03-01",
       endDate: "2026-03-31",
-      categoryId: "cat-1",
+      categoryId: "11111111-1111-4111-8111-111111111111",
       currency: "CNY",
       minAmount: "10",
       maxAmount: "99",
@@ -29,7 +33,7 @@ describe("calculateLedgerStats", () => {
       filters: {
         startDate: "2026-03-01",
         endDate: "2026-03-31",
-        categoryId: "cat-1",
+        categoryId: "11111111-1111-4111-8111-111111111111",
         currency: "CNY",
         minAmount: "10",
         maxAmount: "99",
@@ -58,5 +62,27 @@ describe("calculateLedgerStats", () => {
     await calculateLedgerStats("ledger-2");
 
     expect(calculateStats).toHaveBeenCalledWith({ ledgerId: "ledger-2", filters: {} });
+  });
+
+  it("rejects a query it cannot read before the port is asked to count it", async () => {
+    await expect(calculateLedgerStats("ledger-1", { minAmount: "abc" })).rejects.toThrow(
+      "Validation failed"
+    );
+    await expect(calculateLedgerStats("ledger-1", { uncategorizedOnly: true })).rejects.toThrow(
+      "Validation failed"
+    );
+
+    expect(calculateStats).not.toHaveBeenCalled();
+  });
+
+  it("normalizes the search term the same way listing does", async () => {
+    calculateStats.mockResolvedValueOnce({ total: "searched" });
+
+    await calculateLedgerStats("ledger-1", { search: "  coffee  " });
+
+    expect(calculateStats).toHaveBeenCalledWith({
+      ledgerId: "ledger-1",
+      filters: { search: "coffee" },
+    });
   });
 });

@@ -8,7 +8,7 @@ import { useSourceDocumentRecoveryMutations } from "@/modules/source-document/ho
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
-import { getBookAction } from "@/modules/ledger/server-actions/books";
+import { getBookAction } from "@/lib/queries/ledger-query-client";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";

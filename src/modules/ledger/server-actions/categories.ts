@@ -19,7 +19,6 @@ import {
 } from "@/modules/ledger/contract-schemas";
 import { applyCategoryPreset } from "@/modules/ledger/application/use-cases/apply-category-preset";
 import { createEntryCategory } from "@/modules/ledger/application/use-cases/create-entry-category";
-import { deleteEntryCategory } from "@/modules/ledger/application/use-cases/delete-entry-category";
 import { updateEntryCategory } from "@/modules/ledger/application/use-cases/update-entry-category";
 import { serverComposition } from "@/application/server-composition-root";
 import { saveEntryCategories } from "@/modules/ledger/application/use-cases/save-entry-categories";
@@ -57,11 +56,7 @@ export const updateEntryCategoryAction = withLedgerAccess(
 export const deleteEntryCategoryAction = withLedgerAccess(
   async (ledgerId: string, categoryId: string): Promise<DeleteEntryCategoryResultDto> => {
     const validatedCategoryId = parseEntryCategoryId(categoryId);
-    const deleted = await deleteEntryCategory(
-      ledgerId,
-      validatedCategoryId,
-      serverComposition.categories
-    );
+    const deleted = await serverComposition.categories.delete(ledgerId, validatedCategoryId);
     return { categoryId: validatedCategoryId, deleted };
   }
 );

@@ -138,6 +138,39 @@ describe("getLedgerPageBootstrap", () => {
     expect(listStreamPageMock).not.toHaveBeenCalled();
   });
 
+  it("starts the categories read without waiting for the books", async () => {
+    let releaseBooks!: (books: unknown[]) => void;
+    listBooksMock.mockReturnValue(
+      new Promise((resolve) => {
+        releaseBooks = resolve;
+      })
+    );
+
+    const pending = getLedgerPageBootstrap({
+      ledgerId: "ledger-1",
+      initialTab: "stream",
+      periodParams: { period: "thisMonth" },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listEntryCategoriesMock).toHaveBeenCalledTimes(1);
+    // The reads that need the viewed book's zone still wait for the book.
+    expect(listStreamPageMock).not.toHaveBeenCalled();
+
+    releaseBooks([
+      {
+        id: "book-1",
+        ledgerId: "ledger-1",
+        name: "共同支出",
+        timeZone: null,
+        sortOrder: 1,
+      },
+    ]);
+    await expect(pending).resolves.not.toBeNull();
+    expect(listStreamPageMock).toHaveBeenCalledTimes(1);
+  });
+
   it("accepts a pre-authorized ledger DTO and skips re-authorization", async () => {
     const preAuthDto = createPreAuthorizedLedgerDto();
     const result = await getLedgerPageBootstrap({

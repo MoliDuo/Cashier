@@ -18,6 +18,11 @@ import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { getLedgerEntryAction } from "@/modules/ledger/server/get-entry";
 import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
+import {
+  getBookAction,
+  getBooksAction,
+  getBooksIncludingArchivedAction,
+} from "@/modules/ledger/server/books";
 import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import {
@@ -25,11 +30,7 @@ import {
   getCategoryReclassificationJobAction,
 } from "@/modules/ledger/server/get-category-reclassification-job";
 import { scheduleCategoryReclassificationRecoveryAfter } from "@/application/processing/schedule-category-reclassification";
-import {
-  parseLedgerStatsQuery,
-  parseListLedgerEntriesInput,
-  parseLedgerEntryId,
-} from "@/modules/ledger/contract-schemas";
+import { parseLedgerEntryId } from "@/modules/ledger/contract-schemas";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
@@ -50,6 +51,9 @@ const requestSchema = z
       "entries",
       "entry",
       "ledger",
+      "books",
+      "books-including-archived",
+      "book",
       "categories",
       "summary",
       "settings",
@@ -62,8 +66,8 @@ const requestSchema = z
   .strict();
 
 /**
- * The three ledger-scoped reads below take exactly one argument, unlike the
- * paginated reads that also carry an input object.
+ * The ledger-scoped reads below take exactly one argument, unlike the paginated
+ * reads that also carry an input object.
  */
 const singleArgumentSchema = z.array(z.unknown()).length(1);
 
@@ -120,7 +124,7 @@ export async function POST(request: Request) {
           scheduleProcessingRecoveryAfter(ledgerId);
           break;
         case "entries":
-          result = await getLedgerEntriesAction(ledgerId, parseListLedgerEntriesInput(input));
+          result = await getLedgerEntriesAction(ledgerId, input);
           break;
         case "entry":
           result = await getLedgerEntryAction(ledgerId, parseLedgerEntryId(input));
@@ -129,12 +133,23 @@ export async function POST(request: Request) {
           singleArgumentSchema.parse(payload.args);
           result = await getLedgerAction(ledgerId);
           break;
+        case "books":
+          singleArgumentSchema.parse(payload.args);
+          result = await getBooksAction(ledgerId);
+          break;
+        case "books-including-archived":
+          singleArgumentSchema.parse(payload.args);
+          result = await getBooksIncludingArchivedAction(ledgerId);
+          break;
+        case "book":
+          result = await getBookAction(ledgerId, input);
+          break;
         case "categories":
           singleArgumentSchema.parse(payload.args);
           result = await getEntryCategoriesAction(ledgerId);
           break;
         case "summary":
-          result = await getLedgerStatsAction(ledgerId, parseLedgerStatsQuery(input ?? {}));
+          result = await getLedgerStatsAction(ledgerId, input ?? {});
           break;
         case "settings":
           singleArgumentSchema.parse(payload.args);

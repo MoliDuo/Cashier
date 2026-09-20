@@ -17,6 +17,10 @@ interface UseCategoryDraftSyncOptions {
  * Reconciles incoming server categories against the in-progress draft while
  * `managing` is active: applies server changes straight through when the
  * draft has no local edits, or flags a conflict when it does.
+ *
+ * There is one conflict, not two: a draft that has moved on since the saved
+ * revision is the same condition whether the server answered a save with
+ * `CONFLICT` or the categories arrived under an edited draft.
  */
 export function useCategoryDraftSync({
   categories,
@@ -26,31 +30,25 @@ export function useCategoryDraftSync({
   setDraftOrder,
   hasCategoryDraft,
 }: UseCategoryDraftSyncOptions) {
-  const [serverChanged, setServerChanged] = useState(false);
   const [revisionConflict, setRevisionConflict] = useState(false);
   const incomingDraft = useMemo(() => categories.map(toCategoryDraft), [categories]);
 
   if (managing && !categoryDraftsEqual(serverDraft, incomingDraft)) {
     setServerDraft(incomingDraft);
     if (hasCategoryDraft) {
-      setServerChanged(true);
       setRevisionConflict(true);
     } else {
       setDraftOrder(incomingDraft);
-      setServerChanged(false);
       setRevisionConflict(false);
     }
   }
 
   const resetSyncState = () => {
-    setServerChanged(false);
     setRevisionConflict(false);
   };
 
   return {
     incomingDraft,
-    serverChanged,
-    setServerChanged,
     revisionConflict,
     setRevisionConflict,
     resetSyncState,

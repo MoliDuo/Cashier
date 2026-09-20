@@ -105,8 +105,35 @@ export async function getLedgerPageBootstrap(
   queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
 
   const mainCurrency = ledgerDto.settings.mainCurrency;
-  const books = (await dependencies.books.list(input.ledgerId)).map(toBookDto);
-  queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
+  // The categories and the settings view do not depend on the viewed book, so
+  // they start here: only the date-scoped reads below have to wait for it. Each
+  // promise joins this chain immediately, so a failure is reported by the page
+  // boundary rather than left unhandled.
+  const categoriesPromise = queryClient.fetchQuery({
+    queryKey: queryKeys.entryCategories(input.ledgerId),
+    queryFn: () => listEntryCategories(input.ledgerId, dependencies.categories),
+    staleTime: LEDGER.STALE_TIME_MS,
+  });
+  const settingsPromise =
+    input.initialTab === "settings"
+      ? queryClient.prefetchQuery({
+          queryKey: queryKeys.ledgerSettings(input.ledgerId),
+          queryFn: () =>
+            getLedgerSettingsView(input.ledgerId, {
+              categories: dependencies.categories,
+              credentials: dependencies.credentials,
+            }),
+          staleTime: LEDGER.STALE_TIME_MS,
+        })
+      : Promise.resolve();
+  const booksPromise = dependencies.books
+    .list(input.ledgerId)
+    .then((rows) => rows.map(toBookDto))
+    .then((books) => {
+      queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
+      return books;
+    });
+  const [books] = await Promise.all([booksPromise, categoriesPromise, settingsPromise]);
   // The remembered scope can name a book that has since been archived or
   // deleted. The live list is the authority: the scope resets to 总账 on the
   // client, and the server must not prefetch the dead book's records in the
@@ -180,11 +207,6 @@ export async function getLedgerPageBootstrap(
           search: input.advancedFilters?.search,
         });
 
-  const categoriesPromise = queryClient.fetchQuery({
-    queryKey: queryKeys.entryCategories(input.ledgerId),
-    queryFn: () => listEntryCategories(input.ledgerId, dependencies.categories),
-    staleTime: LEDGER.STALE_TIME_MS,
-  });
   await Promise.all([
     ...(input.initialTab === "stream" && streamDescriptor != null
       ? [
@@ -270,20 +292,6 @@ export async function getLedgerPageBootstrap(
           }),
         ]
       : []),
-    ...(input.initialTab === "settings"
-      ? [
-          queryClient.prefetchQuery({
-            queryKey: queryKeys.ledgerSettings(input.ledgerId),
-            queryFn: () =>
-              getLedgerSettingsView(input.ledgerId, {
-                categories: dependencies.categories,
-                credentials: dependencies.credentials,
-              }),
-            staleTime: LEDGER.STALE_TIME_MS,
-          }),
-        ]
-      : []),
-    categoriesPromise,
   ]);
   if (input.initialTab === "stream" && streamDescriptor != null) {
     const stream = queryClient.getQueryData<InfiniteData<StreamPage>>(streamDescriptor.queryKey);

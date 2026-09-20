@@ -17,8 +17,7 @@ import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { SettingsSection } from "./settings/SettingsSection";
 import { toast } from "sonner";
-import { useCategoryAssignmentJob } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
-import { isCategoryAssignmentJobActive } from "@/modules/ledger/ui/category-assignment-status-visibility";
+import { useCategoryAssignment } from "./CategoryAssignmentProvider";
 
 interface CategorySectionProps {
   ledgerId: string;
@@ -50,8 +49,7 @@ export function CategorySection({
   const common = useTranslations("Common");
   const locale = useLocale();
   const preset = useCategoryPresetSwitch({ ledgerId, categories, locale });
-  const assignment = useCategoryAssignmentJob(ledgerId);
-  const categoryAssignmentActive = isCategoryAssignmentJobActive(assignment.job);
+  const { isActive: categoryAssignmentActive } = useCategoryAssignment();
 
   const {
     managing,
@@ -65,7 +63,6 @@ export function CategorySection({
     setDiscardManagementOpen,
     discardEditOpen,
     setDiscardEditOpen,
-    serverChanged,
     revisionConflict,
     saveError,
     dirty,
@@ -280,7 +277,7 @@ export function CategorySection({
               size="sm"
               disabled={!dirty || isSaving}
               onClick={() => {
-                if (revisionConflict || serverChanged) toast.error(t("updateConflict"));
+                if (revisionConflict) toast.error(t("updateConflict"));
                 else void handleSave();
               }}
             >

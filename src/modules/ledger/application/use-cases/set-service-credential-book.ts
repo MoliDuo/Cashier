@@ -1,5 +1,6 @@
 import type { ServiceCredentialPort } from "@/application/contracts";
 import type { ServiceCredentialDto } from "@/modules/ledger/contracts";
+import { toServiceCredentialDto } from "../queries/list-service-credentials";
 
 /** Rebinds one key to another book; its store of uploads follows immediately. */
 export async function setServiceCredentialBook(
@@ -9,15 +10,5 @@ export async function setServiceCredentialBook(
   credentials: Pick<ServiceCredentialPort, "setBook">
 ): Promise<ServiceCredentialDto> {
   const updated = await credentials.setBook(ledgerId, credentialId, bookId);
-  return {
-    id: updated.id,
-    bookId: updated.bookId,
-    tokenPrefix: updated.tokenPrefix,
-    tokenSuffix: updated.tokenSuffix,
-    ledgerId: updated.ledgerId,
-    name: updated.name,
-    createdAt: updated.createdAt,
-    lastUsedAt: updated.lastUsedAt,
-    deletedAt: null,
-  };
+  return toServiceCredentialDto(updated);
 }
