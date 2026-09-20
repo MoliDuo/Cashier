@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
   applyCategoryPresetAction: applyPresetAction,
 }));
-vi.mock("@/modules/ledger/ui/CategoryAssignmentProvider", () => ({
+vi.mock("@/modules/ledger/ui/category-assignment-context", () => ({
   useCategoryAssignment: () => ({
     ledgerId: "ledger-1",
     job: null,

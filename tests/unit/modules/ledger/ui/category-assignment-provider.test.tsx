@@ -3,10 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
-import {
-  CategoryAssignmentProvider,
-  useCategoryAssignment,
-} from "@/modules/ledger/ui/CategoryAssignmentProvider";
+import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
+import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 
 const { getJob, toastSuccess, toastError, featureMessages } = vi.hoisted(() => ({
   getJob: vi.fn(),

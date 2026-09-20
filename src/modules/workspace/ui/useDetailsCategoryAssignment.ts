@@ -17,7 +17,7 @@ import type {
   EntryCategory,
   LedgerEntry,
 } from "@/modules/ledger/contracts";
-import { useCategoryAssignment } from "@/modules/ledger/ui/CategoryAssignmentProvider";
+import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 import { selectionMatches } from "./selection-snapshot";
 
 /** One pick is written through as-is; a longer selection is uploaded in chunks. */
@@ -75,13 +75,9 @@ export function useDetailsCategoryAssignment({
     total: number;
   } | null>(null);
   const categoryRequestKeyRef = useRef<string | null>(null);
-  // The run outlives this tab, so the page follows it and the dialog only reads
-  // it: nothing here polls, and nothing here announces what the page started.
-  const {
-    job: reclassificationJob,
-    isActive: isReclassifying,
-    registerSubmittedJob,
-  } = useCategoryAssignment();
+  // The run outlives this tab, so the page follows it and this dialog only hands
+  // it over: nothing here polls, and nothing here announces what the page began.
+  const { registerSubmittedJob } = useCategoryAssignment();
   const categorySelectionChanged =
     categorySnapshot != null &&
     (categorySnapshot.ledgerId !== ledgerId ||
@@ -261,8 +257,6 @@ export function useDetailsCategoryAssignment({
     confirmCategory,
     isConfirmingCategory: isAssigningCategory || startAiCategory.isPending,
     isStartingCategory: startAiCategory.isPending,
-    reclassificationJob,
-    isReclassifying,
     selectionUploadProgress,
   };
 }

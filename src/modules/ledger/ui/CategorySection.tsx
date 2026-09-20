@@ -17,7 +17,7 @@ import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { SettingsSection } from "./settings/SettingsSection";
 import { toast } from "sonner";
-import { useCategoryAssignment } from "./CategoryAssignmentProvider";
+import { useCategoryAssignment } from "./category-assignment-context";
 
 interface CategorySectionProps {
   ledgerId: string;

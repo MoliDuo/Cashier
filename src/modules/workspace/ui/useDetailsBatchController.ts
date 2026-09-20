@@ -263,9 +263,7 @@ export function useDetailsBatchController(
     toggleCategoryPick: categoryAssignment.toggleCategoryPick,
     categorySelectionChanged: categoryAssignment.categorySelectionChanged,
     confirmCategory: categoryAssignment.confirmCategory,
-    reclassificationJob: categoryAssignment.reclassificationJob,
     selectionUploadProgress: categoryAssignment.selectionUploadProgress,
-    isReclassifying: categoryAssignment.isReclassifying,
     isConfirmingCategory: categoryAssignment.isConfirmingCategory,
     isPending:
       update.isPending ||

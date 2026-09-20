@@ -1,42 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 import {
   useCategoryAssignmentJob,
   type CategoryAssignmentNotice,
 } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
 import { CategoryAssignmentStatus } from "./CategoryAssignmentStatus";
-
-export interface CategoryAssignmentContextValue {
-  ledgerId: string;
-  /** The ledger's most recent assignment run. */
-  job: CategoryReclassificationJob | null;
-  isActive: boolean;
-  isReadError: boolean;
-  refresh: () => Promise<unknown>;
-  dismiss: () => void;
-  registerSubmittedJob: (job: CategoryReclassificationJob) => void;
-}
-
-const CategoryAssignmentContext = createContext<CategoryAssignmentContextValue | null>(null);
-
-/**
- * The ledger's assignment run, as the page that owns it sees it. Components
- * below the tabs read this instead of starting a poll of their own: one owner
- * means one poll, one history of what this page watched, and one completion
- * notice — no matter which tab happens to be mounted.
- */
-export function useCategoryAssignment(): CategoryAssignmentContextValue {
-  const value = useContext(CategoryAssignmentContext);
-  if (value == null) {
-    throw new Error("useCategoryAssignment must be used inside CategoryAssignmentProvider");
-  }
-  return value;
-}
+import { CategoryAssignmentContext } from "./category-assignment-context";
 
 /**
  * Follows the ledger's assignment run above the tabs, so a run survives tab

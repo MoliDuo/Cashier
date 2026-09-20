@@ -539,42 +539,46 @@ describe("useDetailsBatchController", () => {
     expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
   });
 
-  it("reports a finished run once, and only for a run this client watched", async () => {
+  it("reports a finished run once, and only for a run this page watched", async () => {
     const { wrapper, queryClient } = setup();
     const running = assignmentJob("running");
-    // A fresh object per poll, so every response really does reach the hook.
+    // A fresh object per poll, so every response really does reach the page.
     reclassificationJobMock
       .mockResolvedValueOnce(running)
       .mockImplementation(async () => succeededJob());
-    const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
-      { wrapper }
+    renderHook(() => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"), {
+      wrapper,
+    });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(["ledger", "ledger-1", "category-reclassification"])
+      ).toMatchObject({ id: "job-1", status: "running" })
     );
-    await waitFor(() => expect(result.current.isReclassifying).toBe(true));
 
     await act(async () => {
       await queryClient.refetchQueries({
         queryKey: ["ledger", "ledger-1", "category-reclassification"],
       });
     });
-
-    await waitFor(() => expect(result.current.isReclassifying).toBe(false));
     await act(async () => {
       await queryClient.refetchQueries({
         queryKey: ["ledger", "ledger-1", "category-reclassification"],
       });
     });
-    expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledTimes(1));
   });
 
-  it("stays quiet about a run that finished before this client arrived", async () => {
-    const { wrapper } = setup();
+  it("stays quiet about a run that finished before this page arrived", async () => {
+    const { wrapper, queryClient } = setup();
     reclassificationJobMock.mockResolvedValue(succeededJob());
-    const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
-      { wrapper }
+    renderHook(() => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"), {
+      wrapper,
+    });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(["ledger", "ledger-1", "category-reclassification"])
+      ).toMatchObject({ status: "succeeded" })
     );
-    await waitFor(() => expect(result.current.reclassificationJob).not.toBeNull());
     expect(toastSuccessMock).not.toHaveBeenCalled();
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
@@ -732,16 +736,21 @@ describe("useDetailsBatchController", () => {
     });
     await waitFor(() => expect(result.current.categoryDialogOpen).toBe(false));
 
-    // The dialog is gone but the run is not: the page still reports it.
-    await waitFor(() => expect(result.current.isReclassifying).toBe(true));
+    // The dialog is gone but the run is not: the page still holds it, and still
+    // reports its outcome once it ends.
+    const runQueryKey = ["ledger", "ledger-1", "category-reclassification"];
+    await waitFor(() =>
+      expect(queryClient.getQueryData(runQueryKey)).toMatchObject({ id: "job-1" })
+    );
     reclassificationJobMock.mockImplementation(async () => succeededJob());
     await act(async () => {
-      await queryClient.refetchQueries({
-        queryKey: ["ledger", "ledger-1", "category-reclassification"],
-      });
+      await queryClient.refetchQueries({ queryKey: runQueryKey });
     });
 
-    await waitFor(() => expect(result.current.isReclassifying).toBe(false));
+    await waitFor(() =>
+      expect(queryClient.getQueryData(runQueryKey)).toMatchObject({ status: "succeeded" })
+    );
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryDone"));
   });
 
   it("ignores a date preview that lands after the dialog was reopened", async () => {
