@@ -1,7 +1,7 @@
 # 配置参考
 
-本地全家桶从 `.env.local.example` 开始；外部数据库和对象存储部署从 `.env.example`
-开始。空字符串会被当作未配置，除非下面另有说明。
+本地开发从 `.env.local.example` 开始；Vercel 部署的环境变量从 `.env.example` 参考填写。
+空字符串会被当作未配置，除非下面另有说明。
 
 账号、账本和分账都不在环境变量里：空库首次启动时，服务端会打印一次性初始化代码，
 在 `/{locale}/setup` 向导中填入代码、邮箱、密码和分账名称即可创建。
@@ -26,7 +26,7 @@
 | `DATABASE_URL`      | 外部模式 | 无     | 必须是 `postgres://` 或 `postgresql://` 地址。 |
 | `DATABASE_POOL_MAX` | 否       | `2`    | 连接池上限，范围 1–50。                        |
 
-本地全家桶由 `docker-compose.local.yml` 自动提供 `DATABASE_URL`。
+`.env.local.example` 提供指向 `docker-compose.local.yml` 中 PostgreSQL 的 `DATABASE_URL`。
 
 ## S3 / Cloudflare R2
 
@@ -40,24 +40,24 @@
 | `S3_SECRET_ACCESS_KEY` | 外部模式   | 无            | S3 访问密钥。                          |
 | `S3_FORCE_PATH_STYLE`  | 否         | `false`       | MinIO 等服务通常需要设为 `true`。      |
 
-本地全家桶会启动 MinIO 并自动创建 `cashier` 桶。
+`npm run docker:local` 会启动 MinIO 并自动创建 `cashier` 桶。
 
 ## 认证与内部密钥
 
 | 变量                   | 必需   | 默认值                          | 说明                                                             |
 | ---------------------- | ------ | ------------------------------- | ---------------------------------------------------------------- |
-| `AUTH_SECRET`          | 运行时 | 本地模板提供；Docker 可自动生成 | Auth.js 会话签名密钥。                                           |
-| `API_KEY_PEPPER`       | 运行时 | 本地模板提供；Docker 可自动生成 | 服务凭证哈希使用的 pepper。                                      |
-| `RATE_LIMIT_PEPPER`    | 运行时 | 本地模板提供；Docker 可自动生成 | 限流键匿名化哈希使用的 pepper。                                  |
-| `AUTH_OTP_PEPPER`      | 运行时 | 本地模板提供；Docker 可自动生成 | 邮箱验证码哈希使用的 pepper。                                    |
+| `AUTH_SECRET`          | 运行时 | 本地模板提供                    | Auth.js 会话签名密钥。                                           |
+| `API_KEY_PEPPER`       | 运行时 | 本地模板提供                    | 服务凭证哈希使用的 pepper。                                      |
+| `RATE_LIMIT_PEPPER`    | 运行时 | 本地模板提供                    | 限流键匿名化哈希使用的 pepper。                                  |
+| `AUTH_OTP_PEPPER`      | 运行时 | 本地模板提供                    | 邮箱验证码哈希使用的 pepper。                                    |
 | `AUTH_RESEND_KEY`      | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和注册。                         |
 | `AUTH_EMAIL_FROM`      | 否     | `Cashier <noreply@example.com>` | 验证码和登录通知的发件人。                                       |
 | `SESSION_MAX_AGE_DAYS` | 否     | `14`                            | 登录会话最长天数。                                               |
 | `DEV_AUTH_BYPASS`      | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。 |
 
-`.env.local.example` 内置公开的固定开发值，复制后可直接运行源码或本地全家桶；这些值
-不能用于可被外部访问的部署。删除或留空这些值时，Docker 容器会生成随机内部密钥并保存到
-`cashier_config` 卷。外部部署必须自行提供安全随机值，并保证重启和多实例之间保持一致。
+`.env.local.example` 内置公开的固定开发值，复制后可直接运行本地源码；这些值不能用于
+可被外部访问的部署。Vercel 部署必须自行提供安全随机值，并保证重启、预览实例和多实例
+之间保持一致。
 
 ## AI、图片与缓存
 
@@ -66,13 +66,11 @@
 | `AI_MAX_RETRIES`           | `3`        | AI 调用重试次数，可设为 0。  |
 | `AI_RETRY_DELAY_MS`        | `1000`     | AI 重试初始等待毫秒数。      |
 | `AI_TEMPERATURE`           | `0.3`      | 模型 temperature，范围 0–2。 |
-| `MAX_INPUT_PIXELS`         | `25000000` | 兼容保留；当前不控制 Sharp。 |
 | `MAX_IMAGE_QUALITY`        | `85`       | 图片输出质量，范围 1–100。   |
 | `SOURCE_DOC_STALE_TIME_MS` | `120000`   | 单据客户端数据新鲜期。       |
 | `CURRENCY_STALE_TIME_MS`   | `14400000` | 汇率客户端数据新鲜期。       |
 
 当前图片策略固定为 16 MP 业务校验上限，以及 24 MP Sharp 解码保护上限。
-`MAX_INPUT_PIXELS` 仍保留以兼容既有部署配置，但修改它不会改变这两个限制。
 
 批量分类的并发按原始账单计算，不是用户可选择的明细数量上限。同一账单每次 AI 请求最多
 包含 50 条已选明细；选择上传以 1,000 条为一个传输分段。部署前应根据供应商配额和数据库
@@ -81,26 +79,25 @@
 
 ## 恢复、限流与代理
 
-| 变量                                      | 默认值 | 说明                                                                                                           |
-| ----------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------- |
-| `PROCESSING_RECOVERY_MAX_BATCH`           | `5`    | 单次请求最多恢复的待处理任务数。                                                                               |
-| `PROCESSING_RECOVERY_MAX_ATTEMPTS`        | `5`    | 待处理任务最多恢复尝试次数。                                                                                   |
-| `PROCESSING_RECOVERY_COOLDOWN_SECONDS`    | `60`   | 恢复尝试之间的冷却时间。                                                                                       |
-| `API_RATE_LIMIT_PER_MINUTE`               | `60`   | 每个服务凭证共享的 API v1 每分钟额度。                                                                         |
-| `AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS`        | `10`   | 密码登录邮箱维度窗口上限。                                                                                     |
-| `AUTH_PASSWORD_IP_MAX_ATTEMPTS`           | `50`   | 密码登录可信 IP 维度窗口上限。                                                                                 |
-| `AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` | `900`  | 密码登录限流窗口秒数。                                                                                         |
-| `TRUSTED_PROXY`                           | 无     | 可选值仅为 `platform`。Vercel 读取单值 `X-Vercel-Forwarded-For`；Docker 读取由可信入口覆盖的单值 `X-Real-IP`。 |
+| 变量                                      | 默认值 | 说明                                                                                                                |
+| ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `PROCESSING_RECOVERY_MAX_BATCH`           | `5`    | 单次请求最多恢复的待处理任务数。                                                                                    |
+| `PROCESSING_RECOVERY_MAX_ATTEMPTS`        | `5`    | 待处理任务最多恢复尝试次数。                                                                                        |
+| `PROCESSING_RECOVERY_COOLDOWN_SECONDS`    | `60`   | 恢复尝试之间的冷却时间。                                                                                            |
+| `API_RATE_LIMIT_PER_MINUTE`               | `60`   | 每个服务凭证共享的 API v1 每分钟额度。                                                                              |
+| `AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS`        | `10`   | 密码登录邮箱维度窗口上限。                                                                                          |
+| `AUTH_PASSWORD_IP_MAX_ATTEMPTS`           | `50`   | 密码登录可信 IP 维度窗口上限。                                                                                      |
+| `AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` | `900`  | 密码登录限流窗口秒数。                                                                                              |
+| `TRUSTED_PROXY`                           | 无     | 可选值仅为 `platform`。Vercel 读取单值 `X-Vercel-Forwarded-For`；自建反向代理读取由可信入口覆盖的单值 `X-Real-IP`。 |
 
 未配置可信入口，或平台头为空、多值、非法时，地址会归入固定的哈希 `unknown` 桶，认证前限流仍然生效。`src/lib/env/startup.ts` 还定义了更细的 OTP 限流变量。
 
 ## 日志与端口
 
-| 变量        | 默认值 | 说明                             |
-| ----------- | ------ | -------------------------------- |
-| `LOG_LEVEL` | `info` | 应用日志级别。                   |
-| `APP_PORT`  | `3000` | Compose 暴露到宿主机的应用端口。 |
-| `S3_PORT`   | `9000` | 本地全家桶暴露的 MinIO 端口。    |
+| 变量        | 默认值 | 说明                    |
+| ----------- | ------ | ----------------------- |
+| `LOG_LEVEL` | `info` | 应用日志级别。          |
+| `S3_PORT`   | `9000` | 本地 MinIO 暴露的端口。 |
 
 不要在日志、Issue 或截图中公开 `.env`、Bearer Token、内部密钥、邮箱验证码或原始票据。
 

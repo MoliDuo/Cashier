@@ -17,7 +17,6 @@ import {
   type UpdateEntryCategoryInput,
   type SaveEntryCategoriesInput,
 } from "@/modules/ledger/contract-schemas";
-import { listEntryCategories } from "@/modules/ledger/application/queries/list-entry-categories";
 import { applyCategoryPreset } from "@/modules/ledger/application/use-cases/apply-category-preset";
 import { createEntryCategory } from "@/modules/ledger/application/use-cases/create-entry-category";
 import { deleteEntryCategory } from "@/modules/ledger/application/use-cases/delete-entry-category";
@@ -96,10 +95,6 @@ export const saveEntryCategoriesAction = withLedgerAccess(
       serverComposition.categories
     );
   }
-);
-
-export const getEntryCategoriesAction = withLedgerAccess((ledgerId: string) =>
-  listEntryCategories(ledgerId, serverComposition.categories)
 );
 
 export const applyCategoryPresetAction = withLedgerAccess(

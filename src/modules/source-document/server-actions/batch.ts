@@ -52,55 +52,80 @@ function logBatchFailure(operation: "delete" | "retry", error: unknown, code: st
   );
 }
 
-export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> => {
-    const targets = versionedTargetsSchema.parse(inputTargets);
-    const result: PartialBatchCommandResult = {
-      succeeded: [],
-      stale: [],
-      failed: [],
-    };
-    for (const target of targets) {
-      const id = target.sourceDocumentId;
-      try {
-        const deleted = await serverComposition.sourceDocumentAggregate.deleteDocuments({
-          ledgerId,
-          target,
+/** What one item of a versioned batch came back as, once it did not throw. */
+type VersionedBatchOutcome =
+  | { status: "succeeded"; version: number }
+  | { status: "stale"; expectedVersion: number; currentVersion: number };
+
+/**
+ * Runs one batch item at a time, keeping the order it was given, and reports
+ * each one as succeeded, stale, or failed under a stable code. Both batch
+ * actions differ only in the item they run, so the classification, logging and
+ * partial-success shape live here rather than twice over.
+ */
+async function runVersionedBatch(
+  operation: "delete" | "retry",
+  targets: VersionedTarget[],
+  run: (target: VersionedTarget) => Promise<VersionedBatchOutcome>
+): Promise<PartialBatchCommandResult> {
+  const result: PartialBatchCommandResult = {
+    succeeded: [],
+    stale: [],
+    failed: [],
+  };
+  for (const target of targets) {
+    const id = target.sourceDocumentId;
+    try {
+      const outcome = await run(target);
+      if (outcome.status === "succeeded") {
+        result.succeeded.push({ id, sourceDocumentId: id, version: outcome.version });
+      } else {
+        result.stale.push({
+          id,
+          sourceDocumentId: id,
+          expectedVersion: outcome.expectedVersion,
+          currentVersion: outcome.currentVersion,
         });
-        if (deleted.ok) {
-          result.succeeded.push({ id, sourceDocumentId: id, version: deleted.version });
-        } else {
-          result.stale.push({
-            id,
-            sourceDocumentId: id,
+      }
+    } catch (error) {
+      const code = stableBatchFailureCode(error);
+      logBatchFailure(operation, error, code);
+      result.failed.push({ id, code });
+    }
+  }
+  return result;
+}
+
+export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
+  async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> =>
+    runVersionedBatch("delete", versionedTargetsSchema.parse(inputTargets), async (target) => {
+      const deleted = await serverComposition.sourceDocumentAggregate.deleteDocuments({
+        ledgerId,
+        target,
+      });
+      return deleted.ok
+        ? { status: "succeeded", version: deleted.version }
+        : {
+            status: "stale",
             expectedVersion: deleted.expectedVersion,
             currentVersion: deleted.currentVersion,
-          });
-        }
-      } catch (error) {
-        const code = stableBatchFailureCode(error);
-        logBatchFailure("delete", error, code);
-        result.failed.push({ id, code });
-      }
-    }
-    return result;
-  }
+          };
+    })
 );
 
 export const batchRetrySourceDocumentsAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> => {
-    const targets = versionedTargetsSchema.parse(inputTargets);
-    const result: PartialBatchCommandResult = {
-      succeeded: [],
-      stale: [],
-      failed: [],
-    };
     const intents: ProcessingJobContract[] = [];
-    for (const target of targets) {
-      const id = target.sourceDocumentId;
-      try {
+    const result = await runVersionedBatch(
+      "retry",
+      versionedTargetsSchema.parse(inputTargets),
+      async (target) => {
         const retried = await retrySourceDocument(
-          { ledgerId, sourceDocumentId: id, expectedVersion: target.expectedVersion },
+          {
+            ledgerId,
+            sourceDocumentId: target.sourceDocumentId,
+            expectedVersion: target.expectedVersion,
+          },
           {
             submissions: {
               submit: serverComposition.sourceDocumentAggregate.installRetry,
@@ -108,22 +133,17 @@ export const batchRetrySourceDocumentsAction = withSourceDocumentLedgerAccess(
             scheduleProcessing: (job) => intents.push(job),
           }
         );
-        if (retried.ok) {
-          result.succeeded.push({ id, sourceDocumentId: id, version: retried.version });
-        } else {
-          result.stale.push({
-            id,
-            sourceDocumentId: id,
-            expectedVersion: retried.expectedVersion,
-            currentVersion: retried.currentVersion,
-          });
-        }
-      } catch (error) {
-        const code = stableBatchFailureCode(error);
-        logBatchFailure("retry", error, code);
-        result.failed.push({ id, code });
+        return retried.ok
+          ? { status: "succeeded", version: retried.version }
+          : {
+              status: "stale",
+              expectedVersion: retried.expectedVersion,
+              currentVersion: retried.currentVersion,
+            };
       }
-    }
+    );
+    // The scheduled intents run after every item has been classified, so a
+    // retry that was never created is never scheduled.
     for (const job of intents) scheduleProcessingAfter(job);
     return result;
   }

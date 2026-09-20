@@ -5,15 +5,14 @@ for contributors, not as a deployment guarantee.
 
 ## Source-document processing
 
-- Vercel and Docker use the same application path.
+- Vercel is the only production target; local development runs the same application path.
 - A submission creates a durable processing job and schedules work with Next.js `after()`.
 - There is no global drain loop, cron process, external queue, or continuously running worker.
 - Processing intents use idempotent dispatch, claim leases, and lease renewal.
 - Processor completion reports `atomic` when the aggregate transaction already completed its
   job, and `residual` when the dispatcher must acknowledge remaining work. Only residual
   completion invokes the separate acknowledgement; recovery claims batches through one path.
-- On Vercel, processing remains bounded by the function `maxDuration`; Docker does not impose that
-  serverless lifecycle limit.
+- Processing remains bounded by the Vercel function `maxDuration`.
 
 `POST /api/v1/source-documents` returns `201` only after image processing, object upload, and
 database persistence finish. It does not wait for AI parsing. If parsing fails or the request

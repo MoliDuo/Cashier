@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
-import { getLedgerAction } from "@/modules/ledger/server-actions/get";
+import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
 import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
 import { auth } from "@/auth";
 import { eq } from "drizzle-orm";

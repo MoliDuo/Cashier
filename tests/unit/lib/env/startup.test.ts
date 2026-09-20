@@ -187,7 +187,6 @@ describe("validateStartupEnv", () => {
       "DEV_AUTH_BYPASS",
       "LOG_LEVEL",
       "MAX_IMAGE_QUALITY",
-      "MAX_INPUT_PIXELS",
       "OPENAI_BASE_URL",
       "OTP_EXPIRES_SECONDS",
       "OTP_IP_MAX_ATTEMPTS_PER_HOUR",

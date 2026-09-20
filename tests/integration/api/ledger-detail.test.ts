@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getLedgerAction } from "@/modules/ledger/server-actions/get";
+import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
 import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
 import { getTestDb } from "../../setup";
 import { currencyRates, ledgers } from "@/persistence";

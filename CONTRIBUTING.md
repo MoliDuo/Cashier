@@ -36,8 +36,7 @@ For development against explicitly configured infrastructure instead:
 ```bash
 npm ci
 cp .env.local.example .env
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d \
-  postgres minio storage-bootstrap
+npm run docker:local
 npm run db:migrate
 npm run dev
 ```
@@ -128,7 +127,7 @@ The suite covers password rejection/login, shared ledger access, manual entry,
 editing, persistence after reload, deletion, logout, and protected-page redirects. Failures retain
 screenshots and traces in `test-results/` and an HTML report in `playwright-report/`. Normal exit,
 failure, and handled interruptions stop the test server and remove only this run's database.
-CI runs this separately from the Vitest gate and requires it before publishing an image.
+CI runs this separately from the Vitest gate.
 
 ## Commits and pull requests
 

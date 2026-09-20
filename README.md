@@ -34,11 +34,12 @@ Cashier 会从图片或文字中提取日期、商家、金额、币种、分类
 
 ## 快速开始
 
-你只需要 Docker 和 Docker Compose。
+本地试运行需要 Node.js 24 和 Docker。
 
 ```bash
 git clone https://github.com/Xiangyu-Labs/Cashier.git
 cd Cashier
+npm ci
 cp .env.local.example .env
 ```
 
@@ -48,22 +49,24 @@ cp .env.local.example .env
 OPENAI_API_KEY=your-api-key
 ```
 
-然后启动：
+然后启动 PostgreSQL、MinIO 和应用：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+npm run docker:local
+npm run db:migrate
+npm run dev
 ```
 
 首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表，但不会创建账号。打开
 [http://localhost:3000](http://localhost:3000)：所有页面都会跳到 `/{locale}/setup`
-初始化向导。服务端日志（容器日志或 `npm run dev` 的终端）会打印一次性初始化代码，
+初始化向导。服务端日志会打印一次性初始化代码，
 日志行以 `First-run setup is pending` 开头。在向导中填入该代码、登录邮箱、密码和
 分账名称（默认预填 `共同支出`）即可创建账号，之后 `/setup` 永久返回 404。
 
 `AI_MODEL` 默认为 `gpt-4o`。如果你使用其他 OpenAI 兼容服务，请同时修改
 `OPENAI_BASE_URL` 和 `AI_MODEL`。
 
-需要接入已有的 PostgreSQL、Cloudflare R2 或其他 S3 兼容存储时，请阅读
+需要部署到 Vercel，或接入已有的 PostgreSQL、Cloudflare R2 或其他 S3 兼容存储时，请阅读
 [部署、升级与备份](./docs/deployment.md)。
 
 ## 使用前请知道
@@ -87,23 +90,13 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
 ## 本地开发
 
-本地开发需要 Node.js 24、PostgreSQL 和 S3 兼容存储：
-
-```bash
-npm ci
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d \
-  postgres minio storage-bootstrap
-npm run db:migrate
-npm run dev
-```
-
-提交改动前运行：
+开发环境与上面的快速开始相同。提交改动前运行：
 
 ```bash
 npm run check
 ```
 
-更完整的开发约定见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+更完整的开发约定，包括不依赖 `.env` 的独立 demo 工作区，见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ## License
 

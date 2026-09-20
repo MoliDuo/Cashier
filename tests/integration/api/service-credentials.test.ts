@@ -16,7 +16,7 @@ import {
   deleteServiceCredentialAction,
   getServiceCredentialsAction,
 } from "@/modules/ledger/server-actions/credentials";
-import { getLedgerSettingsAction } from "@/modules/ledger/server-actions/settings";
+import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { ValidationError } from "@/lib/errors";
 import { computeHash } from "@/lib/security/service-credential-token";

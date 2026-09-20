@@ -35,7 +35,6 @@ export const ENV_DEFAULTS = {
   OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE: "5",
   SESSION_MAX_AGE_DAYS: "14",
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
-  MAX_INPUT_PIXELS: "25000000",
   MAX_IMAGE_QUALITY: "85",
   LOG_LEVEL: "info",
   DEV_AUTH_BYPASS: "false",
@@ -185,7 +184,6 @@ const startupEnvFields = {
   OTP_IP_MAX_ATTEMPTS_PER_HOUR: positiveIntWithDefault("OTP_IP_MAX_ATTEMPTS_PER_HOUR"),
   OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE: positiveIntWithDefault("OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE"),
   SESSION_MAX_AGE_DAYS: positiveIntWithDefault("SESSION_MAX_AGE_DAYS"),
-  MAX_INPUT_PIXELS: positiveIntWithDefault("MAX_INPUT_PIXELS"),
   MAX_IMAGE_QUALITY: z.preprocess(
     blankToUndefined,
     z.coerce

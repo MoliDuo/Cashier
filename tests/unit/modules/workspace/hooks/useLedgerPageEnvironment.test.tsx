@@ -19,10 +19,8 @@ const { getLedgerActionMock, getEntryCategoriesActionMock, getBooksActionMock, b
     browserZone: { value: null as string | null },
   }));
 
-vi.mock("@/modules/ledger/server-actions/get", () => ({
+vi.mock("@/lib/queries/ledger-query-client", () => ({
   getLedgerAction: getLedgerActionMock,
-}));
-vi.mock("@/modules/ledger/server-actions/categories", () => ({
   getEntryCategoriesAction: getEntryCategoriesActionMock,
 }));
 vi.mock("@/modules/ledger/server-actions/books", () => ({
@@ -57,6 +55,11 @@ type EnvironmentProps = {
   scope: string | null;
   initialBooks?: readonly BookDto[];
   initialDeviceTimeZone: string | null;
+  /**
+   * False starts the hook with no server-provided ledger or categories, the way
+   * a client-side navigation does, so the query client is the only source.
+   */
+  withInitialData?: boolean;
 };
 
 function createWrapper() {
@@ -78,8 +81,9 @@ function renderEnvironment(props: EnvironmentProps) {
       useLedgerPageEnvironment({
         ledgerId: "ledger-1",
         scope: current.scope,
-        initialLedger: ledgerDto,
-        initialCategories: [] as EntryCategoryWithCount[],
+        ...(current.withInitialData === false
+          ? {}
+          : { initialLedger: ledgerDto, initialCategories: [] as EntryCategoryWithCount[] }),
         ...(current.initialBooks !== undefined ? { initialBooks: current.initialBooks } : {}),
         initialDeviceTimeZone: current.initialDeviceTimeZone,
         setIsInputOpen: vi.fn(),
@@ -267,6 +271,32 @@ describe("useLedgerPageEnvironment time zone readiness", () => {
     renderEnvironment({ scope: null, initialBooks: [], initialDeviceTimeZone: null });
 
     await waitFor(() => expect(document.cookie).toContain("CASHIER_TIME_ZONE=Asia/Tokyo"));
+  });
+
+  it("serves the server-provided ledger and categories without a browser round trip", () => {
+    renderEnvironment({ scope: null, initialBooks: [], initialDeviceTimeZone: "Asia/Tokyo" });
+
+    expect(getLedgerActionMock).not.toHaveBeenCalled();
+    expect(getEntryCategoriesActionMock).not.toHaveBeenCalled();
+  });
+
+  it("reads the ledger and categories through the session query client when the server sent none", async () => {
+    getLedgerActionMock.mockResolvedValue({
+      ...ledgerDto,
+      settings: { ...ledgerDto.settings, mainCurrency: "EUR" },
+    });
+    getEntryCategoriesActionMock.mockResolvedValue([]);
+
+    const { result } = renderEnvironment({
+      scope: null,
+      initialBooks: [],
+      initialDeviceTimeZone: "Asia/Tokyo",
+      withInitialData: false,
+    });
+
+    await waitFor(() => expect(getLedgerActionMock).toHaveBeenCalledWith("ledger-1"));
+    expect(getEntryCategoriesActionMock).toHaveBeenCalledWith("ledger-1");
+    await waitFor(() => expect(result.current.mainCurrency).toBe("EUR"));
   });
 
   it("falls back to the deployment zone when the browser cannot name one", async () => {

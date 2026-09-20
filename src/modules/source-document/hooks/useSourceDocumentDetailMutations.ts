@@ -77,6 +77,25 @@ export function useSourceDocumentDetailMutations({
     version,
   });
 
+  /**
+   * Writes a command's saved document into the detail cache unless a newer
+   * version already arrived while the command was in flight, filling in the
+   * fields the command responses leave out.
+   */
+  const commitDetailSnapshot = async (document: SourceDocumentResultDto) => {
+    const key = queryKeys.sourceDocument(ledgerId!, id);
+    await queryClient.cancelQueries({ queryKey: key, exact: true });
+    queryClient.setQueryData<SourceDocumentResultDto>(key, (previous) =>
+      previous != null && previous.version > document.version
+        ? previous
+        : {
+            ...document,
+            hasImages: document.hasImages ?? false,
+            ledgerEntries: document.ledgerEntries ?? [],
+          }
+    );
+  };
+
   const saveChangesMutation = useLedgerMutation<
     SaveSourceDocumentChangesResultDto,
     SaveDetailChanges
@@ -121,20 +140,7 @@ export function useSourceDocumentDetailMutations({
     successMessage: null,
     errorMessage: null,
     invalidationErrorMessage: tCommon("savedRefreshFailed"),
-    onSuccess: async (result) => {
-      const key = queryKeys.sourceDocument(ledgerId!, id);
-      await queryClient.cancelQueries({ queryKey: key, exact: true });
-      const document = result.sourceDocument;
-      queryClient.setQueryData<SourceDocumentResultDto>(key, (previous) =>
-        previous != null && previous.version > document.version
-          ? previous
-          : {
-              ...document,
-              hasImages: document.hasImages ?? false,
-              ledgerEntries: document.ledgerEntries ?? [],
-            }
-      );
-    },
+    onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
   });
 
   const dateOrganizationMutation = useLedgerMutation<
@@ -155,20 +161,7 @@ export function useSourceDocumentDetailMutations({
     },
     successMessage: null,
     errorMessage: null,
-    onSuccess: async (result) => {
-      const key = queryKeys.sourceDocument(ledgerId!, id);
-      await queryClient.cancelQueries({ queryKey: key, exact: true });
-      const document = result.sourceDocument;
-      queryClient.setQueryData<SourceDocumentResultDto>(key, (previous) =>
-        previous != null && previous.version > document.version
-          ? previous
-          : {
-              ...document,
-              hasImages: document.hasImages ?? false,
-              ledgerEntries: document.ledgerEntries ?? [],
-            }
-      );
-    },
+    onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
   });
 
   const dismissDateOrganizationMutation = useLedgerMutation<

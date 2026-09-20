@@ -47,7 +47,6 @@ export interface RuntimeEnv {
   readonly otpVerifyMaxAttemptsPerMinute: number;
   readonly apiRateLimitPerMinute: number;
   readonly sessionMaxAgeDays: number;
-  readonly maxInputPixels: number;
   readonly maxImageQuality: number;
   readonly databasePoolMax: number;
   readonly logLevel: string;
@@ -201,9 +200,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get sessionMaxAgeDays() {
     return getStartupEnvValue("SESSION_MAX_AGE_DAYS");
-  },
-  get maxInputPixels() {
-    return getStartupEnvValue("MAX_INPUT_PIXELS");
   },
   get maxImageQuality() {
     return getStartupEnvValue("MAX_IMAGE_QUALITY");

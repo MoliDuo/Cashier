@@ -4,9 +4,11 @@ import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSmartPolling } from "@/hooks/use-smart-polling";
 import { queryKeys } from "@/lib/query-keys";
-import { getEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
-import { getLedgerAction } from "@/modules/ledger/server-actions/get";
-import { getLedgerSettingsAction } from "@/modules/ledger/server-actions/settings";
+import {
+  getEntryCategoriesAction,
+  getLedgerAction,
+  getLedgerSettingsAction,
+} from "@/lib/queries/ledger-query-client";
 import type { EntryCategoryWithCount, Ledger, ServiceCredential } from "@/modules/ledger/contracts";
 import { LEDGER } from "@/lib/constants";
 

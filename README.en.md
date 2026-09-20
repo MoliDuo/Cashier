@@ -34,11 +34,12 @@ the record in the stream, details, and statistics views.
 
 ## Quick start
 
-You only need Docker and Docker Compose.
+Trying it locally needs Node.js 24 and Docker.
 
 ```bash
 git clone https://github.com/Xiangyu-Labs/Cashier.git
 cd Cashier
+npm ci
 cp .env.local.example .env
 ```
 
@@ -49,23 +50,26 @@ wizard creates them:
 OPENAI_API_KEY=your-api-key
 ```
 
-Start the bundled stack:
+Then start PostgreSQL, MinIO, and the app:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+npm run docker:local
+npm run db:migrate
+npm run dev
 ```
 
 On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. It does
 not create an account. Open [http://localhost:3000](http://localhost:3000): every page leads to the
-`/{locale}/setup` wizard. The server logs (the container logs or the `npm run dev` terminal) print a
-one-time setup code, on a line starting with `First-run setup is pending`. Enter that code, a
+`/{locale}/setup` wizard. The server logs print a one-time setup code, on a line starting with
+`First-run setup is pending`. Enter that code, a
 sign-in email, a password and your book names (共同支出 is pre-filled as the default) to create the
 account; `/setup` returns 404 afterwards.
 
 `AI_MODEL` defaults to `gpt-4o`. When using another OpenAI-compatible service, set both
 `OPENAI_BASE_URL` and `AI_MODEL`.
 
-For an existing PostgreSQL database, Cloudflare R2, or another S3-compatible service, see
+For deploying to Vercel, or for an existing PostgreSQL database, Cloudflare R2, or another
+S3-compatible service, see
 [Deployment, upgrades, and backups (Chinese)](./docs/deployment.md).
 
 ## Before you use it
@@ -91,23 +95,14 @@ For an existing PostgreSQL database, Cloudflare R2, or another S3-compatible ser
 
 ## Local development
 
-Local development requires Node.js 24, PostgreSQL, and S3-compatible storage:
-
-```bash
-npm ci
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d \
-  postgres minio storage-bootstrap
-npm run db:migrate
-npm run dev
-```
-
-Before submitting a change, run:
+Development uses the same stack as the quick start above. Before submitting a change, run:
 
 ```bash
 npm run check
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development workflow.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development workflow, including the
+standalone demo workspace that needs no `.env`.
 
 ## License
 

@@ -1,8 +1,39 @@
 "use server";
 
-import { cancelSourceDocumentProcessing } from "@/modules/source-document/application/use-cases/source-document-lifecycle";
-import type { CancelProcessingResponseDto } from "@/modules/source-document/contracts";
-import { revisionLifecycleAction } from "./revision-lifecycle-action";
+import { serverComposition } from "@/application/server-composition-root";
+import { StaleSourceDocumentVersionError } from "@/lib/errors";
+import { staleVersionedCommandResult } from "@/modules/source-document/application/versioned-command-result";
+import type {
+  CancelProcessingResponseDto,
+  VersionedCommandResult,
+} from "@/modules/source-document/contracts";
+import { versionedTargetSchema } from "@/modules/source-document/contract-schemas";
+import { withSourceDocumentLedgerAccess } from "./access";
 
-export const cancelSourceDocumentProcessingAction =
-  revisionLifecycleAction<CancelProcessingResponseDto>(cancelSourceDocumentProcessing);
+export const cancelSourceDocumentProcessingAction = withSourceDocumentLedgerAccess(
+  async (
+    { ledgerId },
+    sourceDocumentId: string,
+    expectedVersion: number
+  ): Promise<VersionedCommandResult<CancelProcessingResponseDto>> => {
+    const target = versionedTargetSchema.parse({ sourceDocumentId, expectedVersion });
+    try {
+      const cancelled = await serverComposition.sourceDocumentAggregate.cancelProcessing(
+        ledgerId,
+        target.sourceDocumentId,
+        target.expectedVersion
+      );
+      return {
+        ok: true,
+        sourceDocumentId: target.sourceDocumentId,
+        version: cancelled.version,
+        data: { processingStatus: cancelled.processingStatus },
+      };
+    } catch (error) {
+      if (error instanceof StaleSourceDocumentVersionError) {
+        return staleVersionedCommandResult<CancelProcessingResponseDto>(error);
+      }
+      throw error;
+    }
+  }
+);

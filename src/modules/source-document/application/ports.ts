@@ -152,7 +152,14 @@ export interface SourceDocumentAggregateWritePort {
   installRetry(
     input: SourceDocumentSubmissionInput & { sourceDocumentId: string; expectedVersion: number }
   ): ReturnType<SourceDocumentSubmissionPort["submit"]>;
-  cancelProcessing: SourceDocumentLifecyclePort["cancelProcessing"];
+  cancelProcessing(
+    ledgerId: string,
+    sourceDocumentId: string,
+    expectedVersion: number
+  ): Promise<{
+    version: number;
+    processingStatus: "cancelled";
+  }>;
   deleteDocuments(input: {
     ledgerId: string;
     target: VersionedTarget;
@@ -182,17 +189,6 @@ export interface QuickEntryPorts {
     toCurrency: string;
     date?: string;
   }): Promise<{ convertedAmount: string; exchangeRate: string }>;
-}
-
-export interface SourceDocumentLifecyclePort {
-  cancelProcessing(
-    ledgerId: string,
-    sourceDocumentId: string,
-    expectedVersion: number
-  ): Promise<{
-    version: number;
-    processingStatus: "cancelled";
-  }>;
 }
 
 export interface ProcessingRecoveryPort {

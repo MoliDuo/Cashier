@@ -73,11 +73,55 @@ describe("session ledger query transport", () => {
     const ledger = createLedgerData({ userId });
     await getTestDb().insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(getTestDb(), ledger.id);
-    for (const query of ["detail", "stream", "total", "refresh", "entries", "entry", "summary"]) {
+    for (const query of [
+      "detail",
+      "stream",
+      "total",
+      "refresh",
+      "entries",
+      "entry",
+      "ledger",
+      "categories",
+      "summary",
+      "settings",
+    ]) {
       const response = await POST(request(query, [ledger.id, { unexpected: true }]));
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: "QUERY_FAILED" });
     }
     expect((await POST(request("stats", [{}]))).status).toBe(400);
+  });
+
+  it("serves the settings reads over the same scoped transport", async () => {
+    const db = getTestDb();
+    const ledger = createLedgerData({ userId });
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
+
+    const ledgerRead = await POST(request("ledger", [ledger.id]));
+    expect(ledgerRead.status).toBe(200);
+    expect(ledgerRead.headers.get("cache-control")).toBe("private, no-store");
+    expect(await ledgerRead.json()).toMatchObject({ id: ledger.id });
+
+    const categoriesRead = await POST(request("categories", [ledger.id]));
+    expect(categoriesRead.status).toBe(200);
+    expect(categoriesRead.headers.get("cache-control")).toBe("private, no-store");
+    expect(await categoriesRead.json()).toEqual([]);
+
+    const settingsRead = await POST(request("settings", [ledger.id]));
+    expect(settingsRead.status).toBe(200);
+    expect(settingsRead.headers.get("cache-control")).toBe("private, no-store");
+    expect(await settingsRead.json()).toEqual({ uncategorizedCount: 0, credentials: [] });
+
+    // A retired ledger is not readable: the two access-checked reads answer
+    // 404, and the ledger read answers the empty body its application query
+    // already returns for a ledger this account does not have live.
+    const retiredLedgerId = crypto.randomUUID();
+    await db.insert(ledgers).values({ id: retiredLedgerId, userId, deletedAt: new Date() });
+    const foreignLedgerRead = await POST(request("ledger", [retiredLedgerId]));
+    expect(foreignLedgerRead.status).toBe(200);
+    expect(await foreignLedgerRead.json()).toBeNull();
+    expect((await POST(request("categories", [retiredLedgerId]))).status).toBe(404);
+    expect((await POST(request("settings", [retiredLedgerId]))).status).toBe(404);
   });
 });

@@ -14,7 +14,6 @@ const remotePatterns: Array<{ protocol: "https" | "http"; hostname: string }> = 
 const nextConfig: NextConfig = {
   ...(demoProject == null ? {} : { distDir: `.next-${demoProject}` }),
   // instrumentation.ts is enabled by default in Next.js 16+
-  output: "standalone",
   // The dev tools badge is fixed to a viewport corner, where it covers the
   // ledger's own footer controls at phone widths — the source-document modal's
   // Evidence button sits underneath it. Development warnings still reach the

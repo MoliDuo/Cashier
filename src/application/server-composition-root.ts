@@ -84,7 +84,7 @@ const executeSingleProcessingJob = createExecuteSingleProcessingJob({
   recordProcessingFailure: (input) => postgresRevisionAdapter.recordProcessingFailure(input),
 });
 
-/** Composition root for the PostgreSQL-backed Docker runtime. */
+/** Composition root for the PostgreSQL-backed runtime. */
 export const serverComposition = {
   accountSecurity: postgresAccountSecurityAdapter,
   books: postgresBookAdapter,

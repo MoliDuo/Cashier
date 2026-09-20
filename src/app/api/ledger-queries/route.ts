@@ -17,6 +17,9 @@ import {
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { getLedgerEntryAction } from "@/modules/ledger/server/get-entry";
+import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
+import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
+import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import {
   getCategoryAssignmentResultsAction,
   getCategoryReclassificationJobAction,
@@ -46,7 +49,10 @@ const requestSchema = z
       "refresh",
       "entries",
       "entry",
+      "ledger",
+      "categories",
       "summary",
+      "settings",
       "stats",
       "reclassification",
       "category-assignment-results",
@@ -54,6 +60,12 @@ const requestSchema = z
     args: z.array(z.unknown()).min(1).max(2),
   })
   .strict();
+
+/**
+ * The three ledger-scoped reads below take exactly one argument, unlike the
+ * paginated reads that also carry an input object.
+ */
+const singleArgumentSchema = z.array(z.unknown()).length(1);
 
 export async function POST(request: Request) {
   const headers = { "Cache-Control": "private, no-store" };
@@ -113,8 +125,20 @@ export async function POST(request: Request) {
         case "entry":
           result = await getLedgerEntryAction(ledgerId, parseLedgerEntryId(input));
           break;
+        case "ledger":
+          singleArgumentSchema.parse(payload.args);
+          result = await getLedgerAction(ledgerId);
+          break;
+        case "categories":
+          singleArgumentSchema.parse(payload.args);
+          result = await getEntryCategoriesAction(ledgerId);
+          break;
         case "summary":
           result = await getLedgerStatsAction(ledgerId, parseLedgerStatsQuery(input ?? {}));
+          break;
+        case "settings":
+          singleArgumentSchema.parse(payload.args);
+          result = await getLedgerSettingsAction(ledgerId);
           break;
         case "reclassification":
           result = await getCategoryReclassificationJobAction(ledgerId);

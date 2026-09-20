@@ -30,9 +30,9 @@ vi.mock("next-intl/server", () => ({ getLocale: vi.fn().mockResolvedValue("zh") 
 // Import actions
 import {
   deleteEntryCategoryAction,
-  getEntryCategoriesAction,
   getUncategorizedCountAction,
 } from "@/modules/ledger/server-actions/categories";
+import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
 import {
   deleteLedgerEntryAction,
   createLedgerEntryAction,

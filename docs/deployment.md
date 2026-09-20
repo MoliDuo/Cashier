@@ -1,83 +1,63 @@
 # 部署、升级与备份
 
-Cashier 提供两种 Docker Compose 部署方式：
+生产环境部署在 Vercel 上；PostgreSQL 和 S3 兼容对象存储由你提供。本地开发只用
+`docker-compose.local.yml` 启动 PostgreSQL 和 MinIO 两个基础服务，应用本身用
+`npm run dev` 运行。
 
 反向代理不是必需项。仅当入口会覆盖客户端提供的 `X-Real-IP` 时设置
-`TRUSTED_PROXY=platform`；直连部署应保持未设置。Vercel 部署在显式设置该值后读取
+`TRUSTED_PROXY=platform`；直连部署应保持未设置。在 Vercel 上显式设置该值后读取
 平台的单值 `X-Vercel-Forwarded-For`，非法或多值头不会被信任。
 
-- 本地全家桶：Cashier、PostgreSQL 和 MinIO 全部由 Compose 管理，适合首次体验和单机部署。
-- 外部服务：Compose 只启动 Cashier，数据库和对象存储由你提供。
+## Vercel 部署
 
-## 本地全家桶
+把仓库导入 Vercel，构建命令保持仓库默认值。在项目的环境变量中配置：
 
-复制本地模板并填写 AI 配置：
-
-```bash
-cp .env.local.example .env
-```
-
-```dotenv
-OPENAI_API_KEY=your-api-key
-```
-
-账号不需要配置：空库第一次启动时，服务端会在日志中打印一次性初始化代码。
-
-启动：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-```
-
-这个模式会创建三个具名卷：
-
-| 数据卷             | 内容                      |
-| ------------------ | ------------------------- |
-| `cashier_postgres` | PostgreSQL 账本数据       |
-| `cashier_minio`    | 原始票据图片              |
-| `cashier_config`   | Docker 自动生成的内部密钥 |
-
-`docker compose -f docker-compose.yml -f docker-compose.local.yml down` 只停止并移除容器，
-不会删除这些卷。增加 `-v` 会永久删除数据库、图片和内部密钥，执行前务必确认备份。
-
-本地模板中的四个内部密钥是公开的固定开发值，只用于让 loopback 环境复制后立即启动。
-任何可被外部访问的部署都必须替换它们；也可以将它们留空，让 Docker 在
-`cashier_config` 卷中生成并持久化随机值。
-
-## 外部 PostgreSQL 与对象存储
-
-复制外部服务模板：
-
-```bash
-cp .env.example .env
-```
-
-必须配置：
-
-- `DATABASE_URL`：PostgreSQL 连接地址。
-- `S3_ENDPOINT`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、
-  `S3_SECRET_ACCESS_KEY`：S3 或 R2 配置。
+- `APP_URL`：Vercel 分配的公开地址。
+- `DATABASE_URL`：外部 PostgreSQL 连接地址。
+- `S3_ENDPOINT`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`：
+  S3 或 R2 配置，桶必须预先创建。
 - `S3_PUBLIC_ENDPOINT`：浏览器可以访问的对象存储端点。
 - `OPENAI_API_KEY`：AI 服务密钥。
+- `AUTH_SECRET`、`API_KEY_PEPPER`、`RATE_LIMIT_PEPPER`、`AUTH_OTP_PEPPER`：四个内部密钥，
+  必须是安全随机值，并且在同一部署的重启、预览实例和多次构建之间保持一致。
 
 账号、账本和分账由首次启动的向导创建，不需要环境变量。
 
-对象存储桶必须预先创建。然后启动：
+Vercel 不会自动执行数据库迁移。发布新版本前，先对目标数据库运行一次仓库现有的迁移命令：
 
 ```bash
-docker compose -f docker-compose.yml up -d
+npm run db:migrate
 ```
 
-`docker:external` 和 `docker:prod` npm 脚本执行的是同一外部服务模式。
+命令从当前环境（包括 `.env`）读取 `DATABASE_URL`，并在 advisory lock 保护下应用
+`src/persistence/postgres-migrations/` 中尚未执行的迁移。
+
+## 本地基础服务
+
+源码开发需要 Node.js 24，以及本机运行的 PostgreSQL 和 S3 兼容存储：
+
+```bash
+cp .env.local.example .env
+npm run docker:local
+npm run db:migrate
+npm run dev
+```
+
+`docker-compose.local.yml` 启动 PostgreSQL 和 MinIO，并在 Postgres 首次就绪后创建
+`cashier` 桶。它定义两个具名卷：
+
+| 数据卷             | 内容            |
+| ------------------ | --------------- |
+| `cashier_postgres` | PostgreSQL 数据 |
+| `cashier_minio`    | 原始票据图片    |
+
+`npm run docker:down` 只停止并移除容器，不会删除这些卷。增加 `-v` 会永久删除数据库和
+图片，执行前务必确认备份。
+
+`.env.local.example` 中的四个内部密钥是公开的固定开发值，只用于让 loopback 环境复制后
+立即启动。任何可被外部访问的部署都必须替换它们。
 
 ## 首次启动
-
-容器入口会按以下顺序执行：
-
-1. 如果没有显式提供内部密钥，在 `cashier_config` 卷中生成并持久化
-   `AUTH_SECRET`、`API_KEY_PEPPER`、`RATE_LIMIT_PEPPER` 和 `AUTH_OTP_PEPPER`。
-2. 等待 PostgreSQL 并应用 `src/persistence/postgres-migrations/` 中的迁移。
-3. 启动 Cashier；容器不会自动创建账号。
 
 空数据库首次启动后，打开服务地址：所有页面都会跳转到 `/{locale}/setup`。服务端日志中
 会打印一次性初始化代码，例如：
@@ -89,10 +69,10 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 在向导中填入该代码、一个登录邮箱、密码，以及一到多个分账名称（默认预填 `共同支出`），
 提交后会一次性创建账号、账本、分账和默认分类，随后 `/setup` 永久返回 404。
 
-初始化代码只保护"数据库为空"到"账号已创建"这段窗口，因此它只存在于进程内存中；
+初始化代码只保护“数据库为空”到“账号已创建”这段窗口，因此它只存在于进程内存中；
 重启服务会重新生成并再次打印。已有数据的部署不会看到这个向导。
 
-初始密码只在创建账号时使用。后续修改 `.env` 不会同步修改现有账号密码。
+初始密码只在创建账号时使用。后续修改环境变量不会同步修改现有账号密码。
 从双人账本升级请阅读 [从双人账本升级](./deployment/single-account-upgrade.md)。
 
 ## 升级
@@ -101,7 +81,7 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 
 1. 备份 PostgreSQL。
 2. 备份 S3/R2/MinIO 存储桶。
-3. 保存当前部署所使用的镜像标签或 Git 提交号。
+3. 记录当前部署所使用的 Git 提交号或部署版本。
 4. 阅读目标版本的提交记录和迁移变化。
 
 包含 `0043_category_assignment_v2.sql` 的版本不能与旧分类任务执行器混跑。升级时先停止
@@ -113,14 +93,7 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 过旧 0042 的数据库无法仅凭分类名称或当前顺序精确推断此前的自定义排序；只有升级前的可靠
 备份可能恢复它。本次升级不会猜测或再次改写现有顺序。
 
-使用预构建镜像时：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml pull app
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-```
-
-容器启动时会自动执行数据库迁移。不要在没有数据库备份的情况下跳过多个版本升级。
+部署新版本前先运行 `npm run db:migrate`。不要在没有数据库备份的情况下跳过多个版本升级。
 
 早期版本曾以明文保存服务凭证。仅在恢复或核验这类历史数据库时使用专项工具：
 
@@ -137,8 +110,8 @@ npm run db:migrate:credentials -- <backfill|verify|clear-plaintext>
 
 - PostgreSQL 数据库。
 - S3/R2/MinIO 桶中的对象。
-- `cashier_config` 卷，或者你自行保存的四个内部密钥。
-- 当前 `.env` 的非敏感配置记录；密钥应放在专用密码或密钥管理系统中。
+- Vercel 环境变量中的四个内部密钥，或你另行保存的副本。
+- 当前环境变量的非敏感配置记录；密钥应放在专用密码或密钥管理系统中。
 
 恢复时应使用彼此对应的数据库和对象存储快照。只恢复其中一项可能留下数据库记录存在但
 图片缺失，或对象存在但数据库无引用的状态。
@@ -165,12 +138,10 @@ npm run prune -- --json --batch-size 500 --orphan-grace-days 14 \
 
 ## 常用命令
 
-| 命令                      | 用途                       |
-| ------------------------- | -------------------------- |
-| `npm run docker:local`    | 使用 npm 启动本地全家桶    |
-| `npm run docker:external` | 使用 npm 启动外部服务模式  |
-| `npm run docker:build`    | 构建生产镜像               |
-| `npm run docker:down`     | 停止本地全家桶，保留具名卷 |
-| `npm run db:migrate`      | 在源码开发环境应用迁移     |
+| 命令                   | 用途                           |
+| ---------------------- | ------------------------------ |
+| `npm run docker:local` | 启动本地 PostgreSQL 和 MinIO   |
+| `npm run docker:down`  | 停止本地基础服务，保留具名卷   |
+| `npm run db:migrate`   | 对当前 `DATABASE_URL` 应用迁移 |
 
 所有配置项见 [配置参考](./configuration.md)。

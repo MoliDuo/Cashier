@@ -75,4 +75,76 @@ describe("source document batch server actions", () => {
     expect(result.failed).toEqual([{ id: sourceDocumentId, code: "PROCESSING_UNAVAILABLE" }]);
     expect(JSON.stringify(result)).not.toContain("storage provider unavailable");
   });
+
+  it("classifies every item separately and keeps the order it was given", async () => {
+    const staleId = "00000000-0000-4000-8000-000000000003";
+    const failedId = "00000000-0000-4000-8000-000000000004";
+    deleteDocumentsMock
+      .mockResolvedValueOnce({ ok: true, version: 2 })
+      .mockResolvedValueOnce({
+        ok: false,
+        expectedVersion: 1,
+        currentVersion: 3,
+      })
+      .mockRejectedValueOnce(new Error("database unavailable"));
+
+    const result = await batchDeleteSourceDocumentsAction(ledgerId, [
+      { sourceDocumentId, expectedVersion: 1 },
+      { sourceDocumentId: staleId, expectedVersion: 1 },
+      { sourceDocumentId: failedId, expectedVersion: 1 },
+    ]);
+
+    expect(result).toEqual({
+      succeeded: [{ id: sourceDocumentId, sourceDocumentId, version: 2 }],
+      stale: [
+        {
+          id: staleId,
+          sourceDocumentId: staleId,
+          expectedVersion: 1,
+          currentVersion: 3,
+        },
+      ],
+      failed: [{ id: failedId, code: "INTERNAL" }],
+    });
+  });
+
+  it("schedules a retry intent only after every item has been classified", async () => {
+    const order: string[] = [];
+    retrySourceDocumentMock.mockImplementation(
+      async (
+        input: { sourceDocumentId: string },
+        dependencies: { scheduleProcessing: (job: unknown) => void }
+      ) => {
+        order.push(`item:${input.sourceDocumentId}`);
+        if (input.sourceDocumentId === sourceDocumentId) {
+          dependencies.scheduleProcessing({ id: `job:${input.sourceDocumentId}` });
+          return { ok: true, version: 2 };
+        }
+        throw new AppError("storage provider unavailable", "STORAGE_UNAVAILABLE");
+      }
+    );
+    scheduleProcessingAfterMock.mockImplementation(() => order.push("schedule"));
+    const failedId = "00000000-0000-4000-8000-000000000004";
+
+    const result = await batchRetrySourceDocumentsAction(ledgerId, [
+      { sourceDocumentId, expectedVersion: 1 },
+      { sourceDocumentId: failedId, expectedVersion: 1 },
+    ]);
+
+    expect(order).toEqual([`item:${sourceDocumentId}`, `item:${failedId}`, "schedule"]);
+    expect(scheduleProcessingAfterMock).toHaveBeenCalledTimes(1);
+    expect(result.succeeded).toEqual([{ id: sourceDocumentId, sourceDocumentId, version: 2 }]);
+    expect(result.failed).toEqual([{ id: failedId, code: "PROCESSING_UNAVAILABLE" }]);
+  });
+
+  it("refuses an empty batch and a duplicated target", async () => {
+    await expect(batchDeleteSourceDocumentsAction(ledgerId, [])).rejects.toThrow();
+    await expect(
+      batchDeleteSourceDocumentsAction(ledgerId, [
+        { sourceDocumentId, expectedVersion: 1 },
+        { sourceDocumentId, expectedVersion: 2 },
+      ])
+    ).rejects.toThrow();
+    expect(deleteDocumentsMock).not.toHaveBeenCalled();
+  });
 });

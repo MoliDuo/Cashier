@@ -129,6 +129,30 @@ function assignmentJob(status: "pending" | "running" | "succeeded" = "pending") 
   };
 }
 
+const dateImpact = (
+  entryCount: number
+): {
+  selectedEntryCount: number;
+  sourceDocumentCount: number;
+  affectedEntryCount: number;
+  sourceDocumentIds: string[];
+} => ({
+  selectedEntryCount: entryCount,
+  sourceDocumentCount: entryCount === 0 ? 0 : 1,
+  affectedEntryCount: entryCount,
+  sourceDocumentIds: entryCount === 0 ? [] : ["document-1"],
+});
+
+const succeededJob = () => ({
+  ...assignmentJob("running"),
+  status: "succeeded" as const,
+  processedCount: 1,
+  appliedCount: 1,
+  documentCompleted: 1,
+  activeDocumentCount: 0,
+  completedAt: "2026-09-04T00:00:01.000Z",
+});
+
 describe("useDetailsBatchController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -274,9 +298,8 @@ describe("useDetailsBatchController", () => {
       result.current.handleSelect("entry-1", true);
       result.current.handleSelect("entry-2", true);
     });
-    await act(async () => {
-      await result.current.previewDate.mutateAsync();
-    });
+    act(() => result.current.openDateDialog());
+    await act(async () => Promise.resolve());
     expect(previewBatchLedgerEntryDateActionMock).toHaveBeenCalledWith("ledger-1", [
       "entry-1",
       "entry-2",
@@ -311,7 +334,8 @@ describe("useDetailsBatchController", () => {
       result.current.handleSelect("entry-1", true);
       result.current.handleSelect("entry-2", true);
     });
-    await act(async () => result.current.previewDate.mutateAsync());
+    act(() => result.current.openDateDialog());
+    await act(async () => Promise.resolve());
     act(() => result.current.handleSelect("entry-2", false));
 
     await expect(result.current.updateDates.mutateAsync()).rejects.toThrow("selection_changed");
@@ -506,15 +530,10 @@ describe("useDetailsBatchController", () => {
   it("reports a finished run once, and only for a run this client watched", async () => {
     const { wrapper, queryClient } = setup();
     const running = assignmentJob("running");
-    reclassificationJobMock.mockResolvedValueOnce(running).mockResolvedValue({
-      ...running,
-      status: "succeeded",
-      processedCount: 1,
-      appliedCount: 1,
-      documentCompleted: 1,
-      activeDocumentCount: 0,
-      completedAt: "2026-09-04T00:00:01.000Z",
-    });
+    // A fresh object per poll, so every response really does reach the hook.
+    reclassificationJobMock
+      .mockResolvedValueOnce(running)
+      .mockImplementation(async () => succeededJob());
     const { result } = renderHook(
       () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
       { wrapper }
@@ -528,6 +547,259 @@ describe("useDetailsBatchController", () => {
     });
 
     await waitFor(() => expect(result.current.isReclassifying).toBe(false));
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: ["ledger", "ledger-1", "category-reclassification"],
+      });
+    });
+    expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet about a run that finished before this client arrived", async () => {
+    const { wrapper } = setup();
+    reclassificationJobMock.mockResolvedValue(succeededJob());
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.reclassificationJob).not.toBeNull());
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("writes a single pick straight through at the direct limit", async () => {
+    const { wrapper } = setup();
+    const ids = Array.from({ length: 100 }, (_, index) => `entry-${index}`);
+    batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
+      ok: true,
+      versions: [{ sourceDocumentId: "document-1", version: 2 }],
+      data: { ledgerEntryIds: ids, affectedCount: 100 },
+    });
+    const { result } = renderHook(
+      () =>
+        useDetailsBatchController(
+          "ledger-1",
+          ids.map((id) => entry(id)),
+          "fingerprint"
+        ),
+      { wrapper }
+    );
+    act(() => result.current.handleSelectMany(ids, true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => result.current.toggleCategoryPick("category-1", true));
+
+    await act(async () => {
+      result.current.confirmCategory();
+      await Promise.resolve();
+    });
+
+    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(batchUpdateLedgerEntriesActionMock).toHaveBeenCalledTimes(1);
+    expect(result.current.categoryDialogOpen).toBe(false);
+  });
+
+  it("asks the model once a single pick passes the direct limit", async () => {
+    const { wrapper } = setup();
+    const ids = Array.from({ length: 101 }, (_, index) => `entry-${index}`);
+    const { result } = renderHook(
+      () =>
+        useDetailsBatchController(
+          "ledger-1",
+          ids.map((id) => entry(id)),
+          "fingerprint"
+        ),
+      { wrapper }
+    );
+    act(() => result.current.handleSelectMany(ids, true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => result.current.toggleCategoryPick("category-1", true));
+
+    await act(async () => {
+      result.current.confirmCategory();
+      await Promise.resolve();
+    });
+
+    expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
+    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith("ledger-1", {
+      requestKey: expect.any(String),
+      mode: { kind: "assign", categoryId: "category-1" },
+      expectedEntryCount: 101,
+    });
+  });
+
+  it("uploads a long selection in 1000-entry chunks, resuming from what the server already has", async () => {
+    const { wrapper } = setup();
+    const ids = Array.from({ length: 2500 }, (_, index) => `entry-${index}`);
+    beginCategoryAssignmentActionMock.mockResolvedValueOnce({
+      ...assignmentJob("pending"),
+      status: "preparing",
+      receivedCount: 1000,
+    });
+    appendCategoryAssignmentSelectionActionMock.mockImplementation(
+      async (_ledgerId: string, input: { chunkIndex: number }) => ({
+        jobId: "job-1",
+        received: Math.min(2500, 1000 + input.chunkIndex * 1000),
+        total: 2500,
+      })
+    );
+    const { result } = renderHook(
+      () =>
+        useDetailsBatchController(
+          "ledger-1",
+          ids.map((id) => entry(id)),
+          "fingerprint"
+        ),
+      { wrapper }
+    );
+    act(() => result.current.handleSelectMany(ids, true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => result.current.toggleCategoryPick("category-1", true));
+
+    await act(async () => {
+      result.current.confirmCategory();
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith("ledger-1", {
+        jobId: "job-1",
+        expectedEntryCount: 2500,
+      })
+    );
+
+    const chunks = appendCategoryAssignmentSelectionActionMock.mock.calls.map((call) => ({
+      chunkIndex: (call[1] as { chunkIndex: number }).chunkIndex,
+      size: (call[1] as { entries: unknown[] }).entries.length,
+    }));
+    expect(chunks).toEqual([
+      { chunkIndex: 1, size: 1000 },
+      { chunkIndex: 2, size: 500 },
+    ]);
+  });
+
+  it("keeps the picks when the direct write fails", async () => {
+    const { wrapper } = setup();
+    batchUpdateLedgerEntriesActionMock.mockRejectedValueOnce(new Error("write failed"));
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => result.current.toggleCategoryPick("category-1", true));
+
+    await act(async () => {
+      result.current.confirmCategory();
+      await Promise.resolve();
+    });
+
+    expect(result.current.categoryDialogOpen).toBe(true);
+    expect(result.current.pickedCategoryIds).toEqual(["category-1"]);
+    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a run reporting after its dialog is closed", async () => {
+    const { wrapper, queryClient } = setup();
+    const running = assignmentJob("running");
+    reclassificationJobMock.mockResolvedValueOnce(null).mockImplementation(async () => ({
+      ...running,
+    }));
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.setCategoryDialogOpen(true));
+    act(() => {
+      result.current.toggleCategoryPick("category-1", true);
+      result.current.toggleCategoryPick("category-2", true);
+    });
+
+    await act(async () => {
+      result.current.confirmCategory();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.categoryDialogOpen).toBe(false));
+
+    await waitFor(() => expect(result.current.isReclassifying).toBe(true));
+    reclassificationJobMock.mockImplementation(async () => succeededJob());
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: ["ledger", "ledger-1", "category-reclassification"],
+      });
+    });
+
+    await waitFor(() => expect(result.current.isReclassifying).toBe(false));
     expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryDone");
+  });
+
+  it("ignores a date preview that lands after the dialog was reopened", async () => {
+    const { wrapper } = setup();
+    const firstPreview = deferred();
+    previewBatchLedgerEntryDateActionMock
+      .mockImplementationOnce(async () => {
+        await firstPreview.promise;
+        return dateImpact(2);
+      })
+      .mockResolvedValueOnce(dateImpact(1));
+    const { result } = renderHook(
+      () =>
+        useDetailsBatchController("ledger-1", [entry("entry-1"), entry("entry-2")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelectMany(["entry-1", "entry-2"], true));
+    act(() => result.current.openDateDialog());
+    act(() => result.current.setDateDialogOpen(false));
+    act(() => result.current.handleSelect("entry-2", false));
+    act(() => result.current.openDateDialog());
+
+    await waitFor(() => expect(result.current.dateImpact).toEqual(dateImpact(1)));
+    await act(async () => {
+      firstPreview.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => Promise.resolve());
+
+    expect(result.current.dateImpact).toEqual(dateImpact(1));
+    expect(result.current.dateSelectionChanged).toBe(false);
+    expect(result.current.updateDates.isPending).toBe(false);
+  });
+
+  it("retries a failed date preview inside the open dialog", async () => {
+    const { wrapper } = setup();
+    previewBatchLedgerEntryDateActionMock
+      .mockRejectedValueOnce(new Error("preview down"))
+      .mockResolvedValueOnce(dateImpact(1));
+    const { result } = renderHook(
+      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      { wrapper }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.openDateDialog());
+    await waitFor(() => expect(result.current.datePreviewFailed).toBe(true));
+    expect(result.current.dateDialogOpen).toBe(true);
+
+    act(() => result.current.retryDatePreview());
+
+    await waitFor(() => expect(result.current.dateImpact).toEqual(dateImpact(1)));
+    expect(result.current.datePreviewFailed).toBe(false);
+  });
+
+  it("refuses to confirm a preview once the filters moved under it", async () => {
+    const { wrapper } = setup();
+    previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce(dateImpact(1));
+    const { result, rerender } = renderHook(
+      ({ fingerprint }: { fingerprint: string }) =>
+        useDetailsBatchController("ledger-1", [entry("entry-1")], fingerprint),
+      { wrapper, initialProps: { fingerprint: "fingerprint" } }
+    );
+    act(() => result.current.handleSelect("entry-1", true));
+    act(() => result.current.openDateDialog());
+    await waitFor(() => expect(result.current.dateImpact).toEqual(dateImpact(1)));
+
+    rerender({ fingerprint: "other-fingerprint" });
+
+    expect(result.current.dateSelectionChanged).toBe(true);
+    await expect(result.current.updateDates.mutateAsync()).rejects.toThrow("selection_changed");
+    expect(batchUpdateLedgerEntryDatesActionMock).not.toHaveBeenCalled();
   });
 });

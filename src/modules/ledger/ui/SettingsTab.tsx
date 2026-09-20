@@ -29,7 +29,7 @@ import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { SettingsSectionActions } from "./settings/SettingsSectionActions";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { queryKeys } from "@/lib/query-keys";
-import { getEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
+import { getEntryCategoriesAction } from "@/lib/queries/ledger-query-client";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import type { BookDto } from "@/modules/ledger/contracts";

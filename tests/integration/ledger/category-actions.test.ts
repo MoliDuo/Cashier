@@ -10,8 +10,8 @@ import {
   createEntryCategoryAction,
   deleteEntryCategoryAction,
   reorderEntryCategoriesAction,
-  getEntryCategoriesAction,
 } from "@/modules/ledger/server-actions/categories";
+import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,

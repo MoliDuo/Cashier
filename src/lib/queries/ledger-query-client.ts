@@ -13,7 +13,10 @@ type QueryActions = {
     input: import("@/modules/source-document/contract-refresh").LedgerRefreshRequest
   ) => Promise<import("@/modules/source-document/contract-refresh").LedgerRefreshResult>;
   entries: typeof import("@/modules/ledger/server/list-entries").getLedgerEntriesAction;
+  ledger: typeof import("@/modules/ledger/server/get-ledger").getLedgerAction;
+  categories: typeof import("@/modules/ledger/server/list-categories").getEntryCategoriesAction;
   summary: typeof import("@/modules/ledger/server/stats").getLedgerStatsAction;
+  settings: typeof import("@/modules/ledger/server/get-ledger-settings").getLedgerSettingsAction;
   stats: typeof import("@/modules/stats/server/get-enhanced-stats").getEnhancedStats;
   reclassification: typeof import("@/modules/ledger/server/get-category-reclassification-job").getCategoryReclassificationJobAction;
   "category-assignment-results": typeof import("@/modules/ledger/server/get-category-reclassification-job").getCategoryAssignmentResultsAction;
@@ -41,7 +44,10 @@ export const listStreamPageAction = query("stream");
 export const getStreamTotalAction = query("total");
 export const getStreamRefreshAction = query("refresh");
 export const getLedgerEntriesAction = query("entries");
+export const getLedgerAction = query("ledger");
+export const getEntryCategoriesAction = query("categories");
 export const getLedgerStatsAction = query("summary");
+export const getLedgerSettingsAction = query("settings");
 export const getEnhancedStats = query("stats");
 export const getCategoryReclassificationJobAction = query("reclassification");
 export const getCategoryAssignmentResultsAction = query("category-assignment-results");
