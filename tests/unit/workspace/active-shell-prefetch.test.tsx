@@ -63,7 +63,7 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
 }));
 
 vi.mock("@/i18n/use-feature-messages", () => ({
-  preloadFeatureMessages: vi.fn(),
+  preloadFeatureMessages: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
