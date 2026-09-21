@@ -1,6 +1,6 @@
 "use server";
 import { serverComposition } from "@/application/server-composition-root";
-import type { UploadPlanContract } from "@/application/contracts";
+import type { DirectUploadPlanContract } from "@/application/contracts";
 import {
   createSourceDocumentUploadPlanInputSchema,
   finalizeSourceDocumentUploadInputSchema,
@@ -11,7 +11,10 @@ import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
 
 export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, input: CreateSourceDocumentUploadPlanInput): Promise<UploadPlanContract> =>
+  async (
+    { ledgerId },
+    input: CreateSourceDocumentUploadPlanInput
+  ): Promise<DirectUploadPlanContract> =>
     serverComposition.storedFiles.createDirectUploadPlan(
       ledgerId,
       createSourceDocumentUploadPlanInputSchema.parse(input).map((file) => ({

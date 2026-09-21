@@ -109,7 +109,6 @@ describe("current-runtime target adapters", () => {
         originalFilename: "receipt.jpg",
       },
     ]);
-    expect(plan.targets[0]?.url).not.toContain(ledgerId);
     const uploaded = await adapter.uploadTarget({
       ledgerId,
       uploadSessionId: plan.id,

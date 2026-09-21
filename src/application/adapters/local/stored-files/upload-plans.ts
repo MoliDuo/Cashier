@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import type {
+  DirectUploadPlanContract,
   LedgerId,
   UploadFileRequestContract,
   UploadPlanContract,
@@ -58,12 +59,7 @@ export function createUploadPlanOperations(dependencies: ResolvedStoredFileAdapt
     return {
       id: sessionId,
       expiresAt: expiresAt.toISOString(),
-      targets: files.map((file, position) => ({
-        id: targetIds[position]!,
-        method: "PUT" as const,
-        url: `/api/stored-files/upload-targets/${sessionId}/${targetIds[position]!}`,
-        requiredHeaders: { "Content-Type": file.contentType },
-      })),
+      targets: targetIds.map((id) => ({ id })),
       finalizationToken,
       maxFiles: MAX_FILES,
       maxBytesPerFile: MAX_ORIGINAL_BYTES_PER_FILE,
@@ -73,7 +69,7 @@ export function createUploadPlanOperations(dependencies: ResolvedStoredFileAdapt
   async function createDirectUploadPlan(
     ledgerId: LedgerId,
     files: readonly UploadFileRequestContract[]
-  ): Promise<UploadPlanContract> {
+  ): Promise<DirectUploadPlanContract> {
     validateRequests(files);
     if (files.some((file) => file.checksum == null || !/^[a-f\d]{64}$/.test(file.checksum))) {
       throw new ValidationError("Direct uploads require a lowercase SHA-256 checksum");
@@ -118,7 +114,7 @@ export function createUploadPlanOperations(dependencies: ResolvedStoredFileAdapt
             file.checksum!,
             Math.floor((UPLOAD_SESSION_EXPIRY_MS - DIRECT_UPLOAD_FINALIZE_BUFFER_MS) / 1000)
           );
-          return { id: targetId, method: "PUT" as const, ...signed };
+          return { id: targetId, ...signed };
         })
       );
       return {

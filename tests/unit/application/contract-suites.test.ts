@@ -20,7 +20,7 @@ function createCurrentRuntimeHarness(): ApplicationContractHarness {
   const plan: UploadPlanContract = {
     id: "upload-session-1",
     expiresAt: "2026-07-13T01:00:00.000Z",
-    targets: [{ id: "target-1", method: "POST", url: "/api/uploads", requiredHeaders: {} }],
+    targets: [{ id: "target-1" }],
     finalizationToken: "finalize-token",
     maxFiles: 10,
     maxBytesPerFile: 10 * 1024 * 1024,

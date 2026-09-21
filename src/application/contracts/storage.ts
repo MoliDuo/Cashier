@@ -14,9 +14,16 @@ export interface StoredFileContract {
   createdAt: string;
 }
 
+/**
+ * A slot in an upload session. A server-side upload writes to it through the
+ * adapter, so the id is all it needs; only a plan the browser has to execute
+ * itself carries somewhere to send the bytes.
+ */
 interface UploadTargetContract {
   id: string;
-  method: "PUT" | "POST";
+}
+
+interface DirectUploadTargetContract extends UploadTargetContract {
   url: string;
   requiredHeaders: Readonly<Record<string, string>>;
 }
@@ -35,6 +42,11 @@ export interface UploadPlanContract {
   finalizationToken: string;
   maxFiles: number;
   maxBytesPerFile: number;
+}
+
+/** An upload plan whose targets the caller reaches over the network itself. */
+export interface DirectUploadPlanContract extends Omit<UploadPlanContract, "targets"> {
+  targets: readonly DirectUploadTargetContract[];
 }
 
 export interface UploadFinalizationContract {
@@ -74,7 +86,7 @@ export interface DirectStoredFilePort extends StoredFilePort {
   createDirectUploadPlan(
     ledgerId: LedgerId,
     files: readonly UploadFileRequestContract[]
-  ): Promise<UploadPlanContract>;
+  ): Promise<DirectUploadPlanContract>;
   finalizeDirectUpload(input: UploadFinalizationContract): Promise<readonly StoredFileContract[]>;
   abandonUploadSession(ledgerId: LedgerId, uploadSessionId: string): Promise<void>;
 }
