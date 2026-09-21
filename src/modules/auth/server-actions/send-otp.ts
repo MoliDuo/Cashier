@@ -39,10 +39,10 @@ function sendOTPFailure(error: unknown): SendOTPActionResult {
     if (error.code === "AUTH_RATE_LIMIT_UNAVAILABLE") {
       return { ok: false, code: "rate_limit_unavailable" };
     }
-    // A misconfigured env var (a bad AUTH_RATE_LIMIT_MAX, say) is a distinct
-    // failure from "the rate limiter
-    // backend is unavailable" or "something unexpected happened" — surface
-    // it as its own code instead of letting it fall through to "unexpected".
+    // A misconfigured env var (a malformed DATABASE_URL, say) is a distinct
+    // failure from "the rate limiter backend is unavailable" or "something
+    // unexpected happened" — surface it as its own code instead of letting it
+    // fall through to "unexpected".
     if (error.code === "STARTUP_ENV_INVALID") {
       return { ok: false, code: "config_error" };
     }
