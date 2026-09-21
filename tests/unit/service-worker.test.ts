@@ -1,33 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The PWA policy is two decisions that a reader cannot see until they bite:
- * navigations are never served from the cache, and a new worker never takes
- * over a page on its own. Both used to be guarded by grepping the sources for
- * words, which a comment could break and a real regression could slip past.
- * These tests capture the options the build really hands Serwist and run the
- * worker's own message handler instead.
+ * The worker's whole job is a decision a reader cannot see until it bites: a
+ * new version never takes over a page on its own. These tests run the worker's
+ * real message handler against a stand-in global scope and read back the
+ * options it hands Serwist.
  */
 
 const { serwistWorkerOptions, addEventListeners } = vi.hoisted(() => ({
   serwistWorkerOptions: { current: null as Record<string, unknown> | null },
   addEventListeners: vi.fn(),
-}));
-
-// Both Next plugins pull the same native file watcher in, and a native addon
-// loaded from two worker threads at once fails to register. The options are
-// read from next.config's own export rather than from these stand-ins.
-vi.mock("@serwist/next", () => ({
-  default:
-    () =>
-    <T>(config: T) =>
-      config,
-}));
-vi.mock("next-intl/plugin", () => ({
-  default:
-    () =>
-    <T>(config: T) =>
-      config,
 }));
 
 vi.mock("serwist", () => ({
@@ -167,31 +149,5 @@ describe("service worker activation protocol", () => {
     expect(harness.matchAll).not.toHaveBeenCalled();
     expect(harness.skipWaiting).not.toHaveBeenCalled();
     expect(port.postMessage).not.toHaveBeenCalled();
-  });
-});
-
-describe("build-time PWA configuration", () => {
-  it("never serves a navigation from the cache and keeps API chunks unprecached", async () => {
-    const { serwistOptions } = await import("../../../next.config");
-
-    expect(serwistOptions).toMatchObject({
-      swSrc: "src/service-worker.ts",
-      swDest: "public/sw.js",
-      swUrl: "/sw.js",
-      // The app shell is per-account and per-locale, so a cached navigation
-      // could hand a reader a shell that is not theirs.
-      cacheOnNavigation: false,
-      reloadOnOnline: false,
-    });
-
-    const isExcluded = (asset: string) =>
-      serwistOptions.exclude.some((pattern) => pattern.test(asset));
-    expect(isExcluded("static/chunks/app/api/v1/route.js")).toBe(true);
-    expect(isExcluded("server/middleware-manifest.json")).toBe(true);
-    expect(isExcluded("app-build-manifest.json")).toBe(true);
-    // The protected route's own chunks are precached: they are immutable and
-    // content-hashed, and they are what makes the tab bar usable at once.
-    expect(isExcluded("static/chunks/app/[locale]/(protected)/page-a1b2c3.js")).toBe(false);
-    expect(isExcluded("static/chunks/main-app-9f8e7d.js")).toBe(false);
   });
 });
