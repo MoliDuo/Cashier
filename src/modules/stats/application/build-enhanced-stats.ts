@@ -79,9 +79,9 @@ function civilDayCount(from: string, to: string): number {
 }
 
 /**
- * Shared assembly for enhanced stats DTOs. Both the PostgreSQL adapter and the
- * offline startup-cache selector feed their own buckets through this function
- * so online and offline statistics cannot drift apart.
+ * Shared assembly for enhanced stats DTOs. Every read that produces statistics
+ * folds its rows into buckets and hands them here, so the figures cannot drift
+ * apart between one reader and the next.
  */
 export function buildEnhancedStatsDto({
   mainCurrency,
@@ -95,6 +95,14 @@ export function buildEnhancedStatsDto({
   const growth = calculateDecimalGrowth(current.total, previous.total);
   const dayCount = civilDayCount(queryRange.from, queryRange.to);
   const dailyAverage = dayCount > 0 ? current.total.dividedBy(dayCount).toFixed() : "0";
+
+  // A refund nets against the period total, so a share measured against it can
+  // exceed 100% for everyone else. Spending shares are measured against what was
+  // actually spent, and a category that nets out to nothing has no share of it.
+  const positiveTotal = [...current.categories.values()].reduce(
+    (sum, category) => (category.total.gt(0) ? sum.plus(category.total) : sum),
+    new Decimal(0)
+  );
 
   const categories = [...current.categories.values()]
     .toSorted((left, right) => right.total.cmp(left.total))
@@ -110,9 +118,10 @@ export function buildEnhancedStatsDto({
         icon: category.icon,
         totalConverted: category.total.toFixed(),
         currency: mainCurrency,
-        percent: current.total.gt(0)
-          ? category.total.dividedBy(current.total).times(100).toNumber()
-          : 0,
+        percent:
+          category.total.gt(0) && positiveTotal.gt(0)
+            ? category.total.dividedBy(positiveTotal).times(100).toNumber()
+            : 0,
         count: category.count,
         trend: {
           percent: categoryGrowth.percent,
@@ -121,10 +130,14 @@ export function buildEnhancedStatsDto({
       };
     });
 
-  const sortedDays = [...current.days.entries()].toSorted(([left], [right]) =>
-    left.localeCompare(right)
-  );
-  const chart = sortedDays.map(([date, day]) => ({ date, total: day.total.toFixed() }));
+  const sortedDaysOf = (bucket: EnhancedStatsBucket) =>
+    [...bucket.days.entries()].toSorted(([left], [right]) => left.localeCompare(right));
+  const dailyTotals = (days: [string, EnhancedStatsBucketDay][]) =>
+    days.map(([date, day]) => ({ date, total: day.total.toFixed() }));
+
+  const sortedDays = sortedDaysOf(current);
+  const chart = dailyTotals(sortedDays);
+  const previousChart = dailyTotals(sortedDaysOf(previous));
   const heatmapDays: CalendarDayData[] = sortedDays.map(([date, day]) => ({
     date,
     totalAmount: day.total.toFixed(),
@@ -153,6 +166,7 @@ export function buildEnhancedStatsDto({
     },
     categories,
     chart,
+    previousChart,
     heatmap: {
       days: heatmapDays,
       stats: calculateHeatmapStats(heatmapDays.map((day) => day.totalAmount)),

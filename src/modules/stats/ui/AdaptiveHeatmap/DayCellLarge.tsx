@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getHeatmapColor, formatCellAmount } from "../../lib/heatmap-colors";
+import { formatCompactAmount } from "@/lib/format/currency";
 import { formatRelativeDateLabel } from "@/lib/date-utils";
 import type { HeatmapLevel } from "../../types";
 import { compare } from "@/lib/money/decimal";
@@ -57,18 +58,21 @@ export function DayCellLarge({
             }}
           >
             <span
-              className="max-w-full truncate px-0.5 text-xs font-normal lg:text-sm"
+              className="max-w-full truncate px-0.5 text-xs font-normal tabular-nums"
               style={{ color: `var(--heatmap-text-${level >= 4 ? "high" : "low"})` }}
             >
               {dayNumber}
             </span>
 
             {count > 0 || compare(amount, "0") !== 0 ? (
+              // The cell is about forty pixels wide on a phone. The currency
+              // is already named above the grid, so the symbol only costs the
+              // figure the room it needs to stay readable.
               <span
-                className="max-w-full truncate px-0.5 text-xs font-semibold"
+                className="max-w-full truncate px-0.5 text-micro font-semibold tabular-nums"
                 style={{ color: `var(--heatmap-text-${level >= 4 ? "high" : "low"})` }}
               >
-                {formatCellAmount(amount, currency, locale)}
+                {formatCompactAmount(amount, currency, locale)}
               </span>
             ) : null}
           </button>
@@ -78,6 +82,7 @@ export function DayCellLarge({
           {count > 0 || compare(amount, "0") !== 0 ? (
             <div>
               {t("expense")}: {formatCellAmount(amount, currency, locale)}
+              {count > 0 ? ` · ${t("count", { count })}` : null}
             </div>
           ) : (
             <div className="text-muted-foreground">{t("noConsumption")}</div>

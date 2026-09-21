@@ -336,7 +336,16 @@ describe("Enhanced Stats Actions", () => {
 
       expect(result.summary.total).toBe("30");
       expect(result.summary.comparison.previousTotal).toBe("70");
-      expect(result.chart).toHaveLength(2);
+      expect(result.chart).toEqual([
+        { date: "2024-03-01", total: "10" },
+        { date: "2024-03-31", total: "20" },
+      ]);
+      // The comparison window's own boundary days survive the read, so last
+      // period can be drawn day by day rather than only summed.
+      expect(result.previousChart).toEqual([
+        { date: "2024-02-01", total: "30" },
+        { date: "2024-02-29", total: "40" },
+      ]);
     });
 
     it("should calculate correct summary totals", async () => {

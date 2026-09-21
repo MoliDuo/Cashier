@@ -3,9 +3,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
 import { StatsTab } from "@/modules/workspace/ui/StatsTab";
-import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
+import type { EnhancedStatsDto } from "@/modules/stats/contracts";
+import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
 
 const { searchParamsState } = vi.hoisted(() => ({
   searchParamsState: { current: new URLSearchParams() },
@@ -30,29 +31,7 @@ const ledgerFixture: Ledger = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-const statsFixture: EnhancedStatsDto = {
-  unconvertedCount: 0,
-  summary: {
-    total: "120",
-    currency: "CNY",
-    trend: { percent: 100, amount: "60" },
-    dailyAverage: "20",
-    comparison: {
-      mode: "same_period",
-      from: "2026-07-01",
-      to: "2026-07-06",
-      previousTotal: "60",
-      amountDelta: "60",
-      percent: 100,
-    },
-  },
-  categories: [],
-  chart: [],
-  heatmap: {
-    days: [],
-    stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
-  },
-};
+const statsFixture = buildEnhancedStatsFixture();
 
 function renderStatsTab(bookId?: string) {
   const queryClient = new QueryClient({

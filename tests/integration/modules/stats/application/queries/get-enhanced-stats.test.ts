@@ -155,6 +155,9 @@ describe("getEnhancedStatsQuery", () => {
       { date: "2024-03-01", total: "40" },
       { date: "2024-03-02", total: "30" },
     ]);
+    // Nothing was recorded in February, so the comparison series is empty
+    // rather than echoing the current window back.
+    expect(result.previousChart).toEqual([]);
   });
 
   it("counts documents with a null entry date by their effective date", async () => {

@@ -1,25 +1,27 @@
 "use client";
-import { CategoryIcon } from "@/components/CategoryIcon";
+import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { cn } from "@/lib/utils";
+import { CategoryIcon } from "@/components/CategoryIcon";
 import { EmptyState } from "@/components/EmptyState";
 import { textRoleClassName } from "@/components/typography";
+import { Button } from "@/components/ui/button";
 import { formatCurrencyAmount } from "@/lib/format/currency";
+import { compare } from "@/lib/money/decimal";
+import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
-import Decimal from "decimal.js";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { StatsPanel } from "./StatsPanel";
+
+/** Past this many, the tail is folded away: a ranking is read from the top. */
+const COLLAPSED_LENGTH = 6;
 
 interface CategoryStat {
   id: string | null;
   name: string;
   icon: string | null;
-  totalConverted: string; // Converted Amount
-  percent: number; // % of total
+  totalConverted: string;
+  /** Share of the period's spending; zero for a category that nets out at or below nothing. */
+  percent: number;
   count: number;
-  trend?: {
-    percent: number;
-    amount: string;
-  };
 }
 
 interface StatsRankingProps {
@@ -36,144 +38,106 @@ export function StatsRanking({
   onCategoryClick,
 }: StatsRankingProps) {
   const t = useTranslations("StatsTab");
+  const tCalendar = useTranslations("Calendar");
   const locale = useLocale();
-  const showPercent =
-    data.every((cat) => new Decimal(cat.totalConverted).gte(0)) &&
-    data.some((cat) => new Decimal(cat.totalConverted).gt(0));
+  const [expanded, setExpanded] = useState(false);
 
   if (isLoading) {
     return (
-      <div className="space-y-5 px-2" role="status" aria-busy="true">
-        {/* "支出排行" title */}
-        <div className="h-6 w-24 bg-surface2/50 rounded animate-pulse" />
-
-        {/* Category items */}
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex items-center gap-3">
-            {/* Icon circle */}
-            <div className="w-10 h-10 rounded-full bg-surface2/50 animate-pulse shrink-0" />
-            {/* Content */}
-            <div className="flex-1 space-y-1.5">
-              {/* Top line: Name + Amount */}
-              <div className="flex justify-between items-center">
-                <div className="h-4 w-16 bg-surface2/50 rounded animate-pulse" />
-                <div className="h-4 w-20 bg-surface2/50 rounded animate-pulse font-mono" />
+      <StatsPanel title={t("expenseRanking")}>
+        <div className="space-y-5" role="status" aria-busy="true">
+          {[1, 2, 3, 4, 5].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-surface2/50" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-4 w-24 animate-pulse rounded bg-surface2/50" />
+                <div className="h-1.5 w-full animate-pulse rounded-full bg-surface2/50" />
               </div>
-              {/* Bottom line: Progress bar + percent */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-1.5 bg-surface2/50 rounded-full animate-pulse" />
-                <div className="h-3 w-12 bg-surface2/50 rounded animate-pulse shrink-0" />
-              </div>
+              <div className="h-4 w-20 animate-pulse rounded bg-surface2/50" />
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </StatsPanel>
     );
   }
 
   if (data.length === 0) {
-    return <EmptyState title={t("noStats")} description={t("noStatsDesc")} />;
+    return (
+      <StatsPanel title={t("expenseRanking")}>
+        <EmptyState title={t("noStats")} description={t("noStatsDesc")} />
+      </StatsPanel>
+    );
   }
 
-  return (
-    <div className="space-y-5 px-2">
-      <h3 className={textRoleClassName("sectionTitle", "flex items-center gap-2")}>
-        {t("expenseRanking")}
-      </h3>
+  const visible = expanded ? data : data.slice(0, COLLAPSED_LENGTH);
+  const hidden = data.length - visible.length;
 
-      <div className="space-y-5">
-        {data.map((cat) => {
-          const percent = cat.percent;
-          const displayName = cat.id === null ? t("uncategorized") : cat.name;
-          const handleClick = () => {
-            if (onCategoryClick) {
-              // Use "__uncategorized__" for null ids to match DetailsTab convention
-              onCategoryClick(cat.id ?? "__uncategorized__");
-            }
-          };
+  return (
+    <StatsPanel title={t("expenseRanking")}>
+      <div className="space-y-4">
+        {visible.map((category) => {
+          const displayName = category.id === null ? t("uncategorized") : category.name;
+          // A refunded category has no share of what was spent. It keeps its
+          // amount and its place in the order; only the bar has nothing to say.
+          const hasShare = compare(category.totalConverted, "0") > 0;
+          const amount = formatCurrencyAmount(category.totalConverted, currencySymbol, locale);
+          const share = `${category.percent.toFixed(0)}%`;
+
           return (
             <button
               type="button"
-              key={cat.id ?? "__uncategorized__"}
+              key={category.id ?? "__uncategorized__"}
               disabled={onCategoryClick == null}
-              aria-label={`${displayName}, ${formatCurrencyAmount(cat.totalConverted, currencySymbol, locale)}, ${showPercent ? `${percent.toFixed(0)}%` : ""}`}
+              aria-label={`${displayName}, ${amount}, ${hasShare ? share : t("noShare")}`}
               className={cn(
-                "group flex w-full items-center gap-3 text-left",
-                onCategoryClick &&
-                  "cursor-pointer hover:bg-surface2/50 rounded-lg -mx-2 px-2 py-1 transition-colors"
+                "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 text-left",
+                onCategoryClick != null &&
+                  "-mx-2 cursor-pointer rounded-lg px-2 py-1 transition-colors hover:bg-surface2/50"
               )}
-              onClick={handleClick}
+              onClick={() => onCategoryClick?.(category.id ?? "__uncategorized__")}
             >
-              {/* Icon Circle */}
-              <div className="w-10 h-10 rounded-full bg-surface2 flex items-center justify-center text-lg shrink-0 group-hover:bg-primary/10 transition-colors">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface2 transition-colors group-hover:bg-primary/10">
                 <CategoryIcon
-                  iconName={cat.icon}
-                  className="w-5 h-5 text-text/80 group-hover:text-primary transition-colors"
+                  iconName={category.icon}
+                  className="h-5 w-5 text-text/80 transition-colors group-hover:text-primary"
                 />
-              </div>
+              </span>
 
-              {/* Content */}
-              <div className="flex-1 space-y-1.5">
-                {/* Top Line: Name + Amount */}
-                <div className="flex justify-between items-center text-sm">
-                  <div className="font-medium text-text">{displayName}</div>
-                  <AmountText variant="item">
-                    {formatCurrencyAmount(cat.totalConverted, currencySymbol, locale)}
-                  </AmountText>
-                </div>
+              <span className="min-w-0 space-y-1.5">
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className={textRoleClassName("bodyStrong", "truncate")}>{displayName}</span>
+                  <span className={textRoleClassName("meta", "shrink-0 tabular-nums")}>
+                    {tCalendar("count", { count: category.count })}
+                  </span>
+                </span>
+                <span className="block h-1.5 overflow-hidden rounded-full bg-surface2">
+                  <span
+                    className="block h-full origin-left rounded-full bg-primary transition-transform duration-[var(--motion-expand)] ease-[var(--motion-enter)]"
+                    style={{
+                      transform: `scaleX(${hasShare ? Math.max(0, Math.min(100, category.percent)) / 100 : 0})`,
+                    }}
+                  />
+                </span>
+              </span>
 
-                {/* Bottom Line: Progress + Detail */}
-                <div className="flex items-center gap-3">
-                  {/* Progress Bar */}
-                  <div
-                    hidden={!showPercent}
-                    className="flex-1 h-1.5 bg-surface2 rounded-full overflow-hidden"
-                  >
-                    <div
-                      className="h-full origin-left rounded-full bg-primary transition-transform duration-[var(--motion-expand)] ease-[var(--motion-enter)]"
-                      style={{ transform: `scaleX(${Math.max(0, Math.min(100, percent)) / 100})` }}
-                    />
-                  </div>
-
-                  {/* Stats Detail */}
-                  <div className="text-xs text-muted-foreground flex items-center gap-2 shrink-0">
-                    {showPercent && <span className="tabular-nums">{percent.toFixed(0)}%</span>}
-                    {/* Show trend if significant */}
-                    {cat.trend && Math.abs(cat.trend.percent) > 10 && (
-                      <span
-                        className={cn(
-                          "flex items-center gap-0.5",
-                          new Decimal(cat.trend.amount).gt(0) ? "text-destructive" : "text-primary"
-                        )}
-                      >
-                        {new Decimal(cat.trend.amount).gt(0) ? (
-                          <TrendingUp className="h-3 w-3" aria-hidden />
-                        ) : (
-                          <TrendingDown className="h-3 w-3" aria-hidden />
-                        )}
-                        <span className="sr-only">
-                          {new Decimal(cat.trend.amount).gt(0) ? t("increase") : t("decrease")}
-                        </span>
-                        <AmountText variant="secondary">
-                          {formatCurrencyAmount(
-                            new Decimal(cat.trend.amount).abs().toFixed(),
-                            currencySymbol,
-                            locale,
-                            {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            }
-                          )}
-                        </AmountText>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <span className="shrink-0 text-right">
+                <AmountText variant="item" className="block">
+                  {amount}
+                </AmountText>
+                <span className={textRoleClassName("meta", "block tabular-nums")}>
+                  {hasShare ? share : "—"}
+                </span>
+              </span>
             </button>
           );
         })}
       </div>
-    </div>
+
+      {data.length > COLLAPSED_LENGTH ? (
+        <Button variant="ghost" className="w-full" onClick={() => setExpanded(!expanded)}>
+          {expanded ? t("showFewerCategories") : t("showAllCategories", { count: hidden })}
+        </Button>
+      ) : null}
+    </StatsPanel>
   );
 }

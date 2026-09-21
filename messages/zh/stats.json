@@ -81,6 +81,26 @@
     "loadFailed": "统计数据加载失败，请重试。",
     "retry": "重试",
     "previousPeriod": "上一周期",
-    "nextPeriod": "下一周期"
+    "nextPeriod": "下一周期",
+    "entries": "笔数",
+    "averageEntry": "单笔均值",
+    "recordedDays": "记账天数",
+    "recordedDaysValue": "{active} / {total}",
+    "sparklineLabel": "本期日支出",
+    "sparklinePrevious": "上期同期",
+    "sparklineExpand": "查看完整趋势",
+    "dailyAverageLine": "日均",
+    "weekdayRhythm": "星期节律",
+    "weekdayAverage": "周{weekday}平均 {amount}",
+    "weekdayPeak": "一周里最高",
+    "highlights": "本期看点",
+    "busiestDay": "最大单日",
+    "recordingStreak": "连续记账",
+    "streakDays": "{days} 天",
+    "topMoverUp": "{category} 比{period}多花了 {amount}",
+    "topMoverDown": "{category} 比{period}少花了 {amount}",
+    "showAllCategories": "显示全部（{count}）",
+    "showFewerCategories": "收起",
+    "noShare": "无占比"
   }
 }

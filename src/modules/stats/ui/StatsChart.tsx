@@ -11,6 +11,9 @@ import { buildChartPoints } from "@/modules/stats/lib/chart-points";
 
 interface StatsChartProps {
   data: { date: string; total: string }[];
+  /** The comparison window's daily totals, read off against `data` by position. */
+  previousData?: { date: string; total: string }[];
+  dailyAverage?: string;
   rangeType: DateRangeType;
   startDate: Date;
   endDate: Date;
@@ -20,6 +23,8 @@ interface StatsChartProps {
 
 export function StatsChart({
   data = [],
+  previousData = [],
+  dailyAverage = "0",
   rangeType,
   startDate,
   endDate,
@@ -42,6 +47,19 @@ export function StatsChart({
       locale,
     });
   }, [data, endDate, isLoading, locale, rangeType, startDate]);
+  // The comparison window covers different dates, so it is lined up against
+  // this one by position — its first day under this period's first day — and
+  // cut where this period ends rather than stretched across it.
+  const previousValues = useMemo(() => {
+    if (isLoading || previousData.length === 0) return [];
+    return buildChartPoints({
+      data: previousData,
+      rangeType,
+      startDate: previousData[0]!.date,
+      endDate: previousData[previousData.length - 1]!.date,
+      locale,
+    }).map((point) => point.value);
+  }, [isLoading, locale, previousData, rangeType]);
   const [hoveredPoint, setHoveredPoint] = useState<{
     index: number;
     dataset: typeof chartPoints;
@@ -51,7 +69,7 @@ export function StatsChart({
   const { yAxisMax, hasOutliers } = useMemo(() => {
     if (chartPoints.length === 0) return { yAxisMax: 1, hasOutliers: false };
 
-    const values = chartPoints.map((p) => p.value);
+    const values = [...chartPoints.map((p) => p.value), ...previousValues];
     const maxVal = Math.max(...values, 1);
 
     // 数据点少于10个时，使用最大值（避免过度压缩）
@@ -72,7 +90,7 @@ export function StatsChart({
     // 确保封顶线至少是最大值的20%（避免过度拉伸）
     const yAxisMax = Math.max(p95Value, maxVal * 0.2);
     return { yAxisMax, hasOutliers: true };
-  }, [chartPoints]);
+  }, [chartPoints, previousValues]);
 
   if (isLoading) {
     return (
@@ -101,6 +119,12 @@ export function StatsChart({
     formatCompactCurrencyAmount(value, currencySymbol, locale);
   const yAxisMin = Math.min(0, ...chartPoints.map((point) => point.value));
   const yAxisRange = yAxisMax - yAxisMin;
+  const averageValue = Number(dailyAverage);
+  const averageOffset =
+    Number.isFinite(averageValue) && averageValue > yAxisMin && averageValue < yAxisMax
+      ? paddingTop +
+        (1 - (averageValue - yAxisMin) / yAxisRange) * (100 - paddingTop - paddingBottom)
+      : null;
   const yAxisTicks = [
     yAxisMax,
     yAxisMin + (yAxisRange * 2) / 3,
@@ -110,12 +134,33 @@ export function StatsChart({
 
   return (
     <div className="w-full h-52 relative pt-6 pb-6 select-none">
+      {/* Legend for the comparison line, which is otherwise an unexplained dash. */}
+      {previousValues.length > 1 ? (
+        <div className="absolute left-12 top-0 flex items-center gap-1.5 text-micro text-muted-foreground">
+          <span aria-hidden="true" className="h-px w-4 border-t border-dashed border-current" />
+          {tTab("sparklinePrevious")}
+        </div>
+      ) : null}
       {/* Outlier indicator */}
       {hasOutliers && (
         <div className="absolute top-0 right-2 text-micro text-muted-foreground bg-surface2/50 px-2 py-0.5 rounded-full">
           {t("scaleAdjusted")}
         </div>
       )}
+      {/* The period's own daily average, so a point reads as above or below par. */}
+      {averageOffset != null ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-12 right-2"
+          style={{ top: `calc(1.5rem + ${chartHeight}px * ${averageOffset / 100})` }}
+        >
+          <div className="border-t border-dashed border-primary/50" />
+          <span className="absolute right-0 -top-4 rounded bg-surface px-1 text-micro text-primary">
+            {tTab("dailyAverageLine")}
+          </span>
+        </div>
+      ) : null}
+
       {/* Grid Lines */}
       <div className="pointer-events-none absolute bottom-8 left-12 right-2 top-6 flex flex-col justify-between">
         {yAxisTicks.map((tick) => (
@@ -137,6 +182,31 @@ export function StatsChart({
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
         >
+          {/* Last period, for scale: the same days one period back. */}
+          {previousValues.length > 1 && (
+            <polyline
+              points={previousValues
+                .map((value, index) => {
+                  const xPercent =
+                    previousValues.length === 1 ? 50 : (index / (previousValues.length - 1)) * 100;
+                  const displayValue = Math.min(value, yAxisMax);
+                  const yPercent =
+                    paddingTop +
+                    (1 - (displayValue - yAxisMin) / yAxisRange) *
+                      (100 - paddingTop - paddingBottom);
+                  return `${xPercent},${yPercent}`;
+                })
+                .join(" ")}
+              fill="none"
+              stroke="var(--chart-5)"
+              strokeWidth="1.5"
+              strokeDasharray="4 4"
+              opacity="0.55"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+
           {/* Line Path */}
           {chartPoints.length > 1 && (
             <polyline

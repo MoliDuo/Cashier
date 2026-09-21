@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { StatsContentView } from "@/modules/stats/ui/StatsContentView";
-import type { EnhancedStatsDto } from "@/modules/stats/contracts";
+import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
 
 const baseProps = {
   rangeType: "month" as const,
@@ -21,29 +21,7 @@ const baseProps = {
   fallbackCurrency: "CNY",
 };
 
-const statsFixture: EnhancedStatsDto = {
-  unconvertedCount: 0,
-  summary: {
-    total: "120",
-    currency: "CNY",
-    trend: { percent: 100, amount: "60" },
-    dailyAverage: "20",
-    comparison: {
-      mode: "same_period",
-      from: "2026-07-01",
-      to: "2026-07-06",
-      previousTotal: "60",
-      amountDelta: "60",
-      percent: 100,
-    },
-  },
-  categories: [],
-  chart: [],
-  heatmap: {
-    days: [],
-    stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
-  },
-};
+const statsFixture = buildEnhancedStatsFixture();
 
 describe("StatsContentView", () => {
   it("shows an error panel instead of zero totals when the query failed without data", () => {
@@ -108,5 +86,31 @@ describe("StatsContentView", () => {
 
     expect(screen.getByText(/去年/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "周" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the ranking beside the chosen view rather than behind it", () => {
+    // The ranking used to sit below a full-width heatmap, off the bottom of a
+    // desktop screen. Both panels are now on the page at once.
+    render(<StatsContentView {...baseProps} stats={statsFixture} />);
+
+    expect(screen.getByRole("heading", { name: "每日热力图" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "支出排行" })).toBeVisible();
+  });
+
+  it("holds the weekday breakdown back for a week, which has one of each day", () => {
+    const stats = buildEnhancedStatsFixture({
+      chart: [{ date: "2026-08-03", total: "120" }],
+      heatmap: {
+        days: [{ date: "2026-08-03", totalAmount: "120", entryCount: 1, currencies: ["CNY"] }],
+        stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
+      },
+    });
+    const { rerender } = render(
+      <StatsContentView {...baseProps} contentRangeType="week" stats={stats} />
+    );
+    expect(screen.queryByRole("heading", { name: "星期节律" })).not.toBeInTheDocument();
+
+    rerender(<StatsContentView {...baseProps} contentRangeType="month" stats={stats} />);
+    expect(screen.getByRole("heading", { name: "星期节律" })).toBeVisible();
   });
 });

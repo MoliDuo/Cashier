@@ -1,10 +1,12 @@
 /**
  * Large Grid Heatmap (<= 35 days)
- * 7-column grid with 40px cells showing date and amount
+ * A month at a glance: one week per row, Monday first.
  */
 
 "use client";
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { parseDateString } from "@/lib/date-utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,6 +34,10 @@ export function LargeGridHeatmap({
   currency,
   locale,
 }: LargeGridHeatmapProps) {
+  const t = useTranslations("Calendar");
+  // The key is spelled out rather than built, so the catalogue check can see it.
+  const weekdayNames = t.raw("weekDaysMon") as string[];
+
   // Create a map for quick lookup
   const dayMap = useMemo(() => {
     const map = new Map<string, CalendarDayData>();
@@ -58,10 +64,24 @@ export function LargeGridHeatmap({
   }, [days, queryRange]);
 
   return (
-    <div className={cn("w-full flex justify-center", className)}>
-      {/* 7-column grid for days of week layout */}
+    <div className={cn("flex w-full justify-center", className)}>
       <TooltipProvider>
-        <div className="grid min-w-0 w-full grid-cols-7 gap-1.5 sm:gap-2 lg:max-w-[800px] lg:gap-3 xl:max-w-[900px] xl:gap-4">
+        {/*
+         * The grid is capped rather than stretched. Seven columns across a
+         * desktop container gave cells the size of a playing card with a 12px
+         * figure floating in the middle, and pushed the ranking off the screen
+         * entirely. A calendar reads as a calendar at about sixty pixels.
+         */}
+        <div className="grid w-full min-w-0 max-w-[27rem] grid-cols-7 gap-1.5 sm:gap-2">
+          {weekdayNames.map((name) => (
+            <span
+              key={name}
+              aria-hidden="true"
+              className={textRoleClassName("micro", "pb-0.5 text-center")}
+            >
+              {name}
+            </span>
+          ))}
           {Array.from({ length: leadingEmptyCells }, (_, index) => (
             <div
               key={`offset-${index}`}

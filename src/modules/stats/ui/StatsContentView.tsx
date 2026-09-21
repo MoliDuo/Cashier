@@ -1,15 +1,20 @@
 "use client";
 
+import { useMemo } from "react";
 import { BarChart3, Grid3X3 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { textRoleClassName } from "@/components/typography";
 import type { DateRangeType } from "@/lib/date-utils";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
+import { deriveStatsInsights } from "@/modules/stats/lib/derived-insights";
 import { CalendarHeatmapSection } from "./CalendarHeatmapSection";
 import { StatsChart } from "./StatsChart";
-import { StatsHeader } from "./StatsHeader";
+import { StatsHighlights } from "./StatsHighlights";
+import { StatsPanel } from "./StatsPanel";
+import { StatsPeriodBar } from "./StatsPeriodBar";
 import { StatsRanking } from "./StatsRanking";
+import { StatsSummary } from "./StatsSummary";
+import { StatsWeekdayRhythm } from "./StatsWeekdayRhythm";
 
 interface StatsContentViewProps {
   rangeType: DateRangeType;
@@ -66,10 +71,16 @@ export function StatsContentView({
       : contentRangeType === "month"
         ? t("lastMonth")
         : t("lastYear");
-  const statsTrend = stats?.summary.trend;
-  const trend =
-    statsTrend == null ? undefined : { percent: statsTrend.percent, amount: statsTrend.amount };
-  const comparison = stats?.summary.comparison;
+
+  // Derived once here rather than in each panel: they are all reading the same
+  // payload, and three copies of the walk would be three chances to disagree.
+  const insights = useMemo(
+    () =>
+      stats == null
+        ? null
+        : deriveStatsInsights(stats, { startDate: startDateStr, endDate: endDateStr }),
+    [endDateStr, startDateStr, stats]
+  );
 
   if (isError && stats == null) {
     return (
@@ -89,6 +100,33 @@ export function StatsContentView({
     );
   }
 
+  const viewSwitch = (
+    <div className="flex items-center gap-1">
+      <Button
+        variant={chartView === "heatmap" ? "default" : "ghost"}
+        size="sm"
+        onClick={() => onChartViewChange("heatmap")}
+        disabled={readOnly}
+        aria-pressed={chartView === "heatmap"}
+        className="h-7 px-2"
+      >
+        <Grid3X3 aria-hidden="true" className="mr-1 h-4 w-4" />
+        {t("heatmap")}
+      </Button>
+      <Button
+        variant={chartView === "trend" ? "default" : "ghost"}
+        size="sm"
+        onClick={() => onChartViewChange("trend")}
+        disabled={readOnly}
+        aria-pressed={chartView === "trend"}
+        className="h-7 px-2"
+      >
+        <BarChart3 aria-hidden="true" className="mr-1 h-4 w-4" />
+        {t("trend")}
+      </Button>
+    </div>
+  );
+
   return (
     <div className="relative space-y-6 pb-24" aria-busy={isLoading}>
       {isError ? (
@@ -104,21 +142,41 @@ export function StatsContentView({
           ) : null}
         </div>
       ) : null}
-      <StatsHeader
+
+      <StatsPeriodBar
         rangeType={rangeType}
         setRangeType={onRangeTypeChange}
         periodOffset={periodOffset}
         setPeriodOffset={onPeriodOffsetChange}
         label={label}
-        totalExpense={stats?.summary.total ?? "0"}
-        averageDaily={stats?.summary.dailyAverage ?? "0"}
+        readOnly={readOnly}
+      />
+
+      <StatsSummary
+        total={stats?.summary.total ?? "0"}
+        dailyAverage={stats?.summary.dailyAverage ?? "0"}
         currencySymbol={currencySymbol}
+        comparison={stats?.summary.comparison}
         periodLabel={periodLabel}
-        {...(comparison !== undefined ? { comparison } : {})}
-        {...(trend !== undefined ? { trend } : {})}
+        insights={
+          insights ?? {
+            entryCount: 0,
+            averageEntry: null,
+            activeDays: 0,
+            periodDays: 0,
+            busiestDay: null,
+            longestStreak: 0,
+            weekdayAverages: [],
+            topMover: null,
+          }
+        }
+        chart={stats?.chart ?? []}
+        previousChart={stats?.previousChart ?? []}
+        onExpandTrend={chartView === "trend" ? undefined : () => onChartViewChange("trend")}
         readOnly={readOnly}
         isLoading={isLoading && stats == null}
       />
+
       {stats?.unconvertedCount != null && stats.unconvertedCount > 0 ? (
         <div
           role="status"
@@ -128,75 +186,79 @@ export function StatsContentView({
         </div>
       ) : null}
 
-      <div className="min-w-0 space-y-2 px-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className={textRoleClassName("bodyMuted", "font-semibold")}>
-            {chartView === "trend" ? t("expenseTrend") : t("dailyHeatmap")}
-          </h3>
-          <div className="flex items-center gap-1">
-            <Button
-              variant={chartView === "heatmap" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => onChartViewChange("heatmap")}
-              disabled={readOnly}
-              aria-pressed={chartView === "heatmap"}
-              className="h-7 px-2"
-            >
-              <Grid3X3 aria-hidden="true" className="mr-1 h-4 w-4" />
-              {t("heatmap")}
-            </Button>
-            <Button
-              variant={chartView === "trend" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => onChartViewChange("trend")}
-              disabled={readOnly}
-              aria-pressed={chartView === "trend"}
-              className="h-7 px-2"
-            >
-              <BarChart3 aria-hidden="true" className="mr-1 h-4 w-4" />
-              {t("trend")}
-            </Button>
-          </div>
+      {/*
+       * Two columns from lg. Below that the heatmap column would be narrower
+       * than the phone layout it is already tuned for, which is the worst of
+       * both; above it there is room for the ranking to sit beside the calendar
+       * instead of below the fold.
+       */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+        <div className="min-w-0 lg:col-span-7">
+          <StatsPanel
+            title={chartView === "trend" ? t("expenseTrend") : t("dailyHeatmap")}
+            actions={viewSwitch}
+          >
+            {stats == null ? (
+              <div
+                className="h-64 animate-pulse rounded-lg border border-border bg-surface2/60"
+                data-testid="stats-visualization-skeleton"
+                role="status"
+                aria-busy="true"
+              />
+            ) : chartView === "trend" ? (
+              <StatsChart
+                data={stats.chart}
+                previousData={stats.previousChart}
+                dailyAverage={stats.summary.dailyAverage}
+                rangeType={contentRangeType}
+                startDate={startDate}
+                endDate={endDate}
+                isLoading={isLoading && stats == null}
+                currencySymbol={currencySymbol}
+              />
+            ) : (
+              <CalendarHeatmapSection
+                days={stats.heatmap.days}
+                stats={stats.heatmap.stats}
+                {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
+                currency={currencySymbol}
+                locale={locale}
+                queryRange={{ startDate: startDateStr, endDate: endDateStr }}
+              />
+            )}
+          </StatsPanel>
         </div>
-        {stats == null ? (
-          <div
-            className="h-64 animate-pulse rounded-lg border border-border bg-surface2/60"
-            data-testid="stats-visualization-skeleton"
-            role="status"
-            aria-busy="true"
-          />
-        ) : chartView === "trend" ? (
-          <StatsChart
-            data={stats.chart}
-            rangeType={contentRangeType}
-            startDate={startDate}
-            endDate={endDate}
+
+        <div className="min-w-0 space-y-6 lg:col-span-5">
+          <StatsRanking
+            data={stats?.categories ?? []}
             isLoading={isLoading && stats == null}
             currencySymbol={currencySymbol}
+            {...(onCategoryDrilldown !== undefined
+              ? {
+                  onCategoryClick: (categoryId: string) =>
+                    onCategoryDrilldown(categoryId, startDateStr, endDateStr),
+                }
+              : {})}
           />
-        ) : (
-          <CalendarHeatmapSection
-            days={stats.heatmap.days}
-            stats={stats.heatmap.stats}
-            {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
-            currency={currencySymbol}
-            locale={locale}
-            queryRange={{ startDate: startDateStr, endDate: endDateStr }}
-          />
-        )}
-      </div>
 
-      <StatsRanking
-        data={stats?.categories ?? []}
-        isLoading={isLoading && stats == null}
-        currencySymbol={currencySymbol}
-        {...(onCategoryDrilldown !== undefined
-          ? {
-              onCategoryClick: (categoryId: string) =>
-                onCategoryDrilldown(categoryId, startDateStr, endDateStr),
-            }
-          : {})}
-      />
+          {insights != null ? (
+            <StatsHighlights
+              insights={insights}
+              currencySymbol={currencySymbol}
+              periodLabel={periodLabel}
+              {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
+            />
+          ) : null}
+
+          {insights != null && contentRangeType !== "week" ? (
+            <StatsWeekdayRhythm
+              weekdayAverages={insights.weekdayAverages}
+              currencySymbol={currencySymbol}
+            />
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
