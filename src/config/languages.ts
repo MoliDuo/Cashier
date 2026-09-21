@@ -4,37 +4,12 @@ export const UI_LANGUAGES = [
   { label: "English", value: "en" },
 ];
 
+// Two people write this ledger, in Simplified Chinese. English is here because
+// a source document often is, and because a fork's first user is more likely to
+// want it than any third choice we could guess at.
 export const AI_LANGUAGES = [
   { label: "简体中文", value: "zh-CN" },
-  { label: "繁体中文 (香港)", value: "zh-HK" },
-  { label: "繁体中文 (台湾)", value: "zh-TW" },
-  { label: "English (US)", value: "en-US" },
-  { label: "English (UK)", value: "en-GB" },
-  { label: "日本語", value: "ja-JP" },
-  { label: "한국어", value: "ko-KR" },
-  { label: "Français", value: "fr-FR" },
-  { label: "Deutsch", value: "de-DE" },
-  { label: "Español", value: "es-ES" },
-  { label: "Italiano", value: "it-IT" },
-  { label: "Русский", value: "ru-RU" },
-  { label: "Português", value: "pt-BR" },
-  { label: "Tiếng Việt", value: "vi-VN" },
-  { label: "ไทย", value: "th-TH" },
-  { label: "Bahasa Indonesia", value: "id-ID" },
-  { label: "Bahasa Melayu", value: "ms-MY" },
-  { label: "Türkçe", value: "tr-TR" },
-  { label: "العربية", value: "ar-SA" },
-  { label: "हिन्दी", value: "hi-IN" },
-  { label: "Nederlands", value: "nl-NL" },
-  { label: "Polski", value: "pl-PL" },
-  { label: "Svenska", value: "sv-SE" },
-  { label: "Dansk", value: "da-DK" },
-  { label: "Norsk", value: "no-NO" },
-  { label: "Suomi", value: "fi-FI" },
-  { label: "Ελληνικά", value: "el-GR" },
-  { label: "Magyar", value: "hu-HU" },
-  { label: "Čeština", value: "cs-CZ" },
-  { label: "Română", value: "ro-RO" },
+  { label: "English", value: "en-US" },
 ] as const;
 
 export type AiLanguage = (typeof AI_LANGUAGES)[number]["value"];

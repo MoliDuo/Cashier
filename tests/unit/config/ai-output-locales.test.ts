@@ -19,16 +19,19 @@ describe("AI output locales", () => {
     }
   });
 
-  it("describes Japanese as a native-user bookkeeping locale", () => {
-    const instruction = buildAiOutputLocaleInstruction("ja-JP");
+  it("describes the selected language as a native-user bookkeeping locale", () => {
+    const instruction = buildAiOutputLocaleInstruction("zh-CN");
 
-    expect(instruction).toContain("日本語 (ja-JP)");
+    expect(instruction).toContain("简体中文 (zh-CN)");
     expect(instruction).toContain("native user");
     expect(instruction).toContain("title, ledger_entries[].item_name");
     expect(instruction).toContain("higher priority than Additional Instructions");
   });
 
   it("uses English deterministic copy for an unrecognized locale", () => {
+    // A ledger saved when the picker offered thirty languages keeps its value
+    // in the database; it must degrade, not throw.
+    expect(getAiOutputCopy("ja-JP").untitledDocument).toBe("Untitled document");
     expect(getAiOutputCopy("xx-TEST").untitledDocument).toBe("Untitled document");
   });
 });
