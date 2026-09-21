@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 
 const {
@@ -138,13 +139,13 @@ describe("source document batch server actions", () => {
   });
 
   it("refuses an empty batch and a duplicated target", async () => {
-    await expect(batchDeleteSourceDocumentsAction(ledgerId, [])).rejects.toThrow();
+    await expect(batchDeleteSourceDocumentsAction(ledgerId, [])).rejects.toThrow(ZodError);
     await expect(
       batchDeleteSourceDocumentsAction(ledgerId, [
         { sourceDocumentId, expectedVersion: 1 },
         { sourceDocumentId, expectedVersion: 2 },
       ])
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(deleteDocumentsMock).not.toHaveBeenCalled();
   });
 });

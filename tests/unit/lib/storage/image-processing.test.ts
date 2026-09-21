@@ -114,7 +114,7 @@ describe("image-processing", () => {
     it("should throw on invalid buffer instead of returning original bytes", async () => {
       const invalidBuffer = Buffer.from("not an image");
 
-      await expect(processImage(invalidBuffer, "image/jpeg")).rejects.toThrow();
+      await expect(processImage(invalidBuffer, "image/jpeg")).rejects.toThrow(Error);
     });
 
     it("should return processed output even if larger than original", async () => {
@@ -167,7 +167,7 @@ describe("image-processing", () => {
     it("rejects malformed bytes and declared MIME mismatches", async () => {
       await expect(
         validateStoredImageBytes(Buffer.from("not-an-image"), "image/jpeg")
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       const { buffer } = await createTestImage(20, 20, "png");
       await expect(validateStoredImageBytes(buffer, "image/jpeg")).rejects.toThrow(
         "does not match"

@@ -19,11 +19,19 @@ const coverageConfig = {
   clean: false,
   all: true,
   include: ["src/**/*.ts", "src/**/*.tsx"],
+  /**
+   * Module UI used to be excluded, although 59 test files cover it: the
+   * thresholds neither credited those tests nor noticed an untested component.
+   * Including it moved every figure up rather than down, so the exclusion was
+   * only hiding work that was already being done. The numbers below sit a few
+   * points under the measured ones, which is room for ordinary movement and
+   * not room for a feature to arrive untested.
+   */
   thresholds: {
-    lines: 70,
-    statements: 68,
-    functions: 65,
-    branches: 60,
+    lines: 76,
+    statements: 74,
+    functions: 73,
+    branches: 66,
   },
   exclude: [
     "node_modules",
@@ -37,7 +45,6 @@ const coverageConfig = {
     "src/app/**/error.tsx",
     "src/app/**/not-found.tsx",
     "src/app/manifest.ts",
-    "src/modules/**/ui/**/*.tsx",
   ],
 };
 

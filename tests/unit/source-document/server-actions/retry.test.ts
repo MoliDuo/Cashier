@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 const { retrySourceDocumentMock } = vi.hoisted(() => ({
   retrySourceDocumentMock: vi.fn(),
@@ -76,7 +77,9 @@ describe("retrySourceDocumentAction", () => {
   });
 
   it("validates the source document id and expected version", async () => {
-    await expect(retrySourceDocumentAction("ledger-1", "not-a-uuid", 3)).rejects.toThrow();
-    await expect(retrySourceDocumentAction("ledger-1", sourceDocumentId, 0)).rejects.toThrow();
+    await expect(retrySourceDocumentAction("ledger-1", "not-a-uuid", 3)).rejects.toThrow(ZodError);
+    await expect(retrySourceDocumentAction("ledger-1", sourceDocumentId, 0)).rejects.toThrow(
+      ZodError
+    );
   });
 });

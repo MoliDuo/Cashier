@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NotFoundError } from "@/lib/errors";
 import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { getTestDb } from "tests/setup";
@@ -46,6 +47,6 @@ describe("source-document delete tolerance", () => {
     });
     await expect(
       deleteSourceDocumentAction(ledgerId, document!.id, document!.version)
-    ).rejects.toThrow();
+    ).rejects.toThrow(NotFoundError);
   });
 });

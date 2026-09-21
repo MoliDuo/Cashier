@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { StaleSourceDocumentVersionError } from "@/lib/errors";
 
 const { cancelProcessingMock } = vi.hoisted(() => ({
@@ -70,12 +71,12 @@ describe("cancelSourceDocumentProcessingAction", () => {
   });
 
   it("validates the source document id and expected version", async () => {
-    await expect(
-      cancelSourceDocumentProcessingAction("ledger-1", "not-a-uuid", 3)
-    ).rejects.toThrow();
+    await expect(cancelSourceDocumentProcessingAction("ledger-1", "not-a-uuid", 3)).rejects.toThrow(
+      ZodError
+    );
     await expect(
       cancelSourceDocumentProcessingAction("ledger-1", sourceDocumentId, 0)
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(cancelProcessingMock).not.toHaveBeenCalled();
   });
 });

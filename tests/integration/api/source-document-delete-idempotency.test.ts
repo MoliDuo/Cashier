@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
+import { NotFoundError } from "@/lib/errors";
 import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { ledgers, sourceDocuments } from "@/persistence";
@@ -52,7 +53,9 @@ describe("SourceDocument delete CAS", () => {
   it("does not durably replay a lost delete response", async () => {
     const document = await createDocument();
     await deleteSourceDocumentAction(ledgerId, document.id, 1);
-    await expect(deleteSourceDocumentAction(ledgerId, document.id, 1)).rejects.toThrow();
+    await expect(deleteSourceDocumentAction(ledgerId, document.id, 1)).rejects.toThrow(
+      NotFoundError
+    );
     const deleted = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });

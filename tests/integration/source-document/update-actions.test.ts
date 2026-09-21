@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { ZodError } from "zod";
 import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import { getTestDb } from "../../setup";
 import { currencyRates, ledgerEntries, sourceDocuments, ledgers } from "@/persistence";
@@ -220,7 +221,7 @@ describe("Source Document Update Actions", () => {
           targets: [],
           data: { title: "Ignored" },
         })
-      ).rejects.toThrow();
+      ).rejects.toThrow(ZodError);
     });
 
     it("treats an already-matching title as a no-op: zero writes, version unchanged", async () => {

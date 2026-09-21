@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NotFoundError } from "@/lib/errors";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import {
@@ -99,7 +100,9 @@ describe("single live ledger access", () => {
       contentType: "image/jpeg",
       body: new Uint8Array([1]),
     };
-    await expect(adapter.uploadTargetForUser({ ...upload, userId: deleted })).rejects.toThrow();
+    await expect(adapter.uploadTargetForUser({ ...upload, userId: deleted })).rejects.toThrow(
+      NotFoundError
+    );
     expect((await adapter.uploadTargetForUser({ ...upload, userId })).ownerLedgerId).toBe(ledgerId);
   });
 

@@ -1,5 +1,6 @@
 import { asc, eq, isNull, and } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
 import { editRetrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
@@ -127,7 +128,7 @@ describe("source-document retry action", () => {
         } as never,
         before!.version
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 
   it("retry succeeds despite a previous failed revision, preserving the original active revision", async () => {

@@ -31,9 +31,9 @@ describe("image encoding retry parameters", () => {
   });
 
   it("does not re-encode an oversized PNG at an ignored quality", async () => {
-    await expect(
-      processImage(Buffer.from("test"), "image/png", { format: "png" })
-    ).rejects.toThrow();
+    await expect(processImage(Buffer.from("test"), "image/png", { format: "png" })).rejects.toThrow(
+      Error
+    );
     expect(png).toHaveBeenCalledTimes(1);
     expect(encode).toHaveBeenCalledTimes(1);
   });
@@ -41,7 +41,7 @@ describe("image encoding retry parameters", () => {
   it("stops lossy retries at the minimum quality without repeating it", async () => {
     await expect(
       processImage(Buffer.from("test"), "image/png", { format: "webp", quality: 85 })
-    ).rejects.toThrow();
+    ).rejects.toThrow(Error);
     expect(webp.mock.calls.map(([options]) => options.quality)).toEqual([85, 70, 60]);
     expect(encode).toHaveBeenCalledTimes(3);
   });

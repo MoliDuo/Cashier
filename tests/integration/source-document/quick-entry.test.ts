@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ZodError } from "zod";
 import { getTestDb } from "../../setup";
 import {
   currencyRates,
@@ -220,7 +221,7 @@ describe("createQuickEntryAction", () => {
         categoryId,
         amount: "-100",
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 
   it("should reject zero amount", async () => {
@@ -229,7 +230,7 @@ describe("createQuickEntryAction", () => {
         categoryId,
         amount: "0",
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 
   it("should create entry with null description", async () => {
