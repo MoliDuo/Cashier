@@ -21,7 +21,6 @@ export const postgresOtpTokenAdapter: OtpTokenPort = {
           attempts: 0,
           lockedUntil: null,
           lastAttemptAt: null,
-          verifiedAt: null,
           ipAddress: input.ipAddress ?? null,
           createdAt: new Date(),
         },
@@ -42,7 +41,6 @@ export const postgresOtpTokenAdapter: OtpTokenPort = {
           expiresAt: row.expires,
           attempts: row.attempts,
           lockedUntil: row.lockedUntil,
-          verifiedAt: row.verifiedAt,
         };
   },
   async recordFailure(input) {
@@ -60,41 +58,11 @@ export const postgresOtpTokenAdapter: OtpTokenPort = {
         and(
           eq(otpTokens.email, input.email),
           eq(otpTokens.tokenHash, input.tokenHash),
-          isNull(otpTokens.verifiedAt),
           sql`${otpTokens.attempts} < ${input.maxAttempts}`
         )
       )
       .returning({ attempts: otpTokens.attempts, lockedUntil: otpTokens.lockedUntil });
     return rows[0] ?? null;
-  },
-  async claim(input) {
-    const rows = await db
-      .update(otpTokens)
-      .set({ verifiedAt: input.now })
-      .where(
-        and(
-          eq(otpTokens.email, input.email),
-          eq(otpTokens.tokenHash, input.tokenHash),
-          isNull(otpTokens.verifiedAt),
-          sql`${otpTokens.expires} > ${input.now}`,
-          sql`${otpTokens.attempts} < ${input.maxAttempts}`,
-          or(isNull(otpTokens.lockedUntil), sql`${otpTokens.lockedUntil} <= ${input.now}`)
-        )
-      )
-      .returning({ id: otpTokens.id });
-    return rows.length === 1;
-  },
-  async release(input): Promise<void> {
-    await db
-      .update(otpTokens)
-      .set({ verifiedAt: null })
-      .where(
-        and(
-          eq(otpTokens.email, input.email),
-          eq(otpTokens.tokenHash, input.tokenHash),
-          sql`${otpTokens.verifiedAt} is not null`
-        )
-      );
   },
   async consume(input) {
     const rows = await db
@@ -103,7 +71,9 @@ export const postgresOtpTokenAdapter: OtpTokenPort = {
         and(
           eq(otpTokens.email, input.email),
           eq(otpTokens.tokenHash, input.tokenHash),
-          sql`${otpTokens.verifiedAt} is not null`
+          sql`${otpTokens.expires} > ${input.now}`,
+          sql`${otpTokens.attempts} < ${input.maxAttempts}`,
+          or(isNull(otpTokens.lockedUntil), sql`${otpTokens.lockedUntil} <= ${input.now}`)
         )
       )
       .returning({ id: otpTokens.id });

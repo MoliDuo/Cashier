@@ -77,23 +77,13 @@ describe("authenticateWithOTP", () => {
     });
     expect(principal).toMatchObject({ email: TEST_EMAIL });
 
+    // Verifying spends the token; nothing downstream can hand it back.
     const db = getTestDb();
-    const claimed = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, TEST_EMAIL),
-    });
-    expect(claimed?.verifiedAt).toBeInstanceOf(Date);
+    expect(
+      await db.query.otpTokens.findFirst({ where: eq(otpTokens.email, TEST_EMAIL) })
+    ).toBeUndefined();
 
-    // The token is consumed only after the cross-module completion step
-    // (default ledger setup) succeeds, so a failed setup can release it.
-    await completeInteractiveSignIn(principal, {
-      ledgers: serverComposition.ledgers,
-      otpTokens: serverComposition.otpTokens,
-    });
-
-    const token = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, TEST_EMAIL),
-    });
-    expect(token).toBeUndefined();
+    await completeInteractiveSignIn(principal, { ledgers: serverComposition.ledgers });
   });
 
   it("returns otp_invalid for an incorrect OTP", async () => {

@@ -5,9 +5,7 @@ import {
   discardOTPToken,
 } from "@/modules/auth/repositories/otp-repository";
 import {
-  consumeOTPClaim as consumeOTPClaimWithPort,
   findOTPRecord as findOTPRecordWithPort,
-  releaseOTPClaim as releaseOTPClaimWithPort,
   verifyOTPWithPolicy as verifyOTPWithPolicyWithPort,
 } from "@/modules/auth/services/otp-verification";
 import { generateOTP, verifyOTP } from "@/modules/auth/services/otp";
@@ -35,10 +33,6 @@ const verifyOTPWithPolicy = (
   otp: string,
   record: Parameters<typeof verifyOTPWithPolicyWithPort>[2]
 ) => verifyOTPWithPolicyWithPort(email, otp, record, otpPort);
-const consumeOTPClaim = (claim: Parameters<typeof consumeOTPClaimWithPort>[0]) =>
-  consumeOTPClaimWithPort(claim, otpPort);
-const releaseOTPClaim = (claim: Parameters<typeof releaseOTPClaimWithPort>[0]) =>
-  releaseOTPClaimWithPort(claim, otpPort);
 
 // Helper function for tests - combines data access and business logic
 async function verifyOTPToken(email: string, otp: string) {
@@ -209,17 +203,13 @@ describe("OTP Repository", () => {
       expect(result.reason).toBe("not_found");
     });
 
-    it("should claim OTP on success and consume only after downstream success", async () => {
+    it("spends the OTP the moment it verifies", async () => {
       const otp = generateOTP();
       await createOTPToken(testEmail, otp, "127.0.0.1");
 
       const result = await verifyOTPToken(testEmail, otp);
 
       expect(result.success).toBe(true);
-      const claimed = requireDefined((await db.select().from(otpTokens))[0], "Expected claim");
-      expect(claimed.verifiedAt).toBeInstanceOf(Date);
-
-      await consumeOTPClaim({ email: testEmail, tokenHash: claimed.tokenHash });
       expect(await db.select().from(otpTokens)).toHaveLength(0);
     });
 
@@ -233,18 +223,15 @@ describe("OTP Repository", () => {
       ]);
 
       expect(results.filter((result) => result.success)).toHaveLength(1);
-      expect(await db.select().from(otpTokens)).toHaveLength(1);
+      expect(await db.select().from(otpTokens)).toHaveLength(0);
     });
 
-    it("allows the same OTP to be claimed again after downstream failure releases it", async () => {
+    it("refuses an OTP that has already been spent", async () => {
       const otp = generateOTP();
       await createOTPToken(testEmail, otp, "127.0.0.1");
 
       expect((await verifyOTPToken(testEmail, otp)).success).toBe(true);
-      const claimed = requireDefined((await db.select().from(otpTokens))[0], "Expected claim");
-      await releaseOTPClaim({ email: testEmail, tokenHash: claimed.tokenHash });
-
-      expect((await verifyOTPToken(testEmail, otp)).success).toBe(true);
+      expect((await verifyOTPToken(testEmail, otp)).reason).toBe("not_found");
     });
 
     it("counts concurrent failed attempts without lost updates", async () => {

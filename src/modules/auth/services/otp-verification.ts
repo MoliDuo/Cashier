@@ -11,11 +11,6 @@ export interface VerificationResult {
   lockedUntil?: Date;
 }
 
-export interface ClaimedOTP {
-  email: string;
-  tokenHash: string;
-}
-
 export async function findOTPRecord(
   email: string,
   tokens: OtpTokenPort
@@ -57,21 +52,13 @@ export async function verifyOTPWithPolicy(
       attemptsRemaining: maxAttempts - failure.attempts,
     };
   }
-  const claimed = await tokens.claim({
+  const consumed = await tokens.consume({
     email: email.toLowerCase(),
     tokenHash: record.tokenHash,
     now: new Date(),
     maxAttempts: getMaxAttempts(),
   });
-  if (!claimed) return { success: false, reason: "not_found" };
-  logger.info("OTP verified and claimed successfully");
+  if (!consumed) return { success: false, reason: "not_found" };
+  logger.info("OTP verified and consumed successfully");
   return { success: true };
-}
-
-export async function releaseOTPClaim(claim: ClaimedOTP, tokens: OtpTokenPort): Promise<void> {
-  await tokens.release(claim);
-}
-
-export async function consumeOTPClaim(claim: ClaimedOTP, tokens: OtpTokenPort): Promise<boolean> {
-  return tokens.consume(claim);
 }

@@ -10,7 +10,6 @@ export interface AuthenticatedPrincipal {
    * interactive sign-in orchestrator consumes it only after cross-module
    * completion (shared ledger validation) succeeds, and releases it on failure.
    */
-  pendingOtpClaim?: { email: string; tokenHash: string };
 }
 
 export type InterfaceLanguage = "auto" | "zh" | "en";

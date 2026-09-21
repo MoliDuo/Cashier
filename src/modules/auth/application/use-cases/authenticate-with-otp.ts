@@ -3,11 +3,7 @@ import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { isValidOTPFormat } from "@/modules/auth/services/otp";
 import { checkVerifyRateLimit } from "@/modules/auth/services/otp-rate-limit";
-import {
-  findOTPRecord,
-  releaseOTPClaim,
-  verifyOTPWithPolicy,
-} from "@/modules/auth/services/otp-verification";
+import { findOTPRecord, verifyOTPWithPolicy } from "@/modules/auth/services/otp-verification";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { normalizeEmail } from "@/lib/utils/email";
@@ -144,33 +140,24 @@ export async function authenticateWithOTP(
     }
   }
 
-  const claim = { email: normalizedEmail, tokenHash: record.tokenHash };
-  try {
-    const user = await dependencies.userAccounts.findByEmail(normalizedEmail);
-    if (user == null) {
-      logger.warn(
-        { subject: logIdentifier("email", normalizedEmail) },
-        "OTP sign-in denied for an address that is not a login email"
-      );
-      throw new OTPInvalidSignInError();
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      image: user.image,
-      authVersion: user.authVersion,
-      locale,
-      pendingOtpClaim: claim,
-    };
-  } catch (error) {
-    await releaseOTPClaim(claim, dependencies.otpTokens).catch((releaseError) => {
-      logger.error(
-        { error: releaseError, subject: logIdentifier("email", normalizedEmail) },
-        "Failed to release OTP claim"
-      );
-    });
-    throw error;
+  // The code is spent by now. An address with a live token but no account is
+  // an address that was removed from the account between send and verify;
+  // burning the code there costs one resend and nothing else.
+  const user = await dependencies.userAccounts.findByEmail(normalizedEmail);
+  if (user == null) {
+    logger.warn(
+      { subject: logIdentifier("email", normalizedEmail) },
+      "OTP sign-in denied for an address that is not a login email"
+    );
+    throw new OTPInvalidSignInError();
   }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    image: user.image,
+    authVersion: user.authVersion,
+    locale,
+  };
 }

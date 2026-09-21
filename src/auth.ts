@@ -24,10 +24,7 @@ class AuthCredentialsSigninError extends CredentialsSignin {
 }
 
 async function completeSignIn(principal: AuthenticatedPrincipal) {
-  return completeInteractiveSignIn(principal, {
-    ledgers: serverComposition.ledgers,
-    otpTokens: serverComposition.otpTokens,
-  });
+  return completeInteractiveSignIn(principal, { ledgers: serverComposition.ledgers });
 }
 
 async function authorizeInteractiveSignIn(

@@ -120,13 +120,11 @@ export const otpTokens = pgTable(
       .notNull()
       .$defaultFn(() => new Date()),
     lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
-    verifiedAt: timestamp("verified_at", { withTimezone: true }),
     ipAddress: inet("ip_address"),
   },
   (table) => [
     uniqueIndex("uniq_otp_tokens_email").on(table.email),
     index("idx_otp_tokens_expires").on(table.expires),
-    index("idx_otp_tokens_verified").on(table.email, table.verifiedAt),
   ]
 );
 

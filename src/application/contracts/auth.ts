@@ -62,7 +62,6 @@ export interface OtpTokenContract {
   expiresAt: Date;
   attempts: number;
   lockedUntil: Date | null;
-  verifiedAt: Date | null;
 }
 
 export interface OtpTokenPort {
@@ -79,14 +78,18 @@ export interface OtpTokenPort {
     maxAttempts: number;
     lockedUntil: Date;
   }): Promise<{ attempts: number; lockedUntil: Date | null } | null>;
-  claim(input: {
+  /**
+   * Spend the token. Returns false if it was already spent, has expired, is
+   * locked out, or has run out of attempts — the same conditions the caller
+   * checked a moment ago, re-checked here so that two simultaneous verifies
+   * cannot both win.
+   */
+  consume(input: {
     email: string;
     tokenHash: string;
     now: Date;
     maxAttempts: number;
   }): Promise<boolean>;
-  release(input: { email: string; tokenHash: string }): Promise<void>;
-  consume(input: { email: string; tokenHash: string }): Promise<boolean>;
   discard(input: { email: string; tokenHash: string }): Promise<boolean>;
 }
 

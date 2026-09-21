@@ -761,7 +761,7 @@ function countByAttribution(rows: Record<string, unknown>[]): Map<string, number
 
 describe("published migration chain upgrade to one account with books", () => {
   it(
-    "replays 0000 -> 0047, seeds the couple database, then applies the real 0048 and 0049",
+    "replays 0000 -> 0047, seeds the couple database, then applies every migration after it",
     { timeout: 300_000 },
     async () => {
       const { dataSchema, migrationsSchema } = deriveSchemaPair();
@@ -1292,9 +1292,11 @@ describe("published migration chain upgrade to one account with books", () => {
         expect(await scalarCount(data, `SELECT count(*)::int AS count FROM source_documents`)).toBe(
           documentsBeforeNoop
         );
-        expect(migrationLogBeforeNoop).toHaveLength(50);
+        // The whole published chain applied, ending where the journal ends.
+        const published = readPublishedJournal().entries;
+        expect(migrationLogBeforeNoop).toHaveLength(published.length);
         expect(firstRow(migrationLogBeforeNoop.slice(-1), "last migration").when).toBe(
-          1789785600000
+          firstRow(published.slice(-1), "last journal entry").when
         );
       } finally {
         await pool?.end().catch(() => undefined);

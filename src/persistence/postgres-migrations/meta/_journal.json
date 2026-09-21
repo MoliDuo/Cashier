@@ -351,6 +351,13 @@
       "when": 1789785600000,
       "tag": "0049_drop_book_default",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1789982551744,
+      "tag": "0050_drop_otp_verified_at",
+      "breakpoints": true
     }
   ]
 }
