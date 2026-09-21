@@ -42,7 +42,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-const withSerwist = withSerwistInit({
+/**
+ * How the service worker is built and what it is allowed to precache.
+ *
+ * Exported so the policy can be asserted against this object rather than
+ * against the text of this file: `cacheOnNavigation` and the exclusions are
+ * decisions about what a reader may be served, not formatting.
+ */
+export const serwistOptions = {
   swSrc: "src/service-worker.ts",
   swDest: "public/sw.js",
   swUrl: "/sw.js",
@@ -50,6 +57,8 @@ const withSerwist = withSerwistInit({
   reloadOnOnline: false,
   disable: process.env.NODE_ENV === "development",
   exclude: [/middleware-manifest\.json$/, /app-build-manifest\.json$/, /chunks\/app\/api\//],
-});
+};
+
+const withSerwist = withSerwistInit(serwistOptions);
 
 export default withSerwist(withNextIntl(nextConfig));
