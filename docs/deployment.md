@@ -10,7 +10,7 @@
 
 ## Vercel 部署
 
-把仓库导入 Vercel，构建命令保持仓库默认值。在项目的环境变量中配置：
+把仓库导入 Vercel，构建命令由 `vercel.json` 提供。在项目的环境变量中配置：
 
 - `APP_URL`：Vercel 分配的公开地址。
 - `DATABASE_URL`：外部 PostgreSQL 连接地址。
@@ -23,19 +23,19 @@
 
 账号、账本和分账由首次启动的向导创建，不需要环境变量。
 
-Vercel 不会自动执行数据库迁移。发布新版本前，先对目标数据库运行一次仓库现有的迁移命令：
+迁移由构建命令自己执行。`vercel.json` 里的 `buildCommand` 是
+`npm run db:migrate && npm run build`：迁移跑在构建前面，失败就直接让整次构建失败，
+不会部署出一个 schema 对不上的版本。命令从当前环境（包括 `.env`）读取 `DATABASE_URL`，
+并在 advisory lock 保护下应用 `src/persistence/postgres-migrations/` 中尚未执行的迁移。
 
-```bash
-npm run db:migrate
-```
+这条命令过去只配在 Vercel 控制台的 Build Command Override 里，仓库里看不见——
+读代码的人（包括你自己）会以为迁移要手动跑。现在它写在 `vercel.json` 中，
+重建项目或者被 fork 之后也不会悄悄丢掉迁移这一步。
 
-命令从当前环境（包括 `.env`）读取 `DATABASE_URL`，并在 advisory lock 保护下应用
-`src/persistence/postgres-migrations/` 中尚未执行的迁移。
-
-仓库根目录的 `vercel.json` 只做一件事：把 `ignoreCommand` 设成
-`[ "$VERCEL_ENV" != "production" ]`，让 Vercel 跳过所有非 production 的构建。
-两个人用的应用不需要预览环境，而 Dependabot 每周会开几个 PR，每个 PR 都会触发一次
-完整构建——那些构建没有人会去看。JSON 写不了注释，所以理由记在这里。
+`vercel.json` 的另一半是 `ignoreCommand`：`[ "$VERCEL_ENV" != "production" ]`
+让 Vercel 跳过所有非 production 的构建。两个人用的应用不需要预览环境，而 Dependabot
+每周会开几个 PR，每个 PR 都会触发一次完整构建——那些构建没有人会去看。
+JSON 写不了注释，所以这两条的理由都记在这里。
 
 ## 本地基础服务
 
@@ -97,7 +97,7 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 过旧 0042 的数据库无法仅凭分类名称或当前顺序精确推断此前的自定义排序；只有升级前的可靠
 备份可能恢复它。本次升级不会猜测或再次改写现有顺序。
 
-部署新版本前先运行 `npm run db:migrate`。不要在没有数据库备份的情况下跳过多个版本升级。
+部署时构建命令会自己运行 `npm run db:migrate`，但不要在没有数据库备份的情况下跳过多个版本升级。
 
 ## 备份与恢复
 
