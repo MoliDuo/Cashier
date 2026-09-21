@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { signIn, type SignInResponse } from "next-auth/react";
 import { useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/routing";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { sendOTPAction } from "@/modules/auth/server-actions/send-otp";
 import type { SendOTPActionResult } from "@/modules/auth/server-actions/send-otp";
-import { useLoginDraftStore } from "@/modules/auth/login-draft-store";
-import { useLoginUrlState, type LoginMode } from "./use-login-url-state";
-import { useOtpContextStorage } from "./use-otp-context-storage";
 
-export type { LoginMode } from "./use-login-url-state";
+export type LoginMode = "password" | "otp";
+type LoginStep = "email" | "otp";
 
 interface LoginFlowOptions {
   initialMode?: LoginMode;
   isDevAuthAvailable?: boolean;
+}
+
+/** Where to land after signing in; anything not a same-site path becomes "/". */
+function sanitizeCallbackUrl(value: string | null): string {
+  return value != null && value.startsWith("/") && !value.startsWith("//") ? value : "/";
 }
 
 function getSignInErrorMessage(
@@ -76,59 +80,41 @@ export function useLoginFlow(
 ) {
   const router = useRouter();
   const locale = useLocale();
-  const { callbackUrl, mode, step, rawStep, writeFlowUrl } = useLoginUrlState(initialMode);
-  const email = useLoginDraftStore((state) => state.email);
-  const otp = useLoginDraftStore((state) => state.otp);
-  const resendPending = useLoginDraftStore((state) => state.resendPending);
-  const otpExpired = useLoginDraftStore((state) => state.otpExpired);
-  const expiresAt = useLoginDraftStore((state) => state.expiresAt);
-  const canResendAt = useLoginDraftStore((state) => state.canResendAt);
-  const setEmail = useLoginDraftStore((state) => state.setEmail);
-  const setOtp = useLoginDraftStore((state) => state.setOtp);
-  const setResendPending = useLoginDraftStore((state) => state.setResendPending);
-  const setOtpExpiry = useLoginDraftStore((state) => state.setOtpExpiry);
-  const setOtpExpired = useLoginDraftStore((state) => state.setOtpExpired);
-  const resetDraft = useLoginDraftStore((state) => state.reset);
+  const callbackUrl = sanitizeCallbackUrl(useSearchParams().get("callbackUrl"));
+
+  // The whole flow is one page's worth of state. Reloading in the middle of it
+  // drops the draft and returns to the email step, which is the honest outcome:
+  // the code that was sent is still valid, and asking for another is one tap.
+  const [mode, setModeState] = useState<LoginMode>(initialMode);
+  const [step, setStep] = useState<LoginStep>("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [canResendAt, setCanResendAt] = useState<number | null>(null);
+  const [otpExpired, setOtpExpired] = useState(false);
+  const [resendPending, setResendPending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState("");
-  const [passwordMode, setPasswordMode] = useState(mode);
-  if (passwordMode !== mode) {
-    setPasswordMode(mode);
-    setPassword("");
-  }
 
-  // resendPending lives in a module-level store, so if a previous page load's
-  // handleResendOTP was interrupted before its `finally` ran (e.g. unmount
-  // mid-request), it would otherwise stay stuck true and permanently disable
-  // both tabs for the rest of this page load. Clear it on mount.
-  useEffect(() => {
-    setResendPending(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const { contextHydrated, clearOtpContext, storeOtpContext } = useOtpContextStorage({
-    mode,
-    rawStep,
-    setEmail,
-    setOtpExpiry,
-    writeFlowUrl,
-  });
+  const setOtpExpiry = (nextExpiresAt: number | null, nextCanResendAt: number | null) => {
+    setExpiresAt(nextExpiresAt);
+    setCanResendAt(nextCanResendAt);
+    setOtpExpired(false);
+  };
 
   const setMode = (nextMode: LoginMode) => {
     if (isLoading || resendPending) return;
     setError(null);
-    clearOtpContext();
     setPassword("");
     setOtp("");
-    writeFlowUrl(nextMode, "email");
+    setModeState(nextMode);
+    setStep("email");
   };
 
   const finishSignIn = (result: SignInResponse | undefined) => {
     if (result?.ok && result.error == null) {
-      clearOtpContext();
       setPassword("");
-      resetDraft();
       router.push(callbackUrl);
       router.refresh();
       return true;
@@ -183,12 +169,8 @@ export function useLoginFlow(
       }
       setOtpExpiry(result.expiresAt, result.canResendAt);
       setOtp("");
-      storeOtpContext({
-        email: submittedEmail,
-        expiresAt: result.expiresAt,
-        canResendAt: result.canResendAt,
-      });
-      writeFlowUrl("otp", "otp");
+      setModeState("otp");
+      setStep("otp");
     } catch {
       setError(t("unexpectedError"));
     } finally {
@@ -228,7 +210,6 @@ export function useLoginFlow(
       setOtpExpiry(result.expiresAt, result.canResendAt);
       setOtp("");
       setError(null);
-      storeOtpContext({ email, expiresAt: result.expiresAt, canResendAt: result.canResendAt });
     } catch {
       setError(t("resendFailed"));
     } finally {
@@ -239,9 +220,8 @@ export function useLoginFlow(
   const handleChangeEmail = () => {
     if (resendPending) return;
     setError(null);
-    clearOtpContext();
     setOtp("");
-    writeFlowUrl("otp", "email");
+    setStep("email");
   };
 
   const handleDevSignIn = async () => {
@@ -269,13 +249,9 @@ export function useLoginFlow(
     canResendAt,
     resendPending,
     otpExpired,
-    contextHydrated,
     isDevAuthAvailable,
     setMode,
-    setEmail: (nextEmail: string) => {
-      if (nextEmail !== email) clearOtpContext();
-      setEmail(nextEmail);
-    },
+    setEmail,
     setPassword,
     setOtp,
     handlePasswordLogin,
