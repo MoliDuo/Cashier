@@ -73,7 +73,6 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 重启服务会重新生成并再次打印。已有数据的部署不会看到这个向导。
 
 初始密码只在创建账号时使用。后续修改环境变量不会同步修改现有账号密码。
-从双人账本升级请阅读 [从双人账本升级](./deployment/single-account-upgrade.md)。
 
 ## 升级
 
