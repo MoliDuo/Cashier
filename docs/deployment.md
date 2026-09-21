@@ -32,16 +32,25 @@
 读代码的人（包括你自己）会以为迁移要手动跑。现在它写在 `vercel.json` 中，
 重建项目或者被 fork 之后也不会悄悄丢掉迁移这一步。
 
-`vercel.json` 的另一半是 `ignoreCommand`：`[ "$VERCEL_ENV" = "preview" ]`
-让 Vercel 跳过预览构建。两个人用的应用不需要预览环境，而 Dependabot 每周会开几个 PR，
-每个 PR 都会触发一次完整构建——那些构建没有人会去看。
+`vercel.json` 的另一半是 `ignoreCommand`，它跳过 `main` 以外的构建。两个人用的应用
+不需要预览环境，而 Dependabot 每周会开几个 PR，每个 PR 都会触发一次完整构建——
+那些构建没有人会去看。
 
-这个判断只在**确认**是 preview 时才跳过，而不是"不是 production 就跳过"。
-两种写法读起来一样，但第一版写成了后者，结果生产构建被连带跳掉了两次：
-`VERCEL_ENV` 在 ignore 这一步取不到值，空字符串自然也不等于 `production`。
-判断环境变量的时候，取不到值的那条路要落在"照常构建"这一边。
+判断用的是 `VERCEL_GIT_COMMIT_REF`，并且**分支名取不到时照常构建**：
 
-JSON 写不了注释，所以这两条的理由都记在这里。
+```sh
+[ -n "$VERCEL_GIT_COMMIT_REF" ] && [ "$VERCEL_GIT_COMMIT_REF" != "main" ]
+```
+
+这里踩过一次坑。第一版写的是 `[ "$VERCEL_ENV" != "production" ]`，看起来等价，
+结果连着跳掉了两次生产构建——`VERCEL_ENV` 在 ignore 这一步是空的，空字符串同样不等于
+`production`。判断环境变量的时候，取不到值的那条路必须落在"照常构建"这一边：
+多花两分钟构建是小事，推了 main 却悄无声息地没部署不是。
+
+命令里那行 `echo` 会把两个变量的实际取值打进构建日志，下次再怀疑是谁没取到值时，
+不用靠改配置来试。
+
+JSON 写不了注释，所以这几条的理由都记在这里。
 
 ## 本地基础服务
 
