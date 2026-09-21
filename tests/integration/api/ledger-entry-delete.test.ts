@@ -59,8 +59,13 @@ describe("Ledger Entry Delete Action", () => {
     expect(deletedEntry?.deletedAt).not.toBeNull();
   });
 
-  it("should throw error if ledger entry belongs to another ledger", async () => {
+  it("refuses every ledger once a second live one exists, which is the deployment's rule", async () => {
     const db = getTestDb();
+    // This deployment serves one live ledger: `getSharedForMember` returns null
+    // as soon as there are two, so the refusal below is the single-ledger rule
+    // firing, not per-record scoping. Scoping is held at the aggregate, in
+    // tests/integration/source-document/cross-ledger-access.test.ts, where a
+    // second ledger does not disable the check being measured.
     const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
       db,
       "other@example.com",
@@ -68,13 +73,19 @@ describe("Ledger Entry Delete Action", () => {
       "11111111-1111-1111-1111-111111111111"
     );
 
-    // This should throw error because requireLedgerAccess will fail for TEST_USER_ID
-    await expect(
-      deleteLedgerEntryAction(
-        otherLedgerId,
-        { sourceDocumentId: testSourceDocId, expectedVersion: 1 },
-        testEntryId
-      )
-    ).rejects.toThrow("Ledger not found");
+    const target = { sourceDocumentId: testSourceDocId, expectedVersion: 1 };
+    await expect(deleteLedgerEntryAction(otherLedgerId, target, testEntryId)).rejects.toThrow(
+      "Ledger not found"
+    );
+    // The caller's own ledger is refused too, which is what makes the rule the
+    // rule rather than an authorization check on the argument.
+    await expect(deleteLedgerEntryAction(testLedgerId, target, testEntryId)).rejects.toThrow(
+      "Ledger not found"
+    );
+
+    const survivor = await db.query.ledgerEntries.findFirst({
+      where: eq(ledgerEntries.id, testEntryId),
+    });
+    expect(survivor?.deletedAt).toBeNull();
   });
 });
