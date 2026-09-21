@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, Archive, ArchiveRestore, RefreshCw, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Archive,
+  ArchiveRestore,
+  Check,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,7 +87,7 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
     useBookMutations(ledgerId);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [renameTarget, setRenameTarget] = useState<BookDto | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [archiveTarget, setArchiveTarget] = useState<BookDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookDto | null>(null);
@@ -119,6 +129,32 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
     next[index] = next[target]!;
     next[target] = current;
     reorderBooks.mutate(next.map((book) => book.id));
+  };
+
+  const startRename = (book: BookDto) => {
+    setRenamingId(book.id);
+    setRenameDraft(book.name);
+  };
+
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameDraft("");
+  };
+
+  /**
+   * A name is one field of a book that already exists, so it is written the
+   * moment it is committed, the way the zone and the order above already are.
+   * A refusal — a taken name, a name the server trims to nothing — is a toast
+   * from the mutation, and the row stays open on the rejected draft so it can
+   * be corrected instead of retyped.
+   */
+  const commitRename = (book: BookDto) => {
+    const name = renameDraft.trim();
+    if (name === "" || name === book.name) {
+      cancelRename();
+      return;
+    }
+    updateBook.mutate({ bookId: book.id, name }, { onSuccess: cancelRename });
   };
 
   // 自动 resolves to the device on this screen, so the reader sees which zone a
@@ -195,100 +231,155 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
           <p className="text-sm text-muted-foreground">{t("empty")}</p>
         ) : (
           <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
-            {list.map((book, index) => (
-              <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
-                <div className="min-w-0 flex-1">
-                  <span className="truncate text-sm font-medium text-text">{book.name}</span>
-                  <p className="mt-0.5 text-micro text-muted-foreground">
-                    {book.timeZone ?? deviceZoneOption}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={busy || index === 0}
-                    aria-label={t("moveUp", { name: book.name })}
-                    onClick={() => move(index, -1)}
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={busy || index === list.length - 1}
-                    aria-label={t("moveDown", { name: book.name })}
-                    onClick={() => move(index, 1)}
-                  >
-                    <ArrowDown className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => {
-                      setRenameTarget(book);
-                      setRenameDraft(book.name);
-                    }}
-                  >
-                    {t("rename")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={busy}
-                    aria-label={t("archive")}
-                    title={t("archive")}
-                    className="text-muted-foreground hover:text-danger"
-                    onClick={() => setArchiveTarget(book)}
-                  >
-                    <Archive className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={busy}
-                    aria-label={t("delete")}
-                    title={t("delete")}
-                    className="text-muted-foreground hover:text-danger"
-                    onClick={() => setDeleteTarget(book)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-                <div className="w-full sm:w-56">
-                  <Select
-                    value={book.timeZone ?? "auto"}
-                    onValueChange={(value) =>
-                      updateBook.mutate({
-                        bookId: book.id,
-                        timeZone: value === "auto" ? null : value,
-                      })
-                    }
-                    disabled={busy}
-                  >
-                    <SelectTrigger aria-label={t("timeZone")} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectItem value="auto">
-                        {t("timeZoneAutoDetected", { timeZone: deviceZoneOption })}
-                      </SelectItem>
-                      {zoneOptionsFor(book).map((timeZone) => (
-                        <SelectItem key={timeZone} value={timeZone}>
-                          {timeZone}
+            {list.map((book, index) => {
+              const renaming = renamingId === book.id;
+              return (
+                <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
+                  <div className="min-w-0 flex-1">
+                    {renaming ? (
+                      <Input
+                        autoFocus
+                        value={renameDraft}
+                        maxLength={20}
+                        autoComplete="off"
+                        aria-label={t("rename", { name: book.name })}
+                        disabled={updateBook.isPending}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            commitRename(book);
+                            return;
+                          }
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            cancelRename();
+                          }
+                        }}
+                        className="h-8"
+                      />
+                    ) : (
+                      <span className="truncate text-sm font-medium text-text">{book.name}</span>
+                    )}
+                    <p className="mt-0.5 text-micro text-muted-foreground">
+                      {book.timeZone ?? deviceZoneOption}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {renaming ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={renameDraft.trim() === "" || updateBook.isPending}
+                          aria-label={tCommon("save")}
+                          title={tCommon("save")}
+                          onClick={() => commitRename(book)}
+                        >
+                          <Check className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={updateBook.isPending}
+                          aria-label={tCommon("cancel")}
+                          title={tCommon("cancel")}
+                          onClick={cancelRename}
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busy || index === 0}
+                          aria-label={t("moveUp", { name: book.name })}
+                          onClick={() => move(index, -1)}
+                        >
+                          <ArrowUp className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busy || index === list.length - 1}
+                          aria-label={t("moveDown", { name: book.name })}
+                          onClick={() => move(index, 1)}
+                        >
+                          <ArrowDown className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busy}
+                          aria-label={t("rename", { name: book.name })}
+                          title={t("rename", { name: book.name })}
+                          onClick={() => startRename(book)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busy}
+                          aria-label={t("archive")}
+                          title={t("archive")}
+                          className="text-muted-foreground hover:text-danger"
+                          onClick={() => setArchiveTarget(book)}
+                        >
+                          <Archive className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busy}
+                          aria-label={t("delete")}
+                          title={t("delete")}
+                          className="text-muted-foreground hover:text-danger"
+                          onClick={() => setDeleteTarget(book)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <div className="w-full sm:w-56">
+                    <Select
+                      value={book.timeZone ?? "auto"}
+                      onValueChange={(value) =>
+                        updateBook.mutate({
+                          bookId: book.id,
+                          timeZone: value === "auto" ? null : value,
+                        })
+                      }
+                      disabled={busy}
+                    >
+                      <SelectTrigger aria-label={t("timeZone")} className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectItem value="auto">
+                          {t("timeZoneAutoDetected", { timeZone: deviceZoneOption })}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </li>
-            ))}
+                        {zoneOptionsFor(book).map((timeZone) => (
+                          <SelectItem key={timeZone} value={timeZone}>
+                            {timeZone}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -363,48 +454,6 @@ export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
               }
             >
               {t("add")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={renameTarget != null}
-        onOpenChange={(open) => !updateBook.isPending && (open ? undefined : setRenameTarget(null))}
-      >
-        <DialogContent variant="modal">
-          <DialogHeader>
-            <DialogTitle>{t("renameTitle")}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-2 py-4">
-            <Label htmlFor="rename-book-name">{t("name")}</Label>
-            <Input
-              id="rename-book-name"
-              value={renameDraft}
-              maxLength={20}
-              disabled={updateBook.isPending}
-              onChange={(event) => setRenameDraft(event.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRenameTarget(null)}
-              disabled={updateBook.isPending}
-            >
-              {tCommon("cancel")}
-            </Button>
-            <Button
-              disabled={renameDraft.trim() === "" || updateBook.isPending}
-              onClick={() => {
-                if (renameTarget == null) return;
-                updateBook.mutate(
-                  { bookId: renameTarget.id, name: renameDraft.trim() },
-                  { onSuccess: () => setRenameTarget(null) }
-                );
-              }}
-            >
-              {t("rename")}
             </Button>
           </DialogFooter>
         </DialogContent>

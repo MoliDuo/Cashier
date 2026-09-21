@@ -9,9 +9,10 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-const { getBooksAction, getBooksIncludingArchivedAction } = vi.hoisted(() => ({
+const { getBooksAction, getBooksIncludingArchivedAction, updateBook } = vi.hoisted(() => ({
   getBooksAction: vi.fn(),
   getBooksIncludingArchivedAction: vi.fn(),
+  updateBook: vi.fn(),
 }));
 
 vi.mock("@/lib/queries/ledger-query-client", () => ({
@@ -22,7 +23,7 @@ vi.mock("@/lib/queries/ledger-query-client", () => ({
 vi.mock("@/modules/ledger/hooks/useBookMutations", () => ({
   useBookMutations: () => ({
     createBook: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
-    updateBook: { mutate: vi.fn(), isPending: false },
+    updateBook: { mutate: updateBook, isPending: false },
     reorderBooks: { mutate: vi.fn(), isPending: false },
     archiveBook: { mutate: vi.fn(), isPending: false },
     restoreBook: { mutate: vi.fn(), isPending: false },
@@ -115,6 +116,49 @@ describe("设置 book list data range", () => {
 
     expect(await screen.findByText(ARCHIVED.name)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("renames a book in its own row and writes it without a dialog", async () => {
+    getBooksIncludingArchivedAction.mockResolvedValue([LIVE, ARCHIVED]);
+    renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+
+    // A name is one field of a book that already exists, so the row itself opens
+    // for editing — nothing may cover the list to change it.
+    fireEvent.click(screen.getByRole("button", { name: "rename" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const input = screen.getByRole("textbox", { name: "rename" });
+    fireEvent.change(input, { target: { value: "日常开销" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(updateBook).toHaveBeenCalledWith(
+      { bookId: LIVE.id, name: "日常开销" },
+      expect.anything()
+    );
+  });
+
+  it("drops the draft on Escape and writes nothing", async () => {
+    getBooksIncludingArchivedAction.mockResolvedValue([LIVE, ARCHIVED]);
+    renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+
+    fireEvent.click(screen.getByRole("button", { name: "rename" }));
+    const input = screen.getByRole("textbox", { name: "rename" });
+    fireEvent.change(input, { target: { value: "改到一半" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(updateBook).not.toHaveBeenCalled();
+    expect(screen.getByText(LIVE.name)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "rename" })).not.toBeInTheDocument();
+  });
+
+  it("does not write a name that was opened and left unchanged", async () => {
+    getBooksIncludingArchivedAction.mockResolvedValue([LIVE, ARCHIVED]);
+    renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+
+    fireEvent.click(screen.getByRole("button", { name: "rename" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "rename" }), { key: "Enter" });
+
+    expect(updateBook).not.toHaveBeenCalled();
   });
 
   it("keeps the list and reports a retry when a background refresh fails", async () => {

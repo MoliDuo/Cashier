@@ -154,10 +154,15 @@ test("books production creates, renames and reorders a book, and keeps it across
   await addBook(page, secondName);
   await expect.poll(() => order([firstName, secondName])).toEqual([firstName, secondName]);
 
-  await bookRow(page, secondName).getByRole("button", { name: "Rename", exact: true }).click();
-  const renameDialog = page.getByRole("dialog").last();
-  await renameDialog.locator("#rename-book-name").fill(renamed);
-  await renameDialog.getByRole("button", { name: "Rename", exact: true }).click();
+  // A name is one field of a book that already exists, so the row opens in place
+  // and Enter writes it — nothing covers the list to rename it.
+  await bookRow(page, secondName)
+    .getByRole("button", { name: `Rename ${secondName}`, exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const nameInput = page.getByRole("textbox", { name: `Rename ${secondName}`, exact: true });
+  await nameInput.fill(renamed);
+  await nameInput.press("Enter");
   await expect(bookRow(page, renamed)).toBeVisible();
   await expect(bookRow(page, secondName)).toHaveCount(0);
 
