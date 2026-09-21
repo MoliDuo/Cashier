@@ -44,7 +44,6 @@
     "db:push": "drizzle-kit push",
     "db:generate": "node scripts/guard-drizzle-generate.mjs && drizzle-kit generate",
     "db:migrate": "node scripts/migrate-database.mjs",
-    "db:migrate:credentials": "node scripts/migrations/hash-service-credentials.mjs",
     "db:studio": "drizzle-kit studio",
     "db:drop": "drizzle-kit drop",
     "prune": "node scripts/prune-storage.mjs",
