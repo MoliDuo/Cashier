@@ -36,6 +36,17 @@ const nextConfig: NextConfig = {
             // photographing a receipt; microphone and geolocation stay off.
             value: "camera=(self), microphone=(), geolocation=()",
           },
+          {
+            key: "Content-Security-Policy",
+            // The three directives that need no nonce, so they cost neither a
+            // middleware pass nor static optimization. `frame-ancestors` is the
+            // one that earns its place: nothing else here refuses to be framed,
+            // and a ledger is exactly the kind of page worth clickjacking. The
+            // script and style directives are left out on purpose — a useful
+            // one needs per-request nonces, and this app has no HTML injection
+            // sink to aim them at.
+            value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+          },
         ],
       },
     ];
