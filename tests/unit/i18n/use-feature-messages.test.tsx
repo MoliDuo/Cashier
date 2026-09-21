@@ -14,7 +14,7 @@ describe("useFeatureMessages", () => {
 
   it("surfaces a failed request and retries the same shared cache", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce({ ok: false } as Response);
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503 } as Response);
 
     const queryClient = new QueryClient();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -40,8 +40,25 @@ describe("useFeatureMessages", () => {
     });
     expect(result.current.data).toEqual({ StatsTab: { month: "Month" } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the retry free to reach the server after a failed response", async () => {
+    // Regression: the request asked for `cache: "force-cache"`, which replays
+    // whatever the HTTP cache holds whatever its status. One 404 or gateway
+    // error was then pinned, and the retry button re-read that same failure
+    // instead of the server. The versioned URL and the immutable response
+    // header are what keep a good catalog off the network.
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
+
+    const queryClient = new QueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useFeatureMessages("en", "stats"), { wrapper });
+
+    await waitFor(() => expect(result.current.status).toBe("success"));
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("/api/i18n/en/stats?v="), {
-      cache: "force-cache",
       credentials: "same-origin",
     });
   });

@@ -38,6 +38,11 @@ describe("feature messages route", () => {
     ["en", "toString"],
     ["en", "missing"],
   ])("returns 404 for invalid locale or feature %s/%s", async (locale, feature) => {
-    expect((await request(locale, feature)).status).toBe(404);
+    const response = await request(locale, feature);
+
+    expect(response.status).toBe(404);
+    // A not-found carries no version, so a cache that keeps it hands the client
+    // the same failure on every later request instead of asking the server.
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 });

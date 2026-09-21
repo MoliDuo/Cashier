@@ -13,7 +13,12 @@ export async function GET(
     !SUPPORTED_LOCALES.includes(locale as SupportedLocale) ||
     !Object.hasOwn(FEATURE_MESSAGES, feature)
   ) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // A not-found carries no version, so nothing makes it safe to keep: let a
+    // cache hold it and the client replays the failure instead of asking again.
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "no-store" } }
+    );
   }
   const messages = await importFeatureMessages(
     locale as SupportedLocale,

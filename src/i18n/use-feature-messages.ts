@@ -25,11 +25,18 @@ function featureMessagesQuery(locale: string, feature: Feature) {
   return {
     queryKey: ["feature-messages", FEATURE_MESSAGE_VERSION, normalizedLocale, feature] as const,
     queryFn: async (): Promise<Record<string, unknown>> => {
+      // The version in the URL and the immutable response header are what keep
+      // a good catalog off the network. `cache: "force-cache"` added nothing on
+      // top of that and replayed whatever the HTTP cache held regardless of
+      // status, so one 404 or gateway error stayed pinned for the life of the
+      // entry — the retry button re-read the same failure instead of the server.
       const response = await fetch(
         `/api/i18n/${normalizedLocale}/${feature}?v=${FEATURE_MESSAGE_VERSION}`,
-        { credentials: "same-origin", cache: "force-cache" }
+        { credentials: "same-origin" }
       );
-      if (!response.ok) throw new Error("Unable to load feature messages");
+      if (!response.ok) {
+        throw new Error(`Unable to load feature messages (HTTP ${response.status})`);
+      }
       return (await response.json()) as Record<string, unknown>;
     },
     staleTime: Infinity,
