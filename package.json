@@ -19,7 +19,6 @@
     "start": "next start",
     "lint": "eslint",
     "tsc": "tsc --noEmit",
-    "i18n:generate": "node scripts/generate-i18n-catalogs.mjs",
     "validate:i18n": "node scripts/validate-i18n-catalogs.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:dead-code": "knip --include files,dependencies,unlisted,unresolved,exports,types",

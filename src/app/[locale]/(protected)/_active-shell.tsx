@@ -15,7 +15,6 @@ import {
   useShellController,
 } from "@/components/providers/shell-controller";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { preloadFeatureMessages } from "@/i18n/use-feature-messages";
 import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import {
   getScopedLedgerSearchParams,
@@ -114,24 +113,11 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
     [activeTab, attemptLeave, handleTabChange, ready, refreshCurrentTab]
   );
 
-  const preloadTabCode = useCallback(
-    (tab: LedgerTab) => {
-      // Preloading is best effort. The tab that actually mounts reads the same
-      // query and shows the retry banner itself, so a rejection here has nobody
-      // to inform — left floating it only surfaces as an unhandled rejection.
-      if (tab === "details") {
-        import("@/modules/workspace/ui/DetailsTab");
-        preloadFeatureMessages(queryClient, locale, "details").catch(() => {});
-      } else if (tab === "stats") {
-        import("@/modules/workspace/ui/StatsTab");
-        preloadFeatureMessages(queryClient, locale, "stats").catch(() => {});
-      } else if (tab === "settings") {
-        import("@/modules/ledger/ui/SettingsTab");
-        preloadFeatureMessages(queryClient, locale, "settings").catch(() => {});
-      }
-    },
-    [locale, queryClient]
-  );
+  const preloadTabCode = useCallback((tab: LedgerTab) => {
+    if (tab === "details") import("@/modules/workspace/ui/DetailsTab");
+    else if (tab === "stats") import("@/modules/workspace/ui/StatsTab");
+    else if (tab === "settings") import("@/modules/ledger/ui/SettingsTab");
+  }, []);
 
   const preloadTab = useCallback(
     (tab: LedgerTab) => {

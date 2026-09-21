@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,20 +9,6 @@ import ts from "typescript";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = path.dirname(currentFilePath);
 const messagesDir = path.resolve(currentDirPath, "..", "messages");
-const featureMapPath = path.resolve(
-  currentDirPath,
-  "..",
-  "src",
-  "i18n",
-  "client-feature-message-map.json"
-);
-const messageVersionPath = path.resolve(
-  currentDirPath,
-  "..",
-  "src",
-  "i18n",
-  "feature-message-version.ts"
-);
 const catalogFiles = fs
   .readdirSync(messagesDir)
   .filter((fileName) => fileName.endsWith(".json"))
@@ -177,41 +162,6 @@ function validateCatalogShape(reference, candidate, location, candidateFile) {
 
 const parsedCatalogs = new Map();
 const errors = [];
-let featureMap = {};
-
-try {
-  featureMap = JSON.parse(fs.readFileSync(featureMapPath, "utf8"));
-} catch (error) {
-  errors.push(
-    `feature message map is invalid: ${error instanceof Error ? error.message : String(error)}`
-  );
-}
-
-try {
-  const sourceCatalogs = Object.fromEntries(
-    catalogFiles.map((catalogFile) => [
-      path.basename(catalogFile, ".json"),
-      fs.readFileSync(path.join(messagesDir, catalogFile), "utf8"),
-    ])
-  );
-  const expectedVersion = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(featureMap))
-    .update(JSON.stringify(sourceCatalogs))
-    .digest("hex")
-    .slice(0, 16);
-  const versionSource = fs.readFileSync(messageVersionPath, "utf8");
-  const actualVersion = versionSource.match(/FEATURE_MESSAGE_VERSION\s*=\s*"([a-f0-9]+)"/)?.[1];
-  if (actualVersion !== expectedVersion) {
-    errors.push(
-      `feature-message-version.ts is stale: expected ${expectedVersion}, found ${actualVersion ?? "missing"}`
-    );
-  }
-} catch (error) {
-  errors.push(
-    `feature message version is invalid: ${error instanceof Error ? error.message : String(error)}`
-  );
-}
 
 for (const catalogFile of catalogFiles) {
   const filePath = path.join(messagesDir, catalogFile);
@@ -229,46 +179,6 @@ for (const catalogFile of catalogFiles) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     errors.push(`${catalogFile}: invalid JSON: ${message}`);
-  }
-}
-
-for (const [feature, namespaces] of Object.entries(featureMap)) {
-  if (!Array.isArray(namespaces) || namespaces.some((namespace) => typeof namespace !== "string")) {
-    errors.push(`${feature}: feature namespace list must contain strings only`);
-    continue;
-  }
-  for (const catalogFile of catalogFiles) {
-    const locale = path.basename(catalogFile, ".json");
-    const rootCatalog = parsedCatalogs.get(catalogFile);
-    const featurePath = path.join(messagesDir, locale, `${feature}.json`);
-    if (rootCatalog == null) continue;
-    if (!fs.existsSync(featurePath)) {
-      errors.push(`${locale}/${feature}.json: missing feature catalog`);
-      continue;
-    }
-    let actual;
-    try {
-      actual = JSON.parse(fs.readFileSync(featurePath, "utf8"));
-    } catch (error) {
-      errors.push(
-        `${locale}/${feature}.json: invalid JSON: ${error instanceof Error ? error.message : String(error)}`
-      );
-      continue;
-    }
-    const expected = Object.fromEntries(
-      namespaces
-        .filter((namespace) => namespace in rootCatalog)
-        .map((namespace) => [namespace, rootCatalog[namespace]])
-    );
-    const missingNamespaces = namespaces.filter((namespace) => !(namespace in rootCatalog));
-    if (missingNamespaces.length > 0) {
-      errors.push(
-        `${catalogFile}: feature ${feature} references missing namespaces: ${missingNamespaces.join(", ")}`
-      );
-    }
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      errors.push(`${locale}/${feature}.json: content differs from ${catalogFile}`);
-    }
   }
 }
 
@@ -555,24 +465,6 @@ function collectVisibleStringLiterals(sourceFile, relativeFileName) {
 if (referenceCatalog != null) {
   const sourceRoot = path.resolve(currentDirPath, "..", "src");
   const locales = catalogFiles.map((fileName) => path.basename(fileName, ".json"));
-  const featureCatalogs = new Map();
-
-  for (const feature of Object.keys(featureMap)) {
-    featureCatalogs.set(
-      feature,
-      new Map(
-        locales.map((locale) => {
-          const featurePath = path.join(messagesDir, locale, `${feature}.json`);
-          if (!fs.existsSync(featurePath)) return [locale, null];
-          try {
-            return [locale, JSON.parse(fs.readFileSync(featurePath, "utf8"))];
-          } catch {
-            return [locale, null];
-          }
-        })
-      )
-    );
-  }
 
   for (const fileName of sourceFilesIn(sourceRoot)) {
     const source = fs.readFileSync(fileName, "utf8");
@@ -615,17 +507,6 @@ if (referenceCatalog != null) {
         const catalog = parsedCatalogs.get(`${locale}.json`);
         if (getMessageValue(catalog, fullKey) === undefined) {
           errors.push(`${location}: missing ${locale} message key ${fullKey}`);
-        }
-      }
-
-      for (const [feature, catalogs] of featureCatalogs) {
-        const namespaces = featureMap[feature];
-        if (!Array.isArray(namespaces) || !namespaces.includes(usage.namespace)) continue;
-        for (const locale of locales) {
-          const catalog = catalogs.get(locale);
-          if (getMessageValue(catalog, fullKey) === undefined) {
-            errors.push(`${location}: ${fullKey} is missing from ${locale}/${feature}.json`);
-          }
         }
       }
     }

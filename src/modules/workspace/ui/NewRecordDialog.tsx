@@ -3,13 +3,12 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { readLastNewRecordBookId } from "../new-record-book-memory";
-import { NewRecordForms, InputFormLoadingFallback } from "./NewRecordForms";
+import { NewRecordForms } from "./NewRecordForms";
 import type { NewRecordInputMode } from "./new-record-success-feedback";
 import {
   Select,
@@ -27,7 +26,6 @@ interface NewRecordDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   isSubmitting: boolean;
-  locale: string;
   ledgerId: string;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
@@ -54,7 +52,6 @@ export function NewRecordDialog({
   isOpen,
   onOpenChange,
   isSubmitting,
-  locale,
   ledgerId,
   activeTab,
   committedFilters,
@@ -172,33 +169,27 @@ export function NewRecordDialog({
           </div>
 
           <div>
-            <DeferredFeatureMessages
-              feature="stream"
-              locale={locale}
-              fallback={<InputFormLoadingFallback />}
-            >
-              <NewRecordForms
-                bookId={selectedBookId}
-                viewedBookId={scope}
-                savedBook={selectedBook}
-                ledgerId={ledgerId}
-                activeTab={activeTab}
-                committedFilters={committedFilters}
-                inputMode={inputMode}
-                categories={categories}
-                mainCurrency={mainCurrency}
-                preferredCurrencies={preferredCurrencies}
-                aiDirty={aiDirty}
-                quickDirty={quickDirty}
-                setInputMode={setInputMode}
-                setInputOpen={setInputOpen}
-                setAiPending={setAiPending}
-                setQuickPending={setQuickPending}
-                setAiDirty={setAiDirty}
-                setQuickDirty={setQuickDirty}
-                {...(recordTimeZone != null ? { timeZone: recordTimeZone } : {})}
-              />
-            </DeferredFeatureMessages>
+            <NewRecordForms
+              bookId={selectedBookId}
+              viewedBookId={scope}
+              savedBook={selectedBook}
+              ledgerId={ledgerId}
+              activeTab={activeTab}
+              committedFilters={committedFilters}
+              inputMode={inputMode}
+              categories={categories}
+              mainCurrency={mainCurrency}
+              preferredCurrencies={preferredCurrencies}
+              aiDirty={aiDirty}
+              quickDirty={quickDirty}
+              setInputMode={setInputMode}
+              setInputOpen={setInputOpen}
+              setAiPending={setAiPending}
+              setQuickPending={setQuickPending}
+              setAiDirty={setAiDirty}
+              setQuickDirty={setQuickDirty}
+              {...(recordTimeZone != null ? { timeZone: recordTimeZone } : {})}
+            />
           </div>
         </div>
       </DialogContent>

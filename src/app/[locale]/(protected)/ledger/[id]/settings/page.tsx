@@ -2,7 +2,6 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { SettingsPageClient } from "@/modules/ledger/ui/SettingsPageClient";
-import { pickMessages, FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
 import { auth } from "@/auth";
 import { getLedgerSettingsBootstrap } from "@/modules/workspace/application/queries/get-ledger-settings-bootstrap";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
@@ -65,14 +64,8 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 
   const loginEmails =
     userId == null ? [] : await serverComposition.userAccounts.listLoginEmails(userId);
-  const allMessages = await getMessages({ locale });
-  const settingsMessages = pickMessages(allMessages, [
-    ...FEATURE_MESSAGES.shell,
-    ...FEATURE_MESSAGES.settings,
-  ]);
-
   return (
-    <NextIntlClientProvider messages={settingsMessages} locale={locale}>
+    <NextIntlClientProvider messages={await getMessages({ locale })} locale={locale}>
       <HydrationBoundary state={pageData.dehydratedState}>
         <SettingsPageClient
           ledger={ledger}

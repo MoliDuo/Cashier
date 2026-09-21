@@ -6,7 +6,6 @@ import {
   StatsTabSkeleton,
   SettingsTabSkeleton,
 } from "@/components/skeletons/TabSkeletons";
-import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
 import { LedgerEntriesTab } from "@/modules/workspace/ui/LedgerEntriesTab";
 import { BookReveal } from "@/modules/workspace/ui/BookReveal";
 import type { BookDto } from "@/modules/ledger/contracts";
@@ -19,9 +18,6 @@ import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-st
 import type { InterfaceLanguage } from "@/modules/auth/contracts";
 
 // Dynamic imports keep inactive tab dependencies out of the initial Stream bundle.
-// Each inactive tab is lazily loaded by next/dynamic; its locale messages
-// are loaded separately via DeferredFeatureMessages at the usage site
-// so that the locale prop is available from the parent component scope.
 const DetailsTab = dynamic(
   () => import("@/modules/workspace/ui/DetailsTab").then((m) => m.DetailsTab),
   { loading: () => <DetailsTabSkeleton /> }
@@ -43,7 +39,6 @@ interface LedgerTabPanelsProps {
   books: readonly BookDto[];
   activeTab: LedgerTab;
   hidden: boolean;
-  locale: string;
   ledgerId: string;
   ledger: LedgerDto;
   categories: EntryCategoryWithCount[];
@@ -77,7 +72,6 @@ export function LedgerTabPanels({
   books,
   activeTab,
   hidden,
-  locale,
   ledgerId,
   ledger,
   categories,
@@ -105,18 +99,16 @@ export function LedgerTabPanels({
       {activeTab === "stream" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           {timeZoneReady ? (
-            <DeferredFeatureMessages feature="stream" locale={locale} fallback={null}>
-              <LedgerEntriesTab
-                bookId={recordScope ?? undefined}
-                ledgerId={ledgerId}
-                ledger={ledger}
-                periodParams={periodParams}
-                onFiltersChange={onFiltersChange}
-                advancedFilters={advancedFilters}
-                collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
-                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-              />
-            </DeferredFeatureMessages>
+            <LedgerEntriesTab
+              bookId={recordScope ?? undefined}
+              ledgerId={ledgerId}
+              ledger={ledger}
+              periodParams={periodParams}
+              onFiltersChange={onFiltersChange}
+              advancedFilters={advancedFilters}
+              collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
+              {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+            />
           ) : (
             <EntriesTabSkeleton />
           )}
@@ -126,22 +118,16 @@ export function LedgerTabPanels({
       {activeTab === "details" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           {timeZoneReady ? (
-            <DeferredFeatureMessages
-              feature="details"
-              locale={locale}
-              fallback={<DetailsTabSkeleton />}
-            >
-              <DetailsTab
-                bookId={recordScope ?? undefined}
-                ledgerId={ledgerId}
-                categories={categories.length > 0 ? categories : []}
-                ledger={ledger}
-                periodParams={periodParams}
-                onFiltersChange={onFiltersChange}
-                advancedFilters={advancedFilters}
-                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-              />
-            </DeferredFeatureMessages>
+            <DetailsTab
+              bookId={recordScope ?? undefined}
+              ledgerId={ledgerId}
+              categories={categories.length > 0 ? categories : []}
+              ledger={ledger}
+              periodParams={periodParams}
+              onFiltersChange={onFiltersChange}
+              advancedFilters={advancedFilters}
+              {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+            />
           ) : (
             <DetailsTabSkeleton />
           )}
@@ -151,21 +137,15 @@ export function LedgerTabPanels({
       {activeTab === "stats" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           {timeZoneReady ? (
-            <DeferredFeatureMessages
-              feature="stats"
-              locale={locale}
-              fallback={<StatsTabSkeleton />}
-            >
-              <StatsTab
-                bookId={recordScope ?? undefined}
-                ledgerId={ledgerId}
-                ledger={ledger}
-                onCategoryDrilldown={onCategoryDrilldown}
-                onDateDrilldown={onDateDrilldown}
-                {...(ledgerToday !== undefined ? { ledgerToday } : {})}
-                {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-              />
-            </DeferredFeatureMessages>
+            <StatsTab
+              bookId={recordScope ?? undefined}
+              ledgerId={ledgerId}
+              ledger={ledger}
+              onCategoryDrilldown={onCategoryDrilldown}
+              onDateDrilldown={onDateDrilldown}
+              {...(ledgerToday !== undefined ? { ledgerToday } : {})}
+              {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
+            />
           ) : (
             <StatsTabSkeleton />
           )}
@@ -174,23 +154,17 @@ export function LedgerTabPanels({
 
       {activeTab === "settings" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
-          <DeferredFeatureMessages
-            feature="settings"
-            locale={locale}
-            fallback={<SettingsTabSkeleton />}
-          >
-            <SettingsTab
-              ledgerId={ledgerId}
-              ledger={ledger}
-              initialCategories={categories}
-              initialBooks={books}
-              {...(userEmail !== undefined ? { userEmail } : {})}
-              {...(hasPassword !== undefined ? { hasPassword } : {})}
-              {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
-              {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
-              {...(onGoToDetails == null ? {} : { onGoToDetails })}
-            />
-          </DeferredFeatureMessages>
+          <SettingsTab
+            ledgerId={ledgerId}
+            ledger={ledger}
+            initialCategories={categories}
+            initialBooks={books}
+            {...(userEmail !== undefined ? { userEmail } : {})}
+            {...(hasPassword !== undefined ? { hasPassword } : {})}
+            {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
+            {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
+            {...(onGoToDetails == null ? {} : { onGoToDetails })}
+          />
         </div>
       )}
     </div>

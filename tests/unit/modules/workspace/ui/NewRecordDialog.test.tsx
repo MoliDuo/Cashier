@@ -92,7 +92,6 @@ function renderDialog(overrides: Partial<Parameters<typeof NewRecordDialog>[0]> 
     isOpen: false,
     onOpenChange: vi.fn(),
     isSubmitting: false,
-    locale: "zh",
     ledgerId,
     activeTab: "stream",
     committedFilters: {},

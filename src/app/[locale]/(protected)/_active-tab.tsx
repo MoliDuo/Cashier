@@ -13,7 +13,6 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import { parseLedgerTab } from "@/lib/ledger-tabs";
-import { pickMessages, FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
 import {
   getScopedLedgerSearchParams,
   readLedgerFilterParams,
@@ -124,22 +123,8 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   // a recovery pass after the response finishes.
   scheduleProcessingRecoveryAfter(ledgerId);
 
-  const allMessages = await messagesPromise;
-  const activeFeature =
-    activeTab === "details"
-      ? "details"
-      : activeTab === "stats"
-        ? "stats"
-        : activeTab === "settings"
-          ? "settings"
-          : "stream";
-  const activeMessages = pickMessages(allMessages, [
-    ...FEATURE_MESSAGES.shell,
-    ...FEATURE_MESSAGES[activeFeature],
-  ]);
-
   return (
-    <NextIntlClientProvider messages={activeMessages} locale={locale}>
+    <NextIntlClientProvider messages={await messagesPromise} locale={locale}>
       <ActiveShell ledgerId={ledgerId}>
         <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
           <ActiveTabBootstrap

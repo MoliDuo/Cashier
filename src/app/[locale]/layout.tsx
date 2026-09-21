@@ -4,7 +4,6 @@ import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { pickMessages, FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
 
 function validateLocale(locale: string) {
   if (!hasLocale(routing.locales, locale)) {
@@ -57,10 +56,9 @@ export default async function LocaleLayout({
 }>): Promise<React.ReactNode> {
   const locale = validateLocale((await params).locale);
 
-  // Load only shell namespaces for the global layout.
-  // Protected feature namespaces are loaded by child providers.
-  const allMessages = await getMessages({ locale });
-  const shellMessages = pickMessages(allMessages, FEATURE_MESSAGES.shell);
+  // One catalog for the whole app. Two readers with it installed as a PWA are
+  // not who a split, lazily fetched catalog was saving bytes for.
+  const messages = await getMessages({ locale });
   const tCommon = await getTranslations({ locale, namespace: "Common" });
 
   // `scroll-behavior: smooth` is set in globals.css; the attribute tells the
@@ -69,7 +67,7 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} suppressHydrationWarning data-scroll-behavior="smooth">
       <body className="antialiased" style={{ backgroundColor: "var(--bg)" }}>
-        <NextIntlClientProvider messages={shellMessages} locale={locale}>
+        <NextIntlClientProvider messages={messages} locale={locale}>
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[300] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:text-text focus:shadow-modal"

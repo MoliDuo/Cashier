@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { DeferredFeatureMessages } from "@/i18n/DeferredFeatureMessages";
 import {
   useCategoryAssignmentJob,
   type CategoryAssignmentNotice,
@@ -23,7 +22,6 @@ export function CategoryAssignmentProvider({
   ledgerId: string;
   children: ReactNode;
 }) {
-  const locale = useLocale();
   const assignment = useCategoryAssignmentJob(ledgerId);
   const { notices, consumeNotice } = assignment;
   // The band and the completion notice are the only readers of the details
@@ -43,7 +41,7 @@ export function CategoryAssignmentProvider({
       }}
     >
       {hasSomethingToSay ? (
-        <DeferredFeatureMessages feature="details" locale={locale} fallback={null}>
+        <>
           {notices.map((notice) => (
             <CategoryAssignmentNoticeReporter
               key={notice.jobId}
@@ -61,7 +59,7 @@ export function CategoryAssignmentProvider({
               onTaskRegistered={assignment.registerSubmittedJob}
             />
           ) : null}
-        </DeferredFeatureMessages>
+        </>
       ) : null}
       {children}
     </CategoryAssignmentContext.Provider>

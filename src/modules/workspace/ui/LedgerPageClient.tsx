@@ -1,10 +1,8 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { useLocale, useMessages, useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
-import { FEATURE_MESSAGES } from "@/i18n/client-feature-messages";
-import { useFeatureMessages } from "@/i18n/use-feature-messages";
 import { useDrilldownNavigation } from "../hooks/useDrilldownNavigation";
 import { useLedgerHistorySync } from "../hooks/useLedgerHistorySync";
 import { useLedgerTabs } from "../hooks/useLedgerTabs";
@@ -54,16 +52,6 @@ function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded bg-surface2", className)} />;
 }
 
-function getFeatureForTab(activeTab: LedgerTab): keyof typeof FEATURE_MESSAGES {
-  return activeTab === "details"
-    ? "details"
-    : activeTab === "stats"
-      ? "stats"
-      : activeTab === "settings"
-        ? "settings"
-        : "stream";
-}
-
 export function LedgerPageClient({
   ledgerId,
   initialLedger,
@@ -108,16 +96,6 @@ export function LedgerPageClient({
     locale,
     legacyScope: activeTab === "details" ? "details" : "stream",
   });
-
-  const parentMessages = useMessages();
-  const activeFeature = getFeatureForTab(activeTab);
-  const activeFeatureMessages = useFeatureMessages(
-    locale,
-    activeFeature,
-    parentMessages as Record<string, unknown>
-  );
-  const activeFeatureStatus = activeFeatureMessages.status;
-  const retryFeatureMessages = activeFeatureMessages.retry;
 
   const newRecordDialog = useNewRecordDialogState({ ledgerId });
   const {
@@ -202,9 +180,6 @@ export function LedgerPageClient({
         {/* Every tab refreshes from its own destination in the tab bar, so no
             tab carries a refresh control of its own. Only the active tab is
             mounted — inactive tabs load lazily. */}
-        {activeFeatureStatus === "error" ? (
-          <LedgerQueryErrorBanner empty onRetry={retryFeatureMessages} />
-        ) : null}
         {categoriesQuery.isError ? (
           <LedgerQueryErrorBanner
             empty={categoriesHaveNoData}
@@ -224,7 +199,6 @@ export function LedgerPageClient({
           books={books ?? []}
           activeTab={activeTab}
           hidden={categoriesHaveNoData}
-          locale={locale}
           ledgerId={ledgerId}
           ledger={ledger}
           categories={categories}
@@ -249,7 +223,6 @@ export function LedgerPageClient({
           isOpen={isInputOpen}
           onOpenChange={handleDialogOpenChange}
           isSubmitting={isInputSubmitting}
-          locale={locale}
           ledgerId={ledgerId}
           activeTab={activeTab}
           committedFilters={filters}

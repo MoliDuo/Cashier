@@ -63,7 +63,6 @@ const baseProps = {
   onRecordScopeChange: vi.fn(),
   books,
   hidden: false,
-  locale: "en",
   ledgerId: "ledger-1",
   ledger: ledgerFixture,
   categories: [],
