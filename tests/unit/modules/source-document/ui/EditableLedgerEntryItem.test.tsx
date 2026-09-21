@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { expectAmountVariant } from "tests/helpers/class-tables";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { EditableLedgerEntryItem } from "@/modules/source-document/ui/EditableLedgerEntryItem";
 
@@ -65,9 +66,10 @@ describe("EditableLedgerEntryItem currency control", () => {
   it("shows the amount as plain, undimmed text when read-only", () => {
     renderItem(true);
 
+    // Read-only is not "disabled": the figure is written exactly as an
+    // editable one is, at full strength.
     const amount = screen.getByText("¥18.00");
-    expect(amount).toHaveClass("text-text");
-    expect(amount).not.toHaveClass("opacity-50");
+    expectAmountVariant(amount, "item");
     expect(screen.queryByRole("button", { name: "货币" })).not.toBeInTheDocument();
   });
 
@@ -91,12 +93,12 @@ describe("EditableLedgerEntryItem currency control", () => {
     renderItem(true);
 
     const converted = screen.getByText("¥72.00");
-    expect(converted).toHaveClass("text-base", "font-semibold", "text-text");
+    expectAmountVariant(converted, "item");
 
     // The original amount is named by its currency code alone: the row already
     // reads as a converted one, so no "≈" marks the figure below.
     const original = screen.getByText((text) => text.startsWith("USD"));
-    expect(original).toHaveClass("text-xs", "text-muted-foreground");
+    expectAmountVariant(original, "secondary");
     expect(original.textContent).toContain("USD");
     expect(original.textContent).not.toContain("≈");
 

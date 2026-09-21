@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { textRoleClassName } from "@/components/typography";
 import { useLocale, useTranslations } from "next-intl";
 import {
   formatDateTimeForApi,
@@ -131,7 +132,9 @@ export function DateFilter({
             className={cn("shrink-0 text-muted-foreground", isSmall ? "h-3.5 w-3.5" : "h-4 w-4")}
           />
         )}
-        <span className={cn("min-w-0 text-text text-sm", readOnlyTextClassName)}>{dateLabel}</span>
+        <span className={textRoleClassName("body", cn("min-w-0", readOnlyTextClassName))}>
+          {dateLabel}
+        </span>
       </span>
     );
   }

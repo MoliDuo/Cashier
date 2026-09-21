@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { expectAmountVariant, expectTextRole } from "tests/helpers/class-tables";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
 import { SourceDocumentDateOrganization } from "@/modules/source-document/ui/SourceDocumentDateOrganization";
 
@@ -229,7 +230,7 @@ describe("SourceDocumentDateOrganization", () => {
       within(screen.getByTestId("date-organization-group-header")).getByText("¥18.00")
     ).toBeInTheDocument();
     // Entry rows share the line-item styling so the two lists line up.
-    expect(screen.getByText("早餐")).toHaveClass("font-medium", "text-text");
+    expectTextRole(screen.getByText("早餐"), "bodyStrong");
   });
 
   it("keeps an adjusted date after finishing the draft and applies it", async () => {
@@ -411,12 +412,12 @@ describe("SourceDocumentDateOrganization", () => {
     // One card per date, each carrying the suggestion's tint…
     const headers = screen.getAllByTestId("date-organization-group-header");
     expect(headers).toHaveLength(2);
-    expect(headers[0]?.parentElement).toHaveClass("rounded-lg", "bg-info/5");
+    expect(headers[0]?.parentElement).toHaveClass("bg-info/5");
 
     // …headed by the date the entries would land on, centred, over that date's
     // total, which is the sum of exactly the rows below it.
     const today = within(headers[0] as HTMLElement);
-    expect(today.getByText("今天")).toHaveClass("text-sm", "font-medium", "text-text");
+    expectTextRole(today.getByText("今天"), "bodyStrong");
     expect(today.getByText("¥18.00")).toBeInTheDocument();
     const yesterday = within(headers[1] as HTMLElement);
     expect(yesterday.getByText("昨天")).toBeInTheDocument();
@@ -507,12 +508,12 @@ describe("SourceDocumentDateOrganization", () => {
 
     const row = document.querySelector('[aria-live="polite"]') as HTMLElement;
     const converted = within(row).getByText("¥72.00");
-    expect(converted).toHaveClass("text-base", "font-semibold");
+    expectAmountVariant(converted, "item");
 
     // The original amount is named by its currency code alone: no "≈" marks the
     // figure below the converted one.
     const original = within(row).getByText((text) => text.startsWith("USD"));
-    expect(original).toHaveClass("text-xs", "text-muted-foreground");
+    expectAmountVariant(original, "secondary");
     expect(original.textContent).toContain("USD");
     expect(original.textContent).not.toContain("≈");
 

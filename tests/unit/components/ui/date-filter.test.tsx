@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { expectTextRole } from "tests/helpers/class-tables";
 import { DateFilter } from "@/components/ui/date-filter";
 
 vi.mock("next-intl", () => ({
@@ -62,15 +63,13 @@ describe("DateFilter", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("keeps the read-only value at text-sm even when size is sm", () => {
+  it("writes the read-only value as body text even when size is sm", () => {
     // Regression: the static read-only text inherited the interactive `sm`
-    // size and rendered at text-xs, so the date looked smaller than the
-    // surrounding row.
+    // size and rendered a tier smaller than the row around it. It takes the
+    // shared body role now, so `sm` cannot reach it at all.
     render(<DateFilter value="2026-07-28" onChange={() => {}} readOnly size="sm" />);
 
-    const value = screen.getByText("2026年7月28日 星期二");
-    expect(value).toHaveClass("text-sm");
-    expect(value).not.toHaveClass("text-xs");
+    expectTextRole(screen.getByText("2026年7月28日 星期二"), "body");
   });
 
   it("does not open a calendar when the read-only value is clicked", () => {
@@ -90,12 +89,16 @@ describe("DateFilter", () => {
         onChange={() => {}}
         readOnly
         hideReadOnlyIcon
-        readOnlyTextClassName="text-base font-semibold"
+        readOnlyTextClassName="caller-supplied"
       />
     );
 
     expect(container.querySelector(".lucide-calendar")).not.toBeInTheDocument();
-    expect(screen.getByText("2026年7月28日 星期二")).toHaveClass("text-base", "font-semibold");
+    // What the caller asks for reaches the value, and the role it sits in is
+    // still applied underneath: restyling is an addition, not a replacement.
+    const value = screen.getByText("2026年7月28日 星期二");
+    expect(value).toHaveClass("caller-supplied");
+    expectTextRole(value, "body");
   });
 
   it("falls back to the interactive picker when read-only has no value", () => {

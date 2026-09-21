@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SourceDocumentTotal } from "@/modules/source-document/ui/SourceDocumentViewDetails/components/SourceDocumentTotal";
+import { expectAmountVariant } from "tests/helpers/class-tables";
 
 function renderTotal(staleConversionCount = 0, unconvertedCount = 0) {
   return render(
@@ -18,8 +19,9 @@ describe("SourceDocumentTotal", () => {
     const { container } = renderTotal();
 
     expect(container.textContent).toBe("¥92.00");
-    // A bare amount, matching the ledger stream toolbar's total.
-    expect(screen.getByText("¥92.00")).toHaveClass("text-base", "font-semibold");
+    // A bare amount, written like the ledger stream toolbar's total: the same
+    // variant, not merely the same size as it happens to be set today.
+    expectAmountVariant(screen.getByText("¥92.00"), "summary");
     expect(container.textContent).not.toContain("=");
   });
 

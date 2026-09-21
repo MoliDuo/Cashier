@@ -85,10 +85,17 @@ describe("SelectableCardSurface", () => {
       </SelectableCardSurface>
     );
 
-    // Nothing is drawn over the card's content, and an unselected card carries
-    // no outline of its own — only the selected one does.
+    // Nothing decorative is drawn over the card's content: the card itself is
+    // what says whether it is in, and it says so where assistive tech reads it.
     expect(container.querySelector("[aria-hidden='true']")).toBeNull();
-    expect(container.querySelector('[data-selection-mode="true"]')).not.toHaveClass("ring-primary");
+    expect(container.querySelector('[data-selection-mode="true"]')).toHaveAttribute(
+      "data-selected",
+      "false"
+    );
+    expect(screen.getByRole("checkbox", { name: "Select lunch" })).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
 
     rerender(
       <SelectableCardSurface
@@ -101,7 +108,12 @@ describe("SelectableCardSurface", () => {
       </SelectableCardSurface>
     );
 
-    expect(container.querySelector('[data-selected="true"]')).toHaveClass("ring-1", "ring-primary");
+    expect(container.querySelector("[aria-hidden='true']")).toBeNull();
+    expect(container.querySelector('[data-selected="true"]')).not.toBeNull();
+    expect(screen.getByRole("checkbox", { name: "Select lunch" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
   });
 
   it("disables an unselected card when the selection limit is reached", async () => {

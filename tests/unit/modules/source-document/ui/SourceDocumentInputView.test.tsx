@@ -258,14 +258,18 @@ describe("SourceDocumentInputView image drop zone", () => {
     expect(onAddImageFiles).not.toHaveBeenCalled();
   });
 
-  it("highlights the form only while a file drag is over it", () => {
+  it("says the form will take the drop, and stops saying it once the drag leaves", () => {
     const { form } = renderDropZone();
     const drag = { dataTransfer: { types: ["Files"], files: [] } };
 
     fireEvent.dragEnter(form, drag);
+    // The highlight is the visible half; the announcement is the half a reader
+    // who cannot see it depends on, and both come from the same state.
+    expect(screen.getByRole("status")).toHaveTextContent("Drop images to add");
     expect(form).toHaveClass("ring-1");
 
     fireEvent.dragLeave(form, drag);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(form).not.toHaveClass("ring-1");
   });
 });

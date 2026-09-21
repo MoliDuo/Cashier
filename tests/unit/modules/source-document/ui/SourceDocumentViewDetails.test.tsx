@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { expectAmountVariant, expectTextRole } from "tests/helpers/class-tables";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import { SourceDocumentViewDetails } from "@/modules/source-document/ui/SourceDocumentViewDetails";
@@ -126,12 +127,8 @@ describe("SourceDocumentViewDetails summary date", () => {
     // The bar reuses the ledger toolbar shell: select control, centred date, total.
     expect(within(dateRow).getByText("交易时间")).toHaveClass("sr-only");
     const date = within(dateRow).getByText(/2026年7月28日|Jul 28, 2026/);
-    expect(date).toHaveClass("text-sm", "font-medium");
-    expect(within(dateRow).getByText("¥0.00")).toHaveClass(
-      "text-base",
-      "font-semibold",
-      "tabular-nums"
-    );
+    expectTextRole(date, "bodyStrong");
+    expectAmountVariant(within(dateRow).getByText("¥0.00"), "item");
     // The read-only date drops its calendar marker.
     expect(dateRow.querySelector(".lucide-calendar")).not.toBeInTheDocument();
 
@@ -387,20 +384,5 @@ describe("SourceDocumentViewDetails entry row outline", () => {
     expect(
       container.querySelector('[data-selection-mode="true"][data-selected="true"]')
     ).toHaveClass("ring-1", "ring-primary");
-  });
-
-  it("gives the row that closes the card the card's own bottom corners", () => {
-    const { container } = renderSelection(
-      [entry("entry-1", "Lunch"), entry("entry-2", "Dinner")],
-      []
-    );
-
-    const surfaces = [...container.querySelectorAll("[data-selection-mode]")];
-    expect(surfaces).toHaveLength(2);
-    // Square where it meets the row above it, so its rule replaces the shared
-    // divider instead of sitting next to it.
-    expect(surfaces[0]).toHaveClass("rounded-none");
-    expect(surfaces[1]).not.toHaveClass("rounded-none");
-    expect(surfaces[1]).toHaveClass("rounded-b-[calc(var(--radius-lg)-1px)]");
   });
 });

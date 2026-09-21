@@ -62,6 +62,9 @@ export function SourceDocumentDetailFooterActions({
               onClick={onCancelProcessing}
               disabled={interactionDisabled}
               aria-label={tActions("cancelProcessing")}
+              // The spinner is the only sign the cancellation was taken; a
+              // reader who cannot see it gets the same news from aria-busy.
+              aria-busy={isCancelling || undefined}
             >
               <XCircle
                 aria-hidden="true"

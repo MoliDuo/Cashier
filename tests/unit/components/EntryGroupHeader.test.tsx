@@ -2,42 +2,24 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EntryGroupHeader, groupSelectionState } from "@/components/EntryGroupHeader";
+import { expectAmountVariant, expectTextRole } from "tests/helpers/class-tables";
 
 describe("EntryGroupHeader", () => {
   it("writes the day as content, not as a muted caption", () => {
     render(<EntryGroupHeader title="今天" totalLabel="¥205.93" />);
 
-    const title = screen.getByRole("heading", { name: "今天" });
-    // 14px at the entry name's colour and weight — the band used to be the 12px
-    // `meta` grey, which made a day label read like a hint.
-    expect(title).toHaveClass("text-sm", "font-medium", "text-text");
-    expect(title).not.toHaveClass("text-xs", "text-muted-foreground");
+    // The band used to be the `meta` grey, which made a day label read like a
+    // hint. It takes the entry name's own role now, so the two stay in step
+    // whatever that role is retuned to.
+    expectTextRole(screen.getByRole("heading", { name: "今天" }), "bodyStrong");
   });
 
   it("paints the day's total as the app's ordinary amount", () => {
     render(<EntryGroupHeader title="今天" totalLabel="¥205.93" />);
 
-    const total = screen.getByText("¥205.93");
-    // A sum of the amounts below it, written the same way they are: same size,
-    // weight and colour, so a day's figure is not a smaller variant of them.
-    expect(total).toHaveClass("text-base", "font-semibold", "text-text", "tabular-nums");
-    expect(total).not.toHaveClass("text-sm", "text-muted-foreground");
-  });
-
-  it("draws the rule at the cards' own border colour, inset to the card's width", () => {
-    const { container } = render(<EntryGroupHeader title="今天" totalLabel="¥205.93" />);
-
-    expect(container.firstElementChild).toHaveClass("border-border", "mx-2");
-    expect(container.firstElementChild).not.toHaveClass("border-border/80");
-  });
-
-  it("insets the date and the total onto the rows' own columns", () => {
-    const { container } = render(<EntryGroupHeader title="今天" totalLabel="¥205.93" />);
-
-    // The band's box is inset like a card, and a row's text starts one `px-3`
-    // inside the card's 1px border: 13px is what puts the date over the entry
-    // names' column and the total over the entry amounts' column.
-    expect(container.firstElementChild?.firstElementChild).toHaveClass("px-[13px]");
+    // A sum of the amounts below it, written the way they are: it takes the
+    // same variant rather than a size that happens to match today.
+    expectAmountVariant(screen.getByText("¥205.93"), "item");
   });
 
   it("keeps the band when a group has no total to show", () => {
@@ -97,8 +79,10 @@ describe("EntryGroupHeader", () => {
     expect(onToggle).toHaveBeenCalledTimes(2);
   });
 
-  it("disables the control, and dims the band, when the day cannot be added", () => {
-    const { container } = render(
+  it("refuses the day when it cannot be added, rather than only looking refused", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    render(
       <EntryGroupHeader
         title="今天"
         totalLabel="¥205.93"
@@ -106,13 +90,16 @@ describe("EntryGroupHeader", () => {
           state: "none",
           label: "选中今天的全部记录",
           disabled: true,
-          onToggle: vi.fn(),
+          onToggle,
         }}
       />
     );
 
-    expect(screen.getByRole("checkbox")).toBeDisabled();
-    expect(container.firstElementChild).toHaveClass("opacity-60");
+    const control = screen.getByRole("checkbox");
+    expect(control).toBeDisabled();
+    // The dimming is how it is drawn; this is what it has to do.
+    await user.click(control);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
 

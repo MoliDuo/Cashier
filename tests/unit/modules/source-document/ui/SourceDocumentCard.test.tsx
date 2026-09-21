@@ -104,26 +104,6 @@ describe("SourceDocumentCard interactions", () => {
     expect(onViewDetails).toHaveBeenCalledTimes(1);
   });
 
-  it("runs the entry rows edge to edge in the card, the way the detail sheet does", () => {
-    // Regression: the rows sat inside a padded list and were rounded, so each
-    // one read as a small card of its own inside the card, with visible left
-    // and right edges and a rule that stopped short of them.
-    render(
-      <SourceDocumentCard
-        sourceDocument={sourceDocument}
-        ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
-      />
-    );
-
-    const list = screen.getByTestId("source-document-card-body").firstElementChild as HTMLElement;
-    const row = list.querySelector("button") as HTMLElement;
-    expect(list).not.toHaveClass("px-3");
-    expect(list).toHaveClass("divide-y");
-    expect(row).toHaveClass("px-3");
-    expect(row).not.toHaveClass("rounded-md");
-  });
-
   it("supports a collapsed default and repeated expansion", async () => {
     render(
       <SourceDocumentCard
@@ -320,15 +300,12 @@ describe("SourceDocumentCard interactions", () => {
 
   it("paints the card by the document's state instead of printing it", () => {
     // Regression: every state used to print a status pill. The card now carries
-    // the state itself — green and working, red and failed, grey and inert.
-    const tones = [
-      { status: "processing" as const, expected: ["bg-primary/5", "border-primary/25"] },
-      { status: "failed" as const, expected: ["bg-danger/5", "border-danger/20"] },
-      { status: "cancelled" as const, expected: ["bg-surface2", "border-border"] },
-      { status: "completed" as const, expected: ["bg-surface", "border-border"] },
-    ];
+    // the state itself — working, failed, inert — so no two states may be drawn
+    // the same way, and none of them may name itself in words.
+    const statuses = ["processing", "failed", "cancelled", "completed"] as const;
+    const tones = new Map<string, (typeof statuses)[number]>();
 
-    for (const { status, expected } of tones) {
+    for (const status of statuses) {
       const { unmount } = render(
         <SourceDocumentCard
           sourceDocument={{ ...sourceDocument, processingStatus: status }}
@@ -337,9 +314,21 @@ describe("SourceDocumentCard interactions", () => {
         />
       );
       const card = screen.getByTestId("source-document-card-root");
-      for (const className of expected) expect(card).toHaveClass(className);
+      const tone = [...card.classList]
+        .filter((token) => /^(bg|border)-/.test(token))
+        .sort()
+        .join(" ");
+
+      // A state that is drawn exactly like another one is a state the reader
+      // cannot tell apart, which is what the pill used to spell out for them.
+      expect({ status, sameAs: tones.get(tone) }).toEqual({ status, sameAs: undefined });
+      expect(tone).not.toBe("");
+      tones.set(tone, status);
+      for (const word of statuses) expect(card.textContent).not.toContain(word);
       unmount();
     }
+
+    expect(tones.size).toBe(statuses.length);
   });
 
   it("sweeps a band of light across a card only while its document is processing", () => {

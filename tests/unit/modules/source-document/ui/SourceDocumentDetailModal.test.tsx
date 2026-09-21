@@ -525,8 +525,8 @@ describe("SourceDocumentDetailModal batch mode", () => {
       )
     );
 
-    expect(
-      screen.getByText("cancelProcessing").closest("button")?.querySelector("svg")
-    ).toHaveClass("animate-spin");
+    const cancel = screen.getByText("cancelProcessing").closest("button");
+    expect(cancel).toHaveAttribute("aria-busy", "true");
+    expect(cancel?.querySelector("svg")).toHaveClass("animate-spin");
   });
 });
