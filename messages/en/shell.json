@@ -79,15 +79,7 @@
     "otpCodeLabel": "Your verification code:",
     "otpExpiry": "This code will expire in {minutes} minutes.",
     "otpWarning": "Do not share this code with anyone. We will never ask for your verification code.",
-    "otpFooter": "If you didn't request this code, you can safely ignore this email.",
-    "loginSubject": "New sign-in to your account",
-    "loginPreview": "A new sign-in was detected on your account",
-    "loginHeading": "New sign-in detected",
-    "loginIntro": "A new sign-in was detected on your account.",
-    "loginTimeLabel": "Time:",
-    "loginEmailLabel": "Email:",
-    "loginSafe": "If this was you, no action is needed.",
-    "loginWarn": "If you did not sign in, please secure your account immediately."
+    "otpFooter": "If you didn't request this code, you can safely ignore this email."
   },
   "Common": {
     "historicalRecord": "Historical record",

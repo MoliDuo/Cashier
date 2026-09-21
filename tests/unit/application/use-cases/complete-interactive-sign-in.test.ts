@@ -1,15 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EmailDeliveryPort, LedgerPort, OtpTokenPort } from "@/application/contracts";
+import type { LedgerPort, OtpTokenPort } from "@/application/contracts";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 
-const { resolveHomeMock, consumeOTPClaimMock, releaseOTPClaimMock, sendLoginNotificationMock } =
-  vi.hoisted(() => ({
-    resolveHomeMock: vi.fn(),
-    consumeOTPClaimMock: vi.fn(),
-    releaseOTPClaimMock: vi.fn(),
-    sendLoginNotificationMock: vi.fn(),
-  }));
+const { resolveHomeMock, consumeOTPClaimMock, releaseOTPClaimMock } = vi.hoisted(() => ({
+  resolveHomeMock: vi.fn(),
+  consumeOTPClaimMock: vi.fn(),
+  releaseOTPClaimMock: vi.fn(),
+}));
 
 vi.mock("@/modules/workspace/application/use-cases/resolve-home", () => ({
   resolveHome: resolveHomeMock,
@@ -20,16 +18,11 @@ vi.mock("@/modules/auth/services/otp-verification", () => ({
   releaseOTPClaim: releaseOTPClaimMock,
 }));
 
-vi.mock("@/modules/auth/services/notifications", () => ({
-  sendLoginNotification: sendLoginNotificationMock,
-}));
-
 import { completeInteractiveSignIn } from "@/application/use-cases/complete-interactive-sign-in";
 
 const ledgers = {} as LedgerPort;
 const otpTokens = {} as OtpTokenPort;
-const emailDelivery = {} as EmailDeliveryPort;
-const dependencies = { ledgers, otpTokens, emailDelivery };
+const dependencies = { ledgers, otpTokens };
 const principal: AuthenticatedPrincipal = {
   id: "user-1",
   email: "user@example.com",
@@ -54,7 +47,6 @@ describe("completeInteractiveSignIn", () => {
     });
     consumeOTPClaimMock.mockResolvedValue(true);
     releaseOTPClaimMock.mockResolvedValue(true);
-    sendLoginNotificationMock.mockResolvedValue(undefined);
   });
 
   it("verifies the shared ledger before completing sign-in", async () => {
@@ -117,16 +109,6 @@ describe("completeInteractiveSignIn", () => {
 
     expect(caught).toBeInstanceOf(AuthSignInError);
     expect(caught).toMatchObject({ code: AUTH_ERROR_CODES.OTP_INVALID });
-  });
-
-  it("sends a member login notification", async () => {
-    const result = await completeInteractiveSignIn(principal, dependencies);
-
-    expect(sendLoginNotificationMock).toHaveBeenCalledWith(
-      { email: "user@example.com", locale: "en" },
-      emailDelivery
-    );
-    expect(result).toEqual(principal);
   });
 
   it("releases the claim when consuming it throws", async () => {

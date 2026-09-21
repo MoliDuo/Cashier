@@ -1,11 +1,10 @@
-import type { EmailDeliveryPort, LedgerPort, OtpTokenPort } from "@/application/contracts";
+import type { LedgerPort, OtpTokenPort } from "@/application/contracts";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { consumeOTPClaim, releaseOTPClaim } from "@/modules/auth/services/otp-verification";
 import { resolveHome } from "@/modules/workspace/application/use-cases/resolve-home";
-import { sendLoginNotification } from "@/modules/auth/services/notifications";
 
 /**
  * Complete the cross-domain part of an interactive sign-in.
@@ -19,7 +18,6 @@ export async function completeInteractiveSignIn(
   dependencies: {
     ledgers: Pick<LedgerPort, "getSharedForMember">;
     otpTokens: OtpTokenPort;
-    emailDelivery: EmailDeliveryPort;
   }
 ): Promise<AuthenticatedPrincipal> {
   const claim = principal.pendingOtpClaim ?? null;
@@ -35,16 +33,6 @@ export async function completeInteractiveSignIn(
       });
     }
     throw error;
-  }
-
-  if (principal.email != null && principal.email !== "") {
-    await sendLoginNotification(
-      {
-        email: principal.email,
-        ...(principal.locale == null ? {} : { locale: principal.locale }),
-      },
-      dependencies.emailDelivery
-    );
   }
 
   if (claim == null) {

@@ -88,7 +88,6 @@ describe("authenticateWithOTP", () => {
     await completeInteractiveSignIn(principal, {
       ledgers: serverComposition.ledgers,
       otpTokens: serverComposition.otpTokens,
-      emailDelivery: serverComposition.email,
     });
 
     const token = await db.query.otpTokens.findFirst({

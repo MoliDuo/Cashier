@@ -1032,15 +1032,7 @@
     "otpCodeLabel": "您的验证码：",
     "otpExpiry": "该验证码将在 {minutes} 分钟后失效。",
     "otpWarning": "请勿将验证码透露给任何人。我们绝不会主动向您索取验证码。",
-    "otpFooter": "如果这不是您本人操作，可以忽略这封邮件。",
-    "loginSubject": "您的账户有新的登录",
-    "loginPreview": "检测到您的账户有新的登录",
-    "loginHeading": "检测到新登录",
-    "loginIntro": "检测到您的账户有新的登录。",
-    "loginTimeLabel": "登录时间：",
-    "loginEmailLabel": "登录邮箱：",
-    "loginSafe": "如果这是您本人操作，无需采取任何行动。",
-    "loginWarn": "如果不是您本人登录，请立即保护您的账户安全。"
+    "otpFooter": "如果这不是您本人操作，可以忽略这封邮件。"
   },
   "Currency": {
     "conversionUnavailable": "暂时无法换算"
