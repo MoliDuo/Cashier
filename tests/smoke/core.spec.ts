@@ -6,9 +6,12 @@ test("password login, default ledger, manual entry, edit, delete and sign out", 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const item = `Smoke ${testInfo.project.name} ${testInfo.repeatEachIndex}`;
-  // The stream tab refreshes from its own toolbar box, so the idle refresh
-  // control is that box's hint button rather than a button in the bar above.
-  const refreshControl = page.getByTestId("toolbar-refresh-hint");
+  // Every tab refreshes by tapping the destination it is already on, and the
+  // destinations stay disabled until the tab content has hydrated — so the
+  // stream destination doubles as the signal that the page is ready.
+  const refreshControl = page
+    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("button", { name: "Stream", exact: true });
   await expect
     .poll(
       async () => {

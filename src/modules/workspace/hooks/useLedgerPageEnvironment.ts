@@ -149,6 +149,5 @@ export function useLedgerPageEnvironment({
     effectiveTimeZone,
     deviceTimeZone,
     timeZoneReady,
-    dirtyChangeCount,
   };
 }

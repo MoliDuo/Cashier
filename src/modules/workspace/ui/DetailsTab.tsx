@@ -30,8 +30,6 @@ interface DetailsTabProps {
     search?: string | null;
   };
   timeZone?: string;
-  onRefresh?: (() => Promise<unknown> | unknown) | undefined;
-  isRefreshing?: boolean | undefined;
 }
 
 export function DetailsTab({
@@ -43,8 +41,6 @@ export function DetailsTab({
   onFiltersChange,
   advancedFilters,
   timeZone,
-  onRefresh,
-  isRefreshing,
 }: DetailsTabProps) {
   const data = useDetailsTabData({
     ledgerId,
@@ -123,8 +119,6 @@ export function DetailsTab({
           sentinelRef={sentinelRef}
           batch={batch}
           onViewEntry={handleViewEntry}
-          onRefresh={onRefresh}
-          isRefreshing={isRefreshing}
         />
       )}
     </>

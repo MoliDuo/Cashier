@@ -67,9 +67,6 @@ interface LedgerTabPanelsProps {
   hasPassword?: boolean | undefined;
   passwordUpdatedAt?: string | null | undefined;
   interfaceLanguage?: InterfaceLanguage | undefined;
-  /** Owned by the page, because the tab that needs it is the tab that is mounted. */
-  onRefresh?: () => Promise<unknown> | unknown;
-  isRefreshing?: boolean | undefined;
   onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
@@ -96,8 +93,6 @@ export function LedgerTabPanels({
   hasPassword,
   passwordUpdatedAt,
   interfaceLanguage,
-  onRefresh,
-  isRefreshing,
   onGoToDetails,
 }: LedgerTabPanelsProps) {
   const carriesBookSwitch = activeTab !== "settings" && books.length > 0;
@@ -120,8 +115,6 @@ export function LedgerTabPanels({
                 advancedFilters={advancedFilters}
                 collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
                 {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-                onRefresh={onRefresh}
-                isRefreshing={isRefreshing}
               />
             </DeferredFeatureMessages>
           ) : (
@@ -147,8 +140,6 @@ export function LedgerTabPanels({
                 onFiltersChange={onFiltersChange}
                 advancedFilters={advancedFilters}
                 {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-                onRefresh={onRefresh}
-                isRefreshing={isRefreshing}
               />
             </DeferredFeatureMessages>
           ) : (

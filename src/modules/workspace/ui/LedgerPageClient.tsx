@@ -9,7 +9,6 @@ import { useDrilldownNavigation } from "../hooks/useDrilldownNavigation";
 import { useLedgerHistorySync } from "../hooks/useLedgerHistorySync";
 import { useLedgerTabs } from "../hooks/useLedgerTabs";
 import { usePeriodFilter } from "../hooks/usePeriodFilter";
-import { useActiveTabQueryState } from "../hooks/useActiveTabQueryState";
 import { useNewRecordDialogState } from "../hooks/useNewRecordDialogState";
 import { useLedgerPageEnvironment } from "../hooks/useLedgerPageEnvironment";
 import { useRecordScope } from "../hooks/useRecordScope";
@@ -23,7 +22,6 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { textRoleClassName } from "@/components/typography";
 import { LedgerTabPanels } from "./LedgerTabPanels";
 import { NewRecordDialog } from "./NewRecordDialog";
-import { RefreshButton } from "@/components/ui/refresh-button";
 import { ModalStackGate } from "./ModalStackGate";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { pushLedgerUrl } from "../ledger-url-navigation";
@@ -150,7 +148,6 @@ export function LedgerPageClient({
     effectiveTimeZone,
     deviceTimeZone,
     timeZoneReady,
-    dirtyChangeCount,
   } = useLedgerPageEnvironment({
     ledgerId,
     scope: recordScope,
@@ -170,10 +167,6 @@ export function LedgerPageClient({
   });
 
   const advancedFilters = filterParams;
-  const { isRefreshing, refreshActiveTab } = useActiveTabQueryState({
-    ledgerId,
-    activeTab,
-  });
   const { handleCategoryDrilldown, handleDateDrilldown } = useDrilldownNavigation({
     searchParams,
     pathname,
@@ -206,18 +199,9 @@ export function LedgerPageClient({
   return (
     <CategoryAssignmentProvider key={ledgerId} ledgerId={ledgerId}>
       <div>
-        {/* The stream and details tabs refresh from their own toolbar box, so
-            only the tabs without one keep the bar. */}
-        {activeTab === "stats" || activeTab === "settings" ? (
-          <div className="flex h-9 items-center justify-end px-2">
-            <RefreshButton
-              onRefresh={refreshActiveTab}
-              isRefreshing={isRefreshing}
-              disabled={activeTab === "settings" && dirtyChangeCount > 0}
-            />
-          </div>
-        ) : null}
-        {/* Only mount the active tab — inactive tabs load lazily */}
+        {/* Every tab refreshes from its own destination in the tab bar, so no
+            tab carries a refresh control of its own. Only the active tab is
+            mounted — inactive tabs load lazily. */}
         {activeFeatureStatus === "error" ? (
           <LedgerQueryErrorBanner empty onRetry={retryFeatureMessages} />
         ) : null}
@@ -256,8 +240,6 @@ export function LedgerPageClient({
           hasPassword={hasPassword}
           passwordUpdatedAt={passwordUpdatedAt}
           interfaceLanguage={interfaceLanguage}
-          onRefresh={refreshActiveTab}
-          isRefreshing={isRefreshing}
           onGoToDetails={handleGoToDetails}
         />
 

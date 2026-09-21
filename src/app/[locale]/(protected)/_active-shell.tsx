@@ -1,11 +1,13 @@
 "use client";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { AppShell } from "@/modules/workspace/ui/AppShell";
 import { SwipeTabSurface } from "@/modules/workspace/ui/SwipeTabSurface";
 import { TabNavigation } from "@/modules/workspace/ui/TabNavigation";
+import { useActiveTabQueryState } from "@/modules/workspace/hooks/useActiveTabQueryState";
 import { useLedgerTabs } from "@/modules/workspace/hooks/useLedgerTabs";
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import {
@@ -61,7 +63,8 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
   const t = useTranslations("Common");
   const queryClient = useQueryClient();
   const { ready, onInputIntent, onOpenInput } = useShellController();
-  const { leaveConfirmOpen, attemptLeave, confirmLeave, cancelLeave } = useSettingsLeaveGuard();
+  const { hasDirtyChanges, leaveConfirmOpen, attemptLeave, confirmLeave, cancelLeave } =
+    useSettingsLeaveGuard();
 
   // The viewed book is the page's shared scope, published by LedgerPageClient
   // into the store, and a scope change is a client-side update with no server
@@ -79,12 +82,36 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
   });
   useTabScrollRestoration(ledgerId, activeTab);
 
+  // The destination a reader is already on has nowhere to navigate, so it
+  // carries the tab's refresh instead: every tab is reloaded from the same
+  // gesture, and no tab needs a control of its own for it.
+  const { isRefreshing, refreshActiveTab } = useActiveTabQueryState({ ledgerId, activeTab });
+  const [refreshPending, setRefreshPending] = useState(false);
+
+  const refreshCurrentTab = useCallback(async () => {
+    // A refetch would discard whatever 设置 is holding unsaved, and a refresh
+    // already under way needs no second one.
+    if (hasDirtyChanges || isRefreshing || refreshPending) return;
+    setRefreshPending(true);
+    try {
+      await refreshActiveTab();
+    } catch {
+      toast.error(t("refreshFailed"));
+    } finally {
+      setRefreshPending(false);
+    }
+  }, [hasDirtyChanges, isRefreshing, refreshActiveTab, refreshPending, t]);
+
   const guardedTabChange = useCallback(
     (tab: LedgerTab) => {
-      if (!ready || tab === activeTab) return;
+      if (!ready) return;
+      if (tab === activeTab) {
+        void refreshCurrentTab();
+        return;
+      }
       attemptLeave(() => handleTabChange(tab));
     },
-    [activeTab, attemptLeave, handleTabChange, ready]
+    [activeTab, attemptLeave, handleTabChange, ready, refreshCurrentTab]
   );
 
   const preloadTabCode = useCallback(
@@ -132,6 +159,7 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
       navigation={
         <TabNavigation
           disabled={!ready}
+          refreshing={refreshPending}
           activeTab={activeTab}
           onTabChange={guardedTabChange}
           onOpenInput={onOpenInput}

@@ -419,9 +419,10 @@ test("books production refreshes 设置 to pick up another browser's change", as
     await addBook(other.page, bookName);
 
     // The list this browser already holds is fresh, so only the manual refresh
-    // can bring the other browser's book in.
+    // can bring the other browser's book in — and 设置 refreshes by tapping the
+    // destination this browser is already on.
     await expect(bookRow(page, bookName)).toHaveCount(0);
-    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await openTab(page, "Settings");
     await expect(bookRow(page, bookName)).toBeVisible();
     await deleteBook(page, bookName);
     await expect(bookRow(other.page, bookName)).toHaveCount(1);

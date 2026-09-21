@@ -61,23 +61,6 @@ describe("LedgerEntriesToolbar", () => {
     expect(defaultProps.onSelectAll).toHaveBeenCalled();
   });
 
-  it("stops offering refresh once the box carries selection controls", () => {
-    const { rerender } = render(<LedgerEntriesToolbar {...defaultProps} onRefresh={vi.fn()} />);
-
-    expect(screen.getByTestId("toolbar-refresh-hint")).toBeInTheDocument();
-
-    rerender(
-      <LedgerEntriesToolbar
-        {...defaultProps}
-        onRefresh={vi.fn()}
-        isSelectionMode={true}
-        selectedCount={1}
-      />
-    );
-
-    expect(screen.queryByTestId("toolbar-refresh-hint")).not.toBeInTheDocument();
-  });
-
   it("keeps active status details inside the filter panel", () => {
     render(<LedgerEntriesToolbar {...defaultProps} filters={{ statuses: ["completed"] }} />);
 

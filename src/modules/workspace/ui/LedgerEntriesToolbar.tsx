@@ -49,8 +49,6 @@ interface LedgerEntriesToolbarProps {
   timeZone?: string;
   readOnly?: boolean;
   syncStatus?: ReactNode;
-  onRefresh?: (() => Promise<unknown> | unknown) | undefined;
-  isRefreshing?: boolean | undefined;
 }
 
 export function LedgerEntriesToolbar({
@@ -80,8 +78,6 @@ export function LedgerEntriesToolbar({
   timeZone,
   readOnly = false,
   syncStatus,
-  onRefresh,
-  isRefreshing,
 }: LedgerEntriesToolbarProps) {
   const t = useTranslations("LedgerEntriesTab");
   const tCommon = useTranslations("Common");
@@ -158,14 +154,9 @@ export function LedgerEntriesToolbar({
     handleDateDialogOpenChange(false);
   };
 
-  // Selection replaces the browsing controls, so the box stops being a refresh
-  // surface there: no hint over the count, and no stray refetch from a tap on
-  // the band.
   return (
     <EntriesToolbarShell
       syncStatus={syncStatus}
-      onRefresh={isSelectionMode ? undefined : onRefresh}
-      isRefreshing={isRefreshing}
       {...(!isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
       totalLabel={
         !isSelectionMode && filteredTotal !== undefined

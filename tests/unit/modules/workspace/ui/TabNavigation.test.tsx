@@ -44,6 +44,34 @@ describe("TabNavigation", () => {
     expect(onOpenInput).toHaveBeenCalledOnce();
   });
 
+  it("reports the active destination too, because it carries that tab's refresh", async () => {
+    const user = userEvent.setup();
+    const onTabChange = vi.fn();
+
+    renderNavigation(
+      <TabNavigation activeTab="stream" onTabChange={onTabChange} onOpenInput={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "流水" }));
+
+    expect(onTabChange).toHaveBeenCalledWith("stream");
+  });
+
+  it("spins the destination whose tab is refreshing, and leaves the others alone", () => {
+    renderNavigation(
+      <TabNavigation activeTab="stats" refreshing onTabChange={vi.fn()} onOpenInput={vi.fn()} />
+    );
+
+    const active = screen.getByRole("button", { name: /^统计/ });
+    expect(active.querySelector("svg")).toHaveClass("animate-spin");
+    expect(active).toHaveAttribute("aria-busy", "true");
+    // The wait is named for whoever cannot see the spinner.
+    expect(active).toHaveTextContent("刷新中…");
+    expect(screen.getByRole("button", { name: "流水" }).querySelector("svg")).not.toHaveClass(
+      "animate-spin"
+    );
+  });
+
   it("calls onTabIntent on pointer enter and focus for inactive destinations", async () => {
     const user = userEvent.setup();
     const onTabIntent = vi.fn();

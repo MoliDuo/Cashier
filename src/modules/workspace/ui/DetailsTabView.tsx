@@ -49,8 +49,6 @@ interface DetailsTabViewProps {
   sentinelRef: RefCallback<HTMLDivElement>;
   batch: BatchController;
   onViewEntry: (entry: LedgerEntry) => void;
-  onRefresh?: (() => Promise<unknown> | unknown) | undefined;
-  isRefreshing?: boolean | undefined;
 }
 
 export function DetailsTabView(props: DetailsTabViewProps) {
@@ -72,8 +70,6 @@ export function DetailsTabView(props: DetailsTabViewProps) {
     sentinelRef,
     batch,
     onViewEntry,
-    onRefresh,
-    isRefreshing,
   } = props;
   const t = useTranslations("DetailsTab");
   const tCommon = useTranslations("Common");
@@ -96,12 +92,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
 
   return (
     <>
-      {/* Selection replaces the browsing controls, so the box stops being a
-          refresh surface there: no hint over the count, and no stray refetch
-          from a tap on the band. */}
       <DetailsToolbar
-        onRefresh={batch.isSelectionMode ? undefined : onRefresh}
-        isRefreshing={isRefreshing}
         {...(!batch.isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
         {...(!batch.isSelectionMode && monthStats.mainTotal != null
           ? {

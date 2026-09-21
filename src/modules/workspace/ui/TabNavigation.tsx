@@ -1,12 +1,15 @@
 "use client";
-import { BarChart3, ListChecks, Plus, ReceiptText, Settings } from "lucide-react";
+import { BarChart3, ListChecks, Plus, ReceiptText, RefreshCw, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 
 interface TabNavigationProps {
   disabled?: boolean;
+  /** True while the tab the reader is on is refetching from its own tap. */
+  refreshing?: boolean;
   activeTab: LedgerTab;
+  /** The active destination is the tab's refresh, so it is called for it too. */
   onTabChange: (tab: LedgerTab) => void;
   onOpenInput: () => void;
   onInputIntent?: () => void;
@@ -26,6 +29,7 @@ const TAB_CONFIG: Array<{
 
 export function TabNavigation({
   disabled = false,
+  refreshing = false,
   activeTab,
   onTabChange,
   onOpenInput,
@@ -60,6 +64,9 @@ export function TabNavigation({
           icon={Icon}
           label={labelFor(value)}
           disabledTitle={tCommon("loading")}
+          refreshTitle={tCommon("refresh")}
+          refreshing={refreshing && activeTab === value}
+          refreshingLabel={tCommon("refreshing")}
           onClick={() => onTabChange(value)}
           onIntent={
             onTabIntent != null && value !== activeTab ? () => onTabIntent(value) : undefined
@@ -88,6 +95,9 @@ export function TabNavigation({
           icon={Icon}
           label={labelFor(value)}
           disabledTitle={tCommon("loading")}
+          refreshTitle={tCommon("refresh")}
+          refreshing={refreshing && activeTab === value}
+          refreshingLabel={tCommon("refreshing")}
           onClick={() => onTabChange(value)}
           onIntent={
             onTabIntent != null && value !== activeTab ? () => onTabIntent(value) : undefined
@@ -106,6 +116,10 @@ interface NavButtonProps {
   onIntent?: (() => void) | undefined;
   disabled?: boolean;
   disabledTitle: string;
+  /** Names the second job the active destination carries. */
+  refreshTitle: string;
+  refreshing: boolean;
+  refreshingLabel: string;
 }
 
 function NavButton({
@@ -116,13 +130,17 @@ function NavButton({
   onIntent,
   disabled,
   disabledTitle,
+  refreshTitle,
+  refreshing,
+  refreshingLabel,
 }: NavButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={disabled ? disabledTitle : undefined}
+      title={disabled ? disabledTitle : active ? refreshTitle : undefined}
+      aria-busy={refreshing || undefined}
       onPointerEnter={onIntent}
       onPointerDown={onIntent}
       onFocus={onIntent}
@@ -136,8 +154,15 @@ function NavButton({
             : "text-muted-foreground hover:bg-surface2/40 hover:text-text"
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      {refreshing ? (
+        <RefreshCw className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+      ) : (
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      )}
       <span className="truncate">{label}</span>
+      <span aria-live="polite" className="sr-only">
+        {refreshing ? refreshingLabel : ""}
+      </span>
     </button>
   );
 }
