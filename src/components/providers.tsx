@@ -1,10 +1,9 @@
 "use client";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QUERY } from "@/lib/constants";
-import { deleteLegacyClientCache } from "@/lib/legacy-client-cache-cleanup";
 import { ServiceWorkerUpdate } from "@/components/ServiceWorkerUpdate";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -38,10 +37,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
     });
     return client;
   });
-
-  useEffect(() => {
-    void deleteLegacyClientCache().catch(() => undefined);
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
