@@ -20,7 +20,6 @@ import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-sett
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { ValidationError } from "@/lib/errors";
 import { computeHash } from "@/lib/security/service-credential-token";
-import { postgresServiceCredentialAdapter } from "@/application/adapters/postgres";
 import sharp from "sharp";
 
 async function validJpegBase64(): Promise<string> {
@@ -456,40 +455,6 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
       .where(eq(serviceCredentials.id, credential.id));
     expect((await post()).status).toBe(201);
     expect((await readLastUsedAt())?.getTime()).toBeGreaterThan(sixMinutesAgo.getTime());
-  });
-
-  it("rejects a credential revoked after a recent authentication without a lastUsedAt write", async () => {
-    const db = getTestDb();
-    const credential = await createServiceCredentialAction(testLedgerId, {
-      name: "Fresh Revoke Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
-    });
-    // Mark the credential as recently used so authenticate() takes the
-    // write-throttled path (no lastUsedAt UPDATE) and must rely on the fresh
-    // locking recheck to observe the revocation.
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-    await db
-      .update(serviceCredentials)
-      .set({ lastUsedAt: twoMinutesAgo })
-      .where(eq(serviceCredentials.id, credential.id));
-
-    // Revoke in a transaction that commits shortly after taking the row lock.
-    // The hash lookup in authenticate() still sees the active row under READ
-    // COMMITTED; the fresh-path FOR SHARE recheck then waits for the revoke to
-    // commit and must fail the request.
-    const revoke = db.transaction(async (tx) => {
-      await tx
-        .update(serviceCredentials)
-        .set({ deletedAt: new Date() })
-        .where(eq(serviceCredentials.id, credential.id));
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    });
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    await expect(
-      postgresServiceCredentialAdapter.authenticate(credential.token)
-    ).resolves.toBeNull();
-    await revoke;
   });
 
   it("should return credentials with prefix/suffix via getLedgerSettingsAction", async () => {

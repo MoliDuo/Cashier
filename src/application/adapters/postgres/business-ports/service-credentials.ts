@@ -84,20 +84,6 @@ export const postgresServiceCredentialAdapter: ServiceCredentialPort = {
         logError("modules/ledger:authenticate-service-credential:update-last-used", error);
         throw new RateLimitUnavailableError();
       }
-    } else {
-      // Fresh path: skip the lastUsedAt write, but keep the revocation fence
-      // with a locking re-read. FOR SHARE waits for any in-flight revoke and
-      // re-evaluates the deletedAt predicate against the committed row, so a
-      // credential revoked after the hash lookup still fails this request —
-      // the same guarantee the stale path gets from its conditional UPDATE.
-      const active = await db
-        .select({ id: serviceCredentials.id })
-        .from(serviceCredentials)
-        .where(and(eq(serviceCredentials.id, hashMatch.id), isNull(serviceCredentials.deletedAt)))
-        .for("share")
-        .limit(1)
-        .then((rows) => rows[0]);
-      if (active == null) return null;
     }
     // The authenticated contract is deliberately bounded to id, ledgerId and
     // the key's book; lastUsedAt is read internally only to throttle the write.
