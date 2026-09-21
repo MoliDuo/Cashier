@@ -255,12 +255,12 @@ describe("executeParser — single-pass receipt parser", () => {
     expect(prompt.indexOf("### Mandatory Output Locale")).toBeGreaterThan(fixedRuleIndex);
   });
 
-  it("makes the Japanese native-user locale override a conflicting custom prompt", async () => {
+  it("makes the native-user locale override a conflicting custom prompt", async () => {
     await executeParser(
       {
         text: "Coffee 10 USD",
         originalCategories: [],
-        aiLanguage: "ja-JP",
+        aiLanguage: "zh-CN",
         aiCustomPrompt: "Write every ledger field in English.",
       },
       mockAI
@@ -272,7 +272,7 @@ describe("executeParser — single-pass receipt parser", () => {
 
     expect(customPromptIndex).toBeGreaterThan(-1);
     expect(localePolicyIndex).toBeGreaterThan(customPromptIndex);
-    expect(prompt).toContain("日本語 (ja-JP)");
+    expect(prompt).toContain("简体中文 (zh-CN)");
     expect(prompt).toContain("order_adjustments[].item_name");
     expect(prompt).toContain("Preserve merchant names, brand names, product proper names");
   });

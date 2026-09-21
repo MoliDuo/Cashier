@@ -17,6 +17,7 @@ import {
 import { generateOTP, getResendCooldown } from "@/modules/auth/services/otp";
 import type { EmailDeliveryPort, OtpTokenPort, UserAccountPort } from "@/application/contracts";
 import type { RateLimiterPort } from "@/application/contracts";
+import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
 
 type OTPAuthEmailMessages = {
   otpSubject: string;
@@ -100,9 +101,9 @@ export async function sendOTP(
   const canResendAt = Math.floor(cooldown.acquiredAt.getTime() / 1000) + getResendCooldown();
 
   if ((await dependencies.users.findByEmail(normalizedEmail)) == null) {
-    const expiresAt = new Date(cooldown.acquiredAt.getTime() + runtimeEnv.otpExpiresSeconds * 1000);
+    const expiresAt = new Date(cooldown.acquiredAt.getTime() + OTP_EXPIRES_SECONDS * 1000);
     return {
-      expiresIn: runtimeEnv.otpExpiresSeconds,
+      expiresIn: OTP_EXPIRES_SECONDS,
       expiresAt: Math.floor(expiresAt.getTime() / 1000),
       canResendAt,
     };
@@ -122,7 +123,7 @@ export async function sendOTP(
     expiresAt = token.expiresAt;
     tokenHash = token.tokenHash;
     const locale = params.locale ?? DEFAULT_LOCALE;
-    const expiresInMinutes = Math.ceil(runtimeEnv.otpExpiresSeconds / 60);
+    const expiresInMinutes = Math.ceil(OTP_EXPIRES_SECONDS / 60);
     const { subject, copy } = await getOTPEmailCopy(locale, params.host, otp, expiresInMinutes);
     const delivery = await dependencies.emailDelivery.send({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,

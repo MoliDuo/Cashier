@@ -24,42 +24,23 @@ afterEach(() => {
 describe("runtimeEnv", () => {
   it("revalidates changed raw values without caching failures", async () => {
     const { getStartupEnvValue } = await import("@/lib/env/startup");
-    const env: NodeJS.ProcessEnv = { NODE_ENV: "test", AI_MAX_RETRIES: "5" };
-    expect(getStartupEnvValue("AI_MAX_RETRIES", env)).toBe(5);
-    expect(getStartupEnvValue("AI_MAX_RETRIES", env)).toBe(5);
-    env.AI_MAX_RETRIES = "invalid";
-    expect(() => getStartupEnvValue("AI_MAX_RETRIES", env)).toThrow("AI_MAX_RETRIES");
-    env.AI_MAX_RETRIES = "2";
-    expect(getStartupEnvValue("AI_MAX_RETRIES", env)).toBe(2);
-    delete env.AI_MAX_RETRIES;
-    expect(getStartupEnvValue("AI_MAX_RETRIES", env)).toBe(3);
+    const env: NodeJS.ProcessEnv = { NODE_ENV: "test", DATABASE_POOL_MAX: "5" };
+    expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(5);
+    expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(5);
+    env.DATABASE_POOL_MAX = "invalid";
+    expect(() => getStartupEnvValue("DATABASE_POOL_MAX", env)).toThrow("DATABASE_POOL_MAX");
+    env.DATABASE_POOL_MAX = "2";
+    expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(2);
+    delete env.DATABASE_POOL_MAX;
+    expect(getStartupEnvValue("DATABASE_POOL_MAX", env)).toBe(2);
   });
   it("reads validated application env through typed accessors", async () => {
     process.env = {
       ...originalEnv,
       ...baseEnv,
-      AI_MAX_RETRIES: "5",
       AI_MODEL: "custom-model",
-      AI_RETRY_DELAY_MS: "1500",
-      AI_TEMPERATURE: "0.7",
-      AUTH_RATE_LIMIT_MAX: "12",
-      AUTH_RATE_LIMIT_WINDOW: "600",
-      AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS: "11",
-      AUTH_PASSWORD_IP_MAX_ATTEMPTS: "51",
-      AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "601",
       AUTH_EMAIL_FROM: "Cashier <security@example.com>",
       LOG_LEVEL: "warn",
-      MAX_IMAGE_QUALITY: "72",
-      OTP_EXPIRES_SECONDS: "420",
-      OTP_LOCKOUT_MINUTES: "20",
-      OTP_MAX_ATTEMPTS: "7",
-      OTP_RESEND_COOLDOWN_SECONDS: "90",
-      OTP_IP_MAX_ATTEMPTS_PER_HOUR: "14",
-      OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE: "6",
-      API_RATE_LIMIT_PER_MINUTE: "75",
-      SESSION_MAX_AGE_DAYS: "21",
-      SOURCE_DOC_STALE_TIME_MS: "654321",
-      CURRENCY_STALE_TIME_MS: "7654321",
       TZ: "UTC",
       TRUSTED_PROXY: "platform",
       AUTH_RESEND_KEY: "re_test",
@@ -83,25 +64,6 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.trustedProxy).toBe("platform");
     expect(runtimeEnv.timeZone).toBe("UTC");
     expect(runtimeEnv.aiModel).toBe("custom-model");
-    expect(runtimeEnv.aiMaxRetries).toBe(5);
-    expect(runtimeEnv.aiRetryDelayMs).toBe(1500);
-    expect(runtimeEnv.aiTemperature).toBe(0.7);
-    expect(runtimeEnv.sourceDocStaleTimeMs).toBe(654321);
-    expect(runtimeEnv.currencyStaleTimeMs).toBe(7654321);
-    expect(runtimeEnv.otpExpiresSeconds).toBe(420);
-    expect(runtimeEnv.otpLockoutMinutes).toBe(20);
-    expect(runtimeEnv.otpMaxAttempts).toBe(7);
-    expect(runtimeEnv.otpResendCooldownSeconds).toBe(90);
-    expect(runtimeEnv.authRateLimitMax).toBe(12);
-    expect(runtimeEnv.authRateLimitWindow).toBe(600);
-    expect(runtimeEnv.authPasswordEmailMaxAttempts).toBe(11);
-    expect(runtimeEnv.authPasswordIpMaxAttempts).toBe(51);
-    expect(runtimeEnv.authPasswordRateLimitWindowSeconds).toBe(601);
-    expect(runtimeEnv.otpIpMaxAttemptsPerHour).toBe(14);
-    expect(runtimeEnv.otpVerifyMaxAttemptsPerMinute).toBe(6);
-    expect(runtimeEnv.apiRateLimitPerMinute).toBe(75);
-    expect(runtimeEnv.sessionMaxAgeDays).toBe(21);
-    expect(runtimeEnv.maxImageQuality).toBe(72);
     expect(runtimeEnv.logLevel).toBe("warn");
   });
 

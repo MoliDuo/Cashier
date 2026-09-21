@@ -1,18 +1,15 @@
-import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { RateLimitUnavailableError } from "@/lib/errors";
 import { getResendCooldown } from "./otp";
 import type { RateLimiterPort } from "@/application/contracts";
 import { createHash } from "node:crypto";
-
-// Config reads below (bucketKey and the getXxx() helpers) touch runtimeEnv
-// getters, which re-validate on every access and can throw
-// AppError("STARTUP_ENV_INVALID", ...). Every call site keeps those reads
-// outside its try/catch so a misconfigured env var is never swallowed and
-// relabeled as RateLimitUnavailableError ("sign-in protection is temporarily
-// unavailable") — that message must mean the rate limiter backend actually
-// failed, not that config is broken.
+import {
+  AUTH_RATE_LIMIT_MAX,
+  AUTH_RATE_LIMIT_WINDOW_SECONDS,
+  OTP_IP_MAX_ATTEMPTS_PER_HOUR,
+  OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE,
+} from "@/config/tuning";
 
 const OTP_SEND_PREFIX = "otp:send:";
 const OTP_SEND_IP_PREFIX = "otp:send:ip:";
@@ -30,22 +27,6 @@ function bucketKey(purpose: string, identifier: string): string {
   return `${purpose}:${digest}`;
 }
 
-function getSendMaxAttempts(): number {
-  return runtimeEnv.authRateLimitMax;
-}
-
-function getSendWindowSeconds(): number {
-  return runtimeEnv.authRateLimitWindow;
-}
-
-function getIpMaxAttempts(): number {
-  return runtimeEnv.otpIpMaxAttemptsPerHour;
-}
-
-function getVerifyMaxAttempts(): number {
-  return runtimeEnv.otpVerifyMaxAttemptsPerMinute;
-}
-
 export async function checkSendRateLimit(
   email: string,
   rateLimiter: RateLimiterPort
@@ -55,21 +36,23 @@ export async function checkSendRateLimit(
   retryAfter?: number;
 }> {
   const key = bucketKey(OTP_SEND_PREFIX.slice(0, -1), email);
-  const sendWindowSeconds = getSendWindowSeconds();
-  const sendMaxAttempts = getSendMaxAttempts();
   try {
-    const result = await rateLimiter.increment(key, sendMaxAttempts, sendWindowSeconds);
+    const result = await rateLimiter.increment(
+      key,
+      AUTH_RATE_LIMIT_MAX,
+      AUTH_RATE_LIMIT_WINDOW_SECONDS
+    );
 
     if (!result.success) {
       const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
       logger.warn(
-        { subject: logIdentifier("email", email), attempts: sendMaxAttempts + 1 },
+        { subject: logIdentifier("email", email), attempts: AUTH_RATE_LIMIT_MAX + 1 },
         "OTP send rate limit exceeded for email"
       );
       return {
         allowed: false,
         remainingAttempts: 0,
-        retryAfter: retryAfter > 0 ? retryAfter : sendWindowSeconds,
+        retryAfter: retryAfter > 0 ? retryAfter : AUTH_RATE_LIMIT_WINDOW_SECONDS,
       };
     }
 
@@ -95,14 +78,17 @@ export async function checkSendRateLimitByIP(
   retryAfter?: number;
 }> {
   const key = bucketKey(OTP_SEND_IP_PREFIX.slice(0, -1), ip);
-  const ipMaxAttempts = getIpMaxAttempts();
   try {
-    const result = await rateLimiter.increment(key, ipMaxAttempts, IP_WINDOW_SECONDS);
+    const result = await rateLimiter.increment(
+      key,
+      OTP_IP_MAX_ATTEMPTS_PER_HOUR,
+      IP_WINDOW_SECONDS
+    );
 
     if (!result.success) {
       const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
       logger.warn(
-        { subject: logIdentifier("ip", ip), attempts: ipMaxAttempts + 1 },
+        { subject: logIdentifier("ip", ip), attempts: OTP_IP_MAX_ATTEMPTS_PER_HOUR + 1 },
         "OTP send rate limit exceeded for IP"
       );
       return {
@@ -160,13 +146,16 @@ export async function checkVerifyRateLimit(
   rateLimiter: RateLimiterPort
 ): Promise<boolean> {
   const key = bucketKey(OTP_VERIFY_PREFIX.slice(0, -1), ip);
-  const verifyMaxAttempts = getVerifyMaxAttempts();
   try {
-    const result = await rateLimiter.increment(key, verifyMaxAttempts, VERIFY_WINDOW_SECONDS);
+    const result = await rateLimiter.increment(
+      key,
+      OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE,
+      VERIFY_WINDOW_SECONDS
+    );
 
     if (!result.success) {
       logger.warn(
-        { subject: logIdentifier("ip", ip), attempts: verifyMaxAttempts + 1 },
+        { subject: logIdentifier("ip", ip), attempts: OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE + 1 },
         "OTP verify rate limit exceeded for IP"
       );
       return false;

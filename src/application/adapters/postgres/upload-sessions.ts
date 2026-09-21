@@ -1,8 +1,12 @@
 import { and, isNull, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, NotFoundError } from "@/lib/errors";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { ledgers, uploadSessionFiles, uploadSessions } from "@/persistence";
+import {
+  UPLOAD_DAILY_BYTES_LIMIT,
+  UPLOAD_OPEN_SESSION_LIMIT,
+  UPLOAD_PLAN_LIMIT_PER_15_MIN,
+} from "@/config/tuning";
 
 interface CreateUploadSessionInput {
   id: string;
@@ -75,9 +79,9 @@ export const postgresUploadSessionRepository: UploadSessionRepository = {
         .then((rows) => Number(rows[0]?.bytes ?? 0));
       const reservedBytes = input.targets.reduce((sum, target) => sum + target.byteSize, 0);
       if (
-        recentPlans >= runtimeEnv.uploadPlanLimitPer15Min ||
-        openSessions >= runtimeEnv.uploadOpenSessionLimit ||
-        dailyBytes + reservedBytes > runtimeEnv.uploadDailyBytesLimit
+        recentPlans >= UPLOAD_PLAN_LIMIT_PER_15_MIN ||
+        openSessions >= UPLOAD_OPEN_SESSION_LIMIT ||
+        dailyBytes + reservedBytes > UPLOAD_DAILY_BYTES_LIMIT
       ) {
         throw new AppError("Upload quota exceeded", "UPLOAD_QUOTA_EXCEEDED", 429);
       }

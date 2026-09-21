@@ -2,11 +2,14 @@ import { AppError, NotFoundError } from "@/lib/errors";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
 import { validatePassword } from "@/modules/auth/services/password-policy";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import type { AccountSecurityPort } from "../ports";
 import type { RateLimiterPort } from "@/application/contracts";
+import {
+  AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
+  AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+} from "@/config/tuning";
 
 const PASSWORD_CHANGE_PREFIX = "auth:password-change:user:";
 
@@ -43,8 +46,8 @@ export async function changePassword(
   validatePassword(params.newPassword);
 
   const key = `${PASSWORD_CHANGE_PREFIX}${params.userId}`;
-  const limit = runtimeEnv.authPasswordEmailMaxAttempts;
-  const windowSeconds = runtimeEnv.authPasswordRateLimitWindowSeconds;
+  const limit = AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS;
+  const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
   let reservation: Awaited<ReturnType<RateLimiterPort["increment"]>>;
   try {
     reservation = await dependencies.rateLimiter.increment(key, limit, windowSeconds);

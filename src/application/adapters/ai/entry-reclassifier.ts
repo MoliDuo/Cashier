@@ -9,6 +9,7 @@ import {
   resolveReclassificationDecisions,
 } from "@/modules/ledger/application/reclassification-protocol";
 import type { EntryReclassifierPort } from "@/modules/ledger/application/ports";
+import { AI_CATEGORY_REQUEST_TIMEOUT_MS } from "@/config/tuning";
 
 /** One document can be a full receipt: up to MAX_BATCH_SIZE rows, one decision each. */
 const MAX_TOKENS = 4000;
@@ -37,7 +38,7 @@ export const entryReclassifierAdapter: EntryReclassifierPort = {
       TEMPERATURE,
       undefined,
       input.signal,
-      { maxAttempts: 1, timeoutMs: runtimeEnv.aiCategoryRequestTimeoutMs }
+      { maxAttempts: 1, timeoutMs: AI_CATEGORY_REQUEST_TIMEOUT_MS }
     );
 
     try {

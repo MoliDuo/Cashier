@@ -65,13 +65,11 @@ const adapters = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@/lib/env/runtime", () => ({
-  runtimeEnv: {
-    get aiCategoryConcurrency() {
-      return state.concurrency;
-    },
-    aiCategoryMaxAttempts: 3,
+vi.mock("@/config/tuning", () => ({
+  get AI_CATEGORY_CONCURRENCY() {
+    return state.concurrency;
   },
+  AI_CATEGORY_MAX_ATTEMPTS: 3,
 }));
 vi.mock("@/application/adapters/postgres/category-assignment-v2", () => ({
   postgresCategoryAssignmentV2Adapter: {

@@ -10,6 +10,7 @@ import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handle
 import { runtimeEnv } from "@/lib/env/runtime";
 import { getClientIPFromHeaders } from "@/lib/utils/ip";
 import { logger } from "@/lib/logger";
+import { API_RATE_LIMIT_PER_MINUTE } from "@/config/tuning";
 
 interface ApiV1Context {
   credential: AuthenticatedServiceCredentialContract;
@@ -133,7 +134,7 @@ export async function handleApiV1Route(
 
     // 4. Credential-wide quota shared by POST and GET regardless of client IP.
     const validBucketKey = validCredentialBucketKey(credential.id);
-    const apiRateLimit = runtimeEnv.apiRateLimitPerMinute;
+    const apiRateLimit = API_RATE_LIMIT_PER_MINUTE;
     const rateLimitStart = performance.now();
     const validRateResult = await serverComposition.rateLimiter.increment(
       validBucketKey,

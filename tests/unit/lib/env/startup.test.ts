@@ -60,17 +60,16 @@ describe("validateStartupEnv", () => {
     expect(() =>
       validateStartupEnv({
         ...baseEnv,
-        AI_MAX_RETRIES: "-1",
+        DATABASE_POOL_MAX: "-1",
       })
-    ).toThrow(/AI_MAX_RETRIES/);
+    ).toThrow(/DATABASE_POOL_MAX/);
   });
 
   it("applies production defaults independently of test-environment overrides", () => {
     const result = validateStartupEnv({ ...baseEnv, NODE_ENV: "production" });
 
     expect(result.AI_MODEL).toBe("gpt-4o");
-    expect(result.AI_MAX_RETRIES).toBe(3);
-    expect(result.AI_RETRY_DELAY_MS).toBe(1000);
+    expect(result.DATABASE_POOL_MAX).toBe(2);
   });
 
   it("accepts an absent or platform-managed trusted proxy", () => {
@@ -164,46 +163,16 @@ describe("validateStartupEnv", () => {
 
   it("owns all app env defaults in the startup module", () => {
     expect(Object.keys(ENV_DEFAULTS).sort()).toEqual([
-      "AI_CATEGORY_CONCURRENCY",
-      "AI_CATEGORY_MAX_ATTEMPTS",
-      "AI_CATEGORY_REQUEST_TIMEOUT_MS",
-      "AI_MAX_RETRIES",
       "AI_MODEL",
-      "AI_REQUEST_TIMEOUT_MS",
-      "AI_RETRY_DELAY_MS",
-      "AI_REVISION_DEADLINE_MS",
-      "AI_TEMPERATURE",
-      "API_RATE_LIMIT_PER_MINUTE",
       "APP_URL",
       "AUTH_EMAIL_FROM",
-      "AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS",
-      "AUTH_PASSWORD_IP_MAX_ATTEMPTS",
-      "AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS",
-      "AUTH_RATE_LIMIT_MAX",
-      "AUTH_RATE_LIMIT_WINDOW",
-      "CURRENCY_STALE_TIME_MS",
       "DATABASE_POOL_MAX",
       "DEV_AUTH_BYPASS",
       "LOG_LEVEL",
-      "MAX_IMAGE_QUALITY",
       "OPENAI_BASE_URL",
-      "OTP_EXPIRES_SECONDS",
-      "OTP_IP_MAX_ATTEMPTS_PER_HOUR",
-      "OTP_LOCKOUT_MINUTES",
-      "OTP_MAX_ATTEMPTS",
-      "OTP_RESEND_COOLDOWN_SECONDS",
-      "OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE",
-      "PROCESSING_RECOVERY_COOLDOWN_SECONDS",
-      "PROCESSING_RECOVERY_MAX_ATTEMPTS",
-      "PROCESSING_RECOVERY_MAX_BATCH",
       "S3_FORCE_PATH_STYLE",
       "S3_REGION",
-      "SESSION_MAX_AGE_DAYS",
-      "SOURCE_DOC_STALE_TIME_MS",
       "TZ",
-      "UPLOAD_DAILY_BYTES_LIMIT",
-      "UPLOAD_OPEN_SESSION_LIMIT",
-      "UPLOAD_PLAN_LIMIT_PER_15_MIN",
     ]);
   });
 });

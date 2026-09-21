@@ -1,10 +1,14 @@
 import { after } from "next/server";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { selectRecoverableProcessingJobs } from "@/modules/source-document/application/use-cases/select-recoverable-processing-jobs";
 import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 import { serverComposition } from "@/application/server-composition-root";
+import {
+  PROCESSING_RECOVERY_COOLDOWN_SECONDS,
+  PROCESSING_RECOVERY_MAX_ATTEMPTS,
+  PROCESSING_RECOVERY_MAX_BATCH,
+} from "@/config/tuning";
 
 /**
  * Schedules recovery of bounded processing intents that were missed by
@@ -19,9 +23,9 @@ import { serverComposition } from "@/application/server-composition-root";
  */
 async function scheduleProcessingRecovery(ledgerId: string): Promise<void> {
   const config = {
-    maxBatch: runtimeEnv.processingRecoveryMaxBatch,
-    maxAttempts: runtimeEnv.processingRecoveryMaxAttempts,
-    cooldownSeconds: runtimeEnv.processingRecoveryCooldownSeconds,
+    maxBatch: PROCESSING_RECOVERY_MAX_BATCH,
+    maxAttempts: PROCESSING_RECOVERY_MAX_ATTEMPTS,
+    cooldownSeconds: PROCESSING_RECOVERY_COOLDOWN_SECONDS,
   };
 
   const recoverable = await selectRecoverableProcessingJobs(

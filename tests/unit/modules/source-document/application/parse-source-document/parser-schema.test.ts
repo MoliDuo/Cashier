@@ -72,10 +72,10 @@ describe("parser-schema", () => {
   it("uses a localized fallback title for the target AI language", () => {
     const parsed = normalizeResult(
       parserOutputSchema.parse({ ...simpleSuccess, title: null }),
-      "ja-JP"
+      "zh-CN"
     );
 
-    expect(parsed.title).toBe("名称未設定の明細");
+    expect(parsed.title).toBe("未命名单据");
   });
 
   it("normalizeResult returns invalid when a ledger_entry has a non-positive amount", () => {

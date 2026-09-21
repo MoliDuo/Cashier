@@ -39,6 +39,7 @@ import {
   buildStreamQueryDescriptor,
 } from "@/modules/workspace/ledger-tab-query-descriptors";
 import type { StatsUrlState } from "@/modules/workspace/ledger-url-params";
+import { SOURCE_DOC_STALE_TIME_MS } from "@/config/tuning";
 
 interface LedgerPageBootstrapResult {
   dehydratedState: DehydratedState;
@@ -234,7 +235,7 @@ export async function getLedgerPageBootstrap(
             },
             initialPageParam: undefined as string | undefined,
             getNextPageParam: (lastPage: StreamPage) => lastPage.nextCursor,
-            staleTime: runtimeEnv.sourceDocStaleTimeMs,
+            staleTime: SOURCE_DOC_STALE_TIME_MS,
           }),
           queryClient.prefetchQuery({
             queryKey: streamDescriptor.totalQueryKey,

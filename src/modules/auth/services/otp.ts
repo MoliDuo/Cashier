@@ -1,11 +1,13 @@
 import crypto from "crypto";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { OTP_LENGTH } from "../constants";
+import {
+  OTP_EXPIRES_SECONDS,
+  OTP_LOCKOUT_MINUTES,
+  OTP_MAX_ATTEMPTS,
+  OTP_RESEND_COOLDOWN_SECONDS,
+} from "@/config/tuning";
 
-const DEFAULT_OTP_EXPIRES_SECONDS = 300;
-const DEFAULT_LOCKOUT_MINUTES = 15;
-const DEFAULT_MAX_ATTEMPTS = 5;
-const DEFAULT_RESEND_COOLDOWN_SECONDS = 60;
 const V2_HASH_PATTERN = /^v2:([a-f0-9]{64}):([a-f0-9]{32})$/;
 
 export function generateOTP(): string {
@@ -50,19 +52,17 @@ export function isValidOTPFormat(otp: string): boolean {
 }
 
 export function getOTPExpiration(): Date {
-  const expiresInSeconds = runtimeEnv.otpExpiresSeconds ?? DEFAULT_OTP_EXPIRES_SECONDS;
-  return new Date(Date.now() + expiresInSeconds * 1000);
+  return new Date(Date.now() + OTP_EXPIRES_SECONDS * 1000);
 }
 
 export function getLockoutExpiration(): Date {
-  const lockoutMinutes = runtimeEnv.otpLockoutMinutes ?? DEFAULT_LOCKOUT_MINUTES;
-  return new Date(Date.now() + lockoutMinutes * 60 * 1000);
+  return new Date(Date.now() + OTP_LOCKOUT_MINUTES * 60 * 1000);
 }
 
 export function getMaxAttempts(): number {
-  return runtimeEnv.otpMaxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  return OTP_MAX_ATTEMPTS;
 }
 
 export function getResendCooldown(): number {
-  return runtimeEnv.otpResendCooldownSeconds ?? DEFAULT_RESEND_COOLDOWN_SECONDS;
+  return OTP_RESEND_COOLDOWN_SECONDS;
 }

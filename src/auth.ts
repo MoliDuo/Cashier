@@ -9,12 +9,12 @@ import { authenticateDevUser } from "@/modules/auth/application/use-cases/authen
 import { getSessionUser } from "@/modules/auth/application/queries/get-session-user";
 import { isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
 import { TIME_SECONDS } from "@/lib/constants";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { serverComposition } from "@/application/server-composition-root";
 import { completeInteractiveSignIn } from "@/application/use-cases/complete-interactive-sign-in";
 import { AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { UnauthorizedError } from "@/lib/errors";
+import { SESSION_MAX_AGE_DAYS } from "@/config/tuning";
 
 class AuthCredentialsSigninError extends CredentialsSignin {
   constructor(code: string) {
@@ -152,7 +152,7 @@ export const authOptions = {
   providers,
   session: {
     strategy: "jwt",
-    maxAge: runtimeEnv.sessionMaxAgeDays * TIME_SECONDS.DAY,
+    maxAge: SESSION_MAX_AGE_DAYS * TIME_SECONDS.DAY,
     updateAge: TIME_SECONDS.DAY,
   },
   pages: authConfig.pages,

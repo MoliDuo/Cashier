@@ -12,7 +12,7 @@ import type { ParserInput } from "./parser";
 import { convertToParsedEntries } from "./result-mapper";
 import type { NormalizedParseOutput } from "./parser-schema";
 import { normalizeFailureReason } from "@/modules/source-document/failure-reason-policy";
-import { runtimeEnv } from "@/lib/env/runtime";
+import { AI_REVISION_DEADLINE_MS } from "@/config/tuning";
 
 // ===== Context =====
 
@@ -116,10 +116,10 @@ export async function runParsePipeline(
       reject(
         new ProcessingFailure(
           "processing_timeout",
-          `Source document parsing exceeded ${runtimeEnv.aiRevisionDeadlineMs}ms deadline`
+          `Source document parsing exceeded ${AI_REVISION_DEADLINE_MS}ms deadline`
         )
       );
-    }, runtimeEnv.aiRevisionDeadlineMs);
+    }, AI_REVISION_DEADLINE_MS);
     timeout.unref();
   });
 

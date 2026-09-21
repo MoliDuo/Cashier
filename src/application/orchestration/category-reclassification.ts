@@ -1,7 +1,6 @@
 import "server-only";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
 import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
@@ -13,6 +12,7 @@ import {
 } from "@/application/adapters/in-process";
 import { storedFileAdapter } from "@/application/adapters/storage";
 import type { ClaimedCategoryAssignmentDocument } from "@/application/adapters/postgres/category-assignment-v2";
+import { AI_CATEGORY_CONCURRENCY, AI_CATEGORY_MAX_ATTEMPTS } from "@/config/tuning";
 
 const CLAIM_LEASE_MS = 120_000;
 const CLAIM_HEARTBEAT_MS = 20_000;
@@ -179,7 +179,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
       sourceDocumentId: work.sourceDocumentId,
       claimToken: work.claimToken,
       errorCode,
-      maxAttempts: runtimeEnv.aiCategoryMaxAttempts,
+      maxAttempts: AI_CATEGORY_MAX_ATTEMPTS,
       ...(errorCode === "ai_rate_limited" ? { retryAfterMs: 10_000 } : {}),
       now: new Date(),
     });
@@ -204,7 +204,7 @@ async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<bo
     const claimed = await postgresCategoryAssignmentV2Adapter.claimDocuments({
       now: new Date(),
       leaseMs: CLAIM_LEASE_MS,
-      concurrency: runtimeEnv.aiCategoryConcurrency,
+      concurrency: AI_CATEGORY_CONCURRENCY,
       ...scope,
     });
     if (claimed.length > 0) {

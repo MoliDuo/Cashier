@@ -7,7 +7,6 @@
  */
 
 import sharp from "sharp";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import {
@@ -17,6 +16,7 @@ import {
   validateImageProcessing,
   sanitizeMimeType,
 } from "@/lib/storage/upload-policy";
+import { MAX_IMAGE_QUALITY } from "@/config/tuning";
 
 /**
  * Image processing options
@@ -35,7 +35,7 @@ export interface ImageProcessingOptions {
 /**
  * Get default image quality from environment or use fallback
  */
-const getDefaultQuality = (): number => runtimeEnv.maxImageQuality;
+const getDefaultQuality = (): number => MAX_IMAGE_QUALITY;
 
 /**
  * Default processing options optimized for receipt/invoice images

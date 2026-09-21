@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   generateOTP,
   getLockoutExpiration,
@@ -11,13 +11,6 @@ import {
 } from "@/modules/auth/services/otp";
 
 describe("OTP security contracts", () => {
-  beforeEach(() => {
-    delete process.env.OTP_EXPIRES_SECONDS;
-    delete process.env.OTP_MAX_ATTEMPTS;
-    delete process.env.OTP_LOCKOUT_MINUTES;
-    delete process.env.OTP_RESEND_COOLDOWN_SECONDS;
-  });
-
   it("generates and validates exactly six decimal digits", () => {
     expect(generateOTP()).toMatch(/^\d{6}$/);
     expect(isValidOTPFormat("000000")).toBe(true);
@@ -49,7 +42,7 @@ describe("OTP security contracts", () => {
     }
   });
 
-  it("uses the documented default expiration and lockout durations", () => {
+  it("expires in five minutes and locks out for fifteen after five tries", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
 
@@ -57,22 +50,6 @@ describe("OTP security contracts", () => {
     expect(getLockoutExpiration()).toEqual(new Date("2026-01-01T00:15:00.000Z"));
     expect(getMaxAttempts()).toBe(5);
     expect(getResendCooldown()).toBe(60);
-
-    vi.useRealTimers();
-  });
-
-  it("honors configured expiration, lockout, attempt, and resend limits", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
-    process.env.OTP_EXPIRES_SECONDS = "600";
-    process.env.OTP_LOCKOUT_MINUTES = "30";
-    process.env.OTP_MAX_ATTEMPTS = "3";
-    process.env.OTP_RESEND_COOLDOWN_SECONDS = "120";
-
-    expect(getOTPExpiration()).toEqual(new Date("2026-01-01T00:10:00.000Z"));
-    expect(getLockoutExpiration()).toEqual(new Date("2026-01-01T00:30:00.000Z"));
-    expect(getMaxAttempts()).toBe(3);
-    expect(getResendCooldown()).toBe(120);
 
     vi.useRealTimers();
   });

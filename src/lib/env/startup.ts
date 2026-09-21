@@ -8,40 +8,10 @@ export const ENV_DEFAULTS = {
   AI_MODEL: "gpt-4o",
   S3_REGION: "auto",
   S3_FORCE_PATH_STYLE: "false",
-  AI_MAX_RETRIES: "3",
-  AI_RETRY_DELAY_MS: "1000",
-  AI_REQUEST_TIMEOUT_MS: "60000",
-  AI_REVISION_DEADLINE_MS: "180000",
-  AI_CATEGORY_CONCURRENCY: "100",
-  AI_CATEGORY_REQUEST_TIMEOUT_MS: "60000",
-  AI_CATEGORY_MAX_ATTEMPTS: "3",
-  UPLOAD_PLAN_LIMIT_PER_15_MIN: "20",
-  UPLOAD_OPEN_SESSION_LIMIT: "5",
-  UPLOAD_DAILY_BYTES_LIMIT: "104857600",
-  AI_TEMPERATURE: "0.3",
-  SOURCE_DOC_STALE_TIME_MS: "120000",
-  CURRENCY_STALE_TIME_MS: "14400000",
-  OTP_EXPIRES_SECONDS: "300",
-  OTP_LOCKOUT_MINUTES: "15",
-  OTP_MAX_ATTEMPTS: "5",
-  OTP_RESEND_COOLDOWN_SECONDS: "60",
-  AUTH_RATE_LIMIT_MAX: "10",
-  AUTH_RATE_LIMIT_WINDOW: "900",
-  AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS: "10",
-  AUTH_PASSWORD_IP_MAX_ATTEMPTS: "50",
-  AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: "900",
-  API_RATE_LIMIT_PER_MINUTE: "60",
-  OTP_IP_MAX_ATTEMPTS_PER_HOUR: "10",
-  OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE: "5",
-  SESSION_MAX_AGE_DAYS: "14",
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
-  MAX_IMAGE_QUALITY: "85",
   LOG_LEVEL: "info",
   DEV_AUTH_BYPASS: "false",
   DATABASE_POOL_MAX: "2",
-  PROCESSING_RECOVERY_MAX_BATCH: "5",
-  PROCESSING_RECOVERY_MAX_ATTEMPTS: "5",
-  PROCESSING_RECOVERY_COOLDOWN_SECONDS: "60",
 } as const;
 
 function blankToUndefined(value: unknown): unknown {
@@ -74,28 +44,6 @@ function urlWithDefault(name: keyof typeof ENV_DEFAULTS) {
   return z.preprocess(
     blankToUndefined,
     z.url({ error: `${name} must be a valid URL` }).default(getDefaultString(name))
-  );
-}
-
-function nonNegativeIntWithDefault(name: keyof typeof ENV_DEFAULTS) {
-  return z.preprocess(
-    blankToUndefined,
-    z.coerce
-      .number()
-      .int(`${name} must be an integer`)
-      .nonnegative(`${name} must be a non-negative integer`)
-      .default(Number.parseInt(getDefaultString(name), 10))
-  );
-}
-
-function positiveIntWithDefault(name: keyof typeof ENV_DEFAULTS) {
-  return z.preprocess(
-    blankToUndefined,
-    z.coerce
-      .number()
-      .int(`${name} must be an integer`)
-      .positive(`${name} must be a positive integer`)
-      .default(Number.parseInt(getDefaultString(name), 10))
   );
 }
 
@@ -139,59 +87,6 @@ const startupEnvFields = {
   TRUSTED_PROXY: z.preprocess(blankToUndefined, z.literal("platform").optional()),
   TZ: stringWithDefault("TZ"),
   AI_MODEL: stringWithDefault("AI_MODEL"),
-  AI_MAX_RETRIES: nonNegativeIntWithDefault("AI_MAX_RETRIES"),
-  AI_RETRY_DELAY_MS: nonNegativeIntWithDefault("AI_RETRY_DELAY_MS"),
-  AI_REQUEST_TIMEOUT_MS: positiveIntWithDefault("AI_REQUEST_TIMEOUT_MS"),
-  AI_REVISION_DEADLINE_MS: positiveIntWithDefault("AI_REVISION_DEADLINE_MS"),
-  AI_CATEGORY_CONCURRENCY: z.preprocess(
-    blankToUndefined,
-    z.coerce.number().int().min(1).max(256).default(100)
-  ),
-  AI_CATEGORY_REQUEST_TIMEOUT_MS: z.preprocess(
-    blankToUndefined,
-    z.coerce.number().int().min(1000).max(180000).default(60000)
-  ),
-  AI_CATEGORY_MAX_ATTEMPTS: z.preprocess(
-    blankToUndefined,
-    z.coerce.number().int().min(1).max(5).default(3)
-  ),
-  UPLOAD_PLAN_LIMIT_PER_15_MIN: positiveIntWithDefault("UPLOAD_PLAN_LIMIT_PER_15_MIN"),
-  UPLOAD_OPEN_SESSION_LIMIT: positiveIntWithDefault("UPLOAD_OPEN_SESSION_LIMIT"),
-  UPLOAD_DAILY_BYTES_LIMIT: positiveIntWithDefault("UPLOAD_DAILY_BYTES_LIMIT"),
-  AI_TEMPERATURE: z.preprocess(
-    blankToUndefined,
-    z.coerce
-      .number()
-      .min(0, "AI_TEMPERATURE must be between 0 and 2")
-      .max(2, "AI_TEMPERATURE must be between 0 and 2")
-      .default(Number.parseFloat(getDefaultString("AI_TEMPERATURE")))
-  ),
-  SOURCE_DOC_STALE_TIME_MS: nonNegativeIntWithDefault("SOURCE_DOC_STALE_TIME_MS"),
-  CURRENCY_STALE_TIME_MS: nonNegativeIntWithDefault("CURRENCY_STALE_TIME_MS"),
-  OTP_EXPIRES_SECONDS: positiveIntWithDefault("OTP_EXPIRES_SECONDS"),
-  OTP_LOCKOUT_MINUTES: positiveIntWithDefault("OTP_LOCKOUT_MINUTES"),
-  OTP_MAX_ATTEMPTS: positiveIntWithDefault("OTP_MAX_ATTEMPTS"),
-  OTP_RESEND_COOLDOWN_SECONDS: nonNegativeIntWithDefault("OTP_RESEND_COOLDOWN_SECONDS"),
-  AUTH_RATE_LIMIT_MAX: positiveIntWithDefault("AUTH_RATE_LIMIT_MAX"),
-  AUTH_RATE_LIMIT_WINDOW: positiveIntWithDefault("AUTH_RATE_LIMIT_WINDOW"),
-  AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS: positiveIntWithDefault("AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS"),
-  AUTH_PASSWORD_IP_MAX_ATTEMPTS: positiveIntWithDefault("AUTH_PASSWORD_IP_MAX_ATTEMPTS"),
-  AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(
-    "AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS"
-  ),
-  API_RATE_LIMIT_PER_MINUTE: positiveIntWithDefault("API_RATE_LIMIT_PER_MINUTE"),
-  OTP_IP_MAX_ATTEMPTS_PER_HOUR: positiveIntWithDefault("OTP_IP_MAX_ATTEMPTS_PER_HOUR"),
-  OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE: positiveIntWithDefault("OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE"),
-  SESSION_MAX_AGE_DAYS: positiveIntWithDefault("SESSION_MAX_AGE_DAYS"),
-  MAX_IMAGE_QUALITY: z.preprocess(
-    blankToUndefined,
-    z.coerce
-      .number()
-      .int("MAX_IMAGE_QUALITY must be an integer")
-      .min(1, "MAX_IMAGE_QUALITY must be between 1 and 100")
-      .max(100, "MAX_IMAGE_QUALITY must be between 1 and 100")
-      .default(Number.parseInt(getDefaultString("MAX_IMAGE_QUALITY"), 10))
-  ),
   LOG_LEVEL: stringWithDefault("LOG_LEVEL"),
   DEV_AUTH_BYPASS: booleanStringWithDefault("DEV_AUTH_BYPASS"),
   DATABASE_POOL_MAX: z.preprocess(
@@ -202,11 +97,6 @@ const startupEnvFields = {
       .min(1, "DATABASE_POOL_MAX must be between 1 and 50")
       .max(50, "DATABASE_POOL_MAX must be between 1 and 50")
       .default(Number.parseInt(getDefaultString("DATABASE_POOL_MAX"), 10))
-  ),
-  PROCESSING_RECOVERY_MAX_BATCH: positiveIntWithDefault("PROCESSING_RECOVERY_MAX_BATCH"),
-  PROCESSING_RECOVERY_MAX_ATTEMPTS: positiveIntWithDefault("PROCESSING_RECOVERY_MAX_ATTEMPTS"),
-  PROCESSING_RECOVERY_COOLDOWN_SECONDS: positiveIntWithDefault(
-    "PROCESSING_RECOVERY_COOLDOWN_SECONDS"
   ),
 } satisfies z.ZodRawShape;
 

@@ -209,9 +209,8 @@ describe("sendOTP use case", () => {
     expect(result.canResendAt).toBe(1_234_567_890);
   });
 
-  it("renders the configured OTP expiry rounded up to whole minutes", async () => {
+  it("renders the OTP expiry in whole minutes", async () => {
     process.env.AUTH_RESEND_KEY = "resend-key";
-    process.env.OTP_EXPIRES_SECONDS = "420";
 
     await sendOTP({
       email: validEmail("test@example.com"),
@@ -221,8 +220,8 @@ describe("sendOTP use case", () => {
 
     expect(otpEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        expiresInMinutes: 7,
-        copy: expect.objectContaining({ expiry: expect.stringContaining("7") }),
+        expiresInMinutes: 5,
+        copy: expect.objectContaining({ expiry: expect.stringContaining("5") }),
       })
     );
   });

@@ -1,5 +1,4 @@
 import type { UserAccountPort } from "@/application/contracts";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { getClientIPFromHeaders, type HeadersLike } from "@/lib/utils/ip";
@@ -8,6 +7,11 @@ import { AuthSignInError, AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { normalizeEmail } from "@/lib/utils/email";
 import { verifyPassword } from "@/modules/auth/services/password";
 import type { RateLimiterPort } from "@/application/contracts";
+import {
+  AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
+  AUTH_PASSWORD_IP_MAX_ATTEMPTS,
+  AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+} from "@/config/tuning";
 
 const PASSWORD_EMAIL_PREFIX = "auth:password:email:";
 const PASSWORD_IP_PREFIX = "auth:password:ip:";
@@ -21,12 +25,12 @@ async function reservePasswordRateLimits(
   rateLimiter: RateLimiterPort
 ): Promise<PasswordRateLimitReservation[]> {
   const reservations: PasswordRateLimitReservation[] = [];
-  const windowSeconds = runtimeEnv.authPasswordRateLimitWindowSeconds;
+  const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
   try {
     const emailKey = `${PASSWORD_EMAIL_PREFIX}${email}`;
     const emailResult = await rateLimiter.increment(
       emailKey,
-      runtimeEnv.authPasswordEmailMaxAttempts,
+      AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
       windowSeconds
     );
     if (!emailResult.success) {
@@ -37,7 +41,7 @@ async function reservePasswordRateLimits(
     const ipKey = `${PASSWORD_IP_PREFIX}${logIdentifier("ip", ip)}`;
     const ipResult = await rateLimiter.increment(
       ipKey,
-      runtimeEnv.authPasswordIpMaxAttempts,
+      AUTH_PASSWORD_IP_MAX_ATTEMPTS,
       windowSeconds
     );
     if (!ipResult.success) {
@@ -78,7 +82,7 @@ async function releasePasswordRateLimits(
   rateLimiter: RateLimiterPort
 ) {
   try {
-    const windowSeconds = runtimeEnv.authPasswordRateLimitWindowSeconds;
+    const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
     await Promise.all(
       reservations.map((reservation) =>
         rateLimiter.releaseIncrement(reservation.key, windowSeconds, reservation.resetTime)
