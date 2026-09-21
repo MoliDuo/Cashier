@@ -62,7 +62,12 @@ describe("ledger tab query descriptors", () => {
       mainCurrency: "USD",
     });
 
-    expect(descriptor.summaryParams.filters).toEqual({ search: "coffee" });
+    // The 汇总 read takes the window with the filters, in one flat input.
+    expect(descriptor.summaryInput).toEqual({
+      startDate: "2026-03-01",
+      endDate: "2026-03-31",
+      search: "coffee",
+    });
     expect(descriptor.getEntriesInput()).toEqual({
       startDate: "2026-03-01",
       endDate: "2026-03-31",
@@ -98,7 +103,7 @@ describe("ledger tab query descriptors", () => {
     const mine = buildDetailsQueryDescriptor({ ...input, bookId: "member-1" });
     const partner = buildDetailsQueryDescriptor({ ...input, bookId: "member-2" });
     expect(mine.getEntriesInput()).toEqual(expect.objectContaining({ bookId: "member-1" }));
-    expect(mine.summaryParams.filters.bookId).toBe("member-1");
+    expect(mine.summaryInput.bookId).toBe("member-1");
     expect(mine.entriesQueryKey).not.toEqual(partner.entriesQueryKey);
     expect(mine.summaryQueryKey).not.toEqual(partner.summaryQueryKey);
   });

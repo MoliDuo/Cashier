@@ -1,4 +1,7 @@
-import type { ListLedgerEntriesInput } from "@/modules/ledger/contract-schemas";
+import type {
+  LedgerStatsQueryInput,
+  ListLedgerEntriesInput,
+} from "@/modules/ledger/contract-schemas";
 import {
   buildDetailsFilterKey,
   getDetailsInitialQueryState,
@@ -28,18 +31,8 @@ interface DetailsQueryDescriptor {
   filterKey: string | null;
   summaryQueryKey: readonly unknown[];
   entriesQueryKey: readonly unknown[];
-  summaryParams: {
-    startDate?: string;
-    endDate?: string;
-    filters: {
-      bookId?: string;
-      categoryId?: string;
-      currency?: string;
-      minAmount?: string;
-      maxAmount?: string;
-      search?: string;
-    };
-  };
+  /** The 汇总 read's own input: every caller hands it over as it stands. */
+  summaryInput: LedgerStatsQueryInput;
   getEntriesInput: (pageParam?: string) => ListLedgerEntriesInput;
 }
 
@@ -81,10 +74,10 @@ export function buildDetailsQueryDescriptor(input: {
       endDate: state.endDateStr,
       filter: filterKey,
     }),
-    summaryParams: {
+    summaryInput: {
+      ...detailsFilters,
       ...(state.startDateStr != null ? { startDate: state.startDateStr } : {}),
       ...(state.endDateStr != null ? { endDate: state.endDateStr } : {}),
-      filters: detailsFilters,
     },
     getEntriesInput: (pageParam) => ({
       ...detailsFilters,

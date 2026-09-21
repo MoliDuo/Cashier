@@ -71,16 +71,7 @@ export function useDetailsTabData({
 
   const summaryQuery = useQuery({
     queryKey: descriptor.summaryQueryKey,
-    queryFn: () =>
-      getLedgerStatsAction(ledgerId, {
-        ...descriptor.summaryParams.filters,
-        ...(descriptor.summaryParams.startDate != null
-          ? { startDate: descriptor.summaryParams.startDate }
-          : {}),
-        ...(descriptor.summaryParams.endDate != null
-          ? { endDate: descriptor.summaryParams.endDate }
-          : {}),
-      }),
+    queryFn: () => getLedgerStatsAction(ledgerId, descriptor.summaryInput),
     enabled: true,
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     refetchOnWindowFocus: false,

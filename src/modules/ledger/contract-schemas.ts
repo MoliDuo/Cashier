@@ -377,5 +377,4 @@ export type UpdateServiceCredentialInput = z.infer<typeof updateServiceCredentia
 export type CreateBookInput = z.infer<typeof createBookInputSchema>;
 export type UpdateBookInput = z.infer<typeof updateBookInputSchema>;
 export type ListLedgerEntriesInput = z.input<typeof listLedgerEntriesInputSchema>;
-export type ListLedgerEntriesValidatedInput = z.infer<typeof listLedgerEntriesInputSchema>;
 export type LedgerStatsQueryInput = z.infer<typeof ledgerStatsQuerySchema>;
