@@ -1,0 +1,29 @@
+# A two-person app is far likelier to be reached through a dependency CVE than
+# through its own login form, and nothing else here watches for one. Updates are
+# grouped and weekly so the pull requests stay readable: one for everyday version
+# bumps, and a separate one for security fixes so those are never buried.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+      dependencies:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+    # Majors land on their own, because they are the ones worth reading a
+    # changelog for.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
