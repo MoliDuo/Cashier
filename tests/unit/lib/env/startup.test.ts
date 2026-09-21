@@ -5,7 +5,6 @@ const baseEnv = {
   NODE_ENV: "test",
   DATABASE_URL: "postgresql://cashier:cashier@localhost:5432/cashier",
   API_KEY_PEPPER: "test-pepper",
-  RATE_LIMIT_PEPPER: "test-rate-limit-pepper",
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
   AUTH_OTP_PEPPER: "otp-pepper",

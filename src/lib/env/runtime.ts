@@ -3,7 +3,6 @@ import { getStartupEnvValue } from "./startup";
 export interface RuntimeEnv {
   readonly databaseUrl: string;
   readonly apiKeyPepper: string;
-  readonly rateLimitPepper: string;
   readonly openaiApiKey: string;
   readonly openaiBaseUrl: string;
   readonly hasOpenaiBaseUrl: boolean;
@@ -68,9 +67,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get apiKeyPepper() {
     return getStartupEnvValue("API_KEY_PEPPER");
-  },
-  get rateLimitPepper() {
-    return getStartupEnvValue("RATE_LIMIT_PEPPER");
   },
   get openaiApiKey() {
     return getStartupEnvValue("OPENAI_API_KEY");

@@ -18,7 +18,7 @@
   S3 或 R2 配置，桶必须预先创建。
 - `S3_PUBLIC_ENDPOINT`：浏览器可以访问的对象存储端点。
 - `OPENAI_API_KEY`：AI 服务密钥。
-- `AUTH_SECRET`、`API_KEY_PEPPER`、`RATE_LIMIT_PEPPER`、`AUTH_OTP_PEPPER`：四个内部密钥，
+- `AUTH_SECRET`、`API_KEY_PEPPER`、`AUTH_OTP_PEPPER`：三个内部密钥，
   必须是安全随机值，并且在同一部署的重启、预览实例和多次构建之间保持一致。
 
 账号、账本和分账由首次启动的向导创建，不需要环境变量。

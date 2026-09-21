@@ -109,7 +109,6 @@ function booleanStringWithDefault(name: keyof typeof ENV_DEFAULTS) {
 const startupEnvFields = {
   DATABASE_URL: requiredPostgresUrl("DATABASE_URL"),
   API_KEY_PEPPER: requiredString("API_KEY_PEPPER"),
-  RATE_LIMIT_PEPPER: requiredString("RATE_LIMIT_PEPPER"),
   OPENAI_API_KEY: requiredString("OPENAI_API_KEY"),
   OPENAI_BASE_URL: urlWithDefault("OPENAI_BASE_URL"),
   AUTH_SECRET: requiredString("AUTH_SECRET"),

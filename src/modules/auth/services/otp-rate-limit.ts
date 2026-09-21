@@ -4,7 +4,7 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import { RateLimitUnavailableError } from "@/lib/errors";
 import { getResendCooldown } from "./otp";
 import type { RateLimiterPort } from "@/application/contracts";
-import { createHmac } from "node:crypto";
+import { createHash } from "node:crypto";
 
 // Config reads below (bucketKey and the getXxx() helpers) touch runtimeEnv
 // getters, which re-validate on every access and can throw
@@ -22,10 +22,11 @@ const OTP_VERIFY_PREFIX = "otp:verify:";
 const IP_WINDOW_SECONDS = 60 * 60;
 const VERIFY_WINDOW_SECONDS = 60;
 
+// The digest is unkeyed on purpose. It bounds the key's length and keeps raw
+// addresses out of `rate_limit_buckets`; it is not hiding anything, because the
+// same database stores the login emails in plain text two tables over.
 function bucketKey(purpose: string, identifier: string): string {
-  const digest = createHmac("sha256", runtimeEnv.rateLimitPepper)
-    .update(identifier.trim().toLowerCase())
-    .digest("hex");
+  const digest = createHash("sha256").update(identifier.trim().toLowerCase()).digest("hex");
   return `${purpose}:${digest}`;
 }
 
