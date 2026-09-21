@@ -147,7 +147,6 @@ describe("first-run setup", () => {
         bookNames: ["共同支出", "哞哞的"],
         email: "Owner@Example.com",
         password: "setup-pass-1",
-        locale: "zh",
       },
       postgresSetupAdapter
     );
@@ -177,7 +176,6 @@ describe("first-run setup", () => {
           bookNames: ["另一个"],
           email: "second@example.com",
           password: "setup-pass-2",
-          locale: "zh",
         },
         postgresSetupAdapter
       )
@@ -272,7 +270,6 @@ describe("first-run setup", () => {
         bookNames: ["共同支出"],
         email: "owner@example.com",
         password: "setup-pass-1",
-        locale: "zh",
       },
       postgresSetupAdapter
     );
@@ -293,7 +290,6 @@ describe("first-run setup", () => {
           bookNames: ["共同支出", "共同支出"],
           email: "owner@example.com",
           password: "setup-pass-1",
-          locale: "zh",
         },
         postgresSetupAdapter
       )
@@ -305,7 +301,6 @@ describe("first-run setup", () => {
           bookNames: ["共同支出"],
           email: "owner@example.com",
           password: "short",
-          locale: "zh",
         },
         postgresSetupAdapter
       )
@@ -323,7 +318,7 @@ describe("first-run setup", () => {
     await db.delete(loginEmails);
     await db.delete(users);
 
-    const account = { bookNames: ["共同支出"], email: "owner@example.com", locale: "zh" };
+    const account = { bookNames: ["共同支出"], email: "owner@example.com" };
 
     // 100 ASCII characters: a character count alone calls this fine.
     await expect(
@@ -353,7 +348,7 @@ describe("first-run setup", () => {
     expect(new TextEncoder().encode(password)).toHaveLength(72);
 
     const result = await createInitialAccount(
-      { bookNames: ["共同支出"], email: "boundary@example.com", password, locale: "zh" },
+      { bookNames: ["共同支出"], email: "boundary@example.com", password },
       postgresSetupAdapter
     );
 
@@ -371,7 +366,6 @@ describe("first-run setup", () => {
     const payload = {
       email: "owner@example.com",
       password: "setup-pass-1",
-      locale: "zh",
       books: ["共同支出"],
     };
 

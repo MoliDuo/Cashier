@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import enMessages from "../../../../../messages/en.json";
 import zhMessages from "../../../../../messages/zh.json";
 import { PasswordForm } from "@/modules/auth/ui/PasswordForm";
 import type {
@@ -94,22 +93,16 @@ describe("PasswordForm", () => {
     expect(screen.queryByText("Current password rejected by upstream")).toBeNull();
   });
 
-  it.each([
-    ["en", enMessages, "Last changed", "Tuesday, August 11, 2026"],
-    ["zh", zhMessages, "上次修改于", "2026年8月11日 星期二"],
-  ] as const)(
-    "formats the last-updated date with the %s locale",
-    (locale, messages, prefix, formatted) => {
-      const updatedAt = "2026-08-11T00:00:00.000Z";
-      render(
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <PasswordForm hasPassword passwordUpdatedAt={updatedAt} />
-        </NextIntlClientProvider>
-      );
+  it("formats the last-updated date in Chinese", () => {
+    const updatedAt = "2026-08-11T00:00:00.000Z";
+    render(
+      <NextIntlClientProvider locale="zh" messages={zhMessages}>
+        <PasswordForm hasPassword passwordUpdatedAt={updatedAt} />
+      </NextIntlClientProvider>
+    );
 
-      expect(screen.getByText(`${prefix} ${formatted}`)).toBeInTheDocument();
-    }
-  );
+    expect(screen.getByText("上次修改于 2026年8月11日 星期二")).toBeInTheDocument();
+  });
 });
 
 function submitSetPassword() {

@@ -20,10 +20,10 @@ let setupSettled = false;
  * already resolved a session never reaches here, so it costs one query only on
  * the two entry points a first visitor can land on.
  */
-export async function redirectToSetupIfPending(locale: string): Promise<void> {
+export async function redirectToSetupIfPending(): Promise<void> {
   if (setupSettled) return;
   // `redirect` throws, so the instance is only recorded as settled on the path
   // that actually saw an account.
-  if (await serverComposition.setup.isPending()) redirect(`/${locale}/setup`);
+  if (await serverComposition.setup.isPending()) redirect("/setup");
   setupSettled = true;
 }

@@ -358,6 +358,13 @@
       "when": 1789982551744,
       "tag": "0050_drop_otp_verified_at",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1789986014415,
+      "tag": "0051_drop_user_preferences",
+      "breakpoints": true
     }
   ]
 }

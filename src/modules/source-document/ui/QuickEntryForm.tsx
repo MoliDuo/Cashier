@@ -20,7 +20,7 @@ import { DateFilter } from "@/components/ui/date-filter";
 import { useQuickEntryFormController } from "@/modules/source-document/hooks/useQuickEntryFormController";
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
-import { Link } from "@/i18n/routing";
+import Link from "next/link";
 
 interface QuickEntryFormProps {
   ledgerId: string;

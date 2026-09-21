@@ -8,7 +8,7 @@ vi.mock("@/components/skeletons/TabSkeletons", () => ({
   SettingsTabSkeleton: () => <div data-testid="settings-skeleton" />,
 }));
 
-import { LedgerBootstrapFallback } from "@/app/[locale]/(protected)/_ledger-bootstrap-fallback";
+import { LedgerBootstrapFallback } from "@/app/(protected)/_ledger-bootstrap-fallback";
 
 describe("LedgerBootstrapFallback", () => {
   it.each([

@@ -1,7 +1,6 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import { CredentialsSignin } from "@auth/core/errors";
 import Credentials from "next-auth/providers/credentials";
-import { resolveSupportedLocale } from "@/i18n/resolve-locale";
 import { authConfig } from "./auth.config";
 import { authenticateWithOTP } from "@/modules/auth/application/use-cases/authenticate-with-otp";
 import { authenticateWithPassword } from "@/modules/auth/application/use-cases/authenticate-with-password";
@@ -49,7 +48,6 @@ const providers: NextAuthConfig["providers"] = [
     credentials: {
       email: { type: "email" },
       otp: { type: "text" },
-      locale: { type: "text" },
     },
     async authorize(credentials, request) {
       if (
@@ -72,9 +70,6 @@ const providers: NextAuthConfig["providers"] = [
           {
             email,
             otp,
-            locale: resolveSupportedLocale({
-              explicitLocale: typeof credentials.locale === "string" ? credentials.locale : null,
-            }),
             requestHeaders: request.headers,
           },
           {
@@ -92,7 +87,6 @@ const providers: NextAuthConfig["providers"] = [
     credentials: {
       email: { type: "email" },
       password: { type: "password" },
-      locale: { type: "text" },
     },
     async authorize(credentials, request) {
       if (typeof credentials?.email !== "string" || typeof credentials.password !== "string") {
@@ -105,9 +99,6 @@ const providers: NextAuthConfig["providers"] = [
           {
             email,
             password,
-            locale: resolveSupportedLocale({
-              explicitLocale: typeof credentials.locale === "string" ? credentials.locale : null,
-            }),
             requestHeaders: request.headers,
           },
           {
@@ -125,19 +116,10 @@ if (isDevAuthBypassEnabled()) {
     Credentials({
       id: "dev",
       name: "Development",
-      credentials: {
-        locale: { type: "text" },
-      },
-      async authorize(credentials) {
+      credentials: {},
+      async authorize() {
         return authorizeInteractiveSignIn(() =>
-          authenticateDevUser(
-            {
-              locale: resolveSupportedLocale({
-                explicitLocale: typeof credentials?.locale === "string" ? credentials.locale : null,
-              }),
-            },
-            { users: serverComposition.userAccounts }
-          )
+          authenticateDevUser({ users: serverComposition.userAccounts })
         );
       },
     })
@@ -196,7 +178,6 @@ export const authOptions = {
             image: dbUser.image,
             hasPassword: dbUser.passwordHash != null,
             passwordUpdatedAt: dbUser.passwordUpdatedAt?.toISOString() ?? null,
-            interfaceLanguage: dbUser.interfaceLanguage,
             authenticatedAt: authenticatedAtDate.toISOString(),
           },
         };
@@ -217,13 +198,11 @@ declare module "next-auth" {
       image?: string | null;
       hasPassword: boolean;
       passwordUpdatedAt: string | null;
-      interfaceLanguage: "auto" | "zh" | "en";
       authenticatedAt: string;
     };
   }
 
   interface User {
-    locale?: string | null;
     authVersion: number;
   }
 }

@@ -8,7 +8,7 @@ const expectedIcons = [
 ];
 
 describe("buildPwaManifest", () => {
-  it("preserves the default Chinese manifest without a locale scope", () => {
+  it("describes the installed app", () => {
     expect(buildPwaManifest()).toEqual({
       name: "Cashier - AI 记账助手",
       short_name: "Cashier",
@@ -19,23 +19,5 @@ describe("buildPwaManifest", () => {
       theme_color: "#ffffff",
       icons: expectedIcons,
     });
-  });
-
-  it("builds the English locale manifest with its existing scope and start URL", () => {
-    expect(buildPwaManifest("en")).toEqual({
-      name: "Cashier - AI Bookkeeping",
-      short_name: "Cashier",
-      description: "AI-powered bookkeeping",
-      start_url: "/en",
-      scope: "/en/",
-      display: "standalone",
-      background_color: "#ffffff",
-      theme_color: "#ffffff",
-      icons: expectedIcons,
-    });
-  });
-
-  it("adds locale scope to the Chinese manifest", () => {
-    expect(buildPwaManifest("zh")).toMatchObject({ start_url: "/zh", scope: "/zh/" });
   });
 });

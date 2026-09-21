@@ -58,13 +58,10 @@ function categorySignature(categories: readonly EntryCategoryWithCount[]): strin
     .join("|");
 }
 
-function matchingPreset(
-  categories: readonly EntryCategoryWithCount[],
-  locale: string
-): CategoryPresetId | null {
+function matchingPreset(categories: readonly EntryCategoryWithCount[]): CategoryPresetId | null {
   const names = new Set(categories.map((category) => category.name));
   for (const presetId of CATEGORY_PRESET_IDS) {
-    const presetNames = getCategoryPreset(presetId, locale).map((category) => category.name);
+    const presetNames = getCategoryPreset(presetId).map((category) => category.name);
     if (presetNames.length === names.size && presetNames.every((name) => names.has(name)))
       return presetId;
   }
@@ -73,10 +70,9 @@ function matchingPreset(
 
 function suggestedMappings(
   presetId: CategoryPresetId,
-  locale: string,
   categories: readonly EntryCategoryWithCount[]
 ): PresetMappingDraft {
-  const targets = getCategoryPreset(presetId, locale);
+  const targets = getCategoryPreset(presetId);
   const indexByName = new Map(targets.map((category, index) => [category.name, index]));
   const indexByKey = new Map(targets.map((category, index) => [category.key, index]));
   return Object.fromEntries(
@@ -131,14 +127,9 @@ function errorCode(error: Error): unknown {
 interface UseCategoryPresetSwitchOptions {
   ledgerId: string;
   categories: EntryCategoryWithCount[];
-  locale: string;
 }
 
-export function useCategoryPresetSwitch({
-  ledgerId,
-  categories,
-  locale,
-}: UseCategoryPresetSwitchOptions) {
+export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPresetSwitchOptions) {
   const t = useTranslations("Settings");
   const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
@@ -150,7 +141,6 @@ export function useCategoryPresetSwitch({
   const [drafts, setDrafts] = useState<Partial<Record<CategoryPresetId, PresetMappingDraft>>>({});
   const [snapshot, setSnapshot] = useState<{
     ledgerId: string;
-    locale: string;
     categories: EntryCategoryWithCount[];
     signature: string;
     revision: string;
@@ -163,12 +153,11 @@ export function useCategoryPresetSwitch({
   const revisionRequestRef = useRef(0);
 
   const draftCategories = snapshot?.categories ?? categories;
-  const draftLocale = snapshot?.locale ?? locale;
-  const preset = useMemo(() => getCategoryPreset(presetId, draftLocale), [draftLocale, presetId]);
+  const preset = useMemo(() => getCategoryPreset(presetId), [presetId]);
   const mappings = useMemo(() => drafts[presetId] ?? {}, [drafts, presetId]);
   const recommendations = useMemo(
-    () => suggestedMappings(presetId, draftLocale, draftCategories),
-    [draftCategories, draftLocale, presetId]
+    () => suggestedMappings(presetId, draftCategories),
+    [draftCategories, presetId]
   );
   const summary = useMemo(
     () => summarize(draftCategories, mappings, preset.length),
@@ -220,19 +209,18 @@ export function useCategoryPresetSwitch({
       if (nextPresetId === presetId) return;
       setDrafts((current) => ({
         ...current,
-        [nextPresetId]:
-          current[nextPresetId] ?? suggestedMappings(nextPresetId, draftLocale, draftCategories),
+        [nextPresetId]: current[nextPresetId] ?? suggestedMappings(nextPresetId, draftCategories),
       }));
       setPresetId(nextPresetId);
       setSaveError(null);
     },
-    [draftCategories, draftLocale, presetId]
+    [draftCategories, presetId]
   );
 
   const initializeSnapshot = useCallback(() => {
     const request = ++revisionRequestRef.current;
-    const initialPresetId = matchingPreset(categories, locale) ?? DEFAULT_PRESET_ID;
-    const initialMappings = suggestedMappings(initialPresetId, locale, categories);
+    const initialPresetId = matchingPreset(categories) ?? DEFAULT_PRESET_ID;
+    const initialMappings = suggestedMappings(initialPresetId, categories);
     setIsPreparing(true);
     setResult(null);
     setSaveError(null);
@@ -240,7 +228,6 @@ export function useCategoryPresetSwitch({
       if (revisionRequestRef.current !== request) return;
       setSnapshot({
         ledgerId,
-        locale,
         categories: [...categories],
         signature: categorySignature(categories),
         revision,
@@ -251,7 +238,7 @@ export function useCategoryPresetSwitch({
       setDrafts({ [initialPresetId]: initialMappings });
       setIsPreparing(false);
     });
-  }, [categories, ledgerId, locale]);
+  }, [categories, ledgerId]);
 
   const openDialog = useCallback(() => {
     setOpen(true);
@@ -303,7 +290,6 @@ export function useCategoryPresetSwitch({
     await mutation.mutateAsync({
       expectedRevision: snapshot.revision,
       presetId,
-      locale: snapshot.locale,
       mappings: snapshot.categories.map((category) => ({
         fromCategoryId: category.id,
         toPresetIndex: mappings[category.id]!,
@@ -323,7 +309,6 @@ export function useCategoryPresetSwitch({
     setDiscardOpen,
     presetId,
     preset,
-    locale: draftLocale,
     mappings,
     setMapping,
     isSuggestedMapping: (categoryId: string) =>

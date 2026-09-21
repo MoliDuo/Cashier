@@ -8,7 +8,6 @@ import {
 } from "@/lib/validation";
 import { MAX_BATCH_SIZE } from "@/lib/batch-ids";
 import { CATEGORY_PRESET_IDS } from "@/config/category-presets";
-import { SUPPORTED_LOCALES } from "@/i18n/locales";
 import { isValidTimeZone } from "@/lib/date-utils";
 import { MAX_SEARCH_LENGTH, normalizeSearchTerm } from "@/lib/search";
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
@@ -130,7 +129,6 @@ const saveEntryCategoriesInputSchema = strictObjectSchema({
 const applyCategoryPresetInputSchema = strictObjectSchema({
   expectedRevision: categoryCollectionRevisionSchema,
   presetId: z.enum(CATEGORY_PRESET_IDS),
-  locale: z.enum(SUPPORTED_LOCALES),
   mappings: z
     .array(
       strictObjectSchema({

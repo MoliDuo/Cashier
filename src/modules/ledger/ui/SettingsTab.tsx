@@ -1,6 +1,6 @@
 "use client";
 import type { EntryCategoryWithCount, Ledger } from "@/modules/ledger/contracts";
-import { useRouter, usePathname } from "@/i18n/routing";
+import { usePathname } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
 import { AccountSettings } from "./settings/AccountSettings";
@@ -18,14 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
-import { UI_LANGUAGES } from "@/config/languages";
 import { signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { updateUserPreferencesAction } from "@/modules/auth/server-actions/user-preferences";
-import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { SettingsSectionActions } from "./settings/SettingsSectionActions";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { queryKeys } from "@/lib/query-keys";
@@ -52,12 +49,11 @@ interface SettingsTabProps {
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
-  interfaceLanguage?: InterfaceLanguage;
   onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
-type AppearanceField = "theme" | "language";
-const appearanceFields: readonly AppearanceField[] = ["theme", "language"];
+type AppearanceField = "theme";
+const appearanceFields: readonly AppearanceField[] = ["theme"];
 
 export function SettingsTab({
   ledger,
@@ -69,12 +65,9 @@ export function SettingsTab({
   userEmail,
   hasPassword = false,
   passwordUpdatedAt = null,
-  interfaceLanguage = "auto",
   onGoToDetails,
 }: SettingsTabProps) {
-  const router = useRouter();
   const pathname = usePathname();
-  const locale = useLocale();
   const t = useTranslations("Settings");
   const tQueryError = useTranslations("LedgerQueryError");
   const { theme, setTheme } = useTheme();
@@ -82,7 +75,6 @@ export function SettingsTab({
   const queryClient = useQueryClient();
   const [appearanceServer, setAppearanceServer] = useState({
     theme: theme ?? "system",
-    language: interfaceLanguage,
   });
   const [appearanceDraft, setAppearanceDraft] = useState(appearanceServer);
   const [appearanceTouched, setAppearanceTouched] = useState<Set<AppearanceField>>(new Set());
@@ -90,15 +82,10 @@ export function SettingsTab({
   const [appearanceError, setAppearanceError] = useState<string | null>(null);
   const [appearanceServerChanged, setAppearanceServerChanged] = useState(false);
   const [metadataPollingSession, setMetadataPollingSession] = useState(0);
-  const appearanceDirty =
-    appearanceServer.theme !== appearanceDraft.theme ||
-    appearanceServer.language !== appearanceDraft.language;
+  const appearanceDirty = appearanceServer.theme !== appearanceDraft.theme;
 
-  const nextAppearanceServer = { theme: theme ?? "system", language: interfaceLanguage };
-  if (
-    nextAppearanceServer.theme !== appearanceServer.theme ||
-    nextAppearanceServer.language !== appearanceServer.language
-  ) {
+  const nextAppearanceServer = { theme: theme ?? "system" };
+  if (nextAppearanceServer.theme !== appearanceServer.theme) {
     const touchedServerFieldsChanged = appearanceFields.some(
       (field) =>
         appearanceTouched.has(field) && appearanceServer[field] !== nextAppearanceServer[field]
@@ -106,9 +93,6 @@ export function SettingsTab({
     setAppearanceServer(nextAppearanceServer);
     setAppearanceDraft((current) => ({
       theme: appearanceTouched.has("theme") ? current.theme : nextAppearanceServer.theme,
-      language: appearanceTouched.has("language")
-        ? current.language
-        : nextAppearanceServer.language,
     }));
     setAppearanceServerChanged((current) => current || touchedServerFieldsChanged);
   }
@@ -189,44 +173,14 @@ export function SettingsTab({
     setAppearanceStatus("saving");
     setAppearanceError(null);
     try {
-      let savedLanguage = appearanceDraft.language;
-      if (appearanceDraft.language !== appearanceServer.language) {
-        const saved = await updateUserPreferencesAction({
-          interfaceLanguage: appearanceDraft.language,
-        });
-        savedLanguage = saved.interfaceLanguage;
-      }
-
-      if (appearanceDraft.theme !== appearanceServer.theme) {
-        setTheme(appearanceDraft.theme);
-      }
-
-      const savedAppearance = {
-        theme: appearanceDraft.theme,
-        language: savedLanguage,
-      };
-      setAppearanceServer(savedAppearance);
-      setAppearanceDraft(savedAppearance);
+      setTheme(appearanceDraft.theme);
+      setAppearanceServer(appearanceDraft);
       setAppearanceTouched(new Set());
       setAppearanceServerChanged(false);
       setAppearanceStatus("idle");
-
-      if (savedLanguage !== appearanceServer.language) {
-        const queryString = searchParams.toString();
-        const query = queryString !== "" ? `?${queryString}` : "";
-        if (savedLanguage === "auto") {
-          document.cookie =
-            "NEXT_LOCALE=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax";
-          router.refresh();
-        } else {
-          document.cookie = `NEXT_LOCALE=${savedLanguage}; path=/; max-age=31536000; samesite=lax`;
-          if (savedLanguage === locale) router.refresh();
-          else router.push(`${pathname}${query}`, { locale: savedLanguage });
-        }
-      }
     } catch {
       setAppearanceStatus("error");
-      setAppearanceError(t("uiLanguageSaveFailed"));
+      setAppearanceError(t("appearanceSaveFailed"));
     }
   };
 
@@ -269,7 +223,7 @@ export function SettingsTab({
         </div>
       )}
       <SettingsSection
-        title={t("appearanceAndLanguage")}
+        title={t("appearance")}
         actions={
           <SettingsSectionActions
             dirty={appearanceDirty}
@@ -299,31 +253,6 @@ export function SettingsTab({
               {(["system", "light", "dark"] as const).map((themeName) => (
                 <SelectItem key={themeName} value={themeName}>
                   {themeLabel(themeName)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsField>
-        <SettingsField title={t("uiLanguage")}>
-          <Select
-            value={appearanceDraft.language}
-            onValueChange={(value) => {
-              setAppearanceDraft((current) => ({
-                ...current,
-                language: value as InterfaceLanguage,
-              }));
-              setAppearanceTouched((current) => new Set(current).add("language"));
-              setAppearanceError(null);
-            }}
-            disabled={appearanceStatus === "saving"}
-          >
-            <SelectTrigger aria-label={t("uiLanguage")} className="w-full sm:w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              {UI_LANGUAGES.map((lang) => (
-                <SelectItem key={lang.value} value={lang.value}>
-                  {lang.value === "auto" ? t("uiLanguageAuto") : lang.label}
                 </SelectItem>
               ))}
             </SelectContent>

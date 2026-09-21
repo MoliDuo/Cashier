@@ -65,7 +65,7 @@ export async function openBookSwitcher(page: Page) {
  * The strip's options, in the order it paints them: 总账 first, then the books.
  */
 export function bookOptions(page: Page) {
-  return page.getByRole("group", { name: "Book" }).getByRole("button").filter({ visible: true });
+  return page.getByRole("group", { name: "分账" }).getByRole("button").filter({ visible: true });
 }
 
 /**

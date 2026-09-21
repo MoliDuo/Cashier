@@ -31,12 +31,12 @@ vi.mock("@/application/processing/schedule-processing-recovery", () => ({
   scheduleProcessingRecoveryAfter: scheduleProcessingRecoveryAfterMock,
 }));
 
-vi.mock("@/app/[locale]/(protected)/_ledger-bootstrap-fallback", () => ({
+vi.mock("@/app/(protected)/_ledger-bootstrap-fallback", () => ({
   LedgerBootstrapFallback: () =>
     React.createElement("div", { "data-testid": "ledger-bootstrap-fallback" }),
 }));
 
-vi.mock("@/i18n/routing", () => ({
+vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
     throw new Error("REDIRECT");
   }),
@@ -82,7 +82,7 @@ vi.mock("@/i18n/client-feature-messages", () => ({
 }));
 
 // Mock ActiveShell so we don't need client-side hook mocks (usePathname, useSearchParams, etc.)
-vi.mock("@/app/[locale]/(protected)/_active-shell", () => ({
+vi.mock("@/app/(protected)/_active-shell", () => ({
   ActiveShell: ({ children }: { children: React.ReactNode }) =>
     React.createElement("div", { "data-testid": "active-shell" }, children),
 }));
@@ -115,7 +115,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 // --------------------------------------------------------------------------
 // Imports after all mocks
 // --------------------------------------------------------------------------
-import { ActiveTab } from "@/app/[locale]/(protected)/_active-tab";
+import { ActiveTab } from "@/app/(protected)/_active-tab";
 import { UnauthorizedError } from "@/lib/errors";
 
 describe("protected home streaming boundary", () => {

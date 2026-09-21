@@ -128,8 +128,8 @@ describe("ledger-url-params", () => {
   it("builds URLs without introducing navigation side effects", () => {
     const params = new URLSearchParams("tab=details&period=custom");
 
-    expect(buildLedgerUrl("/ledger/test-id", params, "en")).toBe(
-      "/en/ledger/test-id?tab=details&period=custom"
+    expect(buildLedgerUrl("/ledger/test-id", params)).toBe(
+      "/ledger/test-id?tab=details&period=custom"
     );
   });
 
@@ -137,9 +137,9 @@ describe("ledger-url-params", () => {
     const replaceState = vi.spyOn(window.history, "replaceState").mockImplementation(() => {});
     const params = new URLSearchParams("tab=details&period=custom");
 
-    const replacedUrl = replaceLedgerUrl("/ledger/test-id", params, "zh");
+    const replacedUrl = replaceLedgerUrl("/ledger/test-id", params);
 
-    expect(replacedUrl).toBe("/zh/ledger/test-id?tab=details&period=custom");
+    expect(replacedUrl).toBe("/ledger/test-id?tab=details&period=custom");
     expect(replaceState).toHaveBeenCalled();
   });
 
@@ -155,11 +155,10 @@ describe("ledger-url-params", () => {
     const url = pushLedgerUrl(
       "/ledger/test-id",
       new URLSearchParams("tab=stats&detailType=source-document&detailId=document-1"),
-      "en",
       "tab"
     );
 
-    expect(url).toBe("/en/ledger/test-id?tab=stats");
+    expect(url).toBe("/ledger/test-id?tab=stats");
     expect(replaceState).toHaveBeenCalled();
     expect(pushState).not.toHaveBeenCalled();
   });

@@ -120,7 +120,7 @@ export const postgresSetupAdapter: SetupPort = {
   },
 
   async createInitialAccount(input) {
-    const categories = getCategoryPreset("default", input.locale);
+    const categories = getCategoryPreset("default");
     const passwordHash = await hashPassword(input.password);
     const now = new Date();
 

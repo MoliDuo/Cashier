@@ -19,7 +19,7 @@ import { MAX_HEATMAP_DAYS } from "@/modules/stats/lib/heatmap-range";
 import { QUERY } from "@/lib/constants";
 import { DEFAULT_STATS_RANGE_TYPE } from "@/modules/workspace/initial-query-state";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
-import { usePathname } from "@/i18n/routing";
+import { usePathname } from "next/navigation";
 import {
   readStatsSearchParams,
   setStatsSearchParams,
@@ -90,9 +90,9 @@ export function StatsTab({
         offset: update.offset ?? statsUrlState.offset,
         view: update.view ?? statsUrlState.view,
       });
-      pushLedgerUrl(pathname, params, locale, "stats");
+      pushLedgerUrl(pathname, params, "stats");
     },
-    [locale, pathname, searchParams, statsUrlState]
+    [pathname, searchParams, statsUrlState]
   );
 
   const statsDescriptor = useMemo(

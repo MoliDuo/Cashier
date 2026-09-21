@@ -107,7 +107,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                     </span>
                   </label>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {getCategoryPreset(presetId, preset.locale).map((category) => (
+                    {getCategoryPreset(presetId).map((category) => (
                       <details
                         key={category.name}
                         className={cn(

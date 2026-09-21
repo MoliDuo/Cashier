@@ -1,7 +1,7 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
-import { usePathname } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useDrilldownNavigation } from "../hooks/useDrilldownNavigation";
 import { useLedgerHistorySync } from "../hooks/useLedgerHistorySync";
@@ -11,7 +11,6 @@ import { useNewRecordDialogState } from "../hooks/useNewRecordDialogState";
 import { useLedgerPageEnvironment } from "../hooks/useLedgerPageEnvironment";
 import { useRecordScope } from "../hooks/useRecordScope";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { LedgerQueryErrorBanner } from "@/modules/workspace/ui/LedgerQueryErrorBanner";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
@@ -45,7 +44,6 @@ interface LedgerPageClientProps {
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
-  interfaceLanguage?: InterfaceLanguage;
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -64,11 +62,9 @@ export function LedgerPageClient({
   userEmail,
   hasPassword,
   passwordUpdatedAt,
-  interfaceLanguage,
 }: LedgerPageClientProps) {
   const t = useTranslations("LedgerPage");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { books } = useBooks({
@@ -87,13 +83,11 @@ export function LedgerPageClient({
     initialTab,
     searchParams,
     pathname,
-    locale,
   });
   useLedgerHistorySync({
     pathname,
     searchParams,
     ledgerId,
-    locale,
     legacyScope: activeTab === "details" ? "details" : "stream",
   });
 
@@ -139,7 +133,6 @@ export function LedgerPageClient({
   const { periodParams, filters, filterParams, handleFiltersChange } = usePeriodFilter({
     pathname,
     searchParams,
-    locale,
     scope: activeTab === "details" ? "details" : "stream",
     ...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {}),
   });
@@ -149,7 +142,6 @@ export function LedgerPageClient({
     searchParams,
     pathname,
     ledgerId,
-    locale,
     ...(recordScope == null ? {} : { bookId: recordScope }),
   });
   const handleGoToDetails = (validCategoryIds: readonly string[]) => {
@@ -163,7 +155,7 @@ export function LedgerPageClient({
     ) {
       params.delete("detailsCategoryId");
     }
-    pushLedgerUrl(pathname, params, locale, "tab");
+    pushLedgerUrl(pathname, params, "tab");
   };
 
   if (ledger == null) {
@@ -213,7 +205,6 @@ export function LedgerPageClient({
           userEmail={userEmail}
           hasPassword={hasPassword}
           passwordUpdatedAt={passwordUpdatedAt}
-          interfaceLanguage={interfaceLanguage}
           onGoToDetails={handleGoToDetails}
         />
 

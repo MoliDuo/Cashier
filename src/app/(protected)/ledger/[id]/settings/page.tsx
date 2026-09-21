@@ -9,7 +9,7 @@ import { serverComposition } from "@/application/server-composition-root";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/routing";
+import Link from "next/link";
 import { textRoleClassName } from "@/components/typography";
 
 interface SettingsPageProps {
@@ -77,7 +77,6 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
           {...(session?.user?.email != null ? { userEmail: session.user.email } : {})}
           {...(session?.user != null ? { hasPassword: session.user.hasPassword } : {})}
           {...(session?.user != null ? { passwordUpdatedAt: session.user.passwordUpdatedAt } : {})}
-          {...(session?.user != null ? { interfaceLanguage: session.user.interfaceLanguage } : {})}
         />
       </HydrationBoundary>
     </NextIntlClientProvider>

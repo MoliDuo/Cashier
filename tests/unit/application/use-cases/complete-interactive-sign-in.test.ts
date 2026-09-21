@@ -17,7 +17,6 @@ const principal: AuthenticatedPrincipal = {
   email: "user@example.com",
   name: "User",
   image: null,
-  locale: "en",
   authVersion: 1,
 };
 
@@ -37,12 +36,6 @@ describe("completeInteractiveSignIn", () => {
 
     expect(resolveHomeMock).toHaveBeenCalledWith("user-1", ledgers);
     expect(result).toEqual(principal);
-  });
-
-  it("does not use locale for ledger lookup", async () => {
-    await completeInteractiveSignIn({ ...principal, locale: "" }, dependencies);
-
-    expect(resolveHomeMock).toHaveBeenCalledWith("user-1", ledgers);
   });
 
   it("propagates a missing shared ledger instead of handing out a session", async () => {

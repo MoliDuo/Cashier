@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import GlobalError from "@/app/[locale]/error";
-import LedgerError from "@/app/[locale]/(protected)/ledger/[id]/error";
+import GlobalError from "@/app/error";
+import LedgerError from "@/app/(protected)/ledger/[id]/error";
 
 const originalLocation = window.location;
 

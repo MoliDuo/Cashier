@@ -78,7 +78,6 @@ describe("auth.ts adapter wiring", () => {
       passwordUpdatedAt: new Date("2026-07-01T00:00:00.000Z"),
       authVersion: 1,
       registrationCompletedAt: new Date("2026-06-01T00:00:00.000Z"),
-      interfaceLanguage: "auto",
     });
   });
 
@@ -97,7 +96,7 @@ describe("auth.ts adapter wiring", () => {
 
     const request = { headers: new Headers({ "x-forwarded-for": "127.0.0.1" }) };
     const result = await otpProvider?.authorize?.(
-      { email: "user@example.com", otp: "123456", locale: "zh" },
+      { email: "user@example.com", otp: "123456" },
       request
     );
 
@@ -105,7 +104,6 @@ describe("auth.ts adapter wiring", () => {
       {
         email: "user@example.com",
         otp: "123456",
-        locale: "zh",
         requestHeaders: request.headers,
       },
       expect.any(Object)
@@ -113,7 +111,7 @@ describe("auth.ts adapter wiring", () => {
     expect(result).toMatchObject({ email: "user@example.com" });
   }, 30_000);
 
-  it("passes locale through password authorization", async () => {
+  it("hands the password provider its credentials and the request headers", async () => {
     authenticateWithPasswordMock.mockResolvedValueOnce({
       id: "db-user",
       email: "user@example.com",
@@ -128,16 +126,12 @@ describe("auth.ts adapter wiring", () => {
     );
     const request = { headers: new Headers() };
 
-    await passwordProvider?.authorize?.(
-      { email: "user@example.com", password: "secret", locale: "en" },
-      request
-    );
+    await passwordProvider?.authorize?.({ email: "user@example.com", password: "secret" }, request);
 
     expect(authenticateWithPasswordMock).toHaveBeenCalledWith(
       {
         email: "user@example.com",
         password: "secret",
-        locale: "en",
         requestHeaders: request.headers,
       },
       expect.any(Object)
@@ -200,7 +194,6 @@ describe("auth.ts adapter wiring", () => {
         image: "db-image",
         hasPassword: true,
         passwordUpdatedAt: "2026-07-01T00:00:00.000Z",
-        interfaceLanguage: "auto",
         authenticatedAt: "2027-01-15T08:00:00.000Z",
       },
     });
@@ -240,7 +233,6 @@ describe("auth.ts adapter wiring", () => {
       passwordUpdatedAt: null,
       authVersion: 2,
       registrationCompletedAt: new Date(),
-      interfaceLanguage: "auto",
     });
 
     await expect(

@@ -4,8 +4,6 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import { RateLimitError, AppError } from "@/lib/errors";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { normalizeEmail, DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
-import type { SupportedLocale } from "@/i18n/locales";
-import { DEFAULT_LOCALE } from "@/i18n/locales";
 import type { SendOTPEmail } from "@/modules/auth/contract-schemas";
 import { createOTPToken, discardOTPToken } from "@/modules/auth/repositories/otp-repository";
 import {
@@ -30,18 +28,13 @@ type OTPAuthEmailMessages = {
   otpFooter: string;
 };
 
-async function getOTPEmailCopy(
-  locale: SupportedLocale,
-  host: string,
-  otp: string,
-  expiresInMinutes: number
-) {
-  const messages = (await import(`../../../../../messages/${locale}.json`)).default as {
+async function getOTPEmailCopy(host: string, otp: string, expiresInMinutes: number) {
+  const messages = (await import("../../../../../messages/zh.json")).default as {
     AuthEmail: OTPAuthEmailMessages;
   };
   const t = messages.AuthEmail;
   return {
-    subject: locale.startsWith("zh") ? "Cashier 验证码" : "Cashier verification code",
+    subject: "Cashier 验证码",
     copy: {
       preview: t.otpPreview,
       heading: t.otpHeading.replace("{host}", host),
@@ -59,7 +52,6 @@ export async function sendOTP(
     email: SendOTPEmail;
     ip: string;
     host: string;
-    locale?: SupportedLocale;
   },
   dependencies: {
     emailDelivery: EmailDeliveryPort;
@@ -122,14 +114,13 @@ export async function sendOTP(
     );
     expiresAt = token.expiresAt;
     tokenHash = token.tokenHash;
-    const locale = params.locale ?? DEFAULT_LOCALE;
     const expiresInMinutes = Math.ceil(OTP_EXPIRES_SECONDS / 60);
-    const { subject, copy } = await getOTPEmailCopy(locale, params.host, otp, expiresInMinutes);
+    const { subject, copy } = await getOTPEmailCopy(params.host, otp, expiresInMinutes);
     const delivery = await dependencies.emailDelivery.send({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: normalizedEmail,
       subject,
-      content: OTPEmail({ otp, host: params.host, expiresInMinutes, locale, copy }),
+      content: OTPEmail({ otp, host: params.host, expiresInMinutes, copy }),
     });
     if (delivery === "not_configured") {
       throw new AppError("Email login is not configured", "EMAIL_NOT_CONFIGURED", 503);

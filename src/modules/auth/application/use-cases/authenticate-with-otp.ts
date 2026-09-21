@@ -65,7 +65,6 @@ export async function authenticateWithOTP(
   params: {
     email: string;
     otp: string;
-    locale?: string;
     requestHeaders: HeadersLike;
   },
   dependencies: {
@@ -75,7 +74,6 @@ export async function authenticateWithOTP(
   }
 ): Promise<AuthenticatedPrincipal> {
   const normalizedEmail = validateCredentials(params.email, params.otp);
-  const locale = params.locale ?? "zh";
 
   const ip = getClientIPFromHeaders(params.requestHeaders);
   let isAllowed: boolean;
@@ -158,6 +156,5 @@ export async function authenticateWithOTP(
     name: user.name,
     image: user.image,
     authVersion: user.authVersion,
-    locale,
   };
 }

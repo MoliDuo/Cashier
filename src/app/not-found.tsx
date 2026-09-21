@@ -1,4 +1,4 @@
-import { Link } from "@/i18n/routing";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Home } from "lucide-react";
 import { textRoleClassName } from "@/components/typography";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,6 @@ export function EmailSettings({
 }: EmailSettingsProps) {
   const t = useTranslations("Settings.Emails");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
   const queryClient = useQueryClient();
   const key = queryKeys.loginEmails();
   const { data } = useQuery({
@@ -109,7 +108,7 @@ export function EmailSettings({
     setPending(true);
     setError(null);
     try {
-      const result = await sendLoginEmailCodeAction(email, locale);
+      const result = await sendLoginEmailCodeAction(email);
       if (!result.ok) {
         if (result.code === "reauth_required") {
           await onRequireReauthentication?.();

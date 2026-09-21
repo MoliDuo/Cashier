@@ -1,23 +1,9 @@
 import { getRequestConfig } from "next-intl/server";
-import { cookies, headers } from "next/headers";
-import { resolveSupportedLocale } from "./resolve-locale";
+import messages from "../../messages/zh.json";
 
-export default getRequestConfig(async ({ requestLocale }) => {
-  const explicitLocale = await requestLocale;
-  const cookieStore = await cookies();
-  const cookieLocale = cookieStore.get("NEXT_LOCALE")?.value ?? null;
-
-  const headersList = await headers();
-  const acceptLanguage = headersList.get("accept-language");
-
-  const locale = resolveSupportedLocale({
-    ...(explicitLocale === undefined ? {} : { explicitLocale }),
-    cookieLocale,
-    acceptLanguage,
-  });
-
-  return {
-    locale,
-    messages: (await import(`../../messages/${locale}.json`)).default,
-  };
-});
+/**
+ * Cashier is written in Chinese, for the two people who keep this ledger.
+ * next-intl stays because it is where the strings live and what formats them;
+ * there is simply nothing to negotiate.
+ */
+export default getRequestConfig(async () => ({ locale: "zh", messages }));

@@ -6,16 +6,12 @@ const icons: MetadataRoute.Manifest["icons"] = [
   { src: "/apple-icon.png", sizes: "180x180", type: "image/png" },
 ];
 
-export function buildPwaManifest(locale?: "en" | "zh"): MetadataRoute.Manifest {
-  const localized = locale != null;
-  const zh = locale !== "en";
-
+export function buildPwaManifest(): MetadataRoute.Manifest {
   return {
-    name: zh ? "Cashier - AI 记账助手" : "Cashier - AI Bookkeeping",
+    name: "Cashier - AI 记账助手",
     short_name: "Cashier",
-    description: zh ? "AI 驱动的智能记账工具" : "AI-powered bookkeeping",
-    start_url: localized ? `/${locale}` : "/",
-    ...(localized ? { scope: `/${locale}/` } : {}),
+    description: "AI 驱动的智能记账工具",
+    start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#ffffff",

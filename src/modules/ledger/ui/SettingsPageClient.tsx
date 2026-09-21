@@ -1,12 +1,11 @@
 "use client";
 import type { Ledger } from "@/modules/ledger/contracts";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { SettingsTab } from "./SettingsTab";
-import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 import { textRoleClassName } from "@/components/typography";
@@ -26,7 +25,6 @@ interface SettingsPageClientProps {
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
-  interfaceLanguage?: InterfaceLanguage;
 }
 
 export function SettingsPageClient({
@@ -39,7 +37,6 @@ export function SettingsPageClient({
   userEmail,
   hasPassword,
   passwordUpdatedAt,
-  interfaceLanguage,
 }: SettingsPageClientProps) {
   const router = useRouter();
   const t = useTranslations("Settings");
@@ -75,7 +72,6 @@ export function SettingsPageClient({
           {...(userEmail !== undefined ? { userEmail } : {})}
           {...(hasPassword !== undefined ? { hasPassword } : {})}
           {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
-          {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
         />
       </CategoryAssignmentProvider>
       <ConfirmDialog

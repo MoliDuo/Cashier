@@ -105,7 +105,6 @@ interface UserAccountContract {
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
   authVersion: number;
-  interfaceLanguage: "auto" | "zh" | "en";
 }
 
 export interface LoginEmailContract {
@@ -130,7 +129,6 @@ export interface SetupContract {
   bookNames: readonly string[];
   email: string;
   password: string;
-  locale: string;
 }
 
 export interface SetupPort {
@@ -156,15 +154,3 @@ export interface SetupPort {
  * code is past its lifetime, so a new one has to be issued and printed.
  */
 export type SetupCodeVerdict = "accepted" | "mismatch" | "locked_out" | "expired";
-
-export interface UserPreferencesContract {
-  interfaceLanguage: "auto" | "zh" | "en";
-}
-
-export interface UserPreferencesPort {
-  get(userId: string): Promise<UserPreferencesContract | null>;
-  update(input: {
-    userId: string;
-    preferences: UserPreferencesContract;
-  }): Promise<UserPreferencesContract | null>;
-}

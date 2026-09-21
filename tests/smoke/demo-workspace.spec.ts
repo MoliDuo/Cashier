@@ -5,9 +5,9 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.goto("/en");
+  await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
-  await page.getByRole("button", { name: "Continue as dev", exact: true }).click();
+  await page.getByRole("button", { name: "以开发身份进入", exact: true }).click();
   await expect(page).not.toHaveURL(/\/login/);
 
   // This walkthrough runs the dev server, where Next's issues pill sits in a
@@ -24,13 +24,13 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   await expect(detail.getByText("Flat White", { exact: true })).toBeVisible();
   await expect(detail.getByText("Chicken Sandwich", { exact: true })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) < 1024) {
-    await detail.getByRole("button", { name: "Evidence", exact: true }).click();
+    await detail.getByRole("button", { name: "原始凭证", exact: true }).click();
   }
-  await expect(detail.getByRole("img", { name: "Image 1" })).toBeVisible();
+  await expect(detail.getByRole("img", { name: "图片 1" })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) < 1024) {
-    await detail.getByRole("button", { name: "Back to details", exact: true }).click();
+    await detail.getByRole("button", { name: "返回明细", exact: true }).click();
   }
-  await detail.getByRole("button", { name: "Close", exact: true }).click();
+  await detail.getByRole("button", { name: "关闭", exact: true }).click();
 
   // The strip runs 总账 / 共同支出 / 哞哞 / 梁梁; FreshMart is in 梁梁 and
   // Harbor Coffee in 哞哞.
@@ -51,20 +51,20 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   const blurry = page
     .getByTestId("source-document-card-root")
     .filter({ hasText: "Blurry Parking Receipt" });
-  await expect(blurry.getByTestId("status-label")).toHaveText("Couldn't Parse");
+  await expect(blurry.getByTestId("status-label")).toHaveText("无法解析");
   await blurry.getByRole("button", { name: /Blurry Parking Receipt/ }).click();
   const blurryDetail = page.getByRole("dialog").first();
-  await expect(blurryDetail.getByText("Couldn't Parse", { exact: true })).toBeVisible();
+  await expect(blurryDetail.getByText("无法解析", { exact: true })).toBeVisible();
   await expect(
     blurryDetail.getByText("The receipt photo is too blurry to read the merchant and the total.", {
       exact: true,
     })
   ).toBeVisible();
-  await blurryDetail.getByRole("button", { name: "Close", exact: true }).click();
+  await blurryDetail.getByRole("button", { name: "关闭", exact: true }).click();
 
   await page
-    .getByRole("navigation", { name: "Ledger navigation" })
-    .getByRole("button", { name: "Stats", exact: true })
+    .getByRole("navigation", { name: "账本导航" })
+    .getByRole("button", { name: "统计", exact: true })
     .click();
   await expect(page.getByText("Dining", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Household", { exact: true }).first()).toBeVisible();

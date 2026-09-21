@@ -131,7 +131,6 @@ describe("CategorySection", () => {
     expect(applyPresetAction).toHaveBeenCalledWith("ledger-1", {
       expectedRevision: expect.stringMatching(/^[0-9a-f]{64}$/),
       presetId: "concise",
-      locale: "zh",
       mappings: [{ fromCategoryId: "category-1", toPresetIndex: 0 }],
     });
   });

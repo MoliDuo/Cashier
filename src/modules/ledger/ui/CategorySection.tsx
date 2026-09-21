@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, CircleSlash, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type {
   EntryCategory,
   EntryCategoryWithCount,
@@ -47,8 +47,7 @@ export function CategorySection({
 }: CategorySectionProps) {
   const t = useTranslations("Settings");
   const common = useTranslations("Common");
-  const locale = useLocale();
-  const preset = useCategoryPresetSwitch({ ledgerId, categories, locale });
+  const preset = useCategoryPresetSwitch({ ledgerId, categories });
   const { isActive: categoryAssignmentActive } = useCategoryAssignment();
 
   const {

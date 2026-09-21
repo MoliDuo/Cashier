@@ -59,13 +59,12 @@ describe("sendOTPAction edge cases", () => {
   it("uses localhost when host header is missing and still creates token", async () => {
     process.env.AUTH_RESEND_KEY = "test-resend-key";
 
-    await sendOTPAction(testEmail, "en");
+    await sendOTPAction(testEmail);
 
     expect(resendSendMock).toHaveBeenCalledTimes(1);
     const firstCall = resendSendMock.mock.calls[0]?.[0];
     const renderedEmail = await render(firstCall?.react);
-    expect(renderedEmail).toContain("Sign in to");
-    expect(renderedEmail).toContain("localhost</h1>");
+    expect(renderedEmail).toContain("登录 localhost</h1>");
     expect(firstCall?.to).toBe(testEmail);
 
     const db = getTestDb();
@@ -75,29 +74,11 @@ describe("sendOTPAction edge cases", () => {
     expect(token).toBeDefined();
   });
 
-  it("falls back to Accept-Language when sendOTPAction is called without locale", async () => {
-    process.env.AUTH_RESEND_KEY = "test-resend-key";
-    headersMock.mockResolvedValue({
-      get: (key: string) => {
-        if (key === "x-forwarded-for") return "203.0.113.18";
-        if (key === "accept-language") return "en-US,en;q=0.9";
-        return null;
-      },
-    });
-
-    await sendOTPAction(testEmail);
-
-    const firstCall = resendSendMock.mock.calls[0]?.[0];
-    const renderedEmail = await render(firstCall?.react);
-    expect(firstCall?.subject).toBe("Cashier verification code");
-    expect(renderedEmail).toContain("Sign in to localhost");
-  });
-
   it("returns a stable error code when email provider send fails", async () => {
     process.env.AUTH_RESEND_KEY = "test-resend-key";
     resendSendMock.mockRejectedValueOnce(new Error("provider down"));
 
-    await expect(sendOTPAction(testEmail, "en")).resolves.toEqual({
+    await expect(sendOTPAction(testEmail)).resolves.toEqual({
       ok: false,
       code: "email_send_failed",
     });

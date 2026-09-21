@@ -39,7 +39,7 @@ describe("Auth Actions - sendOTPAction", () => {
   });
 
   it("should send OTP successfully with valid email", async () => {
-    const result = await sendOTPAction(TEST_EMAIL, "zh");
+    const result = await sendOTPAction(TEST_EMAIL);
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("Expected OTP send to succeed");
@@ -57,21 +57,21 @@ describe("Auth Actions - sendOTPAction", () => {
   });
 
   it("should reject empty email", async () => {
-    await expect(sendOTPAction("", "zh")).resolves.toEqual({
+    await expect(sendOTPAction("")).resolves.toEqual({
       ok: false,
       code: "invalid_email",
     });
   });
 
   it("should reject null email", async () => {
-    await expect(sendOTPAction(null as unknown as string, "zh")).resolves.toEqual({
+    await expect(sendOTPAction(null as unknown as string)).resolves.toEqual({
       ok: false,
       code: "invalid_email",
     });
   });
 
   it("should reject invalid email format", async () => {
-    await expect(sendOTPAction("not-an-email", "zh")).resolves.toEqual({
+    await expect(sendOTPAction("not-an-email")).resolves.toEqual({
       ok: false,
       code: "invalid_email",
     });
@@ -79,7 +79,7 @@ describe("Auth Actions - sendOTPAction", () => {
 
   it("should reject email exceeding max length (254 chars)", async () => {
     const longEmail = "a".repeat(250) + "@test.com";
-    await expect(sendOTPAction(longEmail, "zh")).resolves.toEqual({
+    await expect(sendOTPAction(longEmail)).resolves.toEqual({
       ok: false,
       code: "invalid_email",
     });
@@ -87,7 +87,7 @@ describe("Auth Actions - sendOTPAction", () => {
 
   it("should normalize email to lowercase", async () => {
     const mixedCaseEmail = "Test@Example.COM";
-    await sendOTPAction(mixedCaseEmail, "zh");
+    await sendOTPAction(mixedCaseEmail);
 
     const db = getTestDb();
     const record = await db.query.otpTokens.findFirst({
@@ -98,11 +98,11 @@ describe("Auth Actions - sendOTPAction", () => {
 
   it("should enforce resend cooldown", async () => {
     // First send should succeed
-    const result1 = await sendOTPAction(TEST_EMAIL, "zh");
+    const result1 = await sendOTPAction(TEST_EMAIL);
     expect(result1.ok).toBe(true);
 
     // Immediate second send should fail with cooldown
-    await expect(sendOTPAction(TEST_EMAIL, "zh")).resolves.toMatchObject({
+    await expect(sendOTPAction(TEST_EMAIL)).resolves.toMatchObject({
       ok: false,
       code: "rate_limited",
       retryAfter: expect.any(Number),

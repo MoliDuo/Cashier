@@ -1,19 +1,12 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-const { currentLocale } = vi.hoisted(() => {
-  const ref: { value: string } = { value: "zh" };
-  return { currentLocale: ref };
-});
-
 vi.mock("next-intl", async () => {
-  const en = (await import("messages/en.json")).default as Record<string, Record<string, string>>;
-  const zh = (await import("messages/zh.json")).default as Record<string, Record<string, string>>;
+  const msgs = (await import("messages/zh.json")).default as Record<string, Record<string, string>>;
 
   return {
     useTranslations: (namespace?: string) => {
-      const msgs = currentLocale.value === "en" ? en : zh;
       return (key: string, values?: Record<string, string | number>) => {
         const nsMessages = namespace ? msgs[namespace] : undefined;
         let msg = nsMessages?.[key];
@@ -34,8 +27,8 @@ vi.mock("next-intl", async () => {
         return msg;
       };
     },
-    useLocale: () => currentLocale.value,
-    useMessages: () => (currentLocale.value === "en" ? en : zh),
+    useLocale: () => "zh",
+    useMessages: () => msgs,
     useTimeZone: () => "UTC",
     useNow: () => new Date(),
     NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -43,28 +36,17 @@ vi.mock("next-intl", async () => {
 });
 
 describe("Dialog", () => {
-  beforeEach(() => {
-    currentLocale.value = "en";
-  });
+  it("renders the close screen-reader text from the Common namespace", () => {
+    render(
+      <Dialog open>
+        <DialogTrigger />
+        <DialogContent variant="modal">
+          <p>Dialog body</p>
+        </DialogContent>
+      </Dialog>
+    );
 
-  it("renders localized close screen-reader text via Common namespace", () => {
-    for (const [locale, expected] of [
-      ["en", "Close"],
-      ["zh", "关闭"],
-    ] as const) {
-      currentLocale.value = locale;
-      render(
-        <Dialog open>
-          <DialogTrigger />
-          <DialogContent variant="modal">
-            <p>Dialog body</p>
-          </DialogContent>
-        </Dialog>
-      );
-
-      expect(screen.getByRole("button", { name: expected })).toBeInTheDocument();
-      cleanup();
-    }
+    expect(screen.getByRole("button", { name: "关闭" })).toBeInTheDocument();
   });
 
   it("focuses the dialog title before its close control", async () => {
@@ -80,7 +62,7 @@ describe("Dialog", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "Dialog title" })).toHaveFocus()
     );
-    expect(screen.getByRole("button", { name: "Close" })).not.toHaveFocus();
+    expect(screen.getByRole("button", { name: "关闭" })).not.toHaveFocus();
   });
 
   it("increments the layer for a nested task dialog", () => {

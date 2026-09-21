@@ -52,7 +52,7 @@ describe("useCategoryPresetSwitch", () => {
   it("retains a separate mapping draft while switching between presets", async () => {
     const { wrapper } = setup();
     const { result } = renderHook(
-      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [custom], locale: "zh" }),
+      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [custom] }),
       { wrapper }
     );
     act(() => result.current.openDialog());
@@ -72,7 +72,7 @@ describe("useCategoryPresetSwitch", () => {
   it("allows an empty ledger to apply a preset", async () => {
     const { wrapper } = setup();
     const { result } = renderHook(
-      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [], locale: "zh" }),
+      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [] }),
       { wrapper }
     );
     act(() => result.current.openDialog());
@@ -85,8 +85,7 @@ describe("useCategoryPresetSwitch", () => {
   it("blocks a frozen draft after the server category collection changes", async () => {
     const { wrapper } = setup();
     const { result, rerender } = renderHook(
-      ({ categories }) =>
-        useCategoryPresetSwitch({ ledgerId: "ledger-1", categories, locale: "zh" }),
+      ({ categories }) => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories }),
       { wrapper, initialProps: { categories: [custom] } }
     );
     act(() => result.current.openDialog());
@@ -104,7 +103,7 @@ describe("useCategoryPresetSwitch", () => {
   it("keeps dirty input when close is cancelled", async () => {
     const { wrapper } = setup();
     const { result } = renderHook(
-      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [custom], locale: "zh" }),
+      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [custom] }),
       { wrapper }
     );
     act(() => result.current.openDialog());

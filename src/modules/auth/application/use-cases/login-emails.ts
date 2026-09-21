@@ -10,7 +10,6 @@ import {
 } from "@/lib/errors";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
-import type { SupportedLocale } from "@/i18n/locales";
 import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../../services/otp";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
@@ -24,7 +23,6 @@ export async function sendLoginEmailCode(
   input: {
     userId: string;
     newEmail: string;
-    locale: SupportedLocale;
     host: string;
   },
   dependencies: { emailDelivery: EmailDeliveryPort; accounts: AccountSecurityPort }
@@ -54,36 +52,24 @@ export async function sendLoginEmailCode(
     throw new RateLimitError("Please wait before requesting another code", 60);
   }
 
-  const zh = input.locale.startsWith("zh");
   try {
     const delivery = await dependencies.emailDelivery.send({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: newEmail,
-      subject: zh ? "Cashier 验证码" : "Cashier verification code",
+      subject: "Cashier 验证码",
       content: OTPEmail({
         otp,
         host: input.host,
         expiresInMinutes: 5,
-        locale: input.locale,
-        copy: zh
-          ? {
-              preview: "添加登录邮箱",
-              heading: "添加登录邮箱",
-              intro: "输入以下验证码以把这个邮箱加入登录邮箱列表。",
-              codeLabel: "验证码",
-              expiry: "验证码将在 5 分钟后失效。",
-              warning: "如果不是你发起的操作，请忽略此邮件。",
-              footer: "Cashier 账户安全",
-            }
-          : {
-              preview: "Add a login email",
-              heading: "Add a login email",
-              intro: "Enter this code to add this address to the sign-in list.",
-              codeLabel: "Verification code",
-              expiry: "This code expires in 5 minutes.",
-              warning: "Ignore this email if you did not request this change.",
-              footer: "Cashier account security",
-            },
+        copy: {
+          preview: "添加登录邮箱",
+          heading: "添加登录邮箱",
+          intro: "输入以下验证码以把这个邮箱加入登录邮箱列表。",
+          codeLabel: "验证码",
+          expiry: "验证码将在 5 分钟后失效。",
+          warning: "如果不是你发起的操作，请忽略此邮件。",
+          footer: "Cashier 账户安全",
+        },
       }),
     });
     if (delivery !== "sent") throw new Error("Email provider did not accept the message");

@@ -11,9 +11,9 @@ describe("ledger-url-navigation", () => {
     const historySpy = vi.spyOn(window.history, "replaceState");
     const params = new URLSearchParams("tab=details&period=thisMonth");
 
-    const url = replaceLedgerUrl("/ledgers/ledger-1", params, "en");
+    const url = replaceLedgerUrl("/ledgers/ledger-1", params);
 
-    expect(url).toBe("/en/ledgers/ledger-1?tab=details&period=thisMonth");
+    expect(url).toBe("/ledgers/ledger-1?tab=details&period=thisMonth");
     expect(historySpy).toHaveBeenCalledWith(
       { cashier: { ledgerNavigation: true, kind: "filter", sequence: 0 } },
       "",
@@ -35,9 +35,9 @@ describe("ledger-url-navigation", () => {
     );
     const historySpy = vi.spyOn(window.history, "pushState");
 
-    const url = pushLedgerUrl("/ledgers/ledger-1", new URLSearchParams("tab=details"), "zh", "tab");
+    const url = pushLedgerUrl("/ledgers/ledger-1", new URLSearchParams("tab=details"), "tab");
 
-    expect(url).toBe("/zh/ledgers/ledger-1?tab=details");
+    expect(url).toBe("/ledgers/ledger-1?tab=details");
 
     expect(historySpy).toHaveBeenCalledWith(
       {
@@ -64,8 +64,7 @@ describe("ledger-url-navigation", () => {
 
     const url = replaceLedgerUrl(
       "/ledgers/ledger-1",
-      new URLSearchParams("tab=details&detailId=document-1"),
-      "en"
+      new URLSearchParams("tab=details&detailId=document-1")
     );
 
     expect(historySpy).toHaveBeenCalledWith(
@@ -76,17 +75,5 @@ describe("ledger-url-navigation", () => {
       "",
       url
     );
-  });
-
-  it("replaces an existing locale prefix instead of duplicating it", () => {
-    const url = replaceLedgerUrl("/zh/ledgers/ledger-1", new URLSearchParams(), "en");
-
-    expect(url).toBe("/en/ledgers/ledger-1");
-  });
-
-  it("falls back to the default locale for an unsupported locale", () => {
-    const url = replaceLedgerUrl("/ledgers/ledger-1", new URLSearchParams(), "fr");
-
-    expect(url).toBe("/zh/ledgers/ledger-1");
   });
 });

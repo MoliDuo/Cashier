@@ -1,5 +1,4 @@
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from "@/i18n/locales";
 import { DECIMAL_STRING_PATTERN, normalize as normalizeDecimal } from "@/lib/money/decimal";
 import { isValidDateString } from "@/lib/date-utils";
 
@@ -410,17 +409,9 @@ export function updateLedgerSearchParams(
 
 export function buildLedgerUrl(
   pathname: string,
-  searchParams: SearchParamsStringLike | URLSearchParams,
-  locale: string
+  searchParams: SearchParamsStringLike | URLSearchParams
 ): string {
-  const supportedLocale = SUPPORTED_LOCALES.includes(locale as SupportedLocale)
-    ? (locale as SupportedLocale)
-    : DEFAULT_LOCALE;
   const normalizedPathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const segments = normalizedPathname.split("/");
-  const localizedPathname = SUPPORTED_LOCALES.includes(segments[1] as SupportedLocale)
-    ? ["", supportedLocale, ...segments.slice(2)].join("/")
-    : `/${supportedLocale}${normalizedPathname === "/" ? "" : normalizedPathname}`;
   const query = searchParams.toString();
-  return query === "" ? localizedPathname : `${localizedPathname}?${query}`;
+  return query === "" ? normalizedPathname : `${normalizedPathname}?${query}`;
 }

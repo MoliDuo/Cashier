@@ -40,7 +40,7 @@ import { useLedgerPageEnvironment } from "@/modules/workspace/hooks/useLedgerPag
 
 const ledgerDto: LedgerDto = {
   id: "ledger-1",
-  settings: { ...getDefaultLedger("en").settings, mainCurrency: "USD" },
+  settings: { ...getDefaultLedger().settings, mainCurrency: "USD" },
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };

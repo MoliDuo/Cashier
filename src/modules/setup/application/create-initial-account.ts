@@ -6,7 +6,6 @@ export interface SetupInput {
   bookNames: readonly string[];
   email: string;
   password: string;
-  locale: string;
 }
 
 export interface SetupResult {
@@ -33,6 +32,5 @@ export async function createInitialAccount(
     bookNames: names,
     email: input.email.trim().toLowerCase(),
     password: input.password,
-    locale: input.locale,
   });
 }

@@ -36,7 +36,6 @@ describe("getSessionUser", () => {
       passwordHash: null,
       passwordUpdatedAt: null,
       authVersion: 1,
-      interfaceLanguage: "auto",
     });
   });
 

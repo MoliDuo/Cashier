@@ -73,13 +73,12 @@ export interface SaveEntryCategoriesInput {
 
 /**
  * A preset switch. The preset's category text is resolved on the server from
- * `presetId` + `locale`, so a client cannot invent categories; it only decides
- * where each existing category's entries land.
+ * `presetId`, so a client cannot invent categories; it only decides where each
+ * existing category's entries land.
  */
 export interface ApplyCategoryPresetInput {
   expectedRevision: string;
   presetId: CategoryPresetId;
-  locale: string;
   mappings: { fromCategoryId: string; toPresetIndex: number | null }[];
 }
 export interface ApplyCategoryPresetResult {

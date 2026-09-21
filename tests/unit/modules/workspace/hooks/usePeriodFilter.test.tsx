@@ -17,7 +17,6 @@ describe("usePeriodFilter", () => {
       usePeriodFilter({
         pathname: "/ledger/test",
         searchParams,
-        locale: "en",
       })
     );
 

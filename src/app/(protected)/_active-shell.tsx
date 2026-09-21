@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -58,7 +58,6 @@ export function ActiveShell({ ledgerId, children }: ActiveShellProps) {
 function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const locale = useLocale();
   const t = useTranslations("Common");
   const queryClient = useQueryClient();
   const { ready, onInputIntent, onOpenInput } = useShellController();
@@ -77,7 +76,6 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
   const { activeTab, handleTabChange } = useLedgerTabs({
     searchParams,
     pathname,
-    locale,
   });
   useTabScrollRestoration(ledgerId, activeTab);
 

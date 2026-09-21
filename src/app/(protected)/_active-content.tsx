@@ -2,7 +2,6 @@ import { LedgerPageClient } from "@/modules/workspace/ui/LedgerPageClient";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
-import type { InterfaceLanguage } from "@/modules/auth/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 interface ActiveContentProps {
@@ -13,7 +12,6 @@ interface ActiveContentProps {
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
-  interfaceLanguage?: InterfaceLanguage;
   initialCategories?: EntryCategoryWithCount[];
   ledgerToday?: string;
   initialBooks?: readonly BookDto[];
@@ -34,7 +32,6 @@ export function ActiveContent({
   userEmail,
   hasPassword,
   passwordUpdatedAt,
-  interfaceLanguage,
   initialCategories,
   ledgerToday,
   initialBooks,
@@ -55,7 +52,6 @@ export function ActiveContent({
       {...(userEmail !== undefined ? { userEmail } : {})}
       {...(hasPassword !== undefined ? { hasPassword } : {})}
       {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
-      {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
     />
   );
 }

@@ -41,10 +41,10 @@ describe("sendOTPAction", () => {
       },
     });
 
-    await expect(sendOTPAction("User@Example.com", "zh")).resolves.toMatchObject({ ok: true });
+    await expect(sendOTPAction("User@Example.com")).resolves.toMatchObject({ ok: true });
 
     expect(sendOTPMock).toHaveBeenCalledWith(
-      { email: "User@Example.com", ip: "unknown", host: "cashier.example", locale: "zh" },
+      { email: "User@Example.com", ip: "unknown", host: "cashier.example" },
       expect.any(Object)
     );
   });
@@ -54,7 +54,7 @@ describe("sendOTPAction", () => {
       get: (_key: string) => null,
     });
 
-    await expect(sendOTPAction("not-an-email", "en")).resolves.toEqual({
+    await expect(sendOTPAction("not-an-email")).resolves.toEqual({
       ok: false,
       code: "invalid_email",
     });
@@ -67,7 +67,7 @@ describe("sendOTPAction", () => {
     });
     sendOTPMock.mockRejectedValueOnce(new RateLimitError("wait", 42));
 
-    await expect(sendOTPAction("test@example.com", "en")).resolves.toEqual({
+    await expect(sendOTPAction("test@example.com")).resolves.toEqual({
       ok: false,
       code: "rate_limited",
       retryAfter: 42,
@@ -79,10 +79,10 @@ describe("sendOTPAction", () => {
       get: (_key: string) => null,
     });
 
-    await sendOTPAction("test@example.com", "en");
+    await sendOTPAction("test@example.com");
 
     expect(sendOTPMock).toHaveBeenCalledWith(
-      { email: "test@example.com", ip: "unknown", host: "localhost", locale: "en" },
+      { email: "test@example.com", ip: "unknown", host: "localhost" },
       expect.any(Object)
     );
   });
@@ -99,14 +99,13 @@ describe("sendOTPAction", () => {
       },
     });
 
-    await sendOTPAction("test@example.com", "en");
+    await sendOTPAction("test@example.com");
 
     expect(sendOTPMock).toHaveBeenCalledWith(
       {
         email: "test@example.com",
         ip: "198.51.100.12",
         host: "cashier.example",
-        locale: "en",
       },
       expect.any(Object)
     );

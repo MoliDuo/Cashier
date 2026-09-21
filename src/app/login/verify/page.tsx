@@ -1,11 +1,12 @@
 "use client";
 import { useTranslations } from "next-intl";
 import { Mail, CheckCircle } from "lucide-react";
-import { Link } from "@/i18n/routing";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { textRoleClassName } from "@/components/typography";
 
-export default function VerifyPage() {
+function Verify() {
   const t = useTranslations("Auth");
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
@@ -25,7 +26,7 @@ export default function VerifyPage() {
 
         {/* Description */}
         <p className={textRoleClassName("bodyMuted", "mb-6")}>
-          {t("checkEmailDesc", { email: email !== "" ? email : "your email" })}
+          {t("checkEmailDesc", { email: email !== "" ? email : t("yourEmail") })}
         </p>
 
         {/* Email Icon Card */}
@@ -50,5 +51,18 @@ export default function VerifyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * `?email=` is only known at request time, so the reading half sits behind a
+ * boundary. The fallback is empty: this page is one short confirmation, and a
+ * skeleton of it would flash for longer than the text takes to arrive.
+ */
+export default function VerifyPage() {
+  return (
+    <Suspense>
+      <Verify />
+    </Suspense>
   );
 }

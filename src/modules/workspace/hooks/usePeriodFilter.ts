@@ -29,7 +29,6 @@ interface FilterParams {
 interface UsePeriodFilterParams {
   pathname: string;
   searchParams: URLSearchParams;
-  locale: string;
   scope?: LedgerFilterScope;
   timeZone?: string;
 }
@@ -63,7 +62,6 @@ function buildPeriodUrlUpdate(
 export function usePeriodFilter({
   pathname,
   searchParams,
-  locale,
   scope = "stream",
   timeZone,
 }: UsePeriodFilterParams): UsePeriodFilterReturn {
@@ -103,9 +101,9 @@ export function usePeriodFilter({
         scope
       );
 
-      pushLedgerUrl(pathname, params, locale, "filter");
+      pushLedgerUrl(pathname, params, "filter");
     },
-    [filters, locale, pathname, periodParams, scope, searchParams]
+    [filters, pathname, periodParams, scope, searchParams]
   );
 
   return {

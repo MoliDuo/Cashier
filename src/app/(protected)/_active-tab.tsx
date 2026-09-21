@@ -1,9 +1,9 @@
 import { Suspense } from "react";
-import { getLocale, getMessages } from "next-intl/server";
+import { getMessages } from "next-intl/server";
 import { cookies } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { HydrationBoundary } from "@tanstack/react-query";
-import { redirect } from "@/i18n/routing";
+import { redirect } from "next/navigation";
 import {
   resolveAuthenticatedHome,
   type AuthenticatedHomeContext,
@@ -56,16 +56,14 @@ interface ActiveTabProps {
 }
 
 export async function ActiveTab({ searchParams }: ActiveTabProps) {
-  const localePromise = getLocale();
+  const messagesPromise = getMessages();
   const contextPromise = resolveAuthenticatedHome();
-  const locale = await localePromise;
-  const messagesPromise = getMessages({ locale });
   let context;
   try {
     context = await contextPromise;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      redirect({ href: "/login", locale });
+      redirect("/login");
       return null;
     }
     throw error;
@@ -124,7 +122,7 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   scheduleProcessingRecoveryAfter(ledgerId);
 
   return (
-    <NextIntlClientProvider messages={await messagesPromise} locale={locale}>
+    <NextIntlClientProvider messages={await messagesPromise}>
       <ActiveShell ledgerId={ledgerId}>
         <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
           <ActiveTabBootstrap
@@ -179,7 +177,6 @@ async function ActiveTabBootstrap({
         {...(session.user?.email != null ? { userEmail: session.user.email } : {})}
         hasPassword={session.user?.hasPassword ?? false}
         passwordUpdatedAt={session.user?.passwordUpdatedAt ?? null}
-        interfaceLanguage={session.user?.interfaceLanguage ?? "auto"}
       />
     </HydrationBoundary>
   );

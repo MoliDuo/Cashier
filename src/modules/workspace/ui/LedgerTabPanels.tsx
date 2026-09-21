@@ -15,7 +15,6 @@ import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contrac
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import type { RecordScope } from "@/modules/ledger/filters";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
-import type { InterfaceLanguage } from "@/modules/auth/contracts";
 
 // Dynamic imports keep inactive tab dependencies out of the initial Stream bundle.
 const DetailsTab = dynamic(
@@ -61,7 +60,6 @@ interface LedgerTabPanelsProps {
   userEmail?: string | undefined;
   hasPassword?: boolean | undefined;
   passwordUpdatedAt?: string | null | undefined;
-  interfaceLanguage?: InterfaceLanguage | undefined;
   onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
@@ -86,7 +84,6 @@ export function LedgerTabPanels({
   userEmail,
   hasPassword,
   passwordUpdatedAt,
-  interfaceLanguage,
   onGoToDetails,
 }: LedgerTabPanelsProps) {
   const carriesBookSwitch = activeTab !== "settings" && books.length > 0;
@@ -162,7 +159,6 @@ export function LedgerTabPanels({
             {...(userEmail !== undefined ? { userEmail } : {})}
             {...(hasPassword !== undefined ? { hasPassword } : {})}
             {...(passwordUpdatedAt !== undefined ? { passwordUpdatedAt } : {})}
-            {...(interfaceLanguage !== undefined ? { interfaceLanguage } : {})}
             {...(onGoToDetails == null ? {} : { onGoToDetails })}
           />
         </div>

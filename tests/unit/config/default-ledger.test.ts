@@ -3,7 +3,7 @@ import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 describe("getDefaultLedger", () => {
   it("returns the configured Chinese default categories", () => {
-    expect(getDefaultLedger("zh-CN").categories).toEqual([
+    expect(getDefaultLedger().categories).toEqual([
       {
         name: "餐饮",
         description: "涵盖日常膳食及饮水支出，包括正餐、烹饪食材、调味品、饮品及零食",
@@ -84,29 +84,6 @@ describe("getDefaultLedger", () => {
         icon: "Gift",
         sortOrder: 13,
       },
-    ]);
-  });
-
-  it("keeps English defaults aligned with the Chinese category structure", () => {
-    const categories = getDefaultLedger("en").categories;
-
-    expect(categories.map(({ name }) => name)).toEqual([
-      "Dining",
-      "Household",
-      "Shopping",
-      "Clothing",
-      "Personal Care",
-      "Housing",
-      "Daily Life",
-      "Transport",
-      "Healthcare",
-      "Education",
-      "Memberships",
-      "Entertainment",
-      "Gifts & Giving",
-    ]);
-    expect(categories.map(({ sortOrder }) => sortOrder)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
     ]);
   });
 });

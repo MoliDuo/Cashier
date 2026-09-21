@@ -1,20 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CalculatorInput } from "@/components/ui/calculator-input";
 
-const { currentLocale } = vi.hoisted(() => {
-  /** Mutable locale ref switched per test to test en/zh translations */
-  const ref: { value: string } = { value: "zh" };
-  return { currentLocale: ref };
-});
-
 vi.mock("next-intl", async () => {
-  const en = (await import("messages/en.json")).default as Record<string, Record<string, string>>;
-  const zh = (await import("messages/zh.json")).default as Record<string, Record<string, string>>;
+  const msgs = (await import("messages/zh.json")).default as Record<string, Record<string, string>>;
 
   return {
     useTranslations: (namespace?: string) => {
-      const msgs = currentLocale.value === "en" ? en : zh;
       return (key: string, values?: Record<string, string | number>) => {
         const nsMessages = namespace ? msgs[namespace] : undefined;
         let msg = nsMessages?.[key];
@@ -35,8 +27,8 @@ vi.mock("next-intl", async () => {
         return msg;
       };
     },
-    useLocale: () => currentLocale.value,
-    useMessages: () => (currentLocale.value === "en" ? en : zh),
+    useLocale: () => "zh",
+    useMessages: () => msgs,
     useTimeZone: () => "UTC",
     useNow: () => new Date(),
     NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -190,21 +182,12 @@ describe("CalculatorInput", () => {
     expect(screen.queryByText("Error")).not.toBeInTheDocument();
   });
 
-  describe.each(["en", "zh"] as const)("localization (%s)", (locale) => {
-    beforeEach(() => {
-      currentLocale.value = locale;
-    });
+  it("labels the amount, opener, and dialog from the catalog", () => {
+    render(<CalculatorInput value={42} onChange={() => {}} />);
 
-    it("labels the amount, opener, and dialog in the active locale", () => {
-      render(<CalculatorInput value={42} onChange={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "金额" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开计算器" }));
 
-      const amountLabel = locale === "en" ? "Amount" : "金额";
-      fireEvent.click(screen.getByRole("button", { name: amountLabel }));
-
-      const openLabel = locale === "en" ? "Open calculator" : "打开计算器";
-      fireEvent.click(screen.getByRole("button", { name: openLabel }));
-
-      expect(screen.getByText(locale === "en" ? "Calculator" : "计算器")).toBeInTheDocument();
-    });
+    expect(screen.getByText("计算器")).toBeInTheDocument();
   });
 });

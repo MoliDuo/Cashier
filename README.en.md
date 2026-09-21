@@ -60,7 +60,7 @@ npm run dev
 
 On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. It does
 not create an account. Open [http://localhost:3000](http://localhost:3000): every page leads to the
-`/{locale}/setup` wizard. The server logs print a one-time setup code, on a line starting with
+`/setup` wizard. The server logs print a one-time setup code, on a line starting with
 `First-run setup is pending`. Enter that code, a
 sign-in email, a password and your book names (共同支出 is pre-filled as the default) to create the
 account; `/setup` returns 404 afterwards.

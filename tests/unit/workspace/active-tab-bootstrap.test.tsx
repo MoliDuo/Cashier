@@ -27,12 +27,12 @@ vi.mock("@/application/processing/schedule-processing-recovery", () => ({
   scheduleProcessingRecoveryAfter: scheduleProcessingRecoveryAfterMock,
 }));
 
-vi.mock("@/app/[locale]/(protected)/_ledger-bootstrap-fallback", () => ({
+vi.mock("@/app/(protected)/_ledger-bootstrap-fallback", () => ({
   LedgerBootstrapFallback: () =>
     React.createElement("div", { "data-testid": "ledger-bootstrap-fallback" }),
 }));
 
-vi.mock("@/i18n/routing", () => ({
+vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
     throw new Error("REDIRECT");
   }),
@@ -72,7 +72,7 @@ vi.mock("@/modules/workspace/ui/LedgerPageClient", () => ({
     React.createElement("div", { "data-testid": "ledger-page-client" }),
 }));
 
-import { ActiveTab } from "@/app/[locale]/(protected)/_active-tab";
+import { ActiveTab } from "@/app/(protected)/_active-tab";
 import { LedgerPageClient } from "@/modules/workspace/ui/LedgerPageClient";
 
 const BOOK_B = "20000000-0000-4000-8000-00000000000b";

@@ -6,7 +6,6 @@ import {
   index,
   timestamp,
   uniqueIndex,
-  jsonb,
   uuid,
   inet,
   check,
@@ -27,10 +26,6 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
     authVersion: integer("auth_version").notNull().default(1),
-    preferences: jsonb("preferences")
-      .$type<UserPreferences>()
-      .notNull()
-      .default({ interfaceLanguage: "auto" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -43,12 +38,6 @@ export const users = pgTable(
 );
 
 export type User = InferSelectModel<typeof users>;
-
-export type InterfaceLanguage = "auto" | "zh" | "en";
-
-export interface UserPreferences {
-  interfaceLanguage: InterfaceLanguage;
-}
 
 /**
  * The addresses that sign in to the one account. An address is added by

@@ -138,7 +138,6 @@ describe("password authentication", () => {
       {
         email: "owner@example.com",
         password: "valid-password-1",
-        locale: "en",
         requestHeaders: new Headers(),
       },
       { users, rateLimiter: { ...rateLimiter, increment, releaseIncrement } }

@@ -12,7 +12,6 @@ function LedgerNavigationHarness() {
   const { activeTab, handleTabChange } = useLedgerTabs({
     pathname: "/ledgers/ledger-1",
     searchParams,
-    locale: "en",
   });
 
   useEffect(() => {
@@ -74,14 +73,14 @@ describe("ledger navigation flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "details" }));
 
     expect(window.location.search).toBe("?tab=details");
-    expect(window.location.pathname).toBe("/en/ledgers/ledger-1");
+    expect(window.location.pathname).toBe("/ledgers/ledger-1");
     expect(screen.getByRole("button", { name: "details" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("active-tab-content")).toHaveTextContent("details");
 
     fireEvent.click(screen.getByRole("button", { name: "stats" }));
 
     expect(window.location.search).toBe("?tab=stats");
-    expect(window.location.pathname).toBe("/en/ledgers/ledger-1");
+    expect(window.location.pathname).toBe("/ledgers/ledger-1");
     expect(screen.getByRole("button", { name: "stats" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("active-tab-content")).toHaveTextContent("stats");
 

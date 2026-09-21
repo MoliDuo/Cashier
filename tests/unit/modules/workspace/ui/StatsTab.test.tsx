@@ -14,9 +14,6 @@ const { searchParamsState } = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParamsState.current,
-}));
-
-vi.mock("@/i18n/routing", () => ({
   usePathname: () => "/ledgers/ledger-1",
 }));
 

@@ -259,8 +259,8 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   }
   await client.query(
     `INSERT INTO users
-      (id, name, preferences, created_at, updated_at)
-     VALUES ($1, $2, '{"interfaceLanguage":"auto"}'::jsonb, $3, $3)
+      (id, name, created_at, updated_at)
+     VALUES ($1, $2, $3, $3)
      ON CONFLICT (id) DO NOTHING`,
     [userId, fixture.user.name, now]
   );

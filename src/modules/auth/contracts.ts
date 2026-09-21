@@ -4,18 +4,11 @@ export interface AuthenticatedPrincipal {
   name: string | null;
   image: string | null;
   authVersion: number;
-  locale?: string | null;
   /**
    * OTP-only: the verified token is claimed but not yet consumed. The
    * interactive sign-in orchestrator consumes it only after cross-module
    * completion (shared ledger validation) succeeds, and releases it on failure.
    */
-}
-
-export type InterfaceLanguage = "auto" | "zh" | "en";
-
-export interface UserPreferences {
-  interfaceLanguage: InterfaceLanguage;
 }
 
 export type PasswordMutationActionErrorCode =

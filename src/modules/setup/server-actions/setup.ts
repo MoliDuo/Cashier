@@ -1,7 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
-import { resolveSupportedLocale } from "@/i18n/resolve-locale";
 import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { normalizeEmail } from "@/lib/utils/email";
@@ -45,17 +43,11 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
       if (verdict === "locked_out") return { ok: false, code: "code_locked_out" };
       return { ok: false, code: "wrong_code" };
     }
-    const requestHeaders = await headers();
-    const locale = resolveSupportedLocale({
-      explicitLocale: parsed.locale,
-      acceptLanguage: requestHeaders.get("accept-language"),
-    });
     const result = await createInitialAccount(
       {
         bookNames: parsed.books,
         email: normalizeEmail(parsed.email),
         password: parsed.password,
-        locale,
       },
       serverComposition.setup
     );

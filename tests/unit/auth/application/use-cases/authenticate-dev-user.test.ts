@@ -25,31 +25,20 @@ describe("authenticateDevUser", () => {
   it("returns the seeded dev account when the bypass is on", async () => {
     findByEmail.mockResolvedValue(devAccount);
 
-    await expect(authenticateDevUser({}, { users })).resolves.toMatchObject({
-      id: "user-1",
-      locale: "zh-CN",
-    });
-  });
-
-  it("carries the requested locale", async () => {
-    findByEmail.mockResolvedValue(devAccount);
-
-    await expect(authenticateDevUser({ locale: "en" }, { users })).resolves.toMatchObject({
-      locale: "en",
-    });
+    await expect(authenticateDevUser({ users })).resolves.toMatchObject({ id: "user-1" });
   });
 
   it("returns null when the dev account is missing", async () => {
     findByEmail.mockResolvedValue(null);
 
-    await expect(authenticateDevUser({}, { users })).resolves.toBeNull();
+    await expect(authenticateDevUser({ users })).resolves.toBeNull();
   });
 
   it("returns null when the bypass is off", async () => {
     process.env.DEV_AUTH_BYPASS = "false";
     findByEmail.mockResolvedValue(devAccount);
 
-    await expect(authenticateDevUser({}, { users })).resolves.toBeNull();
+    await expect(authenticateDevUser({ users })).resolves.toBeNull();
     expect(findByEmail).not.toHaveBeenCalled();
   });
 });

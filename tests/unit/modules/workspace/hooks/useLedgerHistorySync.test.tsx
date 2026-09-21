@@ -50,7 +50,6 @@ describe("useLedgerHistorySync", () => {
         searchParams: new URLSearchParams(detailSearch),
         legacyScope: "stream",
         ledgerId,
-        locale: "en",
       })
     );
 
@@ -109,7 +108,6 @@ describe("useLedgerHistorySync", () => {
         searchParams: new URLSearchParams(detailSearch),
         legacyScope: "stream",
         ledgerId,
-        locale: "en",
       })
     );
     try {
@@ -156,7 +154,6 @@ describe("useLedgerHistorySync", () => {
             searchParams: new URLSearchParams(search),
             legacyScope: "stream",
             ledgerId,
-            locale: "en",
           });
           return guard;
         },

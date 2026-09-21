@@ -1,10 +1,9 @@
 "use server";
 
 import crypto from "node:crypto";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { requireRecentAuth } from "@/lib/auth-actions";
-import { resolveSupportedLocale } from "@/i18n/resolve-locale";
 import { ConflictError, RateLimitError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { AppError } from "@/lib/errors";
 import { normalizeEmail } from "@/lib/utils/email";
@@ -76,23 +75,16 @@ export const listLoginEmailsAction = async (): Promise<string[]> => {
 
 /** Sends an OTP to an address that is not yet a login address. */
 export async function sendLoginEmailCodeAction(
-  inputEmail: string,
-  locale?: string
+  inputEmail: string
 ): Promise<SendLoginEmailCodeActionResult> {
   try {
     const userId = await requireRecentAuth();
     const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
-    const [requestHeaders, cookieStore] = await Promise.all([headers(), cookies()]);
-    const resolvedLocale = resolveSupportedLocale({
-      explicitLocale: locale ?? null,
-      cookieLocale: cookieStore.get("NEXT_LOCALE")?.value ?? null,
-      acceptLanguage: requestHeaders.get("accept-language"),
-    });
+    const requestHeaders = await headers();
     const result = await sendLoginEmailCode(
       {
         userId,
         newEmail,
-        locale: resolvedLocale,
         host: requestHeaders.get("host") ?? "Cashier",
       },
       { emailDelivery: serverComposition.email, accounts: serverComposition.accountSecurity }

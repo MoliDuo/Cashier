@@ -98,7 +98,7 @@ async function releasePasswordRateLimits(
 }
 
 export async function authenticateWithPassword(
-  params: { email: string; password: string; locale?: string; requestHeaders: HeadersLike },
+  params: { email: string; password: string; requestHeaders: HeadersLike },
   dependencies: { users: UserAccountPort; rateLimiter: RateLimiterPort }
 ): Promise<AuthenticatedPrincipal> {
   const email = normalizeEmail(params.email);
@@ -128,6 +128,5 @@ export async function authenticateWithPassword(
     name: user.name,
     image: user.image,
     authVersion: user.authVersion,
-    ...(params.locale === undefined ? {} : { locale: params.locale }),
   };
 }

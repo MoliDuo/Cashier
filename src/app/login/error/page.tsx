@@ -3,11 +3,12 @@ import { useTranslations } from "next-intl";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
-import { Link } from "@/i18n/routing";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { textRoleClassName } from "@/components/typography";
 
-export default function LoginErrorPage() {
+function LoginError() {
   const t = useTranslations("Auth");
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
@@ -67,5 +68,19 @@ export default function LoginErrorPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The page reads `?error=` and `?code=`, which Next cannot know while
+ * prerendering, so the reading half sits behind a boundary. The fallback is
+ * empty: the page it would replace is a single short message, and a skeleton
+ * of it would flash for longer than the message takes to arrive.
+ */
+export default function LoginErrorPage() {
+  return (
+    <Suspense>
+      <LoginError />
+    </Suspense>
   );
 }

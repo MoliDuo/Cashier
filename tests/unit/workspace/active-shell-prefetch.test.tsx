@@ -16,10 +16,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParamsState.current,
 }));
 
-vi.mock("@/i18n/routing", () => ({
-  usePathname: () => "/ledgers/ledger-1",
-}));
-
 vi.mock("next-intl", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next-intl")>();
   return {
@@ -75,7 +71,7 @@ vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
   }),
 }));
 
-import { ActiveShell } from "@/app/[locale]/(protected)/_active-shell";
+import { ActiveShell } from "@/app/(protected)/_active-shell";
 import { useBookScopeStore } from "@/lib/store/book-scope";
 
 const BOOK_ID = "10000000-0000-4000-8000-000000000001";

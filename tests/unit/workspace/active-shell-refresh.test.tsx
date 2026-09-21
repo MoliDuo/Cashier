@@ -71,7 +71,7 @@ vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
   }),
 }));
 
-import { ActiveShell } from "@/app/[locale]/(protected)/_active-shell";
+import { ActiveShell } from "@/app/(protected)/_active-shell";
 import { useShellController } from "@/components/providers/shell-controller";
 
 /**

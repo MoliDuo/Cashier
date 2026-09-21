@@ -15,14 +15,11 @@ vi.mock("next-auth/react", () => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(searchParams.value),
+  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
 vi.mock("next-intl", () => ({
   useLocale: () => "en",
-}));
-
-vi.mock("@/i18n/routing", () => ({
-  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
 vi.mock("@/modules/auth/server-actions/send-otp", () => ({

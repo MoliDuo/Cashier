@@ -39,14 +39,14 @@ npm run dev
 ```
 
 Fill in the AI values. Accounts do not come from the environment: against an empty database the
-server prints a one-time setup code to its logs, and `/{locale}/setup` asks for that code plus one
+server prints a one-time setup code to its logs, and `/setup` asks for that code plus one
 login email, one password, and the book names.
 
 Never commit `.env`, provider credentials, real receipts, API keys, or raw personal data.
 
 ## Where things live
 
-- `src/app/` — locale-prefixed routes and API handlers
+- `src/app/` — routes and API handlers
 - `src/modules/` — business logic and feature UI
 - `src/application/`, `src/lib/`, `src/components/`, `src/persistence/` — shared contracts and infrastructure
 - `src/persistence/postgres-migrations/` — PostgreSQL migrations

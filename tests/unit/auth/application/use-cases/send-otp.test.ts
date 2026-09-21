@@ -188,7 +188,6 @@ describe("sendOTP use case", () => {
       otp: "123456",
       host: "cashier.example",
       expiresInMinutes: 5,
-      locale: "zh",
       copy: expect.objectContaining({
         heading: "登录 cashier.example",
         codeLabel: "您的验证码：",
@@ -305,13 +304,11 @@ describe("sendOTP use case", () => {
       email: validEmail("user@example.com"),
       ip: "203.0.113.2",
       host: "cashier.example",
-      locale: "zh",
     });
 
     expect(otpEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
         host: "cashier.example",
-        locale: "zh",
         copy: expect.objectContaining({
           heading: "登录 cashier.example",
           codeLabel: "您的验证码：",

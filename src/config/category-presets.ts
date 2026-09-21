@@ -104,87 +104,6 @@ const DEFAULT_CATEGORIES_ZH: readonly PresetCategoryDefinition[] = [
   },
 ];
 
-const DEFAULT_CATEGORIES_EN: readonly PresetCategoryDefinition[] = [
-  {
-    name: "Dining",
-    description:
-      "Daily food and drink expenses, including meals, cooking ingredients, seasonings, beverages, and snacks",
-    icon: "Utensils",
-  },
-  {
-    name: "Household",
-    description:
-      "Everyday household consumables, such as paper products, cleaning supplies, kitchen supplies, and other household goods",
-    icon: "ShoppingCart",
-  },
-  {
-    name: "Shopping",
-    description:
-      "Goods that do not fit household, clothing, personal care, or another specific category, such as electronics, stationery, gifts, and miscellaneous items",
-    icon: "ShoppingBag",
-  },
-  {
-    name: "Clothing",
-    description:
-      "Clothing, footwear, bags, jewelry, watches, and other wearable accessories, including purchases, cleaning, and repairs",
-    icon: "Shirt",
-  },
-  {
-    name: "Personal Care",
-    description:
-      "Personal care and grooming expenses, such as hair care, skincare, cosmetics, perfume, haircuts, and beauty services",
-    icon: "Scissors",
-  },
-  {
-    name: "Housing",
-    description:
-      "Fixed housing expenses, such as rent, utilities, internet, property management, and home repairs",
-    icon: "House",
-  },
-  {
-    name: "Daily Life",
-    description:
-      "Everyday services and miscellaneous expenses, such as courier delivery, housekeeping, document processing, phone bills, printing, and other odds and ends",
-    icon: "Receipt",
-  },
-  {
-    name: "Transport",
-    description:
-      "Commuting and travel expenses, such as public transit, rideshare, fuel, and parking fees",
-    icon: "Bus",
-  },
-  {
-    name: "Healthcare",
-    description:
-      "Medical and health expenses, such as medication, treatment, checkups, and nutritional supplements",
-    icon: "Stethoscope",
-  },
-  {
-    name: "Education",
-    description:
-      "Learning and skill-development expenses, such as tuition, courses, books, exam fees, and study tools",
-    icon: "GraduationCap",
-  },
-  {
-    name: "Memberships",
-    description:
-      "Membership and subscription expenses, such as app subscriptions, API quotas, and gym memberships",
-    icon: "Crown",
-  },
-  {
-    name: "Entertainment",
-    description:
-      "Leisure, social, and cultural activities, such as games, movies, performances, exhibitions, and related digital services",
-    icon: "Gamepad2",
-  },
-  {
-    name: "Gifts & Giving",
-    description:
-      "Gift money, cash gifts, treating others, donations, and other social-obligation expenses",
-    icon: "Gift",
-  },
-];
-
 const CONCISE_CATEGORIES_ZH: readonly PresetCategoryDefinition[] = [
   {
     name: "吃喝",
@@ -218,61 +137,16 @@ const CONCISE_CATEGORIES_ZH: readonly PresetCategoryDefinition[] = [
   },
 ];
 
-const CONCISE_CATEGORIES_EN: readonly PresetCategoryDefinition[] = [
-  {
-    name: "Food & Drink",
-    description: "Everyday food and drink, including meals, beverages, snacks, and groceries",
-    icon: "Utensils",
-  },
-  {
-    name: "Home",
-    description:
-      "Housing and household expenses, such as rent, utilities, internet, home goods, and everyday consumables",
-    icon: "House",
-  },
-  {
-    name: "Travel",
-    description:
-      "Commuting and travel expenses, such as public transit, rideshare, fuel, parking, and trips",
-    icon: "Bus",
-  },
-  {
-    name: "Health",
-    description:
-      "Healthcare expenses, such as medication, treatment, checkups, fitness, and supplements",
-    icon: "Stethoscope",
-  },
-  {
-    name: "Leisure",
-    description:
-      "Leisure expenses, such as games, media, performances, memberships, and social activities",
-    icon: "Gamepad2",
-  },
-  {
-    name: "Other",
-    description:
-      "Anything outside the categories above, such as clothing, electronics, education, and gifts",
-    icon: "ShoppingBag",
-  },
-];
-
-const CATEGORY_PRESETS: Readonly<
-  Record<
-    CategoryPresetId,
-    { zh: readonly PresetCategoryDefinition[]; en: readonly PresetCategoryDefinition[] }
-  >
-> = {
-  default: { zh: DEFAULT_CATEGORIES_ZH, en: DEFAULT_CATEGORIES_EN },
-  concise: { zh: CONCISE_CATEGORIES_ZH, en: CONCISE_CATEGORIES_EN },
+const CATEGORY_PRESETS: Readonly<Record<CategoryPresetId, readonly PresetCategoryDefinition[]>> = {
+  default: DEFAULT_CATEGORIES_ZH,
+  concise: CONCISE_CATEGORIES_ZH,
 };
 
-/** The preset's categories in display order, localized like `getDefaultLedger`. */
+/** The preset's categories in display order. */
 export function getCategoryPreset(
-  presetId: CategoryPresetId,
-  locale: string = "zh"
+  presetId: CategoryPresetId
 ): readonly (PresetCategory & { key: string })[] {
-  const preset = CATEGORY_PRESETS[presetId];
-  const definitions = locale.startsWith("zh") ? preset.zh : preset.en;
+  const definitions = CATEGORY_PRESETS[presetId];
   const keys =
     presetId === "default"
       ? [
@@ -294,13 +168,11 @@ export function getCategoryPreset(
   return definitions.map((category, index) => ({ ...category, key: keys[index]! }));
 }
 
-/** Match only exact built-in names, across both supported data languages. */
+/** Match only exact built-in names. */
 export function getPresetSemanticKey(name: string): string | null {
   for (const presetId of CATEGORY_PRESET_IDS) {
-    for (const locale of ["zh", "en"] as const) {
-      const match = getCategoryPreset(presetId, locale).find((category) => category.name === name);
-      if (match != null) return match.key;
-    }
+    const match = getCategoryPreset(presetId).find((category) => category.name === name);
+    if (match != null) return match.key;
   }
   return null;
 }

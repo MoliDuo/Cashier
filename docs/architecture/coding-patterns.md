@@ -56,10 +56,8 @@ required port through the use case boundary. Concrete runtime wiring belongs in 
 ## Frontend
 
 - Use centralized query keys and `useLedgerMutation` for server state changes.
-- Load tab-specific components and translations only when that tab is active.
-- Deferred feature translations use the application QueryClient. Their key is
-  `["feature-messages", version, locale, feature]`; do not add a second module-level cache or request
-  listener system.
+- Load tab-specific components only when that tab is active. The message catalog is one file for
+  one language; it ships with the page rather than being fetched per feature.
 - Keep browser image data as `File`/`Blob` through compression and upload. Object URLs are UI
   resources and must be revoked when an image is replaced, removed, reset, or unmounted.
 - Treat Infinite Query pages and detail queries as independent server-state views. Ledger mutations

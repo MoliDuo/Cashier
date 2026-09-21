@@ -21,7 +21,7 @@ export async function applyCategoryPreset(
 ): Promise<ApplyCategoryPresetResult> {
   const result = await categories.applyPreset(ledgerId, {
     expectedRevision: input.expectedRevision,
-    presetCategories: getCategoryPreset(input.presetId, input.locale),
+    presetCategories: getCategoryPreset(input.presetId),
     mappings: input.mappings,
   });
   return {

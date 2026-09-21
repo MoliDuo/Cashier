@@ -1,11 +1,11 @@
-import createMiddleware from "next-intl/middleware";
-import { routing } from "./i18n/routing";
 import { NextResponse } from "next/server";
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 
 const { auth } = NextAuth(authConfig);
-const intlMiddleware = createMiddleware(routing);
+
+/** Paths from when every route carried a locale prefix. */
+const LEGACY_LOCALE_PREFIX = /^\/(?:zh|en)(?=\/|$)/;
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -15,8 +15,7 @@ export default auth((req) => {
     const isPublicApi =
       pathname === "/api/auth" ||
       pathname.startsWith("/api/auth/") ||
-      pathname.startsWith("/api/v1/") ||
-      pathname.startsWith("/api/i18n/");
+      pathname.startsWith("/api/v1/");
 
     if (!isPublicApi && !req.auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,9 +27,15 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // 3. For all other routes (pages), run Intl Middleware
-  // Auth protection for pages is handled by (protected) layout
-  return intlMiddleware(req);
+  // A bookmark or an installed home-screen shortcut still points at /zh/...
+  if (LEGACY_LOCALE_PREFIX.test(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = pathname.replace(LEGACY_LOCALE_PREFIX, "") || "/";
+    return NextResponse.redirect(url);
+  }
+
+  // Auth protection for pages is handled by the (protected) layout.
+  return NextResponse.next();
 });
 
 export const config = {

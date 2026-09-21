@@ -8,16 +8,8 @@ import ts from "typescript";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = path.dirname(currentFilePath);
-const messagesDir = path.resolve(currentDirPath, "..", "messages");
-const catalogFiles = fs
-  .readdirSync(messagesDir)
-  .filter((fileName) => fileName.endsWith(".json"))
-  .sort();
-
-if (catalogFiles.length === 0) {
-  console.error("No locale catalogs found in messages/.");
-  process.exit(1);
-}
+const CATALOG_FILE = "zh.json";
+const catalogPath = path.resolve(currentDirPath, "..", "messages", CATALOG_FILE);
 
 function getDuplicateTopLevelKeys(content) {
   const matches = content.matchAll(/^ {2}"([^"]+)":/gm);
@@ -80,130 +72,50 @@ function parseIcuMessage(message, location) {
   }
 }
 
-function validateCatalogShape(reference, candidate, location, candidateFile) {
-  const referenceType = Array.isArray(reference)
-    ? "array"
-    : reference === null
-      ? "null"
-      : typeof reference;
-  const candidateType = Array.isArray(candidate)
-    ? "array"
-    : candidate === null
-      ? "null"
-      : typeof candidate;
-
-  if (referenceType !== candidateType) {
-    errors.push(
-      `${candidateFile}: ${location || "<root>"} has type ${candidateType}; expected ${referenceType}`
-    );
+/**
+ * There is one catalog, so nothing can disagree with anything: the only shape
+ * question left is whether each message is valid ICU. `parseIcuMessage`
+ * records its own errors.
+ */
+function checkIcuMessages(value, location) {
+  if (typeof value === "string") {
+    parseIcuMessage(value, `${CATALOG_FILE}:${location}`);
     return;
   }
-
-  if (typeof reference === "string" && typeof candidate === "string") {
-    const referenceArguments = parseIcuMessage(reference, `${referenceCatalogFile}:${location}`);
-    const candidateArguments = parseIcuMessage(candidate, `${candidateFile}:${location}`);
-    if (
-      referenceArguments != null &&
-      candidateArguments != null &&
-      (referenceArguments.size !== candidateArguments.size ||
-        [...referenceArguments].some((argument) => !candidateArguments.has(argument)))
-    ) {
-      errors.push(
-        `${candidateFile}: ${location} ICU arguments differ; expected ${[...referenceArguments]
-          .sort()
-          .join(", ")}, found ${[...candidateArguments].sort().join(", ")}`
-      );
-    }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => checkIcuMessages(item, `${location}[${index}]`));
     return;
   }
-
-  if (Array.isArray(reference) && Array.isArray(candidate)) {
-    if (reference.length !== candidate.length) {
-      errors.push(
-        `${candidateFile}: ${location} array length is ${candidate.length}; expected ${reference.length}`
-      );
-      return;
-    }
-    reference.forEach((value, index) => {
-      validateCatalogShape(value, candidate[index], `${location}[${index}]`, candidateFile);
-    });
-    return;
-  }
-
-  if (
-    reference != null &&
-    candidate != null &&
-    typeof reference === "object" &&
-    typeof candidate === "object"
-  ) {
-    const referenceKeysForObject = Object.keys(reference);
-    const candidateKeysForObject = Object.keys(candidate);
-    for (const key of referenceKeysForObject) {
-      if (!(key in candidate)) {
-        errors.push(
-          `${candidateFile}: missing key ${location === "" ? key : `${location}.${key}`}`
-        );
-        continue;
-      }
-      validateCatalogShape(
-        reference[key],
-        candidate[key],
-        location === "" ? key : `${location}.${key}`,
-        candidateFile
-      );
-    }
-    for (const key of candidateKeysForObject) {
-      if (!(key in reference)) {
-        errors.push(`${candidateFile}: extra key ${location === "" ? key : `${location}.${key}`}`);
-      }
+  if (value != null && typeof value === "object") {
+    for (const [key, nested] of Object.entries(value)) {
+      checkIcuMessages(nested, location === "" ? key : `${location}.${key}`);
     }
   }
 }
 
-const parsedCatalogs = new Map();
 const errors = [];
+const rawContent = fs.readFileSync(catalogPath, "utf8");
+const duplicateTopLevelKeys = getDuplicateTopLevelKeys(rawContent);
 
-for (const catalogFile of catalogFiles) {
-  const filePath = path.join(messagesDir, catalogFile);
-  const rawContent = fs.readFileSync(filePath, "utf8");
-  const duplicateTopLevelKeys = getDuplicateTopLevelKeys(rawContent);
-
-  if (duplicateTopLevelKeys.length > 0) {
-    errors.push(
-      `${catalogFile}: duplicate top-level keys detected: ${duplicateTopLevelKeys.join(", ")}`
-    );
-  }
-
-  try {
-    parsedCatalogs.set(catalogFile, JSON.parse(rawContent));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    errors.push(`${catalogFile}: invalid JSON: ${message}`);
-  }
+if (duplicateTopLevelKeys.length > 0) {
+  errors.push(
+    `${CATALOG_FILE}: duplicate top-level keys detected: ${duplicateTopLevelKeys.join(", ")}`
+  );
 }
 
-const referenceCatalogFile = catalogFiles.includes("en.json") ? "en.json" : catalogFiles[0];
-const referenceCatalog = parsedCatalogs.get(referenceCatalogFile);
+let catalog = null;
+try {
+  catalog = JSON.parse(rawContent);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  errors.push(`${CATALOG_FILE}: invalid JSON: ${message}`);
+}
+
 const referenceKeys = new Set();
 
-if (referenceCatalog == null) {
-  errors.push(`Reference catalog ${referenceCatalogFile} could not be parsed.`);
-} else {
-  for (const key of flattenKeys(referenceCatalog)) referenceKeys.add(key);
-  validateCatalogShape(referenceCatalog, referenceCatalog, "", referenceCatalogFile);
-
-  for (const catalogFile of catalogFiles) {
-    if (catalogFile === referenceCatalogFile) {
-      continue;
-    }
-
-    const catalog = parsedCatalogs.get(catalogFile);
-    if (catalog == null) {
-      continue;
-    }
-
-    validateCatalogShape(referenceCatalog, catalog, "", catalogFile);
-  }
+if (catalog != null) {
+  for (const key of flattenKeys(catalog)) referenceKeys.add(key);
+  checkIcuMessages(catalog, "");
 }
 
 function sourceFilesIn(directory) {
@@ -462,9 +374,8 @@ function collectVisibleStringLiterals(sourceFile, relativeFileName) {
   return findings;
 }
 
-if (referenceCatalog != null) {
+if (catalog != null) {
   const sourceRoot = path.resolve(currentDirPath, "..", "src");
-  const locales = catalogFiles.map((fileName) => path.basename(fileName, ".json"));
 
   for (const fileName of sourceFilesIn(sourceRoot)) {
     const source = fs.readFileSync(fileName, "utf8");
@@ -490,24 +401,16 @@ if (referenceCatalog != null) {
       }
       if (usage.key == null) {
         // Dynamic keys cannot be expanded safely from syntax alone. Still
-        // validate the statically known namespace in every catalog and report
-        // the usage so it is visible in CI output.
-        for (const locale of locales) {
-          const catalog = parsedCatalogs.get(`${locale}.json`);
-          if (usage.namespace !== "" && getMessageValue(catalog, usage.namespace) === undefined) {
-            errors.push(
-              `${location}: missing ${locale} message namespace ${usage.namespace} for dynamic key`
-            );
-          }
+        // validate the statically known namespace and report the usage so it
+        // is visible in CI output.
+        if (usage.namespace !== "" && getMessageValue(catalog, usage.namespace) === undefined) {
+          errors.push(`${location}: missing message namespace ${usage.namespace} for dynamic key`);
         }
         continue;
       }
       const fullKey = usage.namespace === "" ? usage.key : `${usage.namespace}.${usage.key}`;
-      for (const locale of locales) {
-        const catalog = parsedCatalogs.get(`${locale}.json`);
-        if (getMessageValue(catalog, fullKey) === undefined) {
-          errors.push(`${location}: missing ${locale} message key ${fullKey}`);
-        }
+      if (getMessageValue(catalog, fullKey) === undefined) {
+        errors.push(`${location}: missing message key ${fullKey}`);
       }
     }
 
@@ -545,4 +448,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Validated ${catalogFiles.length} locale catalogs successfully.`);
+console.log(`Validated ${CATALOG_FILE} successfully.`);

@@ -20,7 +20,6 @@ export interface AuthenticatedHomeContext {
       image?: string | null;
       hasPassword: boolean;
       passwordUpdatedAt: string | null;
-      interfaceLanguage: "auto" | "zh" | "en";
     };
   };
   locale: string;
@@ -67,7 +66,6 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
         image: validSession.user?.image ?? null,
         hasPassword: validSession.user?.hasPassword ?? false,
         passwordUpdatedAt: validSession.user?.passwordUpdatedAt ?? null,
-        interfaceLanguage: validSession.user?.interfaceLanguage ?? "auto",
       },
     },
     locale,

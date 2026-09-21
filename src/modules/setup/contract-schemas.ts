@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { ValidationError } from "@/lib/errors";
-import { SUPPORTED_LOCALES } from "@/i18n/locales";
 import { getPasswordRuleViolation, PASSWORD_RULE_MESSAGES } from "@/modules/auth/password-rules";
 
 const bookNameSchema = z.string().trim().min(1).max(20);
@@ -35,7 +34,6 @@ export const setupInputSchema = z
     setupCode: setupCodeSchema,
     email: emailSchema,
     password: passwordSchema,
-    locale: z.enum(SUPPORTED_LOCALES),
     books: z
       .array(bookNameSchema)
       .min(1, "Add at least one book")

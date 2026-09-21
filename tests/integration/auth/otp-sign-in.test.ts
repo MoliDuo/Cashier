@@ -72,7 +72,6 @@ describe("authenticateWithOTP", () => {
     const principal = await authenticateWithOTP({
       email: TEST_EMAIL,
       otp: "123456",
-      locale: "zh",
       requestHeaders: REQUEST_HEADERS,
     });
     expect(principal).toMatchObject({ email: TEST_EMAIL });
@@ -95,7 +94,6 @@ describe("authenticateWithOTP", () => {
       await authenticateWithOTP({
         email: TEST_EMAIL,
         otp: "999999",
-        locale: "zh",
         requestHeaders: REQUEST_HEADERS,
       });
     } catch (caughtError) {
@@ -120,7 +118,6 @@ describe("authenticateWithOTP", () => {
       authenticateWithOTP({
         email: "missing-token@example.com",
         otp: "123456",
-        locale: "en",
         requestHeaders: REQUEST_HEADERS,
       })
     ).rejects.toMatchObject({ code: AUTH_ERROR_CODES.OTP_INVALID });
@@ -136,7 +133,6 @@ describe("authenticateWithOTP", () => {
       authenticateWithOTP({
         email: TEST_EMAIL,
         otp: "123456",
-        locale: "zh",
         requestHeaders: REQUEST_HEADERS,
       })
     ).rejects.toBeInstanceOf(OTPExpiredSignInError);
@@ -145,7 +141,6 @@ describe("authenticateWithOTP", () => {
       authenticateWithOTP({
         email: TEST_EMAIL,
         otp: "123456",
-        locale: "zh",
         requestHeaders: REQUEST_HEADERS,
       })
     ).rejects.toMatchObject({ code: AUTH_ERROR_CODES.OTP_EXPIRED });
@@ -161,7 +156,6 @@ describe("authenticateWithOTP", () => {
         await authenticateWithOTP({
           email: TEST_EMAIL,
           otp: "999999",
-          locale: "zh",
           requestHeaders: REQUEST_HEADERS,
         });
       } catch (caughtError) {
@@ -189,7 +183,6 @@ describe("authenticateWithOTP", () => {
         await authenticateWithOTP({
           email: TEST_EMAIL,
           otp: "999999",
-          locale: "zh",
           requestHeaders: REQUEST_HEADERS,
         });
       } catch {
@@ -201,7 +194,6 @@ describe("authenticateWithOTP", () => {
       authenticateWithOTP({
         email: TEST_EMAIL,
         otp: "999999",
-        locale: "zh",
         requestHeaders: REQUEST_HEADERS,
       })
     ).rejects.toBeInstanceOf(OTPRateLimitedSignInError);
@@ -210,7 +202,6 @@ describe("authenticateWithOTP", () => {
       authenticateWithOTP({
         email: TEST_EMAIL,
         otp: "999999",
-        locale: "zh",
         requestHeaders: REQUEST_HEADERS,
       })
     ).rejects.toMatchObject({ code: AUTH_ERROR_CODES.OTP_RATE_LIMITED });

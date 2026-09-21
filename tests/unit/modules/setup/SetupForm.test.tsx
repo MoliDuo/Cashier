@@ -15,7 +15,7 @@ vi.mock("@/modules/setup/server-actions/setup", () => ({
 
 // The shared setup stands in for `Link` only, and the wizard navigates once it
 // succeeds, so the router is replaced here as well.
-vi.mock("@/i18n/routing", () => ({
+vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: routerReplaceMock, refresh: routerRefreshMock }),
 }));
 

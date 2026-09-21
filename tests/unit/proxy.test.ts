@@ -1,14 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
-const { mockIntlMiddleware } = vi.hoisted(() => ({
-  mockIntlMiddleware: vi.fn(),
-}));
-
-vi.mock("next-intl/middleware", () => ({
-  default: () => mockIntlMiddleware,
-}));
-
 vi.mock("next-auth", () => ({
   default: () => ({
     auth: (
@@ -21,19 +13,11 @@ vi.mock("../../src/auth.config", () => ({
   authConfig: {},
 }));
 
-vi.mock("../../src/i18n/routing", () => ({
-  routing: {
-    locales: ["zh", "en"],
-    defaultLocale: "zh",
-  },
-}));
-
 import proxy from "@/proxy";
 
 describe("Proxy Logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIntlMiddleware.mockReturnValue(new NextResponse(null, { status: 200 }));
   });
 
   function createRequest(path: string, auth: unknown = null) {
@@ -47,11 +31,9 @@ describe("Proxy Logic", () => {
     (proxy as unknown as (req: NextRequest) => Promise<NextResponse>)(req);
 
   describe("Public Routes", () => {
-    it("sends public pages through locale routing without authentication", async () => {
-      for (const path of ["/login", "/zh/login", "/s/some-share-id"]) {
-        mockIntlMiddleware.mockClear();
-        await invokeProxy(createRequest(path));
-        expect(mockIntlMiddleware).toHaveBeenCalledOnce();
+    it("lets public pages through without authentication", async () => {
+      for (const path of ["/login", "/s/some-share-id"]) {
+        expect((await invokeProxy(createRequest(path))).status).toBe(200);
       }
     });
 
@@ -60,24 +42,34 @@ describe("Proxy Logic", () => {
       const res = await invokeProxy(req);
       expect(res.status).toBe(200);
     });
+  });
 
-    it("allows versioned i18n assets without authentication", async () => {
-      const res = await invokeProxy(createRequest("/api/i18n/en/stats.json"));
-      expect(res.status).toBe(200);
-      expect(mockIntlMiddleware).not.toHaveBeenCalled();
+  describe("Retired locale prefixes", () => {
+    // A bookmark or an installed shortcut from the bilingual era still points
+    // at /zh/..., so the prefix is stripped rather than 404'd.
+    it.each([
+      ["/zh/login", "/login"],
+      ["/en/ledgers/ledger-1", "/ledgers/ledger-1"],
+      ["/zh", "/"],
+    ])("redirects %s to %s", async (from, to) => {
+      const res = await invokeProxy(createRequest(from));
+
+      expect(res.status).toBe(307);
+      expect(new URL(res.headers.get("location")!).pathname).toBe(to);
+    });
+
+    it("leaves a path that merely starts with those letters alone", async () => {
+      expect((await invokeProxy(createRequest("/zhuanzhang"))).status).toBe(200);
     });
   });
 
   describe("Protected Page Routes", () => {
-    it("leaves page authorization to protected layouts while preserving locale routing", async () => {
+    it("leaves page authorization to the protected layouts", async () => {
       for (const request of [
         createRequest("/dashboard"),
-        createRequest("/en/dashboard"),
         createRequest("/dashboard", { user: { id: "user1" } }),
       ]) {
-        mockIntlMiddleware.mockClear();
         expect((await invokeProxy(request)).status).toBe(200);
-        expect(mockIntlMiddleware).toHaveBeenCalledOnce();
       }
     });
   });
@@ -98,7 +90,6 @@ describe("Proxy Logic", () => {
       expect(res.status).toBe(401);
       const data = await res.json();
       expect(data).toEqual({ error: "Unauthorized" });
-      expect(mockIntlMiddleware).not.toHaveBeenCalled();
     });
 
     it("should allow authenticated access to /api/protected", async () => {
@@ -106,13 +97,11 @@ describe("Proxy Logic", () => {
       const res = await invokeProxy(req);
 
       expect(res.status).toBe(200);
-      expect(mockIntlMiddleware).not.toHaveBeenCalled();
     });
 
     it("does not let a dot bypass API authentication", async () => {
       const res = await invokeProxy(createRequest("/api/private/file.json"));
       expect(res.status).toBe(401);
-      expect(mockIntlMiddleware).not.toHaveBeenCalled();
     });
   });
 
@@ -121,7 +110,6 @@ describe("Proxy Logic", () => {
       const req = createRequest("/_next/static/chunk.js");
       const res = await invokeProxy(req);
       expect(res.status).toBe(200);
-      expect(mockIntlMiddleware).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,8 +1,7 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import type { UserAccountPort, UserPreferencesPort } from "@/application/contracts";
+import type { UserAccountPort } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { loginEmails, users } from "@/persistence";
-import { normalizeUserPreferences } from "@/modules/auth/services/user-preferences";
 
 const accountColumns = {
   id: true,
@@ -11,7 +10,6 @@ const accountColumns = {
   passwordHash: true,
   passwordUpdatedAt: true,
   authVersion: true,
-  preferences: true,
 } as const;
 
 type AccountRow = {
@@ -21,7 +19,6 @@ type AccountRow = {
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
   authVersion: number;
-  preferences: unknown;
 };
 
 /**
@@ -49,7 +46,6 @@ function toAccount(row: AccountRow, email: string) {
     passwordHash: row.passwordHash,
     passwordUpdatedAt: row.passwordUpdatedAt,
     authVersion: row.authVersion,
-    interfaceLanguage: normalizeUserPreferences(row.preferences).interfaceLanguage,
   };
 }
 
@@ -63,7 +59,6 @@ export const postgresUserAccountAdapter: UserAccountPort = {
         passwordHash: users.passwordHash,
         passwordUpdatedAt: users.passwordUpdatedAt,
         authVersion: users.authVersion,
-        preferences: users.preferences,
         loginEmail: loginEmails.email,
       })
       .from(loginEmails)
@@ -95,25 +90,5 @@ export const postgresUserAccountAdapter: UserAccountPort = {
       email: row.email,
       emailVerifiedAt: row.emailVerified?.toISOString() ?? null,
     }));
-  },
-};
-
-export const postgresUserPreferencesAdapter: UserPreferencesPort = {
-  async get(userId) {
-    const row = await db.query.users.findFirst({
-      where: and(eq(users.id, userId), isNull(users.deletedAt)),
-      columns: { preferences: true },
-    });
-    return row == null ? null : normalizeUserPreferences(row.preferences);
-  },
-
-  async update(input) {
-    const updated = await db
-      .update(users)
-      .set({ preferences: input.preferences, updatedAt: new Date() })
-      .where(and(eq(users.id, input.userId), isNull(users.deletedAt)))
-      .returning({ preferences: users.preferences })
-      .then((rows) => rows[0]);
-    return updated == null ? null : normalizeUserPreferences(updated.preferences);
   },
 };

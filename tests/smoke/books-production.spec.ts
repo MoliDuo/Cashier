@@ -25,18 +25,18 @@ function apiBase(): string {
 
 /** Signs in with the account's real password; no development bypass exists here. */
 async function login(page: Page) {
-  await page.goto("/en");
+  await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
-  await page.getByLabel("Email Address", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("Password", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
+  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
+  await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page).not.toHaveURL(/\/login/);
-  await expect(page.getByRole("button", { name: "New Record", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "记一笔", exact: true })).toBeEnabled();
 }
 
-async function openTab(page: Page, name: "Stream" | "Details" | "Stats" | "Settings") {
+async function openTab(page: Page, name: "流水" | "明细" | "统计" | "设置") {
   await page
-    .getByRole("navigation", { name: "Ledger navigation" })
+    .getByRole("navigation", { name: "账本导航" })
     .getByRole("button", { name, exact: true })
     .click();
 }
@@ -47,20 +47,16 @@ function bookRow(page: Page, name: string) {
 }
 
 async function addBook(page: Page, name: string) {
-  await page.getByRole("button", { name: "Add book", exact: true }).click();
+  await page.getByRole("button", { name: "新增分账", exact: true }).click();
   const dialog = page.getByRole("dialog").last();
-  await dialog.getByLabel("Name", { exact: true }).fill(name);
-  await dialog.getByRole("button", { name: "Add book", exact: true }).click();
+  await dialog.getByLabel("名称", { exact: true }).fill(name);
+  await dialog.getByRole("button", { name: "新增分账", exact: true }).click();
   await expect(bookRow(page, name)).toBeVisible();
 }
 
 async function deleteBook(page: Page, name: string) {
-  await bookRow(page, name).getByRole("button", { name: "Delete", exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "Delete", exact: true })
-    .click();
+  await bookRow(page, name).getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("dialog").last().getByRole("button", { name: "删除", exact: true }).click();
   await expect(bookRow(page, name)).toHaveCount(0);
 }
 
@@ -70,13 +66,9 @@ async function deleteBook(page: Page, name: string) {
  * workspace's own tests are not allowed to produce.
  */
 async function archiveBook(page: Page, name: string) {
-  await bookRow(page, name).getByRole("button", { name: "Archive", exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "Archive", exact: true })
-    .click();
-  await expect(bookRow(page, name).getByRole("button", { name: "Restore" })).toBeVisible();
+  await bookRow(page, name).getByRole("button", { name: "归档", exact: true }).click();
+  await page.getByRole("dialog").last().getByRole("button", { name: "归档", exact: true }).click();
+  await expect(bookRow(page, name).getByRole("button", { name: "恢复" })).toBeVisible();
 }
 
 /** The pull-down switcher, picking by name so a leftover book cannot shift the pick. */
@@ -85,7 +77,7 @@ async function selectBookByName(page: Page, name: string) {
   // By accessible name, not `hasText`: that comparison ignores case, so a book
   // named Eta would otherwise also find Theta and the click would be ambiguous.
   await page
-    .getByRole("group", { name: "Book" })
+    .getByRole("group", { name: "分账" })
     .getByRole("button", { name, exact: true })
     .click();
   await expect(page.getByTestId("book-reveal")).toHaveAttribute("data-pull-reveal", "closed");
@@ -97,16 +89,16 @@ async function recordQuickEntry(
   page: Page,
   { item, amount, book }: { item: string; amount: string; book: string }
 ) {
-  await page.getByRole("button", { name: "New Record", exact: true }).click();
+  await page.getByRole("button", { name: "记一笔", exact: true }).click();
   const dialog = page.getByRole("dialog").last();
-  await dialog.getByRole("button", { name: "Quick Entry", exact: true }).click();
-  const picker = dialog.getByLabel("Book", { exact: true });
+  await dialog.getByRole("button", { name: "快速记账", exact: true }).click();
+  const picker = dialog.getByLabel("分账", { exact: true });
   await picker.press("ArrowDown");
   await page.getByRole("option", { name: book, exact: true }).click();
-  await dialog.getByRole("textbox", { name: "Item name (optional)", exact: true }).fill(item);
+  await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
   await dialog.getByRole("group").getByRole("button").first().click();
-  await dialog.getByRole("textbox", { name: "Amount", exact: true }).fill(amount);
-  await dialog.getByRole("button", { name: "Record", exact: true }).click();
+  await dialog.getByRole("textbox", { name: "金额", exact: true }).fill(amount);
+  await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText(item, { exact: true }).first()).toBeVisible();
 }
@@ -117,7 +109,7 @@ function streamTotal(page: Page) {
 }
 
 function statsHero(page: Page) {
-  return page.getByText("Total Expense", { exact: true }).locator("..");
+  return page.getByText("总支出", { exact: true }).locator("..");
 }
 
 /** A second browser, with its own cookies: the device state must not travel. */
@@ -149,7 +141,7 @@ test("books production creates, renames and reorders a book, and keeps it across
   };
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await addBook(page, firstName);
   await addBook(page, secondName);
   await expect.poll(() => order([firstName, secondName])).toEqual([firstName, secondName]);
@@ -157,10 +149,10 @@ test("books production creates, renames and reorders a book, and keeps it across
   // A name is one field of a book that already exists, so the row opens in place
   // and Enter writes it — nothing covers the list to rename it.
   await bookRow(page, secondName)
-    .getByRole("button", { name: `Rename ${secondName}`, exact: true })
+    .getByRole("button", { name: `重命名 ${secondName}`, exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  const nameInput = page.getByRole("textbox", { name: `Rename ${secondName}`, exact: true });
+  const nameInput = page.getByRole("textbox", { name: `重命名 ${secondName}`, exact: true });
   await nameInput.fill(renamed);
   await nameInput.press("Enter");
   await expect(bookRow(page, renamed)).toBeVisible();
@@ -169,13 +161,13 @@ test("books production creates, renames and reorders a book, and keeps it across
   // One step up, not to the top: the seeded books keep the positions every
   // other test in this runner depends on.
   await bookRow(page, renamed)
-    .getByRole("button", { name: `Move ${renamed} up`, exact: true })
+    .getByRole("button", { name: `上移 ${renamed}`, exact: true })
     .click();
   // 分账 is written from the action's answer, so the swap lands a round trip after
   // the click; the painted order is the state to wait on.
   await expect.poll(() => order([firstName, renamed])).toEqual([renamed, firstName]);
   await expect(
-    bookRow(page, renamed).getByRole("button", { name: `Move ${renamed} up`, exact: true })
+    bookRow(page, renamed).getByRole("button", { name: `上移 ${renamed}`, exact: true })
   ).toBeEnabled();
 
   await page.reload();
@@ -199,10 +191,10 @@ test("books production scopes the stream, the details and the stats to one book"
   const itemB = `Delta item ${suffix}`;
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await addBook(page, bookA);
   await addBook(page, bookB);
-  await openTab(page, "Stream");
+  await openTab(page, "流水");
 
   await recordQuickEntry(page, { item: itemA, amount: "111.11", book: bookA });
   await recordQuickEntry(page, { item: itemB, amount: "222.22", book: bookB });
@@ -222,7 +214,7 @@ test("books production scopes the stream, the details and the stats to one book"
   await expect(streamTotal(page)).toContainText("¥222.22");
 
   // 明细 follows the same scope, and the same scope carries across tabs.
-  await openTab(page, "Details");
+  await openTab(page, "明细");
   await expect(page.getByTestId("ledger-entry-card-root").filter({ hasText: itemB })).toHaveCount(
     1
   );
@@ -238,7 +230,7 @@ test("books production scopes the stream, the details and the stats to one book"
   );
 
   await selectBookByName(page, bookA);
-  await openTab(page, "Stats");
+  await openTab(page, "统计");
   // The hero is the scope's own total, so a wrong scope cannot pass by summing
   // the books to the same number.
   await expect(statsHero(page).getByText("¥111.11", { exact: true })).toBeVisible();
@@ -246,7 +238,7 @@ test("books production scopes the stream, the details and the stats to one book"
   await selectBookByName(page, bookB);
   await expect(statsHero(page).getByText("¥222.22", { exact: true })).toBeVisible();
 
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await archiveBook(page, bookA);
   await archiveBook(page, bookB);
   expect(errors).toEqual([]);
@@ -261,10 +253,10 @@ test("books production moves a record from one book to another", async ({ page }
   const item = `Moved item ${suffix}`;
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await addBook(page, bookA);
   await addBook(page, bookB);
-  await openTab(page, "Stream");
+  await openTab(page, "流水");
   await recordQuickEntry(page, { item, amount: "333.33", book: bookA });
 
   await selectBookByName(page, bookA);
@@ -278,12 +270,12 @@ test("books production moves a record from one book to another", async ({ page }
     .getByRole("button", { name: item, exact: true })
     .click();
   const detail = page.getByRole("dialog").first();
-  const detailBook = detail.getByLabel("Book", { exact: true });
+  const detailBook = detail.getByLabel("分账", { exact: true });
   await expect(detailBook).toContainText(bookA);
   await detailBook.press("ArrowDown");
   await page.getByRole("option", { name: bookB, exact: true }).click();
   await expect(detailBook).toContainText(bookB);
-  await detail.getByRole("button", { name: "Close", exact: true }).click();
+  await detail.getByRole("button", { name: "关闭", exact: true }).click();
 
   await expect(page.getByText(item, { exact: true })).toHaveCount(0);
   await selectBookByName(page, bookB);
@@ -292,12 +284,12 @@ test("books production moves a record from one book to another", async ({ page }
 
   await selectBookByName(page, bookA);
   await expect(streamTotal(page)).toContainText("¥0.00");
-  await openTab(page, "Stats");
+  await openTab(page, "统计");
   await expect(statsHero(page).getByText("¥0.00", { exact: true })).toBeVisible();
   await selectBookByName(page, bookB);
   await expect(statsHero(page).getByText("¥333.33", { exact: true })).toBeVisible();
 
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await archiveBook(page, bookA);
   await archiveBook(page, bookB);
   expect(errors).toEqual([]);
@@ -314,42 +306,42 @@ test("books production keeps the viewed book and the record picker apart", async
   const item = `Picker item ${suffix}`;
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await addBook(page, bookA);
   await addBook(page, bookB);
-  await openTab(page, "Stream");
+  await openTab(page, "流水");
   await selectBookByName(page, bookA);
 
   // The view is 甲账, but 记一笔 starts from its own memory — the first book in
   // 设置 order — because the two choices are answers to different questions.
-  await page.getByRole("button", { name: "New Record", exact: true }).click();
+  await page.getByRole("button", { name: "记一笔", exact: true }).click();
   let dialog = page.getByRole("dialog").last();
-  await dialog.getByRole("button", { name: "Quick Entry", exact: true }).click();
-  await expect(dialog.getByLabel("Book", { exact: true })).toContainText("共同支出");
+  await dialog.getByRole("button", { name: "快速记账", exact: true }).click();
+  await expect(dialog.getByLabel("分账", { exact: true })).toContainText("共同支出");
 
-  await dialog.getByLabel("Book", { exact: true }).press("ArrowDown");
+  await dialog.getByLabel("分账", { exact: true }).press("ArrowDown");
   await page.getByRole("option", { name: bookB, exact: true }).click();
-  await dialog.getByRole("textbox", { name: "Item name (optional)", exact: true }).fill(item);
+  await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
   await dialog.getByRole("group").getByRole("button").first().click();
-  await dialog.getByRole("textbox", { name: "Amount", exact: true }).fill("44.44");
-  await dialog.getByRole("button", { name: "Record", exact: true }).click();
+  await dialog.getByRole("textbox", { name: "金额", exact: true }).fill("44.44");
+  await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(
-    page.getByText(`Saved to ${bookB}. It is not visible in the current view.`, { exact: true })
+    page.getByText(`已保存到「${bookB}」，当前视图不会显示这条记录。`, { exact: true })
   ).toBeVisible();
 
   // Saving elsewhere changed the picker's memory, not what is being viewed.
   await expect(currentBookOption(page)).toHaveText(bookA);
   await expect(page.getByText(item, { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "New Record", exact: true }).click();
+  await page.getByRole("button", { name: "记一笔", exact: true }).click();
   dialog = page.getByRole("dialog").last();
-  await expect(dialog.getByLabel("Book", { exact: true })).toContainText(bookB);
+  await expect(dialog.getByLabel("分账", { exact: true })).toContainText(bookB);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 
   await selectBookByName(page, bookB);
   await expect(page.getByText(item, { exact: true }).first()).toBeVisible();
 
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await archiveBook(page, bookA);
   await archiveBook(page, bookB);
   expect(errors).toEqual([]);
@@ -360,7 +352,7 @@ test("books production keeps the viewed book per browser, not per account", asyn
   page.on("pageerror", (error) => errors.push(error.message));
 
   await login(page);
-  await expect(currentBookOption(page)).toHaveText("All books");
+  await expect(currentBookOption(page)).toHaveText("总账");
   await selectBookByName(page, "旅行支出");
 
   await page.reload();
@@ -369,7 +361,7 @@ test("books production keeps the viewed book per browser, not per account", asyn
   // Another browser signs in as the same account and still opens on 总账.
   const other = await newDevice(page);
   try {
-    await expect(currentBookOption(other.page)).toHaveText("All books");
+    await expect(currentBookOption(other.page)).toHaveText("总账");
     await selectBookByName(other.page, "共同支出");
     await page.reload();
     await expect(currentBookOption(page)).toHaveText("旅行支出");
@@ -389,17 +381,17 @@ test("books production sees a book archived by another browser when 设置 opens
   await login(page);
   const other = await newDevice(page);
   try {
-    await openTab(other.page, "Settings");
+    await openTab(other.page, "设置");
     await addBook(other.page, bookName);
     await archiveBook(other.page, bookName);
 
     // This browser has not read 分账 yet, so this first visit is what has to
     // carry the archived row — the workspace bootstrap only knows live books.
-    await openTab(page, "Settings");
-    await expect(page.getByRole("heading", { name: "Archived books", exact: true })).toBeVisible();
-    await expect(bookRow(page, bookName).getByText("Archived", { exact: true })).toBeVisible();
-    await bookRow(page, bookName).getByRole("button", { name: "Restore", exact: true }).click();
-    await expect(bookRow(page, bookName).getByRole("button", { name: "Archive" })).toBeVisible();
+    await openTab(page, "设置");
+    await expect(page.getByRole("heading", { name: "已归档的分账", exact: true })).toBeVisible();
+    await expect(bookRow(page, bookName).getByText("已归档", { exact: true })).toBeVisible();
+    await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
+    await expect(bookRow(page, bookName).getByRole("button", { name: "归档" })).toBeVisible();
     await deleteBook(page, bookName);
   } finally {
     await other.context.close();
@@ -415,19 +407,19 @@ test("books production refreshes 设置 to pick up another browser's change", as
   const bookName = `Kappa ${testInfo.project.name}`;
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await expect(bookRow(page, "共同支出")).toBeVisible();
 
   const other = await newDevice(page);
   try {
-    await openTab(other.page, "Settings");
+    await openTab(other.page, "设置");
     await addBook(other.page, bookName);
 
     // The list this browser already holds is fresh, so only the manual refresh
     // can bring the other browser's book in — and 设置 refreshes by tapping the
     // destination this browser is already on.
     await expect(bookRow(page, bookName)).toHaveCount(0);
-    await openTab(page, "Settings");
+    await openTab(page, "设置");
     await expect(bookRow(page, bookName)).toBeVisible();
     await deleteBook(page, bookName);
     await expect(bookRow(other.page, bookName)).toHaveCount(1);
@@ -445,20 +437,20 @@ test("books production falls back to 总账 when the viewed book is archived", a
   const bookName = `Lambda ${testInfo.project.name}`;
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await addBook(page, bookName);
-  await openTab(page, "Stream");
+  await openTab(page, "流水");
   await selectBookByName(page, bookName);
 
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await archiveBook(page, bookName);
-  await openTab(page, "Stream");
+  await openTab(page, "流水");
   // The dead scope is gone once the strip marks 总账 again.
-  await expect(currentBookOption(page)).toHaveText("All books");
+  await expect(currentBookOption(page)).toHaveText("总账");
 
-  await openTab(page, "Settings");
-  await bookRow(page, bookName).getByRole("button", { name: "Restore", exact: true }).click();
-  await expect(bookRow(page, bookName).getByRole("button", { name: "Archive" })).toBeVisible();
+  await openTab(page, "设置");
+  await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
+  await expect(bookRow(page, bookName).getByRole("button", { name: "归档" })).toBeVisible();
   await deleteBook(page, bookName);
   expect(errors).toEqual([]);
 });
@@ -473,17 +465,17 @@ test("books production files an API upload into the book its key is bound to", a
   const credentialName = `Uploader ${suffix}`;
 
   await login(page);
-  await openTab(page, "Settings");
+  await openTab(page, "设置");
   await addBook(page, bookName);
 
-  await page.getByRole("button", { name: "New Credential", exact: true }).click();
+  await page.getByRole("button", { name: "新建密钥", exact: true }).click();
   const createDialog = page.getByRole("dialog").last();
   await createDialog
-    .getByLabel("Credential name (e.g., automatic notes script)", { exact: true })
+    .getByLabel("密钥名称 (例如: 自动记账脚本)", { exact: true })
     .fill(credentialName);
-  await createDialog.getByLabel("Book", { exact: true }).press("ArrowDown");
+  await createDialog.getByLabel("分账", { exact: true }).press("ArrowDown");
   await page.getByRole("option", { name: bookName, exact: true }).click();
-  await createDialog.getByRole("button", { name: "Confirm", exact: true }).click();
+  await createDialog.getByRole("button", { name: "确认", exact: true }).click();
 
   const tokenDialog = page.getByRole("dialog").last();
   const tokenMatch = (await tokenDialog.locator("div.break-all").innerText()).match(
@@ -491,9 +483,9 @@ test("books production files an API upload into the book its key is bound to", a
   );
   const token = tokenMatch?.[0];
   expect(token).toBeTruthy();
-  await tokenDialog.getByRole("button", { name: "I've saved it", exact: true }).click();
+  await tokenDialog.getByRole("button", { name: "我已保存", exact: true }).click();
   await expect(
-    page.getByRole("combobox", { name: `Change the book for ${credentialName}`, exact: true })
+    page.getByRole("combobox", { name: `修改「${credentialName}」的分账`, exact: true })
   ).toHaveText(bookName);
 
   const headers = { Authorization: `Bearer ${token!}` };
@@ -522,7 +514,7 @@ test("books production files an API upload into the book its key is bound to", a
     )
     .toBe("completed");
 
-  await openTab(page, "Stream");
+  await openTab(page, "流水");
   await selectBookByName(page, bookName);
   await streamTotal(page).click();
   await expect(
@@ -538,22 +530,14 @@ test("books production files an API upload into the book its key is bound to", a
     .getByRole("button", { name: "Demo Receipt", exact: true })
     .click();
   const detail = page.getByRole("dialog").first();
-  await detail.getByRole("button", { name: "Delete", exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "Delete", exact: true })
-    .click();
+  await detail.getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("dialog").last().getByRole("button", { name: "删除", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  await openTab(page, "Settings");
-  await page.getByRole("button", { name: `Delete ${credentialName}`, exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "Delete", exact: true })
-    .click();
-  await expect(page.getByRole("button", { name: `Delete ${credentialName}` })).toHaveCount(0);
+  await openTab(page, "设置");
+  await page.getByRole("button", { name: `删除${credentialName}`, exact: true }).click();
+  await page.getByRole("dialog").last().getByRole("button", { name: "删除", exact: true }).click();
+  await expect(page.getByRole("button", { name: `删除${credentialName}` })).toHaveCount(0);
   await archiveBook(page, bookName);
   expect(errors).toEqual([]);
 });

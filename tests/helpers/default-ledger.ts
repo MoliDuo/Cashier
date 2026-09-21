@@ -17,7 +17,7 @@ function seedCategories(preset: readonly PresetCategory[]) {
   }));
 }
 
-const zhLedger = {
+const defaultLedger = {
   settings: {
     aiLanguage: "zh-CN",
     currencies: ["CNY", "USD"] as string[],
@@ -25,21 +25,9 @@ const zhLedger = {
     collapseEntriesDefault: false,
     aiCustomPrompt: "",
   },
-  categories: seedCategories(getCategoryPreset("default", "zh")),
+  categories: seedCategories(getCategoryPreset("default")),
 };
 
-const enLedger = {
-  settings: {
-    aiLanguage: "en",
-    currencies: ["USD", "EUR", "GBP"] as string[],
-    mainCurrency: "USD",
-    collapseEntriesDefault: false,
-    aiCustomPrompt: "",
-  },
-  categories: seedCategories(getCategoryPreset("default", "en")),
-};
-
-export function getDefaultLedger(locale: string = "zh") {
-  if (locale.startsWith("zh")) return zhLedger;
-  return enLedger;
+export function getDefaultLedger() {
+  return defaultLedger;
 }

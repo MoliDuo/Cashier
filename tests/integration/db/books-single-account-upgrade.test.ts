@@ -309,7 +309,6 @@ interface UpgradedUserRow {
   name: string | null;
   password_hash: string | null;
   auth_version: number;
-  preferences: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -704,7 +703,7 @@ async function readLegacyUsers(pool: Pool): Promise<LegacyUserRow[]> {
 
 async function readUpgradedUsers(pool: Pool): Promise<UpgradedUserRow[]> {
   const result = await pool.query<UpgradedUserRow>(
-    `SELECT id, name, password_hash, auth_version, preferences::text AS preferences,
+    `SELECT id, name, password_hash, auth_version,
             created_at::text AS created_at, updated_at::text AS updated_at,
             deleted_at::text AS deleted_at
        FROM users ORDER BY id`
@@ -859,7 +858,6 @@ describe("published migration chain upgrade to one account with books", () => {
           name: legacyOwner.name,
           password_hash: legacyOwner.password_hash,
           auth_version: legacyOwner.auth_version + 1,
-          preferences: legacyOwner.preferences,
           created_at: legacyOwner.created_at,
           updated_at: legacyOwner.updated_at,
           deleted_at: null,
@@ -869,7 +867,6 @@ describe("published migration chain upgrade to one account with books", () => {
           name: "Fixture Retired",
           password_hash: "fixture-retired-password-hash",
           auth_version: 1,
-          preferences: legacyUsers.find((row) => row.id === fixture.retiredId)!.preferences,
           created_at: "2025-12-01 00:00:00+00",
           updated_at: "2025-12-02 00:00:00+00",
           deleted_at: "2026-05-05 00:00:00+00",
@@ -1148,7 +1145,6 @@ describe("published migration chain upgrade to one account with books", () => {
           "name",
           "password_hash",
           "password_updated_at",
-          "preferences",
           "updated_at",
         ]);
         expect(await tableExists(data, "login_emails")).toBe(true);

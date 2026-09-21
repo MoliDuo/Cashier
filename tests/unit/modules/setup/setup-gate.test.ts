@@ -25,8 +25,8 @@ describe("redirectToSetupIfPending", () => {
     const { redirectToSetupIfPending } = await loadGate();
     isPending.mockResolvedValue(true);
 
-    await expect(redirectToSetupIfPending("zh")).rejects.toThrow("NEXT_REDIRECT:/zh/setup");
-    await expect(redirectToSetupIfPending("zh")).rejects.toThrow("NEXT_REDIRECT:/zh/setup");
+    await expect(redirectToSetupIfPending()).rejects.toThrow("NEXT_REDIRECT:/setup");
+    await expect(redirectToSetupIfPending()).rejects.toThrow("NEXT_REDIRECT:/setup");
 
     // A pending instance is still pending on the next request, so the answer
     // has to be re-read until it changes.
@@ -37,9 +37,9 @@ describe("redirectToSetupIfPending", () => {
     const { redirectToSetupIfPending } = await loadGate();
     isPending.mockResolvedValue(false);
 
-    await redirectToSetupIfPending("zh");
-    await redirectToSetupIfPending("en");
-    await redirectToSetupIfPending("zh");
+    await redirectToSetupIfPending();
+    await redirectToSetupIfPending();
+    await redirectToSetupIfPending();
 
     expect(isPending).toHaveBeenCalledTimes(1);
     expect(redirect).not.toHaveBeenCalled();

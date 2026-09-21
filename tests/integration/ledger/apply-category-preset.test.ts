@@ -106,7 +106,6 @@ describe("applyCategoryPresetAction", () => {
     const saved = await applyCategoryPresetAction(ledger.id, {
       expectedRevision: await revisionOf(ledger.id),
       presetId: "concise",
-      locale: "zh",
       mappings: [
         { fromCategoryId: foodId, toPresetIndex: 0 },
         { fromCategoryId: travelId, toPresetIndex: 2 },
@@ -164,7 +163,6 @@ describe("applyCategoryPresetAction", () => {
     const saved = await applyCategoryPresetAction(ledger.id, {
       expectedRevision: await revisionOf(ledger.id),
       presetId: "concise",
-      locale: "zh",
       mappings: [
         { fromCategoryId: otherId, toPresetIndex: null },
         { fromCategoryId: foodId, toPresetIndex: 0 },
@@ -201,7 +199,6 @@ describe("applyCategoryPresetAction", () => {
       applyCategoryPresetAction(ledger.id, {
         expectedRevision,
         presetId: "concise",
-        locale: "zh",
         mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
@@ -225,7 +222,6 @@ describe("applyCategoryPresetAction", () => {
       applyCategoryPresetAction(ledger.id, {
         expectedRevision: await revisionOf(ledger.id),
         presetId: "concise",
-        locale: "zh",
         mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
@@ -254,7 +250,6 @@ describe("applyCategoryPresetAction", () => {
       applyCategoryPresetAction(ledger.id, {
         expectedRevision: await revisionOf(ledger.id),
         presetId: "concise",
-        locale: "zh",
         mappings: [{ fromCategoryId: foreignId, toPresetIndex: 0 }],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
@@ -280,7 +275,6 @@ describe("applyCategoryPresetAction", () => {
     await applyCategoryPresetAction(ledger.id, {
       expectedRevision: await revisionOf(ledger.id),
       presetId: "concise",
-      locale: "zh",
       mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],
     });
 

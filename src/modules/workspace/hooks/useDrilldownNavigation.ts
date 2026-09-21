@@ -10,8 +10,6 @@ interface UseDrilldownNavigationOptions {
   searchParams: URLSearchParams;
   pathname: string;
   ledgerId: string;
-  /** The viewer's locale, used when the drilldown rewrites the URL. */
-  locale: string;
 }
 
 interface UseDrilldownNavigationResult {
@@ -27,7 +25,6 @@ export function useDrilldownNavigation({
   searchParams,
   pathname,
   ledgerId,
-  locale,
 }: UseDrilldownNavigationOptions): UseDrilldownNavigationResult {
   const queryClient = useQueryClient();
   const handleCategoryDrilldown = useCallback(
@@ -44,9 +41,9 @@ export function useDrilldownNavigation({
         { period: "custom", startDate, endDate },
         { categoryId }
       );
-      pushLedgerUrl(pathname, params, locale, "drilldown");
+      pushLedgerUrl(pathname, params, "drilldown");
     },
-    [bookId, ledgerId, locale, pathname, queryClient, searchParams]
+    [bookId, ledgerId, pathname, queryClient, searchParams]
   );
 
   const handleDateDrilldown = useCallback(
@@ -66,9 +63,9 @@ export function useDrilldownNavigation({
         { period: "custom", startDate: date, endDate: date },
         { categoryId: nextCategoryId, currency: filters?.currency ?? null }
       );
-      pushLedgerUrl(pathname, params, locale, "drilldown");
+      pushLedgerUrl(pathname, params, "drilldown");
     },
-    [bookId, ledgerId, locale, pathname, queryClient, searchParams]
+    [bookId, ledgerId, pathname, queryClient, searchParams]
   );
 
   return {

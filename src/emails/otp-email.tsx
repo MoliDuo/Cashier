@@ -9,7 +9,6 @@ import {
   Section,
 } from "@react-email/components";
 import * as React from "react";
-import type { SupportedLocale } from "@/i18n/locales";
 
 interface OTPEmailCopy {
   preview: string;
@@ -25,13 +24,12 @@ interface OTPEmailProps {
   otp: string;
   host: string;
   expiresInMinutes: number;
-  locale: SupportedLocale;
   copy: OTPEmailCopy;
 }
 
-export default function OTPEmail({ otp, locale, copy }: OTPEmailProps) {
+export default function OTPEmail({ otp, copy }: OTPEmailProps) {
   return (
-    <Html lang={locale}>
+    <Html lang="zh">
       <Head />
       <Preview>{copy.preview}</Preview>
       <Body style={main}>

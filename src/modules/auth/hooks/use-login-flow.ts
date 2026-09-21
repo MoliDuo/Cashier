@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signIn, type SignInResponse } from "next-auth/react";
 import { useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { sendOTPAction } from "@/modules/auth/server-actions/send-otp";
 import type { SendOTPActionResult } from "@/modules/auth/server-actions/send-otp";
@@ -162,7 +162,7 @@ export function useLoginFlow(
     setIsLoading(true);
     setError(null);
     try {
-      const result = await sendOTPAction(submittedEmail, locale);
+      const result = await sendOTPAction(submittedEmail);
       if (!result.ok) {
         setError(getSendOTPErrorMessage(result, t, "sendCodeFailed"));
         return;
@@ -202,7 +202,7 @@ export function useLoginFlow(
     setError(null);
     setResendPending(true);
     try {
-      const result = await sendOTPAction(email, locale);
+      const result = await sendOTPAction(email);
       if (!result.ok) {
         setError(getSendOTPErrorMessage(result, t, "resendFailed"));
         return;

@@ -103,7 +103,6 @@ export const applyCategoryPresetAction = withLedgerAccess(
       {
         expectedRevision: validated.expectedRevision,
         presetId: validated.presetId,
-        locale: validated.locale,
         mappings: validated.mappings,
       },
       serverComposition.categories
