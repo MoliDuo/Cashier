@@ -32,6 +32,11 @@ npm run db:migrate
 命令从当前环境（包括 `.env`）读取 `DATABASE_URL`，并在 advisory lock 保护下应用
 `src/persistence/postgres-migrations/` 中尚未执行的迁移。
 
+仓库根目录的 `vercel.json` 只做一件事：把 `ignoreCommand` 设成
+`[ "$VERCEL_ENV" != "production" ]`，让 Vercel 跳过所有非 production 的构建。
+两个人用的应用不需要预览环境，而 Dependabot 每周会开几个 PR，每个 PR 都会触发一次
+完整构建——那些构建没有人会去看。JSON 写不了注释，所以理由记在这里。
+
 ## 本地基础服务
 
 源码开发需要 Node.js 24，以及本机运行的 PostgreSQL 和 S3 兼容存储：
