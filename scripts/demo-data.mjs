@@ -41,7 +41,7 @@ const DEMO_RESET_DATA_TABLES = [
  * and it rejects the push. The composed token is only ever valid against the
  * local demo database, and it is printed at startup.
  *
- * @testOnly Composes a fixture credential's demo token.
+ * Composes a fixture credential's demo token.
  */
 export function fixtureCredentialToken(credential) {
   return `${CREDENTIAL_TOKEN_PREFIX}${credential.tokenBody}`;
@@ -52,7 +52,7 @@ export function fixtureCredentialToken(credential) {
  * `@/` alias and cannot be imported from this script. The focused test pins
  * both implementations to the same digest so the rule cannot drift.
  *
- * @testOnly Hashes a fixture credential token the way the app does.
+ * Hashes a fixture credential token the way the app does.
  */
 export function computeCredentialHash(token, pepper) {
   return crypto
@@ -70,7 +70,7 @@ function requiredUrl(name, value) {
   }
 }
 
-/** @testOnly Verifies that focused tests reject non-local demo targets. */
+/** Verifies that focused tests reject non-local demo targets. */
 export function validateDemoEnvironment(environment = process.env) {
   if (environment.CASHIER_DEMO_MODE !== "true") {
     throw new Error("CASHIER_DEMO_MODE=true is required");
@@ -162,7 +162,7 @@ async function uploadFixtureImages(storage, environment, ledgerId) {
  * Drizzle's bookkeeping schema goes with it: leaving that behind would make the
  * runner believe every migration is already applied.
  *
- * @testOnly Empties the demo schemas, refusing anything but the demo database.
+ * Empties the demo schemas, refusing anything but the demo database.
  */
 export async function resetDemoSchema(environment = process.env) {
   const { databaseUrl } = validateDemoEnvironment(environment);
@@ -591,7 +591,7 @@ async function describeSchema(client, schema, countedTables) {
  * so a write added here by accident fails instead of quietly turning the
  * preview into a rebuild.
  *
- * @testOnly Reports the demo reset targets from a live connection, read-only.
+ * Reports the demo reset targets from a live connection, read-only.
  * @param {DemoResetClient} client
  * @param {{ dataSchema?: string, migrationsSchema?: string }} [options]
  */
@@ -619,7 +619,7 @@ export async function inspectDemoResetTargets(client, options = {}) {
  * credentials, and this output exists to be read and pasted around — and no
  * object storage client is built, so no object can be written or deleted.
  *
- * @testOnly Prints the reset preview; refuses every non-demo target.
+ * Prints the reset preview; refuses every non-demo target.
  * @param {NodeJS.ProcessEnv} [environment]
  */
 export async function previewDemoReset(environment = process.env) {

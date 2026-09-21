@@ -28,7 +28,6 @@ export interface CategoryInfo {
 
 export type SourceType = "text" | "image" | "mixed";
 
-/** @testOnly Exported for parser input classification tests. */
 export function determineSourceType(input: SourceDocumentInput): SourceType {
   const hasText = input.text != null && input.text !== "";
   const hasImages = !!(input.images && input.images.length > 0);

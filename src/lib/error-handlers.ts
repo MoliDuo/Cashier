@@ -17,7 +17,6 @@ export interface ErrorResponse {
 /**
  * Convert any error to standard error response
  */
-/** @testOnly Exported for stable error-envelope tests. */
 export function toErrorResponse(error: unknown): ErrorResponse {
   return toSanitizedErrorResponse(error);
 }

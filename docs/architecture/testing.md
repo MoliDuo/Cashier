@@ -8,7 +8,7 @@ Cashier keeps fast, deterministic unit tests separate from database-backed integ
 - `npm run test:watch` watches the unit projects.
 - `npm run test:integration` starts an isolated PostgreSQL container and runs both integration
   projects.
-- `npm run test:all` and `npm run test:run` run every project once.
+- `npm run test:all` runs every project once.
 - `npm run test:coverage` runs every project with the repository coverage thresholds.
 
 Database-backed commands require a running Docker daemon but no `.env`, credentials, fixed port, or
@@ -26,10 +26,9 @@ the container after the Vitest run. The first run may download PostgreSQL and re
 - The same behavior is fully verified at the lowest suitable layer. Higher layers focus on
   authorization, validation, error mapping, and composition.
 
-Production-file helpers exposed only for focused tests use `@testOnly`; compatibility or framework
-entrypoints that static analysis cannot discover use `@publicContract`. The complete Knip pass still
-checks both categories. Only the production-only pass excludes the reviewed labels, so removing the
-last test or caller makes the complete pass fail instead of silently accumulating exports.
+`npm run check:dead-code` runs Knip over the complete graph, tests included, so an export loses
+its last reference the moment nothing at all refers to it. An export that only tests use is not
+flagged, and does not need a label saying so.
 
 ## Isolation
 

@@ -115,7 +115,6 @@ export const applyCategoryPresetAction = withLedgerAccess(
  * Get count of uncategorized entries (entries without a category)
  * Separated from getEntryCategoriesAction for cleaner cache management
  */
-/** @publicContract Retained server-action boundary for uncategorized counts. */
 export const getUncategorizedCountAction = withLedgerAccess(
   async (ledgerId: string): Promise<number> =>
     serverComposition.categories.countUncategorized(ledgerId)

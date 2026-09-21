@@ -80,7 +80,6 @@ export function buildLedgerEntryEffectiveDateConditions(
   return conditions;
 }
 
-/** @testOnly Exported for focused SQL filter regression tests. */
 export function buildLedgerEntryFilterConditions(
   ledgerId: string,
   filters: LedgerEntryFilterParams

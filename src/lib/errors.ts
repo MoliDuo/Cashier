@@ -34,7 +34,6 @@ export class UnauthorizedError extends AppError {
 /**
  * Forbidden error (403)
  */
-/** @testOnly Retained to verify error identity preservation at access wrappers. */
 export class ForbiddenError extends AppError {
   constructor(message: string = "Forbidden") {
     super(message, "FORBIDDEN", 403);

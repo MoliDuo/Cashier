@@ -14,7 +14,6 @@ import { deleteServiceCredential } from "@/modules/ledger/application/use-cases/
 import { listServiceCredentials } from "@/modules/ledger/application/queries/list-service-credentials";
 import { serverComposition } from "@/application/server-composition-root";
 
-/** @publicContract Retained server-action boundary for credential management. */
 export const getServiceCredentialsAction = withLedgerAccess(
   async (ledgerId: string): Promise<ServiceCredentialDto[]> =>
     listServiceCredentials(ledgerId, serverComposition.serviceCredentials)

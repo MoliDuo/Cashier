@@ -20,7 +20,6 @@ function toCanonical(value: Decimal): string {
  * Safely parse a money value. Accepts strings, numbers, or Decimal instances.
  * Throws if the input is not a valid finite decimal.
  */
-/** @testOnly Exported for decimal boundary tests; production callers use higher-level helpers. */
 export function parse(input: string | number | Decimal): Decimal {
   return new MoneyDecimal(input);
 }
@@ -113,7 +112,6 @@ export function round(value: string, decimals: number): string {
  * @param decimals - Number of decimal places for rounding (default 2).
  * @returns An array of allocated decimal strings whose sum equals the input value.
  */
-/** @testOnly Exported for deterministic allocation regression tests. */
 export function allocate(value: string, ratios: number[], decimals = 2): string[] {
   if (ratios.length === 0) return [];
 

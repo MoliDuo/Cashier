@@ -18,7 +18,6 @@ export function isValidJson(content: string): boolean {
 /**
  * Parse JSON string, returns null if invalid
  */
-/** @testOnly Exported for tolerant task payload parsing tests. */
 export function tryParseJson<T = unknown>(content: string): T | null {
   try {
     return JSON.parse(content) as T;

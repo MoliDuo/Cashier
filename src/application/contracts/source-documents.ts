@@ -39,7 +39,6 @@ export interface SourceDocumentRevisionContract {
   finishedAt: string | null;
 }
 
-/** @testOnly Exported for application contract suites. */
 export function supportedSourceDocumentActions(input: {
   activeRevisionId: RevisionId | null;
   latestSubmissionStatus: RevisionProcessingStatus | null;

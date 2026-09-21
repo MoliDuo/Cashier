@@ -3,7 +3,6 @@ import { isValidUuid } from "@/lib/validation";
 
 export const MAX_BATCH_SIZE = 100;
 
-/** @testOnly Exported for boundary validation regression tests. */
 export function parseBatchIds(input: unknown): string[] {
   if (!Array.isArray(input)) throw new ValidationError("Batch IDs must be an array");
   const ids = [...new Set(input)];

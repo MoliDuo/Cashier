@@ -132,20 +132,20 @@ const SCENARIOS = {
 
 export const DEMO_AI_SCENARIOS = Object.keys(SCENARIOS);
 
-/** @testOnly The scenario name a prompt asks for, or null when it asks for none. */
+/** The scenario name a prompt asks for, or null when it asks for none. */
 export function readScenarioToken(prompt) {
   const match = SCENARIO_TOKEN.exec(prompt);
   return match == null ? null : match[1].toLowerCase();
 }
 
-/** @testOnly The scenario a prompt resolves to: its own request, or the default. */
+/** The scenario a prompt resolves to: its own request, or the default. */
 export function selectScenario(prompt) {
   const requested = readScenarioToken(prompt);
   return requested != null && Object.hasOwn(SCENARIOS, requested) ? requested : DEFAULT_SCENARIO;
 }
 
 /**
- * @testOnly What the stub answers a given prompt, decided without any HTTP so
+ * What the stub answers a given prompt, decided without any HTTP so
  * the scenarios can be checked against the application's own parser schema.
  */
 export function answerFor(
@@ -164,7 +164,7 @@ export function answerFor(
   };
 }
 
-/** @testOnly The chat-completion envelope the app's OpenAI client reads. */
+/** The chat-completion envelope the app's OpenAI client reads. */
 export function chatCompletionEnvelope(payload, content) {
   return {
     id: "chatcmpl-demo",

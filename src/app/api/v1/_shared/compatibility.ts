@@ -7,7 +7,6 @@ export interface ApiV1SourceDocumentCreateResponse {
   status: "processing";
 }
 
-/** @publicContract Published API v1 compatibility metadata. */
 export const apiV1Compatibility = {
   version: "v1",
   status: "stable",

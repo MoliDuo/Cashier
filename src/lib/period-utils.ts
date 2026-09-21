@@ -232,7 +232,6 @@ export function parsePeriodFromSearchParams(
 /**
  * Convert Date objects to PeriodParams for custom date ranges.
  */
-/** @testOnly Exported for period round-trip regression tests. */
 export function datesToPeriodParams(startDate?: Date, endDate?: Date): PeriodParams {
   if (!startDate || !endDate) {
     return { period: "thisMonth" };

@@ -231,7 +231,6 @@ export function getOpenAIClient(): OpenAIClient {
   return openAIClient;
 }
 
-/** @testOnly Resets the process cache between provider configuration tests. */
 export function resetOpenAIClient(): void {
   openAIClient = null;
 }

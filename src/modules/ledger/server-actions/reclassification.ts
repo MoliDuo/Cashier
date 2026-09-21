@@ -154,7 +154,6 @@ export const retryCategoryAssignmentLatestAction = withLedgerAccess(
   }
 );
 
-/** @publicContract Compatibility entrypoint using the v2 upload and execution path. */
 export const startCategoryReclassificationAction = withLedgerAccess(
   async (
     ledgerId: string,

@@ -20,7 +20,7 @@ function integerPort(name, value, fallback) {
   return parsed;
 }
 
-/** @testOnly Builds the forced local environment for focused safety tests. */
+/** Builds the forced local environment for focused safety tests. */
 export function createDemoEnvironment(environment = process.env) {
   const appPort = integerPort(
     "CASHIER_DEMO_APP_PORT",
@@ -78,7 +78,7 @@ async function run(command, args, environment) {
   }
 }
 
-/** @testOnly Returns the standalone Compose invocation used by the demo stack. */
+/** Returns the standalone Compose invocation used by the demo stack. */
 export function createDemoComposeArgs(environment = process.env) {
   return [...composeProjectArgs(environment), "up", "-d", "postgres", "minio", "storage-bootstrap"];
 }
@@ -88,7 +88,7 @@ export function createDemoComposeArgs(environment = process.env) {
  * MinIO and its bucket bootstrap would create the very objects a preview promises
  * not to touch.
  *
- * @testOnly Returns the database-only Compose invocation the preview uses.
+ * Returns the database-only Compose invocation the preview uses.
  */
 export function createDemoPreviewComposeArgs(environment = process.env) {
   return [...composeProjectArgs(environment), "up", "-d", "postgres"];
@@ -102,7 +102,7 @@ function composeProjectArgs(environment) {
   return ["compose", "-p", project, "-f", "docker-compose.demo.yml"];
 }
 
-/** @testOnly Returns the fixture command while preserving reset preview semantics. */
+/** Returns the fixture command while preserving reset preview semantics. */
 export function createDemoDataArgs({ reset = false, apply = false } = {}) {
   return ["scripts/demo-data.mjs", "reset", ...(!reset || apply ? ["--apply"] : [])];
 }
@@ -112,7 +112,7 @@ export function createDemoDataArgs({ reset = false, apply = false } = {}) {
  * settings page shows just the prefix and suffix, so this banner is where a
  * developer copies them from.
  *
- * @testOnly Lists the seeded sample credentials printed once the demo is up.
+ * Lists the seeded sample credentials printed once the demo is up.
  */
 export function formatDemoCredentialLines() {
   return [
@@ -175,7 +175,7 @@ async function stop(child) {
  * seeded or written to object storage. Only `--apply`, or a normal
  * `dev:demo`/`test:demo` launch, runs the destructive path.
  *
- * @testOnly Exposes the demo command sequence to an injected executor.
+ * Exposes the demo command sequence to an injected executor.
  * @param {{ args?: string[], environment?: Record<string, string | undefined>, execute?: (command: string, args: string[], environment: Record<string, string | undefined>) => Promise<unknown> }} [options]
  */
 export async function runDemoCommands({

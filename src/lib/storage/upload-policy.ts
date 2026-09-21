@@ -72,7 +72,6 @@ export const SUPPORTED_MIME_SET: ReadonlySet<string> = new Set(SUPPORTED_MIME_TY
  * Validate a file upload request against basic policy limits.
  * Throws an Error with a descriptive message if the request violates any constraint.
  */
-/** @testOnly Exported for upload policy boundary tests. */
 export function validateFileUpload(file: { contentType: string; byteSize: number }): void {
   if (!SUPPORTED_MIME_SET.has(file.contentType)) {
     throw new ValidationError(`Unsupported content type: ${file.contentType}`);
@@ -117,7 +116,6 @@ export function validateImageProcessing(metadata: {
  *                                   across all files in the revision.
  * @param newFileBytes - Normalized size of the file being added.
  */
-/** @testOnly Exported for revision aggregate limit tests. */
 export function validateRevisionUpload(
   aggregateNormalizedBytes: number,
   newFileBytes: number
@@ -134,7 +132,6 @@ export function validateRevisionUpload(
 /**
  * Check whether a file count is within policy bounds.
  */
-/** @testOnly Exported for upload count policy tests. */
 export function validateFileCount(count: number): void {
   if (count < 1 || count > MAX_FILES) {
     throw new ValidationError(`File count ${count} must be between 1 and ${MAX_FILES}`);

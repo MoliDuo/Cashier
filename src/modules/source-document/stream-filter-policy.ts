@@ -82,7 +82,6 @@ export function filterStreamEntries(
   return resolvedEntries.filter((entry) => matchesStreamEntry(entry, filters));
 }
 
-/** @testOnly Exported for client/server stream predicate parity tests. */
 export function matchesStreamDocument(
   item: SourceDocumentListItemDto,
   filters: StreamFilterPolicy
@@ -106,7 +105,6 @@ export function matchesStreamDocument(
   return filterStreamEntries(item.ledgerEntries ?? [], filters).length > 0;
 }
 
-/** @testOnly Exported for filtered stream projection tests. */
 export function projectStreamDocument(
   item: SourceDocumentListItemDto,
   filters: StreamFilterPolicy
