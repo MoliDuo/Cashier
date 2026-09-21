@@ -32,9 +32,15 @@
 读代码的人（包括你自己）会以为迁移要手动跑。现在它写在 `vercel.json` 中，
 重建项目或者被 fork 之后也不会悄悄丢掉迁移这一步。
 
-`vercel.json` 的另一半是 `ignoreCommand`：`[ "$VERCEL_ENV" != "production" ]`
-让 Vercel 跳过所有非 production 的构建。两个人用的应用不需要预览环境，而 Dependabot
-每周会开几个 PR，每个 PR 都会触发一次完整构建——那些构建没有人会去看。
+`vercel.json` 的另一半是 `ignoreCommand`：`[ "$VERCEL_ENV" = "preview" ]`
+让 Vercel 跳过预览构建。两个人用的应用不需要预览环境，而 Dependabot 每周会开几个 PR，
+每个 PR 都会触发一次完整构建——那些构建没有人会去看。
+
+这个判断只在**确认**是 preview 时才跳过，而不是"不是 production 就跳过"。
+两种写法读起来一样，但第一版写成了后者，结果生产构建被连带跳掉了两次：
+`VERCEL_ENV` 在 ignore 这一步取不到值，空字符串自然也不等于 `production`。
+判断环境变量的时候，取不到值的那条路要落在"照常构建"这一边。
+
 JSON 写不了注释，所以这两条的理由都记在这里。
 
 ## 本地基础服务
