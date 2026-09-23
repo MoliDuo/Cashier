@@ -121,7 +121,7 @@ export function SwipeTabSurface({
 
   return (
     <div
-      className="w-full min-w-0 max-w-full overflow-x-clip touch-pan-y"
+      className="w-full min-w-0 max-w-full overflow-x-clip touch-pan-y touch-pinch-zoom"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finish}

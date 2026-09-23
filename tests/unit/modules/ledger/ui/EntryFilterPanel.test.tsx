@@ -63,6 +63,28 @@ describe("EntryFilterPanel", () => {
     expect(screen.queryByRole("dialog", { name: "筛选" })).not.toBeInTheDocument();
   });
 
+  // iOS Safari zooms the page into any field under 16px the moment it takes
+  // focus, so the search box must neither grab focus nor render small on a phone.
+  it("opens on its title and keeps the search box at 16px below md", async () => {
+    render(
+      <EntryFilterPanel
+        filters={{}}
+        onFiltersChange={vi.fn()}
+        showCategory={false}
+        showCurrency={false}
+        periodParams={{ period: "thisMonth" }}
+      />
+    );
+
+    const dialog = await openPanel();
+    const search = screen.getByPlaceholderText("搜索标题、名称或描述");
+
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(search).not.toHaveFocus();
+    expect(search).toHaveClass("text-base", "md:text-sm");
+    expect(search).not.toHaveClass("text-sm");
+  });
+
   it("promises a dialog rather than a dropdown", () => {
     const { container } = render(
       <EntryFilterPanel

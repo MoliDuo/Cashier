@@ -206,7 +206,8 @@ body {
   font-family: var(--font-sans);
   overflow-x: clip;
   overscroll-behavior-y: contain;
-  touch-action: pan-y;
+  /* pinch-zoom stays: without it a zoomed-in page can never be pinched back out. */
+  touch-action: pan-y pinch-zoom;
 }
 
 /*

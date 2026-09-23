@@ -118,7 +118,6 @@ export function QuickEntryForm({
             ? `${t("itemNamePlaceholder")}${selectedCategory.name}`
             : t("itemName")
         }
-        className="text-sm"
       />
 
       {/* Date Selector */}
