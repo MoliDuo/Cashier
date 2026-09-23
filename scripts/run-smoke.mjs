@@ -24,18 +24,44 @@ adminUrl.href = postgres.databaseUrl;
 const databaseName = `smoke_${randomUUID().replaceAll("-", "")}`;
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
-const reservePort = async () => {
-  const listener = net.createServer();
-  listener.listen(0, "127.0.0.1");
-  await once(listener, "listening");
-  const address = listener.address();
-  if (typeof address !== "object" || address == null) throw new Error("Could not reserve port");
-  await new Promise((resolve) => listener.close(resolve));
-  return address.port;
+// Next.js needs its port before it starts, because APP_URL and AUTH_URL carry
+// it, and it only binds after a build that takes a minute. A port the kernel
+// handed out and took back sits in the ephemeral range, where any outbound
+// connection in that minute (the build's own, Postgres clients) can claim it and
+// leave the server unable to listen. Picking below that range keeps it out of
+// the kernel's hands; the two helper servers bind port 0 and keep what they got.
+const isPortAvailable = async (port) => {
+  const probe = net.createServer();
+  try {
+    await new Promise((resolve, reject) => {
+      probe.once("error", reject);
+      probe.listen(port, "127.0.0.1", resolve);
+    });
+    return true;
+  } catch (error) {
+    if (error?.code === "EADDRINUSE") return false;
+    throw error;
+  } finally {
+    if (probe.listening) await new Promise((resolve) => probe.close(resolve));
+  }
 };
-const port = await reservePort();
-const aiPort = await reservePort();
-const storagePort = await reservePort();
+const pickAppPort = async () => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const port = 20_000 + Math.floor(Math.random() * 12_000);
+    if (await isPortAvailable(port)) return port;
+  }
+  throw new Error("Could not find a free port for the smoke server");
+};
+const listenOnAnyPort = async (server) => {
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  return server.address().port;
+};
+const port = await pickAppPort();
+const aiServer = createDemoAiServer({ latencyMs: 3_000 });
+const aiPort = await listenOnAnyPort(aiServer);
+const storageServer = createSmokeObjectStorage({ log: console.log });
+const storagePort = await listenOnAnyPort(storageServer);
 const baseURL = `http://127.0.0.1:${port}`;
 // The upload path is part of what production does, so the run points it at an
 // in-memory S3 endpoint instead of a bucket: the image still travels through
@@ -74,12 +100,6 @@ const env = {
 };
 let activeChild;
 let server;
-const aiServer = createDemoAiServer({ latencyMs: 3_000 });
-aiServer.listen(aiPort, "127.0.0.1");
-await once(aiServer, "listening");
-const storageServer = createSmokeObjectStorage({ log: console.log });
-storageServer.listen(storagePort, "127.0.0.1");
-await once(storageServer, "listening");
 let created = false;
 let interrupted = false;
 const run = async (args) => {
@@ -96,6 +116,20 @@ const stop = async (child) => {
   const timer = setTimeout(() => child.kill("SIGKILL"), 5_000);
   await exited;
   clearTimeout(timer);
+};
+const waitForServer = async (child) => {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode != null || child.signalCode != null) {
+      throw new Error("Next.js exited before the smoke server became ready");
+    }
+    try {
+      const response = await fetch(`${baseURL}/login`);
+      if (response.ok) return;
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error("Smoke server did not become ready within 60 seconds");
 };
 const interrupt = () => {
   interrupted = true;
@@ -153,6 +187,9 @@ try {
     ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", String(port)],
     { env, stdio: "inherit" }
   );
+  // Without this, a server that never came up leaves every spec to time out
+  // against whatever answers on the port, and the real error scrolls past.
+  await waitForServer(server);
   // The @demo spec needs the dev sign-in, which this runner deliberately keeps
   // off (DEV_AUTH_BYPASS is false and NODE_ENV is production). It runs under
   // `npm run test:demo`, which boots the demo environment instead.
