@@ -53,6 +53,13 @@ vi.mock("@/modules/workspace/ui/TabNavigation", () => ({
   },
 }));
 
+// Hovering or pressing a destination preloads its tab's code without awaiting
+// it. The real tabs pull in most of the app, and an import still in flight when
+// the file ends fails the run after every test has passed.
+vi.mock("@/modules/workspace/ui/DetailsTab", () => ({ DetailsTab: () => null }));
+vi.mock("@/modules/workspace/ui/StatsTab", () => ({ StatsTab: () => null }));
+vi.mock("@/modules/ledger/ui/SettingsTab", () => ({ SettingsTab: () => null }));
+
 vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
   prefetchDetailsTabQuery: prefetchDetailsTabQueryMock,
   prefetchStatsTabQuery: prefetchStatsTabQueryMock,
