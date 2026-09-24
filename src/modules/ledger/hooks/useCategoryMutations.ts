@@ -16,7 +16,6 @@ interface UseCategoryMutationsOptions {
 
 export function useCategoryMutations(ledgerId: string, options: UseCategoryMutationsOptions = {}) {
   const t = useTranslations("Settings");
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
   const [generatingCategoryIds, setGeneratingCategoryIds] = useState<Set<string>>(new Set());
   const [failedCategoryIds, setFailedCategoryIds] = useState<Set<string>>(new Set());
@@ -45,7 +44,6 @@ export function useCategoryMutations(ledgerId: string, options: UseCategoryMutat
     invalidates: ["categories"],
     mutationFn: ({ categoryId }: { categoryId: string; requestId: number }) =>
       generateEntryCategoryMetadataAction(ledgerId, categoryId),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (_data, { categoryId: _categoryId }) => {
       options.onMetadataGenerated?.();
     },
@@ -80,7 +78,6 @@ export function useCategoryMutations(ledgerId: string, options: UseCategoryMutat
     mutationFn: (input) => saveEntryCategoriesAction(ledgerId, input),
     successMessage: t("categoriesSaved"),
     errorMessage: t("saveCategoriesFailed"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (saved, input) => {
       queryClient.setQueryData(queryKeys.entryCategories(ledgerId), saved);
       for (const category of input.categories) {

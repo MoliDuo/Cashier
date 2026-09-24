@@ -6,12 +6,10 @@ import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 
-const { getJob, toastSuccess, toastError, featureMessages } = vi.hoisted(() => ({
+const { getJob, toastSuccess, toastError } = vi.hoisted(() => ({
   getJob: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
-  /** Stands in for the deferred details messages the boundary fetches. */
-  featureMessages: { ready: true },
 }));
 
 vi.mock("@/lib/queries/ledger-query-client", () => ({
@@ -28,10 +26,6 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string, values?: Record<string, unknown>) =>
     values == null ? key : `${key}(${values.applied}/${values.confirmed}/${values.issues})`,
   useLocale: () => "zh",
-}));
-vi.mock("@/i18n/DeferredFeatureMessages", () => ({
-  DeferredFeatureMessages: ({ children }: PropsWithChildren) =>
-    featureMessages.ready ? <>{children}</> : null,
 }));
 vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
   cancelCategoryAssignmentAction: vi.fn(),
@@ -123,7 +117,6 @@ async function waitForBand() {
 describe("CategoryAssignmentProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    featureMessages.ready = true;
     getJob.mockResolvedValue(null);
   });
 
@@ -180,22 +173,6 @@ describe("CategoryAssignmentProvider", () => {
 
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
-  });
-
-  it("holds a notice until the messages it speaks in have loaded", async () => {
-    featureMessages.ready = false;
-    getJob.mockResolvedValueOnce(job()).mockResolvedValue(succeededJob());
-    const { queryClient, wrapper } = setup();
-    const view = render(<SubmitProbe run={job()} />, { wrapper });
-
-    await waitFor(() => expect(screen.getByTestId("job-status")).toHaveTextContent("running"));
-    await poll(queryClient);
-    expect(toastSuccess).not.toHaveBeenCalled();
-
-    featureMessages.ready = true;
-    view.rerender(<SubmitProbe run={job()} />);
-
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledTimes(1));
   });
 
   it("shows the status band above the page while a run is moving", async () => {

@@ -9,12 +9,10 @@ import { LedgerEntriesUnifiedGroups } from "@/modules/workspace/ui/UnifiedStream
 vi.mock("@/modules/source-document/ui/SourceDocumentCard", () => ({
   SourceDocumentCard: ({
     sourceDocument,
-    errorCode,
   }: {
-    sourceDocument: { id: string };
-    errorCode?: string | null;
+    sourceDocument: { id: string; errorCode?: string | null };
   }) => (
-    <div data-testid={`card-${sourceDocument.id}`} data-error-code={errorCode ?? ""}>
+    <div data-testid={`card-${sourceDocument.id}`} data-error-code={sourceDocument.errorCode ?? ""}>
       {sourceDocument.id}
     </div>
   ),

@@ -4,7 +4,7 @@ import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, sourceDocumentRevisions } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { v4 as uuidv4 } from "uuid";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
   getRatesMock: vi.fn(async () => ({
@@ -62,7 +62,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     await ensureTestLedgerBooks(db, ledgerId);
   });
 
-  it("creates one replacement revision when deleting multiple entries from one document", async () => {
+  it("deletes multiple entries from one document without creating a revision", async () => {
     const db = getTestDb();
     const doc = await seedDoc(db, ledgerId);
     const entries = await db
@@ -102,7 +102,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .select({ id: sourceDocumentRevisions.id })
       .from(sourceDocumentRevisions)
       .where(eq(sourceDocumentRevisions.sourceDocumentId, doc.id));
-    expect(afterRevisionCount).toHaveLength(beforeRevisionCount.length + 1);
+    expect(afterRevisionCount).toHaveLength(beforeRevisionCount.length);
 
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, doc.id),
@@ -110,7 +110,8 @@ describe("batchDeleteLedgerEntriesAction", () => {
     const activeEntries = await db.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.sourceDocumentId, doc.id),
-        eq(ledgerEntries.sourceDocumentRevisionId, document!.activeRevisionId!)
+        eq(ledgerEntries.sourceDocumentRevisionId, document!.activeRevisionId!),
+        isNull(ledgerEntries.deletedAt)
       ),
     });
     expect(activeEntries).toHaveLength(1);

@@ -20,6 +20,10 @@ vi.mock("@/lib/storage/s3", () => ({
   getS3Storage: () => ({
     upload: vi.fn(),
     download: downloadMock,
+    stream: async (key: string) => {
+      const bytes: Buffer = await downloadMock(key);
+      return new Blob([new Uint8Array(bytes)]).stream();
+    },
     delete: vi.fn(async () => ({ success: true })),
   }),
 }));

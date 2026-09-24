@@ -100,7 +100,6 @@ function validEmail(email: string) {
 describe("sendOTP use case", () => {
   const originalResendKey = process.env.AUTH_RESEND_KEY;
   const originalEmailFrom = process.env.AUTH_EMAIL_FROM;
-  const originalOtpExpiresSeconds = process.env.OTP_EXPIRES_SECONDS;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -144,12 +143,6 @@ describe("sendOTP use case", () => {
       delete process.env.AUTH_EMAIL_FROM;
     } else {
       process.env.AUTH_EMAIL_FROM = originalEmailFrom;
-    }
-
-    if (originalOtpExpiresSeconds == null) {
-      delete process.env.OTP_EXPIRES_SECONDS;
-    } else {
-      process.env.OTP_EXPIRES_SECONDS = originalOtpExpiresSeconds;
     }
   });
 

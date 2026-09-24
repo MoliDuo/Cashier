@@ -196,9 +196,7 @@ describe("useLedgerMutation", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(toastSuccessMock).toHaveBeenCalledWith("Saved");
-    expect(toastErrorMock).toHaveBeenCalledWith(
-      "Saved, but the latest data could not be refreshed. Retry."
-    );
+    expect(toastErrorMock).toHaveBeenCalledWith("已保存，但无法刷新最新数据，请重试。");
   });
 
   it("retries ledger invalidation once after one second", async () => {
@@ -263,9 +261,7 @@ describe("useLedgerMutation", () => {
 
       expect(mutationFn).toHaveBeenCalledTimes(1);
       expect(queryFn).toHaveBeenCalledTimes(2);
-      expect(toastErrorMock).toHaveBeenCalledWith(
-        "Saved, but the latest data could not be refreshed. Retry."
-      );
+      expect(toastErrorMock).toHaveBeenCalledWith("已保存，但无法刷新最新数据，请重试。");
       await act(async () => vi.advanceTimersByTimeAsync(1_000));
       expect(mutationFn).toHaveBeenCalledTimes(1);
       expect(queryFn).toHaveBeenCalledTimes(3);

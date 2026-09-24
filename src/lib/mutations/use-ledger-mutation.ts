@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   invalidateLedgerQueries,
@@ -15,7 +16,6 @@ export interface UseLedgerMutationOptions<TData, TVariables> {
     | ((data: TData, variables: TVariables) => readonly LedgerInvalidationGroup[]);
   successMessage?: string | null;
   errorMessage?: string | null;
-  invalidationErrorMessage?: string | null;
   onSuccess?: (data: TData, variables: TVariables) => void | Promise<void>;
   onError?: (error: Error, variables: TVariables) => void;
   onSettled?: (
@@ -30,6 +30,7 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
   options: UseLedgerMutationOptions<TData, TVariables>
 ) {
   const queryClient = useQueryClient();
+  const tCommon = useTranslations("Common");
   const {
     mutationFn,
     refreshMode = "wait",
@@ -37,7 +38,6 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
     invalidates,
     successMessage,
     errorMessage,
-    invalidationErrorMessage = "Saved, but the latest data could not be refreshed. Retry.",
     onSuccess,
     onError,
     onSettled,
@@ -64,7 +64,7 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
             console.error("[useLedgerMutation] resource invalidation failed", {
               error: invalidationError,
             });
-            if (invalidationErrorMessage != null) toast.error(invalidationErrorMessage);
+            toast.error(tCommon("savedRefreshFailed"));
             globalThis.setTimeout(() => {
               void invalidateLedgerQueries(queryClient, ledgerId, groups).catch((retryError) => {
                 console.error("[useLedgerMutation] resource invalidation retry failed", {

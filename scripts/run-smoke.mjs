@@ -84,7 +84,6 @@ const env = {
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
   OPENAI_API_KEY: "smoke-unused",
   OPENAI_BASE_URL: `http://127.0.0.1:${aiPort}/v1`,
-  AI_MAX_RETRIES: "0",
   S3_ENDPOINT: storageEndpoint,
   S3_PUBLIC_ENDPOINT: storageEndpoint,
   S3_BUCKET: "smoke-objects",

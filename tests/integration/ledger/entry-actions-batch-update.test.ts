@@ -4,7 +4,7 @@ import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, entryCategories } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { v4 as uuidv4 } from "uuid";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
   getRatesMock: vi.fn(async () => ({
@@ -111,14 +111,9 @@ describe("batchUpdateLedgerEntriesAction", () => {
       where: eq(sourceDocuments.id, doc.id),
     });
 
-    expect(after?.activeRevisionId).not.toBe(before?.activeRevisionId);
-    const archived = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentRevisionId, before!.activeRevisionId!),
-        isNull(ledgerEntries.deletedAt)
-      ),
-    });
-    expect(archived).toHaveLength(0);
+    // Manual edits update the active projection in place and bump the version.
+    expect(after?.activeRevisionId).toBe(before?.activeRevisionId);
+    expect(after?.version).toBe(before!.version + 1);
 
     for (const id of ids) {
       const entry = await db.query.ledgerEntries.findFirst({
@@ -351,6 +346,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
       where: eq(sourceDocuments.id, doc.id),
     });
     expect(updatedDocument?.documentDate).toBe("2026-01-02");
-    expect(updatedDocument?.activeRevisionId).not.toBe(activeRevisionId);
+    expect(updatedDocument?.activeRevisionId).toBe(activeRevisionId);
+    expect(updatedDocument?.version).toBe(2);
   });
 });

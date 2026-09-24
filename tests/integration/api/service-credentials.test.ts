@@ -41,10 +41,6 @@ function requireFirst<T>(rows: readonly T[], label: string): T {
 }
 
 // Mock Processing
-vi.mock("@/lib/processing", () => ({
-  createProcessingTask: vi.fn(),
-  createTask: vi.fn(),
-}));
 
 const mockR2 = vi.hoisted(() => {
   const files = new Map<string, Buffer>();
@@ -85,15 +81,6 @@ vi.mock("@/lib/tasks", async (importOriginal) => {
 });
 
 // Mock Tasks
-vi.mock("@/application/adapters/in-process/parse-source-document-task", () => ({
-  TASK_TYPE_PARSE_SOURCE_DOCUMENT: "parse_source_document",
-  parseSourceDocumentTaskDefinition: {
-    type: "parse_source_document",
-    handler: {
-      execute: vi.fn(),
-    },
-  },
-}));
 
 describe("Service Credentials & Ledger Entry Ingestion", () => {
   let testLedgerId: string;

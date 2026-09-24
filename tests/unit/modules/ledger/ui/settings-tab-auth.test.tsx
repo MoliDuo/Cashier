@@ -108,10 +108,6 @@ vi.mock("@/modules/ledger/ui/ServiceCredentialSection", () => ({
   ServiceCredentialSection: () => <div>Service credentials</div>,
 }));
 
-vi.mock("@/modules/ledger/ui/ExportSection", () => ({
-  ExportSection: () => <div>Export data</div>,
-}));
-
 import { SettingsTab } from "@/modules/ledger/ui/SettingsTab";
 
 describe("SettingsTab account authentication controls", () => {

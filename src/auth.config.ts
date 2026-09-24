@@ -8,8 +8,7 @@ export const authConfig = {
   },
   callbacks: {
     authorized() {
-      // We can move the proxy logic here if we want to simplify src/proxy.ts.
-      // The current request handling stays in src/proxy.ts, so this remains permissive.
+      // Access control lives in src/proxy.ts and the (protected) layout.
       return true;
     },
   },

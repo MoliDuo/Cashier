@@ -65,10 +65,6 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
   prefetchStatsTabQuery: prefetchStatsTabQueryMock,
 }));
 
-vi.mock("@/i18n/use-feature-messages", () => ({
-  preloadFeatureMessages: vi.fn(() => Promise.resolve({})),
-}));
-
 vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
   useSettingsLeaveGuard: () => ({
     leaveConfirmOpen: false,

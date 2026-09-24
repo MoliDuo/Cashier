@@ -62,7 +62,6 @@ export function useDetailsCategoryAssignment({
   isAssigningCategory,
 }: UseDetailsCategoryAssignmentOptions) {
   const tBatch = useTranslations("BatchActions");
-  const tCommon = useTranslations("Common");
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pickedCategoryIds, setPickedCategoryIds] = useState<string[]>([]);
   const [clearCategoryPicked, setClearCategoryPicked] = useState(false);
@@ -173,7 +172,6 @@ export function useDetailsCategoryAssignment({
         expectedEntryCount: input.entries.length,
       });
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     errorMessage: tBatch("aiCategoryFailed"),
     onSuccess: (job) => {
       // Hand the run to the page before it can finish: a run whose first answer

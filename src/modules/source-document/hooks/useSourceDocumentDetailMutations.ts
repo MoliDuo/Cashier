@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import type { SourceDocumentDetailDto } from "../contracts";
@@ -61,7 +60,6 @@ export function useSourceDocumentDetailMutations({
   version,
   onClose,
 }: UseSourceDocumentDetailMutationsOptions) {
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
 
   const { deleteDocumentMutation } = useSourceDocumentRecordMutations({
@@ -122,7 +120,6 @@ export function useSourceDocumentDetailMutations({
     errorMessage: null,
     refreshMode: "background",
     refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (_result, input) => input.onCommitted?.(),
   });
 
@@ -139,7 +136,6 @@ export function useSourceDocumentDetailMutations({
     },
     successMessage: null,
     errorMessage: null,
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
   });
 
@@ -200,7 +196,6 @@ export function useSourceDocumentDetailMutations({
     },
     successMessage: null,
     errorMessage: null,
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
   });
 
   const deleteEntryMutation = useLedgerMutation<
@@ -222,7 +217,6 @@ export function useSourceDocumentDetailMutations({
     errorMessage: null,
     refreshMode: "background",
     refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (_result, input) => input.onCommitted?.(),
   });
 

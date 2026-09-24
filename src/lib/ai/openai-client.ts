@@ -6,7 +6,7 @@ import { type ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { runtimeEnv } from "@/lib/env/runtime";
-import { AI_MAX_RETRIES, AI_REQUEST_TIMEOUT_MS, AI_RETRY_DELAY_MS } from "@/config/tuning";
+import { AI_MAX_ATTEMPTS, AI_REQUEST_TIMEOUT_MS, AI_RETRY_DELAY_MS } from "@/config/tuning";
 
 export interface GenerateContentOptions {
   maxAttempts?: number;
@@ -97,7 +97,7 @@ export class OpenAIClient {
   ): Promise<{ content: string; usage?: { promptTokens: number; completionTokens: number } }> {
     const effectiveMaxTokens = maxTokens ?? 8192;
     const effectiveTemperature = temperature ?? 1;
-    const maxAttempts = options?.maxAttempts ?? Math.min(AI_MAX_RETRIES + 1, 3);
+    const maxAttempts = options?.maxAttempts ?? AI_MAX_ATTEMPTS;
     const timeoutMs = options?.timeoutMs ?? AI_REQUEST_TIMEOUT_MS;
     const baseDelay = AI_RETRY_DELAY_MS;
     const correlationId = crypto.randomUUID();

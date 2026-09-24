@@ -40,8 +40,6 @@ describe("OpenAIClient Retry Logic", () => {
 
   beforeEach(() => {
     process.env.OPENAI_API_KEY = "test-key";
-    process.env.AI_MAX_RETRIES = "2";
-    process.env.AI_RETRY_DELAY_MS = "10";
 
     mockCreate.mockReset();
     mockOpenAI.mockClear();

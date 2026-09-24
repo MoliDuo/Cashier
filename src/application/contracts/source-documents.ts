@@ -5,8 +5,6 @@
 
 import type { ApplicationErrorCode } from "./errors";
 
-export type { ApplicationErrorCode } from "./errors";
-
 export type SourceDocumentId = string;
 export type RevisionId = string;
 export type LedgerId = string;

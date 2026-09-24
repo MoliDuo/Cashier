@@ -26,11 +26,6 @@ async function validJpegBase64(): Promise<string> {
   return buffer.toString("base64");
 }
 
-vi.mock("@/lib/processing", () => ({
-  createProcessingTask: vi.fn(),
-  createTask: vi.fn(),
-}));
-
 const { submitMock } = vi.hoisted(() => ({
   submitMock: vi.fn().mockResolvedValue("mock-task-id"),
 }));
@@ -42,16 +37,6 @@ vi.mock("@/lib/tasks", async (importOriginal) => {
     submitTask: submitMock,
   };
 });
-
-vi.mock("@/application/adapters/in-process/parse-source-document-task", () => ({
-  TASK_TYPE_PARSE_SOURCE_DOCUMENT: "parse_source_document",
-  parseSourceDocumentTaskDefinition: {
-    type: "parse_source_document",
-    handler: {
-      execute: vi.fn(),
-    },
-  },
-}));
 
 // Hoisted shared memory store so the beforeEach and vi.mock factory share the same Map
 const mockR2 = vi.hoisted(() => {

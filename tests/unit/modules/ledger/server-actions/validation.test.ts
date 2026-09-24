@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ValidationError } from "@/lib/errors";
 
-const {
-  saveEntryCategoriesMock,
-  createLedgerEntryWithConversionMock,
-  createServiceCredentialMock,
-  deleteServiceCredentialMock,
-} = vi.hoisted(() => ({
-  saveEntryCategoriesMock: vi.fn(),
-  createLedgerEntryWithConversionMock: vi.fn(),
-  createServiceCredentialMock: vi.fn(),
-  deleteServiceCredentialMock: vi.fn(),
-}));
+const { saveEntryCategoriesMock, createServiceCredentialMock, deleteServiceCredentialMock } =
+  vi.hoisted(() => ({
+    saveEntryCategoriesMock: vi.fn(),
+    createServiceCredentialMock: vi.fn(),
+    deleteServiceCredentialMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/auth-actions", () => ({
   withAuth:
@@ -30,17 +25,6 @@ vi.mock("@/modules/ledger/access", () => ({
     ) =>
     (ledgerId: string, ...args: TArgs) =>
       handler({ userId: "00000000-0000-4000-8000-000000000001" }, ledgerId, ...args),
-}));
-
-vi.mock("@/application/adapters/postgres/ledger-entry-idempotency", () => ({
-  postgresIdempotentLedgerEntryCommandAdapter: {
-    create: vi.fn((input) =>
-      createLedgerEntryWithConversionMock({ ledgerId: input.ledgerId, ...input.command })
-    ),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  runIdempotentUserMutation: vi.fn((_input, mutation) => mutation()),
 }));
 
 vi.mock("@/modules/ledger/application/use-cases/save-entry-categories", () => ({
@@ -74,7 +58,6 @@ describe("ledger server-action validation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saveEntryCategoriesMock.mockResolvedValue({ id: "category-1" });
-    createLedgerEntryWithConversionMock.mockResolvedValue({ id: "entry-1" });
     createServiceCredentialMock.mockResolvedValue({ id: "credential-1" });
     deleteServiceCredentialMock.mockResolvedValue(undefined);
   });
@@ -104,7 +87,6 @@ describe("ledger server-action validation", () => {
         } as never
       )
     ).rejects.toBeInstanceOf(ValidationError);
-    expect(createLedgerEntryWithConversionMock).not.toHaveBeenCalled();
   });
 
   it("createServiceCredentialAction rejects blank name with ValidationError", async () => {

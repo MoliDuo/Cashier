@@ -64,23 +64,6 @@ vi.mock("next-intl", async (importOriginal) => {
   };
 });
 
-vi.mock("@/i18n/client-feature-messages", () => ({
-  pickMessages: (messages: Record<string, unknown>, namespaces: string[]) => {
-    const picked: Record<string, unknown> = {};
-    for (const ns of namespaces) {
-      if (ns in messages) picked[ns] = messages[ns];
-    }
-    return picked;
-  },
-  FEATURE_MESSAGES: {
-    shell: ["Common"],
-    stream: ["LedgerPage"],
-    details: [],
-    stats: [],
-    settings: [],
-  },
-}));
-
 // Mock ActiveShell so we don't need client-side hook mocks (usePathname, useSearchParams, etc.)
 vi.mock("@/app/(protected)/_active-shell", () => ({
   ActiveShell: ({ children }: { children: React.ReactNode }) =>

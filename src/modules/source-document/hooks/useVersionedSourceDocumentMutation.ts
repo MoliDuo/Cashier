@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import type { UseLedgerMutationOptions } from "@/lib/mutations/use-ledger-mutation";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import type { VersionedCommandResult } from "@/modules/source-document/contracts";
@@ -36,7 +35,6 @@ export function useVersionedSourceDocumentMutation<TResult>({
   onSuccess,
   onError,
 }: UseVersionedSourceDocumentMutationOptions<TResult>) {
-  const tCommon = useTranslations("Common");
   return useLedgerMutation<TResult, void | (() => void)>(ledgerId, {
     refreshMode,
     invalidates: ["documents", "stats"],
@@ -46,7 +44,6 @@ export function useVersionedSourceDocumentMutation<TResult>({
       const result = await action(ledgerId, sourceDocumentId, version);
       return unwrapVersionedCommandResult(result);
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     successMessage,
     errorMessage,
     onSuccess: (result, onCommitted) => {

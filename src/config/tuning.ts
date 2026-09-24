@@ -16,7 +16,7 @@
 
 /** OpenAI calls: how long to wait, how often to try again. */
 export const AI_REQUEST_TIMEOUT_MS = 60_000;
-export const AI_MAX_RETRIES = 3;
+export const AI_MAX_ATTEMPTS = 3;
 /**
  * Base for the randomized backoff between attempts. Zero under test: there is
  * no provider there to be polite to, and a real backoff eats the `after()`

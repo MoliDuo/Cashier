@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import { useTranslations } from "next-intl";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
 import { editRetrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
@@ -117,7 +116,6 @@ export function useSourceDocumentSubmitMutations({
   onSuccess,
   bookId,
 }: UseSourceDocumentSubmitMutationsOptions) {
-  const tCommon = useTranslations("Common");
   const {
     progress,
     setProgress,
@@ -173,7 +171,6 @@ export function useSourceDocumentSubmitMutations({
       );
       return result;
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     successMessage: null,
     errorMessage: null,
     onSuccess: async (data, variables) => {
@@ -231,7 +228,6 @@ export function useSourceDocumentSubmitMutations({
         );
         return unwrapVersionedCommandResult(result);
       },
-      invalidationErrorMessage: tCommon("savedRefreshFailed"),
       successMessage: messages.retrySuccess,
       errorMessage: null,
       onSuccess: async (data, variables) => {

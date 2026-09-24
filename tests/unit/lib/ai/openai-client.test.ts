@@ -41,8 +41,6 @@ describe("openai-client", () => {
   describe("error classification after retry exhaustion", () => {
     beforeEach(() => {
       (process.env as Record<string, string>).NODE_ENV = "test";
-      process.env.AI_MAX_RETRIES = "0";
-      process.env.AI_RETRY_DELAY_MS = "1";
     });
 
     const loadClient = async () => {
@@ -62,7 +60,6 @@ describe("openai-client", () => {
       ["content_filter", "OPENAI_CONTENT_FILTERED"],
       ["length", "OPENAI_INPUT_TOO_LARGE"],
     ])("does not retry deterministic %s responses", async (reason, code) => {
-      process.env.AI_MAX_RETRIES = "3";
       const client = await loadClient();
       const create = vi.fn().mockResolvedValue({
         choices: [{ finish_reason: reason, message: { content: "" } }],

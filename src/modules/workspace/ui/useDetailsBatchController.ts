@@ -102,7 +102,6 @@ export function useDetailsBatchController(
       );
       return unwrapAtomicBatchCommandResult(result);
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     errorMessage: tCommon("error"),
     onSuccess: (result) => {
       if (result.affectedCount > 0)
@@ -134,7 +133,6 @@ export function useDetailsBatchController(
         targetsFor(selection.selectedIds),
         selection.selectedIds
       ),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     errorMessage: tCommon("deleteFailed"),
     onSuccess: (result) => {
       const unresolved = [...result.stale, ...result.failed].map((item) => item.id);
@@ -230,7 +228,6 @@ export function useDetailsBatchController(
       );
       return unwrapAtomicBatchCommandResult(result);
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     errorMessage: tBatch("selectionChanged"),
     onSuccess: (result) => {
       toast.success(tBatch("datesUpdated", { count: result.impact.affectedEntryCount }));

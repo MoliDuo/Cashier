@@ -81,9 +81,6 @@ vi.mock("@/modules/ledger/application/queries/list-ledger-entries", () => ({
   listLedgerEntries: listLedgerEntriesMock,
 }));
 
-vi.mock("@/modules/source-document/application/queries/get-source-document-counts", () => ({
-  getSourceDocumentCountsQuery: getSourceDocumentCountsQueryMock,
-}));
 vi.mock("@/modules/source-document/application/queries/list-stream-page", () => ({
   listStreamPage: listStreamPageMock,
 }));

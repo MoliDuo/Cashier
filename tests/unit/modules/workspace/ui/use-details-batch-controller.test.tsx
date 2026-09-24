@@ -38,9 +38,6 @@ vi.mock("next-intl", () => ({
 
 // The run is reported by the page that owns it; the messages it needs are
 // loaded by that boundary in production, so here it renders straight through.
-vi.mock("@/i18n/DeferredFeatureMessages", () => ({
-  DeferredFeatureMessages: ({ children }: PropsWithChildren) => <>{children}</>,
-}));
 
 vi.mock("sonner", () => ({
   toast: { success: toastSuccessMock, error: toastErrorMock, warning: vi.fn() },

@@ -89,7 +89,7 @@ describe("source-document retry action", () => {
     });
     const revisions = await db.query.sourceDocumentRevisions.findMany({
       where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
-      orderBy: asc(sourceDocumentRevisions.revisionNumber),
+      orderBy: asc(sourceDocumentRevisions.createdAt),
     });
     const activeEntries = await db.query.ledgerEntries.findMany({
       where: and(
@@ -165,7 +165,7 @@ describe("source-document retry action", () => {
 
     const revisions1 = await db.query.sourceDocumentRevisions.findMany({
       where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
-      orderBy: asc(sourceDocumentRevisions.revisionNumber),
+      orderBy: asc(sourceDocumentRevisions.createdAt),
     });
     expect(revisions1).toHaveLength(2);
     expect(revisions1[0]?.processingStatus).toBe("completed");
@@ -206,7 +206,7 @@ describe("source-document retry action", () => {
 
     const revisions2 = await db.query.sourceDocumentRevisions.findMany({
       where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
-      orderBy: asc(sourceDocumentRevisions.revisionNumber),
+      orderBy: asc(sourceDocumentRevisions.createdAt),
     });
     expect(revisions2).toHaveLength(3);
     expect(revisions2[0]?.processingStatus).toBe("completed"); // original

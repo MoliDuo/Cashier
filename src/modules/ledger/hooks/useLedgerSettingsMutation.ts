@@ -27,7 +27,6 @@ export function useLedgerSettingsMutation({
   errorMessage,
 }: UseLedgerSettingsMutationParams) {
   const t = useTranslations("Settings");
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
   const translateError = (code: UpdateLedgerActionErrorCode, dates?: string[]) => {
     switch (code) {
@@ -59,7 +58,6 @@ export function useLedgerSettingsMutation({
     },
     successMessage,
     errorMessage: null,
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (savedLedger) => {
       queryClient.setQueryData(queryKeys.ledger(ledgerId), savedLedger);
     },

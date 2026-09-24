@@ -16,7 +16,6 @@ type RecoveryAction = (variables: StreamRecoveryVariables) => Promise<unknown>;
 
 export function useStreamSourceDocumentRecoveryMutations(ledgerId: string) {
   const tActions = useTranslations("SourceDocumentAction");
-  const tCommon = useTranslations("Common");
   const locksRef = useRef(new Set<string>());
   const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [cancellingIds, setCancellingIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -45,7 +44,6 @@ export function useStreamSourceDocumentRecoveryMutations(ledgerId: string) {
       ),
     successMessage: tActions("retrySuccess"),
     errorMessage: tActions("retryError"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
   });
   const cancelMutation = useLedgerMutation<unknown, StreamRecoveryVariables>(ledgerId, {
     invalidates: ["documents", "stats"],
@@ -55,7 +53,6 @@ export function useStreamSourceDocumentRecoveryMutations(ledgerId: string) {
       ),
     successMessage: tActions("cancelSuccess"),
     errorMessage: tActions("cancelError"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
   });
   const retryMutationRef = useRef(retryMutation.mutateAsync);
   const cancelMutationRef = useRef(cancelMutation.mutateAsync);

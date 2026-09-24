@@ -52,7 +52,6 @@ describe("auth runtime config", () => {
 
     expect(authModule.authOptions.pages).toEqual({
       signIn: "/login",
-      verifyRequest: "/login/verify",
       error: "/login/error",
     });
 

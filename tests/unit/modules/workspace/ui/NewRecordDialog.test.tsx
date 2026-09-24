@@ -4,10 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { writeLastNewRecordBookId } from "@/modules/workspace/new-record-book-memory";
 
-vi.mock("@/i18n/DeferredFeatureMessages", () => ({
-  DeferredFeatureMessages: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
-
 vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
   InputFormLoadingFallback: () => null,
   NewRecordForms: (props: {

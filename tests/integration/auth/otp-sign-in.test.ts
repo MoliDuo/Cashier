@@ -44,21 +44,13 @@ async function createTestOTP(email: string, otp: string, expiresAt?: Date) {
 }
 
 describe("authenticateWithOTP", () => {
-  const originalOTPMaxAttempts = process.env.OTP_MAX_ATTEMPTS;
   const originalTrustedProxy = process.env.TRUSTED_PROXY;
 
   beforeEach(async () => {
-    delete process.env.OTP_MAX_ATTEMPTS;
     await createTestUserWithLedger(getTestDb(), TEST_EMAIL);
   });
 
   afterEach(() => {
-    if (originalOTPMaxAttempts == null) {
-      delete process.env.OTP_MAX_ATTEMPTS;
-    } else {
-      process.env.OTP_MAX_ATTEMPTS = originalOTPMaxAttempts;
-    }
-
     if (originalTrustedProxy == null) {
       delete process.env.TRUSTED_PROXY;
     } else {
@@ -174,7 +166,6 @@ describe("authenticateWithOTP", () => {
   });
 
   it("returns otp_rate_limited when verify attempts exceed the IP limit", async () => {
-    process.env.OTP_MAX_ATTEMPTS = "10";
     process.env.TRUSTED_PROXY = "platform";
     await createTestOTP(TEST_EMAIL, "123456");
 

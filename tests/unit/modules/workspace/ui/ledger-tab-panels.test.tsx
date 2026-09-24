@@ -25,10 +25,6 @@ vi.mock("@/modules/workspace/ui/LedgerEntriesTab", () => ({
   },
 }));
 
-vi.mock("@/i18n/DeferredFeatureMessages", () => ({
-  DeferredFeatureMessages: ({ children }: { children: unknown }) => children,
-}));
-
 const BOOK_ME = "10000000-0000-4000-8000-000000000001";
 const BOOK_SHARED = "10000000-0000-4000-8000-000000000002";
 

@@ -131,7 +131,6 @@ interface UseCategoryPresetSwitchOptions {
 
 export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPresetSwitchOptions) {
   const t = useTranslations("Settings");
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -188,7 +187,6 @@ export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPre
       invalidates: ["categories", "stats", "documents"],
       refreshMode: "background",
       mutationFn: (input) => applyCategoryPresetAction(ledgerId, input),
-      invalidationErrorMessage: tCommon("savedRefreshFailed"),
       onSuccess: (saved) => {
         queryClient.setQueryData(queryKeys.entryCategories(ledgerId), saved.categories);
         setConfirmOpen(false);

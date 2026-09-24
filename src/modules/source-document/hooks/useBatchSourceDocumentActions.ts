@@ -41,7 +41,6 @@ export function useBatchSourceDocumentActions(
       const result = await deleteSourceDocumentAction(ledgerId, id, versionFor(id));
       unwrapVersionedCommandResult(result);
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     successMessage: tCommon("deleteSuccess"),
     errorMessage: tCommon("deleteFailed"),
     onSuccess: (_result, input) => {
@@ -66,7 +65,6 @@ export function useBatchSourceDocumentActions(
       });
       return unwrapAtomicBatchCommandResult(result);
     },
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (result) => {
       toast.success(tBatch("datesUpdated", { count: result.updatedCount }));
       clearSelection();
@@ -118,7 +116,6 @@ export function useBatchSourceDocumentActions(
         ledgerId,
         targetsFor(Array.isArray(input) ? input : input.ids)
       ),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (result, input) => {
       if (!Array.isArray(input) && result.stale.length + result.failed.length === 0)
         input.onCommitted();
@@ -131,7 +128,6 @@ export function useBatchSourceDocumentActions(
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: (ids) => batchRetrySourceDocumentsAction(ledgerId, targetsFor(ids)),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
     onSuccess: (result) =>
       settleBatchResult(result, tBatch("retried", { count: result.succeeded.length })),
     onError: () => toast.error(tCommon("error")),
