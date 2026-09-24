@@ -48,7 +48,6 @@ describe("useLedgerHistorySync", () => {
       useLedgerHistorySync({
         pathname: `/ledger/${ledgerId}`,
         searchParams: new URLSearchParams(detailSearch),
-        legacyScope: "stream",
         ledgerId,
       })
     );
@@ -106,7 +105,6 @@ describe("useLedgerHistorySync", () => {
       useLedgerHistorySync({
         pathname: `/ledger/${ledgerId}`,
         searchParams: new URLSearchParams(detailSearch),
-        legacyScope: "stream",
         ledgerId,
       })
     );
@@ -152,7 +150,6 @@ describe("useLedgerHistorySync", () => {
           useLedgerHistorySync({
             pathname: `/ledger/${ledgerId}`,
             searchParams: new URLSearchParams(search),
-            legacyScope: "stream",
             ledgerId,
           });
           return guard;

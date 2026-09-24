@@ -1,56 +1,14 @@
 "use server";
 import { withLedgerAccess } from "../access";
-import type {
-  ApplyCategoryPresetInput,
-  DeleteEntryCategoryResultDto,
-  EntryCategoryDto,
-  ReorderEntryCategoriesResultDto,
-} from "@/modules/ledger/contracts";
+import type { ApplyCategoryPresetInput, EntryCategoryDto } from "@/modules/ledger/contracts";
 import {
   parseApplyCategoryPresetInput,
-  parseCreateEntryCategoryInput,
-  parseEntryCategoryId,
-  parseReorderEntryCategoriesInput,
   parseSaveEntryCategoriesInput,
-  type CreateEntryCategoryInput,
   type SaveEntryCategoriesInput,
 } from "@/modules/ledger/contract-schemas";
 import { applyCategoryPreset } from "@/modules/ledger/application/use-cases/apply-category-preset";
-import { createEntryCategory } from "@/modules/ledger/application/use-cases/create-entry-category";
 import { serverComposition } from "@/application/server-composition-root";
 import { saveEntryCategories } from "@/modules/ledger/application/use-cases/save-entry-categories";
-
-export const createEntryCategoryAction = withLedgerAccess(
-  async (ledgerId: string, data: CreateEntryCategoryInput): Promise<EntryCategoryDto> => {
-    const validated = parseCreateEntryCategoryInput(data);
-    const payload: Parameters<typeof createEntryCategory>[1] = {
-      name: validated.name,
-    };
-    if (validated.description !== undefined) payload.description = validated.description;
-    if (validated.icon !== undefined) payload.icon = validated.icon;
-    if (validated.sortOrder !== undefined) payload.sortOrder = validated.sortOrder;
-    return createEntryCategory(ledgerId, payload, serverComposition.categories);
-  }
-);
-
-export const deleteEntryCategoryAction = withLedgerAccess(
-  async (ledgerId: string, categoryId: string): Promise<DeleteEntryCategoryResultDto> => {
-    const validatedCategoryId = parseEntryCategoryId(categoryId);
-    const deleted = await serverComposition.categories.delete(ledgerId, validatedCategoryId);
-    return { categoryId: validatedCategoryId, deleted };
-  }
-);
-
-export const reorderEntryCategoriesAction = withLedgerAccess(
-  async (ledgerId: string, categoryIds: string[]): Promise<ReorderEntryCategoriesResultDto> => {
-    const validatedIds = parseReorderEntryCategoriesInput(categoryIds);
-    await serverComposition.categories.reorder(ledgerId, validatedIds);
-    return {
-      categoryIds: validatedIds,
-      reorderedCount: validatedIds.length,
-    };
-  }
-);
 
 export const saveEntryCategoriesAction = withLedgerAccess(
   async (ledgerId: string, input: SaveEntryCategoriesInput): Promise<EntryCategoryDto[]> => {
@@ -88,13 +46,4 @@ export const applyCategoryPresetAction = withLedgerAccess(
       serverComposition.categories
     );
   }
-);
-
-/**
- * Get count of uncategorized entries (entries without a category)
- * Separated from getEntryCategoriesAction for cleaner cache management
- */
-export const getUncategorizedCountAction = withLedgerAccess(
-  async (ledgerId: string): Promise<number> =>
-    serverComposition.categories.countUncategorized(ledgerId)
 );

@@ -26,12 +26,7 @@ function toFailureCode(error: unknown): ProcessingFailureCode {
       case "CURRENCY_NOT_FOUND":
         return "exchange_rate_failure";
       case "FILE_NOT_FOUND":
-      case "LOCAL_STORAGE_UPLOAD_FAILED":
-      case "LOCAL_STORAGE_DOWNLOAD_FAILED":
         return "storage_failure";
-      case "TASK_RUNTIME_EDGE_UNSUPPORTED":
-      case "TASK_RUNTIME_NOT_INITIALIZED":
-        return "processing_unavailable";
     }
   }
   return "processing_unavailable";

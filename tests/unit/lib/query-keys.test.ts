@@ -11,11 +11,10 @@ describe("queryKeys", () => {
     );
   });
 
-  it("keeps detail projections distinct for the same source document", () => {
+  it("keeps detail and input projections distinct for the same source document", () => {
     const projections = [
       queryKeys.sourceDocument("ledger-1", "document-1"),
-      queryKeys.sourceDocumentLight("ledger-1", "document-1"),
-      queryKeys.sourceDocumentFull("ledger-1", "document-1"),
+      queryKeys.sourceDocumentInput("ledger-1", "document-1"),
     ];
 
     expect(new Set(projections.map((key) => JSON.stringify(key))).size).toBe(projections.length);

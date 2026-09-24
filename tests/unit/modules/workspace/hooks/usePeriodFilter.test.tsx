@@ -17,6 +17,7 @@ describe("usePeriodFilter", () => {
       usePeriodFilter({
         pathname: "/ledger/test",
         searchParams,
+        scope: "stream",
       })
     );
 

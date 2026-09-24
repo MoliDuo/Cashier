@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useMemo } from "react";
-import { updateLedgerSearchParams } from "../ledger-url-params";
 import { pushLedgerUrl } from "../ledger-url-navigation";
 import { parseLedgerTab, type LedgerTab } from "@/lib/ledger-tabs";
 
@@ -27,7 +26,8 @@ export function useLedgerTabs({
 
   const handleTabChange = useCallback(
     (value: string) => {
-      const params = updateLedgerSearchParams(searchParams, { tab: value });
+      const params = new URLSearchParams(searchParams);
+      params.set("tab", value);
       pushLedgerUrl(pathname, params, "tab");
     },
     [pathname, searchParams]

@@ -386,6 +386,13 @@
       "when": 1790223763595,
       "tag": "0054_retire_legacy_upload_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1790223763596,
+      "tag": "0055_retire_revision_number_allocation",
+      "breakpoints": true
     }
   ]
 }

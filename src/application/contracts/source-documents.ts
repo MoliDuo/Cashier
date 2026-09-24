@@ -15,7 +15,6 @@ export type UploadSessionId = string;
 export type ProcessingJobId = string;
 
 export type RevisionProcessingStatus = "processing" | "completed" | "failed" | "cancelled";
-export type RevisionOrigin = "submission" | "manual_edit" | "manual_entry";
 export type RevisionFailureKind = "invalid_input" | "processing_error";
 
 export type SupportedSourceDocumentAction =
@@ -33,7 +32,6 @@ export interface SourceDocumentContract {
 export interface SourceDocumentRevisionContract {
   id: RevisionId;
   sourceDocumentId: SourceDocumentId;
-  origin: RevisionOrigin;
   processingStatus: RevisionProcessingStatus | null;
   submittedAt: string;
   finishedAt: string | null;

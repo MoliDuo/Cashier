@@ -15,7 +15,6 @@ import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "./transaction-
 import { assertSourceDocumentNotProcessing } from "./source-document-write-guards";
 import { copyRevisionFiles, createManualRevision } from "./ledger-projections";
 import { getSourceDocumentInTransaction } from "./source-document-reads/list";
-import { getSourceDocumentLightForLedger } from "@/modules/source-document/application/queries/get-source-document-light";
 
 function normalizeCurrency(value: string | null) {
   return value == null || value === "" ? "CNY" : value;
@@ -278,10 +277,10 @@ export async function applyDateOrganization(
           eq(sourceDocuments.version, input.expectedVersion)
         )
       );
-    const sourceDocument = await getSourceDocumentLightForLedger(
+    const sourceDocument = await getSourceDocumentInTransaction(
+      tx,
       input.ledgerId,
-      input.sourceDocumentId,
-      { get: (ledgerId, id) => getSourceDocumentInTransaction(tx, ledgerId, id) }
+      input.sourceDocumentId
     );
     if (sourceDocument == null) throw new NotFoundError("Source document");
     return { sourceDocument } as const;

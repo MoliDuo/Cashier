@@ -6,7 +6,6 @@ import type { useTranslations } from "next-intl";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type {
   SourceDocument,
-  SourceDocumentLight,
   SplitSourceDocumentInput,
   SplitSourceDocumentResultDto,
 } from "@/modules/source-document/contracts";
@@ -16,7 +15,7 @@ import type { AddEntryData } from "./useSourceDocumentDetailMutations";
 
 interface UseSourceDocumentEntryActionsOptions {
   ledgerId: string;
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   busy: boolean;
   interactionDisabled: boolean;
   selectedIds: string[];

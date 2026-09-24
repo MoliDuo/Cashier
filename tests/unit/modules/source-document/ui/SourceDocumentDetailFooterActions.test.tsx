@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { SourceDocumentDetailFooterActions } from "@/modules/source-document/ui/SourceDocumentDetailFooterActions";
 
 const sourceDocument = {
   supportedActions: ["edit_retry"],
-} as unknown as SourceDocumentLight;
+} as unknown as SourceDocument;
 
 const baseProps = {
   sourceDocument,

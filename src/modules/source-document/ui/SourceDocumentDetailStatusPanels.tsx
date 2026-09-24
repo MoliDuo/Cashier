@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { toStableFailureCode } from "@/application/contracts";
-import type { SourceDocument, SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { useDiagnosticMessages } from "./use-diagnostic-messages";
 
 interface SourceDocumentDetailStatusPanelsProps {
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   loadError: boolean;
   isLoading: boolean;
   isReloading: boolean;

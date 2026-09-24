@@ -1,3 +1,6 @@
+import { serverComposition } from "@/application/server-composition-root";
+import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
+import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import { sql } from "drizzle-orm";
 /**
  * Cascade Operations Integration Tests
@@ -28,10 +31,7 @@ import { eq, isNull, and } from "drizzle-orm";
 vi.mock("next-intl/server", () => ({ getLocale: vi.fn().mockResolvedValue("zh") }));
 
 // Import actions
-import {
-  deleteEntryCategoryAction,
-  getUncategorizedCountAction,
-} from "@/modules/ledger/server-actions/categories";
+import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
 import {
   deleteLedgerEntryAction,
@@ -139,11 +139,11 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
     const entry3 = await createTestEntry(db, ledger.id, { categoryId: category.id });
 
     // Verify initial state
-    const initialCount = await getUncategorizedCountAction(ledger.id);
+    const initialCount = await readUncategorizedCount(ledger.id);
     expect(initialCount).toBe(0);
 
     // Action: Delete the category
-    await deleteEntryCategoryAction(ledger.id, category.id);
+    await removeCategoryFromCollection(ledger.id, category.id);
 
     // Verify: Category no longer appears in list
     const categories = await getTargetEntryCategoriesAction(ledger.id);
@@ -165,7 +165,7 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
     expect(updatedEntry3?.categoryId).toBeNull();
 
     // Verify: Uncategorized count increased by 3
-    const finalCount = await getUncategorizedCountAction(ledger.id);
+    const finalCount = await readUncategorizedCount(ledger.id);
     expect(finalCount).toBe(3);
   });
 
@@ -181,7 +181,7 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
     const entryInB = await createTestEntry(db, ledger.id, { categoryId: categoryB.id });
 
     // Delete category A
-    await deleteEntryCategoryAction(ledger.id, categoryA.id);
+    await removeCategoryFromCollection(ledger.id, categoryA.id);
 
     // Verify: Entry in category B is unchanged
     const updatedEntryInB = await db.query.ledgerEntries.findFirst({
@@ -262,7 +262,7 @@ describe("E1: Create Entry → Data Association Correct", () => {
     expect(createdEntry?.categoryId).toBeNull();
 
     // Verify uncategorized count
-    const count = await getUncategorizedCountAction(ledger.id);
+    const count = await readUncategorizedCount(ledger.id);
     expect(count).toBe(1);
   });
 });
@@ -367,7 +367,7 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     const entry = await createTestEntry(db, ledger.id, { categoryId: category.id });
 
     // Initial state: 0 uncategorized
-    expect(await getUncategorizedCountAction(ledger.id)).toBe(0);
+    expect(await readUncategorizedCount(ledger.id)).toBe(0);
 
     // Remove category from entry
     await updateLedgerEntryAction(
@@ -378,7 +378,7 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     );
 
     // Now 1 uncategorized
-    expect(await getUncategorizedCountAction(ledger.id)).toBe(1);
+    expect(await readUncategorizedCount(ledger.id)).toBe(1);
   });
 });
 
@@ -441,3 +441,16 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
     expect(remainingEntryB).not.toBeNull();
   });
 });
+
+async function removeCategoryFromCollection(ledgerId: string, categoryId: string) {
+  const categories = await serverComposition.categories.list(ledgerId);
+  return saveEntryCategoriesAction(ledgerId, {
+    expectedRevision: await computeCategoryCollectionRevision(categories),
+    categories: categories
+      .filter((category) => category.id !== categoryId)
+      .map(({ id, name, description, icon }) => ({ id, name, description, icon })),
+  });
+}
+async function readUncategorizedCount(ledgerId: string) {
+  return (await getLedgerSettingsAction(ledgerId)).uncategorizedCount;
+}

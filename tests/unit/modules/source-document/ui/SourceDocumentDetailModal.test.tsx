@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { SourceDocumentDetailModal } from "@/modules/source-document/ui/SourceDocumentDetailModal";
 
 const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
@@ -161,7 +161,7 @@ const secondEntry: LedgerEntry = {
   convertedAmount: "18.00",
 };
 
-const sourceDocument: SourceDocumentLight = {
+const sourceDocument: SourceDocument = {
   id: "doc-1",
   version: 1,
   ledgerId: "ledger-1",
@@ -174,6 +174,8 @@ const sourceDocument: SourceDocumentLight = {
   documentDate: "2026-07-28",
   createdAt: "2026-07-28T00:00:00.000Z",
   hasImages: false,
+  ledgerEntries: [],
+  updatedAt: "2026-07-28T00:00:00.000Z",
   supportedActions: [],
   canEdit: true,
   errorCode: null,
@@ -181,7 +183,7 @@ const sourceDocument: SourceDocumentLight = {
 
 function modal(
   onSaveAll = vi.fn(async () => undefined),
-  document: SourceDocumentLight | null = sourceDocument,
+  document: SourceDocument | null = sourceDocument,
   overrides: {
     sourceDocumentId?: string;
     ledgerEntries?: LedgerEntry[];

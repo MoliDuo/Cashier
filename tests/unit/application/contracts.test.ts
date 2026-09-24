@@ -74,10 +74,7 @@ describe("target application contracts", () => {
 
   it("maps infrastructure failures to stable, non-sensitive application errors", () => {
     const error: ApplicationErrorContract = toApplicationError(
-      new AppError(
-        "Failed to download /private/uploads/secret.jpg",
-        "LOCAL_STORAGE_DOWNLOAD_FAILED"
-      )
+      new AppError("Failed to download /private/uploads/secret.jpg", "S3_DOWNLOAD_FAILED")
     );
 
     expect(error.code).toBe("STORAGE_UNAVAILABLE");

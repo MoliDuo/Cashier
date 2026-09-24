@@ -24,12 +24,11 @@ const sourceDocument: SourceDocument = {
   failureKind: null,
   failureMessage: null,
   documentDate: "2026-07-28",
-  metadata: {},
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
-  deletedAt: null,
   hasImages: false,
   supportedActions: ["retry", "edit_retry", "delete"],
+  ledgerEntries: [],
   canEdit: true,
   errorCode: null,
 };

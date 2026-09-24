@@ -46,9 +46,6 @@ vi.mock("@/application/server-composition-root", () => ({
     ledgerReads: {},
   },
 }));
-vi.mock("@/modules/ledger/application/use-cases/create-entry-category", () => ({
-  createEntryCategory: vi.fn(),
-}));
 vi.mock("@/modules/ledger/application/use-cases/create-service-credential", () => ({
   createServiceCredential: vi.fn(),
 }));

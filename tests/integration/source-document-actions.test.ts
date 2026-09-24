@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { getSourceDocumentLightAction } from "@/modules/source-document/server/get-document-light";
+import { getSourceDocumentDetailAction } from "@/modules/source-document/server/get-document-detail";
 import { getTestDb } from "../setup";
 import {
   entryCategories,
@@ -34,7 +34,7 @@ vi.mock("@/auth", () => ({
 
 import { auth } from "@/auth";
 
-describe("getSourceDocumentLightAction", () => {
+describe("getSourceDocumentDetailAction", () => {
   const testUserId = "00000000-0000-0000-0000-000000000000";
 
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe("getSourceDocumentLightAction", () => {
     });
     await activateTestSourceDocumentProjection(db, docData.id, { text: "Lunch for 25.50" });
 
-    const result = await getSourceDocumentLightAction(ledgerData.id, docData.id);
+    const result = await getSourceDocumentDetailAction(ledgerData.id, docData.id);
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe(docData.id);
@@ -93,7 +93,7 @@ describe("getSourceDocumentLightAction", () => {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
 
-    const result = await getSourceDocumentLightAction(ledgerData.id, docData.id);
+    const result = await getSourceDocumentDetailAction(ledgerData.id, docData.id);
 
     expect(result).not.toBeNull();
     expect(result!.hasImages).toBe(true);
@@ -194,7 +194,7 @@ describe("getSourceDocumentLightAction", () => {
     await db.insert(ledgerEntries).values(entryData);
     await activateTestSourceDocumentProjection(db, docData.id);
 
-    const result = await getSourceDocumentLightAction(ledgerData.id, docData.id);
+    const result = await getSourceDocumentDetailAction(ledgerData.id, docData.id);
 
     expect(result).not.toBeNull();
     if (result == null) {
@@ -216,7 +216,7 @@ describe("getSourceDocumentLightAction", () => {
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
 
-    const result = await getSourceDocumentLightAction(ledgerData.id, uuidv4());
+    const result = await getSourceDocumentDetailAction(ledgerData.id, uuidv4());
     expect(result).toBeNull();
   });
 
@@ -236,10 +236,10 @@ describe("getSourceDocumentLightAction", () => {
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
 
-    await expect(getSourceDocumentLightAction(otherLedgerId, docData.id)).rejects.toBeInstanceOf(
+    await expect(getSourceDocumentDetailAction(otherLedgerId, docData.id)).rejects.toBeInstanceOf(
       NotFoundError
     );
-    await expect(getSourceDocumentLightAction(uuidv4(), docData.id)).rejects.toBeInstanceOf(
+    await expect(getSourceDocumentDetailAction(uuidv4(), docData.id)).rejects.toBeInstanceOf(
       NotFoundError
     );
   });

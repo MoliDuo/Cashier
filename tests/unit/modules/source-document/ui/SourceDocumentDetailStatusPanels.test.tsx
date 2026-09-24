@@ -1,9 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { SourceDocumentDetailStatusPanels } from "@/modules/source-document/ui/SourceDocumentDetailStatusPanels";
 
-const baseDocument: SourceDocumentLight = {
+const baseDocument: SourceDocument = {
   id: "doc-1",
   version: 1,
   ledgerId: "ledger-1",
@@ -16,12 +16,14 @@ const baseDocument: SourceDocumentLight = {
   documentDate: "2026-07-28",
   createdAt: "2026-07-28T00:00:00.000Z",
   hasImages: false,
+  ledgerEntries: [],
+  updatedAt: "2026-07-28T00:00:00.000Z",
   supportedActions: [],
   canEdit: true,
   errorCode: null,
 };
 
-function renderPanels(sourceDocument: SourceDocumentLight) {
+function renderPanels(sourceDocument: SourceDocument) {
   return render(
     <SourceDocumentDetailStatusPanels
       sourceDocument={sourceDocument}

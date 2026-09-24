@@ -106,33 +106,12 @@ function scopedKey(scope: LedgerFilterScope, key: FilterKey): string {
 function readScopedValue(
   searchParams: Pick<URLSearchParams, "get">,
   key: FilterKey,
-  scope?: LedgerFilterScope
+  scope: LedgerFilterScope
 ): string | null {
-  if (scope == null) return searchParams.get(key);
   return searchParams.get(scopedKey(scope, key));
 }
 
-export function migrateLegacyLedgerSearchParams(
-  searchParams: SearchParamsLike,
-  scope: LedgerFilterScope
-): URLSearchParams | null {
-  const params = createMutableSearchParams(searchParams);
-  let changed = false;
-
-  for (const key of FILTER_KEYS) {
-    const legacyValue = params.get(key);
-    if (legacyValue == null) continue;
-
-    const namespacedKey = scopedKey(scope, key);
-    if (!params.has(namespacedKey)) params.set(namespacedKey, legacyValue);
-    params.delete(key);
-    changed = true;
-  }
-
-  return changed ? params : null;
-}
-
-/** Returns a legacy-shaped view so existing period parsing can share scoped URL state. */
+/** Projects scoped filters into the shared period parser input. */
 export function getScopedLedgerSearchParams(
   searchParams: SearchParamsLike,
   scope: LedgerFilterScope
@@ -147,7 +126,6 @@ export function getScopedLedgerSearchParams(
 }
 
 export interface LedgerUrlUpdate {
-  tab?: string | null;
   period?: string | null;
   startDate?: string | null;
   endDate?: string | null;
@@ -337,7 +315,7 @@ function setOrDeleteDecimalParam(
 
 export function readLedgerFilterParams(
   searchParams: SearchParamsLike,
-  scope?: LedgerFilterScope
+  scope: LedgerFilterScope
 ): LedgerFilterParams {
   const readDecimal = (key: "minAmount" | "maxAmount"): string | null => {
     const raw = readScopedValue(searchParams, key, scope);
@@ -361,13 +339,12 @@ export function readLedgerFilterParams(
 export function updateLedgerSearchParams(
   searchParams: SearchParamsLike,
   updates: LedgerUrlUpdate,
-  scope?: LedgerFilterScope
+  scope: LedgerFilterScope
 ): URLSearchParams {
   const params = createMutableSearchParams(searchParams);
 
-  const keyFor = (key: FilterKey) => (scope == null ? key : scopedKey(scope, key));
+  const keyFor = (key: FilterKey) => scopedKey(scope, key);
 
-  if ("tab" in updates) setOrDeleteStringParam(params, "tab", updates.tab);
   if ("period" in updates) {
     setOrDeleteStringParam(params, keyFor("period"), updates.period);
 

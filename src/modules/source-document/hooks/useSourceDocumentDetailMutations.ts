@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
-import type { SourceDocumentResultDto } from "../contracts";
+import type { SourceDocumentDetailDto } from "../contracts";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
@@ -82,10 +82,10 @@ export function useSourceDocumentDetailMutations({
    * version already arrived while the command was in flight, filling in the
    * fields the command responses leave out.
    */
-  const commitDetailSnapshot = async (document: SourceDocumentResultDto) => {
+  const commitDetailSnapshot = async (document: SourceDocumentDetailDto) => {
     const key = queryKeys.sourceDocument(ledgerId!, id);
     await queryClient.cancelQueries({ queryKey: key, exact: true });
-    queryClient.setQueryData<SourceDocumentResultDto>(key, (previous) =>
+    queryClient.setQueryData<SourceDocumentDetailDto>(key, (previous) =>
       previous != null && previous.version > document.version
         ? previous
         : {

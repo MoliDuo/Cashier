@@ -2,14 +2,14 @@ import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { NotFoundError } from "@/lib/errors";
-import { getSourceDocumentFullQuery as getSourceDocumentFullQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-full";
+import { getSourceDocumentInputQuery as getSourceDocumentInputQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-input";
 import { sourceDocuments } from "@/persistence";
 import { serverComposition } from "@/application/server-composition-root";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
-const getSourceDocumentFullQuery = (ledgerId: string, sourceDocumentId: string) =>
-  getSourceDocumentFullQueryUseCase(
+const getSourceDocumentInputQuery = (ledgerId: string, sourceDocumentId: string) =>
+  getSourceDocumentInputQueryUseCase(
     ledgerId,
     sourceDocumentId,
     serverComposition.sourceDocumentReads
@@ -30,7 +30,7 @@ describe("source-document full query", () => {
       entryDate: "2026-03-22",
     });
 
-    const existing = await getSourceDocumentFullQuery(ledgerId, docId);
+    const existing = await getSourceDocumentInputQuery(ledgerId, docId);
 
     expect(existing).toMatchObject({
       id: docId,
@@ -40,7 +40,7 @@ describe("source-document full query", () => {
       createdAt: expect.any(String),
     });
     expect(existing).not.toHaveProperty("imageUrls");
-    await expect(getSourceDocumentFullQuery(ledgerId, crypto.randomUUID())).rejects.toThrow(
+    await expect(getSourceDocumentInputQuery(ledgerId, crypto.randomUUID())).rejects.toThrow(
       NotFoundError
     );
   });
@@ -58,7 +58,7 @@ describe("source-document full query", () => {
       .returning();
 
     expect(deletedDocument).toBeDefined();
-    await expect(getSourceDocumentFullQuery(ledgerId, deletedDocument!.id)).rejects.toThrow(
+    await expect(getSourceDocumentInputQuery(ledgerId, deletedDocument!.id)).rejects.toThrow(
       NotFoundError
     );
 

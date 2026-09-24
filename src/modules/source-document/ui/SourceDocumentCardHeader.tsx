@@ -1,7 +1,6 @@
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type {
   SourceDocument,
-  SourceDocumentLight,
   SourceDocumentListItemDto,
   SourceDocumentProcessingStatus,
 } from "@/modules/source-document/contracts";
@@ -31,7 +30,7 @@ import { toStableFailureCode } from "@/application/contracts";
 import { useDiagnosticMessages } from "./use-diagnostic-messages";
 
 interface SourceDocumentCardHeaderProps {
-  sourceDocument: SourceDocument | SourceDocumentLight | SourceDocumentListItemDto;
+  sourceDocument: SourceDocument | SourceDocumentListItemDto;
   processingStatus: SourceDocumentProcessingStatus | null;
   failureKind?: RevisionFailureKind | null | undefined;
   errorCode?: ApplicationErrorCode | ProcessingFailureCode | null | undefined;

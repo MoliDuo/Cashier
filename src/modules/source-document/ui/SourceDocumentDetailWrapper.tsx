@@ -48,7 +48,6 @@ export function SourceDocumentDetailWrapper({
     currentLedgerEntries,
     ledgerId: detailLedgerId,
     isLoading,
-    isLoadingImages,
     error,
     refetch,
   } = useSourceDocumentDetailData({
@@ -129,7 +128,6 @@ export function SourceDocumentDetailWrapper({
       ledgerId={detailLedgerId}
       sourceDocument={sourceDocument}
       isLoading={isLoading}
-      isLoadingImages={isLoadingImages}
       loadError={error != null}
       onReload={handleReload}
       ledgerEntries={currentLedgerEntries}

@@ -31,7 +31,7 @@ describe("Postgres migration journal", () => {
     });
 
     expect(observedInversions).toEqual(allowedLegacyInversions);
-    expect(journal.entries.at(-1)?.tag).toBe("0054_retire_legacy_upload_sessions");
+    expect(journal.entries.at(-1)?.tag).toBe("0055_retire_revision_number_allocation");
   });
 
   it("keeps the harmful global category reorder migration as an intentional no-op", () => {
@@ -136,7 +136,7 @@ describe("Postgres migration journal", () => {
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
-    expect(message).toContain("migration journal is at 0054_retire_legacy_upload_sessions");
+    expect(message).toContain("migration journal is at 0055_retire_revision_number_allocation");
     expect(message).toContain("newest Drizzle snapshot is 0052_snapshot.json");
     expect(message).toContain("Rebaseline the snapshot");
   });

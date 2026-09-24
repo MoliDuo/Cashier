@@ -87,12 +87,6 @@ export interface CategoryPort {
   list(ledgerId: LedgerId): Promise<readonly CategoryContract[]>;
   get(ledgerId: LedgerId, categoryId: string): Promise<CategoryContract | null>;
   listWithCount(ledgerId: LedgerId): Promise<readonly CategoryWithCountContract[]>;
-  create(ledgerId: LedgerId, input: CategoryMutationContract): Promise<CategoryContract>;
-  update(
-    ledgerId: LedgerId,
-    categoryId: string,
-    input: Partial<CategoryMutationContract>
-  ): Promise<CategoryContract | null>;
   updateMissingMetadata(
     ledgerId: LedgerId,
     categoryId: string,
@@ -102,8 +96,6 @@ export interface CategoryPort {
     wroteIcon: boolean;
     wroteDescription: boolean;
   }>;
-  delete(ledgerId: LedgerId, categoryId: string): Promise<boolean>;
-  reorder(ledgerId: LedgerId, categoryIds: readonly string[]): Promise<number>;
   saveAll(
     ledgerId: LedgerId,
     categories: readonly CategoryTargetContract[],
@@ -153,13 +145,6 @@ export interface SettingsPort {
     ledgerId: LedgerId,
     userId: string
   ): Promise<{ currentMainCurrency: string; dates: string[] } | null>;
-}
-
-interface CategoryMutationContract {
-  name: string;
-  description?: string | null;
-  icon?: string | null;
-  sortOrder?: number;
 }
 
 interface CategoryTargetContract {

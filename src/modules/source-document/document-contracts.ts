@@ -40,10 +40,8 @@ interface SourceDocumentInputDataDto {
 
 export interface SourceDocumentDetailDto
   extends SourceDocumentSummaryDto, SourceDocumentInputDataDto {
-  metadata: Record<string, unknown>;
-  deletedAt: string | null;
-  ledgerEntries?: SourceDocumentLedgerEntryDto[];
-  hasImages?: boolean;
+  ledgerEntries: SourceDocumentLedgerEntryDto[];
+  hasImages: boolean;
   activeResultSummary?: SourceDocumentActiveResultSummary;
   dateOrganizationSuggestion?:
     import("./date-organization-contracts").DateOrganizationSuggestion | null;
@@ -58,14 +56,6 @@ export interface SourceDocumentListItemDto extends SourceDocumentSummaryDto {
   text: null;
   ledgerEntries?: SourceDocumentLedgerEntryDto[];
   hasImages: boolean;
-}
-
-export interface SourceDocumentDetailPreviewDto
-  extends Omit<SourceDocumentSummaryDto, "updatedAt">, SourceDocumentInputDataDto {
-  hasImages: boolean;
-  activeResultSummary?: SourceDocumentActiveResultSummary;
-  dateOrganizationSuggestion?:
-    import("./date-organization-contracts").DateOrganizationSuggestion | null;
 }
 
 export interface StreamPage {
@@ -88,8 +78,4 @@ export interface SourceDocumentInputDto extends SourceDocumentInputDataDto {
   processingStatus: SourceDocumentProcessingStatus | null;
   documentDate: string | null;
   createdAt: string;
-}
-
-export interface SourceDocumentResultDto extends SourceDocumentDetailPreviewDto {
-  ledgerEntries: SourceDocumentLedgerEntryDto[];
 }

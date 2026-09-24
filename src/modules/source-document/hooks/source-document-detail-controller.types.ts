@@ -3,7 +3,6 @@ import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type {
   PartialBatchCommandResult,
   SourceDocument,
-  SourceDocumentLight,
   SplitSourceDocumentInput,
   SplitSourceDocumentResultDto,
 } from "@/modules/source-document/contracts";
@@ -12,7 +11,7 @@ import type { AddEntryData } from "./useSourceDocumentDetailMutations";
 
 export interface UseSourceDocumentDetailControllerOptions {
   ledgerId: string;
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   ledgerEntries: LedgerEntry[];
   open: boolean;
   isCancelling: boolean;

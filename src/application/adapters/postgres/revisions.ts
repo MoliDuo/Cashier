@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type {
   RevisionProcessingStatus,
   SourceDocumentContract,
@@ -48,7 +48,6 @@ function mapRevision(
   return {
     id: row.id,
     sourceDocumentId: row.sourceDocumentId,
-    origin: row.origin,
     processingStatus: row.processingStatus,
     submittedAt: row.submittedAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
@@ -181,17 +180,11 @@ export async function createProcessingRevisionInTransaction(
     }
   }
 
-  const aggregate = await tx
-    .select({ value: max(sourceDocumentRevisions.revisionNumber) })
-    .from(sourceDocumentRevisions)
-    .where(eq(sourceDocumentRevisions.sourceDocumentId, sourceDocumentId))
-    .then((rows) => rows[0]);
   const revision = await tx
     .insert(sourceDocumentRevisions)
     .values({
       ledgerId: input.ledgerId,
       sourceDocumentId,
-      revisionNumber: (aggregate?.value ?? 0) + 1,
       origin: "submission",
       inputText: input.input.text,
       inputDocumentDate: input.input.documentDate,

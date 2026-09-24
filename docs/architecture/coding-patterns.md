@@ -45,6 +45,9 @@ required port through the use case boundary. Concrete runtime wiring belongs in 
   that changes nothing observable for the caller (a no-op replay, an unchanged field) must not
   increment `version` — every aggregate command that does produce a user-observable change
   increments the target document's `version` by exactly one.
+- Document details use one complete detail contract, including entries and evidence file metadata.
+  Historical revision numbers remain stored for audit; new revisions use UUID identities and document
+  versions for concurrency, without allocating sequential revision numbers.
 - Use the narrowest read port that satisfies the caller. Edit-retry evidence uses `getInput`; it
   must not load ledger entries or category projections that the caller discards.
 - Loaded ledger settings are complete contracts; only update inputs are partial. Do not repeat

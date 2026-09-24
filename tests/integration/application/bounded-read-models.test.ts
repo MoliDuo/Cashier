@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
 import { serverComposition } from "@/application/server-composition-root";
-import { getSourceDocumentFullQuery as getSourceDocumentFullQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-full";
+import { getSourceDocumentInputQuery as getSourceDocumentInputQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-input";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { ledgerEntries, sourceDocuments, storedFiles } from "@/persistence";
 import {
@@ -25,8 +25,8 @@ const queryPorts = {
 };
 const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>
   listStreamPageUseCase(ledgerId, input, queryPorts);
-const getSourceDocumentFullQuery = (ledgerId: string, sourceDocumentId: string) =>
-  getSourceDocumentFullQueryUseCase(ledgerId, sourceDocumentId, queryPorts.documents);
+const getSourceDocumentInputQuery = (ledgerId: string, sourceDocumentId: string) =>
+  getSourceDocumentInputQueryUseCase(ledgerId, sourceDocumentId, queryPorts.documents);
 
 const SOURCE_LIST_KEYS = [
   "bookId",
@@ -311,7 +311,7 @@ describe("bounded target read models", () => {
       expect(serialized).not.toContain(forbidden);
     }
 
-    const detail = await getSourceDocumentFullQuery(ledgerId, documents[0]!.id);
+    const detail = await getSourceDocumentInputQuery(ledgerId, documents[0]!.id);
     expect(Object.keys(detail).sort()).toEqual(
       ["createdAt", "documentDate", "files", "id", "processingStatus", "text"].sort()
     );

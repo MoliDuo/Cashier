@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/errors";
 
 type QueryActions = {
-  detail: typeof import("@/modules/source-document/server/get-document-light").getSourceDocumentLightAction;
+  detail: typeof import("@/modules/source-document/server/get-document-detail").getSourceDocumentDetailAction;
   stream: (
     ledgerId: string,
     input: import("@/modules/source-document/application/queries/list-stream-page").ListStreamPageInput
@@ -62,7 +62,7 @@ function query<K extends keyof QueryActions>(name: K) {
   };
 }
 
-export const getSourceDocumentLightAction = query("detail");
+export const getSourceDocumentDetailAction = query("detail");
 export const listStreamPageAction = query("stream");
 export const getStreamTotalAction = query("total");
 export const getStreamRefreshAction = query("refresh");

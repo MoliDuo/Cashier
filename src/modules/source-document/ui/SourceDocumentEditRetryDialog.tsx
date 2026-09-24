@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SourceDocumentInput } from "./SourceDocumentInput";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { getSourceDocumentFullAction } from "@/modules/source-document/server-actions/queries";
+import { getSourceDocumentInputAction } from "@/modules/source-document/server-actions/queries";
 import { queryKeys } from "@/lib/query-keys";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -70,14 +70,14 @@ function EditRetryDialogContent({
     (!hasStoredFiles && sourceDocument.hasImages === true) || (!hasStoredFiles && !hasText);
 
   const {
-    data: fullData,
+    data: inputData,
     isLoading,
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: queryKeys.sourceDocumentFull(ledgerId, sourceDocument.id),
+    queryKey: queryKeys.sourceDocumentInput(ledgerId, sourceDocument.id),
     queryFn: async () => {
-      const result = await getSourceDocumentFullAction(ledgerId, sourceDocument.id);
+      const result = await getSourceDocumentInputAction(ledgerId, sourceDocument.id);
       if (result == null) return null;
       return result;
     },
@@ -87,10 +87,10 @@ function EditRetryDialogContent({
   });
 
   const initialData = useMemo(
-    () => buildSourceDocumentRetrySeed(sourceDocument, fullData ?? undefined),
-    [sourceDocument, fullData]
+    () => buildSourceDocumentRetrySeed(sourceDocument, inputData ?? undefined),
+    [sourceDocument, inputData]
   );
-  const seedReady = !needsFetch || fullData != null;
+  const seedReady = !needsFetch || inputData != null;
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}>

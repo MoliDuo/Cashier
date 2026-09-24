@@ -74,11 +74,11 @@ function documentWithFiles(count: number): SourceDocument {
     failureKind: null,
     failureMessage: null,
     documentDate: "2026-07-28",
-    metadata: {},
     createdAt: "2026-07-28T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",
-    deletedAt: null,
     supportedActions: [],
+    ledgerEntries: [],
+    hasImages: count > 0,
     canEdit: true,
     errorCode: null,
   };
@@ -89,7 +89,7 @@ function renderWithQueryClient(element: ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
 }
 
-function renderDetails(count: number, isLoadingImages = false) {
+function renderDetails(count: number) {
   const sourceDocument = documentWithFiles(count);
   return renderWithQueryClient(
     <SourceDocumentViewDetails
@@ -99,7 +99,6 @@ function renderDetails(count: number, isLoadingImages = false) {
       pendingChanges={{ sourceDoc: {}, entries: {} }}
       selectedEntryIds={[]}
       isSelectionMode={false}
-      isLoadingImages={isLoadingImages}
       mobileView="details"
       onMobileViewChange={vi.fn()}
       onSourceDocChange={vi.fn()}
@@ -172,18 +171,6 @@ describe("SourceDocumentViewDetails image stage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the image skeleton instead of the empty state while evidence is loading", () => {
-    renderDetails(0, true);
-    expect(screen.getByTestId("source-document-image-stage-loading")).toBeInTheDocument();
-    expect(screen.queryByText(/暂无原始凭证|No original evidence/i)).not.toBeInTheDocument();
-  });
-
-  it("uses the same stable stage geometry while images are loading", () => {
-    renderDetails(1, true);
-    expect(screen.getByTestId("source-document-image-stage-loading")).toHaveClass("aspect-[4/3]");
-    expect(screen.queryByTestId("source-document-image-stage")).not.toBeInTheDocument();
-  });
-
   it("uses the authenticated stored-file route and hides thumbnails for one image", () => {
     renderDetails(1);
     const stage = screen.getByTestId("source-document-image-stage");
@@ -250,9 +237,9 @@ describe("SourceDocumentViewDetails selection", () => {
       description: null,
       convertedAmount: "12.00",
       exchangeRate: "1",
+      deletedAt: null,
       createdAt: "2026-07-28T00:00:00.000Z",
       updatedAt: "2026-07-28T00:00:00.000Z",
-      deletedAt: null,
     };
     const onToggleSelectionMode = vi.fn();
 
@@ -290,9 +277,9 @@ describe("SourceDocumentViewDetails selection", () => {
       description: null,
       convertedAmount: "12.00",
       exchangeRate: "1",
+      deletedAt: null,
       createdAt: "2026-07-28T00:00:00.000Z",
       updatedAt: "2026-07-28T00:00:00.000Z",
-      deletedAt: null,
     };
     const pendingChanges = {
       sourceDoc: {},
@@ -349,9 +336,9 @@ describe("SourceDocumentViewDetails entry row outline", () => {
     description: null,
     convertedAmount: "12.00",
     exchangeRate: "1",
+    deletedAt: null,
     createdAt: "2026-07-28T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",
-    deletedAt: null,
   });
 
   function renderSelection(ledgerEntries: LedgerEntry[], selectedEntryIds: string[]) {

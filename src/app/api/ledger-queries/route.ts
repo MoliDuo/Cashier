@@ -5,7 +5,7 @@ import { omitUndefinedProperties } from "@/lib/validation";
 import { requireLedgerAccess } from "@/modules/ledger/access";
 import { serverComposition } from "@/application/server-composition-root";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
-import { getSourceDocumentLightAction } from "@/modules/source-document/server/get-document-light";
+import { getSourceDocumentDetailAction } from "@/modules/source-document/server/get-document-detail";
 import { listStreamPage } from "@/modules/source-document/application/queries/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/application/queries/get-stream-total";
 import { getStreamRefresh } from "@/modules/source-document/application/queries/get-stream-refresh";
@@ -16,7 +16,6 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
-import { getLedgerEntryAction } from "@/modules/ledger/server/get-entry";
 import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
 import {
   getBookAction,
@@ -30,7 +29,6 @@ import {
   getCategoryReclassificationJobAction,
 } from "@/modules/ledger/server/get-category-reclassification-job";
 import { scheduleCategoryReclassificationRecoveryAfter } from "@/application/processing/schedule-category-reclassification";
-import { parseLedgerEntryId } from "@/modules/ledger/contract-schemas";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
@@ -49,7 +47,6 @@ const requestSchema = z
       "total",
       "refresh",
       "entries",
-      "entry",
       "ledger",
       "books",
       "books-including-archived",
@@ -89,7 +86,7 @@ export async function POST(request: Request) {
       const input = payload.args[1];
       switch (payload.query) {
         case "detail":
-          result = await getSourceDocumentLightAction(
+          result = await getSourceDocumentDetailAction(
             ledgerId,
             sourceDocumentIdSchema.parse(input)
           );
@@ -125,9 +122,6 @@ export async function POST(request: Request) {
           break;
         case "entries":
           result = await getLedgerEntriesAction(ledgerId, input);
-          break;
-        case "entry":
-          result = await getLedgerEntryAction(ledgerId, parseLedgerEntryId(input));
           break;
         case "ledger":
           singleArgumentSchema.parse(payload.args);

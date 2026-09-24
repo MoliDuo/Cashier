@@ -6,23 +6,14 @@ import { queryKeys } from "@/lib/query-keys";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { useCategoryMutations } from "@/modules/ledger/hooks/useCategoryMutations";
 
-const { createAction, updateAction, reorderAction, saveAction, metadataAction } = vi.hoisted(
-  () => ({
-    createAction: vi.fn(),
-    updateAction: vi.fn(),
-    reorderAction: vi.fn(),
-    saveAction: vi.fn(),
-    metadataAction: vi.fn(),
-  })
-);
+const { saveAction, metadataAction } = vi.hoisted(() => ({
+  saveAction: vi.fn(),
+  metadataAction: vi.fn(),
+}));
 
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
-  createEntryCategoryAction: createAction,
-  updateEntryCategoryAction: updateAction,
-  deleteEntryCategoryAction: vi.fn(),
-  reorderEntryCategoriesAction: reorderAction,
   saveEntryCategoriesAction: saveAction,
 }));
 vi.mock("@/modules/ledger/server-actions/category-metadata", () => ({

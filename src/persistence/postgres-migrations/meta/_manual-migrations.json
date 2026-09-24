@@ -105,6 +105,10 @@
     {
       "file": "0054_retire_legacy_upload_sessions.sql",
       "sha256": "32e20337955b1f6102f24b2c88b8da0fa234f45ad93417cb524c83292f51dbc4"
+    },
+    {
+      "file": "0055_retire_revision_number_allocation.sql",
+      "sha256": "c5065ac75158014c03909e69f5ac321956ca86a5e614d7cdab02c4ba5ee5a96e"
     }
   ]
 }

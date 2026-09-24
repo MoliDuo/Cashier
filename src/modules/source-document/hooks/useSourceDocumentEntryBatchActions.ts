@@ -7,13 +7,12 @@ import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type {
   PartialBatchCommandResult,
   SourceDocument,
-  SourceDocumentLight,
 } from "@/modules/source-document/contracts";
 import { SourceDocumentStaleCommandError } from "@/modules/source-document/command-results";
 
 interface UseSourceDocumentEntryBatchActionsOptions {
   busy: boolean;
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   ledgerEntries: LedgerEntry[];
   isSelectionMode: boolean;
   isEditMode: boolean;

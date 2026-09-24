@@ -3,21 +3,17 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { FileText, ImagePlay, Maximize2 } from "lucide-react";
-import type { SourceDocument, SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
 import { storedFileReadUrl } from "../../../stored-file-read";
 import { SourceDocumentImageModal } from "../../SourceDocumentImageModal";
 
 interface SourceDocumentRawEvidenceProps {
-  sourceDocument: SourceDocument | SourceDocumentLight;
-  isLoadingImages: boolean;
+  sourceDocument: SourceDocument;
 }
 
-export function SourceDocumentRawEvidence({
-  sourceDocument,
-  isLoadingImages,
-}: SourceDocumentRawEvidenceProps) {
+export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawEvidenceProps) {
   const t = useTranslations("SourceDocumentDetail");
   const tCard = useTranslations("SourceDocumentCard");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -48,12 +44,12 @@ export function SourceDocumentRawEvidence({
         </header>
 
         <div className="space-y-4 px-3 pb-3 pt-3">
-          {!hasImages && !hasRawText && !isLoadingImages ? (
+          {!hasImages && !hasRawText ? (
             <p className={textRoleClassName("bodyMuted", "px-3 py-6 text-center")}>
               {t("noEvidence")}
             </p>
           ) : null}
-          {(hasImages || isLoadingImages) && (
+          {hasImages && (
             <div>
               <h3
                 className={textRoleClassName("meta", "mb-2 flex items-center gap-1.5 font-medium")}
@@ -61,12 +57,7 @@ export function SourceDocumentRawEvidence({
                 <ImagePlay className="h-3 w-3 text-primary/60" />
                 {tCard("image")}
               </h3>
-              {isLoadingImages ? (
-                <div
-                  data-testid="source-document-image-stage-loading"
-                  className="aspect-[4/3] w-full animate-pulse rounded-md border border-border/50 bg-border/40 sm:max-h-[52dvh]"
-                />
-              ) : files[selectedImageIndex] == null ? null : (
+              {files[selectedImageIndex] == null ? null : (
                 <>
                   <button
                     type="button"

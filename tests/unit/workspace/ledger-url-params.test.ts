@@ -3,7 +3,6 @@ import {
   buildLedgerUrl,
   parseStatusesParam,
   formatStatusesParam,
-  migrateLegacyLedgerSearchParams,
   normalizeLedgerUrlSearchParams,
   readLedgerFilterParams,
   readStatsSearchParams,
@@ -17,47 +16,44 @@ describe("ledger-url-params", () => {
     vi.restoreAllMocks();
   });
 
-  it("preserves unrelated params while updating tab only", () => {
-    const params = updateLedgerSearchParams(new URLSearchParams("period=month&categoryId=cat_1"), {
-      tab: "details",
-    });
-
-    expect(params.toString()).toContain("tab=details");
-    expect(params.toString()).toContain("period=month");
-    expect(params.toString()).toContain("categoryId=cat_1");
-  });
-
   it("clears startDate and endDate when switching to non-custom period", () => {
     const params = updateLedgerSearchParams(
-      new URLSearchParams("period=custom&startDate=2024-01-01&endDate=2024-01-31"),
-      { period: "week" }
+      new URLSearchParams(
+        "streamPeriod=custom&streamStartDate=2024-01-01&streamEndDate=2024-01-31"
+      ),
+      { period: "week" },
+      "stream"
     );
 
-    expect(params.get("period")).toBe("week");
-    expect(params.get("startDate")).toBeNull();
-    expect(params.get("endDate")).toBeNull();
+    expect(params.get("streamPeriod")).toBe("week");
+    expect(params.get("streamStartDate")).toBeNull();
+    expect(params.get("streamEndDate")).toBeNull();
   });
 
   it("treats __uncategorized__ as a real category filter while clearing empty params", () => {
     const params = updateLedgerSearchParams(
-      new URLSearchParams("categoryId=old&currency=USD&minAmount=5&maxAmount=10"),
+      new URLSearchParams(
+        "streamCategoryId=old&streamCurrency=USD&streamMinAmount=5&streamMaxAmount=10"
+      ),
       {
         categoryId: "__uncategorized__",
         currency: "",
         minAmount: null,
         maxAmount: "NaN",
-      }
+      },
+      "stream"
     );
 
-    expect(params.get("categoryId")).toBe("__uncategorized__");
-    expect(params.get("currency")).toBeNull();
-    expect(params.get("minAmount")).toBeNull();
-    expect(params.get("maxAmount")).toBeNull();
+    expect(params.get("streamCategoryId")).toBe("__uncategorized__");
+    expect(params.get("streamCurrency")).toBeNull();
+    expect(params.get("streamMinAmount")).toBeNull();
+    expect(params.get("streamMaxAmount")).toBeNull();
   });
 
   it("reads __uncategorized__ back from the URL", () => {
     const filters = readLedgerFilterParams(
-      new URLSearchParams("categoryId=__uncategorized__&currency=USD")
+      new URLSearchParams("streamCategoryId=__uncategorized__&streamCurrency=USD"),
+      "stream"
     );
 
     expect(filters.categoryId).toBe("__uncategorized__");
@@ -65,16 +61,23 @@ describe("ledger-url-params", () => {
   });
 
   it("doesn't drop uncategorized when unrelated params change", () => {
-    const params = updateLedgerSearchParams(new URLSearchParams("categoryId=__uncategorized__"), {
-      currency: "EUR",
-    });
+    const params = updateLedgerSearchParams(
+      new URLSearchParams("streamCategoryId=__uncategorized__"),
+      {
+        currency: "EUR",
+      },
+      "stream"
+    );
 
-    expect(params.toString()).toContain("categoryId=__uncategorized__");
+    expect(params.toString()).toContain("streamCategoryId=__uncategorized__");
   });
 
   it("reads normalized filter params from URLSearchParams", () => {
     const filters = readLedgerFilterParams(
-      new URLSearchParams("categoryId=cat_2&currency=EUR&minAmount=100&maxAmount=250")
+      new URLSearchParams(
+        "streamCategoryId=cat_2&streamCurrency=EUR&streamMinAmount=100&streamMaxAmount=250"
+      ),
+      "stream"
     );
 
     expect(filters).toEqual({
@@ -88,58 +91,55 @@ describe("ledger-url-params", () => {
   });
 
   it("writes and overwrites numeric filter params", () => {
-    const params = updateLedgerSearchParams(new URLSearchParams("minAmount=5"), {
-      minAmount: "100",
-      maxAmount: "250",
-    });
+    const params = updateLedgerSearchParams(
+      new URLSearchParams("streamMinAmount=5"),
+      {
+        minAmount: "100",
+        maxAmount: "250",
+      },
+      "stream"
+    );
 
-    expect(params.get("minAmount")).toBe("100");
-    expect(params.get("maxAmount")).toBe("250");
+    expect(params.get("streamMinAmount")).toBe("100");
+    expect(params.get("streamMaxAmount")).toBe("250");
   });
 
   it("rejects non-finite and blank numeric filter params", () => {
     for (const raw of ["", " ", "Infinity", "-Infinity", "NaN"]) {
       const filters = readLedgerFilterParams(
-        new URLSearchParams(`minAmount=${encodeURIComponent(raw)}`)
+        new URLSearchParams(`streamMinAmount=${encodeURIComponent(raw)}`),
+        "stream"
       );
       expect(filters.minAmount).toBeNull();
     }
 
-    const params = updateLedgerSearchParams(new URLSearchParams("minAmount=1&maxAmount=2"), {
-      minAmount: "Infinity",
-      maxAmount: "-Infinity",
-    });
-    expect(params.get("minAmount")).toBeNull();
-    expect(params.get("maxAmount")).toBeNull();
-  });
-
-  it("preserves legacy search params until a scoped update migrates them", () => {
     const params = updateLedgerSearchParams(
-      new URLSearchParams("search=coffee&period=thisMonth&foo=bar"),
-      { tab: "details" }
+      new URLSearchParams("streamMinAmount=1&streamMaxAmount=2"),
+      {
+        minAmount: "Infinity",
+        maxAmount: "-Infinity",
+      },
+      "stream"
     );
-
-    expect(params.get("search")).toBe("coffee");
-    expect(params.get("period")).toBe("thisMonth");
-    expect(params.get("foo")).toBe("bar");
-    expect(params.get("tab")).toBe("details");
+    expect(params.get("streamMinAmount")).toBeNull();
+    expect(params.get("streamMaxAmount")).toBeNull();
   });
 
   it("builds URLs without introducing navigation side effects", () => {
-    const params = new URLSearchParams("tab=details&period=custom");
+    const params = new URLSearchParams("tab=details&streamPeriod=custom");
 
     expect(buildLedgerUrl("/ledger/test-id", params)).toBe(
-      "/ledger/test-id?tab=details&period=custom"
+      "/ledger/test-id?tab=details&streamPeriod=custom"
     );
   });
 
   it("replaces the browser URL synchronously", () => {
     const replaceState = vi.spyOn(window.history, "replaceState").mockImplementation(() => {});
-    const params = new URLSearchParams("tab=details&period=custom");
+    const params = new URLSearchParams("tab=details&streamPeriod=custom");
 
     const replacedUrl = replaceLedgerUrl("/ledger/test-id", params);
 
-    expect(replacedUrl).toBe("/ledger/test-id?tab=details&period=custom");
+    expect(replacedUrl).toBe("/ledger/test-id?tab=details&streamPeriod=custom");
     expect(replaceState).toHaveBeenCalled();
   });
 
@@ -227,29 +227,6 @@ describe("ledger-url-params", () => {
     expect(readLedgerFilterParams(details, "details").search).toBe("morning");
   });
 
-  it("does not read legacy filters until they are explicitly migrated", () => {
-    const legacy = new URLSearchParams(
-      "period=custom&startDate=2026-07-01&endDate=2026-07-31&categoryId=cat-1&statuses=failed"
-    );
-
-    expect(readLedgerFilterParams(legacy, "stream").categoryId).toBeNull();
-    const migratedLegacy = migrateLegacyLedgerSearchParams(legacy, "stream");
-    expect(migratedLegacy).not.toBeNull();
-    const migrated = updateLedgerSearchParams(
-      migratedLegacy ?? legacy,
-      { currency: "CNY" },
-      "stream"
-    );
-
-    expect(migrated.get("period")).toBeNull();
-    expect(migrated.get("categoryId")).toBeNull();
-    expect(migrated.get("streamPeriod")).toBe("custom");
-    expect(migrated.get("streamStartDate")).toBe("2026-07-01");
-    expect(migrated.get("streamEndDate")).toBe("2026-07-31");
-    expect(migrated.get("streamCategoryId")).toBe("cat-1");
-    expect(migrated.get("streamStatuses")).toBe("failed");
-  });
-
   describe("parseStatusesParam", () => {
     it("normalizes status filters into canonical valid values", () => {
       const cases = [
@@ -288,61 +265,78 @@ describe("ledger-url-params", () => {
 
   describe("statuses in updateLedgerSearchParams", () => {
     it("sets statuses parameter when provided", () => {
-      const params = updateLedgerSearchParams(new URLSearchParams(""), {
-        statuses: ["failed", "failed"],
-      });
+      const params = updateLedgerSearchParams(
+        new URLSearchParams(""),
+        {
+          statuses: ["failed", "failed"],
+        },
+        "stream"
+      );
 
-      expect(params.get("statuses")).toBe("failed");
+      expect(params.get("streamStatuses")).toBe("failed");
     });
 
     it("deletes statuses parameter when the filter is cleared", () => {
       for (const statuses of [null, []] as const) {
-        const params = updateLedgerSearchParams(new URLSearchParams("statuses=processing,failed"), {
-          statuses: statuses == null ? null : [...statuses],
-        });
-        expect(params.get("statuses")).toBeNull();
+        const params = updateLedgerSearchParams(
+          new URLSearchParams("streamStatuses=processing,failed"),
+          {
+            statuses: statuses == null ? null : [...statuses],
+          },
+          "stream"
+        );
+        expect(params.get("streamStatuses")).toBeNull();
       }
     });
 
     it("preserves existing statuses when not in updates", () => {
-      const params = updateLedgerSearchParams(new URLSearchParams("statuses=processing,failed"), {
-        period: "all",
-      });
+      const params = updateLedgerSearchParams(
+        new URLSearchParams("streamStatuses=processing,failed"),
+        {
+          period: "all",
+        },
+        "stream"
+      );
 
-      expect(params.get("statuses")).toBe("processing,failed");
+      expect(params.get("streamStatuses")).toBe("processing,failed");
     });
 
     it("sets statuses together with other params in one update", () => {
       const params = updateLedgerSearchParams(
-        new URLSearchParams("period=thisMonth&minAmount=10"),
+        new URLSearchParams("streamPeriod=thisMonth&streamMinAmount=10"),
         {
           period: "all",
           minAmount: null,
           maxAmount: null,
           statuses: ["cancelled", "failed", "failed"],
-          tab: "stream",
-        }
+        },
+        "stream"
       );
 
-      expect(params.get("period")).toBe("all");
-      expect(params.get("startDate")).toBeNull();
-      expect(params.get("endDate")).toBeNull();
-      expect(params.get("minAmount")).toBeNull();
-      expect(params.get("maxAmount")).toBeNull();
-      expect(params.get("statuses")).toBe("failed,cancelled");
-      expect(params.get("tab")).toBe("stream");
+      expect(params.get("streamPeriod")).toBe("all");
+      expect(params.get("streamStartDate")).toBeNull();
+      expect(params.get("streamEndDate")).toBeNull();
+      expect(params.get("streamMinAmount")).toBeNull();
+      expect(params.get("streamMaxAmount")).toBeNull();
+      expect(params.get("streamStatuses")).toBe("failed,cancelled");
     });
   });
 
   describe("statuses in readLedgerFilterParams", () => {
     it("reads statuses from URL", () => {
-      const filters = readLedgerFilterParams(new URLSearchParams("statuses=processing,failed"));
+      const filters = readLedgerFilterParams(
+        new URLSearchParams("streamStatuses=processing,failed"),
+        "stream"
+      );
 
       expect(filters.statuses).toEqual(["processing", "failed"]);
     });
 
     it("returns empty array when statuses param is absent", () => {
-      const filters = readLedgerFilterParams(new URLSearchParams("categoryId=cat_1"));
+      const filters = readLedgerFilterParams(
+        new URLSearchParams("streamCategoryId=cat_1"),
+        "stream"
+      );
 
       expect(filters.statuses).toEqual([]);
     });
@@ -352,10 +346,26 @@ describe("ledger-url-params", () => {
     it("ignores the legacy ?bookId URL parameter entirely", () => {
       // The scope moved to a device cookie; a link that still carries the old
       // parameter is read as 总账 and the parameter is not even cleaned up.
-      expect(readLedgerFilterParams(new URLSearchParams("bookId=nonsense"))).toBeDefined();
+      expect(
+        readLedgerFilterParams(new URLSearchParams("bookId=nonsense"), "stream")
+      ).toBeDefined();
       expect(
         normalizeLedgerUrlSearchParams(new URLSearchParams(`bookId=${"1".repeat(36)}`))
       ).toBeNull();
     });
+  });
+});
+
+it("ignores unscoped bookmarks instead of migrating them", () => {
+  const params = new URLSearchParams("categoryId=old&statuses=failed&search=coffee");
+  expect(readLedgerFilterParams(params, "stream")).toMatchObject({
+    categoryId: null,
+    statuses: [],
+    search: null,
+  });
+  expect(readLedgerFilterParams(params, "details")).toMatchObject({
+    categoryId: null,
+    statuses: [],
+    search: null,
   });
 });

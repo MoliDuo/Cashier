@@ -33,7 +33,6 @@ import {
 import { storedFileAdapter } from "@/application/adapters/storage";
 import { listLedgerEntryPage } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-page";
 import { getBatchEntryDateImpact } from "@/application/adapters/postgres/ledger-reads/get-batch-entry-date-impact";
-import { getLedgerEntryDetail } from "@/application/adapters/postgres/ledger-reads/get-ledger-entry-detail";
 import { calculateLedgerEntryStats } from "@/application/adapters/postgres/ledger-reads/calculate-ledger-entry-stats";
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-views-by-source-document-ids";
 import { hasActiveLedgerEntries } from "@/application/adapters/postgres/ledger-reads/has-active-entries";
@@ -98,7 +97,6 @@ export const serverComposition = {
     hasActiveEntries: hasActiveLedgerEntries,
     calculateStats: calculateLedgerEntryStats,
     getBatchEntryDateImpact,
-    getEntry: getLedgerEntryDetail,
     listEntries: listLedgerEntryPage,
     listEntriesBySourceDocumentIds: listLedgerEntryViewsBySourceDocumentIds,
   },

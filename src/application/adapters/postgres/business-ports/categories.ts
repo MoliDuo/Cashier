@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { CategoryPort } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { ConflictError, ValidationError } from "@/lib/errors";
@@ -98,47 +98,6 @@ export const postgresCategoryAdapter: CategoryPort = {
     }));
   },
 
-  async create(ledgerId, input) {
-    return db.transaction(async (tx) => {
-      await lockLedgerForUpdate(tx, ledgerId);
-      const [last] = await tx
-        .select({ sortOrder: entryCategories.sortOrder })
-        .from(entryCategories)
-        .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
-        .orderBy(desc(entryCategories.sortOrder))
-        .limit(1);
-      const created = await tx
-        .insert(entryCategories)
-        .values({ ...input, ledgerId, sortOrder: input.sortOrder ?? (last?.sortOrder ?? -1) + 1 })
-        .returning()
-        .then((rows) => rows[0]);
-      if (created == null) throw new ConflictError("Failed to create category");
-      return mapCategory(created);
-    });
-  },
-
-  async update(ledgerId, categoryId, input) {
-    return db.transaction(async (tx) => {
-      await lockLedgerForUpdate(tx, ledgerId);
-      if (input.name !== undefined || input.description !== undefined) {
-        await assertCategoryCandidatesMutable(tx, ledgerId, [categoryId]);
-      }
-      const updated = await tx
-        .update(entryCategories)
-        .set({ ...input, updatedAt: new Date() })
-        .where(
-          and(
-            eq(entryCategories.ledgerId, ledgerId),
-            eq(entryCategories.id, categoryId),
-            isNull(entryCategories.deletedAt)
-          )
-        )
-        .returning()
-        .then((rows) => rows[0]);
-      return updated == null ? null : mapCategory(updated);
-    });
-  },
-
   async updateMissingMetadata(ledgerId, categoryId, input) {
     return db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, ledgerId);
@@ -188,84 +147,6 @@ export const postgresCategoryAdapter: CategoryPort = {
     });
   },
 
-  async delete(ledgerId, categoryId) {
-    return db.transaction(async (tx) => {
-      await lockLedgerForUpdate(tx, ledgerId);
-      await assertCategoryCandidatesMutable(tx, ledgerId, [categoryId]);
-      const category = await tx
-        .select({ id: entryCategories.id })
-        .from(entryCategories)
-        .where(
-          and(
-            eq(entryCategories.ledgerId, ledgerId),
-            eq(entryCategories.id, categoryId),
-            isNull(entryCategories.deletedAt)
-          )
-        )
-        .then((rows) => rows[0]);
-      if (category == null) return false;
-      const now = new Date();
-      await tx
-        .update(ledgerEntries)
-        .set({ categoryId: null, updatedAt: now })
-        .where(
-          and(
-            eq(ledgerEntries.ledgerId, ledgerId),
-            eq(ledgerEntries.categoryId, categoryId),
-            isNull(ledgerEntries.deletedAt)
-          )
-        );
-      await tx
-        .update(entryCategories)
-        .set({ deletedAt: now, updatedAt: now })
-        .where(and(eq(entryCategories.ledgerId, ledgerId), eq(entryCategories.id, categoryId)));
-      return true;
-    });
-  },
-
-  async reorder(ledgerId, categoryIds) {
-    return db.transaction(async (tx) => {
-      await lockLedgerForUpdate(tx, ledgerId);
-      if (categoryIds.length === 0) return 0;
-      const active = await tx
-        .select({ id: entryCategories.id })
-        .from(entryCategories)
-        .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
-        .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
-      const activeIds = new Set(active.map((category) => category.id));
-      if (
-        categoryIds.length !== active.length ||
-        new Set(categoryIds).size !== categoryIds.length ||
-        categoryIds.some((categoryId) => !activeIds.has(categoryId))
-      ) {
-        throw new ValidationError("Category reorder must include every active category");
-      }
-      const ordering = JSON.stringify(
-        categoryIds.map((id, sortOrder) => ({ id, sort_order: sortOrder }))
-      );
-      const updated = await tx.execute(sql`
-        WITH positions AS (
-          SELECT * FROM jsonb_to_recordset(${ordering}::jsonb) AS value(
-            id uuid,
-            sort_order integer
-          )
-        )
-        UPDATE entry_categories AS category
-        SET sort_order = positions.sort_order,
-            updated_at = ${new Date()}
-        FROM positions
-        WHERE category.id = positions.id
-          AND category.ledger_id = ${ledgerId}
-          AND category.deleted_at IS NULL
-        RETURNING category.id
-      `);
-      if (updated.rows.length !== categoryIds.length) {
-        throw new ConflictError("Category reorder changed during update");
-      }
-      return categoryIds.length;
-    });
-  },
-
   async saveAll(ledgerId, targets, expectedRevision) {
     return db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, ledgerId);
@@ -306,6 +187,29 @@ export const postgresCategoryAdapter: CategoryPort = {
       const now = new Date();
       const removedIds = removed.map((category) => category.id);
       if (removedIds.length > 0) {
+        const affectedDocumentIds = await tx
+          .selectDistinct({ id: sourceDocuments.id })
+          .from(ledgerEntries)
+          .innerJoin(
+            sourceDocuments,
+            and(
+              eq(sourceDocuments.ledgerId, ledgerId),
+              eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
+              eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
+              isNull(sourceDocuments.deletedAt)
+            )
+          )
+          .where(
+            and(
+              eq(ledgerEntries.ledgerId, ledgerId),
+              inArray(ledgerEntries.categoryId, removedIds),
+              isNull(ledgerEntries.deletedAt)
+            )
+          )
+          .then((rows) => rows.map((row) => row.id).sort());
+        const documents = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
+        for (const document of documents) await assertSourceDocumentNotProcessing(tx, document);
+        await incrementCategoryChangedDocumentVersions(tx, ledgerId, affectedDocumentIds, now);
         await tx
           .update(ledgerEntries)
           .set({ categoryId: null, updatedAt: now })

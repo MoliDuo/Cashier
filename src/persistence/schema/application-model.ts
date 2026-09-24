@@ -70,7 +70,8 @@ export const sourceDocumentRevisions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
-    revisionNumber: integer("revision_number").notNull(),
+    // Historical numbering is retained for existing records; new revisions use UUID identity.
+    revisionNumber: integer("revision_number"),
     title: text("title"),
     origin: revisionOriginEnum("origin").notNull().default("submission"),
     inputText: text("input_text"),

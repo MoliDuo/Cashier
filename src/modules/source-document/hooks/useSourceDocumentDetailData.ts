@@ -1,8 +1,8 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SourceDocumentResultDto } from "../contracts";
+import type { SourceDocumentDetailDto } from "../contracts";
 import { queryKeys } from "@/lib/query-keys";
-import { getSourceDocumentLightAction } from "@/lib/queries/ledger-query-client";
+import { getSourceDocumentDetailAction } from "@/lib/queries/ledger-query-client";
 import { QUERY } from "@/lib/constants";
 import { withQueryTimeout } from "@/lib/query-timeout";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
@@ -23,8 +23,8 @@ export function useSourceDocumentDetailData({
   const query = useQuery({
     queryKey: key,
     queryFn: async () => {
-      const incoming = await withQueryTimeout(getSourceDocumentLightAction(ledgerId, id));
-      const current = queryClient.getQueryData<SourceDocumentResultDto>(key);
+      const incoming = await withQueryTimeout(getSourceDocumentDetailAction(ledgerId, id));
+      const current = queryClient.getQueryData<SourceDocumentDetailDto>(key);
       return incoming != null && current != null && current.version > incoming.version
         ? current
         : incoming;
@@ -40,17 +40,11 @@ export function useSourceDocumentDetailData({
   useLedgerRefreshPolling(ledgerId, open && id !== "");
 
   const currentLedgerEntries = sourceDocument?.ledgerEntries ?? [];
-  const isLoadingImages =
-    sourceDocument != null &&
-    sourceDocument.hasImages === true &&
-    sourceDocument.files.length === 0;
-
   return {
     sourceDocument: sourceDocument ?? null,
     currentLedgerEntries,
     ledgerId: sourceDocument?.ledgerId ?? ledgerId,
     isLoading,
-    isLoadingImages,
     error,
     refetch: query.refetch,
   };

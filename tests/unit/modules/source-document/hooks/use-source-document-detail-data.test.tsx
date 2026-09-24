@@ -5,10 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSourceDocumentDetailData } from "@/modules/source-document/hooks/useSourceDocumentDetailData";
 import { queryKeys } from "@/lib/query-keys";
 
-const getSourceDocumentLightAction = vi.fn();
+const getSourceDocumentDetailAction = vi.fn();
 
 vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getSourceDocumentLightAction: (...args: unknown[]) => getSourceDocumentLightAction(...args),
+  getSourceDocumentDetailAction: (...args: unknown[]) => getSourceDocumentDetailAction(...args),
 }));
 
 describe("useSourceDocumentDetailData", () => {
@@ -19,7 +19,7 @@ describe("useSourceDocumentDetailData", () => {
     );
     const key = queryKeys.sourceDocument("ledger-1", "source-1");
     let resolve!: (value: unknown) => void;
-    getSourceDocumentLightAction.mockReturnValue(
+    getSourceDocumentDetailAction.mockReturnValue(
       new Promise((done) => {
         resolve = done;
       })
@@ -28,7 +28,7 @@ describe("useSourceDocumentDetailData", () => {
       () => useSourceDocumentDetailData({ ledgerId: "ledger-1", id: "source-1", open: true }),
       { wrapper }
     );
-    await waitFor(() => expect(getSourceDocumentLightAction).toHaveBeenCalled());
+    await waitFor(() => expect(getSourceDocumentDetailAction).toHaveBeenCalled());
     await act(async () => {
       queryClient.setQueryData(key, {
         id: "source-1",
@@ -42,20 +42,17 @@ describe("useSourceDocumentDetailData", () => {
     expect(queryClient.getQueryData(key)).toMatchObject({ version: 3 });
   });
   beforeEach(() => {
-    getSourceDocumentLightAction.mockReset().mockResolvedValue({
+    getSourceDocumentDetailAction.mockReset().mockResolvedValue({
       id: "11111111-1111-4111-8111-111111111111",
       ledgerId: "ledger-1",
       title: "Lunch",
       text: "receipt",
       files: [],
       processingStatus: "completed",
-      type: "text",
       failureMessage: null,
       documentDate: "2026-07-15",
-      metadata: {},
       createdAt: "2026-07-15T00:00:00.000Z",
       updatedAt: "2026-07-15T00:00:00.000Z",
-      deletedAt: null,
       ledgerEntries: [],
       hasImages: false,
       supportedActions: ["retry", "edit_retry", "delete"],
@@ -82,8 +79,8 @@ describe("useSourceDocumentDetailData", () => {
     );
 
     await waitFor(() => expect(result.current.sourceDocument?.title).toBe("Lunch"));
-    expect(getSourceDocumentLightAction).toHaveBeenCalledTimes(1);
-    expect(getSourceDocumentLightAction).toHaveBeenCalledWith(
+    expect(getSourceDocumentDetailAction).toHaveBeenCalledTimes(1);
+    expect(getSourceDocumentDetailAction).toHaveBeenCalledWith(
       "ledger-1",
       "11111111-1111-4111-8111-111111111111"
     );
@@ -102,7 +99,6 @@ describe("useSourceDocumentDetailData", () => {
         text: "receipt",
         files: [],
         processingStatus: "completed",
-        type: "text",
         failureMessage: null,
         documentDate: "2026-07-28",
         createdAt: "2026-07-15T00:00:00.000Z",
@@ -128,7 +124,7 @@ describe("useSourceDocumentDetailData", () => {
     );
 
     expect(result.current.sourceDocument?.documentDate).toBe("2026-07-28");
-    expect(getSourceDocumentLightAction).not.toHaveBeenCalled();
+    expect(getSourceDocumentDetailAction).not.toHaveBeenCalled();
   });
 
   it("shows stale cached data immediately and refreshes it in the background", async () => {
@@ -144,7 +140,6 @@ describe("useSourceDocumentDetailData", () => {
         text: "receipt",
         files: [],
         processingStatus: "completed",
-        type: "text",
         failureMessage: null,
         documentDate: "2026-07-28",
         createdAt: "2026-07-15T00:00:00.000Z",
@@ -171,7 +166,7 @@ describe("useSourceDocumentDetailData", () => {
     );
 
     expect(result.current.sourceDocument?.title).toBe("Cached");
-    await waitFor(() => expect(getSourceDocumentLightAction).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getSourceDocumentDetailAction).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.sourceDocument?.title).toBe("Lunch"));
   });
 });

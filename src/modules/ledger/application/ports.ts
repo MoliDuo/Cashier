@@ -93,7 +93,6 @@ export interface CategoryReclassificationJobPort {
 
 export interface LedgerReadPort {
   hasActiveEntries(ledgerId: string): Promise<boolean>;
-  getEntry(id: string, ledgerId: string): Promise<LedgerEntryDto | null>;
   listEntries(input: {
     ledgerId: string;
     limit?: number;

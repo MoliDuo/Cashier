@@ -77,10 +77,8 @@ export const queryKeys = {
     ["ledger", ledgerId, "source-document", documentId, "detail"] as const,
   sourceDocumentDetailPrefix: (ledgerId: string) =>
     ["ledger", ledgerId, "source-document"] as const,
-  sourceDocumentLight: (ledgerId: string, documentId: string) =>
-    ["ledger", ledgerId, "source-document", documentId, "light"] as const,
-  sourceDocumentFull: (ledgerId: string, id: string) =>
-    ["ledger", ledgerId, "source-document", id, "full"] as const,
+  sourceDocumentInput: (ledgerId: string, id: string) =>
+    ["ledger", ledgerId, "source-document", id, "input"] as const,
   sourceDocumentRefresh: (ledgerId: string) =>
     ["ledger", ledgerId, "source-documents", "refresh"] as const,
 

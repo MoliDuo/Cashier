@@ -245,13 +245,3 @@ export interface LedgerSettingsViewDto {
   uncategorizedCount: number;
   credentials: ServiceCredentialDto[];
 }
-
-export interface DeleteEntryCategoryResultDto {
-  categoryId: string;
-  deleted: boolean;
-}
-
-export interface ReorderEntryCategoriesResultDto {
-  categoryIds: string[];
-  reorderedCount: number;
-}

@@ -27,7 +27,7 @@ export class LedgerMainCurrencyChangedError extends ConflictError {
   }
 }
 
-const CODE_BY_LEGACY_CODE: Readonly<Record<string, ApplicationErrorCode>> = {
+const APPLICATION_CODE_BY_APP_CODE: Readonly<Record<string, ApplicationErrorCode>> = {
   VALIDATION_ERROR: "VALIDATION_FAILED",
   UNAUTHORIZED: "UNAUTHENTICATED",
   FORBIDDEN: "FORBIDDEN",
@@ -38,19 +38,15 @@ const CODE_BY_LEGACY_CODE: Readonly<Record<string, ApplicationErrorCode>> = {
   STATS_RANGE_TOO_LARGE: "STATS_RANGE_TOO_LARGE",
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   RATE_LIMIT: "RATE_LIMITED",
-  LOCAL_STORAGE_UPLOAD_FAILED: "STORAGE_UNAVAILABLE",
-  LOCAL_STORAGE_DOWNLOAD_FAILED: "STORAGE_UNAVAILABLE",
   S3_UPLOAD_FAILED: "STORAGE_UNAVAILABLE",
   S3_DOWNLOAD_FAILED: "STORAGE_UNAVAILABLE",
   S3_DELETE_FAILED: "STORAGE_UNAVAILABLE",
   FILE_NOT_FOUND: "NOT_FOUND",
-  TASK_RUNTIME_EDGE_UNSUPPORTED: "PROCESSING_UNAVAILABLE",
-  TASK_RUNTIME_NOT_INITIALIZED: "PROCESSING_UNAVAILABLE",
 };
 
 export function toApplicationError(error: unknown): ApplicationErrorContract {
-  const legacyCode = error instanceof AppError ? error.code : undefined;
-  const code = legacyCode == null ? "INTERNAL" : (CODE_BY_LEGACY_CODE[legacyCode] ?? "INTERNAL");
+  const appCode = error instanceof AppError ? error.code : undefined;
+  const code = appCode == null ? "INTERNAL" : (APPLICATION_CODE_BY_APP_CODE[appCode] ?? "INTERNAL");
   const hidesDetails =
     code === "INTERNAL" || code === "STORAGE_UNAVAILABLE" || code === "PROCESSING_UNAVAILABLE";
   return {

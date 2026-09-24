@@ -1,12 +1,11 @@
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocumentLight } from "@/modules/source-document/contracts";
 import { useState, useMemo, useCallback } from "react";
 import { type EntryEditData } from "@/modules/source-document/types";
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import type { PendingChanges } from "@/modules/source-document/detail-types";
 
 interface UsePendingChangesOptions {
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   ledgerEntries: LedgerEntry[];
 }
 

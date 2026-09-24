@@ -88,7 +88,6 @@ export function LedgerPageClient({
     pathname,
     searchParams,
     ledgerId,
-    legacyScope: activeTab === "details" ? "details" : "stream",
   });
 
   const newRecordDialog = useNewRecordDialogState({ ledgerId });

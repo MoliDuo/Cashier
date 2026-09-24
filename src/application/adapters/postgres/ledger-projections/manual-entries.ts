@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, max, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/application/contracts";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
@@ -186,18 +186,6 @@ export async function replaceManualProjection(
   }
 }
 
-async function nextRevisionNumber(
-  tx: PostgresTransaction,
-  sourceDocumentId: string
-): Promise<number> {
-  const aggregate = await tx
-    .select({ value: max(sourceDocumentRevisions.revisionNumber) })
-    .from(sourceDocumentRevisions)
-    .where(eq(sourceDocumentRevisions.sourceDocumentId, sourceDocumentId))
-    .then((rows) => rows[0]);
-  return (aggregate?.value ?? 0) + 1;
-}
-
 export async function createManualRevision(
   tx: PostgresTransaction,
   input: {
@@ -209,14 +197,12 @@ export async function createManualRevision(
   }
 ) {
   const now = new Date();
-  const revisionNumber = await nextRevisionNumber(tx, input.sourceDocumentId);
   const revision = await tx
     .insert(sourceDocumentRevisions)
     .values({
       ...(input.revisionId === undefined ? {} : { id: input.revisionId }),
       ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
-      revisionNumber,
       origin: input.origin,
       inputText: input.inputText ?? null,
       processingStatus: null,

@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import {
-  migrateLegacyLedgerSearchParams,
-  normalizeLedgerUrlSearchParams,
-  readLedgerDetailSearchParams,
-  type LedgerFilterScope,
-} from "../ledger-url-params";
+import { normalizeLedgerUrlSearchParams, readLedgerDetailSearchParams } from "../ledger-url-params";
 import { replaceLedgerUrl } from "../ledger-url-navigation";
 import { writeLedgerHistory } from "@/lib/navigation/ledger-history";
 import { registerLedgerHistoryTraversal } from "@/lib/navigation/ledger-history-traversal";
@@ -16,14 +11,12 @@ import { useUnsavedChangesStore, type UnsavedChangesLeaveGuard } from "@/lib/sto
 interface UseLedgerHistorySyncOptions {
   pathname: string;
   searchParams: URLSearchParams;
-  legacyScope: LedgerFilterScope;
   ledgerId: string;
 }
 
 export function useLedgerHistorySync({
   pathname,
   searchParams,
-  legacyScope,
   ledgerId,
 }: UseLedgerHistorySyncOptions): void {
   const blockSyncRef = useRef(false);
@@ -44,13 +37,11 @@ export function useLedgerHistorySync({
   }, [pathname, searchParams]);
 
   useEffect(() => {
-    const migrated = migrateLegacyLedgerSearchParams(searchParams, legacyScope);
-    const normalized = normalizeLedgerUrlSearchParams(migrated ?? searchParams);
-    const next = normalized ?? migrated;
+    const next = normalizeLedgerUrlSearchParams(searchParams);
     if (next != null && next.toString() !== searchParams.toString()) {
       replaceLedgerUrl(pathname, next);
     }
-  }, [legacyScope, pathname, searchParams]);
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     if (blockSyncRef.current) {

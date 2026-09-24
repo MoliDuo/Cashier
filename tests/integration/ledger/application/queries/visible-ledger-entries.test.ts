@@ -14,18 +14,22 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
-const getLedgerEntryDetail = (id: string, ledgerId: string) =>
-  serverComposition.ledgerReads.getEntry(id, ledgerId);
+const findVisibleEntry = async (id: string, ledgerId: string) => {
+  const page = await serverComposition.ledgerReads.listEntries({
+    ledgerId,
+    limit: 100,
+    filters: {},
+  });
+  return page.items.find((entry) => entry.id === id) ?? null;
+};
 
-describe("getLedgerEntryDetail", () => {
+describe("visible ledger entries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("returns null when the entry does not exist", async () => {
-    await expect(
-      getLedgerEntryDetail(crypto.randomUUID(), crypto.randomUUID())
-    ).resolves.toBeNull();
+    await expect(findVisibleEntry(crypto.randomUUID(), crypto.randomUUID())).resolves.toBeNull();
   });
 
   it("returns null when entry exists but belongs to a different ledger", async () => {
@@ -44,7 +48,7 @@ describe("getLedgerEntryDetail", () => {
     await activateTestSourceDocumentProjection(db, sourceDocument.id);
 
     // pass a different ledgerId — should return null, not throw
-    await expect(getLedgerEntryDetail(entry.id, crypto.randomUUID())).resolves.toBeNull();
+    await expect(findVisibleEntry(entry.id, crypto.randomUUID())).resolves.toBeNull();
   });
 
   it("returns detail while stripping heavy source-document fields", async () => {
@@ -76,7 +80,7 @@ describe("getLedgerEntryDetail", () => {
       imageUrls: ["https://example.com/a.png", "https://example.com/b.png"],
     });
 
-    const result = await getLedgerEntryDetail(entry.id, ledger.id);
+    const result = await findVisibleEntry(entry.id, ledger.id);
 
     expect(result).not.toBeNull();
     expect(result?.id).toBe(entry.id);

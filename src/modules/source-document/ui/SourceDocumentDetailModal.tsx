@@ -2,7 +2,7 @@
 import type { BookDto, LedgerEntry, EntryCategory } from "@/modules/ledger/contracts";
 import type {
   PartialBatchCommandResult,
-  SourceDocumentLight,
+  SourceDocument,
   SplitSourceDocumentInput,
   SplitSourceDocumentResultDto,
   ApplyDateOrganizationInput,
@@ -11,7 +11,6 @@ import type {
 import { memo, useCallback, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { SourceDocument } from "@/modules/source-document/contracts";
 import { ArrowLeft, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { SourceDocumentViewDetails } from "./SourceDocumentViewDetails";
@@ -46,9 +45,8 @@ interface SourceDocumentDetailModalProps {
   isAssigningBook?: boolean;
   sourceDocumentId?: string;
   ledgerId: string;
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   isLoading?: boolean;
-  isLoadingImages?: boolean;
   loadError?: boolean;
   onReload?: () => Promise<void>;
   ledgerEntries: LedgerEntry[];
@@ -100,7 +98,6 @@ function SourceDocumentDetailEditor({
   ledgerId,
   sourceDocument,
   isLoading = false,
-  isLoadingImages = false,
   loadError = false,
   onReload,
   ledgerEntries,
@@ -304,7 +301,6 @@ function SourceDocumentDetailEditor({
                   pendingChanges={editor.pendingChanges}
                   selectedEntryIds={selection.selectedIds}
                   isSelectionMode={selection.isSelectionMode}
-                  isLoadingImages={isLoadingImages}
                   onSourceDocChange={editor.handleSourceDocChange}
                   onEntryChange={editor.handleEntryChange}
                   onSelectEntry={selection.handleSelect}

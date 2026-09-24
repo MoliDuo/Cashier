@@ -11,7 +11,7 @@ export interface RetrySeedSourceDocument {
   hasImages?: boolean;
 }
 
-export interface RetrySeedFullData {
+export interface RetrySeedInputData {
   text: string | null;
   files: SourceDocumentStoredFileDto[];
   documentDate: string | null;
@@ -19,11 +19,12 @@ export interface RetrySeedFullData {
 
 export function buildSourceDocumentRetrySeed(
   sourceDocument: RetrySeedSourceDocument,
-  fullData?: RetrySeedFullData
+  inputData?: RetrySeedInputData
 ): SourceDocumentInputInitialData {
-  const files = fullData?.files ?? sourceDocument.files ?? [];
-  const text = fullData?.text ?? sourceDocument.text ?? undefined;
-  const documentDate = fullData !== undefined ? fullData.documentDate : sourceDocument.documentDate;
+  const files = inputData?.files ?? sourceDocument.files ?? [];
+  const text = inputData?.text ?? sourceDocument.text ?? undefined;
+  const documentDate =
+    inputData !== undefined ? inputData.documentDate : sourceDocument.documentDate;
 
   return {
     images: files.map((file) => ({

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { ledgerDetailLeaveGuardKey } from "@/lib/navigation/ledger-detail-key";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocument, SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import type { PendingChanges } from "@/modules/source-document/detail-types";
 import { SourceDocumentStaleCommandError } from "@/modules/source-document/command-results";
 import { usePendingChanges } from "./usePendingChanges";
@@ -14,7 +14,7 @@ import { useSourceDocumentRevisionGuard } from "./useSourceDocumentRevisionGuard
 
 interface UseSourceDocumentDetailSessionOptions {
   ledgerId: string;
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   ledgerEntries: LedgerEntry[];
   open: boolean;
   externalPending: boolean;

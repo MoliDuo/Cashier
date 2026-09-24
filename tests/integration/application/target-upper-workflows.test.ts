@@ -20,8 +20,14 @@ import {
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
-const getLedgerEntryDetail = (id: string, ledgerId: string) =>
-  serverComposition.ledgerReads.getEntry(id, ledgerId);
+const findVisibleEntry = async (id: string, ledgerId: string) => {
+  const page = await serverComposition.ledgerReads.listEntries({
+    ledgerId,
+    limit: 100,
+    filters: {},
+  });
+  return page.items.find((entry) => entry.id === id) ?? null;
+};
 const listLedgerEntries = (
   ledgerId: string,
   input: Parameters<typeof listLedgerEntriesUseCase>[1]
@@ -67,6 +73,16 @@ describe("target upper workflows", () => {
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
     });
+    expect(
+      await db.query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.id, completed.revisionId),
+      })
+    ).toMatchObject({ revisionNumber: null });
+    // Simulate a historical revision: later submissions must preserve its number.
+    await db
+      .update(sourceDocumentRevisions)
+      .set({ revisionNumber: 7 })
+      .where(eq(sourceDocumentRevisions.id, completed.revisionId));
     const pending = await createPendingRevision({
       ledgerId,
       input: { text: "pending", storedFileIds: [], documentDate: null },
@@ -78,6 +94,16 @@ describe("target upper workflows", () => {
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
+    expect(
+      await db.query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.id, failedSubmission.revision.id),
+      })
+    ).toMatchObject({ revisionNumber: null });
+    expect(
+      await db.query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.id, completed.revisionId),
+      })
+    ).toMatchObject({ revisionNumber: 7 });
     await postgresRevisionAdapter.recordProcessingFailure({
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
@@ -137,7 +163,7 @@ describe("target upper workflows", () => {
     });
 
     const stream = await listLedgerEntries(ledgerId, { limit: 20 });
-    const detail = await getLedgerEntryDetail(activeEntry!.id, ledgerId);
+    const detail = await findVisibleEntry(activeEntry!.id, ledgerId);
     const summary = await calculateLedgerStats(ledgerId, {
       startDate: "2026-07-15",
       endDate: "2026-07-15",
@@ -179,7 +205,7 @@ describe("target upper workflows", () => {
       })
     ).resolves.toMatchObject({ ok: true });
     await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
-    await expect(getLedgerEntryDetail(activeEntry!.id, ledgerId)).resolves.toBeNull();
+    await expect(findVisibleEntry(activeEntry!.id, ledgerId)).resolves.toBeNull();
   });
 
   it("preserves decimal adjustments, dates, categories, currencies, and exchange-rate facts atomically", async () => {
@@ -235,7 +261,7 @@ describe("target upper workflows", () => {
     });
 
     const stream = await listLedgerEntries(ledgerId, { limit: 20 });
-    const detail = await getLedgerEntryDetail(ids[0]!, ledgerId);
+    const detail = await findVisibleEntry(ids[0]!, ledgerId);
     const stats = await calculateLedgerStats(ledgerId, {
       startDate: "2026-07-14",
       endDate: "2026-07-14",
@@ -456,7 +482,7 @@ describe("target upper workflows", () => {
     });
     const revisionCount = (await db.select().from(sourceDocumentRevisions)).length;
     const stream = await listLedgerEntries(ledgerId, { limit: 20 });
-    const detail = await getLedgerEntryDetail(original!.id, ledgerId);
+    const detail = await findVisibleEntry(original!.id, ledgerId);
     const stats = await calculateLedgerStats(ledgerId);
     expect(stream.items[0]).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(detail).toMatchObject({ id: original!.id, amount: "18.000" });
@@ -505,7 +531,7 @@ describe("target upper workflows", () => {
       data: { ledgerEntryId: original!.id, deleted: true },
     });
     await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
-    await expect(getLedgerEntryDetail(original!.id, ledgerId)).resolves.toBeNull();
+    await expect(findVisibleEntry(original!.id, ledgerId)).resolves.toBeNull();
     await expect(calculateLedgerStats(ledgerId)).resolves.toMatchObject({
       convertedTotal: { total: "0", currency: "CNY" },
     });

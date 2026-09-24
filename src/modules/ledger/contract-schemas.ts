@@ -81,14 +81,6 @@ const updateLedgerInputSchema = nonEmptyStrictObjectSchema({
   }),
 });
 
-const createEntryCategoryInputSchema = strictObjectSchema({
-  name: z.string().trim().min(1).max(100),
-  description: z.string().max(500).optional(),
-  icon: z.string().max(100).optional(),
-  sortOrder: z.number().int().min(0).optional(),
-});
-
-const reorderEntryCategoriesInputSchema = z.array(uuidSchema).min(1).max(MAX_BATCH_SIZE);
 const categoryCollectionRevisionSchema = z
   .string()
   .regex(/^[0-9a-f]{64}$/, "Invalid category collection revision");
@@ -292,10 +284,6 @@ export const ledgerStatsQuerySchema = strictObjectSchema({
 
 export const parseUpdateLedgerInput = (input: unknown) =>
   parseLedgerContract(updateLedgerInputSchema, input);
-export const parseCreateEntryCategoryInput = (input: unknown) =>
-  parseLedgerContract(createEntryCategoryInputSchema, input);
-export const parseReorderEntryCategoriesInput = (input: unknown) =>
-  parseLedgerContract(reorderEntryCategoriesInputSchema, input);
 export const parseSaveEntryCategoriesInput = (input: unknown) =>
   parseLedgerContract(saveEntryCategoriesInputSchema, input);
 export const parseApplyCategoryPresetInput = (input: unknown) =>
@@ -346,7 +334,6 @@ export const parseLedgerStatsQuery = (input: unknown) =>
   parseLedgerContract(ledgerStatsQuerySchema, input);
 
 export type UpdateLedgerInput = z.infer<typeof updateLedgerInputSchema>;
-export type CreateEntryCategoryInput = z.infer<typeof createEntryCategoryInputSchema>;
 export type SaveEntryCategoriesInput = z.infer<typeof saveEntryCategoriesInputSchema>;
 export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntryInputSchema>;
 export type UpdateLedgerEntryInput = z.infer<typeof updateLedgerEntryInputSchema>;

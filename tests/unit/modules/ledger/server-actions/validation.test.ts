@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ValidationError } from "@/lib/errors";
 
 const {
-  createEntryCategoryMock,
+  saveEntryCategoriesMock,
   createLedgerEntryWithConversionMock,
   createServiceCredentialMock,
   deleteServiceCredentialMock,
 } = vi.hoisted(() => ({
-  createEntryCategoryMock: vi.fn(),
+  saveEntryCategoriesMock: vi.fn(),
   createLedgerEntryWithConversionMock: vi.fn(),
   createServiceCredentialMock: vi.fn(),
   deleteServiceCredentialMock: vi.fn(),
@@ -43,8 +43,8 @@ vi.mock("@/application/adapters/postgres/ledger-entry-idempotency", () => ({
   runIdempotentUserMutation: vi.fn((_input, mutation) => mutation()),
 }));
 
-vi.mock("@/modules/ledger/application/use-cases/create-entry-category", () => ({
-  createEntryCategory: createEntryCategoryMock,
+vi.mock("@/modules/ledger/application/use-cases/save-entry-categories", () => ({
+  saveEntryCategories: saveEntryCategoriesMock,
 }));
 vi.mock("@/modules/ledger/application/use-cases/create-service-credential", () => ({
   createServiceCredential: createServiceCredentialMock,
@@ -52,16 +52,7 @@ vi.mock("@/modules/ledger/application/use-cases/create-service-credential", () =
 vi.mock("@/modules/ledger/application/use-cases/delete-service-credential", () => ({
   deleteServiceCredential: deleteServiceCredentialMock,
 }));
-vi.mock("@/modules/ledger/application/use-cases/reorder-entry-categories", () => ({
-  reorderEntryCategories: vi.fn(),
-}));
-vi.mock("@/modules/ledger/application/use-cases/update-entry-category", () => ({
-  updateEntryCategory: vi.fn(),
-}));
 
-vi.mock("@/modules/ledger/application/queries/get-uncategorized-entry-count", () => ({
-  getUncategorizedEntryCount: vi.fn(),
-}));
 vi.mock("@/modules/ledger/application/queries/list-entry-categories", () => ({
   listEntryCategories: vi.fn(),
 }));
@@ -72,7 +63,7 @@ vi.mock("@/modules/ledger/application/queries/list-service-credentials", () => (
   listServiceCredentials: vi.fn(),
 }));
 
-import { createEntryCategoryAction } from "@/modules/ledger/server-actions/categories";
+import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { createLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
 import {
   createServiceCredentialAction,
@@ -82,17 +73,20 @@ import {
 describe("ledger server-action validation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createEntryCategoryMock.mockResolvedValue({ id: "category-1" });
+    saveEntryCategoriesMock.mockResolvedValue({ id: "category-1" });
     createLedgerEntryWithConversionMock.mockResolvedValue({ id: "entry-1" });
     createServiceCredentialMock.mockResolvedValue({ id: "credential-1" });
     deleteServiceCredentialMock.mockResolvedValue(undefined);
   });
 
-  it("createEntryCategoryAction rejects invalid payload with ValidationError", async () => {
+  it("saveEntryCategoriesAction rejects invalid payload with ValidationError", async () => {
     await expect(
-      createEntryCategoryAction("ledger-1", { name: "" } as never)
+      saveEntryCategoriesAction("ledger-1", {
+        expectedRevision: "invalid",
+        categories: [],
+      } as never)
     ).rejects.toBeInstanceOf(ValidationError);
-    expect(createEntryCategoryMock).not.toHaveBeenCalled();
+    expect(saveEntryCategoriesMock).not.toHaveBeenCalled();
   });
 
   it("createLedgerEntryAction rejects invalid sourceDocumentId with ValidationError", async () => {
@@ -115,7 +109,10 @@ describe("ledger server-action validation", () => {
 
   it("createServiceCredentialAction rejects blank name with ValidationError", async () => {
     await expect(
-      createServiceCredentialAction("ledger-1", { name: "" } as never)
+      createServiceCredentialAction("ledger-1", {
+        expectedRevision: "invalid",
+        categories: [],
+      } as never)
     ).rejects.toBeInstanceOf(ValidationError);
     expect(createServiceCredentialMock).not.toHaveBeenCalled();
   });

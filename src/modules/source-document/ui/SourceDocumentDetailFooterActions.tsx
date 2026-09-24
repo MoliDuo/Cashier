@@ -4,10 +4,10 @@ import { FileText, RefreshCw, Trash2, X, Save, XCircle, Pencil } from "lucide-re
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { SourceDocument, SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 
 interface SourceDocumentDetailFooterActionsProps {
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   isEditMode: boolean;
   isSelectionMode: boolean;
   busy: boolean;

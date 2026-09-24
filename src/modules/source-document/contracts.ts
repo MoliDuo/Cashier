@@ -10,16 +10,12 @@ export type {
   SourceDocumentDetailDto,
   SourceDocumentInputDto,
   SourceDocumentLedgerEntryDto,
-  SourceDocumentResultDto,
   SourceDocumentListItemDto,
   SourceDocumentStoredFileDto,
   StreamPage,
   StreamTotalDto,
 } from "./document-contracts";
-export type {
-  SourceDocumentDetailDto as SourceDocument,
-  SourceDocumentDetailPreviewDto as SourceDocumentLight,
-} from "./document-contracts";
+export type { SourceDocumentDetailDto as SourceDocument } from "./document-contracts";
 
 export interface CreateSourceDocumentResponseDto {
   sourceDocumentId: string;
@@ -110,12 +106,12 @@ export type DismissDateOrganizationInput = z.infer<
 >;
 
 export interface ApplyDateOrganizationResultDto {
-  sourceDocument: import("./document-contracts").SourceDocumentResultDto;
+  sourceDocument: import("./document-contracts").SourceDocumentDetailDto;
   createdSourceDocumentIds: string[];
 }
 
 export interface SplitSourceDocumentResultDto {
-  sourceDocument: import("./document-contracts").SourceDocumentResultDto;
+  sourceDocument: import("./document-contracts").SourceDocumentDetailDto;
   splitSourceDocumentId: string;
   splitVersion: 1;
   movedEntryCount: number;

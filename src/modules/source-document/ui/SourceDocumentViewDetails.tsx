@@ -1,6 +1,6 @@
 "use client";
 import type { LedgerEntryEmbeddedViewDto, EntryCategory } from "@/modules/ledger/contracts";
-import type { SourceDocument, SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { type ReactNode, useMemo, memo } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -19,7 +19,7 @@ import { SourceDocumentDateOrganization } from "./SourceDocumentDateOrganization
 import type { ApplyDateOrganizationInput } from "../contracts";
 
 interface SourceDocumentViewDetailsProps {
-  sourceDocument: SourceDocument | SourceDocumentLight;
+  sourceDocument: SourceDocument;
   // These entries are always the embedded, sourceDocument-less view (see
   // listLedgerEntryViewsBySourceDocumentIds); typing this as the wider
   // LedgerEntry would let `.sourceDocument` type-check while silently
@@ -31,7 +31,6 @@ interface SourceDocumentViewDetailsProps {
   pendingChanges: PendingChanges;
   selectedEntryIds: string[];
   isSelectionMode: boolean;
-  isLoadingImages?: boolean;
   onSourceDocChange: (changes: SourceDocPendingChanges) => void;
   onEntryChange: (entryId: string, changes: Partial<EntryEditData>) => void;
   onSelectEntry: (entryId: string, selected: boolean) => void;
@@ -76,7 +75,6 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
   pendingChanges,
   selectedEntryIds,
   isSelectionMode,
-  isLoadingImages = false,
   onSourceDocChange,
   onEntryChange,
   onSelectEntry,
@@ -117,8 +115,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
     sourceDocument.processingStatus === "failed" && sourceDocument.failureKind === "invalid_input";
   const hasEvidence =
     sourceDocument.files.length > 0 ||
-    (sourceDocument.text != null && sourceDocument.text.trim().length > 0) ||
-    isLoadingImages;
+    (sourceDocument.text != null && sourceDocument.text.trim().length > 0);
 
   return (
     <div className="grid min-h-0 gap-4 lg:h-full lg:grid-cols-[minmax(0,3fr)_minmax(20rem,2fr)]">
@@ -210,10 +207,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
             {t("backToDetails")}
           </Button>
         ) : null}
-        <SourceDocumentRawEvidence
-          sourceDocument={sourceDocument}
-          isLoadingImages={isLoadingImages}
-        />
+        <SourceDocumentRawEvidence sourceDocument={sourceDocument} />
       </aside>
     </div>
   );

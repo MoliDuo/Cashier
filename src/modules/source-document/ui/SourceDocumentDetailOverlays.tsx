@@ -1,6 +1,6 @@
 "use client";
 import type { LedgerEntry, EntryCategory } from "@/modules/ledger/contracts";
-import type { SourceDocument, SourceDocumentLight } from "@/modules/source-document/contracts";
+import type { SourceDocument } from "@/modules/source-document/contracts";
 import { SourceDocumentEditRetryDialog } from "./SourceDocumentEditRetryDialog";
 import { SourceDocumentSplitDialog } from "./SourceDocumentSplitDialog";
 import { AddLedgerEntryDialog } from "./AddLedgerEntryDialog";
@@ -8,7 +8,7 @@ import type { AddEntryData } from "@/modules/source-document/hooks/useSourceDocu
 
 interface SourceDocumentDetailOverlaysProps {
   ledgerId: string;
-  sourceDocument: SourceDocument | SourceDocumentLight | null;
+  sourceDocument: SourceDocument | null;
   showRetryDialog: boolean;
   setShowRetryDialog: (open: boolean) => void;
   onRetryPendingChange: (pending: boolean) => void;

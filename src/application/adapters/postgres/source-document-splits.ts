@@ -10,7 +10,6 @@ import type {
 } from "@/modules/source-document/contracts";
 import { postgresFxRateBook } from "./exchange-rate";
 import { getSourceDocumentInTransaction } from "./source-document-reads/list";
-import { getSourceDocumentLightForLedger } from "@/modules/source-document/application/queries/get-source-document-light";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { copyRevisionFiles, createManualRevision } from "./ledger-projections";
@@ -262,12 +261,10 @@ export async function splitSourceDocumentAtomically(input: {
           eq(sourceDocuments.id, splitSourceDocumentId)
         )
       );
-    const sourceDocument = await getSourceDocumentLightForLedger(
+    const sourceDocument = await getSourceDocumentInTransaction(
+      tx,
       input.ledgerId,
-      input.sourceDocumentId,
-      {
-        get: (ledgerId, id) => getSourceDocumentInTransaction(tx, ledgerId, id),
-      }
+      input.sourceDocumentId
     );
     if (sourceDocument == null) throw new NotFoundError("Source document");
     return { movedEntryCount: movedEntries.length, sourceDocument } as const;

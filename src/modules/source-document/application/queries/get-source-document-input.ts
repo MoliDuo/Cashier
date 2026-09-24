@@ -2,7 +2,7 @@ import { NotFoundError } from "@/lib/errors";
 import type { SourceDocumentInputDto } from "../../contracts";
 import type { SourceDocumentReadPort } from "../ports";
 
-export async function getSourceDocumentFullQuery(
+export async function getSourceDocumentInputQuery(
   ledgerId: string,
   sourceDocumentId: string,
   documents: Pick<SourceDocumentReadPort, "getInput">
