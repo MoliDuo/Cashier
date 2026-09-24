@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "crypto";
 import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
 import { getBook } from "@/modules/ledger/server/books";
-import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
+import { scheduleRequestMaintenance } from "@/server/maintenance/schedule";
 import type { SourceDocumentSubmissionContract } from "@/application/contracts";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";

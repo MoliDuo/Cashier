@@ -9,7 +9,7 @@ import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";
 import { generateOTP, verifyOTP } from "@/modules/auth/services/otp";
 import { otpTokens } from "@/persistence/schema/auth";
 import { eq } from "drizzle-orm";
-import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
+import { runBoundedMaintenance } from "@/server/maintenance/run";
 
 const deleteOTPToken = async (email: string) => {
   const token = await findOTPRecord(email);

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { readFileSync } from "node:fs";
-import { getTestDb } from "../setup";
-import { createTestBooks, testBookId } from "../helpers/schema-setup";
+import { getTestDb } from "../../setup";
+import { createTestBooks, testBookId } from "../../helpers/schema-setup";
 import {
   currencyRates,
   exchangeRateRecalculationJobs,
@@ -16,15 +16,15 @@ import {
 import {
   drainDueExchangeRateRecalculations,
   runBoundedExchangeRateRecalculation,
-} from "@/application/orchestration/exchange-rate-ledger-recalculation";
+} from "@/server/exchange-rate-recalculation/run";
 import {
   claimExchangeRateRecalculations,
   completeExchangeRateRecalculation,
   failExchangeRateRecalculation,
-} from "@/application/adapters/postgres/exchange-rate-recalculation-jobs";
-import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
+} from "@/server/exchange-rate-recalculation/jobs";
+import { runBoundedMaintenance } from "@/server/maintenance/run";
 import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
-import * as recalculation from "@/application/orchestration/exchange-rate-ledger-recalculation";
+import * as recalculation from "@/server/exchange-rate-recalculation/run";
 
 const deleteObject = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/storage/s3", () => ({
@@ -35,23 +35,13 @@ const { recalculateLedgerForDateMock } = vi.hoisted(() => ({
   recalculateLedgerForDateMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/application/adapters/postgres/business-ports/currency", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("@/application/adapters/postgres/business-ports/currency")
-    >();
-  return {
-    ...actual,
-    postgresCurrencyAdapter: {
-      ...actual.postgresCurrencyAdapter,
-      recalculateLedgerForDate: recalculateLedgerForDateMock,
-    },
-  };
-});
+vi.mock("@/server/exchange-rate-recalculation/recalculate-ledger", () => ({
+  recalculateLedgerForDate: recalculateLedgerForDateMock,
+}));
 
-const { postgresCurrencyAdapter } = await vi.importActual<
-  typeof import("@/application/adapters/postgres/business-ports/currency")
->("@/application/adapters/postgres/business-ports/currency");
+const { recalculateLedgerForDate } = await vi.importActual<
+  typeof import("@/server/exchange-rate-recalculation/recalculate-ledger")
+>("@/server/exchange-rate-recalculation/recalculate-ledger");
 
 async function seedLedgerWithEntry(input: {
   mainCurrency?: string;
@@ -651,9 +641,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       },
     ]);
 
-    await expect(
-      postgresCurrencyAdapter.recalculateLedgerForDate(ledgerId, "2026-06-01")
-    ).resolves.toBe(2);
+    await expect(recalculateLedgerForDate(ledgerId, "2026-06-01")).resolves.toBe(2);
 
     const [entries, documentsAfterChange] = await Promise.all([
       db.query.ledgerEntries.findMany({
@@ -673,9 +661,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     expect(byName.get("Undated")?.exchangeRate).toBe("7.083333333333");
     expect(documentsAfterChange.every((document) => document.version === 2)).toBe(true);
 
-    await expect(
-      postgresCurrencyAdapter.recalculateLedgerForDate(ledgerId, "2026-06-01")
-    ).resolves.toBe(0);
+    await expect(recalculateLedgerForDate(ledgerId, "2026-06-01")).resolves.toBe(0);
     const documentsAfterNoop = await db.query.sourceDocuments.findMany({
       where: eq(sourceDocuments.ledgerId, ledgerId),
     });
@@ -706,9 +692,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       rates: { USD: 1, ISK: 1.405 },
     });
 
-    await expect(
-      postgresCurrencyAdapter.recalculateLedgerForDate(ledgerId, "2026-09-04")
-    ).resolves.toBe(1);
+    await expect(recalculateLedgerForDate(ledgerId, "2026-09-04")).resolves.toBe(1);
 
     const entry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.ledgerId, ledgerId),

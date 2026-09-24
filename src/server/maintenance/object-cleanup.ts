@@ -1,3 +1,4 @@
+import "server-only";
 import { db } from "@/lib/db";
 import { and, eq, sql } from "drizzle-orm";
 import { objectCleanupJobs, uploadSessions } from "@/persistence";

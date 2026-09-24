@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { StoredFileContract, UploadFinalizationContract } from "@/application/contracts";
-import { enqueueObjectCleanup } from "@/application/adapters/postgres/object-cleanup";
+import { enqueueObjectCleanup } from "@/server/maintenance/object-cleanup";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";

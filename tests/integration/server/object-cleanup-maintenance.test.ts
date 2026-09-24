@@ -9,12 +9,12 @@ vi.mock("@/lib/storage/s3", () => ({
   getS3Storage: () => ({ delete: deleteObject }),
 }));
 
-import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
+import { runBoundedMaintenance } from "@/server/maintenance/run";
 import {
   acknowledgeObjectCleanup,
   claimObjectCleanup,
   enqueueObjectCleanup,
-} from "@/application/adapters/postgres/object-cleanup";
+} from "@/server/maintenance/object-cleanup";
 
 afterEach(() => vi.useRealTimers());
 

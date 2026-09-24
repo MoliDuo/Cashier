@@ -6,7 +6,7 @@ import { currencyRates, ledgerEntries, ledgers, sourceDocuments } from "@/persis
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { omitUndefinedProperties } from "@/lib/validation";
 import { runWithConcurrency } from "@/lib/concurrency";
-import { recalculateCurrentEntries } from "@/application/adapters/postgres/source-document-aggregate/recalculate-current-entries";
+import { recalculateCurrentEntries } from "@/modules/source-document/server/projections/recalculate-current-entries";
 import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import type { UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
 import type { LedgerDto, LedgerSettings } from "@/modules/ledger/contracts";

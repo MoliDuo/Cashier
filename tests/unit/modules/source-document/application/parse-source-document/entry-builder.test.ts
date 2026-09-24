@@ -9,10 +9,6 @@ vi.mock("@/lib/date-utils", () => ({
   formatDateTimeForApi: formatDateTimeForApiMock,
 }));
 
-vi.mock("@/application/orchestration/exchange-rate-ledger-recalculation", () => ({
-  initializeExchangeRateLedgerRecalculationOrchestration: vi.fn(),
-}));
-
 import {
   buildEntriesForInsert,
   getEntryFallbackDate,

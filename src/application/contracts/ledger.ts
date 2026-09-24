@@ -5,9 +5,6 @@ import type {
   SourceDocumentId,
 } from "./source-documents";
 
-export interface CurrencyPort {
-  recalculateLedgerForDate(ledgerId: LedgerId, date: string): Promise<number>;
-}
 export interface LedgerProjectionEntryContract {
   id?: string;
   categoryId: string | null;

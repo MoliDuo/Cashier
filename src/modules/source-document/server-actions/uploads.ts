@@ -8,7 +8,7 @@ import {
   type FinalizeSourceDocumentUploadInput,
 } from "../contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
+import { scheduleRequestMaintenance } from "@/server/maintenance/schedule";
 
 export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAccess(
   async (

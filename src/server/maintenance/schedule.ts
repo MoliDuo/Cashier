@@ -1,5 +1,6 @@
+import "server-only";
 import { after } from "next/server";
-import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
+import { runBoundedMaintenance } from "./run";
 import { logger } from "@/lib/logger";
 
 export function scheduleRequestMaintenance(): void {

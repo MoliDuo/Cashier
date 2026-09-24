@@ -6,7 +6,7 @@ import type {
   UploadFileRequestContract,
   UploadPlanContract,
 } from "@/application/contracts";
-import { enqueueObjectCleanup } from "@/application/adapters/postgres/object-cleanup";
+import { enqueueObjectCleanup } from "@/server/maintenance/object-cleanup";
 import { db } from "@/lib/db";
 import { ValidationError } from "@/lib/errors";
 import {

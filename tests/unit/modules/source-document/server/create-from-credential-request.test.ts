@@ -12,7 +12,7 @@ vi.mock("@/modules/ledger/server/books", () => ({ getBook: getBookMock }));
 vi.mock("@/server/processing/recovery", () => ({
   scheduleProcessingRecoveryAfter: vi.fn(),
 }));
-vi.mock("@/application/transport/request-maintenance", () => ({
+vi.mock("@/server/maintenance/schedule", () => ({
   scheduleRequestMaintenance: vi.fn(),
 }));
 

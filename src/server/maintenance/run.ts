@@ -1,3 +1,4 @@
+import "server-only";
 import { and, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -10,7 +11,7 @@ import {
 import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
-import { drainDueExchangeRateRecalculations } from "@/application/orchestration/exchange-rate-ledger-recalculation";
+import { drainDueExchangeRateRecalculations } from "@/server/exchange-rate-recalculation/run";
 import { drainDueCategoryReclassifications } from "@/server/category-reclassification/run";
 import { acknowledgeObjectCleanup, claimObjectCleanup } from "./object-cleanup";
 

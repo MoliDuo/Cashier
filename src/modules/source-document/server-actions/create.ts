@@ -10,7 +10,7 @@ import { createAndQueueSourceDocument } from "../server/create-and-queue";
 import { resolveRecordBook } from "../server/resolve-record-book";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
-import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
+import { scheduleRequestMaintenance } from "@/server/maintenance/schedule";
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
 
 /**
