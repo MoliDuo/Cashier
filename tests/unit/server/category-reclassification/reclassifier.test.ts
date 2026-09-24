@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIMessageContentPart } from "@/lib/tasks/types";
-import { entryReclassifierAdapter } from "@/application/adapters/ai/entry-reclassifier";
 import type {
   ReclassificationCandidate,
   ReclassificationDocumentGroup,
 } from "@/modules/ledger/application/reclassification-protocol";
+import { decideEntryCategories } from "@/server/category-reclassification/reclassifier";
 
 const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
 
@@ -67,7 +67,7 @@ describe("entryReclassifierAdapter", () => {
     });
 
     await expect(
-      entryReclassifierAdapter.decide({ candidates, group: group(), images: [] })
+      decideEntryCategories({ candidates, group: group(), images: [] })
     ).resolves.toEqual({
       decisions: [{ ledgerEntryId: "entry-1", categoryId: "cat-home" }],
       confirmedCount: 0,
@@ -79,7 +79,7 @@ describe("entryReclassifierAdapter", () => {
       content: '{"decisions":[{"entry_index":1,"category_index":1}]}',
     });
 
-    await entryReclassifierAdapter.decide({
+    await decideEntryCategories({
       candidates,
       group: group({ title: "全家便利店", documentDate: "2026-09-10", inputText: "楼下买的" }),
       images: [],
@@ -97,7 +97,7 @@ describe("entryReclassifierAdapter", () => {
       content: '{"decisions":[{"entry_index":1,"category_index":1}]}',
     });
 
-    await entryReclassifierAdapter.decide({
+    await decideEntryCategories({
       candidates,
       group: group({ storedFileIds: ["f1", "f2"] }),
       images: [{ dataUrl: "data:image/jpeg;base64,AAA" }, { dataUrl: "data:image/png;base64,BBB" }],
@@ -118,7 +118,7 @@ describe("entryReclassifierAdapter", () => {
     generateContent.mockResolvedValue({ content: "I could not decide." });
 
     await expect(
-      entryReclassifierAdapter.decide({ candidates, group: group(), images: [] })
+      decideEntryCategories({ candidates, group: group(), images: [] })
     ).rejects.toMatchObject({
       code: "ai_schema_invalid",
       statusCode: 502,
@@ -131,7 +131,7 @@ describe("entryReclassifierAdapter", () => {
     });
 
     await expect(
-      entryReclassifierAdapter.decide({ candidates, group: group(), images: [] })
+      decideEntryCategories({ candidates, group: group(), images: [] })
     ).rejects.toMatchObject({
       code: "ai_schema_invalid",
       statusCode: 502,

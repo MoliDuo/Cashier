@@ -1,7 +1,6 @@
 "use server";
 import { ValidationError } from "@/lib/errors";
-import { serverComposition } from "@/application/server-composition-root";
-import { scheduleCategoryReclassificationAfter } from "@/application/processing/schedule-category-reclassification";
+import { scheduleCategoryReclassificationAfter } from "@/server/category-reclassification/schedule";
 import type {
   AppendCategoryAssignmentSelectionInput,
   BeginCategoryAssignmentInput,
@@ -21,6 +20,16 @@ import { toCategoryReclassificationJobDto } from "../application/queries/categor
 import { withLedgerAccess } from "../access";
 import { listCategories } from "../server/categories";
 import { getLedgerSettings } from "../server/settings";
+import {
+  appendCategoryAssignmentEntries,
+  beginCategoryAssignment,
+  cancelCategoryAssignment,
+  commitCategoryAssignment,
+  getCategoryAssignmentProgress,
+  resolveLatestConflictSelection,
+  retryCategoryAssignmentFailures,
+} from "@/server/category-reclassification/assignments";
+import { getCategoryReclassificationJob } from "@/server/category-reclassification/jobs";
 
 async function validateMode(
   ledgerId: string,
@@ -46,9 +55,9 @@ async function validateMode(
 }
 
 async function loadJob(ledgerId: string, jobId: string): Promise<CategoryReclassificationJobDto> {
-  const job = await serverComposition.categoryReclassificationJobs.get({ ledgerId, jobId });
+  const job = await getCategoryReclassificationJob({ ledgerId, jobId });
   if (job == null) throw new ValidationError("Category assignment job was not found");
-  const metrics = await serverComposition.categoryAssignments.getProgressMetrics({
+  const metrics = await getCategoryAssignmentProgress({
     ledgerId,
     jobId,
   });
@@ -62,7 +71,7 @@ async function begin(
 ): Promise<CategoryReclassificationJobDto> {
   const candidates = await validateMode(ledgerId, input.mode);
   const settings = await getLedgerSettings(ledgerId);
-  const job = await serverComposition.categoryAssignments.begin({
+  const job = await beginCategoryAssignment({
     ledgerId,
     requestKey: input.requestKey,
     mode: input.mode,
@@ -82,7 +91,7 @@ export const beginCategoryAssignmentAction = withLedgerAccess(
 export const appendCategoryAssignmentSelectionAction = withLedgerAccess(
   async (ledgerId: string, input: AppendCategoryAssignmentSelectionInput) => {
     const validated = parseAppendCategoryAssignmentSelectionInput(input);
-    const progress = await serverComposition.categoryAssignments.append({ ledgerId, ...validated });
+    const progress = await appendCategoryAssignmentEntries({ ledgerId, ...validated });
     return { jobId: validated.jobId, received: progress.receivedEntryCount };
   }
 );
@@ -90,7 +99,7 @@ export const appendCategoryAssignmentSelectionAction = withLedgerAccess(
 export const commitCategoryAssignmentSelectionAction = withLedgerAccess(
   async (ledgerId: string, input: CommitCategoryAssignmentSelectionInput) => {
     const validated = parseCommitCategoryAssignmentSelectionInput(input);
-    const committed = await serverComposition.categoryAssignments.commit({
+    const committed = await commitCategoryAssignment({
       ledgerId,
       ...validated,
     });
@@ -102,7 +111,7 @@ export const commitCategoryAssignmentSelectionAction = withLedgerAccess(
 export const cancelCategoryAssignmentAction = withLedgerAccess(
   async (ledgerId: string, input: { jobId: string }) => {
     const validated = parseCancelCategoryAssignmentInput(input);
-    await serverComposition.categoryAssignments.cancel({ ledgerId, jobId: validated.jobId });
+    await cancelCategoryAssignment({ ledgerId, jobId: validated.jobId });
     return loadJob(ledgerId, validated.jobId);
   }
 );
@@ -110,7 +119,7 @@ export const cancelCategoryAssignmentAction = withLedgerAccess(
 export const retryCategoryAssignmentFailuresAction = withLedgerAccess(
   async (ledgerId: string, input: { jobId: string; requestKey: string }) => {
     const validated = parseRetryCategoryAssignmentInput(input);
-    const retry = await serverComposition.categoryAssignments.retryFailures({
+    const retry = await retryCategoryAssignmentFailures({
       ledgerId,
       ...validated,
     });
@@ -122,7 +131,7 @@ export const retryCategoryAssignmentFailuresAction = withLedgerAccess(
 export const retryCategoryAssignmentLatestAction = withLedgerAccess(
   async (ledgerId: string, input: { jobId: string; requestKey: string }) => {
     const validated = parseRetryCategoryAssignmentInput(input);
-    const latest = await serverComposition.categoryAssignments.resolveLatestConflictSelection({
+    const latest = await resolveLatestConflictSelection({
       ledgerId,
       jobId: validated.jobId,
     });
@@ -136,7 +145,7 @@ export const retryCategoryAssignmentLatestAction = withLedgerAccess(
       latest.parentJobId
     );
     for (let offset = 0, chunkIndex = 0; offset < latest.entries.length; offset += 1000) {
-      await serverComposition.categoryAssignments.append({
+      await appendCategoryAssignmentEntries({
         ledgerId,
         jobId: started.id,
         chunkIndex,
@@ -144,7 +153,7 @@ export const retryCategoryAssignmentLatestAction = withLedgerAccess(
       });
       chunkIndex += 1;
     }
-    const committed = await serverComposition.categoryAssignments.commit({
+    const committed = await commitCategoryAssignment({
       ledgerId,
       jobId: started.id,
       expectedEntryCount: latest.entries.length,

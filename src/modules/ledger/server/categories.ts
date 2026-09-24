@@ -23,7 +23,7 @@ import {
 } from "@/application/adapters/postgres/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
-import { incrementCategoryChangedDocumentVersions } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
+import { incrementCategoryChangedDocumentVersions } from "@/modules/source-document/server/category-assignments";
 
 function mapCategory(row: typeof entryCategories.$inferSelect): EntryCategoryDto {
   return {

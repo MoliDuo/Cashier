@@ -2,13 +2,21 @@ import "server-only";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
-import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
-import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
-import { applyCategoryAssignments } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
-import { entryReclassifierAdapter } from "@/application/adapters/ai/entry-reclassifier";
+import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
 import { isSuccessfulLoadImageResult, loadStoredFilesForAI } from "@/server/processing/evidence";
-import type { ClaimedCategoryAssignmentDocument } from "@/application/adapters/postgres/category-assignment-v2";
+import type { ClaimedCategoryAssignmentDocument } from "@/server/category-reclassification/assignments";
 import { AI_CATEGORY_CONCURRENCY, AI_CATEGORY_MAX_ATTEMPTS } from "@/config/tuning";
+import {
+  claimCategoryAssignmentDocuments,
+  failCategoryAssignmentDocument,
+  loadCategoryAssignmentSelection,
+  markCategoryAssignmentEvidenceIncomplete,
+  nextCategoryAssignmentDue,
+  persistCategoryAssignmentDecisions,
+  renewCategoryAssignmentClaim,
+} from "@/server/category-reclassification/assignments";
+import { loadReclassificationDocumentGroups } from "@/server/category-reclassification/document-groups";
+import { decideEntryCategories } from "@/server/category-reclassification/reclassifier";
 
 const CLAIM_LEASE_MS = 120_000;
 const CLAIM_HEARTBEAT_MS = 20_000;
@@ -23,14 +31,14 @@ function stableErrorCode(error: unknown): string {
 
 async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise<void> {
   const startedAt = Date.now();
-  const selection = await postgresCategoryAssignmentV2Adapter.loadDocumentSelection({
+  const selection = await loadCategoryAssignmentSelection({
     ledgerId: work.ledgerId,
     jobId: work.jobId,
     sourceDocumentId: work.sourceDocumentId,
   });
   try {
     if (work.mode.kind === "ai") {
-      const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+      const groups = await loadReclassificationDocumentGroups({
         ledgerId: work.ledgerId,
         ledgerEntryIds: selection.entryIds,
       });
@@ -52,7 +60,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
         .filter(isSuccessfulLoadImageResult)
         .map((image) => ({ dataUrl: image.dataUrl }));
       if (loaded.some((image) => !image.success)) {
-        await postgresCategoryAssignmentV2Adapter.markEvidenceIncomplete({
+        await markCategoryAssignmentEvidenceIncomplete({
           ledgerId: work.ledgerId,
           jobId: work.jobId,
           sourceDocumentId: work.sourceDocumentId,
@@ -65,7 +73,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
         chunkIndex += 1
       ) {
         const now = new Date();
-        const owned = await postgresCategoryAssignmentV2Adapter.renewDocumentClaim({
+        const owned = await renewCategoryAssignmentClaim({
           ledgerId: work.ledgerId,
           jobId: work.jobId,
           sourceDocumentId: work.sourceDocumentId,
@@ -86,15 +94,14 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
         let heartbeatInFlight: Promise<void> | null = null;
         const heartbeat = setInterval(() => {
           if (heartbeatInFlight != null) return;
-          heartbeatInFlight = postgresCategoryAssignmentV2Adapter
-            .renewDocumentClaim({
-              ledgerId: work.ledgerId,
-              jobId: work.jobId,
-              sourceDocumentId: work.sourceDocumentId,
-              claimToken: work.claimToken,
-              leaseMs: CLAIM_LEASE_MS,
-              now: new Date(),
-            })
+          heartbeatInFlight = renewCategoryAssignmentClaim({
+            ledgerId: work.ledgerId,
+            jobId: work.jobId,
+            sourceDocumentId: work.sourceDocumentId,
+            claimToken: work.claimToken,
+            leaseMs: CLAIM_LEASE_MS,
+            now: new Date(),
+          })
             .then((renewed) => {
               if (!renewed) controller.abort();
             })
@@ -105,7 +112,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
         }, CLAIM_HEARTBEAT_MS);
         let result;
         try {
-          result = await entryReclassifierAdapter.decide({
+          result = await decideEntryCategories({
             candidates: work.candidates,
             group: chunk,
             images,
@@ -118,7 +125,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
           clearInterval(heartbeat);
           if (heartbeatInFlight != null) await heartbeatInFlight;
         }
-        const persisted = await postgresCategoryAssignmentV2Adapter.persistDecisions({
+        const persisted = await persistCategoryAssignmentDecisions({
           ledgerId: work.ledgerId,
           jobId: work.jobId,
           sourceDocumentId: work.sourceDocumentId,
@@ -165,7 +172,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
     );
   } catch (error) {
     const errorCode = stableErrorCode(error);
-    const outcome = await postgresCategoryAssignmentV2Adapter.failDocument({
+    const outcome = await failCategoryAssignmentDocument({
       ledgerId: work.ledgerId,
       jobId: work.jobId,
       sourceDocumentId: work.sourceDocumentId,
@@ -200,7 +207,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
 async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<boolean> {
   let processed = false;
   for (;;) {
-    const claimed = await postgresCategoryAssignmentV2Adapter.claimDocuments({
+    const claimed = await claimCategoryAssignmentDocuments({
       now: new Date(),
       leaseMs: CLAIM_LEASE_MS,
       concurrency: AI_CATEGORY_CONCURRENCY,
@@ -211,7 +218,7 @@ async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<bo
       await Promise.all(claimed.map(processDocument));
       continue;
     }
-    const nextDue = await postgresCategoryAssignmentV2Adapter.nextDue(scope);
+    const nextDue = await nextCategoryAssignmentDue(scope);
     if (nextDue == null) return processed;
     const waitMs = nextDue.getTime() - Date.now();
     if (waitMs <= 0) {

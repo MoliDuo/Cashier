@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
 import {
   categoryReclassificationJobEntries,
   categoryReclassificationJobDocuments,
@@ -21,7 +20,15 @@ import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
-import { applyCategoryAssignments } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
+import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
+import {
+  appendCategoryAssignmentEntries,
+  beginCategoryAssignment,
+  cancelCategoryAssignment,
+  claimCategoryAssignmentDocuments,
+  commitCategoryAssignment,
+  resolveLatestConflictSelection,
+} from "@/server/category-reclassification/assignments";
 
 const START = new Date("2030-01-01T00:00:00.000Z");
 const AFTER_EXPIRY = new Date("2030-01-01T00:02:00.000Z");
@@ -65,7 +72,7 @@ async function seedSelection() {
 async function prepareAssignment() {
   const fixture = await seedSelection();
   const requestKey = crypto.randomUUID();
-  const begun = await postgresCategoryAssignmentV2Adapter.begin({
+  const begun = await beginCategoryAssignment({
     ledgerId: fixture.ledger.id,
     requestKey,
     mode: { kind: "assign", categoryId: fixture.category.id },
@@ -80,14 +87,14 @@ async function prepareAssignment() {
 describe("category assignment v2", () => {
   it("resolves conflicted entries against their current document version without widening scope", async () => {
     const fixture = await prepareAssignment();
-    await postgresCategoryAssignmentV2Adapter.append({
+    await appendCategoryAssignmentEntries({
       ledgerId: fixture.ledger.id,
       jobId: fixture.begun.id,
       chunkIndex: 0,
       entries: [fixture.selection],
       now: START,
     });
-    await postgresCategoryAssignmentV2Adapter.commit({
+    await commitCategoryAssignment({
       ledgerId: fixture.ledger.id,
       jobId: fixture.begun.id,
       expectedEntryCount: 1,
@@ -112,7 +119,7 @@ describe("category assignment v2", () => {
       .where(eq(categoryReclassificationJobs.id, fixture.begun.id));
 
     await expect(
-      postgresCategoryAssignmentV2Adapter.resolveLatestConflictSelection({
+      resolveLatestConflictSelection({
         ledgerId: fixture.ledger.id,
         jobId: fixture.begun.id,
       })
@@ -125,7 +132,7 @@ describe("category assignment v2", () => {
 
   it("counts the whole declared range when a partial selection upload is cancelled", async () => {
     const fixture = await seedSelection();
-    const begun = await postgresCategoryAssignmentV2Adapter.begin({
+    const begun = await beginCategoryAssignment({
       ledgerId: fixture.ledger.id,
       requestKey: crypto.randomUUID(),
       mode: { kind: "clear" },
@@ -134,7 +141,7 @@ describe("category assignment v2", () => {
       customPrompt: null,
       now: START,
     });
-    await postgresCategoryAssignmentV2Adapter.append({
+    await appendCategoryAssignmentEntries({
       ledgerId: fixture.ledger.id,
       jobId: begun.id,
       chunkIndex: 0,
@@ -143,7 +150,7 @@ describe("category assignment v2", () => {
     });
 
     await expect(
-      postgresCategoryAssignmentV2Adapter.cancel({
+      cancelCategoryAssignment({
         ledgerId: fixture.ledger.id,
         jobId: begun.id,
         now: START,
@@ -168,7 +175,7 @@ describe("category assignment v2", () => {
 
   it("replays begin, append, and commit without duplicating the selection", async () => {
     const fixture = await prepareAssignment();
-    const replay = await postgresCategoryAssignmentV2Adapter.begin({
+    const replay = await beginCategoryAssignment({
       ledgerId: fixture.ledger.id,
       requestKey: fixture.requestKey,
       mode: { kind: "assign", categoryId: fixture.category.id },
@@ -186,21 +193,21 @@ describe("category assignment v2", () => {
       entries: [fixture.selection],
       now: START,
     };
-    await expect(postgresCategoryAssignmentV2Adapter.append(chunk)).resolves.toEqual({
+    await expect(appendCategoryAssignmentEntries(chunk)).resolves.toEqual({
       receivedEntryCount: 1,
     });
-    await expect(postgresCategoryAssignmentV2Adapter.append(chunk)).resolves.toEqual({
+    await expect(appendCategoryAssignmentEntries(chunk)).resolves.toEqual({
       receivedEntryCount: 1,
     });
     await expect(
-      postgresCategoryAssignmentV2Adapter.append({
+      appendCategoryAssignmentEntries({
         ...chunk,
         entries: [{ ...fixture.selection, expectedVersion: 2 }],
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
 
     await expect(
-      postgresCategoryAssignmentV2Adapter.commit({
+      commitCategoryAssignment({
         ledgerId: fixture.ledger.id,
         jobId: fixture.begun.id,
         expectedEntryCount: 1,
@@ -208,7 +215,7 @@ describe("category assignment v2", () => {
       })
     ).resolves.toMatchObject({ status: "pending", receivedEntryCount: 1 });
     await expect(
-      postgresCategoryAssignmentV2Adapter.commit({
+      commitCategoryAssignment({
         ledgerId: fixture.ledger.id,
         jobId: fixture.begun.id,
         expectedEntryCount: 1,
@@ -225,27 +232,27 @@ describe("category assignment v2", () => {
 
   it("fences an expired claim and commits category, version, and outcome together", async () => {
     const fixture = await prepareAssignment();
-    await postgresCategoryAssignmentV2Adapter.append({
+    await appendCategoryAssignmentEntries({
       ledgerId: fixture.ledger.id,
       jobId: fixture.begun.id,
       chunkIndex: 0,
       entries: [fixture.selection],
       now: START,
     });
-    await postgresCategoryAssignmentV2Adapter.commit({
+    await commitCategoryAssignment({
       ledgerId: fixture.ledger.id,
       jobId: fixture.begun.id,
       expectedEntryCount: 1,
       now: START,
     });
 
-    const [first] = await postgresCategoryAssignmentV2Adapter.claimDocuments({
+    const [first] = await claimCategoryAssignmentDocuments({
       jobId: fixture.begun.id,
       now: START,
       leaseMs: 60_000,
       concurrency: 1,
     });
-    const [second] = await postgresCategoryAssignmentV2Adapter.claimDocuments({
+    const [second] = await claimCategoryAssignmentDocuments({
       jobId: fixture.begun.id,
       now: AFTER_EXPIRY,
       leaseMs: 60_000,

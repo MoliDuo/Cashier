@@ -4,7 +4,7 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import {
   recoverLedgerCategoryReclassifications,
   runCategoryReclassificationJob,
-} from "@/application/orchestration/category-reclassification";
+} from "@/server/category-reclassification/run";
 
 /**
  * The only module in this feature that touches `after()`. Everything the

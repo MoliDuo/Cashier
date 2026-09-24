@@ -8,10 +8,10 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
 import { getTestDb } from "../../setup";
 import { createCategoryData, createLedgerData } from "../../helpers/factories";
 import { createTestSourceDocument, ensureTestLedgerBooks } from "../../helpers/schema-setup";
+import { loadReclassificationDocumentGroups } from "@/server/category-reclassification/document-groups";
 
 /**
  * A projected entry used to verify evidence grouping. Each entry needs its own
@@ -118,7 +118,7 @@ describe("loadDocumentGroups", () => {
       itemName: "可乐",
     });
 
-    const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+    const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,
       // A dead id and an out-of-order pair: the grouping must survive both.
       ledgerEntryIds: [second, crypto.randomUUID(), first],
@@ -157,7 +157,7 @@ describe("loadDocumentGroups", () => {
       itemName: "打车",
     });
 
-    const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+    const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [entryId],
     });
@@ -190,7 +190,7 @@ describe("loadDocumentGroups", () => {
       revisionId: note.revisionId,
     });
 
-    const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+    const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [noteEntry, receiptEntry],
     });
@@ -224,7 +224,7 @@ describe("loadDocumentGroups", () => {
       documentId,
     });
 
-    const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+    const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [liveEntryId, supersededEntryId, orphanEntryId],
     });
@@ -246,7 +246,7 @@ describe("loadDocumentGroups", () => {
       revisionId,
     });
 
-    const groups = await postgresEntryCategoryAssignmentAdapter.loadDocumentGroups({
+    const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [entryId],
     });

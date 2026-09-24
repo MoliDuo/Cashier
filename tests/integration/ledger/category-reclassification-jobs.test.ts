@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { categoryReclassificationJobs, ledgers } from "@/persistence";
-import { postgresCategoryReclassificationJobAdapter as reader } from "@/application/adapters/postgres/category-reclassification-jobs";
+import {
+  getCategoryReclassificationJob,
+  getLatestCategoryReclassificationJob,
+} from "@/server/category-reclassification/jobs";
 import { getTestDb } from "../../setup";
 import { createLedgerData } from "../../helpers/factories";
 
@@ -21,14 +24,18 @@ describe("category assignment job reads", () => {
         appliedCount: 3,
       })
       .returning();
-    expect(await reader.get({ ledgerId: ledger.id, jobId: job!.id })).toMatchObject({
+    expect(
+      await getCategoryReclassificationJob({ ledgerId: ledger.id, jobId: job!.id })
+    ).toMatchObject({
       id: job!.id,
       declaredEntryCount: 3,
       mode: { kind: "clear" },
       appliedCount: 3,
     });
-    expect(await reader.getLatest({ ledgerId: ledger.id })).toMatchObject({ id: job!.id });
-    expect(await reader.get({ ledgerId: other.id, jobId: job!.id })).toBeNull();
-    expect(await reader.getLatest({ ledgerId: other.id })).toBeNull();
+    expect(await getLatestCategoryReclassificationJob({ ledgerId: ledger.id })).toMatchObject({
+      id: job!.id,
+    });
+    expect(await getCategoryReclassificationJob({ ledgerId: other.id, jobId: job!.id })).toBeNull();
+    expect(await getLatestCategoryReclassificationJob({ ledgerId: other.id })).toBeNull();
   });
 });

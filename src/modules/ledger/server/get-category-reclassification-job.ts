@@ -1,8 +1,12 @@
 import { withLedgerAccess } from "../access";
-import { serverComposition } from "@/application/server-composition-root";
 import type { CategoryReclassificationJobDto } from "@/modules/ledger/contracts";
 import { toCategoryReclassificationJobDto } from "../application/queries/category-reclassification-job-dto";
 import type { CategoryAssignmentResultPageDto } from "@/modules/ledger/contracts";
+import {
+  getCategoryAssignmentProgress,
+  listCategoryAssignmentResults,
+} from "@/server/category-reclassification/assignments";
+import { getLatestCategoryReclassificationJob } from "@/server/category-reclassification/jobs";
 
 /**
  * The ledger's most recent run, running or finished. Read through the session
@@ -11,9 +15,9 @@ import type { CategoryAssignmentResultPageDto } from "@/modules/ledger/contracts
  */
 export const getCategoryReclassificationJobAction = withLedgerAccess(
   async (ledgerId: string): Promise<CategoryReclassificationJobDto | null> => {
-    const job = await serverComposition.categoryReclassificationJobs.getLatest({ ledgerId });
+    const job = await getLatestCategoryReclassificationJob({ ledgerId });
     if (job == null) return null;
-    const metrics = await serverComposition.categoryAssignments.getProgressMetrics({
+    const metrics = await getCategoryAssignmentProgress({
       ledgerId,
       jobId: job.id,
     });
@@ -26,5 +30,5 @@ export const getCategoryAssignmentResultsAction = withLedgerAccess(
     ledgerId: string,
     input: { jobId: string; cursor?: number; limit?: number }
   ): Promise<CategoryAssignmentResultPageDto> =>
-    serverComposition.categoryAssignments.listResults({ ledgerId, ...input })
+    listCategoryAssignmentResults({ ledgerId, ...input })
 );

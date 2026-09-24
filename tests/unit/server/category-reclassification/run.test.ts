@@ -71,41 +71,34 @@ vi.mock("@/config/tuning", () => ({
   },
   AI_CATEGORY_MAX_ATTEMPTS: 3,
 }));
-vi.mock("@/application/adapters/postgres/category-assignment-v2", () => ({
-  postgresCategoryAssignmentV2Adapter: {
-    claimDocuments: adapters.claimDocuments,
-    loadDocumentSelection: adapters.loadDocumentSelection,
-    nextDue: adapters.nextDue,
-    renewDocumentClaim: adapters.renewDocumentClaim,
-    persistDecisions: adapters.persistDecisions,
-    markEvidenceIncomplete: adapters.markEvidenceIncomplete,
-    failDocument: adapters.failDocument,
-  },
+vi.mock("@/server/category-reclassification/assignments", () => ({
+  claimCategoryAssignmentDocuments: adapters.claimDocuments,
+  loadCategoryAssignmentSelection: adapters.loadDocumentSelection,
+  nextCategoryAssignmentDue: adapters.nextDue,
+  renewCategoryAssignmentClaim: adapters.renewDocumentClaim,
+  persistCategoryAssignmentDecisions: adapters.persistDecisions,
+  markCategoryAssignmentEvidenceIncomplete: adapters.markEvidenceIncomplete,
+  failCategoryAssignmentDocument: adapters.failDocument,
 }));
-vi.mock("@/application/adapters/postgres/ledger-entry-category-assignment", () => ({
-  postgresEntryCategoryAssignmentAdapter: {
-    loadDocumentGroups: adapters.loadDocumentGroups,
-  },
+vi.mock("@/server/category-reclassification/document-groups", () => ({
+  loadReclassificationDocumentGroups: adapters.loadDocumentGroups,
 }));
-vi.mock("@/application/adapters/postgres/source-document-aggregate/category-assignments", () => ({
+vi.mock("@/modules/source-document/server/category-assignments", () => ({
   applyCategoryAssignments: adapters.applyCategoryAssignments,
 }));
-vi.mock("@/application/adapters/ai/entry-reclassifier", () => ({
-  entryReclassifierAdapter: { decide: adapters.decide },
+vi.mock("@/server/category-reclassification/reclassifier", () => ({
+  decideEntryCategories: adapters.decide,
 }));
 vi.mock("@/server/processing/evidence", () => ({
   loadStoredFilesForAI: vi.fn(async () => []),
   isSuccessfulLoadImageResult: () => false,
-}));
-vi.mock("@/application/adapters/storage", () => ({
-  storedFileAdapter: { readAuthorized: vi.fn() },
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("@/lib/security/log-identifier", () => ({ logIdentifier: () => "hashed" }));
 
-import { runCategoryReclassificationJob } from "@/application/orchestration/category-reclassification";
+import { runCategoryReclassificationJob } from "@/server/category-reclassification/run";
 
 function work(index: number) {
   return {

@@ -27,7 +27,7 @@ import {
   getCategoryAssignmentResultsAction,
   getCategoryReclassificationJobAction,
 } from "@/modules/ledger/server/get-category-reclassification-job";
-import { scheduleCategoryReclassificationRecoveryAfter } from "@/application/processing/schedule-category-reclassification";
+import { scheduleCategoryReclassificationRecoveryAfter } from "@/server/category-reclassification/schedule";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 

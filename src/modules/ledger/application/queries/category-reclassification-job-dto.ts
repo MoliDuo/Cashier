@@ -1,5 +1,5 @@
 import type { CategoryReclassificationJobDto } from "@/modules/ledger/contracts";
-import type { CategoryReclassificationJobRecord } from "@/modules/ledger/application/ports";
+import type { CategoryReclassificationJobRecord } from "@/server/category-reclassification/jobs";
 
 /**
  * The stored run as the client sees it. V2 selection rows stay on the server;

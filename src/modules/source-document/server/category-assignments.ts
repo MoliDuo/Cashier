@@ -1,3 +1,4 @@
+import "server-only";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -8,15 +9,23 @@ import {
   ledgerEntries,
   sourceDocuments,
 } from "@/persistence";
-import { lockLedgerForUpdate } from "../transaction-locks";
+import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
-import { refreshCategoryAssignmentParentJob } from "../category-assignment-v2";
+import { refreshCategoryAssignmentParentJob } from "@/server/category-reclassification/assignments";
 import { ConflictError } from "@/lib/errors";
-import type {
-  ApplyCategoryAssignmentsInput,
-  ApplyCategoryAssignmentsResult,
-} from "@/modules/source-document/application/ports";
-import type { PostgresTransaction } from "../transaction-locks";
+import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+
+export interface ApplyCategoryAssignmentsInput {
+  ledgerId: string;
+  jobId: string;
+  sourceDocumentId: string;
+  claimToken: string;
+  now?: Date;
+}
+
+export type ApplyCategoryAssignmentsResult =
+  | { status: "applied"; appliedCount: number; confirmedCount: number; version: number }
+  | { status: "conflict" | "skipped" | "cancelled" | "claim_lost" };
 
 export async function incrementCategoryChangedDocumentVersions(
   tx: PostgresTransaction,

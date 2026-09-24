@@ -11,7 +11,7 @@ import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { drainDueExchangeRateRecalculations } from "@/application/orchestration/exchange-rate-ledger-recalculation";
-import { drainDueCategoryReclassifications } from "@/application/orchestration/category-reclassification";
+import { drainDueCategoryReclassifications } from "@/server/category-reclassification/run";
 import { acknowledgeObjectCleanup, claimObjectCleanup } from "./object-cleanup";
 
 const LIMIT = 1000;
