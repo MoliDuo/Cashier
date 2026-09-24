@@ -52,7 +52,6 @@ describe("createQuickEntryAction", () => {
     ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
-      userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
     await ensureTestLedgerBooks(db, ledgerId);
@@ -192,7 +191,6 @@ describe("createQuickEntryAction", () => {
     // Create other user first
     await db.insert(users).values({
       id: otherUserId,
-      name: "Other User",
     });
 
     await db.insert(loginEmails).values({
@@ -203,7 +201,6 @@ describe("createQuickEntryAction", () => {
 
     await db.insert(ledgers).values({
       id: otherLedgerId,
-      userId: otherUserId,
     });
 
     await expect(

@@ -32,7 +32,7 @@ describe("source-document retry action", () => {
       createOpenAIMock() as unknown as ReturnType<typeof getOpenAIClient>
     );
     const db = getTestDb();
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     ({ ledgerId } = await createTestUserWithLedger(db, undefined, "Retry Ledger", TEST_USER_ID));
     await db.insert(entryCategories).values({
       ledgerId,

@@ -161,7 +161,6 @@ describe("Processing Recovery", () => {
       .values({
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
-        revisionNumber: 2,
         inputText: "Updated text",
         processingStatus: "processing",
       })
@@ -326,7 +325,6 @@ describe("Processing Recovery", () => {
       .values({
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
-        revisionNumber: 2,
         inputText: "Updated text",
         processingStatus: "processing",
       })

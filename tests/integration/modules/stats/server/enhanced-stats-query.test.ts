@@ -209,8 +209,6 @@ describe("queryEnhancedStats", () => {
       .values({
         ledgerId,
         sourceDocumentId: doc.id,
-        revisionNumber: 2,
-        origin: "submission",
         processingStatus: "processing",
       })
       .returning({ id: sourceDocumentRevisions.id });

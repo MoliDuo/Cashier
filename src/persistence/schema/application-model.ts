@@ -27,19 +27,9 @@ export const revisionProcessingStatusEnum = pgEnum("revision_processing_status",
   "failed",
   "cancelled",
 ]);
-export const revisionOriginEnum = pgEnum("revision_origin", [
-  "submission",
-  "manual_edit",
-  "manual_entry",
-]);
 export const revisionFailureKindEnum = pgEnum("revision_failure_kind", [
   "invalid_input",
   "processing_error",
-]);
-export const retryClassificationEnum = pgEnum("retry_classification", [
-  "retryable",
-  "permanent",
-  "invalid",
 ]);
 export const processingOutboxStatusEnum = pgEnum("processing_outbox_status", [
   "pending",
@@ -70,10 +60,7 @@ export const sourceDocumentRevisions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
-    // Historical numbering is retained for existing records; new revisions use UUID identity.
-    revisionNumber: integer("revision_number"),
     title: text("title"),
-    origin: revisionOriginEnum("origin").notNull().default("submission"),
     inputText: text("input_text"),
     inputDocumentDate: text("input_document_date"),
     inputDateReference: date("input_date_reference", { mode: "string" }),
@@ -97,10 +84,6 @@ export const sourceDocumentRevisions = pgTable(
       table.sourceDocumentId,
       table.id
     ),
-    uniqueIndex("uq_source_document_revisions_document_number").on(
-      table.sourceDocumentId,
-      table.revisionNumber
-    ),
     index("idx_source_document_revisions_ledger_processing_status").on(
       table.ledgerId,
       table.processingStatus
@@ -109,7 +92,6 @@ export const sourceDocumentRevisions = pgTable(
       table.sourceDocumentId,
       table.createdAt
     ),
-    check("ck_source_document_revisions_number", sql`${table.revisionNumber} > 0`),
   ]
 );
 
@@ -120,7 +102,6 @@ export const storedFiles = pgTable(
     ledgerId: uuid("ledger_id")
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
-    storageProvider: text("storage_provider").notNull().default("s3"),
     storageKey: text("storage_key").notNull(),
     contentType: text("content_type").notNull(),
     byteSize: bigint("byte_size", { mode: "number" }).notNull(),
@@ -132,7 +113,7 @@ export const storedFiles = pgTable(
   },
   (table) => [
     uniqueIndex("uq_stored_files_ledger_id_id").on(table.ledgerId, table.id),
-    uniqueIndex("uq_stored_files_provider_key").on(table.storageProvider, table.storageKey),
+    uniqueIndex("uq_stored_files_storage_key").on(table.storageKey),
     index("idx_stored_files_ledger_created").on(table.ledgerId, table.createdAt),
     check("ck_stored_files_byte_size", sql`${table.byteSize} >= 0`),
   ]
@@ -173,21 +154,15 @@ export const processingOutbox = pgTable(
     ledgerId: uuid("ledger_id").notNull(),
     revisionId: uuid("revision_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
-    attemptNumber: integer("attempt_number").notNull().default(1),
     status: processingOutboxStatusEnum("status").notNull().default("pending"),
-    retryClassification: retryClassificationEnum("retry_classification"),
     diagnosticCode: text("diagnostic_code"),
-    correlationId: text("correlation_id"),
     startedAt: timestamp("started_at", { withTimezone: true }),
     requestedAt: requiredTimestamp("requested_at").$defaultFn(() => new Date()),
-    availableAt: requiredTimestamp("available_at").defaultNow(),
     claimToken: text("claim_token"),
-    claimedAt: timestamp("claimed_at", { withTimezone: true }),
     claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
     scheduleAttemptCount: integer("schedule_attempt_count").notNull().default(0),
-    lastScheduledAt: timestamp("last_scheduled_at", { withTimezone: true }),
     nextAvailableAt: requiredTimestamp("next_available_at").$defaultFn(() => new Date()),
   },
   (table) => [
@@ -201,10 +176,7 @@ export const processingOutbox = pgTable(
       foreignColumns: [sourceDocuments.ledgerId, sourceDocuments.id],
       name: "fk_processing_outbox_document_ledger",
     }).onDelete("cascade"),
-    uniqueIndex("uq_processing_outbox_revision_attempt").on(table.revisionId, table.attemptNumber),
-    index("idx_processing_outbox_pending_dispatch")
-      .on(table.availableAt, table.createdAt)
-      .where(sql`${table.status} = 'pending'`),
+    uniqueIndex("uq_processing_outbox_revision").on(table.revisionId),
     index("idx_processing_outbox_claim_expiry")
       .on(table.claimExpiresAt)
       .where(sql`${table.status} = 'claimed'`),
@@ -213,7 +185,6 @@ export const processingOutbox = pgTable(
       table.status,
       table.nextAvailableAt
     ),
-    check("ck_processing_outbox_attempt_number", sql`${table.attemptNumber} > 0`),
   ]
 );
 

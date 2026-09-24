@@ -113,6 +113,10 @@
     {
       "file": "0056_prepare_retired_column_drop.sql",
       "sha256": "ae01376043d7156cc83cfd0d07ebafe5d83c21b729021559b439fb51d61937ff"
+    },
+    {
+      "file": "0057_detach_retired_columns.sql",
+      "sha256": "c70e8038c436309cbc74397e2939fb26c925b54ac0553c5ec37045a55998e663"
     }
   ]
 }

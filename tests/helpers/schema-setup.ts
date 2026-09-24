@@ -100,7 +100,7 @@ export async function createTestUser(
     return id;
   }
 
-  await db.insert(schema.users).values({ id, name: "Test User" });
+  await db.insert(schema.users).values({ id });
   await db.insert(schema.loginEmails).values({
     userId: id,
     email: finalEmail,
@@ -119,10 +119,7 @@ export async function createTestUserWithLedger(
   const finalUserId = await createTestUser(db, email, userId ?? TEST_USER_ID);
 
   const ledgerId = crypto.randomUUID();
-  await db.insert(schema.ledgers).values({
-    id: ledgerId,
-    userId: finalUserId,
-  });
+  await db.insert(schema.ledgers).values({ id: ledgerId });
   await createTestBooks(db, ledgerId);
 
   return { userId: finalUserId, ledgerId };
@@ -163,7 +160,6 @@ export async function createTestSourceDocument(
           .values({
             ledgerId,
             sourceDocumentId: doc.id,
-            revisionNumber: 1,
             inputText: overrides.text ?? "Test document",
             processingStatus:
               status === "processing"
@@ -198,7 +194,6 @@ export async function createTestSourceDocument(
             .insert(schema.storedFiles)
             .values({
               ledgerId,
-              storageProvider: "local",
               storageKey: `tests/${doc.id}/${position}`,
               contentType: "image/jpeg",
               byteSize: 1,
@@ -248,9 +243,7 @@ export async function activateTestSourceDocumentProjection(
             .values({
               ledgerId: document.ledgerId,
               sourceDocumentId: document.id,
-              revisionNumber: 1,
               inputText: content.text,
-              origin: "submission",
               processingStatus: "completed",
               finishedAt: new Date(),
             })
@@ -270,7 +263,6 @@ export async function activateTestSourceDocumentProjection(
               .insert(schema.storedFiles)
               .values({
                 ledgerId: document.ledgerId,
-                storageProvider: "local",
                 storageKey: `tests/${document.id}/${position}`,
                 contentType: "image/jpeg",
                 byteSize: 1,

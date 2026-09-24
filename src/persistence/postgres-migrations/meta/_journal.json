@@ -400,6 +400,13 @@
       "when": 1790223763597,
       "tag": "0056_prepare_retired_column_drop",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1790223823597,
+      "tag": "0057_detach_retired_columns",
+      "breakpoints": true
     }
   ]
 }

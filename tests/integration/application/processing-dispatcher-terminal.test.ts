@@ -202,7 +202,6 @@ describe("executeProcessingJob — standalone function with real adapter/process
       id: staleRevisionId,
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
-      revisionNumber: 2,
       processingStatus: "processing",
     });
     await db

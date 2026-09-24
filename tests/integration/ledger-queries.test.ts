@@ -30,7 +30,7 @@ describe("session ledger query transport", () => {
 
   it("returns private scoped detail and refuses a caller without the live ledger", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
@@ -65,7 +65,7 @@ describe("session ledger query transport", () => {
   });
 
   it("validates each supported read without leaking internal error data", async () => {
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     await getTestDb().insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(getTestDb(), ledger.id);
     for (const query of [
@@ -92,7 +92,7 @@ describe("session ledger query transport", () => {
 
   it("serves the settings reads over the same scoped transport", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
 
@@ -114,7 +114,7 @@ describe("session ledger query transport", () => {
 
   it("serves the books reads over the same scoped transport", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
     const books = await ensureTestLedgerBooks(db, ledger.id, ["共同支出", "旧账"]);
     const liveBookId = books.get("共同支出")!;

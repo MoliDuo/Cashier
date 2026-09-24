@@ -24,7 +24,6 @@ import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
   ensureTestLedgerBooks,
-  TEST_USER_ID,
 } from "../helpers/schema-setup";
 import { eq, isNull, and } from "drizzle-orm";
 
@@ -62,9 +61,9 @@ async function createTestLedger(db: ReturnType<typeof getTestDb>, useCurrentUser
   if (useCurrentUser) {
     // Use the default test user (TEST_USER_ID)
     // First clean up any existing ledger for this user to avoid unique constraint
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
 
-    const ledgerData = createLedgerData({ userId: TEST_USER_ID });
+    const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
     const ledger = await db.query.ledgers.findFirst({

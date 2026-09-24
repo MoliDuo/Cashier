@@ -8,7 +8,6 @@ import {
   createTestSourceDocument,
   TEST_USER_ID,
 } from "../../helpers/schema-setup";
-import { eq } from "drizzle-orm";
 
 describe("getLedgerEntriesAction", () => {
   let testLedgerId: string;
@@ -19,7 +18,7 @@ describe("getLedgerEntriesAction", () => {
     const db = getTestDb();
 
     // Clean up existing ledger for TEST_USER_ID to avoid unique constraint
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
     testLedgerId = ledgerId;
 

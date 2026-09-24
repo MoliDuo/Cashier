@@ -21,8 +21,6 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name"),
-    image: text("image"),
     passwordHash: text("password_hash"),
     passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
     authVersion: integer("auth_version").notNull().default(1),
@@ -32,7 +30,6 @@ export const users = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [check("ck_users_auth_version_positive", sql`${table.authVersion} > 0`)]
 );

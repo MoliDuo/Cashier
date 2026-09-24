@@ -47,7 +47,6 @@ async function createLinkedStoredFile(ledgerId: string) {
     .values({
       ledgerId,
       sourceDocumentId: document!.id,
-      revisionNumber: 1,
       processingStatus: "completed",
       finishedAt: new Date(),
     })
@@ -56,7 +55,6 @@ async function createLinkedStoredFile(ledgerId: string) {
     .insert(storedFiles)
     .values({
       ledgerId,
-      storageProvider: "s3",
       storageKey: `${ledgerId}/private/file`,
       contentType: "image/png",
       byteSize: 5,

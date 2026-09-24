@@ -63,12 +63,8 @@ async function seedLedgerWithEntry(input: {
   });
   await db.insert(ledgers).values({
     id: ledgerId,
-    userId,
     ...(input.mainCurrency != null ? { mainCurrency: input.mainCurrency } : {}),
-    ...(input.deleted === true ? { deletedAt: new Date() } : {}),
   });
-  // A soft-deleted ledger still needs its book: the document rows below are
-  // inserted under the same ledger and the composite key must find one.
   await createTestBooks(db, ledgerId, ["共同支出"]);
   await db.insert(sourceDocuments).values({
     id: sourceDocumentId,
@@ -81,7 +77,6 @@ async function seedLedgerWithEntry(input: {
     id: revisionId,
     ledgerId,
     sourceDocumentId,
-    revisionNumber: 1,
   });
   await db
     .update(sourceDocuments)
@@ -434,8 +429,8 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       emailVerified: new Date(),
     });
     await db.insert(ledgers).values([
-      { id: ledgerId, userId, mainCurrency: "JPY" },
-      { id: secondLedgerId, userId: secondUserId, mainCurrency: "USD" },
+      { id: ledgerId, mainCurrency: "JPY" },
+      { id: secondLedgerId, mainCurrency: "USD" },
     ]);
     await createTestBooks(db, ledgerId, ["共同支出"]);
     await createTestBooks(db, secondLedgerId, ["共同支出"]);
@@ -458,13 +453,11 @@ describe("exchange-rate ledger recalculation orchestration", () => {
         id: revisionId,
         ledgerId,
         sourceDocumentId,
-        revisionNumber: 1,
       },
       {
         id: secondRevisionId,
         ledgerId: secondLedgerId,
         sourceDocumentId: secondSourceDocumentId,
-        revisionNumber: 1,
       },
     ]);
     await db
@@ -567,7 +560,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       email: `${userId}@example.com`,
       emailVerified: new Date(),
     });
-    await db.insert(ledgers).values({ id: ledgerId, userId, mainCurrency: "CNY" });
+    await db.insert(ledgers).values({ id: ledgerId, mainCurrency: "CNY" });
     await createTestBooks(db, ledgerId, ["共同支出"]);
 
     // Older rates first: undated entries must use the newest stored date.
@@ -601,13 +594,11 @@ describe("exchange-rate ledger recalculation orchestration", () => {
         id: datedRevisionId,
         ledgerId,
         sourceDocumentId: datedSourceDocumentId,
-        revisionNumber: 1,
       },
       {
         id: undatedRevisionId,
         ledgerId,
         sourceDocumentId: undatedSourceDocumentId,
-        revisionNumber: 1,
       },
     ]);
     await db

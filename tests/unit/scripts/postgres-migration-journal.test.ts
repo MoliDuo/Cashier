@@ -31,7 +31,7 @@ describe("Postgres migration journal", () => {
     });
 
     expect(observedInversions).toEqual(allowedLegacyInversions);
-    expect(journal.entries.at(-1)?.tag).toBe("0056_prepare_retired_column_drop");
+    expect(journal.entries.at(-1)?.tag).toBe("0057_detach_retired_columns");
   });
 
   it("keeps the harmful global category reorder migration as an intentional no-op", () => {
@@ -136,7 +136,7 @@ describe("Postgres migration journal", () => {
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
-    expect(message).toContain("migration journal is at 0056_prepare_retired_column_drop");
+    expect(message).toContain("migration journal is at 0057_detach_retired_columns");
     expect(message).toContain("newest Drizzle snapshot is 0052_snapshot.json");
     expect(message).toContain("Rebaseline the snapshot");
   });

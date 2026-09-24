@@ -95,7 +95,7 @@ describe("API v1 source-documents route", () => {
     mockR2.files.clear();
     mockR2.setUploadError(null);
 
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const setup = await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
     ledgerId = setup.ledgerId;
 
@@ -156,7 +156,6 @@ describe("API v1 source-documents route", () => {
         .where(eq(storedFiles.id, revisionFilesRows[0]!.storedFileId))
         .then((rows) => rows[0]);
       expect(storedFile).not.toBeUndefined();
-      expect(storedFile!.storageProvider).toBe("s3");
       expect(storedFile!.finalizedAt).not.toBeNull();
 
       // Verify one processing outbox record exists

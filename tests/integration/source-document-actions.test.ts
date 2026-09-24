@@ -41,7 +41,7 @@ describe("getSourceDocumentDetailAction", () => {
 
   it("should return source document with basic data", async () => {
     const db = getTestDb();
-    const ledgerData = createLedgerData({ userId: testUserId });
+    const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
 
@@ -68,7 +68,7 @@ describe("getSourceDocumentDetailAction", () => {
 
   it("should include stored-file identities in the normalized light response", async () => {
     const db = getTestDb();
-    const ledgerData = createLedgerData({ userId: testUserId });
+    const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
 
@@ -95,7 +95,7 @@ describe("getSourceDocumentDetailAction", () => {
 
   it("should include associated ledgerEntries", async () => {
     const db = getTestDb();
-    const ledgerData = createLedgerData({ userId: testUserId });
+    const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
 
@@ -135,7 +135,7 @@ describe("getSourceDocumentDetailAction", () => {
 
   it("should return null when document does not exist", async () => {
     const db = getTestDb();
-    const ledgerData = createLedgerData({ userId: testUserId });
+    const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
 
@@ -151,7 +151,7 @@ describe("getSourceDocumentDetailAction", () => {
     // A second ledger row that is not live: the access wrapper answers NotFound
     // rather than revealing that the row (and its documents) exist.
     const otherLedgerId = randomUUID();
-    await db.insert(ledgers).values({ id: otherLedgerId, userId: testUserId });
+    await db.insert(ledgers).values({ id: otherLedgerId });
     await ensureTestLedgerBooks(db, otherLedgerId);
     const docData = createSourceDocumentData(otherLedgerId);
     await db.insert(sourceDocuments).values({

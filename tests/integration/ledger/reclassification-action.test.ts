@@ -58,7 +58,7 @@ async function seedEntries(input: {
 
 async function setupLedger() {
   const db = getTestDb();
-  const ledger = createLedgerData({ userId });
+  const ledger = createLedgerData();
   const food = createCategoryData(ledger.id, { name: "吃喝", sortOrder: 0 });
   const home = createCategoryData(ledger.id, { name: "居家", sortOrder: 1 });
   const document = createSourceDocumentData(ledger.id);

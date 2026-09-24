@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
 import { getTestDb } from "../setup";
 import {
   activateTestSourceDocumentProjection,
@@ -15,7 +14,7 @@ describe("ledger summary soft-delete regression", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     ({ ledgerId } = await createTestUserWithLedger(db, undefined, "Stats Ledger", TEST_USER_ID));
   });
 

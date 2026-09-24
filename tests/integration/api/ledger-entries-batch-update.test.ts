@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { batchUpdateLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import { getTestDb } from "../../setup";
 import { ledgerEntries, entryCategories, ledgers } from "@/persistence";
-import { inArray, eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import {
   createTestUserWithLedger,
   createTestSourceDocument,
@@ -26,7 +26,7 @@ describe("Batch Update Ledger Entries Action", () => {
   beforeEach(async () => {
     const db = getTestDb();
 
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
     testLedgerId = ledgerId;
 

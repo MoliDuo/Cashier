@@ -24,7 +24,7 @@ describe("saveSourceDocumentChangesAction", () => {
 
   async function seed() {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId, mainCurrency: "USD" });
+    const ledger = createLedgerData({ mainCurrency: "USD" });
     const document = createSourceDocumentData(ledger.id, {
       status: "completed",
       title: "Original",

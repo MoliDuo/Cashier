@@ -88,7 +88,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
   beforeEach(async () => {
     const db = getTestDb();
 
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const { ledgerId } = await createTestUserWithLedger(
       db,
       undefined,

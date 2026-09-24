@@ -207,7 +207,6 @@ describe("current-runtime target adapters", () => {
       .insert(storedFiles)
       .values({
         ledgerId,
-        storageProvider: "local",
         storageKey: `${ledgerId}/stored/pending-evidence`,
         contentType: "image/jpeg",
         byteSize: 7,

@@ -10,7 +10,6 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 const OTHER_USER_ID = "11111111-1111-1111-1111-111111111111";
 
 async function seedEntry(
@@ -61,7 +60,6 @@ describe("getLedgerStatsAction", () => {
     ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
-      userId: TEST_USER_ID,
       mainCurrency: "CNY",
     });
     await ensureTestLedgerBooks(db, ledgerId);
@@ -370,7 +368,6 @@ describe("getLedgerStatsAction", () => {
 
     await db.insert(users).values({
       id: OTHER_USER_ID,
-      name: "Other User",
     });
 
     await db.insert(loginEmails).values({
@@ -382,7 +379,6 @@ describe("getLedgerStatsAction", () => {
     const otherLedgerId = randomUUID();
     await db.insert(ledgers).values({
       id: otherLedgerId,
-      userId: OTHER_USER_ID,
     });
 
     await expect(getLedgerStatsAction({})).rejects.toThrow("Ledger not found");

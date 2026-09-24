@@ -8,7 +8,6 @@ import { getTestDb } from "../../setup";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
-  TEST_USER_ID,
 } from "../../helpers/schema-setup";
 
 /** A single-entry edit is a one-entry batch: the UI has no other update path. */
@@ -30,7 +29,7 @@ describe("single-entry update version CAS", () => {
     ledgerId = crypto.randomUUID();
     sourceDocumentId = crypto.randomUUID();
     entryId = crypto.randomUUID();
-    await db.insert(ledgers).values({ id: ledgerId, userId: TEST_USER_ID, mainCurrency: "CNY" });
+    await db.insert(ledgers).values({ id: ledgerId, mainCurrency: "CNY" });
     await ensureTestLedgerBooks(db, ledgerId);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,

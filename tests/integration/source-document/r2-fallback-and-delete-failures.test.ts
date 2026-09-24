@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotFoundError } from "@/lib/errors";
-import { eq } from "drizzle-orm";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { getTestDb } from "tests/setup";
 import { ledgers, sourceDocuments } from "@/persistence";
@@ -20,7 +19,7 @@ describe("source-document delete tolerance", () => {
       expires: new Date(Date.now() + 3600 * 1000).toISOString(),
     });
     const db = getTestDb();
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     ({ ledgerId } = await createTestUserWithLedger(
       db,
       undefined,

@@ -61,7 +61,7 @@ describe("splitSourceDocumentAction", () => {
 
   async function seed(entryCount = 3) {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId, mainCurrency: "USD" });
+    const ledger = createLedgerData({ mainCurrency: "USD" });
     const document = createSourceDocumentData(ledger.id, { status: "completed" });
     const ids = Array.from({ length: entryCount }, () => crypto.randomUUID());
     await db.insert(ledgers).values(ledger);

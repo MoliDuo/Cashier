@@ -218,7 +218,6 @@ describe("bounded target read models", () => {
       .values(
         Array.from({ length: fileCount }, (_, index) => ({
           ledgerId,
-          storageProvider: "local",
           storageKey: `bounded-ownership/${fileCount}/${index}`,
           contentType: "image/jpeg",
           byteSize: 1,

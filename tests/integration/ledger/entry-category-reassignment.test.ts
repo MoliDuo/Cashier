@@ -49,8 +49,6 @@ async function createSupersededRevision(ledgerId: string, documentId: string): P
     .values({
       ledgerId,
       sourceDocumentId: documentId,
-      revisionNumber: 2,
-      origin: "submission",
       processingStatus: "completed",
       finishedAt: new Date(),
     })

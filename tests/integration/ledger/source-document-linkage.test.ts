@@ -26,7 +26,7 @@ describe("ledger source-document linkage", () => {
 
     const ledger = createLedgerData();
     ledgerId = ledger.id;
-    const otherLedger = createLedgerData({ userId: secondUserId });
+    const otherLedger = createLedgerData();
     const category = createCategoryData(ledgerId);
     const firstDoc = createSourceDocumentData(ledgerId);
     const secondDoc = createSourceDocumentData(ledgerId);

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => new Headers({ "accept-language": "zh-CN" })),
 }));
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUser } from "../../helpers/schema-setup";
 import { findUserByEmail, findUserById, listLoginEmails } from "@/modules/auth/server/users";
@@ -161,7 +161,7 @@ describe("first-run setup", () => {
       id: result.userId,
     });
     const ledger = await db.query.ledgers.findFirst({
-      where: and(eq(ledgers.id, result.ledgerId), isNull(ledgers.deletedAt)),
+      where: eq(ledgers.id, result.ledgerId),
     });
     expect(ledger).toBeDefined();
     const ledgerBooks = await db.query.books.findMany({
@@ -399,7 +399,7 @@ describe("first-run setup", () => {
       expect(await isSetupPending()).toBe(false);
       expect(
         await db.query.ledgers.findFirst({
-          where: and(eq(ledgers.id, result.ledgerId), isNull(ledgers.deletedAt)),
+          where: eq(ledgers.id, result.ledgerId),
         })
       ).toBeDefined();
       // The action is the unauthenticated write, so a second call must not

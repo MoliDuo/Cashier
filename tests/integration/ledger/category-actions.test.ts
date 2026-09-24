@@ -25,8 +25,6 @@ async function getTargetEntryCategoriesAction(ledgerId: string) {
   return getEntryCategoriesAction();
 }
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
-
 describe("getEntryCategoriesAction", () => {
   let ledgerId: string;
 
@@ -35,7 +33,6 @@ describe("getEntryCategoriesAction", () => {
     ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
-      userId: TEST_USER_ID,
     });
     await ensureTestLedgerBooks(db, ledgerId);
   });

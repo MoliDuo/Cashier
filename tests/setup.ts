@@ -142,7 +142,6 @@ beforeEach(async () => {
 
   await database.db.insert(schema.users).values({
     id: "00000000-0000-0000-0000-000000000000",
-    name: "Test User",
   });
   await database.db.insert(schema.loginEmails).values({
     userId: "00000000-0000-0000-0000-000000000000",

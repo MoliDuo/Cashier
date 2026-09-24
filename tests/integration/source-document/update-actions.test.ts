@@ -37,7 +37,7 @@ describe("Source Document Update Actions", () => {
   describe("batchUpdateSourceDocumentsAction", () => {
     it("converts only changed dates in a mixed batch and preserves metadata-only FX", async () => {
       const db = getTestDb();
-      const ledger = createLedgerData({ userId: testUserId, mainCurrency: "USD" });
+      const ledger = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
       await ensureTestLedgerBooks(db, ledger.id);
       const documents = ["2024-03-14", "2024-03-15"].map((documentDate) =>
@@ -90,7 +90,7 @@ describe("Source Document Update Actions", () => {
     });
     it("does not prepare FX or advance the version when the date is unchanged", async () => {
       const db = getTestDb();
-      const ledger = createLedgerData({ userId: testUserId, mainCurrency: "USD" });
+      const ledger = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
       await ensureTestLedgerBooks(db, ledger.id);
       const document = createSourceDocumentData(ledger.id, {
@@ -118,7 +118,7 @@ describe("Source Document Update Actions", () => {
     });
     it("should batch update multiple source documents", async () => {
       const db = getTestDb();
-      const ledgerData = createLedgerData({ userId: testUserId });
+      const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
       await ensureTestLedgerBooks(db, ledgerData.id);
 
@@ -161,10 +161,7 @@ describe("Source Document Update Actions", () => {
 
     it("recalculates active entry conversions using the new historical date", async () => {
       const db = getTestDb();
-      const ledgerData = createLedgerData({
-        userId: testUserId,
-        mainCurrency: "USD",
-      });
+      const ledgerData = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledgerData);
       await ensureTestLedgerBooks(db, ledgerData.id);
       const document = createSourceDocumentData(ledgerData.id, {
@@ -212,7 +209,7 @@ describe("Source Document Update Actions", () => {
 
     it("rejects an empty batch", async () => {
       const db = getTestDb();
-      const ledgerData = createLedgerData({ userId: testUserId });
+      const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
       await ensureTestLedgerBooks(db, ledgerData.id);
 
@@ -226,7 +223,7 @@ describe("Source Document Update Actions", () => {
 
     it("treats an already-matching title as a no-op: zero writes, version unchanged", async () => {
       const db = getTestDb();
-      const ledgerData = createLedgerData({ userId: testUserId });
+      const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
       await ensureTestLedgerBooks(db, ledgerData.id);
       const docData = createSourceDocumentData(ledgerData.id, { title: "Same title" });
@@ -254,7 +251,7 @@ describe("Source Document Update Actions", () => {
 
     it("rolls back the whole batch — including the non-stale document — when one target is stale", async () => {
       const db = getTestDb();
-      const ledgerData = createLedgerData({ userId: testUserId });
+      const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
       await ensureTestLedgerBooks(db, ledgerData.id);
       const okDoc = createSourceDocumentData(ledgerData.id, { title: "Original A" });

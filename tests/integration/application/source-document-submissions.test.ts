@@ -191,7 +191,6 @@ describe("target source-document submissions", () => {
       .insert(storedFiles)
       .values({
         ledgerId,
-        storageProvider: "local",
         storageKey: `${ledgerId}/unfinalized`,
         contentType: "image/jpeg",
         byteSize: 1,

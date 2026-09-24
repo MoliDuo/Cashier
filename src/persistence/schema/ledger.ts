@@ -13,7 +13,6 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { type InferSelectModel, sql } from "drizzle-orm";
-import { users } from "./auth";
 
 // These declarations only provide physical target columns to FK builders.
 // The complete tables remain uniquely exported from their owning modules.
@@ -31,7 +30,6 @@ export const ledgers = pgTable(
   "ledgers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     aiLanguage: text("ai_language").notNull().default("zh-CN"),
     preferredCurrencies: varchar("preferred_currencies", { length: 3 })
       .array()
@@ -46,10 +44,8 @@ export const ledgers = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
-    index("idx_ledgers_user_id").on(table.userId),
     check("ck_ledgers_main_currency", sql`${table.mainCurrency} ~ '^[A-Z]{3}$'`),
     check(
       "ck_ledgers_preferred_currencies",

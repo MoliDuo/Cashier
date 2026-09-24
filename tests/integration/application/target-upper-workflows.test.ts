@@ -66,16 +66,6 @@ describe("target upper workflows", () => {
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
     });
-    expect(
-      await db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, completed.revisionId),
-      })
-    ).toMatchObject({ revisionNumber: null });
-    // Simulate a historical revision: later submissions must preserve its number.
-    await db
-      .update(sourceDocumentRevisions)
-      .set({ revisionNumber: 7 })
-      .where(eq(sourceDocumentRevisions.id, completed.revisionId));
     const pending = await createPendingRevision({
       ledgerId,
       input: { text: "pending", storedFileIds: [], documentDate: null },
@@ -87,16 +77,6 @@ describe("target upper workflows", () => {
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    expect(
-      await db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, failedSubmission.revision.id),
-      })
-    ).toMatchObject({ revisionNumber: null });
-    expect(
-      await db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, completed.revisionId),
-      })
-    ).toMatchObject({ revisionNumber: 7 });
     await recordProcessingFailure({
       lease: await claimRevisionForTest(failedSubmission.revision.id),
       ledgerId,

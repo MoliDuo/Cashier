@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { TEST_USER_ID } from "./schema-setup";
 
 export function createLedgerData(
   overrides: Partial<{
     id: string;
-    userId: string;
     aiLanguage: string;
     preferredCurrencies: string[];
     mainCurrency: string;
@@ -16,7 +14,6 @@ export function createLedgerData(
 ) {
   return {
     id: randomUUID(),
-    userId: TEST_USER_ID, // 默认使用测试用户，避免外键约束失败
     aiLanguage: "zh-CN",
     preferredCurrencies: [],
     mainCurrency: "CNY",

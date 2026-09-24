@@ -344,14 +344,12 @@ describe("upload policy integration", () => {
       const rawRow = await db
         .select({
           storageKey: storedFiles.storageKey,
-          storageProvider: storedFiles.storageProvider,
         })
         .from(storedFiles)
         .where(eq(storedFiles.id, file.id))
         .then((rows) => rows[0]);
       expect(rawRow).toBeDefined();
       expect(rawRow!.storageKey).toContain(ledgerId);
-      expect(rawRow!.storageProvider).toBe("s3");
     });
   });
 });

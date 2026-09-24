@@ -47,7 +47,7 @@ describe("SourceDocument Actions", () => {
     const db = getTestDb();
 
     // Clean up existing ledger for TEST_USER_ID and create new one
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
     testLedgerId = ledgerId;
 

@@ -26,8 +26,6 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
-
 async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entryDate?: string) {
   const [doc] = await db
     .insert(sourceDocuments)
@@ -54,7 +52,6 @@ describe("deleteLedgerEntryAction", () => {
     ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
-      userId: TEST_USER_ID,
     });
     await ensureTestLedgerBooks(db, ledgerId);
   });

@@ -11,7 +11,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import { hasActiveLedgerEntries } from "@/modules/ledger/server/entry-reads/has-active-entries";
 import {
@@ -58,7 +58,7 @@ describe("target Settings currency workflow", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     ({ ledgerId } = await createTestUserWithLedger(db));
     await db
       .update(ledgers)
@@ -121,7 +121,6 @@ describe("target Settings currency workflow", () => {
         id: activeRevisionId,
         ledgerId,
         sourceDocumentId,
-        revisionNumber: 1,
         processingStatus: "completed",
         finishedAt: new Date(),
       },
@@ -129,7 +128,6 @@ describe("target Settings currency workflow", () => {
         id: latestSubmissionRevisionId,
         ledgerId,
         sourceDocumentId,
-        revisionNumber: 2,
         processingStatus: "processing",
       },
     ]);
@@ -274,7 +272,6 @@ describe("target Settings currency workflow", () => {
         id: activeRevisionId,
         ledgerId,
         sourceDocumentId,
-        revisionNumber: 1,
         processingStatus: "completed",
         finishedAt: new Date(),
       });
@@ -391,7 +388,6 @@ describe("settings concurrency invariants", () => {
       id: revisionId,
       ledgerId,
       sourceDocumentId,
-      revisionNumber: 1,
       processingStatus: "processing",
     });
     await db

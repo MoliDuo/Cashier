@@ -135,7 +135,6 @@ describe("projection write shape", () => {
         .insert(storedFiles)
         .values({
           ledgerId,
-          storageProvider: "local",
           storageKey: `tests/${created.sourceDocumentId}/0`,
           contentType: "image/jpeg",
           byteSize: 100,

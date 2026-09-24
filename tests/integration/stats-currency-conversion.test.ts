@@ -15,7 +15,7 @@ describe("Stats Currency Conversion", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const setup = await createTestUserWithLedger(db, undefined, "Converter Ledger", TEST_USER_ID);
     ledgerId = setup.ledgerId;
 

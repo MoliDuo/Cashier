@@ -7,7 +7,6 @@ import { getTestDb } from "../../setup";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
-  TEST_USER_ID,
 } from "../../helpers/schema-setup";
 
 const { getRatesMock } = vi.hoisted(() => ({
@@ -28,7 +27,7 @@ describe("createLedgerEntryAction version CAS", () => {
     const db = getTestDb();
     ledgerId = crypto.randomUUID();
     sourceDocumentId = crypto.randomUUID();
-    await db.insert(ledgers).values({ id: ledgerId, userId: TEST_USER_ID, mainCurrency: "CNY" });
+    await db.insert(ledgers).values({ id: ledgerId, mainCurrency: "CNY" });
     await ensureTestLedgerBooks(db, ledgerId);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,

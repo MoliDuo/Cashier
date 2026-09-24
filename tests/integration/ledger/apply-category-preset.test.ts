@@ -58,7 +58,7 @@ describe("applyCategoryPresetAction", () => {
 
   it("moves entries instead of unsetting them and keeps a kept category", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const foodId = crypto.randomUUID();
     const travelId = crypto.randomUUID();
     const customId = crypto.randomUUID();
@@ -142,7 +142,7 @@ describe("applyCategoryPresetAction", () => {
 
   it("reuses a kept row when a preset category shares its name", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const otherId = crypto.randomUUID();
     const foodId = crypto.randomUUID();
 
@@ -179,7 +179,7 @@ describe("applyCategoryPresetAction", () => {
 
   it("rejects a stale category collection revision without writing", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
@@ -209,7 +209,7 @@ describe("applyCategoryPresetAction", () => {
 
   it("rejects a mapping that does not account for every active category", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
@@ -229,11 +229,11 @@ describe("applyCategoryPresetAction", () => {
 
   it("rejects a category that belongs to another ledger", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     // The app never holds two ledgers, so the action's gate would refuse this
     // database outright. The server function still scopes every category
     // lookup by the ledger it is given, which is what this pins.
-    const otherLedger = createLedgerData({ userId });
+    const otherLedger = createLedgerData();
     const foreignId = crypto.randomUUID();
     await db.insert(ledgers).values([ledger, otherLedger]);
     await ensureTestLedgerBooks(db, ledger.id);
@@ -255,7 +255,7 @@ describe("applyCategoryPresetAction", () => {
 
   it("advances the ledger sync version and flags categories and stats", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);

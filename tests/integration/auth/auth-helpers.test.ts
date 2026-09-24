@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, loginEmails, users } from "@/persistence";
-import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
@@ -36,11 +35,10 @@ describe("requireLedgerAccess", () => {
     ledgerId = randomUUID();
 
     // Clean up any existing ledgers for this user first (due to unique constraint)
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
 
     await db.insert(ledgers).values({
       id: ledgerId,
-      userId: TEST_USER_ID,
     });
     await ensureTestLedgerBooks(db, ledgerId);
   });
@@ -65,7 +63,6 @@ describe("requireLedgerAccess", () => {
     const otherLedgerId = randomUUID();
     await db.insert(ledgers).values({
       id: otherLedgerId,
-      userId: otherUserId,
     });
 
     await expect(requireLedgerAccess()).rejects.toThrow(NotFoundError);

@@ -94,7 +94,7 @@ describe("API v1 source-documents route", () => {
     mockR2.files.clear();
     mockR2.setUploadError(null);
 
-    await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
+    await db.delete(ledgers);
     const setup = await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
     ledgerId = setup.ledgerId;
 

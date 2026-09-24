@@ -41,7 +41,7 @@ describe("saveEntryCategoriesAction", () => {
 
   it("commits additions, edits, deletions, and ordering in one transaction", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const keepId = crypto.randomUUID();
     const removeId = crypto.randomUUID();
     const newId = crypto.randomUUID();
@@ -135,7 +135,7 @@ describe("saveEntryCategoriesAction", () => {
 
   it("rolls back the whole category draft when an affected document is processing", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
     const categoryId = crypto.randomUUID();
@@ -197,10 +197,10 @@ describe("saveEntryCategoriesAction", () => {
 
   it("rejects categories belonging to another ledger without modifying either collection", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     // Two ledgers never coexist in the app, so this drives the server function,
     // which still scopes every category it touches by the ledger it is given.
-    const other = createLedgerData({ userId });
+    const other = createLedgerData();
     await db.insert(ledgers).values([ledger, other]);
     const ownId = crypto.randomUUID();
     const foreignId = crypto.randomUUID();
@@ -227,7 +227,7 @@ describe("saveEntryCategoriesAction", () => {
 
   it("allows every category to be edited and deleted", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const editableId = crypto.randomUUID();
     const fixedId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
@@ -270,7 +270,7 @@ describe("saveEntryCategoriesAction", () => {
 
   it("rejects a stale category collection revision without applying the draft", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
@@ -303,7 +303,7 @@ describe("saveEntryCategoriesAction", () => {
 
   it("saves the maximum category batch while swapping every unique name", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData({ userId });
+    const ledger = createLedgerData();
     const categories = Array.from({ length: 100 }, (_, index) => ({
       id: crypto.randomUUID(),
       ledgerId: ledger.id,

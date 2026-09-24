@@ -19,7 +19,6 @@ describe("currency action composition", () => {
   beforeEach(async () => {
     await getTestDb().insert(ledgers).values({
       id: LEDGER_ID,
-      userId: "00000000-0000-0000-0000-000000000000",
     });
     await ensureTestLedgerBooks(getTestDb(), LEDGER_ID);
     await insertRates("2026-02-04", { CNY: 7.5, USD: 1.1 });
