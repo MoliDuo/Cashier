@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { serverComposition } from "@/application/server-composition-root";
-import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
+import { executeProcessingJob } from "@/server/processing/execute-job";
+import { renewProcessingJobLease } from "@/server/processing/jobs";
+import { processingJobs } from "tests/helpers/processing-jobs";
 import type { ProcessingJobContract } from "@/application/contracts";
 import {
   ledgerEntries,
@@ -16,11 +17,16 @@ import {
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
 }));
+vi.mock("@/server/processing/jobs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/processing/jobs")>();
+  return { ...actual, renewProcessingJobLease: vi.fn(actual.renewProcessingJobLease) };
+});
 import { createAIContext } from "@/lib/tasks/ai-context";
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.mocked(renewProcessingJobLease).mockReset();
 });
 
 /**
@@ -52,7 +58,7 @@ async function pendingIntent(
   };
 }
 
-describe("executeSingleProcessingJob — standalone function with real adapter/processor", () => {
+describe("executeProcessingJob — standalone function with real adapter/processor", () => {
   it.each([
     ["returns null", "null"],
     ["throws", "throw"],
@@ -79,16 +85,14 @@ describe("executeSingleProcessingJob — standalone function with real adapter/p
       return { generate };
     });
 
-    const renew = vi
-      .spyOn(PostgresProcessingJobAdapter.prototype, "renew")
-      .mockImplementation(async () => {
-        if (mode === "null") return null;
-        throw new Error("lease backend unavailable");
-      });
-    const adapter = new PostgresProcessingJobAdapter();
+    const renew = vi.mocked(renewProcessingJobLease).mockImplementation(async () => {
+      if (mode === "null") return null;
+      throw new Error("lease backend unavailable");
+    });
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
-    const execution = serverComposition.executeSingleProcessingJob(job);
+    const execution = executeProcessingJob(job);
     await generationStarted;
     await vi.advanceTimersByTimeAsync(15_000);
 
@@ -157,10 +161,10 @@ describe("executeSingleProcessingJob — standalone function with real adapter/p
     }));
     vi.mocked(createAIContext).mockReturnValue({ generate });
 
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
-    const result = await serverComposition.executeSingleProcessingJob(job);
+    const result = await executeProcessingJob(job);
     expect(result).toBe(true);
 
     const row = await db.query.processingOutbox.findFirst({
@@ -190,7 +194,7 @@ describe("executeSingleProcessingJob — standalone function with real adapter/p
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });
 
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Simulate stale revision: change latestSubmissionRevisionId so recordProcessingFailure guard fails
@@ -207,7 +211,7 @@ describe("executeSingleProcessingJob — standalone function with real adapter/p
       .set({ latestSubmissionRevisionId: staleRevisionId })
       .where(eq(sourceDocuments.id, job.sourceDocumentId));
 
-    const result = await serverComposition.executeSingleProcessingJob(job);
+    const result = await executeProcessingJob(job);
     expect(result).toBe(true);
 
     const row = await db.query.processingOutbox.findFirst({

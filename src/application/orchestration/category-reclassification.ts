@@ -6,11 +6,7 @@ import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/post
 import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
 import { applyCategoryAssignments } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
 import { entryReclassifierAdapter } from "@/application/adapters/ai/entry-reclassifier";
-import {
-  isSuccessfulLoadImageResult,
-  loadStoredFilesForAI,
-} from "@/application/adapters/in-process";
-import { storedFileAdapter } from "@/application/adapters/storage";
+import { isSuccessfulLoadImageResult, loadStoredFilesForAI } from "@/server/processing/evidence";
 import type { ClaimedCategoryAssignmentDocument } from "@/application/adapters/postgres/category-assignment-v2";
 import { AI_CATEGORY_CONCURRENCY, AI_CATEGORY_MAX_ATTEMPTS } from "@/config/tuning";
 
@@ -51,11 +47,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
         return;
       }
       const imageStartedAt = Date.now();
-      const loaded = await loadStoredFilesForAI(
-        (ledgerId, storedFileId) => storedFileAdapter.readAuthorized(ledgerId, storedFileId),
-        work.ledgerId,
-        [...group.storedFileIds]
-      );
+      const loaded = await loadStoredFilesForAI(work.ledgerId, [...group.storedFileIds]);
       const images = loaded
         .filter(isSuccessfulLoadImageResult)
         .map((image) => ({ dataUrl: image.dataUrl }));

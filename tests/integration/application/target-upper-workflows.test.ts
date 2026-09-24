@@ -2,7 +2,6 @@ import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { and, eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { postgresRevisionAdapter } from "@/application/adapters/postgres";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import {
   entryCategories,
@@ -26,6 +25,7 @@ import {
 } from "@/modules/source-document/server/entry-commands";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
+import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
   const page = await listLedgerEntryPage({
@@ -97,7 +97,7 @@ describe("target upper workflows", () => {
         where: eq(sourceDocumentRevisions.id, completed.revisionId),
       })
     ).toMatchObject({ revisionNumber: 7 });
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(failedSubmission.revision.id),
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
@@ -148,7 +148,7 @@ describe("target upper workflows", () => {
       input: { text: "failed replacement", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(failedPending.revision.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,

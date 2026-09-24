@@ -1,8 +1,13 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import "server-only";
 import type {
+  LedgerId,
+  ProcessingLeaseContract,
+  RevisionFailureKind,
+  RevisionId,
   RevisionProcessingStatus,
   SourceDocumentContract,
-  SourceDocumentPort,
+  SourceDocumentId,
   SourceDocumentRevisionContract,
 } from "@/application/contracts";
 import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
@@ -20,9 +25,9 @@ import {
   lockBookForShare,
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
-} from "./transaction-locks";
-import type { PostgresTransaction } from "./transaction-locks";
-import { completeProcessingLeaseInTransaction } from "./processing-terminal";
+} from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
 export type CreatePendingRevisionInput = {
   ledgerId: string;
@@ -229,70 +234,89 @@ export async function createProcessingRevisionInTransaction(
   return { document: mapDocument(updatedDocument, "processing"), revision: mapRevision(revision) };
 }
 
-export const postgresRevisionAdapter: SourceDocumentPort = {
-  async recordProcessingFailure(input) {
-    return db.transaction(async (tx) => {
-      await lockLedgerForUpdate(tx, input.ledgerId);
-      let document;
-      try {
-        document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
-      } catch (error) {
-        if (error instanceof NotFoundError) return false;
-        throw error;
-      }
-      if (document.latestSubmissionRevisionId !== input.revisionId) return false;
-      const revision = await tx
-        .select({ processingStatus: sourceDocumentRevisions.processingStatus })
-        .from(sourceDocumentRevisions)
-        .where(
-          and(
-            eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-            eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-            eq(sourceDocumentRevisions.id, input.revisionId)
-          )
+export interface RecordProcessingFailureInput {
+  ledgerId: LedgerId;
+  sourceDocumentId: SourceDocumentId;
+  revisionId: RevisionId;
+  failureKind: RevisionFailureKind;
+  /**
+   * User-facing text. `null` when the failure carries no explanation, in
+   * which case the UI falls back to localized copy.
+   */
+  failureMessage: string | null;
+  failureCode?: string | null;
+  lease: ProcessingLeaseContract;
+}
+
+/**
+ * Marks the latest submission as failed and closes its outbox lease. Returns
+ * false when the lease was lost or the revision was superseded, so a late
+ * worker never overwrites newer state.
+ */
+export async function recordProcessingFailure(
+  input: RecordProcessingFailureInput
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    await lockLedgerForUpdate(tx, input.ledgerId);
+    let document;
+    try {
+      document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
+    } catch (error) {
+      if (error instanceof NotFoundError) return false;
+      throw error;
+    }
+    if (document.latestSubmissionRevisionId !== input.revisionId) return false;
+    const revision = await tx
+      .select({ processingStatus: sourceDocumentRevisions.processingStatus })
+      .from(sourceDocumentRevisions)
+      .where(
+        and(
+          eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
+          eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
+          eq(sourceDocumentRevisions.id, input.revisionId)
         )
-        .for("update")
-        .then((rows) => rows[0]);
-      if (revision?.processingStatus !== "processing") return false;
-      if (
-        !(await completeProcessingLeaseInTransaction(tx, input.lease, "failed", {
-          code: input.failureCode ?? null,
-        }))
-      ) {
-        return false;
-      }
-      const updated = await tx
-        .update(sourceDocumentRevisions)
-        .set({
-          processingStatus: "failed",
-          failureKind: input.failureKind,
-          failureMessage: input.failureMessage,
-          failureCode: input.failureCode ?? null,
-          finishedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-            eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-            eq(sourceDocumentRevisions.id, input.revisionId),
-            eq(sourceDocumentRevisions.processingStatus, "processing")
-          )
+      )
+      .for("update")
+      .then((rows) => rows[0]);
+    if (revision?.processingStatus !== "processing") return false;
+    if (
+      !(await completeProcessingLeaseInTransaction(tx, input.lease, "failed", {
+        code: input.failureCode ?? null,
+      }))
+    ) {
+      return false;
+    }
+    const updated = await tx
+      .update(sourceDocumentRevisions)
+      .set({
+        processingStatus: "failed",
+        failureKind: input.failureKind,
+        failureMessage: input.failureMessage,
+        failureCode: input.failureCode ?? null,
+        finishedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
+          eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
+          eq(sourceDocumentRevisions.id, input.revisionId),
+          eq(sourceDocumentRevisions.processingStatus, "processing")
         )
-        .returning({ id: sourceDocumentRevisions.id });
-      if (updated.length === 0) return false;
-      await tx
-        .update(sourceDocuments)
-        .set({
-          version: sql`${sourceDocuments.version} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            activeDocumentWhere(input.ledgerId, input.sourceDocumentId),
-            eq(sourceDocuments.latestSubmissionRevisionId, input.revisionId)
-          )
-        );
-      return true;
-    });
-  },
-};
+      )
+      .returning({ id: sourceDocumentRevisions.id });
+    if (updated.length === 0) return false;
+    await tx
+      .update(sourceDocuments)
+      .set({
+        version: sql`${sourceDocuments.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          activeDocumentWhere(input.ledgerId, input.sourceDocumentId),
+          eq(sourceDocuments.latestSubmissionRevisionId, input.revisionId)
+        )
+      );
+    return true;
+  });
+}

@@ -1,6 +1,6 @@
 import "server-only";
 import { StaleSourceDocumentVersionError } from "@/lib/errors";
-import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
+import { scheduleProcessingAfter } from "@/server/processing/schedule";
 import type {
   RetrySourceDocumentResponseDto,
   VersionedCommandResult,

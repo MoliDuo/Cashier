@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AppError } from "@/lib/errors";
 import { omitUndefinedProperties } from "@/lib/validation";
 import { requireLedgerAccess } from "@/modules/ledger/access";
-import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
+import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { getSourceDocumentDetailAction } from "@/modules/source-document/server/get-document-detail";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/server/stream-total";

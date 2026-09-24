@@ -57,7 +57,7 @@ const registeredSourceDocumentWriters = new Set([
   "src/modules/source-document/server/date-organization.ts",
   "src/modules/source-document/server/projections/manual-entries.ts",
   "src/modules/source-document/server/projections/writes.ts",
-  "src/application/adapters/postgres/revisions.ts",
+  "src/modules/source-document/server/revisions.ts",
   "src/application/adapters/postgres/source-document-aggregate/category-assignments.ts",
 ]);
 const forbiddenLogIdentifierProperties = [
@@ -241,7 +241,6 @@ export function findBoundaryViolations(relativePath, source) {
   const isContracts = /^src\/application\/contracts\//.test(relativePath);
   const isPersistence = /^src\/persistence\//.test(relativePath);
   const isApiRoute = /^src\/app\/api\//.test(relativePath);
-  const isInProcessAdapter = /^src\/application\/adapters\/in-process\//.test(relativePath);
   const isClientComponent = hasClientDirective(source);
 
   for (const property of collectRawLogIdentifierProperties(sourceFile)) {
@@ -330,17 +329,6 @@ export function findBoundaryViolations(relativePath, source) {
     ) {
       violations.push(
         `${relativePath}: application contracts must not import persistence, database, provider SDKs, or application adapters`
-      );
-    }
-    const isInProcessInternalImport = specifier.startsWith("@/application/adapters/in-process/");
-    if (
-      isInProcessAdapter &&
-      (persistencePattern.test(specifier) ||
-        libDbPattern.test(specifier) ||
-        (applicationAdaptersPattern.test(specifier) && !isInProcessInternalImport))
-    ) {
-      violations.push(
-        `${relativePath}: in-process adapters must receive persistence and concrete adapters explicitly`
       );
     }
     if (

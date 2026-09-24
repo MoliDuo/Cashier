@@ -159,22 +159,6 @@ export function toSourceDocumentSubmissionContract(
   };
 }
 
-export interface SourceDocumentPort {
-  recordProcessingFailure(input: {
-    ledgerId: LedgerId;
-    sourceDocumentId: SourceDocumentId;
-    revisionId: RevisionId;
-    failureKind: RevisionFailureKind;
-    /**
-     * User-facing text. `null` when the failure carries no explanation, in
-     * which case the UI falls back to localized copy.
-     */
-    failureMessage: string | null;
-    failureCode?: string | null;
-    lease: ProcessingLeaseContract;
-  }): Promise<boolean>;
-}
-
 export interface SourceDocumentSubmissionResult {
   document: SourceDocumentContract;
   revision: SourceDocumentRevisionContract;

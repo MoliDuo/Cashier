@@ -25,7 +25,7 @@ vi.mock("@/modules/source-document/server/submissions", () => ({
   submitSourceDocument: submit,
   submitSourceDocumentIdempotently: submitIdempotently,
 }));
-vi.mock("@/application/processing/schedule-processing", () => ({
+vi.mock("@/server/processing/schedule", () => ({
   scheduleProcessingAfter: scheduleProcessing,
 }));
 vi.mock("@/application/adapters/storage", () => ({

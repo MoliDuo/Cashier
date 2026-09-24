@@ -5,7 +5,7 @@ import { getBook } from "@/modules/ledger/server/books";
 import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
 import type { SourceDocumentSubmissionContract } from "@/application/contracts";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";
-import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
+import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { createAndQueueSourceDocument } from "./create-and-queue";
 
 function contentFingerprint(payload: PreparedApiV1SourceDocumentInput): string {

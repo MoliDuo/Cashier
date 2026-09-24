@@ -1,9 +1,9 @@
+import "server-only";
 import { after } from "next/server";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
-import { selectRecoverableProcessingJobs } from "@/modules/source-document/application/use-cases/select-recoverable-processing-jobs";
-import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
-import { serverComposition } from "@/application/server-composition-root";
+import { recoverProcessingJobs } from "./jobs";
+import { scheduleProcessingAfter } from "./schedule";
 import {
   PROCESSING_RECOVERY_COOLDOWN_SECONDS,
   PROCESSING_RECOVERY_MAX_ATTEMPTS,
@@ -28,11 +28,11 @@ async function scheduleProcessingRecovery(ledgerId: string): Promise<void> {
     cooldownSeconds: PROCESSING_RECOVERY_COOLDOWN_SECONDS,
   };
 
-  const recoverable = await selectRecoverableProcessingJobs(
-    ledgerId,
-    config,
-    serverComposition.processingRecovery
-  );
+  // Every returned job had its schedule attempt count advanced under the
+  // ledger lock, so a concurrent request picks a disjoint set. A job that just
+  // reached the attempt limit still runs once; exhaustion is decided on a
+  // later request, after the cooldown.
+  const recoverable = await recoverProcessingJobs(ledgerId, config);
 
   if (recoverable.length === 0) return;
 

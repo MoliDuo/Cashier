@@ -9,7 +9,7 @@ vi.mock("@/modules/source-document/server/create-and-queue", () => ({
   createAndQueueSourceDocument: createAndQueueSourceDocumentMock,
 }));
 vi.mock("@/modules/ledger/server/books", () => ({ getBook: getBookMock }));
-vi.mock("@/application/processing/schedule-processing-recovery", () => ({
+vi.mock("@/server/processing/recovery", () => ({
   scheduleProcessingRecoveryAfter: vi.fn(),
 }));
 vi.mock("@/application/transport/request-maintenance", () => ({

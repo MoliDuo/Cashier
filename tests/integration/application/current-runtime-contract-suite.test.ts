@@ -10,7 +10,7 @@ import type {
   UploadPlanContract,
 } from "@/application/contracts";
 import { createStoredFileAdapter } from "@/application/adapters/storage";
-import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
+import { processingJobs } from "tests/helpers/processing-jobs";
 
 class ContractFileStore implements ObjectStore {
   readonly files = new Map<string, Buffer>();
@@ -58,7 +58,7 @@ class ContractFileStore implements ObjectStore {
 applicationContractSuite("real Postgres/object-storage/in-process adapter composition", () => {
   const db = getTestDb();
   const files = createStoredFileAdapter({ storage: new ContractFileStore() });
-  const processing = new PostgresProcessingJobAdapter();
+  const processing = processingJobs();
   const actualIntents = new Map<string, ProcessingJobContract>();
   const completions: ProcessingCompletionContract[] = [];
   let setupPromise: ReturnType<typeof createTestUserWithLedger> | null = null;

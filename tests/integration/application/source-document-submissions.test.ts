@@ -5,10 +5,6 @@ import { eq } from "drizzle-orm";
 import { Pool, type PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
-import {
-  PostgresProcessingJobAdapter,
-  postgresRevisionAdapter,
-} from "@/application/adapters/postgres";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import {
   ledgerEntries,
@@ -33,6 +29,8 @@ import {
   submitSourceDocument,
   submitSourceDocumentIdempotently,
 } from "@/modules/source-document/server/submissions";
+import { processingJobs } from "tests/helpers/processing-jobs";
+import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 
 class MemoryFileStore implements ObjectStore {
   readonly files = new Map<string, Buffer>();
@@ -261,7 +259,7 @@ describe("target source-document submissions", () => {
       });
 
       await expect(
-        postgresRevisionAdapter.recordProcessingFailure({
+        recordProcessingFailure({
           lease: await claimRevisionForTest(pending.revision.id),
           ledgerId,
           sourceDocumentId: pending.document.id,
@@ -307,7 +305,7 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     const failedLease = await claimRevisionForTest(failed.revision.id);
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: failedLease,
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
@@ -322,7 +320,7 @@ describe("target source-document submissions", () => {
       inheritInput: false,
       bookId: await testBookId(db, ledgerId),
     });
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(anomalous.revision.id),
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
@@ -342,7 +340,7 @@ describe("target source-document submissions", () => {
       })
     ).toBe(false);
     expect(
-      await postgresRevisionAdapter.recordProcessingFailure({
+      await recordProcessingFailure({
         lease: failedLease,
         ledgerId,
         sourceDocumentId: active.sourceDocumentId,
@@ -373,7 +371,7 @@ describe("target source-document submissions", () => {
       input: { text: "original", storedFileIds: [image.id], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(initial.revision.id),
       ledgerId,
       sourceDocumentId: initial.document.id,
@@ -388,10 +386,7 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
 
-    await Promise.all([
-      new PostgresProcessingJobAdapter().dispatch(retry.job),
-      new PostgresProcessingJobAdapter().dispatch(retry.job),
-    ]);
+    await Promise.all([processingJobs().dispatch(retry.job), processingJobs().dispatch(retry.job)]);
     const retryRevision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, retry.revision.id),
     });
@@ -426,7 +421,7 @@ describe("target source-document submissions", () => {
       },
       bookId: await testBookId(db, ledgerId),
     });
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(initial.revision.id),
       ledgerId,
       sourceDocumentId: initial.document.id,
@@ -481,7 +476,7 @@ describe("target source-document submissions", () => {
     expect(detail).not.toHaveProperty("imageUrls");
     expect(JSON.stringify(detail)).not.toContain("/api/uploads/");
     expect(JSON.stringify(detail)).not.toContain("storageKey");
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(submitted.revision.id),
       ledgerId,
       sourceDocumentId: submitted.document.id,

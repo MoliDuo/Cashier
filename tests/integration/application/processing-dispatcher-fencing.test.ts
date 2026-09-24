@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { serverComposition } from "@/application/server-composition-root";
-import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
 import type { ProcessingJobContract } from "@/application/contracts";
 import {
   ledgerEntries,
@@ -12,6 +10,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
+import { processingJobs, revisionProcessor } from "tests/helpers/processing-jobs";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -54,7 +53,7 @@ async function pendingIntent(
 describe("leased processor fencing", () => {
   async function reclaimedLease(job: ProcessingJobContract) {
     const db = getTestDb();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
     const first = await adapter.claim(job.id);
     expect(first).not.toBeNull();
@@ -94,7 +93,7 @@ describe("leased processor fencing", () => {
         reasoning: "single item",
       }),
     }));
-    const processor = serverComposition.createRevisionProcessor(() => ({ generate }));
+    const processor = revisionProcessor(() => ({ generate }));
 
     await expect(
       processor.process({
@@ -145,7 +144,7 @@ describe("leased processor fencing", () => {
         reasoning: "blurry image",
       }),
     }));
-    const processor = serverComposition.createRevisionProcessor(() => ({ generate }));
+    const processor = revisionProcessor(() => ({ generate }));
 
     await expect(
       processor.process({

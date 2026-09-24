@@ -23,7 +23,7 @@ vi.mock("@/modules/workspace/server/ledger-page-bootstrap", () => ({
   getLedgerPageBootstrap: getLedgerPageBootstrapMock,
 }));
 
-vi.mock("@/application/processing/schedule-processing-recovery", () => ({
+vi.mock("@/server/processing/recovery", () => ({
   scheduleProcessingRecoveryAfter: scheduleProcessingRecoveryAfterMock,
 }));
 

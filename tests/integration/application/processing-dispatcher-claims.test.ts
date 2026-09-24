@@ -4,8 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
-import { serverComposition } from "@/application/server-composition-root";
 import type { ProcessingJobContract } from "@/application/contracts";
 import {
   ledgerEntries,
@@ -19,6 +17,8 @@ vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
 }));
 import { createAIContext } from "@/lib/tasks/ai-context";
+import { processingJobs, revisionProcessor } from "tests/helpers/processing-jobs";
+import { executeProcessingJob } from "@/server/processing/execute-job";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -54,7 +54,7 @@ async function pendingIntent(
   };
 }
 
-describe("PostgresProcessingJobAdapter", () => {
+describe("processing outbox jobs", () => {
   it("processes parser, reconciliation, exchange-rate facts, and result writes by revision identity", async () => {
     const db = getTestDb();
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
@@ -79,7 +79,7 @@ describe("PostgresProcessingJobAdapter", () => {
         reasoning: "single item",
       }),
     }));
-    const processor = serverComposition.createRevisionProcessor(() => ({ generate }));
+    const processor = revisionProcessor(() => ({ generate }));
     const lease = await claimRevisionForTest(job.revisionId);
 
     await expect(
@@ -148,7 +148,7 @@ describe("PostgresProcessingJobAdapter", () => {
       }),
     }));
 
-    const processor = serverComposition.createRevisionProcessor(() => ({ generate }));
+    const processor = revisionProcessor(() => ({ generate }));
     const lease = await claimRevisionForTest(job.revisionId);
 
     await processor.process({
@@ -200,7 +200,7 @@ describe("PostgresProcessingJobAdapter", () => {
       }),
     }));
 
-    const processor1 = serverComposition.createRevisionProcessor(() => ({ generate: generate1 }));
+    const processor1 = revisionProcessor(() => ({ generate: generate1 }));
 
     await processor1.process({
       ledgerId,
@@ -251,7 +251,7 @@ describe("PostgresProcessingJobAdapter", () => {
       }),
     }));
 
-    const processor2 = serverComposition.createRevisionProcessor(() => ({ generate: generate2 }));
+    const processor2 = revisionProcessor(() => ({ generate: generate2 }));
 
     await processor2.process({
       ledgerId,
@@ -273,7 +273,7 @@ describe("PostgresProcessingJobAdapter", () => {
   it("deduplicates dispatch and permits only one concurrent claim", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
 
     await Promise.all([adapter.dispatch(job), adapter.dispatch(job)]);
     const claims = await Promise.all([adapter.claim(job.id), adapter.claim(job.id)]);
@@ -287,7 +287,7 @@ describe("PostgresProcessingJobAdapter", () => {
   it("reclaims an expired lease and rejects stale completion", async () => {
     let now = new Date("2026-07-15T00:00:00.000Z");
     const { job } = await pendingIntent(now.toISOString(), crypto.randomUUID());
-    const adapter = new PostgresProcessingJobAdapter({ leaseMs: 1_000, now: () => now });
+    const adapter = processingJobs({ leaseMs: 1_000, now: () => now });
     await adapter.dispatch(job);
 
     const first = await adapter.claim(job.id);
@@ -318,7 +318,7 @@ describe("PostgresProcessingJobAdapter", () => {
 
   it("returns false on duplicate claim", async () => {
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // First claim succeeds
@@ -330,17 +330,17 @@ describe("PostgresProcessingJobAdapter", () => {
     expect(second).toBeNull();
   });
 
-  it("records failed outcome on processing error via executeSingleProcessingJob", async () => {
+  it("records failed outcome on processing error via executeProcessingJob", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });
 
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
-    const result = await serverComposition.executeSingleProcessingJob(job);
+    const result = await executeProcessingJob(job);
     expect(result).toBe(true);
 
     const row = await db.query.processingOutbox.findFirst({

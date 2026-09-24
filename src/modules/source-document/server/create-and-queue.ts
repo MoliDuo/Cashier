@@ -6,7 +6,7 @@ import { toSourceDocumentSubmissionContract } from "@/application/contracts";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
 import { processImage } from "@/lib/storage/image-processing";
 import { storedFileAdapter } from "@/application/adapters/storage";
-import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
+import { scheduleProcessingAfter } from "@/server/processing/schedule";
 import { submitSourceDocument, submitSourceDocumentIdempotently } from "./submissions";
 import type { PreparedInlineImage } from "@/modules/source-document/api-v1-policy";
 import { prepareInlineImages } from "./prepare-inline-images";

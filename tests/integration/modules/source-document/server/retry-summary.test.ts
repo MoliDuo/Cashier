@@ -1,13 +1,11 @@
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { describe, expect, it } from "vitest";
-import {
-  createProcessingRevisionInTransaction,
-  postgresRevisionAdapter,
-} from "@/application/adapters/postgres/revisions";
+import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 
 const activeEntry = {
   categoryId: null,
@@ -49,7 +47,7 @@ async function setupDocumentWithFailedRetry(
   });
 
   // Step 3: Set the pending revision outcome to invalid/failed
-  await postgresRevisionAdapter.recordProcessingFailure({
+  await recordProcessingFailure({
     lease: await claimRevisionForTest(pending.revision.id),
     ledgerId,
     sourceDocumentId: created.sourceDocumentId,
@@ -82,7 +80,7 @@ async function setupDocumentWithFirstParseFailure(
       input: { text: "First parse", storedFileIds: [], documentDate: null },
     })
   );
-  await postgresRevisionAdapter.recordProcessingFailure({
+  await recordProcessingFailure({
     lease: await claimRevisionForTest(pending.revision.id),
     ledgerId,
     sourceDocumentId: pending.document.id,
@@ -186,7 +184,7 @@ describe("retry active result summary", () => {
         input: { text: "Failed retry", storedFileIds: [], documentDate: null },
       });
     });
-    await postgresRevisionAdapter.recordProcessingFailure({
+    await recordProcessingFailure({
       lease: await claimRevisionForTest(pending.revision.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,

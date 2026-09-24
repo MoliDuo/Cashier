@@ -9,7 +9,7 @@ const { submit, scheduleProcessing } = vi.hoisted(() => ({
 vi.mock("@/modules/source-document/server/submissions", () => ({
   submitSourceDocument: submit,
 }));
-vi.mock("@/application/processing/schedule-processing", () => ({
+vi.mock("@/server/processing/schedule", () => ({
   scheduleProcessingAfter: scheduleProcessing,
 }));
 

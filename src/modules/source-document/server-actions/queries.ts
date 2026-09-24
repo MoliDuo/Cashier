@@ -4,7 +4,7 @@ import { withLedgerAccess } from "@/modules/ledger/access";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import type { SourceDocumentInputDto } from "@/modules/source-document/contracts";
 import { sourceDocumentIdSchema } from "@/modules/source-document/contract-schemas";
-import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
+import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 
 export const getSourceDocumentInputAction = withLedgerAccess(
   async (ledgerId: string, sourceDocumentId: string): Promise<SourceDocumentInputDto> => {

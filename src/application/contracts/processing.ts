@@ -1,21 +1,11 @@
 import type {
   LedgerId,
-  ProcessingClaimContract,
-  ProcessingCompletionContract,
   ProcessingJobContract,
-  ProcessingJobId,
   ProcessingLeaseContract,
   RevisionId,
   RevisionProcessingStatus,
   SourceDocumentId,
 } from "./source-documents";
-
-export interface ProcessingPort {
-  dispatch(job: ProcessingJobContract): Promise<void>;
-  claim(jobId: ProcessingJobId): Promise<ProcessingClaimContract | null>;
-  renew(jobId: ProcessingJobId, claimToken: string): Promise<string | null>;
-  complete(result: ProcessingCompletionContract): Promise<boolean>;
-}
 
 export interface RecoverableProcessingJobContract extends ProcessingJobContract {
   scheduleAttemptCount: number;
@@ -56,8 +46,4 @@ export interface RevisionProcessingContextContract {
   } | null;
   storedFileIds: string[];
   categories: Array<{ id: string; name: string; description: string | null }>;
-}
-
-export interface RevisionProcessorPort {
-  process(request: RevisionProcessingRequestContract): Promise<RevisionProcessingResultContract>;
 }

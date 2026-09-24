@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import {
   createProcessingRevisionInTransaction,
   type CreatePendingRevisionInput,
-} from "@/application/adapters/postgres/revisions";
+} from "@/modules/source-document/server/revisions";
 
 /** Evidence-only fixture for tests that exercise processing jobs separately. */
 export function createPendingRevision(input: CreatePendingRevisionInput) {
@@ -13,9 +13,8 @@ export function createPendingRevision(input: CreatePendingRevisionInput) {
 export async function claimRevisionForTest(revisionId: string) {
   const { eq } = await import("drizzle-orm");
   const { processingOutbox, sourceDocumentRevisions } = await import("@/persistence");
-  const { PostgresProcessingJobAdapter } =
-    await import("@/application/adapters/postgres/processing-jobs");
-  const adapter = new PostgresProcessingJobAdapter();
+  const { processingJobs } = await import("./processing-jobs");
+  const adapter = processingJobs();
   let job = await db.query.processingOutbox.findFirst({
     where: eq(processingOutbox.revisionId, revisionId),
   });

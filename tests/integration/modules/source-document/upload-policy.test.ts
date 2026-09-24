@@ -11,7 +11,7 @@ import type { ObjectStore } from "@/lib/storage";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
-import { createProcessingRevisionInTransaction } from "@/application/adapters/postgres/revisions";
+import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
 import type { StoredFileContract } from "@/application/contracts";
 import { ValidationError } from "@/lib/errors";
 import {

@@ -19,7 +19,7 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { createProcessingRevisionInTransaction } from "@/application/adapters/postgres/revisions";
+import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
 import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
 
 const IDEMPOTENCY_WAIT_ATTEMPTS = 10;

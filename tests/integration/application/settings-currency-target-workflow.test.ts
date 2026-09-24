@@ -545,7 +545,7 @@ describe("settings concurrency invariants", () => {
 
       const { revision } = await db.transaction(async (tx) => {
         const { createProcessingRevisionInTransaction: createProcessingRevision } =
-          await import("@/application/adapters/postgres/revisions");
+          await import("@/modules/source-document/server/revisions");
         return createProcessingRevision(tx, {
           ledgerId,
           sourceDocumentId,

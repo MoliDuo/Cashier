@@ -3,11 +3,10 @@ import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
-import { selectRecoverableProcessingJobs } from "@/modules/source-document/application/use-cases/select-recoverable-processing-jobs";
 import type { ProcessingJobContract } from "@/application/contracts";
 import { processingOutbox, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
+import { processingJobs } from "tests/helpers/processing-jobs";
 
 /**
  * Creates a pending revision + job for a single source document.
@@ -79,11 +78,11 @@ describe("Processing Recovery", () => {
 
   it("recovers an job that was dispatched but never claimed (missed after())", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // nextAvailableAt is in the past (defaults to requestedAt = "2026-07-15")
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
 
     // The job should be recovered and scheduled
     expect(recoverable).toHaveLength(1);
@@ -101,13 +100,13 @@ describe("Processing Recovery", () => {
 
   it("re-selects an job with an expired claim", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Simulate an expired claim (status = claimed, claimExpiresAt in the past)
     await expireClaim(job.id);
 
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
 
     // The job should be recovered despite being in "claimed" status
     expect(recoverable).toHaveLength(1);
@@ -116,13 +115,13 @@ describe("Processing Recovery", () => {
 
   it("does not double-process under concurrent requests", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Two concurrent recovery calls — only one should succeed in scheduling
     const [first, second] = await Promise.all([
-      selectRecoverableProcessingJobs(ledgerId, config, adapter),
-      selectRecoverableProcessingJobs(ledgerId, config, adapter),
+      adapter.recoverBatch(ledgerId, config),
+      adapter.recoverBatch(ledgerId, config),
     ]);
 
     const recoveredIds = [...first, ...second].map((candidate) => candidate.id);
@@ -138,7 +137,7 @@ describe("Processing Recovery", () => {
 
   it("skips recovery when the source document has been deleted", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Soft-delete the source document
@@ -148,13 +147,13 @@ describe("Processing Recovery", () => {
       .set({ deletedAt: new Date(), latestSubmissionRevisionId: null })
       .where(eq(sourceDocuments.id, job.sourceDocumentId));
 
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
     expect(recoverable).toHaveLength(0);
   });
 
   it("skips recovery when a newer pending revision exists (stale replacement)", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Create a newer pending revision and point the document to it
@@ -176,7 +175,7 @@ describe("Processing Recovery", () => {
       .where(eq(sourceDocuments.id, job.sourceDocumentId));
 
     // The old job's revision no longer matches the document's latestSubmissionRevisionId
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
     expect(recoverable).toHaveLength(0);
   });
 
@@ -187,11 +186,11 @@ describe("Processing Recovery", () => {
       crypto.randomUUID()
     );
 
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(intentA);
 
     // Recover for ledgerB — should not pick up intentA
-    const recoverable = await selectRecoverableProcessingJobs(ledgerB, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerB, config);
     expect(recoverable).toHaveLength(0);
   });
 
@@ -199,14 +198,14 @@ describe("Processing Recovery", () => {
 
   it("returns job for execution on last allowed attempt (scheduleAttemptCount reaches maxAttempts)", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Set scheduleAttemptCount to one below maxAttempts — this is the last schedulable attempt
     await setScheduleAttemptCount(job.id, config.maxAttempts - 1);
     await expireNextAvailable(job.id);
 
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
 
     // The job should be returned for execution (this is its last allowed attempt)
     expect(recoverable).toHaveLength(1);
@@ -224,7 +223,7 @@ describe("Processing Recovery", () => {
 
   it("exhausts job on next request after scheduleAttemptCount reaches maxAttempts and cooldown expires", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Simulate: the job has already been scheduled maxAttempts times
@@ -232,7 +231,7 @@ describe("Processing Recovery", () => {
     await expireNextAvailable(job.id);
 
     // This request should exhaust the job (not schedule it)
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
     expect(recoverable).toHaveLength(0);
 
     // Outbox should be marked as failed
@@ -260,7 +259,7 @@ describe("Processing Recovery", () => {
 
     // Create a single ledger and 3 source documents within it
     const { ledgerId, job: intent1 } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(intent1);
 
     // Create 2 more source documents in the same ledger
@@ -299,7 +298,7 @@ describe("Processing Recovery", () => {
     await expireNextAvailable(intent2.id);
     await expireNextAvailable(intent3.id);
 
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, smallConfig, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, smallConfig);
 
     // maxBatch=2 limits the result even though 3 intents are eligible
     expect(recoverable).toHaveLength(2);
@@ -308,17 +307,17 @@ describe("Processing Recovery", () => {
   it("maxBatch=1 still allows job to execute", async () => {
     const singleConfig = { maxBatch: 1, maxAttempts: 3, cooldownSeconds: 60 };
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, singleConfig, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, singleConfig);
     expect(recoverable).toHaveLength(1);
     expect(recoverable[0]!.id).toBe(job.id);
   });
 
   it("exhaustion CAS: stale outbox closed but revision untouched when newer pending exists", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Set up: scheduleAttemptCount at maxAttempts, but then change the document's
@@ -361,7 +360,7 @@ describe("Processing Recovery", () => {
 
   it("exhaustion CAS: full exhaustion when revision is still current pending", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // The revision IS still the current pending — exhaustion should fully update
@@ -390,7 +389,7 @@ describe("Processing Recovery", () => {
 
   it("exhaustion CAS: does not modify completed revision's outcome", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Simulate: the revision was already completed (e.g., by the executor)
@@ -417,7 +416,7 @@ describe("Processing Recovery", () => {
 
   it("does not select an job with scheduleAttemptCount >= maxAttempts for recovery", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Set scheduleAttemptCount to maxAttempts (exceeds threshold for selectRecoverable)
@@ -426,7 +425,7 @@ describe("Processing Recovery", () => {
 
     // The job should NOT be selected for recovery (scheduleAttemptCount >= maxAttempts)
     // Instead, it should be exhausted
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
     expect(recoverable).toHaveLength(0);
 
     // Outbox should be exhausted
@@ -439,7 +438,7 @@ describe("Processing Recovery", () => {
 
   it("exhaustion only happens after cooldown expires", async () => {
     const { ledgerId, job } = await pendingIntent();
-    const adapter = new PostgresProcessingJobAdapter();
+    const adapter = processingJobs();
     await adapter.dispatch(job);
 
     // Set scheduleAttemptCount to maxAttempts and force nextAvailableAt to the future
@@ -453,7 +452,7 @@ describe("Processing Recovery", () => {
       .where(eq(processingOutbox.id, job.id));
 
     // The job should not be exhausted because cooldown hasn't expired
-    const recoverable = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable = await adapter.recoverBatch(ledgerId, config);
     expect(recoverable).toHaveLength(0);
 
     // Outbox should still be pending (not yet exhausted because nextAvailableAt > now)
@@ -465,7 +464,7 @@ describe("Processing Recovery", () => {
 
     // Now expire nextAvailableAt and try again — should exhaust
     await expireNextAvailable(job.id);
-    const recoverable2 = await selectRecoverableProcessingJobs(ledgerId, config, adapter);
+    const recoverable2 = await adapter.recoverBatch(ledgerId, config);
     expect(recoverable2).toHaveLength(0);
 
     const row2 = await db.query.processingOutbox.findFirst({
@@ -484,7 +483,7 @@ describe("Processing retry supersession", () => {
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    const processing = new PostgresProcessingJobAdapter();
+    const processing = processingJobs();
     const oldClaim = await processing.claim(first.job.id);
     expect(oldClaim).not.toBeNull();
 

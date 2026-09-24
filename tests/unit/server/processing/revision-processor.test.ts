@@ -3,9 +3,24 @@ import { LedgerMainCurrencyChangedError } from "@/application/contracts";
 import type { AIContext } from "@/lib/tasks/types";
 import { ProcessingFailure } from "@/modules/source-document/application/parse-source-document/contracts";
 
-const { runParsePipelineMock, toOutputMock } = vi.hoisted(() => ({
+const {
+  runParsePipelineMock,
+  toOutputMock,
+  loadContext,
+  getSettings,
+  loadStoredFiles,
+  getRates,
+  activateRevision,
+  recordProcessingFailure,
+} = vi.hoisted(() => ({
   runParsePipelineMock: vi.fn(),
   toOutputMock: vi.fn(),
+  loadContext: vi.fn(),
+  getSettings: vi.fn(),
+  loadStoredFiles: vi.fn(),
+  getRates: vi.fn(),
+  activateRevision: vi.fn(),
+  recordProcessingFailure: vi.fn(),
 }));
 
 vi.mock("@/modules/source-document/application/parse-source-document/pipeline", () => ({
@@ -14,19 +29,47 @@ vi.mock("@/modules/source-document/application/parse-source-document/pipeline", 
 vi.mock("@/modules/source-document/application/parse-source-document/result-mapper", () => ({
   toParseSourceDocumentOutput: toOutputMock,
 }));
+vi.mock("@/server/processing/context", () => ({ loadRevisionProcessingContext: loadContext }));
+vi.mock("@/modules/ledger/server/settings", () => ({ getLedgerSettings: getSettings }));
+vi.mock("@/server/processing/evidence", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/processing/evidence")>()),
+  loadStoredFilesForAI: loadStoredFiles,
+}));
+vi.mock("@/modules/currency/server/exchange-rates", () => ({ getExchangeRates: getRates }));
+vi.mock("@/modules/source-document/server/projections/writes", () => ({ activateRevision }));
+vi.mock("@/modules/source-document/server/revisions", () => ({ recordProcessingFailure }));
 
-const { CurrentRevisionProcessor } =
-  await import("@/application/adapters/in-process/revision-processor");
+const { processRevision } = await import("@/server/processing/revision-processor");
 
-function createProcessor(entryCount: number, overrides: Record<string, unknown> = {}) {
-  const getSettings = vi.fn().mockResolvedValue({ mainCurrency: "CNY" });
-  const getRates = vi.fn().mockResolvedValue({
+const processor = {
+  process: (input: typeof request) =>
+    processRevision(input, { createAIContext: () => ({}) as AIContext }),
+};
+
+function createProcessor(entryCount: number) {
+  getSettings.mockResolvedValue({ mainCurrency: "CNY" });
+  getRates.mockResolvedValue({
     base: "EUR",
     date: "2026-09-01",
     rates: { EUR: 1, CNY: 8, USD: 1.2 },
   });
-  const activateRevision = vi.fn().mockResolvedValue(true);
-  const recordProcessingFailure = vi.fn().mockResolvedValue(true);
+  activateRevision.mockResolvedValue(true);
+  recordProcessingFailure.mockResolvedValue(true);
+  loadStoredFiles.mockResolvedValue([]);
+  loadContext.mockResolvedValue({
+    revision: {
+      inputText: "receipt",
+      inputDocumentDate: "2026-09-01",
+      processingStatus: "processing",
+    },
+    document: {
+      activeRevisionId: null,
+      latestSubmissionRevisionId: "revision-1",
+      createdAt: new Date("2026-09-01T00:00:00Z"),
+    },
+    storedFileIds: [],
+    categories: [],
+  });
   toOutputMock.mockReturnValue({
     verificationStatus: "passed",
     title: "Parsed",
@@ -39,30 +82,6 @@ function createProcessor(entryCount: number, overrides: Record<string, unknown> 
     })),
   });
   runParsePipelineMock.mockResolvedValue({});
-
-  const processor = new CurrentRevisionProcessor({
-    createAIContext: () => ({}) as AIContext,
-    loadContext: vi.fn().mockResolvedValue({
-      revision: {
-        inputText: "receipt",
-        inputDocumentDate: "2026-09-01",
-        processingStatus: "processing",
-      },
-      document: {
-        activeRevisionId: null,
-        latestSubmissionRevisionId: "revision-1",
-        createdAt: new Date("2026-09-01T00:00:00Z"),
-      },
-      storedFileIds: [],
-      categories: [],
-    }),
-    getSettings,
-    loadStoredFiles: vi.fn().mockResolvedValue([]),
-    getRates,
-    recordProcessingFailure,
-    activateRevision,
-    ...overrides,
-  });
   return { processor, getSettings, getRates, activateRevision, recordProcessingFailure };
 }
 
@@ -74,8 +93,8 @@ const request = {
   lease: { jobId: "job-1", claimToken: "token-1" },
 };
 
-describe("CurrentRevisionProcessor", () => {
-  beforeEach(() => vi.clearAllMocks());
+describe("processRevision", () => {
+  beforeEach(() => vi.resetAllMocks());
 
   it("deduplicates concurrent exchange-rate reads within one processing request", async () => {
     const { processor, getRates, activateRevision } = createProcessor(100);
@@ -90,15 +109,11 @@ describe("CurrentRevisionProcessor", () => {
   });
 
   it("rebuilds currency-dependent work after a commit conflict without reparsing", async () => {
-    const getSettings = vi
-      .fn()
+    createProcessor(1);
+    getSettings
       .mockResolvedValueOnce({ mainCurrency: "CNY" })
       .mockResolvedValueOnce({ mainCurrency: "USD" });
-    const activateRevision = vi
-      .fn()
-      .mockRejectedValueOnce(new LedgerMainCurrencyChangedError())
-      .mockResolvedValueOnce(true);
-    const { processor } = createProcessor(1, { getSettings, activateRevision });
+    activateRevision.mockRejectedValueOnce(new LedgerMainCurrencyChangedError());
 
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "completed",
@@ -118,8 +133,8 @@ describe("CurrentRevisionProcessor", () => {
   });
 
   it("stops after three currency conflicts with the stable exchange-rate failure", async () => {
-    const activateRevision = vi.fn().mockRejectedValue(new LedgerMainCurrencyChangedError());
-    const { processor, getSettings } = createProcessor(1, { activateRevision });
+    createProcessor(1);
+    activateRevision.mockRejectedValue(new LedgerMainCurrencyChangedError());
 
     const processing = processor.process(request);
     await expect(processing).rejects.toBeInstanceOf(ProcessingFailure);

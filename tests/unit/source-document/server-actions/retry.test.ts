@@ -18,7 +18,7 @@ vi.mock("@/modules/source-document/server/retry", () => ({
   retrySourceDocument: retrySourceDocumentMock,
 }));
 
-vi.mock("@/application/processing/schedule-processing-recovery", () => ({
+vi.mock("@/server/processing/recovery", () => ({
   scheduleProcessingRecoveryAfter: vi.fn(),
 }));
 

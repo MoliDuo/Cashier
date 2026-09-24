@@ -1,6 +1,7 @@
+import "server-only";
 import { after } from "next/server";
 import type { ProcessingJobContract } from "@/application/contracts";
-import { serverComposition } from "@/application/server-composition-root";
+import { executeProcessingJob } from "./execute-job";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 
@@ -17,7 +18,7 @@ import { logIdentifier } from "@/lib/security/log-identifier";
  */
 export function scheduleProcessingAfter(job: ProcessingJobContract, requestId?: string): void {
   after(() =>
-    serverComposition.executeSingleProcessingJob(job).catch((error: unknown) => {
+    executeProcessingJob(job).catch((error: unknown) => {
       logger.error(
         {
           error,

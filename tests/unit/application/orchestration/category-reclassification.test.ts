@@ -93,7 +93,7 @@ vi.mock("@/application/adapters/postgres/source-document-aggregate/category-assi
 vi.mock("@/application/adapters/ai/entry-reclassifier", () => ({
   entryReclassifierAdapter: { decide: adapters.decide },
 }));
-vi.mock("@/application/adapters/in-process", () => ({
+vi.mock("@/server/processing/evidence", () => ({
   loadStoredFilesForAI: vi.fn(async () => []),
   isSuccessfulLoadImageResult: () => false,
 }));

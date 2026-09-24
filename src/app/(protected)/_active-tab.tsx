@@ -22,7 +22,7 @@ import { ActiveContent } from "./_active-content";
 import { ActiveShell } from "./_active-shell";
 import { LedgerBootstrapFallback } from "./_ledger-bootstrap-fallback";
 import { getLedgerPageBootstrap } from "@/modules/workspace/server/ledger-page-bootstrap";
-import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
+import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 

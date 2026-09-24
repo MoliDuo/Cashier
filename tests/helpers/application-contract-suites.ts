@@ -3,11 +3,11 @@ import type {
   AuthorizedFileReadContract,
   ProcessingCompletionContract,
   ProcessingJobContract,
-  ProcessingPort,
   StoredFileContract,
   StoredFilePort,
   UploadPlanContract,
 } from "@/application/contracts";
+import type { processingJobs } from "./processing-jobs";
 
 export interface ApplicationContractHarness {
   sourceDocumentActions(input: {
@@ -17,7 +17,7 @@ export interface ApplicationContractHarness {
     deleted?: boolean;
   }): readonly string[];
   files: StoredFilePort;
-  processing: ProcessingPort;
+  processing: Pick<ReturnType<typeof processingJobs>, "claim" | "renew" | "complete">;
   plan(): Promise<UploadPlanContract>;
   finalize(plan: UploadPlanContract): Promise<readonly StoredFileContract[]>;
   read(file: StoredFileContract): Promise<AuthorizedFileReadContract | null>;
@@ -25,7 +25,7 @@ export interface ApplicationContractHarness {
   completions(): readonly ProcessingCompletionContract[];
 }
 
-/** Run this suite for every current and future adapter composition. */
+/** Runs the shared file and processing contract against a real runtime harness. */
 export function applicationContractSuite(
   name: string,
   create: () => ApplicationContractHarness | Promise<ApplicationContractHarness>

@@ -9,7 +9,7 @@ import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
 } from "@/application/adapters/postgres/transaction-locks";
-import { completeProcessingLeaseInTransaction } from "@/application/adapters/postgres/processing-terminal";
+import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
 import { LedgerMainCurrencyChangedError, activeDocumentWhere, replaceProjection } from "./shared";
 import { createCompletedProjectionInTransaction } from "./manual-entries";
