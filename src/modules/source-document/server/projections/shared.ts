@@ -31,7 +31,7 @@ export function requireCurrency(currency: string | null): string {
 export async function assertCategoryOwnership(
   tx: PostgresTransaction,
   ledgerId: string,
-  entries: readonly LedgerProjectionEntryContract[]
+  entries: readonly { categoryId?: string | null | undefined }[]
 ): Promise<void> {
   const categoryIds = [
     ...new Set(entries.flatMap((entry) => (entry.categoryId == null ? [] : [entry.categoryId]))),

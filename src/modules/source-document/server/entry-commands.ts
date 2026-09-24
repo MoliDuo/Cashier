@@ -12,7 +12,7 @@ import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare as compareDecimal } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
-import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { convertAmount, convertAmounts } from "@/modules/currency/server/exchange-rates";
 import { replaceActiveProjectionInTransaction } from "./projections/manual-entries";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
@@ -22,6 +22,7 @@ import {
   lockSourceDocumentsForUpdate,
 } from "@/lib/db/transaction-locks";
 import { hasEditableActiveProjection } from "./write-guards";
+import { assertCategoryOwnership } from "./projections/shared";
 
 type EntryResult = VersionedCommandResult<{ ledgerEntryId: string }>;
 type DeleteEntryResult = VersionedCommandResult<{ ledgerEntryId: string; deleted: true }>;
@@ -34,26 +35,6 @@ function stale<T>(target: VersionedTarget, currentVersion: number): VersionedCom
     expectedVersion: target.expectedVersion,
     currentVersion,
   };
-}
-
-async function assertCategoryOwnership(
-  tx: PostgresTransaction,
-  ledgerId: string,
-  categoryId: string | null | undefined
-) {
-  if (categoryId == null) return;
-  const category = await tx
-    .select({ id: entryCategories.id })
-    .from(entryCategories)
-    .where(
-      and(
-        eq(entryCategories.ledgerId, ledgerId),
-        eq(entryCategories.id, categoryId),
-        isNull(entryCategories.deletedAt)
-      )
-    )
-    .then((rows) => rows[0]);
-  if (category == null) throw new NotFoundError("Category");
 }
 
 async function listProjectionEntries(
@@ -261,7 +242,7 @@ export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryR
     if (ledger.mainCurrency !== prepared.mainCurrency) {
       throw new ConflictError("Ledger currency changed before the entry was committed");
     }
-    await assertCategoryOwnership(tx, input.ledgerId, input.categoryId);
+    await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
     const entries = await listProjectionEntries(
       tx,
       input.ledgerId,
@@ -377,7 +358,7 @@ export async function batchUpdateLedgerEntries(
     if (documents.some((document) => !hasEditableActiveProjection(document))) {
       throw new NotFoundError("Active source document");
     }
-    await assertCategoryOwnership(tx, input.ledgerId, input.categoryId);
+    await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
     const requestedIds = [...new Set(input.ledgerEntryIds)].sort();
     const requested = new Set(requestedIds);
     const activeEntries = await tx
