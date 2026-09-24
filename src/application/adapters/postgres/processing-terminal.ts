@@ -7,11 +7,10 @@ export type ProcessingTerminalStatus = "completed" | "failed";
 
 export async function completeProcessingLeaseInTransaction(
   tx: PostgresTransaction,
-  lease: ProcessingLeaseContract | null | undefined,
+  lease: ProcessingLeaseContract,
   processingStatus: ProcessingTerminalStatus,
   diagnostic?: { code?: string | null; correlationId?: string | null }
 ): Promise<boolean> {
-  if (lease == null) return true;
   const now = new Date();
   const row = await tx
     .update(processingOutbox)

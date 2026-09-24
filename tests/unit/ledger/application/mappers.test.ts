@@ -3,12 +3,12 @@ import { mapLedgerEntryDto } from "@/application/adapters/postgres/ledger-reads/
 import type { LedgerEntry } from "@/persistence";
 
 describe("mapLedgerEntryDto", () => {
-  it("omits optional relation fields when they are absent", () => {
+  it("requires the source document relation and keeps categories optional", () => {
     const entry: LedgerEntry = {
       id: "entry-1",
       ledgerId: "ledger-1",
       categoryId: null,
-      sourceDocumentId: null,
+      sourceDocumentId: "document-1",
       sourceDocumentRevisionId: null,
       position: 0,
       amount: "12.50",
@@ -22,9 +22,25 @@ describe("mapLedgerEntryDto", () => {
       deletedAt: null,
     };
 
-    const dto = mapLedgerEntryDto(entry);
-
+    expect(() => mapLedgerEntryDto(entry)).toThrow("Active entry has no matching source document");
+    const sourceDocument = {
+      id: "document-1",
+      ledgerId: "ledger-1",
+      version: 1,
+      title: null,
+      documentDate: null,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      deletedAt: null,
+    };
+    const dto = mapLedgerEntryDto({ ...entry, sourceDocument });
     expect("category" in dto).toBe(false);
-    expect("sourceDocument" in dto).toBe(false);
+    expect(dto.sourceDocument.id).toBe("document-1");
+    expect(() =>
+      mapLedgerEntryDto({
+        ...entry,
+        sourceDocument: { ...sourceDocument, ledgerId: "other-ledger" },
+      })
+    ).toThrow("Active entry has no matching source document");
   });
 });

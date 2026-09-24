@@ -1,8 +1,10 @@
+import { AppError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
 import type {
   EntryCategoryDto,
   LedgerEntryEmbeddedViewDto,
   LedgerEntryDto,
+  ActiveLedgerEntryDto,
   SourceDocumentReferenceDto,
 } from "@/modules/ledger/contracts";
 
@@ -18,9 +20,9 @@ type SourceDocumentRow = Pick<
   };
 type LedgerEntryRow = Omit<
   LedgerEntryDto,
-  "createdAt" | "updatedAt" | "deletedAt" | "category" | "sourceDocument"
+  "createdAt" | "updatedAt" | "deletedAt" | "category" | "sourceDocument" | "sourceDocumentId"
 > &
-  DateFields;
+  DateFields & { sourceDocumentId: string | null };
 
 function toIso(date: Date | null | undefined): string | null {
   if (date == null) return null;
@@ -90,6 +92,9 @@ export function mapLedgerEntryEmbeddedViewDto(
     category?: EntryCategoryRow | null;
   }
 ): LedgerEntryEmbeddedViewDto {
+  if (entry.sourceDocumentId == null) {
+    throw new AppError("Active entry has no source document", "INVARIANT_VIOLATION");
+  }
   return {
     id: entry.id,
     ledgerId: entry.ledgerId,
@@ -128,11 +133,16 @@ export function mapLedgerEntryDto(
     category?: EntryCategoryRow | null;
     sourceDocument?: SourceDocumentRow | null;
   }
-): LedgerEntryDto {
+): ActiveLedgerEntryDto {
+  if (
+    entry.sourceDocument == null ||
+    entry.sourceDocument.id !== entry.sourceDocumentId ||
+    entry.sourceDocument.ledgerId !== entry.ledgerId
+  ) {
+    throw new AppError("Active entry has no matching source document", "INVARIANT_VIOLATION");
+  }
   return {
     ...mapLedgerEntryEmbeddedViewDto(entry),
-    ...(entry.sourceDocument
-      ? { sourceDocument: mapSourceDocumentReferenceDto(entry.sourceDocument) }
-      : {}),
+    sourceDocument: mapSourceDocumentReferenceDto(entry.sourceDocument),
   };
 }

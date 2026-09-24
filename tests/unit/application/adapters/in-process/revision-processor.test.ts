@@ -60,7 +60,6 @@ function createProcessor(entryCount: number, overrides: Record<string, unknown> 
     loadStoredFiles: vi.fn().mockResolvedValue([]),
     getRates,
     recordProcessingFailure,
-    getRevision: vi.fn().mockResolvedValue(null),
     activateRevision,
     ...overrides,
   });
@@ -71,6 +70,8 @@ const request = {
   ledgerId: "ledger-1",
   sourceDocumentId: "document-1",
   revisionId: "revision-1",
+  signal: new AbortController().signal,
+  lease: { jobId: "job-1", claimToken: "token-1" },
 };
 
 describe("CurrentRevisionProcessor", () => {

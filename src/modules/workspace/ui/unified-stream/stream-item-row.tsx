@@ -1,5 +1,5 @@
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import { SourceDocumentCard } from "@/modules/source-document/ui/SourceDocumentCard";
 import { memo, useCallback } from "react";
 import type { RendererProps, UnifiedStreamItem } from "./types";
@@ -9,10 +9,10 @@ interface UnifiedStreamItemRowProps {
   mainCurrency: string;
   onViewLedgerEntry?: (entry: LedgerEntry) => void;
   onViewSourceDetail: RendererProps["onViewSourceDetail"];
-  onViewSourceDetailIntent?: (doc: SourceDocument) => void;
-  onEditRetry?: (doc: SourceDocument) => void;
+  onViewSourceDetailIntent?: (doc: SourceDocumentListItemDto) => void;
+  onEditRetry?: (doc: SourceDocumentListItemDto) => void;
   onEditRetryIntent?: () => void;
-  onDeleteSourceConfirm: (doc: SourceDocument) => void;
+  onDeleteSourceConfirm: (doc: SourceDocumentListItemDto) => void;
   selectionMode: boolean;
   selected: boolean;
   selectionDisabled: boolean;
@@ -96,8 +96,8 @@ const UnifiedStreamItemRow = memo(function UnifiedStreamItemRow({
   onRetry,
   onCancelProcessing,
 }: UnifiedStreamItemRowProps) {
-  const sourceDocument = item.sourceDocument as SourceDocument;
-  const ledgerEntries = item.ledgerEntries as LedgerEntry[];
+  const sourceDocument = item.sourceDocument;
+  const ledgerEntries = item.ledgerEntries;
   const handleExpandedChange = useCallback(
     (nextExpanded: boolean) => onExpandedChange?.(sourceDocument.id, nextExpanded),
     [onExpandedChange, sourceDocument.id]
@@ -120,9 +120,6 @@ const UnifiedStreamItemRow = memo(function UnifiedStreamItemRow({
       {...(onEditRetry != null ? { onEditRetry: () => onEditRetry(sourceDocument) } : {})}
       {...(onEditRetryIntent != null ? { onEditRetryIntent } : {})}
       onDelete={() => onDeleteSourceConfirm(sourceDocument)}
-      processingStatus={item.sourceDocument.processingStatus}
-      failureKind={item.sourceDocument.failureKind}
-      errorCode={item.sourceDocument.errorCode}
       selectionMode={selectionMode}
       isSelected={selected}
       selectionDisabled={selectionDisabled}

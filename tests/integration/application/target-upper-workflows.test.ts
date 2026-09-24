@@ -1,3 +1,4 @@
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { and, eq, isNull } from "drizzle-orm";
@@ -105,6 +106,7 @@ describe("target upper workflows", () => {
       })
     ).toMatchObject({ revisionNumber: 7 });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(failedSubmission.revision.id),
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
       revisionId: failedSubmission.revision.id,
@@ -155,6 +157,7 @@ describe("target upper workflows", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(failedPending.revision.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       revisionId: failedPending.revision.id,
@@ -457,6 +460,7 @@ describe("target upper workflows", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await postgresLedgerProjectionAdapter.activateRevision({
+      lease: await claimRevisionForTest(pending.revision.id),
       ledgerId,
       expectedMainCurrency: "CNY",
       sourceDocumentId: pending.document.id,

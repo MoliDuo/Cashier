@@ -1,10 +1,8 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import Decimal from "decimal.js";
 import { db } from "@/persistence/db";
 import { ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { toStableFailureCode } from "@/application/contracts";
-import { AppError } from "@/lib/errors";
-import { roundToCurrency } from "@/lib/money/currency-precision";
+import { accountingTotal } from "@/lib/money/accounting-total";
 import type {
   CredentialSourceDocumentReadPort,
   CredentialSourceDocumentStatusResult,
@@ -74,21 +72,9 @@ export const postgresCredentialSourceDocumentReadAdapter: CredentialSourceDocume
         : (revision.processingStatus as CredentialSourceDocumentStatusResult["status"]);
     let result: CredentialSourceDocumentStatusResult["result"] = null;
     if (status === "completed" && document.activeRevisionId != null) {
-      const total = row.entries.reduce((sum, entry) => {
-        if (entry.convertedAmount == null) {
-          // Accounting totals may only be derived from converted amounts.
-          // Falling back to raw amounts would silently mix currencies.
-          throw new AppError(
-            "Completed source document has entries without accounting amounts",
-            "ACCOUNTING_AMOUNT_UNAVAILABLE",
-            500
-          );
-        }
-        return sum.plus(entry.convertedAmount);
-      }, new Decimal(0));
       result = {
         title: document.title,
-        total: roundToCurrency(total.toFixed(), row.mainCurrency),
+        total: accountingTotal(row.entries, row.mainCurrency),
         totalCurrency: row.mainCurrency,
         entries: row.entries.map(({ name, description, amount, currency, category }) => ({
           name,

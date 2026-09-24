@@ -173,12 +173,7 @@ export async function listLedgerEntryPage({
           sourceDocument: row.sourceDocument,
         });
 
-        if (dto.sourceDocument != null) {
-          dto.sourceDocument = {
-            ...dto.sourceDocument,
-            hasImages: row.hasImages,
-          };
-        }
+        dto.sourceDocument.hasImages = row.hasImages;
 
         return dto;
       });

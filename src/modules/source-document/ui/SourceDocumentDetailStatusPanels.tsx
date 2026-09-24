@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { AmountText } from "@/modules/currency/ui/amount-text";
-import { toStableFailureCode } from "@/application/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import { useDiagnosticMessages } from "./use-diagnostic-messages";
 
@@ -100,9 +99,7 @@ export function SourceDocumentDetailStatusPanels({
                 // A document the AI could not turn into expenses shows one
                 // status plus the reason the AI wrote for the ledger owner.
                 const isUnparsable = sourceDocument.failureKind === "invalid_input";
-                const failureCode = toStableFailureCode(
-                  (sourceDocument as SourceDocument).errorCode
-                );
+                const failureCode = sourceDocument.errorCode ?? "processing_unavailable";
                 const title = isUnparsable
                   ? diagnosticMessages.unparsableLabel
                   : diagnosticMessages.label(failureCode);

@@ -162,7 +162,6 @@ export function toSourceDocumentSubmissionContract(
 }
 
 export interface SourceDocumentPort {
-  get(ledgerId: LedgerId, id: SourceDocumentId): Promise<SourceDocumentContract | null>;
   recordProcessingFailure(input: {
     ledgerId: LedgerId;
     sourceDocumentId: SourceDocumentId;
@@ -174,7 +173,7 @@ export interface SourceDocumentPort {
      */
     failureMessage: string | null;
     failureCode?: string | null;
-    lease?: ProcessingLeaseContract;
+    lease: ProcessingLeaseContract;
   }): Promise<boolean>;
 }
 

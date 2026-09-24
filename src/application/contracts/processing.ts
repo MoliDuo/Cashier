@@ -32,8 +32,8 @@ export interface RevisionProcessingRequestContract {
   ledgerId: LedgerId;
   sourceDocumentId: SourceDocumentId;
   revisionId: RevisionId;
-  signal?: AbortSignal;
-  lease?: ProcessingLeaseContract;
+  signal: AbortSignal;
+  lease: ProcessingLeaseContract;
 }
 
 export interface RevisionProcessingResultContract {

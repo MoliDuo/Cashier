@@ -1,5 +1,5 @@
 "use client";
-import type { LedgerEntry } from "@/modules/ledger/contracts";
+import type { ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import { useMemo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getLedgerEntriesAction, getLedgerStatsAction } from "@/lib/queries/ledger-query-client";
@@ -9,7 +9,7 @@ import { QUERY } from "@/lib/constants";
 import { buildDetailsQueryDescriptor } from "@/modules/ledger/ledger-query-descriptor";
 
 export interface UseDetailsTabDataReturn {
-  entries: LedgerEntry[];
+  entries: ActiveLedgerEntryDto[];
   summaryData: Awaited<ReturnType<typeof getLedgerStatsAction>> | undefined;
   isLoading: boolean;
   isFetchingNextPage: boolean;
@@ -92,7 +92,7 @@ export function useDetailsTabData({
   const entries = useMemo(() => {
     if (!data?.pages) return [];
     const allItems = data.pages.flatMap((page) => page.items);
-    const uniqueMap = new Map<string, LedgerEntry>();
+    const uniqueMap = new Map<string, ActiveLedgerEntryDto>();
     allItems.forEach((item) => uniqueMap.set(item.id, item));
     return Array.from(uniqueMap.values());
   }, [data]);

@@ -98,6 +98,7 @@ describe("leased processor fencing", () => {
 
     await expect(
       processor.process({
+        signal: new AbortController().signal,
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,
@@ -148,6 +149,7 @@ describe("leased processor fencing", () => {
 
     await expect(
       processor.process({
+        signal: new AbortController().signal,
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,

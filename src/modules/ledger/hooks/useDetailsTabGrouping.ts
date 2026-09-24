@@ -1,37 +1,37 @@
 "use client";
 import { useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import type { LedgerEntry } from "@/modules/ledger/contracts";
+import type { ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import { useDateGrouping } from "@/hooks/use-date-grouping";
 
 export interface GroupedEntry {
   title: string;
   timestamp: number;
-  items: LedgerEntry[];
+  items: ActiveLedgerEntryDto[];
   total: string;
 }
 
 export interface UseDetailsTabGroupingReturn {
   groupedItems: GroupedEntry[];
-  getDateStr: (entry: LedgerEntry) => string;
+  getDateStr: (entry: ActiveLedgerEntryDto) => string;
 }
 
 export function useDetailsTabGrouping(
-  entries: LedgerEntry[],
+  entries: ActiveLedgerEntryDto[],
   timeZone?: string
 ): UseDetailsTabGroupingReturn {
   const t = useTranslations("DetailsTab");
   const locale = useLocale();
 
-  const getDateStr = useCallback((entry: LedgerEntry) => {
-    if (entry.sourceDocument?.documentDate != null && entry.sourceDocument.documentDate !== "") {
+  const getDateStr = useCallback((entry: ActiveLedgerEntryDto) => {
+    if (entry.sourceDocument.documentDate != null && entry.sourceDocument.documentDate !== "") {
       return entry.sourceDocument.documentDate;
     }
     return formatDateTimeForApi(new Date(entry.createdAt)) ?? formatDateTimeForApi(new Date())!;
   }, []);
   const getAmount = useCallback(
-    (entry: LedgerEntry) => (entry.convertedAmount != null ? entry.convertedAmount : "0"),
+    (entry: ActiveLedgerEntryDto) => (entry.convertedAmount != null ? entry.convertedAmount : "0"),
     []
   );
 

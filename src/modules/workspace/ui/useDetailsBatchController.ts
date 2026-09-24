@@ -12,7 +12,7 @@ import {
   batchUpdateLedgerEntryDatesAction,
   previewBatchLedgerEntryDateAction,
 } from "@/modules/ledger/server-actions/entries";
-import type { EntryCategory, LedgerEntry } from "@/modules/ledger/contracts";
+import type { EntryCategory, ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import type { VersionedTarget } from "@/modules/source-document/contracts";
 import { unwrapAtomicBatchCommandResult } from "@/modules/source-document/command-results";
 import { useDetailsCategoryAssignment } from "./useDetailsCategoryAssignment";
@@ -42,7 +42,7 @@ type DatePreviewState =
 
 export function useDetailsBatchController(
   ledgerId: string,
-  entries: readonly LedgerEntry[],
+  entries: readonly ActiveLedgerEntryDto[],
   queryFingerprint: string,
   timeZone?: string,
   categories: readonly EntryCategory[] = []
@@ -56,8 +56,9 @@ export function useDetailsBatchController(
     (ids: readonly string[]): VersionedTarget[] => {
       const versions = new Map<string, number>();
       for (const id of ids) {
-        const sourceDocument = entryById.get(id)?.sourceDocument;
-        if (sourceDocument == null) throw new Error("Entry has no source document version");
+        const entry = entryById.get(id);
+        if (entry == null) throw new Error("Selected entry is no longer in the loaded page");
+        const { sourceDocument } = entry;
         const previous = versions.get(sourceDocument.id);
         if (previous != null && previous !== sourceDocument.version) {
           throw new Error("Selected entries contain conflicting source document versions");

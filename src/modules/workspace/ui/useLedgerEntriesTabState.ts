@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
-import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 
 export interface LedgerEntriesDeleteConfirmState {
   open: boolean;
@@ -21,7 +21,9 @@ const EMPTY_DELETE_CONFIRM: LedgerEntriesDeleteConfirmState = {
 export function useLedgerEntriesTabState() {
   const [deleteConfirm, setDeleteConfirm] =
     useState<LedgerEntriesDeleteConfirmState>(EMPTY_DELETE_CONFIRM);
-  const [retrySourceDocument, setRetrySourceDocument] = useState<SourceDocument | null>(null);
+  const [retrySourceDocument, setRetrySourceDocument] = useState<SourceDocumentListItemDto | null>(
+    null
+  );
 
   const openSourceDocumentDeleteConfirm = useCallback(
     (id: string, title: string, description: string) => {

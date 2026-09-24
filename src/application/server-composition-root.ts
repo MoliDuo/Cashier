@@ -70,8 +70,6 @@ function createRevisionProcessor(
       ),
     getRates: (date) => postgresFxRateBook.getRates(date),
     recordProcessingFailure: (input) => postgresRevisionAdapter.recordProcessingFailure(input),
-    getRevision: (ledgerId, sourceDocumentId) =>
-      postgresRevisionAdapter.get(ledgerId, sourceDocumentId),
     activateRevision: (input) => postgresLedgerProjectionAdapter.activateRevision(input),
   });
 }

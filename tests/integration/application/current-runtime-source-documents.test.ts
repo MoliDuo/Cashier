@@ -1,4 +1,8 @@
-import { listTargetSourceDocuments } from "@/application/adapters/postgres/source-document-reads";
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import {
+  getTargetSourceDocument,
+  listTargetSourceDocuments,
+} from "@/application/adapters/postgres/source-document-reads";
 import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
@@ -45,7 +49,7 @@ describe("current-runtime target adapters", () => {
       input: { text: "first", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    await expect(postgresRevisionAdapter.get(otherLedgerId, first.document.id)).resolves.toBeNull();
+    await expect(getTargetSourceDocument(otherLedgerId, first.document.id)).resolves.toBeNull();
     await expect(
       createPendingRevision({
         ledgerId,
@@ -56,6 +60,7 @@ describe("current-runtime target adapters", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
     await expect(
       postgresRevisionAdapter.recordProcessingFailure({
+        lease: await claimRevisionForTest(first.revision.id),
         ledgerId,
         sourceDocumentId: first.document.id,
         revisionId: first.revision.id,
@@ -73,6 +78,7 @@ describe("current-runtime target adapters", () => {
     });
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
+        lease: await claimRevisionForTest(retry.revision.id),
         ledgerId,
         expectedMainCurrency: "CNY",
         sourceDocumentId: first.document.id,
@@ -88,13 +94,16 @@ describe("current-runtime target adapters", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(failedRetry.revision.id),
       ledgerId,
       sourceDocumentId: first.document.id,
       revisionId: failedRetry.revision.id,
       failureKind: "invalid_input",
       failureMessage: "unreadable",
     });
-    const preserved = await postgresRevisionAdapter.get(ledgerId, first.document.id);
+    const preserved = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, first.document.id),
+    });
     expect(preserved).toMatchObject({
       activeRevisionId: retry.revision.id,
       latestSubmissionRevisionId: failedRetry.revision.id,
@@ -137,6 +146,7 @@ describe("current-runtime target adapters", () => {
 
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
+        lease: await claimRevisionForTest(pending.revision.id),
         ledgerId,
         expectedMainCurrency: "CNY",
         sourceDocumentId: pending.document.id,
@@ -215,6 +225,7 @@ describe("current-runtime target adapters", () => {
       "edit_retry",
       "delete",
     ]);
+    const pendingLease = await claimRevisionForTest(pending.revision.id);
     const revisionCount = (await db.select().from(sourceDocumentRevisions)).length;
     const fileLinkCount = (await db.select().from(revisionFiles)).length;
 
@@ -232,6 +243,7 @@ describe("current-runtime target adapters", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
+        lease: pendingLease,
         ledgerId,
         expectedMainCurrency: "CNY",
         sourceDocumentId: active.sourceDocumentId,

@@ -243,7 +243,7 @@ export interface LedgerProjectionPort {
     dateOrganizationSuggestion?:
       | import("@/modules/source-document/date-organization-contracts").DateOrganizationSuggestion
       | null;
-    lease?: ProcessingLeaseContract;
+    lease: ProcessingLeaseContract;
   }): Promise<boolean>;
   createManual(input: {
     ledgerId: LedgerId;

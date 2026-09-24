@@ -8,3 +8,34 @@ import {
 export function createPendingRevision(input: CreatePendingRevisionInput) {
   return db.transaction((tx) => createProcessingRevisionInTransaction(tx, input));
 }
+
+/** Claim a real durable job before exercising processing terminal writes. */
+export async function claimRevisionForTest(revisionId: string) {
+  const { eq } = await import("drizzle-orm");
+  const { processingOutbox, sourceDocumentRevisions } = await import("@/persistence");
+  const { PostgresProcessingJobAdapter } =
+    await import("@/application/adapters/postgres/processing-jobs");
+  const adapter = new PostgresProcessingJobAdapter();
+  let job = await db.query.processingOutbox.findFirst({
+    where: eq(processingOutbox.revisionId, revisionId),
+  });
+  if (job == null) {
+    const revision = await db.query.sourceDocumentRevisions.findFirst({
+      where: eq(sourceDocumentRevisions.id, revisionId),
+    });
+    if (revision == null) throw new Error("Test revision missing");
+    const id = crypto.randomUUID();
+    await adapter.dispatch({
+      id,
+      sourceDocumentId: revision.sourceDocumentId,
+      revisionId,
+      requestedAt: new Date().toISOString(),
+      attemptNumber: 1,
+    });
+    job = await db.query.processingOutbox.findFirst({ where: eq(processingOutbox.id, id) });
+  }
+  if (job == null) throw new Error("Test job missing");
+  const claim = await adapter.claim(job.id);
+  if (claim == null) throw new Error("Test job could not be claimed");
+  return { jobId: claim.job.id, claimToken: claim.claimToken };
+}

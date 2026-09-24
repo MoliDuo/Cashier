@@ -188,9 +188,9 @@ export type LedgerEntryDto = {
   id: string;
   ledgerId: string;
   categoryId: string | null;
-  sourceDocumentId: string | null;
+  sourceDocumentId: string;
   amount: string;
-  currency: string | null;
+  currency: string;
   itemName: string;
   description: string | null;
   convertedAmount: string | null;
@@ -202,6 +202,8 @@ export type LedgerEntryDto = {
   sourceDocument?: SourceDocumentReferenceDto | null;
 };
 export type LedgerEntry = LedgerEntryDto;
+
+export type ActiveLedgerEntryDto = LedgerEntryDto & { sourceDocument: SourceDocumentReferenceDto };
 
 export type LedgerEntryEmbeddedViewDto = Omit<LedgerEntryDto, "sourceDocument">;
 
@@ -237,7 +239,7 @@ export interface LedgerSummaryDto {
 export type LedgerEntrySummary = LedgerSummaryDto;
 
 export interface LedgerEntryPageDto {
-  items: LedgerEntryDto[];
+  items: ActiveLedgerEntryDto[];
   nextCursor: string | null;
 }
 

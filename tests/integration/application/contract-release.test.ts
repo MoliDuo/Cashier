@@ -1,3 +1,4 @@
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -37,6 +38,7 @@ describe("local contract release", () => {
 
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
+        lease: await claimRevisionForTest(pending.revision.id),
         ledgerId,
         expectedMainCurrency: "CNY",
         sourceDocumentId: pending.document.id,

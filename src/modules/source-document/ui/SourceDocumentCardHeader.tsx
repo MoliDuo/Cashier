@@ -21,19 +21,10 @@ import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
 import { ProcessingStatus } from "./processing-status";
 import { SourceDocumentCardTotal } from "./SourceDocumentCardTotal";
-import type {
-  ApplicationErrorCode,
-  ProcessingFailureCode,
-  RevisionFailureKind,
-} from "@/application/contracts";
-import { toStableFailureCode } from "@/application/contracts";
 import { useDiagnosticMessages } from "./use-diagnostic-messages";
 
 interface SourceDocumentCardHeaderProps {
   sourceDocument: SourceDocument | SourceDocumentListItemDto;
-  processingStatus: SourceDocumentProcessingStatus | null;
-  failureKind?: RevisionFailureKind | null | undefined;
-  errorCode?: ApplicationErrorCode | ProcessingFailureCode | null | undefined;
   ledgerEntries: LedgerEntry[];
   mainCurrency: string;
   isRetrying: boolean;
@@ -68,9 +59,6 @@ function getProcessingStatus(status: SourceDocumentProcessingStatus | null) {
 
 export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
   sourceDocument,
-  processingStatus: status,
-  failureKind,
-  errorCode,
   ledgerEntries,
   mainCurrency,
   isRetrying,
@@ -90,6 +78,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
   onEditRetryIntent,
   onDelete,
 }: SourceDocumentCardHeaderProps) {
+  const { processingStatus: status, failureKind, errorCode } = sourceDocument;
   const t = useTranslations("SourceDocumentCard");
   const tCommon = useTranslations("Common");
   const tActions = useTranslations("SourceDocumentAction");
@@ -110,7 +99,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
     status === "failed"
       ? failureKind === "invalid_input"
         ? diagnosticMessages.unparsableLabel
-        : diagnosticMessages.label(toStableFailureCode(errorCode))
+        : diagnosticMessages.label(errorCode ?? "processing_unavailable")
       : null;
 
   const hasAction = (action: SupportedSourceDocumentAction) => supportedActions.includes(action);

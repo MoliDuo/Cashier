@@ -45,7 +45,6 @@ export interface CurrentRevisionProcessorOptions {
   loadStoredFiles: (ledgerId: string, storedFileIds: string[]) => Promise<LoadImageResult[]>;
   getRates: FxRateBook["getRates"];
   recordProcessingFailure: SourceDocumentPort["recordProcessingFailure"];
-  getRevision: SourceDocumentPort["get"];
   activateRevision: LedgerProjectionPort["activateRevision"];
 }
 
@@ -67,7 +66,7 @@ export class CurrentRevisionProcessor implements RevisionProcessorPort {
   async process(
     request: RevisionProcessingRequestContract
   ): Promise<RevisionProcessingResultContract> {
-    const signal = request.signal ?? AbortSignal.any([]);
+    const signal = request.signal;
     throwIfProcessingCancelled(signal);
     const [context, ledgerSettings] = await Promise.all([
       this.options.loadContext(request),
@@ -130,12 +129,11 @@ export class CurrentRevisionProcessor implements RevisionProcessorPort {
       );
       const preserved = await this.options.recordProcessingFailure({
         ...request,
-        ...(request.lease == null ? {} : { lease: request.lease }),
         failureKind: "invalid_input",
         failureMessage,
         failureCode: output.diagnostic,
       });
-      if (!preserved && request.lease != null) {
+      if (!preserved) {
         throw new ProcessingCancelledError();
       }
       return {
@@ -157,12 +155,11 @@ export class CurrentRevisionProcessor implements RevisionProcessorPort {
       );
       const preserved = await this.options.recordProcessingFailure({
         ...request,
-        ...(request.lease == null ? {} : { lease: request.lease }),
         failureKind: "invalid_input",
         failureMessage: null,
         failureCode: "entry_validation_failed",
       });
-      if (!preserved && request.lease != null) {
+      if (!preserved) {
         throw new ProcessingCancelledError();
       }
       return { processingStatus: "failed", completion: "atomic" };
@@ -224,20 +221,12 @@ export class CurrentRevisionProcessor implements RevisionProcessorPort {
         const activated = await this.options.activateRevision({
           ...request,
           expectedMainCurrency: mainCurrency,
-          ...(request.lease == null ? {} : { lease: request.lease }),
           ...(output.title == null ? {} : { title: output.title }),
           entries: entryInputs,
           dateOrganizationSuggestion,
         });
         if (!activated) {
-          if (request.lease != null) throw new ProcessingCancelledError();
-          const current = await this.options.getRevision(
-            request.ledgerId,
-            request.sourceDocumentId
-          );
-          if (current?.activeRevisionId !== request.revisionId) {
-            throw new Error("Revision completion is stale");
-          }
+          throw new ProcessingCancelledError();
         }
         return { processingStatus: "completed", completion: "atomic" };
       } catch (error) {

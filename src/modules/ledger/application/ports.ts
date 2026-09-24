@@ -1,4 +1,8 @@
-import type { LedgerEntryDto, LedgerEntryEmbeddedViewDto, LedgerEntrySummary } from "../contracts";
+import type {
+  ActiveLedgerEntryDto,
+  LedgerEntryEmbeddedViewDto,
+  LedgerEntrySummary,
+} from "../contracts";
 import type { LedgerEntryFilterParams } from "../filters";
 import type {
   ReclassificationCandidate,
@@ -98,7 +102,7 @@ export interface LedgerReadPort {
     limit?: number;
     cursor?: string | null;
     filters: LedgerEntryFilterParams;
-  }): Promise<{ items: LedgerEntryDto[]; nextCursor: string | null }>;
+  }): Promise<{ items: ActiveLedgerEntryDto[]; nextCursor: string | null }>;
   calculateStats(input: {
     ledgerId: string;
     filters: LedgerEntryFilterParams;

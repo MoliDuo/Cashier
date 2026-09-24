@@ -1,15 +1,19 @@
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import {
-  PostgresProcessingJobAdapter,
-  postgresRevisionAdapter,
-} from "@/application/adapters/postgres";
+import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
 import { serverComposition } from "@/application/server-composition-root";
 import type { ProcessingJobContract } from "@/application/contracts";
-import { ledgerEntries, ledgers, processingOutbox, currencyRates } from "@/persistence";
+import {
+  ledgerEntries,
+  ledgers,
+  processingOutbox,
+  currencyRates,
+  sourceDocuments,
+} from "@/persistence";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -76,12 +80,15 @@ describe("PostgresProcessingJobAdapter", () => {
       }),
     }));
     const processor = serverComposition.createRevisionProcessor(() => ({ generate }));
+    const lease = await claimRevisionForTest(job.revisionId);
 
     await expect(
       processor.process({
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,
+        lease,
+        signal: new AbortController().signal,
       })
     ).resolves.toEqual({ processingStatus: "completed", completion: "atomic" });
     await expect(
@@ -89,13 +96,15 @@ describe("PostgresProcessingJobAdapter", () => {
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,
+        lease,
+        signal: new AbortController().signal,
       })
     ).resolves.toEqual({ processingStatus: "completed", completion: "residual" });
 
     expect(generate).toHaveBeenCalledTimes(1);
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
     await expect(
-      postgresRevisionAdapter.get(ledgerId, job.sourceDocumentId)
+      db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, job.sourceDocumentId) })
     ).resolves.toMatchObject({
       activeRevisionId: job.revisionId,
       latestSubmissionRevisionId: job.revisionId,
@@ -140,11 +149,14 @@ describe("PostgresProcessingJobAdapter", () => {
     }));
 
     const processor = serverComposition.createRevisionProcessor(() => ({ generate }));
+    const lease = await claimRevisionForTest(job.revisionId);
 
     await processor.process({
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       revisionId: job.revisionId,
+      lease,
+      signal: new AbortController().signal,
     });
 
     // Verify the custom prompt reaches the AI call
@@ -194,6 +206,8 @@ describe("PostgresProcessingJobAdapter", () => {
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       revisionId: job.revisionId,
+      lease: await claimRevisionForTest(job.revisionId),
+      signal: new AbortController().signal,
     });
 
     // Update typed settings after the first parse.
@@ -243,6 +257,8 @@ describe("PostgresProcessingJobAdapter", () => {
       ledgerId,
       sourceDocumentId: pending2.document.id,
       revisionId: pending2.revision.id,
+      lease: await claimRevisionForTest(pending2.revision.id),
+      signal: new AbortController().signal,
     });
 
     // Verify the new AI call used the updated custom prompt

@@ -1,3 +1,4 @@
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import {
@@ -49,6 +50,7 @@ async function setupDocumentWithFailedRetry(
 
   // Step 3: Set the pending revision outcome to invalid/failed
   await postgresRevisionAdapter.recordProcessingFailure({
+    lease: await claimRevisionForTest(pending.revision.id),
     ledgerId,
     sourceDocumentId: created.sourceDocumentId,
     revisionId: pending.revision.id,
@@ -81,6 +83,7 @@ async function setupDocumentWithFirstParseFailure(
     })
   );
   await postgresRevisionAdapter.recordProcessingFailure({
+    lease: await claimRevisionForTest(pending.revision.id),
     ledgerId,
     sourceDocumentId: pending.document.id,
     revisionId: pending.revision.id,
@@ -184,6 +187,7 @@ describe("retry active result summary", () => {
       });
     });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(pending.revision.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       revisionId: pending.revision.id,

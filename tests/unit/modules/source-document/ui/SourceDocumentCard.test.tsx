@@ -55,7 +55,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={{ ...sourceDocument, processingStatus: null }}
         ledgerEntries={[ledgerEntry]}
-        processingStatus={null}
         defaultExpanded={false}
       />
     );
@@ -74,9 +73,6 @@ describe("SourceDocumentCard interactions", () => {
           failureMessage: "这是一张退款单据，本系统只处理支出。",
         }}
         ledgerEntries={[]}
-        processingStatus="failed"
-        failureKind="invalid_input"
-        errorCode={null}
         defaultExpanded={false}
       />
     );
@@ -91,7 +87,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
         onViewDetails={onViewDetails}
       />
     );
@@ -108,7 +103,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
         defaultExpanded={false}
       />
     );
@@ -130,7 +124,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
         onViewDetails={onViewDetails}
         onViewLedgerEntry={onViewLedgerEntry}
       />
@@ -148,7 +141,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[]}
-        processingStatus="completed"
         onViewDetails={onViewDetails}
       />
     );
@@ -165,7 +157,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={{ ...sourceDocument, processingStatus: "failed" }}
         ledgerEntries={[]}
-        processingStatus="failed"
         onRetry={onRetry}
         isRetrying
       />
@@ -179,12 +170,7 @@ describe("SourceDocumentCard interactions", () => {
 
   it("does not open the actions menu when dragging the trigger outside the card", () => {
     render(
-      <SourceDocumentCard
-        sourceDocument={sourceDocument}
-        ledgerEntries={[]}
-        processingStatus="completed"
-        onDelete={vi.fn()}
-      />
+      <SourceDocumentCard sourceDocument={sourceDocument} ledgerEntries={[]} onDelete={vi.fn()} />
     );
 
     const trigger = screen.getByRole("button", { name: /更多操作|more actions/i });
@@ -197,12 +183,7 @@ describe("SourceDocumentCard interactions", () => {
   it("closes the non-modal actions menu with Escape and restores trigger focus", async () => {
     const user = userEvent.setup();
     render(
-      <SourceDocumentCard
-        sourceDocument={sourceDocument}
-        ledgerEntries={[]}
-        processingStatus="completed"
-        onDelete={vi.fn()}
-      />
+      <SourceDocumentCard sourceDocument={sourceDocument} ledgerEntries={[]} onDelete={vi.fn()} />
     );
     const trigger = screen.getByRole("button", { name: /更多操作|more actions/i });
     await user.click(trigger);
@@ -225,7 +206,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
         onViewDetails={onViewDetails}
         selectionMode
         onToggleSelect={onToggleSelect}
@@ -253,7 +233,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
         onViewDetails={onViewDetails}
       />
     );
@@ -269,9 +248,8 @@ describe("SourceDocumentCard interactions", () => {
     (status) => {
       render(
         <SourceDocumentCard
-          sourceDocument={{ ...sourceDocument, title: null }}
+          sourceDocument={{ ...sourceDocument, title: null, processingStatus: status }}
           ledgerEntries={[]}
-          processingStatus={status}
         />
       );
 
@@ -289,7 +267,6 @@ describe("SourceDocumentCard interactions", () => {
           files: [{ id: "file-1", contentType: "image/png", byteSize: 10, originalFilename: null }],
         }}
         ledgerEntries={[]}
-        processingStatus="processing"
       />
     );
 
@@ -309,7 +286,6 @@ describe("SourceDocumentCard interactions", () => {
         <SourceDocumentCard
           sourceDocument={{ ...sourceDocument, processingStatus: status }}
           ledgerEntries={[]}
-          processingStatus={status}
         />
       );
       const card = screen.getByTestId("source-document-card-root");
@@ -335,7 +311,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={{ ...sourceDocument, processingStatus: "processing" }}
         ledgerEntries={[]}
-        processingStatus="processing"
       />
     );
     const sweep = screen.getByTestId("source-document-processing-sweep");
@@ -350,7 +325,6 @@ describe("SourceDocumentCard interactions", () => {
         <SourceDocumentCard
           sourceDocument={{ ...sourceDocument, processingStatus: status }}
           ledgerEntries={[]}
-          processingStatus={status}
         />
       );
       expect(screen.queryByTestId("source-document-processing-sweep")).not.toBeInTheDocument();
@@ -366,7 +340,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={{ ...sourceDocument, processingStatus: "processing" }}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="processing"
         defaultExpanded={false}
       />
     );
@@ -379,7 +352,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={{ ...sourceDocument, processingStatus: "cancelled" }}
         ledgerEntries={[]}
-        processingStatus="cancelled"
       />
     );
 
@@ -394,7 +366,6 @@ describe("SourceDocumentCard interactions", () => {
       <SourceDocumentCard
         sourceDocument={sourceDocument}
         ledgerEntries={[ledgerEntry]}
-        processingStatus="completed"
         defaultExpanded={false}
       />
     );

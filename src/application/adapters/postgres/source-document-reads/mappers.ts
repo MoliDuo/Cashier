@@ -2,16 +2,12 @@ import type {
   SourceDocumentDetailDto,
   SourceDocumentStoredFileDto,
   SourceDocumentListItemDto,
-  SourceDocumentActiveResultSummary,
   SourceDocumentLedgerEntryDto,
 } from "@/modules/source-document/contracts";
-import {
-  PROCESSING_FAILURE_CODES,
-  type ApplicationErrorCode,
-  type ProcessingFailureCode,
-} from "@/application/contracts";
+import { toStableFailureCode, type ProcessingFailureCode } from "@/application/contracts";
+import { accountingTotal } from "@/lib/money/accounting-total";
 import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
-import { compare as decimalCompare, round as decimalRound } from "@/lib/money/decimal";
+import { compare as decimalCompare } from "@/lib/money/decimal";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 
 export interface SourceDocumentRow {
@@ -32,20 +28,20 @@ export interface SourceDocumentRow {
     | null;
 }
 
-export interface SourceDocumentHydrationRow {
-  documentId: string;
-  selectedRevisionId: string | null;
-  activeRevisionId: string | null;
+export interface SourceDocumentListHydrationRow {
   revisionTitle: string | null;
-  inputText: string | null;
   processingStatus: SourceDocumentProcessingStatus | null;
   failureKind: "invalid_input" | "processing_error" | null;
   failureMessage: string | null;
   failureCode: string | null;
   hasImages: boolean;
+}
+
+export interface SourceDocumentHydrationRow extends SourceDocumentListHydrationRow {
+  inputText: string | null;
+  mainCurrency: string;
   files: SourceDocumentStoredFileAggregateRow[];
   ledgerEntries: SourceDocumentLedgerEntryAggregateRow[];
-  activeResultSummary: SourceDocumentActiveResultSummary | null;
 }
 
 export interface SourceDocumentStoredFileAggregateRow {
@@ -135,7 +131,7 @@ export function effectiveDocumentTitle(
 
 export function mapListItem(
   row: SourceDocumentRow,
-  hydration: SourceDocumentHydrationRow
+  hydration: SourceDocumentListHydrationRow
 ): SourceDocumentListItemDto {
   const capabilities = deriveSourceDocumentCapabilities({
     activeRevisionId: row.activeRevisionId,
@@ -172,11 +168,11 @@ export function mapSourceDocumentDetail(
   hydration: SourceDocumentHydrationRow
 ): SourceDocumentDetailDto {
   const activeResultSummary =
-    hydration.activeResultSummary == null
+    row.activeRevisionId == null
       ? null
       : {
-          entryCount: Number(hydration.activeResultSummary.entryCount),
-          total: decimalRound(String(hydration.activeResultSummary.total), 2),
+          entryCount: hydration.ledgerEntries.length,
+          total: accountingTotal(hydration.ledgerEntries, hydration.mainCurrency),
         };
   const capabilities = deriveSourceDocumentCapabilities({
     activeRevisionId: row.activeRevisionId,
@@ -215,28 +211,7 @@ function sanitizedErrorCode(
   processingStatus: string | null | undefined,
   failureKind: "invalid_input" | "processing_error" | null | undefined,
   failureCode: string | null | undefined
-): ApplicationErrorCode | ProcessingFailureCode | null {
-  if (processingStatus !== "failed") return null;
-  if (failureKind === "invalid_input") return "VALIDATION_FAILED";
-  const allowed: readonly ApplicationErrorCode[] = [
-    "VALIDATION_FAILED",
-    "UNAUTHENTICATED",
-    "FORBIDDEN",
-    "NOT_FOUND",
-    "CONFLICT",
-    "RATE_LIMITED",
-    "PROCESSING_UNAVAILABLE",
-    "STORAGE_UNAVAILABLE",
-    "INTERNAL",
-  ];
-  if (allowed.includes(failureCode as ApplicationErrorCode)) {
-    return failureCode as ApplicationErrorCode;
-  }
-  if (
-    failureCode != null &&
-    (PROCESSING_FAILURE_CODES as readonly string[]).includes(failureCode)
-  ) {
-    return failureCode as ProcessingFailureCode;
-  }
-  return "PROCESSING_UNAVAILABLE";
+): ProcessingFailureCode | null {
+  if (processingStatus !== "failed" || failureKind === "invalid_input") return null;
+  return toStableFailureCode(failureCode);
 }

@@ -1,5 +1,5 @@
 import type { Ledger, LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { type PeriodParams } from "@/lib/period-utils";
@@ -81,7 +81,7 @@ export function LedgerEntriesTab({
   });
 
   const handleViewSourceDetail = useCallback(
-    (group: { sourceDocument: SourceDocument; ledgerEntries: LedgerEntry[] }) => {
+    (group: { sourceDocument: SourceDocumentListItemDto; ledgerEntries: LedgerEntry[] }) => {
       openLedgerDetail({
         type: "source-document",
         id: group.sourceDocument.id,
@@ -99,7 +99,7 @@ export function LedgerEntriesTab({
   );
 
   const handleDeleteSourceConfirm = useCallback(
-    (doc: SourceDocument) =>
+    (doc: SourceDocumentListItemDto) =>
       openSourceDocumentDeleteConfirm(doc.id, t("deleteConfirmTitle"), t("deleteConfirmDesc")),
     [openSourceDocumentDeleteConfirm, t]
   );

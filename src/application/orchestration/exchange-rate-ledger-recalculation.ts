@@ -9,41 +9,25 @@ import {
 } from "@/application/adapters/postgres/exchange-rate-recalculation-jobs";
 import { postgresCurrencyAdapter } from "@/application/adapters/postgres/business-ports/currency";
 import { logger } from "@/lib/logger";
-import { runWithConcurrency } from "@/lib/concurrency";
 import type { CurrencyPort } from "@/application/contracts";
 
 const CLAIM_LIMIT = 25;
 const CLAIM_LEASE_MS = 300_000;
 const MAX_DRAIN_BATCHES = 20;
 const MAX_DRAIN_DURATION_MS = 30_000;
-export const MAX_CONCURRENT_LEDGERS = 2;
 
 export interface ExchangeRateRecalculationDependencies {
   currencies: CurrencyPort;
-  recalculateEntriesForDate: (
-    ledgerId: string,
-    rateDate: string,
-    currencies: CurrencyPort
-  ) => Promise<void>;
-}
-
-async function defaultRecalculateEntriesForDate(
-  ledgerId: string,
-  rateDate: string,
-  currencies: CurrencyPort
-): Promise<void> {
-  await currencies.recalculateLedgerForDate(ledgerId, rateDate);
 }
 
 const defaultDependencies: ExchangeRateRecalculationDependencies = {
   currencies: postgresCurrencyAdapter,
-  recalculateEntriesForDate: defaultRecalculateEntriesForDate,
 };
 
 /**
  * Claim and process one bounded batch of durable recalculation jobs.
- * Runs at most two ledgers concurrently; a single ledger failure only
- * schedules its own retry and never blocks the rest of the batch.
+ * Processes jobs sequentially; a failure schedules its own retry without
+ * blocking the rest of the batch.
  */
 export async function runBoundedExchangeRateRecalculation(
   now = new Date(),
@@ -58,18 +42,9 @@ export async function runBoundedExchangeRateRecalculation(
     return 0;
   }
 
-  const groups = new Map<string, ClaimedExchangeRateRecalculation[]>();
   for (const job of claimed) {
-    const group = groups.get(job.ledgerId) ?? [];
-    group.push(job);
-    groups.set(job.ledgerId, group);
+    await processRecalculationJob(job, now, dependencies);
   }
-
-  await runWithConcurrency([...groups.values()], MAX_CONCURRENT_LEDGERS, async (jobs) => {
-    for (const job of jobs) {
-      await processRecalculationJob(job, now, dependencies);
-    }
-  });
   return claimed.length;
 }
 
@@ -90,11 +65,7 @@ async function processRecalculationJob(
   dependencies: ExchangeRateRecalculationDependencies
 ): Promise<void> {
   try {
-    await dependencies.recalculateEntriesForDate(
-      job.ledgerId,
-      job.rateDate,
-      dependencies.currencies
-    );
+    await dependencies.currencies.recalculateLedgerForDate(job.ledgerId, job.rateDate);
     await completeExchangeRateRecalculation({
       rateDate: job.rateDate,
       ledgerId: job.ledgerId,

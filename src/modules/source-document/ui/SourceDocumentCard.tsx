@@ -7,8 +7,6 @@ import { memo, useCallback, useId, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { type SourceDocumentProcessingStatus } from "@/modules/source-document/contracts";
 import type { SupportedSourceDocumentAction } from "@/application/contracts";
-import type { ApplicationErrorCode, ProcessingFailureCode } from "@/application/contracts";
-import type { RevisionFailureKind } from "@/application/contracts";
 import { EntryCardShell, type EntryCardTone } from "@/components/entry-card-shell";
 import { SelectableCardSurface } from "@/components/selectable-card-surface";
 import { SourceDocumentCardHeader } from "./SourceDocumentCardHeader";
@@ -36,9 +34,6 @@ interface SourceDocumentCardProps {
   onExpandedChange?: (expanded: boolean) => void;
   onEditRetry?: () => void | Promise<void>;
   onEditRetryIntent?: () => void;
-  processingStatus: SourceDocumentProcessingStatus | null;
-  failureKind?: RevisionFailureKind | null;
-  errorCode?: ApplicationErrorCode | ProcessingFailureCode | null | undefined;
   className?: string;
   selectionMode?: boolean;
   isSelected?: boolean;
@@ -68,9 +63,6 @@ function SourceDocumentCardBody({
   onExpandedChange,
   onEditRetry,
   onEditRetryIntent,
-  processingStatus,
-  failureKind,
-  errorCode,
   className,
   selectionMode = false,
   isSelected = false,
@@ -82,6 +74,7 @@ function SourceDocumentCardBody({
   onRetry,
   onCancelProcessing,
 }: SourceDocumentCardProps) {
+  const { processingStatus } = sourceDocument;
   const tCommon = useTranslations("Common");
   const tCard = useTranslations("SourceDocumentCard");
   const [localExpanded, setLocalExpanded] = useState(defaultExpanded);
@@ -133,9 +126,6 @@ function SourceDocumentCardBody({
         {processingStatus === "processing" ? <ProcessingSweep /> : null}
         <SourceDocumentCardHeader
           sourceDocument={sourceDocument}
-          processingStatus={processingStatus}
-          failureKind={failureKind}
-          errorCode={errorCode}
           ledgerEntries={ledgerEntries}
           mainCurrency={mainCurrency}
           isRetrying={isRetrying}

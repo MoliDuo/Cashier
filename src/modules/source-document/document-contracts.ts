@@ -1,7 +1,6 @@
 import type { SourceDocumentProcessingStatus } from "./types";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
 import type {
-  ApplicationErrorCode,
   ProcessingFailureCode,
   RevisionFailureKind,
   SupportedSourceDocumentAction,
@@ -30,7 +29,7 @@ interface SourceDocumentSummaryDto {
   updatedAt: string;
   supportedActions: SupportedSourceDocumentAction[];
   canEdit: boolean;
-  errorCode: ApplicationErrorCode | ProcessingFailureCode | null;
+  errorCode: ProcessingFailureCode | null;
 }
 
 interface SourceDocumentInputDataDto {

@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { SourceDocumentDetailDto } from "@/modules/source-document/contracts";
-import { add as decimalAdd } from "@/lib/money/decimal";
 import {
   entryCategories,
   ledgerEntries,
+  ledgers,
   revisionFiles,
   sourceDocumentRevisions,
   sourceDocuments,
@@ -20,6 +20,7 @@ import {
   mapSourceDocumentDetail,
   type SourceDocumentLedgerEntryAggregateRow,
   type SourceDocumentHydrationRow,
+  type SourceDocumentListHydrationRow,
   type SourceDocumentRow,
   type SourceDocumentStoredFileAggregateRow,
 } from "./mappers";
@@ -32,7 +33,7 @@ async function loadSourceDocumentDetailSnapshot(
   const baseRow = await tx
     .select({
       ...getTableColumns(sourceDocuments),
-      documentId: sourceDocuments.id,
+      mainCurrency: ledgers.mainCurrency,
       selectedRevisionId: sourceDocumentRevisions.id,
       activeRevisionId: sourceDocuments.activeRevisionId,
       revisionTitle: sourceDocumentRevisions.title,
@@ -43,6 +44,7 @@ async function loadSourceDocumentDetailSnapshot(
       failureCode: sourceDocumentRevisions.failureCode,
     })
     .from(sourceDocuments)
+    .innerJoin(ledgers, eq(ledgers.id, sourceDocuments.ledgerId))
     .leftJoin(
       sourceDocumentRevisions,
       and(
@@ -88,15 +90,11 @@ async function loadSourceDocumentDetailSnapshot(
           )
           .orderBy(asc(revisionFiles.position));
 
-  const relevantRevisionIds = [baseRow.selectedRevisionId, baseRow.activeRevisionId].filter(
-    (id): id is string => id != null
-  );
   const entryRows =
-    relevantRevisionIds.length === 0
+    baseRow.activeRevisionId == null
       ? []
       : await tx
           .select({
-            revisionId: ledgerEntries.sourceDocumentRevisionId,
             id: ledgerEntries.id,
             ledgerId: ledgerEntries.ledgerId,
             categoryId: ledgerEntries.categoryId,
@@ -125,52 +123,37 @@ async function loadSourceDocumentDetailSnapshot(
             and(
               eq(ledgerEntries.ledgerId, ledgerId),
               eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-              inArray(ledgerEntries.sourceDocumentRevisionId, relevantRevisionIds),
+              eq(ledgerEntries.sourceDocumentRevisionId, baseRow.activeRevisionId),
               isNull(ledgerEntries.deletedAt)
             )
           )
-          .orderBy(
-            asc(ledgerEntries.sourceDocumentRevisionId),
-            asc(ledgerEntries.position),
-            asc(ledgerEntries.id)
-          );
-  const entriesByRevision = new Map<string, SourceDocumentLedgerEntryAggregateRow[]>();
-  for (const entry of entryRows) {
-    if (entry.revisionId == null || entry.sourceDocumentId == null) continue;
-    const entries = entriesByRevision.get(entry.revisionId) ?? [];
-    entries.push({
-      id: entry.id,
-      ledgerId: entry.ledgerId,
-      categoryId: entry.categoryId,
-      sourceDocumentId: entry.sourceDocumentId,
-      amount: entry.amount,
-      currency: entry.currency ?? "CNY",
-      itemName: entry.itemName,
-      description: entry.description,
-      convertedAmount: entry.convertedAmount,
-      exchangeRate: entry.exchangeRate,
-      createdAt: entry.createdAt.toISOString(),
-      updatedAt: entry.updatedAt.toISOString(),
-      deletedAt: entry.deletedAt?.toISOString() ?? null,
-      category:
-        entry.category == null
-          ? null
-          : {
-              ...entry.category,
-              createdAt: entry.category.createdAt.toISOString(),
-              updatedAt: entry.category.updatedAt.toISOString(),
-              deletedAt: entry.category.deletedAt?.toISOString() ?? null,
-            },
-    });
-    entriesByRevision.set(entry.revisionId, entries);
-  }
-
-  const activeEntries =
-    baseRow.activeRevisionId == null ? [] : (entriesByRevision.get(baseRow.activeRevisionId) ?? []);
+          .orderBy(asc(ledgerEntries.position), asc(ledgerEntries.id));
+  const activeEntries: SourceDocumentLedgerEntryAggregateRow[] = entryRows.map((entry) => ({
+    id: entry.id,
+    ledgerId: entry.ledgerId,
+    categoryId: entry.categoryId,
+    sourceDocumentId,
+    amount: entry.amount,
+    currency: entry.currency,
+    itemName: entry.itemName,
+    description: entry.description,
+    convertedAmount: entry.convertedAmount,
+    exchangeRate: entry.exchangeRate,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+    deletedAt: entry.deletedAt?.toISOString() ?? null,
+    category:
+      entry.category == null
+        ? null
+        : {
+            ...entry.category,
+            createdAt: entry.category.createdAt.toISOString(),
+            updatedAt: entry.category.updatedAt.toISOString(),
+            deletedAt: entry.category.deletedAt?.toISOString() ?? null,
+          },
+  }));
   const hydration: SourceDocumentHydrationRow = {
-    documentId: baseRow.documentId,
-    selectedRevisionId: baseRow.selectedRevisionId,
-    activeRevisionId: baseRow.activeRevisionId,
+    mainCurrency: baseRow.mainCurrency,
     revisionTitle: baseRow.revisionTitle,
     inputText: baseRow.inputText,
     processingStatus: baseRow.latestSubmissionStatus,
@@ -180,18 +163,8 @@ async function loadSourceDocumentDetailSnapshot(
     hasImages: fileRows.length > 0,
     files: fileRows,
     ledgerEntries: activeEntries,
-    activeResultSummary:
-      baseRow.activeRevisionId != null
-        ? {
-            entryCount: activeEntries.length,
-            total: activeEntries.reduce(
-              (sum, entry) => decimalAdd(sum, entry.convertedAmount ?? entry.amount),
-              "0"
-            ),
-          }
-        : null,
   };
-  return { row: baseRow as SourceDocumentRow, hydration };
+  return { row: baseRow, hydration };
 }
 
 export async function listTargetSourceDocuments(input: TargetSourceDocumentListInput) {
@@ -201,11 +174,7 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
   const rows = await db
     .select({
       ...getTableColumns(sourceDocuments),
-      documentId: sourceDocuments.id,
-      selectedRevisionId: sourceDocumentRevisions.id,
-      selectedActiveRevisionId: sourceDocuments.activeRevisionId,
       revisionTitle: sourceDocumentRevisions.title,
-      inputText: sourceDocumentRevisions.inputText,
       latestSubmissionStatus: sourceDocumentRevisions.processingStatus,
       failureKind: sourceDocumentRevisions.failureKind,
       failureMessage: sourceDocumentRevisions.failureMessage,
@@ -242,24 +211,17 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
   const last = pageRows.at(-1);
   return {
     items: pageRows.map((row) => {
-      const hydration: SourceDocumentHydrationRow = {
-        documentId: row.documentId,
-        selectedRevisionId: row.selectedRevisionId,
-        activeRevisionId: row.selectedActiveRevisionId,
+      const hydration: SourceDocumentListHydrationRow = {
         revisionTitle: row.revisionTitle,
-        inputText: row.inputText,
         processingStatus: row.latestSubmissionStatus,
         failureKind: row.failureKind,
         failureMessage: row.failureMessage,
         failureCode: row.failureCode,
         hasImages: row.hasImages,
-        files: [],
-        ledgerEntries: [],
-        activeResultSummary: null,
       };
-      return mapListItem(row as SourceDocumentRow, hydration);
+      return mapListItem(row, hydration);
     }),
-    nextCursor: hasMore && last != null ? encodeCursor(last as SourceDocumentRow) : null,
+    nextCursor: hasMore && last != null ? encodeCursor(last) : null,
   };
 }
 

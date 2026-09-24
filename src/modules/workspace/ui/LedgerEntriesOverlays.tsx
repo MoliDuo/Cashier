@@ -1,7 +1,7 @@
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import type { LedgerEntriesDeleteConfirmState } from "./useLedgerEntriesTabState";
 import dynamic from "next/dynamic";
 
@@ -22,7 +22,7 @@ interface LedgerEntriesOverlaysProps {
   onDeleteConfirmOpenChange: (open: boolean) => void;
   onDeleteConfirm: () => void;
   deleteLabel: string;
-  retrySourceDocument: SourceDocument | null;
+  retrySourceDocument: SourceDocumentListItemDto | null;
   onRetryDialogOpenChange: (open: boolean) => void;
   ledgerId: string;
 }

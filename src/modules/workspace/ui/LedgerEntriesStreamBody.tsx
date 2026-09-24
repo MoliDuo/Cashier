@@ -1,6 +1,6 @@
 "use client";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,13 @@ interface LedgerEntriesStreamBodyProps {
   filters: EntryFilters;
   onViewLedgerEntry: (entry: LedgerEntry) => void;
   onViewSourceDetail: (group: {
-    sourceDocument: SourceDocument;
+    sourceDocument: SourceDocumentListItemDto;
     ledgerEntries: LedgerEntry[];
   }) => void;
-  onViewSourceDetailIntent?: (doc: SourceDocument) => void;
-  onEditRetry: (doc: SourceDocument) => void;
+  onViewSourceDetailIntent?: (doc: SourceDocumentListItemDto) => void;
+  onEditRetry: (doc: SourceDocumentListItemDto) => void;
   onEditRetryIntent?: () => void;
-  onDeleteSourceConfirm: (doc: SourceDocument) => void;
+  onDeleteSourceConfirm: (doc: SourceDocumentListItemDto) => void;
   isSelectionMode: boolean;
   selectedIds: string[];
   disableUnselected: boolean;

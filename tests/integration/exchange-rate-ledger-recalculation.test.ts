@@ -15,7 +15,6 @@ import {
 } from "@/persistence";
 import {
   drainDueExchangeRateRecalculations,
-  MAX_CONCURRENT_LEDGERS,
   runBoundedExchangeRateRecalculation,
 } from "@/application/orchestration/exchange-rate-ledger-recalculation";
 import {
@@ -541,7 +540,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
     expect(await db.query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) })).toBeDefined();
   });
 
-  it("bounds recalculation concurrency and covers all ledgers", async () => {
+  it("processes claimed recalculations sequentially without dropping jobs", async () => {
     const eventDate = "2026-04-01";
     const ledgerIds = await Promise.all(
       Array.from({ length: 7 }, () => seedLedgerWithEntry({ entryDate: eventDate }))
@@ -569,7 +568,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       },
       { timeout: 5_000 }
     );
-    expect(maxActive).toBeLessThanOrEqual(MAX_CONCURRENT_LEDGERS);
+    expect(maxActive).toBe(1);
 
     release();
     await pending;

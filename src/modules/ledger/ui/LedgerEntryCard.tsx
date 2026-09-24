@@ -1,5 +1,4 @@
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import { Badge } from "@/components/ui/badge";
 import { EntryCardShell } from "@/components/entry-card-shell";
 import { SelectableCardSurface } from "@/components/selectable-card-surface";
 import { CategoryIcon } from "@/components/CategoryIcon";
@@ -106,12 +105,6 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
                           </span>
                         )}
                       </div>
-                    )}
-
-                    {(ledgerEntry.currency == null || ledgerEntry.currency === "") && (
-                      <Badge variant="warning" className="text-micro px-1 h-5">
-                        {t("needsCurrency")}
-                      </Badge>
                     )}
                   </div>
                 </div>

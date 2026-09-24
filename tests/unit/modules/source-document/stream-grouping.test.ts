@@ -43,7 +43,7 @@ function makeEntry(
     id: "entry-1",
     ledgerId: "ledger-1",
     categoryId: null,
-    sourceDocumentId: null,
+    sourceDocumentId: "document-1",
     amount: "10.00",
     currency: "CNY",
     itemName: "Test",

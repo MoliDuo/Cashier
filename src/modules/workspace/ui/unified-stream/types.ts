@@ -1,5 +1,5 @@
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import type { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
 
@@ -8,13 +8,13 @@ export interface UnifiedStreamGroupProps {
   mainCurrency: string;
   onViewLedgerEntry?: (entry: LedgerEntry) => void;
   onViewSourceDetail: (group: {
-    sourceDocument: SourceDocument;
+    sourceDocument: SourceDocumentListItemDto;
     ledgerEntries: LedgerEntry[];
   }) => void;
-  onViewSourceDetailIntent?: (doc: SourceDocument) => void;
-  onEditRetry?: (doc: SourceDocument) => void;
+  onViewSourceDetailIntent?: (doc: SourceDocumentListItemDto) => void;
+  onEditRetry?: (doc: SourceDocumentListItemDto) => void;
   onEditRetryIntent?: () => void;
-  onDeleteSourceConfirm: (doc: SourceDocument) => void;
+  onDeleteSourceConfirm: (doc: SourceDocumentListItemDto) => void;
   isSelectionMode: boolean;
   selectedIds: string[];
   disableUnselected?: boolean;

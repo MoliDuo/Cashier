@@ -75,36 +75,6 @@ function mapDocument(
   };
 }
 
-async function latestSubmissionStatuses(rows: readonly (typeof sourceDocuments.$inferSelect)[]) {
-  const result = new Map<string, RevisionProcessingStatus>();
-  const latestSubmissionRevisionIds = rows.flatMap((row) =>
-    row.latestSubmissionRevisionId == null ? [] : [row.latestSubmissionRevisionId]
-  );
-  if (latestSubmissionRevisionIds.length === 0) return result;
-
-  const revisions = await db
-    .select({
-      id: sourceDocumentRevisions.id,
-      sourceDocumentId: sourceDocumentRevisions.sourceDocumentId,
-      processingStatus: sourceDocumentRevisions.processingStatus,
-    })
-    .from(sourceDocumentRevisions)
-    .where(inArray(sourceDocumentRevisions.id, latestSubmissionRevisionIds));
-  const expectedRevisionByDocument = new Map(
-    rows.flatMap((row) =>
-      row.latestSubmissionRevisionId == null
-        ? []
-        : [[row.id, row.latestSubmissionRevisionId] as const]
-    )
-  );
-  for (const revision of revisions) {
-    if (expectedRevisionByDocument.get(revision.sourceDocumentId) === revision.id) {
-      result.set(revision.sourceDocumentId, revision.processingStatus as RevisionProcessingStatus);
-    }
-  }
-  return result;
-}
-
 /**
  * Insert the source document a new submission starts, under the locks that
  * make the ledger and the target book's liveness final for this transaction.
@@ -260,15 +230,6 @@ export async function createProcessingRevisionInTransaction(
 }
 
 export const postgresRevisionAdapter: SourceDocumentPort = {
-  async get(ledgerId, id) {
-    const document = await db.query.sourceDocuments.findFirst({
-      where: activeDocumentWhere(ledgerId, id),
-    });
-    if (document == null) return null;
-    const outcomes = await latestSubmissionStatuses([document]);
-    return mapDocument(document, outcomes.get(document.id) ?? null);
-  },
-
   async recordProcessingFailure(input) {
     return db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, input.ledgerId);

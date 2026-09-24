@@ -1,3 +1,4 @@
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import type { ObjectStore } from "@/lib/storage";
 import { eq } from "drizzle-orm";
 import { Pool, type PoolClient } from "pg";
@@ -261,6 +262,7 @@ describe("target source-document submissions", () => {
 
       await expect(
         postgresRevisionAdapter.recordProcessingFailure({
+          lease: await claimRevisionForTest(pending.revision.id),
           ledgerId,
           sourceDocumentId: pending.document.id,
           revisionId: pending.revision.id,
@@ -270,12 +272,16 @@ describe("target source-document submissions", () => {
         })
       ).resolves.toBe(true);
 
-      const document = await postgresRevisionAdapter.get(ledgerId, pending.document.id);
+      const document = await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, pending.document.id),
+      });
       expect(document).toMatchObject({
         activeRevisionId: null,
         latestSubmissionRevisionId: pending.revision.id,
-        supportedActions: ["retry", "edit_retry", "delete"],
       });
+      expect(
+        (await getTargetSourceDocument(ledgerId, pending.document.id))?.supportedActions
+      ).toEqual(["retry", "edit_retry", "delete"]);
       expect(await db.select().from(ledgerEntries)).toHaveLength(0);
     }
   );
@@ -300,7 +306,9 @@ describe("target source-document submissions", () => {
       inheritInput: false,
       bookId: await testBookId(db, ledgerId),
     });
+    const failedLease = await claimRevisionForTest(failed.revision.id);
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: failedLease,
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       revisionId: failed.revision.id,
@@ -315,6 +323,7 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(anomalous.revision.id),
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       revisionId: anomalous.revision.id,
@@ -324,6 +333,7 @@ describe("target source-document submissions", () => {
 
     expect(
       await postgresLedgerProjectionAdapter.activateRevision({
+        lease: failedLease,
         ledgerId,
         expectedMainCurrency: "CNY",
         sourceDocumentId: active.sourceDocumentId,
@@ -333,6 +343,7 @@ describe("target source-document submissions", () => {
     ).toBe(false);
     expect(
       await postgresRevisionAdapter.recordProcessingFailure({
+        lease: failedLease,
         ledgerId,
         sourceDocumentId: active.sourceDocumentId,
         revisionId: failed.revision.id,
@@ -340,7 +351,9 @@ describe("target source-document submissions", () => {
         failureMessage: "processing failed",
       })
     ).toBe(false);
-    const document = await postgresRevisionAdapter.get(ledgerId, active.sourceDocumentId);
+    const document = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, active.sourceDocumentId),
+    });
     expect(document).toMatchObject({
       activeRevisionId: active.revisionId,
       latestSubmissionRevisionId: anomalous.revision.id,
@@ -361,6 +374,7 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(initial.revision.id),
       ledgerId,
       sourceDocumentId: initial.document.id,
       revisionId: initial.revision.id,
@@ -413,6 +427,7 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(initial.revision.id),
       ledgerId,
       sourceDocumentId: initial.document.id,
       revisionId: initial.revision.id,
@@ -467,6 +482,7 @@ describe("target source-document submissions", () => {
     expect(JSON.stringify(detail)).not.toContain("/api/uploads/");
     expect(JSON.stringify(detail)).not.toContain("storageKey");
     await postgresRevisionAdapter.recordProcessingFailure({
+      lease: await claimRevisionForTest(submitted.revision.id),
       ledgerId,
       sourceDocumentId: submitted.document.id,
       revisionId: submitted.revision.id,

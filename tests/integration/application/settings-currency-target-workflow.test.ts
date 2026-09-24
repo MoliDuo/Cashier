@@ -1,3 +1,4 @@
+import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -417,6 +418,7 @@ describe("settings concurrency invariants", () => {
         expectedMainCurrency: "CNY",
         sourceDocumentId,
         revisionId,
+        lease: await claimRevisionForTest(revisionId),
         entries: [
           {
             categoryId: null,
@@ -563,10 +565,13 @@ describe("settings concurrency invariants", () => {
         });
       });
 
+      const lease = await claimRevisionForTest(revision.id);
+
       // Run main-currency change and activateRevision concurrently.
       const results = await Promise.allSettled([
         updateLedger(TEST_USER_ID, ledgerId, { settings: { mainCurrency: "USD" } }),
         postgresLedgerProjectionAdapter.activateRevision({
+          lease,
           ledgerId,
           expectedMainCurrency: "CNY",
           sourceDocumentId,
