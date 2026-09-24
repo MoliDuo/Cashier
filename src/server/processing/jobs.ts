@@ -11,7 +11,9 @@ import { db } from "@/lib/db";
 import { processingOutbox } from "@/persistence";
 import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 
-const DEFAULT_LEASE_MS = 5 * 60 * 1000;
+// Renewed every 15 seconds while the worker runs, so the length only decides how
+// soon a job whose function was killed can be claimed again.
+const DEFAULT_LEASE_MS = 60 * 1000;
 
 /** Overrides for the lease length and the clock; tests use them to walk expiry. */
 export interface ProcessingJobClock {
@@ -25,7 +27,6 @@ function mapJob(row: typeof processingOutbox.$inferSelect): ProcessingJobContrac
     sourceDocumentId: row.sourceDocumentId,
     revisionId: row.revisionId,
     requestedAt: row.requestedAt.toISOString(),
-    attemptNumber: row.attemptNumber,
   };
 }
 
@@ -41,14 +42,11 @@ export async function claimProcessingJob(
       WITH candidate AS (
         SELECT id FROM processing_outbox
         WHERE id = ${jobId}
-          AND available_at <= ${now}
           AND (status = 'pending' OR (status = 'claimed' AND claim_expires_at <= ${now}))
-        ORDER BY available_at, created_at
         FOR UPDATE SKIP LOCKED
-        LIMIT 1
       )
       UPDATE processing_outbox outbox
-      SET status = 'claimed', started_at = COALESCE(outbox.started_at, now()), claim_token = ${claimToken}, claimed_at = ${now},
+      SET status = 'claimed', started_at = COALESCE(outbox.started_at, now()), claim_token = ${claimToken},
           claim_expires_at = ${expiresAt}
       FROM candidate WHERE outbox.id = candidate.id
       RETURNING outbox.*
@@ -62,7 +60,6 @@ export async function claimProcessingJob(
             ledgerId: raw.ledger_id,
             sourceDocumentId: raw.source_document_id,
             revisionId: raw.revision_id,
-            attemptNumber: raw.attempt_number,
             requestedAt: new Date(raw.requested_at as string | Date),
           } as typeof processingOutbox.$inferSelect);
     if (row == null) return null;
@@ -89,7 +86,7 @@ export async function recoverProcessingJobs(
 
     await tx.execute(sql`
       WITH candidate AS (
-        SELECT outbox.id, outbox.revision_id, outbox.attempt_number,
+        SELECT outbox.id, outbox.revision_id,
           CASE
             WHEN document.deleted_at IS NOT NULL
               OR document.latest_submission_revision_id IS DISTINCT FROM outbox.revision_id
@@ -122,14 +119,14 @@ export async function recoverProcessingJobs(
         FROM candidate
         WHERE outbox.id = candidate.id
           AND outbox.status IN ('pending', 'claimed')
-        RETURNING candidate.revision_id, candidate.attempt_number
+        RETURNING candidate.revision_id
       )
       SELECT count(*) FROM closed
     `);
 
     await tx.execute(sql`
       WITH candidate AS (
-        SELECT outbox.id, outbox.revision_id, outbox.attempt_number
+        SELECT outbox.id, outbox.revision_id
         FROM processing_outbox outbox
         JOIN source_documents document
           ON document.ledger_id = outbox.ledger_id
@@ -152,10 +149,10 @@ export async function recoverProcessingJobs(
         LIMIT ${config.maxBatch}
       ), closed AS (
         UPDATE processing_outbox outbox
-        SET status = 'failed', retry_classification = 'permanent', diagnostic_code = 'request_bound_retry_exhausted', completed_at = ${now}, claim_token = NULL, claim_expires_at = NULL
+        SET status = 'failed', diagnostic_code = 'request_bound_retry_exhausted', completed_at = ${now}, claim_token = NULL, claim_expires_at = NULL
         FROM candidate
         WHERE outbox.id = candidate.id
-        RETURNING candidate.revision_id, candidate.attempt_number
+        RETURNING candidate.revision_id
       ), updated_revisions AS (
         UPDATE source_document_revisions revision
         SET processing_status = 'failed', failure_kind = 'processing_error',
@@ -173,7 +170,6 @@ export async function recoverProcessingJobs(
       sourceDocumentId: string;
       revisionId: string;
       requestedAt: Date | string;
-      attemptNumber: number;
       scheduleAttemptCount: number;
       nextAvailableAt: Date | string;
     }>(sql`
@@ -202,14 +198,13 @@ export async function recoverProcessingJobs(
       )
       UPDATE processing_outbox outbox
       SET schedule_attempt_count = outbox.schedule_attempt_count + 1,
-          last_scheduled_at = ${now}, next_available_at = ${nextAvailable}
+          next_available_at = ${nextAvailable}
       FROM candidate
       WHERE outbox.id = candidate.id
       RETURNING outbox.id,
         outbox.source_document_id AS "sourceDocumentId",
         outbox.revision_id AS "revisionId",
         outbox.requested_at AS "requestedAt",
-        outbox.attempt_number AS "attemptNumber",
         outbox.schedule_attempt_count AS "scheduleAttemptCount",
         outbox.next_available_at AS "nextAvailableAt"
     `);
@@ -252,32 +247,21 @@ export async function completeProcessingJob(
   result: ProcessingCompletionContract,
   clock: ProcessingJobClock = {}
 ): Promise<boolean> {
-  const now = clock.now?.() ?? new Date();
-  return db.transaction(async (tx) => {
-    const row = await tx
-      .update(processingOutbox)
-      .set({
-        status: result.processingStatus === "failed" ? "failed" : "completed",
-        retryClassification: result.processingStatus === "failed" ? "retryable" : null,
-        diagnosticCode: result.diagnostic?.code ?? null,
-        correlationId: result.diagnostic?.correlationId ?? null,
-        completedAt: now,
-        claimToken: null,
-        claimExpiresAt: null,
-      })
-      .where(
-        and(
-          eq(processingOutbox.id, result.jobId),
-          eq(processingOutbox.status, "claimed"),
-          eq(processingOutbox.claimToken, result.claimToken)
-        )
+  const completed = await db
+    .update(processingOutbox)
+    .set({
+      status: result.processingStatus === "failed" ? "failed" : "completed",
+      completedAt: clock.now?.() ?? new Date(),
+      claimToken: null,
+      claimExpiresAt: null,
+    })
+    .where(
+      and(
+        eq(processingOutbox.id, result.jobId),
+        eq(processingOutbox.status, "claimed"),
+        eq(processingOutbox.claimToken, result.claimToken)
       )
-      .returning({
-        revisionId: processingOutbox.revisionId,
-        attemptNumber: processingOutbox.attemptNumber,
-      })
-      .then((rows) => rows[0]);
-    if (row == null) return false;
-    return true;
-  });
+    )
+    .returning({ id: processingOutbox.id });
+  return completed.length === 1;
 }

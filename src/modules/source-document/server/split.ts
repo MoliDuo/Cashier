@@ -56,7 +56,7 @@ export async function splitSourceDocumentAtomically(input: {
   const requestId = crypto.randomUUID();
   const [ledger, document] = await Promise.all([
     db.query.ledgers.findFirst({
-      where: and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)),
+      where: eq(ledgers.id, input.ledgerId),
       columns: { mainCurrency: true },
     }),
     db.query.sourceDocuments.findFirst({
@@ -167,7 +167,6 @@ export async function splitSourceDocumentAtomically(input: {
     const splitRevision = await createManualRevision(tx, {
       ledgerId: input.ledgerId,
       sourceDocumentId: splitSourceDocumentId,
-      origin: "manual_entry",
       inputText: activeRevision.inputText,
     });
     await copyRevisionFiles(tx, {

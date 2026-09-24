@@ -53,7 +53,7 @@ async function fetchAggregatedRows(
       AND entries.source_document_id = documents.id
       AND entries.source_document_revision_id = documents.active_revision_id
       AND entries.deleted_at IS NULL
-    JOIN ledgers ON ledgers.id = documents.ledger_id AND ledgers.deleted_at IS NULL
+    JOIN ledgers ON ledgers.id = documents.ledger_id
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
       AND categories.ledger_id = entries.ledger_id
@@ -62,7 +62,7 @@ async function fetchAggregatedRows(
       categories.name, categories.icon, ledgers.main_currency
     UNION ALL
     SELECT 'current', NULL, NULL, NULL, NULL, NULL, NULL, 0, main_currency, 0
-    FROM ledgers WHERE id = ${ledgerId} AND deleted_at IS NULL
+    FROM ledgers WHERE id = ${ledgerId}
   `);
   return result.rows.map((row) => ({
     ...row,

@@ -158,7 +158,7 @@ describe("demo workspace fixture", () => {
       (document) => document.retainedResult?.entries ?? document.entries
     );
 
-    expect(documents).toHaveLength(29);
+    expect(documents).toHaveLength(28);
     expect(entries).toHaveLength(26);
     // Three books, every document in one of them: the switcher and the
     // per-book totals both need all three represented, and an orphaned record
@@ -192,7 +192,7 @@ describe("demo workspace fixture", () => {
       retainedResult?: { entries: unknown[] };
     }>;
 
-    expect(failed).toHaveLength(13);
+    expect(failed).toHaveLength(12);
     expect(
       new Set(
         failed
@@ -213,7 +213,6 @@ describe("demo workspace fixture", () => {
         "exchange_rate_failure",
         "storage_failure",
         "processing_unavailable",
-        "database_unavailable",
         "request_bound_retry_exhausted",
         "processing_timeout",
       ])

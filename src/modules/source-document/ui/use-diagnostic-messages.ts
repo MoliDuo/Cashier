@@ -18,8 +18,6 @@ export function useDiagnosticMessages() {
         return t("storage_failure");
       case "processing_unavailable":
         return t("processing_unavailable");
-      case "database_unavailable":
-        return t("database_unavailable");
       case "request_bound_retry_exhausted":
         return t("request_bound_retry_exhausted");
       case "processing_timeout":
@@ -39,8 +37,6 @@ export function useDiagnosticMessages() {
         return t("storage_failure_desc");
       case "processing_unavailable":
         return t("processing_unavailable_desc");
-      case "database_unavailable":
-        return t("database_unavailable_desc");
       case "request_bound_retry_exhausted":
         return t("request_bound_retry_exhausted_desc");
       case "processing_timeout":

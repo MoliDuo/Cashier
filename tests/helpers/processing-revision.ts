@@ -29,7 +29,6 @@ export async function claimRevisionForTest(revisionId: string) {
       sourceDocumentId: revision.sourceDocumentId,
       revisionId,
       requestedAt: new Date().toISOString(),
-      attemptNumber: 1,
     });
     job = await db.query.processingOutbox.findFirst({ where: eq(processingOutbox.id, id) });
   }

@@ -10,7 +10,6 @@ import {
 import { sourceDocuments } from "./schema/source-document";
 
 export const usersRelations = relations(users, ({ many }) => ({
-  ledgers: many(ledgers),
   loginEmails: many(loginEmails),
 }));
 
@@ -30,11 +29,7 @@ export const booksRelations = relations(books, ({ one, many }) => ({
   serviceCredentials: many(serviceCredentials),
 }));
 
-export const ledgersRelations = relations(ledgers, ({ one, many }) => ({
-  user: one(users, {
-    fields: [ledgers.userId],
-    references: [users.id],
-  }),
+export const ledgersRelations = relations(ledgers, ({ many }) => ({
   books: many(books),
   ledgerEntries: many(ledgerEntries),
   sourceDocuments: many(sourceDocuments),

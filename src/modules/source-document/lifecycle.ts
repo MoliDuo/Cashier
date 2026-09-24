@@ -39,38 +39,17 @@ export const PROCESSING_FAILURE_CODES = [
   "exchange_rate_failure",
   "storage_failure",
   "processing_unavailable",
-  "database_unavailable",
   "request_bound_retry_exhausted",
   "processing_timeout",
 ] as const;
 export type ProcessingFailureCode = (typeof PROCESSING_FAILURE_CODES)[number];
 
 /**
- * Map a legacy or unknown failure code to a stable ProcessingFailureCode.
- * Unknown values are mapped to "processing_unavailable" without discarding
- * the original stored value in the database.
+ * The public code for a stored processing failure. Anything outside the stable
+ * set, including a missing code, is reported as "processing_unavailable".
  */
-export function toStableFailureCode(legacyCode: string | null | undefined): ProcessingFailureCode {
-  if (legacyCode == null) return "processing_unavailable";
-
-  // Direct matches for known stable codes
-  if ((PROCESSING_FAILURE_CODES as readonly string[]).includes(legacyCode)) {
-    return legacyCode as ProcessingFailureCode;
-  }
-
-  // Map legacy ApplicationErrorCode values to stable codes
-  switch (legacyCode) {
-    case "INTERNAL":
-    case "VALIDATION_FAILED":
-      return "ai_schema_invalid";
-    case "RATE_LIMITED":
-      return "ai_provider_unavailable";
-    case "STORAGE_UNAVAILABLE":
-      return "storage_failure";
-    case "NOT_FOUND":
-    case "CONFLICT":
-      return "database_unavailable";
-    default:
-      return "processing_unavailable";
-  }
+export function toStableFailureCode(code: string | null | undefined): ProcessingFailureCode {
+  return (PROCESSING_FAILURE_CODES as readonly string[]).includes(code ?? "")
+    ? (code as ProcessingFailureCode)
+    : "processing_unavailable";
 }

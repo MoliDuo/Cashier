@@ -45,7 +45,6 @@ async function pendingIntent(
       sourceDocumentId: pending.document.id,
       revisionId: pending.revision.id,
       requestedAt,
-      attemptNumber: 1,
     },
   };
 }

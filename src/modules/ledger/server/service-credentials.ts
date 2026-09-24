@@ -75,7 +75,7 @@ export async function authenticateServiceCredential(
       lastUsedAt: serviceCredentials.lastUsedAt,
     })
     .from(serviceCredentials)
-    .innerJoin(ledgers, and(eq(ledgers.id, serviceCredentials.ledgerId), isNull(ledgers.deletedAt)))
+    .innerJoin(ledgers, eq(ledgers.id, serviceCredentials.ledgerId))
     // An archived book stops accepting uploads through its keys; the key
     // itself is untouched and starts working again if the book is restored.
     .innerJoin(books, and(eq(books.id, serviceCredentials.bookId), isNull(books.archivedAt)))

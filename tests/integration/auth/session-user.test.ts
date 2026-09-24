@@ -29,24 +29,6 @@ describe("getSessionUser", () => {
     });
   });
 
-  it("rejects when user is soft deleted", async () => {
-    const db = getTestDb();
-    const userId = crypto.randomUUID();
-
-    await db.insert(users).values({
-      id: userId,
-      deletedAt: new Date(),
-    });
-    await db.insert(loginEmails).values({
-      userId: userId,
-      email: "session-deleted@example.com",
-      emailVerified: new Date(),
-    });
-
-    await expect(getSessionUser(userId)).rejects.toThrow(UnauthorizedError);
-    await expect(getSessionUser(userId)).rejects.toThrow("User not found in database");
-  });
-
   it("rejects when user does not exist", async () => {
     const db = getTestDb();
     const userId = crypto.randomUUID();

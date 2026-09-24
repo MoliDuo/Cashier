@@ -67,7 +67,7 @@ export async function applyDateOrganization(
 ): Promise<VersionedCommandResult<ApplyDateOrganizationResultDto>> {
   const [ledger, document] = await Promise.all([
     db.query.ledgers.findFirst({
-      where: and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)),
+      where: eq(ledgers.id, input.ledgerId),
       columns: { mainCurrency: true },
     }),
     db.query.sourceDocuments.findFirst({
@@ -200,7 +200,6 @@ export async function applyDateOrganization(
       const revision = await createManualRevision(tx, {
         ledgerId: input.ledgerId,
         sourceDocumentId: id,
-        origin: "manual_entry",
         inputText: activeRevision.inputText,
       });
       await copyRevisionFiles(tx, {

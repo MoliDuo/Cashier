@@ -24,11 +24,7 @@ export async function lockLedgerForUpdate(
   tx: PostgresTransaction,
   ledgerId: string
 ): Promise<typeof ledgers.$inferSelect> {
-  const rows = await tx
-    .select()
-    .from(ledgers)
-    .where(and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)))
-    .for("update");
+  const rows = await tx.select().from(ledgers).where(eq(ledgers.id, ledgerId)).for("update");
 
   if (rows.length === 0) {
     throw new NotFoundError("Ledger");

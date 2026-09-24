@@ -139,7 +139,7 @@ async function prepareDateReestimate(
   changedDateIds: ReadonlySet<string>
 ): Promise<DateReestimatePlan> {
   const ledger = await db.query.ledgers.findFirst({
-    where: and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)),
+    where: eq(ledgers.id, ledgerId),
     columns: { mainCurrency: true },
   });
   if (ledger == null) throw new ConflictError("Ledger changed before the date update");
@@ -199,7 +199,7 @@ export async function saveSourceDocumentChanges(
 > {
   const [ledger, document, initialEntries] = await Promise.all([
     db.query.ledgers.findFirst({
-      where: and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)),
+      where: eq(ledgers.id, input.ledgerId),
       columns: { mainCurrency: true },
     }),
     db.query.sourceDocuments.findFirst({

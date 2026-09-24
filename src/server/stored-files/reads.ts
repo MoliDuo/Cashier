@@ -16,7 +16,7 @@ function authorizedFileQuery() {
   return db
     .select({ file: storedFiles })
     .from(storedFiles)
-    .innerJoin(ledgers, and(eq(ledgers.id, storedFiles.ledgerId), isNull(ledgers.deletedAt)))
+    .innerJoin(ledgers, eq(ledgers.id, storedFiles.ledgerId))
     .innerJoin(
       revisionFiles,
       and(

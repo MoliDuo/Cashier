@@ -393,6 +393,13 @@
       "when": 1790223763596,
       "tag": "0055_retire_revision_number_allocation",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790223763597,
+      "tag": "0056_prepare_retired_column_drop",
+      "breakpoints": true
     }
   ]
 }

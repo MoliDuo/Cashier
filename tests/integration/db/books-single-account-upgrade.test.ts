@@ -841,16 +841,10 @@ describe("published migration chain upgrade to one account with books", () => {
         );
 
         // 0048: the two members become one account with two login addresses.
+        // 0056 then removes the account the couple had already retired.
         const upgradedUsers = await readUpgradedUsers(data);
-        expect(upgradedUsers).toHaveLength(2);
-        const upgradedOwner = firstRow(
-          upgradedUsers.filter((row) => row.id === fixture.ownerId),
-          "upgraded owner"
-        );
-        const upgradedRetired = firstRow(
-          upgradedUsers.filter((row) => row.id === fixture.retiredId),
-          "upgraded retired account"
-        );
+        expect(upgradedUsers).toHaveLength(1);
+        const upgradedOwner = firstRow(upgradedUsers, "upgraded owner");
         // The owner keeps everything but the per-person columns, and is signed
         // out once; the partner's row is gone.
         expect(upgradedOwner).toEqual({
@@ -861,15 +855,6 @@ describe("published migration chain upgrade to one account with books", () => {
           created_at: legacyOwner.created_at,
           updated_at: legacyOwner.updated_at,
           deleted_at: null,
-        });
-        expect(upgradedRetired).toEqual({
-          id: fixture.retiredId,
-          name: "Fixture Retired",
-          password_hash: "fixture-retired-password-hash",
-          auth_version: 1,
-          created_at: "2025-12-01 00:00:00+00",
-          updated_at: "2025-12-02 00:00:00+00",
-          deleted_at: "2026-05-05 00:00:00+00",
         });
 
         // Both addresses point at the account that survives, and each keeps its
@@ -945,15 +930,13 @@ describe("published migration chain upgrade to one account with books", () => {
           ])
         ).toBe(0);
 
-        // The old ledger cap is handed over before the partner row goes, so
-        // neither ledger is cascaded away and the retired one stays retired.
+        // The old ledger cap is handed over before the partner row goes, so the
+        // live ledger is not cascaded away; 0056 removes the retired one.
         const upgradedLedgers = await readLedgers(data);
         expect(upgradedLedgers).toEqual(
-          legacyState.ledgers.map((row) => ({ ...row, user_id: fixture.ownerId }))
-        );
-        expect(upgradedLedgers.filter((row) => row.deleted_at === null)).toHaveLength(1);
-        expect(upgradedLedgers.filter((row) => row.id === fixture.historicalLedgerId)).toHaveLength(
-          1
+          legacyState.ledgers
+            .filter((row) => row.id === fixture.liveLedgerId)
+            .map((row) => ({ ...row, user_id: fixture.ownerId }))
         );
 
         // Records: the same rows, the same person, nothing lost or duplicated.

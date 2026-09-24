@@ -10,16 +10,14 @@ export async function completeProcessingLeaseInTransaction(
   tx: PostgresTransaction,
   lease: ProcessingLeaseContract,
   processingStatus: ProcessingTerminalStatus,
-  diagnostic?: { code?: string | null; correlationId?: string | null }
+  diagnostic?: { code?: string | null }
 ): Promise<boolean> {
   const now = new Date();
-  const row = await tx
+  const closed = await tx
     .update(processingOutbox)
     .set({
       status: processingStatus,
-      retryClassification: processingStatus === "failed" ? "retryable" : null,
       diagnosticCode: diagnostic?.code ?? null,
-      correlationId: diagnostic?.correlationId ?? null,
       completedAt: now,
       claimToken: null,
       claimExpiresAt: null,
@@ -32,12 +30,6 @@ export async function completeProcessingLeaseInTransaction(
         sql`${processingOutbox.claimExpiresAt} > now()`
       )
     )
-    .returning({
-      revisionId: processingOutbox.revisionId,
-      attemptNumber: processingOutbox.attemptNumber,
-    })
-    .then((rows) => rows[0]);
-  if (row == null) return false;
-
-  return true;
+    .returning({ id: processingOutbox.id });
+  return closed.length === 1;
 }

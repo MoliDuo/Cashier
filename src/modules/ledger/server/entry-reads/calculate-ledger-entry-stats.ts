@@ -53,7 +53,7 @@ export async function calculateLedgerEntryStats({
 
   const result = await db.execute<StatsRow & Record<string, unknown>>(sql`
     WITH settings AS (
-      SELECT main_currency FROM ledgers WHERE id = ${ledgerId} AND deleted_at IS NULL
+      SELECT main_currency FROM ledgers WHERE id = ${ledgerId}
     ),
     visible_entries AS (
       SELECT

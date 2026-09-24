@@ -1,6 +1,6 @@
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
@@ -31,7 +31,6 @@ async function pendingIntent(
       sourceDocumentId: pending.document.id,
       revisionId: pending.revision.id,
       requestedAt,
-      attemptNumber: 1,
     },
   };
 }
@@ -94,7 +93,6 @@ describe("Processing Recovery", () => {
       where: eq(processingOutbox.id, job.id),
     });
     expect(row?.scheduleAttemptCount).toBe(1);
-    expect(row?.lastScheduledAt).not.toBeNull();
     expect(new Date(row!.nextAvailableAt).getTime()).toBeGreaterThan(Date.now());
   });
 
@@ -250,7 +248,6 @@ describe("Processing Recovery", () => {
     expect(revisionRow?.failureCode).toBe("request_bound_retry_exhausted");
 
     // Diagnostics live on the same durable job.
-    expect(outboxRow?.retryClassification).toBe("permanent");
     expect(outboxRow?.diagnosticCode).toBe("request_bound_retry_exhausted");
   });
 
@@ -280,14 +277,12 @@ describe("Processing Recovery", () => {
       sourceDocumentId: pending2.document.id,
       revisionId: pending2.revision.id,
       requestedAt: "2026-07-15T00:00:00.000Z",
-      attemptNumber: 1,
     };
     const intent3: ProcessingJobContract = {
       id: crypto.randomUUID(),
       sourceDocumentId: pending3.document.id,
       revisionId: pending3.revision.id,
       requestedAt: "2026-07-15T00:00:00.000Z",
-      attemptNumber: 1,
     };
 
     await adapter.dispatch(intent2);
@@ -384,7 +379,6 @@ describe("Processing Recovery", () => {
     expect(revisionRow?.failureCode).toBe("request_bound_retry_exhausted");
 
     // Diagnostics live on the same durable job.
-    expect(outboxRow?.retryClassification).toBe("permanent");
   });
 
   it("exhaustion CAS: does not modify completed revision's outcome", async () => {
@@ -495,24 +489,17 @@ describe("Processing retry supersession", () => {
       bookId: await testBookId(db, ledgerId),
     });
 
-    const [document, oldRevision, oldOutbox, oldAttempt] = await Promise.all([
+    const [document, oldRevision, oldOutbox] = await Promise.all([
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, first.document.id) }),
       db.query.sourceDocumentRevisions.findFirst({
         where: eq(sourceDocumentRevisions.id, first.revision.id),
       }),
       db.query.processingOutbox.findFirst({ where: eq(processingOutbox.id, first.job.id) }),
-      db.query.processingOutbox.findFirst({
-        where: and(
-          eq(processingOutbox.revisionId, first.revision.id),
-          eq(processingOutbox.attemptNumber, 1)
-        ),
-      }),
     ]);
 
     expect(document?.latestSubmissionRevisionId).toBe(second.revision.id);
     expect(oldRevision?.processingStatus).toBe("cancelled");
-    expect(oldOutbox?.status).toBe("cancelled");
-    expect(oldAttempt).toMatchObject({
+    expect(oldOutbox).toMatchObject({
       status: "cancelled",
       diagnosticCode: "superseded_by_retry",
     });

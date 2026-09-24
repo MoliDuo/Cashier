@@ -12,8 +12,6 @@
     "storage_failure_desc": "保存数据时发生存储错误。请重试。",
     "processing_unavailable": "处理不可用",
     "processing_unavailable_desc": "解析服务暂时不可用。请稍后重试。",
-    "database_unavailable": "数据库不可用",
-    "database_unavailable_desc": "数据库发生错误。请稍后重试。",
     "request_bound_retry_exhausted": "重试已耗尽",
     "request_bound_retry_exhausted_desc": "所有自动重试尝试已耗尽。请尝试手动修正或重新处理。",
     "processing_timeout": "处理超时",

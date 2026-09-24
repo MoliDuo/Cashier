@@ -108,7 +108,9 @@ snapshots once. Runtime maintenance does not repeatedly scan history to recreate
 ## Simplified persistence
 
 Processing leases, scheduling state, timestamps, and diagnostic fields live in processing_outbox.
-There is no second attempts table to synchronize. Historical terminal diagnostics are migrated into
+A processing lease lasts 60 seconds and the worker renews it every 15 seconds, so a job whose
+function was killed can be claimed again within a minute. There is no second attempts table to
+synchronize. Historical terminal diagnostics are migrated into
 these rows; existing claim tokens and expiry times are preserved.
 
 Manual edits update the active projection and increment the document version without creating a

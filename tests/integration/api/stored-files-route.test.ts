@@ -9,7 +9,6 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
-  users,
 } from "@/persistence";
 import * as authModule from "@/auth";
 import { AppError } from "@/lib/errors";
@@ -99,13 +98,15 @@ describe("GET /api/stored-files/[fileId]", () => {
     expect(body).not.toContain(file.storageKey);
   });
 
-  it("returns 404 for a deleted account without revealing file existence", async () => {
+  it("returns 404 for an unknown account without revealing file existence", async () => {
     const db = getTestDb();
-    const { userId, ledgerId } = await createTestUserWithLedger(db);
+    const { ledgerId } = await createTestUserWithLedger(db);
     const { file } = await createLinkedStoredFile(ledgerId);
-    // There is one account now, so file reads are scoped by "is the account
-    // live", not by which user created the record.
-    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, userId));
+    // There is one account, so file reads are scoped by "does the account
+    // exist", not by which user created the record.
+    vi.spyOn(authModule, "auth").mockResolvedValue({
+      user: { id: crypto.randomUUID() },
+    } as never);
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
 

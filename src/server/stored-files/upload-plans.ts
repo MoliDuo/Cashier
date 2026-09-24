@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
-import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type {
   DirectUploadPlanContract,
   UploadFileRequestContract,
@@ -188,7 +188,7 @@ async function reserveUploadSession(input: CreateUploadSessionInput): Promise<vo
     const ledger = await tx
       .select({ id: ledgers.id })
       .from(ledgers)
-      .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
+      .where(eq(ledgers.id, input.ledgerId))
       .for("update")
       .then((rows) => rows[0]);
     if (ledger == null) throw new NotFoundError("Ledger");

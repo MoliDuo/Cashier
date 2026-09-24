@@ -179,13 +179,12 @@ export async function resetDemoSchema(environment = process.env) {
 }
 
 async function findDemoTarget(client) {
-  // The account has no email column any more: its address is a login_emails row.
+  // The account is found through its login address; the one ledger belongs to it.
   const result = await client.query(
-    `SELECT u.id AS user_id, l.id AS ledger_id
+    `SELECT u.id AS user_id, (SELECT id FROM ledgers ORDER BY created_at, id LIMIT 1) AS ledger_id
        FROM users u
        JOIN login_emails e ON e.user_id = u.id
-       LEFT JOIN ledgers l ON l.user_id = u.id AND l.deleted_at IS NULL
-      WHERE lower(e.email) = $1 AND u.deleted_at IS NULL
+      WHERE lower(e.email) = $1
       LIMIT 1`,
     [fixture.user.email]
   );
@@ -199,11 +198,11 @@ async function inspectDemoTarget(client) {
   }
   const counts = await client.query(
     `SELECT
-       (SELECT count(*)::int FROM ledgers WHERE user_id = $1) AS ledgers,
-       (SELECT count(*)::int FROM source_documents WHERE ledger_id = $2) AS documents,
-       (SELECT count(*)::int FROM ledger_entries WHERE ledger_id = $2) AS entries,
-       (SELECT count(*)::int FROM stored_files WHERE ledger_id = $2) AS files`,
-    [target.user_id, target.ledger_id]
+       (SELECT count(*)::int FROM ledgers) AS ledgers,
+       (SELECT count(*)::int FROM source_documents WHERE ledger_id = $1) AS documents,
+       (SELECT count(*)::int FROM ledger_entries WHERE ledger_id = $1) AS entries,
+       (SELECT count(*)::int FROM stored_files WHERE ledger_id = $1) AS files`,
+    [target.ledger_id]
   );
   const keys =
     target.ledger_id == null
@@ -223,46 +222,24 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   const asOf = anchorDate(environment);
   const now = new Date(`${asOf}T12:00:00.000Z`);
   if (reset) {
-    // The single demo account is removed along with its ledger, so a reset
-    // restores the fixture instead of layering onto whatever the last session
-    // left behind.
-    const emails = [fixture.user.email];
-    // The account is found through its login address: `users.email` is gone.
-    await client.query(
-      `DELETE FROM revision_files
-        WHERE ledger_id IN (
-          SELECT l.id FROM ledgers l
-          JOIN login_emails e ON e.user_id = l.user_id
-          WHERE lower(e.email) = ANY($1::text[])
-        )`,
-      [emails]
-    );
-    await client.query(
-      `DELETE FROM upload_session_files
-        WHERE ledger_id IN (
-          SELECT l.id FROM ledgers l
-          JOIN login_emails e ON e.user_id = l.user_id
-          WHERE lower(e.email) = ANY($1::text[])
-        )`,
-      [emails]
-    );
-    await client.query(
-      `DELETE FROM ledgers WHERE user_id IN
-        (SELECT user_id FROM login_emails WHERE lower(email) = ANY($1::text[]))`,
-      [emails]
-    );
+    // The dedicated demo database holds one account and one ledger. A reset
+    // removes both, so it restores the fixture instead of layering onto
+    // whatever the last session left behind. The file links go first: they
+    // reference stored files without cascading.
+    await client.query("DELETE FROM revision_files");
+    await client.query("DELETE FROM upload_session_files");
+    await client.query("DELETE FROM ledgers");
     await client.query(
       `DELETE FROM users WHERE id IN
-        (SELECT user_id FROM login_emails WHERE lower(email) = ANY($1::text[]))`,
-      [emails]
+        (SELECT user_id FROM login_emails WHERE lower(email) = $1)`,
+      [fixture.user.email]
     );
   }
   await client.query(
-    `INSERT INTO users
-      (id, name, created_at, updated_at)
-     VALUES ($1, $2, $3, $3)
+    `INSERT INTO users (id, created_at, updated_at)
+     VALUES ($1, $2, $2)
      ON CONFLICT (id) DO NOTHING`,
-    [userId, fixture.user.name, now]
+    [userId, now]
   );
   await client.query(
     `INSERT INTO login_emails (user_id, email, email_verified, created_at, updated_at)
@@ -272,12 +249,11 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   );
   await client.query(
     `INSERT INTO ledgers
-      (id, user_id, ai_language, preferred_currencies, main_currency, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $6)
+      (id, ai_language, preferred_currencies, main_currency, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $5)
      ON CONFLICT (id) DO NOTHING`,
     [
       ledgerId,
-      userId,
       fixture.ledger.aiLanguage,
       fixture.ledger.preferredCurrencies,
       fixture.ledger.mainCurrency,
@@ -385,10 +361,9 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     if (document.retainedResult != null) {
       await client.query(
         `INSERT INTO source_document_revisions
-          (id, ledger_id, source_document_id, revision_number, title, origin, input_text,
-           input_document_date, input_date_reference, processing_status, submitted_at, finished_at,
-           created_at)
-         VALUES ($1, $2, $3, 1, $4, 'submission', $5, $6::text, $6::date, 'completed', $7, $7, $7)`,
+          (id, ledger_id, source_document_id, title, input_text, input_document_date,
+           input_date_reference, processing_status, submitted_at, finished_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6::text, $6::date, 'completed', $7, $7, $7)`,
         [
           document.retainedResult.revisionId,
           ledgerId,
@@ -402,17 +377,15 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     }
     await client.query(
       `INSERT INTO source_document_revisions
-        (id, ledger_id, source_document_id, revision_number, title, origin, input_text,
-         input_document_date, input_date_reference, processing_status, failure_kind, failure_code,
-         failure_message, submitted_at, finished_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text, $8::date, $9, $10, $11, $12, $13, $13, $13)`,
+        (id, ledger_id, source_document_id, title, input_text, input_document_date,
+         input_date_reference, processing_status, failure_kind, failure_code, failure_message,
+         submitted_at, finished_at, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6::text, $6::date, $7, $8, $9, $10, $11, $11, $11)`,
       [
         document.revisionId,
         ledgerId,
         document.id,
-        document.retainedResult == null ? 1 : 2,
         document.title,
-        document.type === "manual" ? "manual_entry" : "submission",
         document.inputText,
         documentDate,
         document.status,
@@ -426,9 +399,9 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       const image = imagesByFileId.get(document.image.fileId);
       await client.query(
         `INSERT INTO stored_files
-          (id, ledger_id, storage_provider, storage_key, content_type, byte_size,
-           original_filename, checksum, created_at, finalized_at)
-         VALUES ($1, $2, 's3', $3, 'image/jpeg', $4, $5, $6, $7, $7)`,
+          (id, ledger_id, storage_key, content_type, byte_size, original_filename, checksum,
+           created_at, finalized_at)
+         VALUES ($1, $2, $3, 'image/jpeg', $4, $5, $6, $7, $7)`,
         [
           image.fileId,
           ledgerId,
@@ -487,26 +460,12 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       ]
     );
     if (document.status === "failed") {
-      const invalid = document.failureKind === "invalid_input";
-      const retryClassification = invalid
-        ? "invalid"
-        : document.failureCode === "request_bound_retry_exhausted"
-          ? "permanent"
-          : "retryable";
       await client.query(
         `INSERT INTO processing_outbox
-          (ledger_id, revision_id, attempt_number, status, retry_classification,
-           diagnostic_code, completed_at, created_at, source_document_id, requested_at, available_at, next_available_at)
-         VALUES ($1, $2, 1, $3, $4, $5, $6, $6, $7, $6, $6, $6)`,
-        [
-          ledgerId,
-          document.revisionId,
-          "failed",
-          retryClassification,
-          document.failureCode,
-          createdAt,
-          document.id,
-        ]
+          (ledger_id, revision_id, status, diagnostic_code, completed_at, created_at,
+           source_document_id, requested_at, next_available_at)
+         VALUES ($1, $2, $3, $4, $5, $5, $6, $5, $5)`,
+        [ledgerId, document.revisionId, "failed", document.failureCode, createdAt, document.id]
       );
     }
   }

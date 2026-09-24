@@ -102,16 +102,12 @@ describe("target application contracts", () => {
   });
 
   describe("toStableFailureCode", () => {
-    it("preserves stable codes and maps legacy or unknown failures to public codes", () => {
+    it("preserves stable codes and reports anything else as processing_unavailable", () => {
       const cases = [
         ["ai_provider_unavailable", "ai_provider_unavailable"],
         ["exchange_rate_failure", "exchange_rate_failure"],
-        ["INTERNAL", "ai_schema_invalid"],
-        ["VALIDATION_FAILED", "ai_schema_invalid"],
-        ["RATE_LIMITED", "ai_provider_unavailable"],
-        ["STORAGE_UNAVAILABLE", "storage_failure"],
-        ["NOT_FOUND", "database_unavailable"],
-        ["CONFLICT", "database_unavailable"],
+        ["INTERNAL", "processing_unavailable"],
+        ["database_unavailable", "processing_unavailable"],
         ["SOME_UNKNOWN_CODE", "processing_unavailable"],
         [null, "processing_unavailable"],
       ] as const;

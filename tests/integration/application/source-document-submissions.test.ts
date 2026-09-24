@@ -558,7 +558,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const bookId = await testBookId(db, ledgerId);
-    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, ledgerId));
+    await db.delete(ledgers).where(eq(ledgers.id, ledgerId));
 
     await expect(
       submitSourceDocument({
@@ -629,7 +629,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     const blocker = await pool.connect();
     try {
       const holderXid = await lockLedgerRow(blocker, ledgerId);
-      await blocker.query("UPDATE ledgers SET deleted_at = now() WHERE id = $1", [ledgerId]);
+      await blocker.query("DELETE FROM ledgers WHERE id = $1", [ledgerId]);
       const insert = submitSourceDocument({
         ledgerId,
         bookId,

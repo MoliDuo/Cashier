@@ -109,6 +109,10 @@
     {
       "file": "0055_retire_revision_number_allocation.sql",
       "sha256": "c5065ac75158014c03909e69f5ac321956ca86a5e614d7cdab02c4ba5ee5a96e"
+    },
+    {
+      "file": "0056_prepare_retired_column_drop.sql",
+      "sha256": "ae01376043d7156cc83cfd0d07ebafe5d83c21b729021559b439fb51d61937ff"
     }
   ]
 }

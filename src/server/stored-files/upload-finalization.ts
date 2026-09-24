@@ -172,7 +172,6 @@ export async function finalizeDirectUpload(
             .values({
               id: storedFileId,
               ledgerId: session.ledgerId,
-              storageProvider: "s3",
               storageKey,
               contentType: normalized.contentType,
               byteSize: normalized.bytes.length,

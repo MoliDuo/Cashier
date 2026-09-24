@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
 import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
+import { saveEntryCategories } from "@/modules/ledger/server/categories";
 import {
   entryCategories,
   ledgerEntries,
@@ -197,7 +198,9 @@ describe("saveEntryCategoriesAction", () => {
   it("rejects categories belonging to another ledger without modifying either collection", async () => {
     const db = getTestDb();
     const ledger = createLedgerData({ userId });
-    const other = { ...createLedgerData({ userId }), deletedAt: new Date() };
+    // Two ledgers never coexist in the app, so this drives the server function,
+    // which still scopes every category it touches by the ledger it is given.
+    const other = createLedgerData({ userId });
     await db.insert(ledgers).values([ledger, other]);
     const ownId = crypto.randomUUID();
     const foreignId = crypto.randomUUID();
@@ -209,7 +212,7 @@ describe("saveEntryCategoriesAction", () => {
       where: eq(entryCategories.ledgerId, ledger.id),
     });
     await expect(
-      saveEntryCategoriesAction({
+      saveEntryCategories(ledger.id, {
         expectedRevision: await computeCategoryCollectionRevision(current),
         categories: [{ id: foreignId, name: "Overwrite", description: null, icon: null }],
       })

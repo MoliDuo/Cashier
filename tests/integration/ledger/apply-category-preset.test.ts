@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
 import { applyCategoryPresetAction } from "@/modules/ledger/server-actions/categories";
+import { applyCategoryPreset } from "@/modules/ledger/server/categories";
 import {
   entryCategories,
   ledgerEntries,
@@ -218,7 +219,7 @@ describe("applyCategoryPresetAction", () => {
     ]);
 
     await expect(
-      applyCategoryPresetAction({
+      applyCategoryPreset(ledger.id, {
         expectedRevision: await revisionOf(ledger.id),
         presetId: "concise",
         mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],
@@ -229,13 +230,10 @@ describe("applyCategoryPresetAction", () => {
   it("rejects a category that belongs to another ledger", async () => {
     const db = getTestDb();
     const ledger = createLedgerData({ userId });
-    // A retired ledger: with one live ledger, another ledger row is only
-    // reachable by id, so this is how a category outside the live ledger is
-    // created at all.
-    const otherLedger = {
-      ...createLedgerData({ userId }),
-      deletedAt: new Date(),
-    };
+    // The app never holds two ledgers, so the action's gate would refuse this
+    // database outright. The server function still scopes every category
+    // lookup by the ledger it is given, which is what this pins.
+    const otherLedger = createLedgerData({ userId });
     const foreignId = crypto.randomUUID();
     await db.insert(ledgers).values([ledger, otherLedger]);
     await ensureTestLedgerBooks(db, ledger.id);
@@ -246,7 +244,7 @@ describe("applyCategoryPresetAction", () => {
     ]);
 
     await expect(
-      applyCategoryPresetAction({
+      applyCategoryPreset(ledger.id, {
         expectedRevision: await revisionOf(ledger.id),
         presetId: "concise",
         mappings: [{ fromCategoryId: foreignId, toPresetIndex: 0 }],

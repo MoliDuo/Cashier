@@ -190,7 +190,6 @@ export async function createManualRevision(
     sourceDocumentId: string;
     inputText?: string | null;
     revisionId?: string;
-    origin: "manual_entry";
   }
 ) {
   const now = new Date();
@@ -200,7 +199,6 @@ export async function createManualRevision(
       ...(input.revisionId === undefined ? {} : { id: input.revisionId }),
       ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
-      origin: input.origin,
       inputText: input.inputText ?? null,
       processingStatus: null,
       submittedAt: now,
@@ -327,7 +325,6 @@ export async function createCompletedProjectionInTransaction(
   const revision = await createManualRevision(tx, {
     ledgerId: input.ledgerId,
     sourceDocumentId: input.sourceDocumentId,
-    origin: "manual_entry",
     ...(input.revisionId === undefined ? {} : { revisionId: input.revisionId }),
     ...(input.inputText !== undefined ? { inputText: input.inputText } : {}),
   });

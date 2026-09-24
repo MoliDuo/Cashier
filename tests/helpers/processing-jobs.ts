@@ -56,10 +56,8 @@ export async function dispatchProcessingJob(job: ProcessingJobContract): Promise
         ledgerId: revision.ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,
-        attemptNumber: job.attemptNumber,
         status: "pending",
         requestedAt: new Date(job.requestedAt),
-        availableAt: new Date(job.requestedAt),
       })
       .onConflictDoNothing();
   });

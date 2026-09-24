@@ -89,26 +89,22 @@ describe("withLedgerAccess", () => {
     await expect(action()).resolves.toBe(ledgerId);
   });
 
-  it("resolves only when exactly one ledger is live", async () => {
+  it("resolves only when there is exactly one ledger", async () => {
     const db = getTestDb();
     mockAuth.mockResolvedValue({
       user: { id: "00000000-0000-0000-0000-000000000000" },
     } as { user: { id: string } });
     const { ledgerId: liveLedgerId } = await createTestUserWithLedger(db);
-    // A ledger row that is not the live one — and, with one live ledger, that
-    // is every other id: the access check no longer asks who owns it.
+    // A second ledger row: the access check does not ask who owns it.
     const otherLedgerId = "00000000-0000-4000-8000-000000000222";
-    await db
-      .insert(ledgers)
-      .values({ id: otherLedgerId, userId: "00000000-0000-0000-0000-000000000000" });
+    await db.insert(ledgers).values({ id: otherLedgerId });
     await ensureTestLedgerBooks(db, otherLedgerId);
     const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 
-    // Two live ledgers make resolution ambiguous, so neither resolves; the
-    // schema change that lets a second row exist is what 0048 guards against.
+    // Two ledgers make resolution ambiguous, so neither resolves.
     await expect(action()).rejects.toThrow(NotFoundError);
 
-    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, otherLedgerId));
+    await db.delete(ledgers).where(eq(ledgers.id, otherLedgerId));
     await expect(action()).resolves.toBe(liveLedgerId);
   });
 });

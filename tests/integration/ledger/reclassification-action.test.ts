@@ -236,13 +236,8 @@ describe("submitSelection", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("rejects a candidate category that belongs to another ledger", async () => {
-    const db = getTestDb();
+  it("rejects a candidate category that is not in the ledger", async () => {
     const { ledger, food, document, revisionId } = await setupLedger();
-    const foreign = { ...createLedgerData({ userId }), deletedAt: new Date() };
-    const foreignCategory = createCategoryData(foreign.id, { name: "别人的", sortOrder: 0 });
-    await db.insert(ledgers).values(foreign);
-    await db.insert(entryCategories).values(foreignCategory);
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
@@ -254,7 +249,7 @@ describe("submitSelection", () => {
     await expect(
       submitSelection(ledger.id, {
         ledgerEntryIds: entryIds,
-        candidateCategoryIds: [food.id, foreignCategory.id],
+        candidateCategoryIds: [food.id, crypto.randomUUID()],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     await expect(getCategoryReclassificationJobAction()).resolves.toBeNull();

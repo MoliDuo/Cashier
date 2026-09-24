@@ -69,7 +69,6 @@ export async function uploadTarget(input: {
         .values({
           id: storedFileId,
           ledgerId: input.ledgerId,
-          storageProvider: "s3",
           storageKey,
           contentType: input.contentType,
           byteSize: bytes.length,

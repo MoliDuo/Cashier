@@ -165,7 +165,6 @@ async function submitInTransaction(
     sourceDocumentId: pending.document.id,
     revisionId: pending.revision.id,
     requestedAt: requestedAt.toISOString(),
-    attemptNumber: 1,
   };
 
   await tx.insert(processingOutbox).values({
@@ -173,10 +172,8 @@ async function submitInTransaction(
     ledgerId: input.ledgerId,
     sourceDocumentId: job.sourceDocumentId,
     revisionId: pending.revision.id,
-    attemptNumber: job.attemptNumber,
     status: "pending",
     requestedAt,
-    availableAt: requestedAt,
   });
 
   return { ...pending, job };

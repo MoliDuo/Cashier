@@ -159,8 +159,8 @@ try {
       [userId, env.SMOKE_EMAIL]
     );
     await db.query(
-      `INSERT INTO ledgers (id, user_id, main_currency, created_at, updated_at) VALUES ($1, $2, 'CNY', now(), now())`,
-      [sharedLedgerId, userId]
+      `INSERT INTO ledgers (id, main_currency, created_at, updated_at) VALUES ($1, 'CNY', now(), now())`,
+      [sharedLedgerId]
     );
     await db.query(
       `INSERT INTO books (ledger_id, name, sort_order, created_at, updated_at) VALUES ($1, '共同支出', 1, now(), now())`,

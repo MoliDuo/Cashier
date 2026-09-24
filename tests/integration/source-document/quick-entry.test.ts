@@ -102,7 +102,6 @@ describe("createQuickEntryAction", () => {
         where: eq(sourceDocumentRevisions.id, sourceDoc!.activeRevisionId!),
       })
     ).resolves.toMatchObject({
-      origin: "manual_entry",
       processingStatus: null,
       inputText: null,
     });

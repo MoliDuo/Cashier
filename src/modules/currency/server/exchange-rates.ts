@@ -211,7 +211,6 @@ async function fetchAndStoreRates(targetDateStr: string): Promise<ExchangeRates>
             ${sourceDocuments.activeRevisionId} = ${ledgerEntries.sourceDocumentRevisionId}
             OR ${sourceDocuments.latestSubmissionRevisionId} = ${ledgerEntries.sourceDocumentRevisionId}
           )
-        WHERE ${ledgers.deletedAt} IS NULL
         ON CONFLICT (rate_date, ledger_id) DO NOTHING
       `);
       return data;

@@ -2,8 +2,7 @@
   "version": 1,
   "user": {
     "id": "10000000-0000-4000-8000-000000000001",
-    "email": "dev@cashier.local",
-    "name": "Local Developer"
+    "email": "dev@cashier.local"
   },
   "ledger": {
     "id": "20000000-0000-4000-8000-000000000001",
@@ -630,20 +629,6 @@
       "failureKind": "processing_error",
       "failureCode": "processing_unavailable",
       "failureMessage": "No processing runtime was available for this request.",
-      "entries": [],
-      "book": "共同支出"
-    },
-    {
-      "id": "40000000-0000-4000-8000-000000000026",
-      "revisionId": "50000000-0000-4000-8000-000000000026",
-      "title": "Ledger Database Failure",
-      "type": "ai_parsed",
-      "dayOffset": -11,
-      "inputText": "Receipt parsed successfully but could not be committed to the ledger.",
-      "status": "failed",
-      "failureKind": "processing_error",
-      "failureCode": "database_unavailable",
-      "failureMessage": "The parsed result could not be committed to the database.",
       "entries": [],
       "book": "共同支出"
     },

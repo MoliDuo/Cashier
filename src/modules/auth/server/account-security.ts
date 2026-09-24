@@ -6,7 +6,7 @@ import { verificationChallenges } from "@/modules/auth/domain/verification-chall
 
 export async function getPasswordHash(userId: string): Promise<string | null | undefined> {
   const user = await db.query.users.findFirst({
-    where: and(eq(users.id, userId), isNull(users.deletedAt)),
+    where: eq(users.id, userId),
     columns: { passwordHash: true },
   });
   return user?.passwordHash;
@@ -25,7 +25,7 @@ export async function setInitialPasswordHash(input: {
       authVersion: sql`${users.authVersion} + 1`,
       updatedAt: input.passwordUpdatedAt,
     })
-    .where(and(eq(users.id, input.userId), isNull(users.deletedAt), isNull(users.passwordHash)))
+    .where(and(eq(users.id, input.userId), isNull(users.passwordHash)))
     .returning({ id: users.id });
   return updated.length === 1;
 }
@@ -44,13 +44,7 @@ export async function replacePasswordHash(input: {
       authVersion: sql`${users.authVersion} + 1`,
       updatedAt: input.passwordUpdatedAt,
     })
-    .where(
-      and(
-        eq(users.id, input.userId),
-        isNull(users.deletedAt),
-        eq(users.passwordHash, input.expectedPasswordHash)
-      )
-    )
+    .where(and(eq(users.id, input.userId), eq(users.passwordHash, input.expectedPasswordHash)))
     .returning({ id: users.id });
   return updated.length === 1;
 }
@@ -72,7 +66,7 @@ export async function createEmailChangeChallenge(input: {
     const [account] = await tx
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.id, input.userId), isNull(users.deletedAt)))
+      .where(eq(users.id, input.userId))
       .for("update");
     if (account == null) return "unauthorized" as const;
 

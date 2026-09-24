@@ -110,7 +110,7 @@ export async function createProcessingRevisionInTransaction(
   const ledger = await tx
     .select({ id: ledgers.id })
     .from(ledgers)
-    .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
+    .where(eq(ledgers.id, input.ledgerId))
     .then((rows) => rows[0]);
   if (ledger == null) throw new NotFoundError("Ledger");
 
@@ -156,7 +156,6 @@ export async function createProcessingRevisionInTransaction(
     .values({
       ledgerId: input.ledgerId,
       sourceDocumentId,
-      origin: "submission",
       inputText: input.input.text,
       inputDocumentDate: input.input.documentDate,
       inputDateReference: input.input.dateReference ?? input.input.documentDate,

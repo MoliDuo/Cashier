@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { loginEmails, users } from "@/persistence";
 
@@ -71,7 +71,7 @@ export async function findUserByEmail(email: string): Promise<UserAccount | null
       loginEmail: loginEmails.email,
     })
     .from(loginEmails)
-    .innerJoin(users, and(eq(users.id, loginEmails.userId), isNull(users.deletedAt)))
+    .innerJoin(users, eq(users.id, loginEmails.userId))
     // Matching the `uniq_login_emails_email` index on `lower(email)` keeps the
     // lookup case-insensitive without making every caller normalize first.
     .where(sql`lower(${loginEmails.email}) = lower(${email})`)
@@ -82,7 +82,7 @@ export async function findUserByEmail(email: string): Promise<UserAccount | null
 
 export async function findUserById(id: string): Promise<UserAccount | null> {
   const row = await db.query.users.findFirst({
-    where: and(eq(users.id, id), isNull(users.deletedAt)),
+    where: eq(users.id, id),
     columns: accountColumns,
   });
   if (row == null) return null;

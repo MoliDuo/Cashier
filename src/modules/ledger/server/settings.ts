@@ -46,7 +46,7 @@ function settingsColumns(settings: Partial<LedgerSettings>) {
 
 export async function getLedgerSettings(ledgerId: string): Promise<LedgerSettings | null> {
   const ledger = await db.query.ledgers.findFirst({
-    where: and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)),
+    where: eq(ledgers.id, ledgerId),
     columns: {
       aiLanguage: true,
       preferredCurrencies: true,
@@ -66,7 +66,7 @@ async function getRequiredExchangeRateDates(
   ledgerId: string
 ): Promise<{ currentMainCurrency: string; dates: string[] } | null> {
   const ledger = await db.query.ledgers.findFirst({
-    where: and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)),
+    where: eq(ledgers.id, ledgerId),
     columns: { mainCurrency: true },
   });
   if (ledger == null) return null;
@@ -107,7 +107,7 @@ async function updateWithCurrencyRecalculation(input: {
     const ledger = await tx
       .select()
       .from(ledgers)
-      .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
+      .where(eq(ledgers.id, input.ledgerId))
       .for("update")
       .then((rows) => rows[0]);
     if (ledger == null) return null;
@@ -167,7 +167,7 @@ async function updateWithCurrencyRecalculation(input: {
         }),
         updatedAt,
       })
-      .where(and(eq(ledgers.id, input.ledgerId), isNull(ledgers.deletedAt)))
+      .where(eq(ledgers.id, input.ledgerId))
       .returning()
       .then((rows) => rows[0]);
     if (updated == null) throw new ConflictError("Failed to update ledger settings");

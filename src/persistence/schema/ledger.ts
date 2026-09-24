@@ -31,9 +31,7 @@ export const ledgers = pgTable(
   "ledgers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     aiLanguage: text("ai_language").notNull().default("zh-CN"),
     preferredCurrencies: varchar("preferred_currencies", { length: 3 })
       .array()

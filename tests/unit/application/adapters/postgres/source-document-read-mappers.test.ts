@@ -27,7 +27,7 @@ const hydration: SourceDocumentHydrationRow = {
   processingStatus: "failed",
   failureKind: "processing_error",
   failureMessage: null,
-  failureCode: "STORAGE_UNAVAILABLE",
+  failureCode: "storage_failure",
   hasImages: false,
   files: [],
   mainCurrency: "KWD",
@@ -90,7 +90,7 @@ describe("source document read contracts", () => {
     ).toBeUndefined();
   });
   it.each([
-    ["STORAGE_UNAVAILABLE", "storage_failure"],
+    ["storage_failure", "storage_failure"],
     ["ai_schema_invalid", "ai_schema_invalid"],
     ["old_unknown_error", "processing_unavailable"],
   ])("normalizes %s at both read boundaries", (failureCode, expected) => {

@@ -1,15 +1,10 @@
-import type { ApplicationErrorCode } from "@/lib/application-errors";
-import type {
-  ProcessingFailureCode,
-  RevisionProcessingStatus,
-} from "@/modules/source-document/lifecycle";
+import type { RevisionProcessingStatus } from "@/modules/source-document/lifecycle";
 
 export interface ProcessingJobContract {
   id: string;
   sourceDocumentId: string;
   revisionId: string;
   requestedAt: string;
-  attemptNumber: number;
 }
 
 /**
@@ -22,17 +17,10 @@ export interface ProcessingLeaseContract {
   claimToken: string;
 }
 
-interface ProcessingDiagnostic {
-  correlationId: string;
-  code: ApplicationErrorCode;
-  stableCode?: ProcessingFailureCode;
-}
-
 export interface ProcessingCompletionContract {
   jobId: string;
   claimToken: string;
   processingStatus: Extract<RevisionProcessingStatus, "completed" | "failed">;
-  diagnostic?: ProcessingDiagnostic;
 }
 
 export interface ProcessingClaimContract {

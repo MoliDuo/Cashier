@@ -1,5 +1,5 @@
 import "server-only";
-import { isNull, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
@@ -20,17 +20,9 @@ export interface SetupResult {
 
 /** True while the instance has no account and no ledger yet. */
 export async function isSetupPending(): Promise<boolean> {
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(isNull(users.deletedAt))
-    .limit(1);
+  const existing = await db.select({ id: users.id }).from(users).limit(1);
   if (existing.length > 0) return false;
-  const ledgerRows = await db
-    .select({ id: ledgers.id })
-    .from(ledgers)
-    .where(isNull(ledgers.deletedAt))
-    .limit(1);
+  const ledgerRows = await db.select({ id: ledgers.id }).from(ledgers).limit(1);
   return ledgerRows.length === 0;
 }
 
@@ -61,11 +53,7 @@ export async function createInitialAccount(input: SetupInput): Promise<SetupResu
     // Two concurrent first requests would otherwise both see an empty
     // database and both create an account; this is what serializes them.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cashier-first-run-setup'))`);
-    const existing = await tx
-      .select({ id: users.id })
-      .from(users)
-      .where(isNull(users.deletedAt))
-      .limit(1);
+    const existing = await tx.select({ id: users.id }).from(users).limit(1);
     if (existing.length > 0) throw new ConflictError("Setup has already been completed");
 
     const [user] = await tx
@@ -80,7 +68,7 @@ export async function createInitialAccount(input: SetupInput): Promise<SetupResu
       emailVerified: now,
     });
 
-    const [ledger] = await tx.insert(ledgers).values({ userId: user.id }).returning();
+    const [ledger] = await tx.insert(ledgers).values({}).returning();
     if (ledger == null) throw new AppError("Failed to create the ledger", "SETUP_FAILED", 500);
 
     await tx.insert(books).values(
