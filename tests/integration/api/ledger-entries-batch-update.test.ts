@@ -10,20 +10,12 @@ import {
   TEST_USER_ID,
 } from "../../helpers/schema-setup";
 
-vi.mock("@/application/adapters/postgres/exchange-rate", () => {
-  const rateBook = {
-    convert: vi.fn(),
-    getRates: vi.fn(async () => ({
-      base: "CNY",
-      date: "2026-09-04",
-      rates: { CNY: 1, USD: 0.14 },
-    })),
-    convertBatch: vi.fn(async (items: Array<{ amount: string }>) =>
-      items.map((item) => ({ convertedAmount: item.amount, exchangeRate: "1" }))
-    ),
-  };
-  return { ExchangeRateService: rateBook, postgresFxRateBook: rateBook, fetchWithRetry: vi.fn() };
-});
+vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
+  convertAmounts: vi.fn(async (items: Array<{ amount: string }>) =>
+    items.map((item) => ({ convertedAmount: item.amount, exchangeRate: "1" }))
+  ),
+}));
 
 describe("Batch Update Ledger Entries Action", () => {
   let testLedgerId: string;

@@ -10,7 +10,7 @@ import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
-import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
+import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 
 // Mock auth module
 vi.mock("@/auth", () => ({
@@ -64,7 +64,7 @@ describe("Source Document Update Actions", () => {
         await activateTestSourceDocumentProjection(db, document.id);
       }
       const convert = vi
-        .spyOn(postgresFxRateBook, "convertBatch")
+        .spyOn(exchangeRates, "convertAmounts")
         .mockResolvedValue([{ convertedAmount: "24", exchangeRate: "0.24" }]);
       try {
         await batchUpdateSourceDocumentsAction({
@@ -102,7 +102,7 @@ describe("Source Document Update Actions", () => {
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
       await activateTestSourceDocumentProjection(db, document.id);
-      const convert = vi.spyOn(postgresFxRateBook, "convertBatch");
+      const convert = vi.spyOn(exchangeRates, "convertAmounts");
       try {
         await batchUpdateSourceDocumentsAction({
           targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],

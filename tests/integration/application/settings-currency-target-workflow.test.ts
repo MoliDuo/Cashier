@@ -6,6 +6,7 @@ import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres
 import { LedgerMainCurrencyChangedError } from "@/application/contracts";
 import { updateLedger as updateLedgerUseCase } from "@/modules/ledger/application/use-cases/update-ledger";
 import { serverComposition } from "@/application/server-composition-root";
+import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import {
   currencyRates,
   ledgerEntries,
@@ -25,7 +26,7 @@ const updateLedger = async (ledgerId: string, data: UpdateLedgerData) => {
     ledgerId,
     { ...data, expectedUpdatedAt: current.updatedAt.toISOString() },
     serverComposition.settings,
-    serverComposition.exchangeRates
+    { getRates: getExchangeRates }
   );
 };
 
@@ -256,7 +257,7 @@ describe("target Settings currency workflow", () => {
      * Inserts a second, main-currency-only entry dated `entryDate`, which by
      * construction has no currency_rates row (rates are only ever cached as
      * a side effect of a *cross-currency* conversion — see entry-builder.ts
-     * and ExchangeRateService.getRates), then attempts the main-currency
+     * and getExchangeRates), then attempts the main-currency
      * change.
      */
     async function addMainCurrencyOnlyEntry(entryDate: string) {
@@ -360,18 +361,12 @@ describe("target Settings currency workflow", () => {
     } as const;
 
     const results = await Promise.allSettled([
-      updateLedgerUseCase(
-        ledgerId,
-        input,
-        serverComposition.settings,
-        serverComposition.exchangeRates
-      ),
-      updateLedgerUseCase(
-        ledgerId,
-        input,
-        serverComposition.settings,
-        serverComposition.exchangeRates
-      ),
+      updateLedgerUseCase(ledgerId, input, serverComposition.settings, {
+        getRates: getExchangeRates,
+      }),
+      updateLedgerUseCase(ledgerId, input, serverComposition.settings, {
+        getRates: getExchangeRates,
+      }),
     ]);
 
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);

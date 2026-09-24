@@ -14,7 +14,7 @@ import type {
   BatchUpdateSourceDocumentsInput as BatchUpdateSourceDocumentsPayload,
   UpdateSourceDocumentInput as UpdateSourceDocumentPayload,
 } from "@/modules/source-document/contract-schemas";
-import { postgresFxRateBook } from "./exchange-rate";
+import { convertAmounts } from "@/modules/currency/server/exchange-rates";
 import { replaceActiveProjectionInTransaction } from "./ledger-projections";
 import {
   lockLedgerForUpdate,
@@ -148,7 +148,7 @@ async function prepareDateReestimate(
   const affectedEntries = initialEntries.filter((entry) =>
     changedDateIds.has(entry.sourceDocumentId!)
   );
-  const changedConversions = await postgresFxRateBook.convertBatch(
+  const changedConversions = await convertAmounts(
     affectedEntries.map((entry) => ({
       amount: entry.amount,
       from: normalizeCurrency(entry.currency, ledger.mainCurrency),
@@ -327,7 +327,7 @@ export async function saveChanges(
   const conversions =
     financialChanges.length === 0
       ? []
-      : await postgresFxRateBook.convertBatch(
+      : await convertAmounts(
           financialChanges.map((entry) => ({
             amount: entry.amount,
             from: normalizeCurrency(entry.currency, ledger.mainCurrency),

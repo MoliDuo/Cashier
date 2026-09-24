@@ -15,13 +15,11 @@ const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
   convertBatchMock: vi.fn(),
 }));
 
-vi.mock("@/application/adapters/postgres/exchange-rate", () => {
-  const rateBook = {
-    getRates: getRatesMock,
-    convertBatch: convertBatchMock,
-  };
-  return { ExchangeRateService: rateBook, postgresFxRateBook: rateBook, fetchWithRetry: vi.fn() };
-});
+vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
+  getExchangeRates: getRatesMock,
+  convertAmounts: convertBatchMock,
+}));
 import { deleteLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
 import {
   activateTestSourceDocumentProjection,

@@ -13,8 +13,7 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import type { AIContext } from "@/lib/tasks/types";
 import { compare } from "@/lib/money/decimal";
-import { convertWithRates } from "@/modules/currency/application/services/rate-calculation";
-import type { FxRateBook } from "@/modules/currency/application/ports";
+import { convertWithRates, type ExchangeRates } from "@/modules/currency/domain/rate-calculation";
 import {
   buildEntriesForInsert,
   getEntryFallbackDate,
@@ -43,7 +42,7 @@ export interface CurrentRevisionProcessorOptions {
   ) => Promise<RevisionProcessingContextContract>;
   getSettings: SettingsPort["get"];
   loadStoredFiles: (ledgerId: string, storedFileIds: string[]) => Promise<LoadImageResult[]>;
-  getRates: FxRateBook["getRates"];
+  getRates: (date: string) => Promise<ExchangeRates>;
   recordProcessingFailure: SourceDocumentPort["recordProcessingFailure"];
   activateRevision: LedgerProjectionPort["activateRevision"];
 }
@@ -168,7 +167,7 @@ export class CurrentRevisionProcessor implements RevisionProcessorPort {
     const validEntries = output.ledgerEntries.filter(
       (entry) => compare(entry.amount, "0") > 0 || entry.isAdjustment === true
     );
-    const ratesByDate = new Map<string, ReturnType<FxRateBook["getRates"]>>();
+    const ratesByDate = new Map<string, Promise<ExchangeRates>>();
     let currentSettings = ledgerSettings;
 
     for (let attempt = 0; attempt < 3; attempt++) {

@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "../setup";
 import { currencyRates } from "@/persistence/schema/currency";
-import { convertCurrency } from "@/modules/currency/application/use-cases/convert-currency";
-import { ExchangeRateService } from "@/application/adapters/postgres/exchange-rate";
+import { convertAmount } from "@/modules/currency/server/exchange-rates";
 
 async function insertTestRates(date: string, rates: Record<string, number>) {
   await getTestDb().insert(currencyRates).values({
@@ -24,10 +23,7 @@ describe("currency fallbacks integration", () => {
 
   it("single conversion still fails for unknown currency", async () => {
     await expect(
-      convertCurrency(
-        { amount: "100", from: "ZZZ", to: "USD", date: testDate },
-        ExchangeRateService
-      )
+      convertAmount({ amount: "100", fromCurrency: "ZZZ", toCurrency: "USD", date: testDate })
     ).rejects.toThrow("Currency not found: ZZZ");
   });
 });

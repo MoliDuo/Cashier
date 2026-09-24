@@ -6,6 +6,7 @@ import { parseUpdateLedgerInput, type UpdateLedgerInput } from "@/modules/ledger
 import { updateLedger } from "@/modules/ledger/application/use-cases/update-ledger";
 import { extractUpdateLedgerActionDates, toUpdateLedgerActionErrorCode } from "./update-error";
 import { serverComposition } from "@/application/server-composition-root";
+import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 
 export const updateLedgerSettingsAction = withLedgerAccess(
   async (ledgerId: string, data: UpdateLedgerInput): Promise<UpdateLedgerActionResult> => {
@@ -13,12 +14,9 @@ export const updateLedgerSettingsAction = withLedgerAccess(
       const validated = parseUpdateLedgerInput(data);
       return {
         ok: true,
-        ledger: await updateLedger(
-          ledgerId,
-          validated,
-          serverComposition.settings,
-          serverComposition.exchangeRates
-        ),
+        ledger: await updateLedger(ledgerId, validated, serverComposition.settings, {
+          getRates: getExchangeRates,
+        }),
       };
     } catch (error) {
       const code = toUpdateLedgerActionErrorCode(error);

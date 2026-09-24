@@ -133,7 +133,7 @@ export interface SettingsPort {
   /**
    * Read-only lookup of the ledger's current main currency and the distinct
    * entry dates its live entries need an exchange rate for. Used to
-   * pre-fetch missing historical rates (via FxRateBook, outside any
+   * pre-fetch missing historical rates (via getExchangeRates, outside any
    * transaction) before attempting a main-currency change, so the change
    * isn't rejected just because those days never had a cross-currency
    * conversion before.

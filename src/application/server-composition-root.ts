@@ -34,7 +34,7 @@ import { getBatchEntryDateImpact } from "@/application/adapters/postgres/ledger-
 import { calculateLedgerEntryStats } from "@/application/adapters/postgres/ledger-reads/calculate-ledger-entry-stats";
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-views-by-source-document-ids";
 import { hasActiveLedgerEntries } from "@/application/adapters/postgres/ledger-reads/has-active-entries";
-import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
+import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { categoryMetadataGeneratorAdapter } from "@/application/adapters/ai/category-metadata-generator";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
@@ -62,7 +62,7 @@ function createRevisionProcessor(
         ledgerId,
         storedFileIds
       ),
-    getRates: (date) => postgresFxRateBook.getRates(date),
+    getRates: getExchangeRates,
     recordProcessingFailure: (input) => postgresRevisionAdapter.recordProcessingFailure(input),
     activateRevision: (input) => postgresLedgerProjectionAdapter.activateRevision(input),
   });
@@ -81,7 +81,6 @@ export const serverComposition = {
   rateLimiter: postgresRateLimiter,
   categories: postgresCategoryAdapter,
   email: resendEmailAdapter,
-  exchangeRates: postgresFxRateBook,
   ledgers: postgresLedgerAdapter,
   ledgerReads: {
     hasActiveEntries: hasActiveLedgerEntries,

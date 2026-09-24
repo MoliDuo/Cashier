@@ -7,7 +7,7 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { serverComposition } from "@/application/server-composition-root";
-import { convertEntryAmount } from "@/modules/currency/application/use-cases/convert-entry-amount";
+import { convertAmount } from "@/modules/currency/server/exchange-rates";
 import { resolveRecordBook } from "../server/resolve-record-book";
 
 /**
@@ -35,7 +35,7 @@ export const createQuickEntryAction = withSourceDocumentLedgerAccess(
     return createQuickEntry(ledgerId, ledger, payload, {
       categories: serverComposition.categories,
       projections: { createManual: serverComposition.sourceDocumentAggregate.createManualDocument },
-      convertAmount: (input) => convertEntryAmount(input, serverComposition.exchangeRates),
+      convertAmount,
     });
   }
 );

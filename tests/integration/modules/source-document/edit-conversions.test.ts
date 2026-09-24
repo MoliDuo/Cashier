@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { postgresSourceDocumentAggregateAdapter as aggregate } from "@/application/adapters/postgres/source-document-aggregate";
-import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
+import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 
 afterEach(() => vi.restoreAllMocks());
@@ -43,7 +43,7 @@ describe("document edit conversion scope", () => {
       .set({ amount: "10.001" })
       .where(eq(ledgerEntries.id, entries[0]!.id));
     const convert = vi
-      .spyOn(postgresFxRateBook, "convertBatch")
+      .spyOn(exchangeRates, "convertAmounts")
       .mockRejectedValue(new Error("FX must not be called"));
     const result = await aggregate.saveChanges({
       ledgerId,
@@ -68,7 +68,7 @@ describe("document edit conversion scope", () => {
   it("converts only the entry with changed financial values", async () => {
     const { db, ledgerId, sourceDocumentId, entries } = await fixture();
     const convert = vi
-      .spyOn(postgresFxRateBook, "convertBatch")
+      .spyOn(exchangeRates, "convertAmounts")
       .mockResolvedValue([{ convertedAmount: "140", exchangeRate: "7" }]);
     await aggregate.saveChanges({
       ledgerId,
@@ -90,7 +90,7 @@ describe("document edit conversion scope", () => {
 
   it("converts every active entry when the document date changes", async () => {
     const { ledgerId, sourceDocumentId } = await fixture();
-    const convert = vi.spyOn(postgresFxRateBook, "convertBatch").mockResolvedValue([
+    const convert = vi.spyOn(exchangeRates, "convertAmounts").mockResolvedValue([
       { convertedAmount: "80", exchangeRate: "8" },
       { convertedAmount: "80", exchangeRate: "8" },
     ]);
@@ -112,7 +112,7 @@ describe("document edit conversion scope", () => {
 
   it("rejects a version changed while FX I/O is running", async () => {
     const { db, ledgerId, sourceDocumentId, entries } = await fixture();
-    vi.spyOn(postgresFxRateBook, "convertBatch").mockImplementation(async () => {
+    vi.spyOn(exchangeRates, "convertAmounts").mockImplementation(async () => {
       await db
         .update(sourceDocuments)
         .set({ version: 2 })

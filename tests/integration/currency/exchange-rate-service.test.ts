@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ExchangeRateService } from "@/application/adapters/postgres/exchange-rate";
+import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { db } from "@/lib/db";
 import { currencyRates } from "@/persistence/schema/currency";
 import { eq } from "drizzle-orm";
 
-describe("ExchangeRateService", () => {
+describe("getExchangeRates", () => {
   beforeEach(async () => {
     // Clear cache and database
     await db.delete(currencyRates);
@@ -29,7 +29,7 @@ describe("ExchangeRateService", () => {
 
     const promises = Array(10)
       .fill(null)
-      .map(() => ExchangeRateService.getRates(date));
+      .map(() => getExchangeRates(date));
 
     const allResults = Promise.all(promises);
     await vi.waitFor(() => expect(callCount).toBe(1));
@@ -57,7 +57,7 @@ describe("ExchangeRateService", () => {
       }),
     } as Response);
 
-    const result = await ExchangeRateService.getRates("2024-01-18");
+    const result = await getExchangeRates("2024-01-18");
     expect(result.rates).toEqual({ USD: 1.15, CNY: 7.7 });
     expect(
       await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, "2024-01-18") })
@@ -74,8 +74,8 @@ describe("ExchangeRateService", () => {
       }),
     } as Response);
 
-    const first = await ExchangeRateService.getRates("2024-01-20");
-    const cached = await ExchangeRateService.getRates("2024-01-20");
+    const first = await getExchangeRates("2024-01-20");
+    const cached = await getExchangeRates("2024-01-20");
     expect(first.date).toBe("2024-01-20");
     expect(cached.date).toBe("2024-01-20");
   });
@@ -90,7 +90,7 @@ describe("ExchangeRateService", () => {
       }),
     } as Response);
 
-    await expect(ExchangeRateService.getRates("2024-01-22")).rejects.toThrow(
+    await expect(getExchangeRates("2024-01-22")).rejects.toThrow(
       "Invalid exchange-rate provider response"
     );
 
@@ -110,7 +110,7 @@ describe("ExchangeRateService", () => {
       }),
     } as Response);
 
-    await expect(ExchangeRateService.getRates("2024-01-22")).rejects.toThrow(
+    await expect(getExchangeRates("2024-01-22")).rejects.toThrow(
       "Invalid exchange-rate provider response"
     );
     expect(
@@ -128,7 +128,7 @@ describe("ExchangeRateService", () => {
       }),
     } as Response);
 
-    await expect(ExchangeRateService.getRates("2024-01-23")).rejects.toThrow(
+    await expect(getExchangeRates("2024-01-23")).rejects.toThrow(
       "Invalid exchange-rate provider response"
     );
 
@@ -148,7 +148,7 @@ describe("ExchangeRateService", () => {
       json: async () => ({ base: "EUR", date: "2024-01-24", rates }),
     } as Response);
 
-    await expect(ExchangeRateService.getRates("2024-01-24")).rejects.toThrow(
+    await expect(getExchangeRates("2024-01-24")).rejects.toThrow(
       "Invalid exchange-rate provider response"
     );
     expect(

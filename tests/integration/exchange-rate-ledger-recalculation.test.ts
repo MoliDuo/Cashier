@@ -23,7 +23,7 @@ import {
   failExchangeRateRecalculation,
 } from "@/application/adapters/postgres/exchange-rate-recalculation-jobs";
 import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
-import { ExchangeRateService } from "@/application/adapters/postgres/exchange-rate";
+import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import * as recalculation from "@/application/orchestration/exchange-rate-ledger-recalculation";
 
 const deleteObject = vi.hoisted(() => vi.fn());
@@ -341,7 +341,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       ok: true,
       json: async () => ({ base: "EUR", date: eventDate, rates: { USD: 1.08, CNY: 7.65 } }),
     } as Response);
-    await ExchangeRateService.getRates(eventDate);
+    await getExchangeRates(eventDate);
     expect(recalculateLedgerForDateMock).not.toHaveBeenCalled();
     expect(await db.query.exchangeRateRecalculationJobs.findMany()).toHaveLength(2);
     await drainDueExchangeRateRecalculations();
@@ -370,7 +370,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       ok: true,
       json: async () => ({ base: "EUR", date: eventDate, rates: { USD: 1.08, CNY: 7.65 } }),
     } as Response);
-    await ExchangeRateService.getRates(eventDate);
+    await getExchangeRates(eventDate);
     expect(recalculateLedgerForDateMock).not.toHaveBeenCalled();
     expect(await db.query.exchangeRateRecalculationJobs.findMany()).toHaveLength(1);
     await drainDueExchangeRateRecalculations();
@@ -392,7 +392,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       ok: true,
       json: async () => ({ base: "EUR", date: "2024-02-10", rates: { USD: 1.08, CNY: 7.65 } }),
     } as Response);
-    const lookup = () => ExchangeRateService.getRates("2024-02-10");
+    const lookup = () => getExchangeRates("2024-02-10");
 
     await lookup();
     await lookup();

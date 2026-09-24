@@ -8,7 +8,7 @@ import type {
   SplitSourceDocumentResultDto,
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
-import { postgresFxRateBook } from "./exchange-rate";
+import { convertAmounts } from "@/modules/currency/server/exchange-rates";
 import { getSourceDocumentInTransaction } from "./source-document-reads/list";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
@@ -101,7 +101,7 @@ export async function splitSourceDocumentAtomically(input: {
   const conversions =
     document.documentDate === input.entryDate
       ? null
-      : await postgresFxRateBook.convertBatch(
+      : await convertAmounts(
           movedEntries.map((entry) => ({
             amount: entry.amount,
             from: normalizeCurrency(entry.currency),

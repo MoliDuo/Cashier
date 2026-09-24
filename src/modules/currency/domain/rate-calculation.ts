@@ -1,7 +1,12 @@
 import { multiply, divide, round } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { AppError } from "@/lib/errors";
-import type { ExchangeRates } from "../ports";
+
+export interface ExchangeRates {
+  base: string;
+  date: string;
+  rates: Record<string, number>;
+}
 
 /**
  * Resolve the cross rate toCurrency / fromCurrency as a canonical decimal

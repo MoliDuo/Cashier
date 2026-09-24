@@ -1,7 +1,6 @@
 import { assertExpenseAmountDirection } from "@/lib/money/expense-amount";
 import { and, eq, getTableColumns, inArray, isNull } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/application/contracts";
-import { convertEntryAmount } from "@/modules/currency/application/use-cases/convert-entry-amount";
 import type { LedgerEntryCommandPort } from "@/modules/ledger/application/ports";
 import type { VersionedCommandResult, VersionedTarget } from "@/modules/source-document/contracts";
 import { db } from "@/lib/db";
@@ -9,7 +8,7 @@ import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare as compareDecimal } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
-import { postgresFxRateBook } from "./exchange-rate";
+import { convertAmount, convertAmounts } from "@/modules/currency/server/exchange-rates";
 import { replaceActiveProjectionInTransaction } from "./ledger-projections";
 import type { PostgresTransaction } from "./transaction-locks";
 import {
@@ -130,15 +129,12 @@ async function prepareCreateConversion(input: {
     .then((rows) => rows[0]);
   if (context == null) throw new NotFoundError("Source document");
   const effectiveCurrency = input.currency ?? context.mainCurrency;
-  const conversion = await convertEntryAmount(
-    {
-      amount: input.amount,
-      fromCurrency: effectiveCurrency,
-      toCurrency: context.mainCurrency,
-      ...(context.entryDate == null ? {} : { date: context.entryDate }),
-    },
-    postgresFxRateBook
-  );
+  const conversion = await convertAmount({
+    amount: input.amount,
+    fromCurrency: effectiveCurrency,
+    toCurrency: context.mainCurrency,
+    ...(context.entryDate == null ? {} : { date: context.entryDate }),
+  });
   return { ...context, effectiveCurrency, conversion };
 }
 
@@ -196,7 +192,7 @@ async function prepareBatchConversions(input: {
       nextAmount: input.amount ?? entry.amount,
     };
   });
-  const conversions = await postgresFxRateBook.convertBatch(
+  const conversions = await convertAmounts(
     preparedRows.map(({ entry, effectiveCurrency, nextAmount }) => ({
       amount: nextAmount,
       from: effectiveCurrency,

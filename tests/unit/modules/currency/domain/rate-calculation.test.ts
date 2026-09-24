@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   convertWithRates,
   resolveRateRatio,
-} from "@/modules/currency/application/services/rate-calculation";
-import type { ExchangeRates } from "@/modules/currency/application/ports";
+  type ExchangeRates,
+} from "@/modules/currency/domain/rate-calculation";
 
 const rates: ExchangeRates = {
   base: "EUR",

@@ -1,5 +1,5 @@
 import type { SettingsPort } from "@/application/contracts";
-import type { FxRateBook } from "@/modules/currency/application/ports";
+import type { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { AppError, NotFoundError } from "@/lib/errors";
 import type { UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
 import type { LedgerDto } from "@/modules/ledger/contracts";
@@ -12,7 +12,7 @@ export async function updateLedger(
   ledgerId: string,
   data: UpdateLedgerInput,
   settings: Pick<SettingsPort, "updateWithCurrencyRecalculation" | "getRequiredExchangeRateDates">,
-  exchangeRates: Pick<FxRateBook, "getRates">
+  exchangeRates: { getRates: typeof getExchangeRates }
 ): Promise<LedgerDto> {
   const nextMainCurrency = data.settings?.mainCurrency;
   if (nextMainCurrency !== undefined) {
@@ -52,7 +52,7 @@ async function ensureExchangeRatesForCurrencyChange(
   nextMainCurrency: string,
   dependencies: {
     settings: Pick<SettingsPort, "getRequiredExchangeRateDates">;
-    exchangeRates: Pick<FxRateBook, "getRates">;
+    exchangeRates: { getRates: typeof getExchangeRates };
   }
 ): Promise<void> {
   const plan = await dependencies.settings.getRequiredExchangeRateDates(ledgerId);

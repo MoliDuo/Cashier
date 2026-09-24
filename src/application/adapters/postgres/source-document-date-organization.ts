@@ -10,7 +10,7 @@ import type {
   DismissDateOrganizationInput,
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
-import { postgresFxRateBook } from "./exchange-rate";
+import { convertAmounts } from "@/modules/currency/server/exchange-rates";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "./transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./source-document-write-guards";
 import { copyRevisionFiles, createManualRevision } from "./ledger-projections";
@@ -132,7 +132,7 @@ export async function applyDateOrganization(
   const conversionByEntry = new Map<string, { convertedAmount: string; exchangeRate: string }>();
   for (const group of appliedGroups) {
     if (group.entryDate == null || group.entryDate === document.documentDate) continue;
-    const conversions = await postgresFxRateBook.convertBatch(
+    const conversions = await convertAmounts(
       group.ledgerEntryIds.map((id) => {
         const entry = entriesById.get(id)!;
         return {

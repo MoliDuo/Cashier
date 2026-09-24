@@ -1,9 +1,8 @@
 "use server";
-import { convertCurrency } from "../application/use-cases/convert-currency";
 import { parseConvertCurrencyInput } from "../contract-schemas";
 import type { ConvertCurrencyResult } from "../contracts";
+import { convertAmount } from "../server/exchange-rates";
 import { withLedgerAccess } from "@/modules/ledger/access";
-import { serverComposition } from "@/application/server-composition-root";
 
 export const convertCurrencyAction = withLedgerAccess(
   async (
@@ -13,15 +12,18 @@ export const convertCurrencyAction = withLedgerAccess(
     to: string,
     date?: string
   ): Promise<ConvertCurrencyResult> => {
-    const result = await convertCurrency(
-      parseConvertCurrencyInput({
-        amount,
-        from,
-        to,
-        ...(date != null ? { date } : {}),
-      }),
-      serverComposition.exchangeRates
-    );
-    return { converted: result.converted };
+    const input = parseConvertCurrencyInput({
+      amount,
+      from,
+      to,
+      ...(date != null ? { date } : {}),
+    });
+    const { convertedAmount } = await convertAmount({
+      amount: input.amount,
+      fromCurrency: input.from,
+      toCurrency: input.to,
+      ...(input.date != null ? { date: input.date } : {}),
+    });
+    return { converted: convertedAmount };
   }
 );

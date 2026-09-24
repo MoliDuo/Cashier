@@ -10,7 +10,7 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
-import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
+import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
@@ -25,7 +25,7 @@ describe("splitSourceDocumentAction", () => {
       .update(ledgerEntries)
       .set({ currency: "MYR", convertedAmount: "2.35", exchangeRate: "0.235" })
       .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
-    const convert = vi.spyOn(postgresFxRateBook, "convertBatch");
+    const convert = vi.spyOn(exchangeRates, "convertAmounts");
     try {
       for (const [index, id] of fixture.ids.slice(0, 2).entries()) {
         const result = await splitSourceDocumentAction({
@@ -156,7 +156,7 @@ describe("splitSourceDocumentAction", () => {
       })
     ).rejects.toThrow(/not in the active/);
     const convert = vi
-      .spyOn(postgresFxRateBook, "convertBatch")
+      .spyOn(exchangeRates, "convertAmounts")
       .mockRejectedValueOnce(new Error("FX unavailable"));
     try {
       await expect(

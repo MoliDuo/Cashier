@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  fetchWithRetry,
-  formatExchangeRateDate,
-} from "@/application/adapters/postgres/exchange-rate";
+import { fetchWithRetry, formatExchangeRateDate } from "@/modules/currency/server/exchange-rates";
 
 describe("formatExchangeRateDate", () => {
   it("normalizes supported date inputs to date-only values", () => {

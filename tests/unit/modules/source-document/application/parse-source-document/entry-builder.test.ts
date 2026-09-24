@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { convertEntryAmountMock, formatDateTimeForApiMock } = vi.hoisted(() => ({
-  convertEntryAmountMock: vi.fn(),
+const { convertAmountMock, formatDateTimeForApiMock } = vi.hoisted(() => ({
+  convertAmountMock: vi.fn(),
   formatDateTimeForApiMock: vi.fn(),
 }));
 
@@ -26,7 +26,7 @@ describe("entry-builder", () => {
   });
 
   it("fails the write when a required accounting conversion fails", async () => {
-    convertEntryAmountMock.mockRejectedValueOnce(new Error("rate unavailable"));
+    convertAmountMock.mockRejectedValueOnce(new Error("rate unavailable"));
 
     await expect(
       buildEntriesForInsert({
@@ -45,13 +45,13 @@ describe("entry-builder", () => {
         ledgerId: "ledger-1",
         mainCurrency: "CNY",
         fallbackDate: "2026-03-20",
-        convertAmount: convertEntryAmountMock,
+        convertAmount: convertAmountMock,
       })
     ).rejects.toThrow("rate unavailable");
   });
 
   it("category_index 0 means no category — categoryId is null", async () => {
-    convertEntryAmountMock.mockResolvedValueOnce({
+    convertAmountMock.mockResolvedValueOnce({
       convertedAmount: "10.00",
       exchangeRate: "10.00",
     });
@@ -75,7 +75,7 @@ describe("entry-builder", () => {
       ledgerId: "ledger-1",
       mainCurrency: "CNY",
       fallbackDate: "2026-03-20",
-      convertAmount: convertEntryAmountMock,
+      convertAmount: convertAmountMock,
     });
 
     const firstEntry = result[0];
@@ -88,7 +88,7 @@ describe("entry-builder", () => {
   });
 
   it("category_index 1 maps to first category, category_index 2 maps to second (1-based)", async () => {
-    convertEntryAmountMock
+    convertAmountMock
       .mockResolvedValueOnce({ convertedAmount: "10.00", exchangeRate: "1" })
       .mockResolvedValueOnce({ convertedAmount: "20.00", exchangeRate: "1" });
 
@@ -119,7 +119,7 @@ describe("entry-builder", () => {
       ledgerId: "ledger-1",
       mainCurrency: "CNY",
       fallbackDate: "2026-03-20",
-      convertAmount: convertEntryAmountMock,
+      convertAmount: convertAmountMock,
     });
 
     const firstEntry = result[0];
