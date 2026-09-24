@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { ValidationError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
 import {
   activateTestSourceDocumentProjection,
@@ -15,17 +14,13 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import {
-  getEnhancedStats,
-  getEnhancedStatsQuery,
-} from "@/modules/stats/application/queries/get-enhanced-stats";
-import { serverComposition } from "@/application/server-composition-root";
+import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 
 async function getTargetEnhancedStatsQuery({
   ledgerId,
   ...input
-}: Parameters<typeof getEnhancedStatsQuery>[1] & { ledgerId: string }): ReturnType<
-  typeof getEnhancedStatsQuery
+}: Parameters<typeof queryEnhancedStats>[1] & { ledgerId: string }): ReturnType<
+  typeof queryEnhancedStats
 > {
   const db = getTestDb();
   const documents = await db.query.sourceDocuments.findMany({
@@ -35,7 +30,7 @@ async function getTargetEnhancedStatsQuery({
   for (const document of documents) {
     await activateTestSourceDocumentProjection(db, document.id);
   }
-  return getEnhancedStatsQuery(ledgerId, input, serverComposition.stats);
+  return queryEnhancedStats(ledgerId, input);
 }
 
 function requireFirst<T>(rows: readonly T[], label: string): T {
@@ -46,7 +41,7 @@ function requireFirst<T>(rows: readonly T[], label: string): T {
   return first;
 }
 
-describe("getEnhancedStatsQuery", () => {
+describe("queryEnhancedStats", () => {
   let ledgerId = "";
   let categoryId = "";
 
@@ -64,19 +59,6 @@ describe("getEnhancedStatsQuery", () => {
       })
       .returning();
     categoryId = requireFirst(insertedCategories, "category").id;
-  });
-
-  it("validates public query inputs before executing", async () => {
-    await expect(
-      getEnhancedStats(
-        ledgerId,
-        {
-          queryRange: { from: "2024-03-31", to: "2024-03-01" },
-          compareRange: { from: "2024-02-29", to: "2024-02-01" },
-        },
-        serverComposition.stats
-      )
-    ).rejects.toThrow(ValidationError);
   });
 
   it("converts mixed currencies by effective date using ledger main currency", async () => {

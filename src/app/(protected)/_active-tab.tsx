@@ -102,7 +102,6 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
       categories: serverComposition.categories,
       books: serverComposition.books,
       ledgerReads: serverComposition.ledgerReads,
-      stats: serverComposition.stats,
       sourceDocuments: {
         documents: serverComposition.sourceDocumentReads,
         ledgerReads: serverComposition.ledgerReads,

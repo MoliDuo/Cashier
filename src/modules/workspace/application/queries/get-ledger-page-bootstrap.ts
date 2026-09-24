@@ -11,7 +11,7 @@ import { resolveRequestTimeZone } from "@/lib/time-zone-cookie";
 import { calculateLedgerStats } from "@/modules/ledger/application/queries/calculate-ledger-stats";
 import { listEntryCategories } from "@/modules/ledger/application/queries/list-entry-categories";
 import { listLedgerEntries } from "@/modules/ledger/application/queries/list-ledger-entries";
-import { getEnhancedStats } from "@/modules/stats/application/queries/get-enhanced-stats";
+import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { listStreamPage } from "@/modules/source-document/application/queries/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/application/queries/get-stream-total";
 import type { StreamPage } from "@/modules/source-document/contracts";
@@ -25,7 +25,6 @@ import type { ServiceCredentialPort } from "@/application/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
 import type { BookPort } from "@/application/contracts";
 import type { LedgerReadPort } from "@/modules/ledger/application/ports";
-import type { StatsReadPort } from "@/modules/stats/application/ports";
 import type {
   LedgerChangeReadPort,
   SourceDocumentReadPort,
@@ -89,7 +88,6 @@ export async function getLedgerPageBootstrap(
       LedgerReadPort,
       "calculateStats" | "listEntries" | "listEntriesBySourceDocumentIds"
     >;
-    stats: Pick<StatsReadPort, "queryEnhanced">;
     sourceDocuments: {
       documents: Pick<SourceDocumentReadPort, "list" | "calculateCompletedTotal">;
       ledgerReads: Pick<LedgerReadPort, "listEntriesBySourceDocumentIds">;
@@ -268,7 +266,7 @@ export async function getLedgerPageBootstrap(
       ? [
           queryClient.prefetchQuery({
             queryKey: statsDescriptor.queryKey,
-            queryFn: () => getEnhancedStats(ledgerId, statsDescriptor.input, dependencies.stats),
+            queryFn: () => queryEnhancedStats(ledgerId, statsDescriptor.input),
             staleTime: QUERY.DEFAULT_STALE_TIME_MS,
           }),
         ]

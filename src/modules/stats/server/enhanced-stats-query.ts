@@ -1,3 +1,4 @@
+import "server-only";
 import Decimal from "decimal.js";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -6,7 +7,7 @@ import type { GetEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 import {
   buildEnhancedStatsDto,
   type EnhancedStatsBucket,
-} from "@/modules/stats/application/build-enhanced-stats";
+} from "@/modules/stats/domain/build-enhanced-stats";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 
 interface AggregatedRow {
@@ -113,13 +114,10 @@ function addRowToBucket(
   }
 }
 
-export async function getEnhancedStatsQuery({
-  ledgerId,
-  queryRange,
-  compareRange,
-  comparisonMode,
-  bookId,
-}: GetEnhancedStatsInput & { ledgerId: string }): Promise<EnhancedStatsDto> {
+export async function queryEnhancedStats(
+  ledgerId: string,
+  { queryRange, compareRange, comparisonMode, bookId }: GetEnhancedStatsInput
+): Promise<EnhancedStatsDto> {
   const rows = await fetchAggregatedRows(ledgerId, queryRange, compareRange, bookId);
   const mainCurrency = rows[0]?.mainCurrency ?? "CNY";
   const current = emptyBucket();

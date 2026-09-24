@@ -9,7 +9,7 @@ import {
 } from "@/application/adapters/postgres";
 import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
 import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
-import { getEnhancedStatsQuery } from "@/modules/stats/application/queries/get-enhanced-stats";
+import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { serverComposition } from "@/application/server-composition-root";
 import {
@@ -171,14 +171,10 @@ describe("target upper workflows", () => {
       startDate: "2026-07-15",
       endDate: "2026-07-15",
     });
-    const enhanced = await getEnhancedStatsQuery(
-      ledgerId,
-      {
-        queryRange: { from: "2026-07-15", to: "2026-07-15" },
-        compareRange: { from: "2026-07-14", to: "2026-07-14" },
-      },
-      serverComposition.stats
-    );
+    const enhanced = await queryEnhancedStats(ledgerId, {
+      queryRange: { from: "2026-07-15", to: "2026-07-15" },
+      compareRange: { from: "2026-07-14", to: "2026-07-14" },
+    });
 
     expect(stream.items).toHaveLength(1);
     expect(stream.items[0]).toMatchObject({

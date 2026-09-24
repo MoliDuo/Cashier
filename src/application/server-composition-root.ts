@@ -34,7 +34,6 @@ import { getBatchEntryDateImpact } from "@/application/adapters/postgres/ledger-
 import { calculateLedgerEntryStats } from "@/application/adapters/postgres/ledger-reads/calculate-ledger-entry-stats";
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-views-by-source-document-ids";
 import { hasActiveLedgerEntries } from "@/application/adapters/postgres/ledger-reads/has-active-entries";
-import { getEnhancedStatsQuery } from "@/application/adapters/postgres/ledger-reads/get-enhanced-stats";
 import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
 import { categoryMetadataGeneratorAdapter } from "@/application/adapters/ai/category-metadata-generator";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
@@ -94,9 +93,6 @@ export const serverComposition = {
   categoryMetadataGenerator: categoryMetadataGeneratorAdapter,
   categoryReclassificationJobs: postgresCategoryReclassificationJobAdapter,
   categoryAssignments: postgresCategoryAssignmentV2Adapter,
-  stats: {
-    queryEnhanced: getEnhancedStatsQuery,
-  },
   otpTokens: postgresOtpTokenAdapter,
   serviceCredentials: postgresServiceCredentialAdapter,
   settings: postgresSettingsAdapter,

@@ -4,7 +4,6 @@ import { getLedgerPageBootstrap as getLedgerPageBootstrapUseCase } from "@/modul
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import type { CategoryPort } from "@/application/contracts";
 import type { LedgerReadPort } from "@/modules/ledger/application/ports";
-import type { StatsReadPort } from "@/modules/stats/application/ports";
 import type {
   SourceDocumentReadPort,
   LedgerChangeReadPort,
@@ -27,7 +26,6 @@ const bootstrapDependencies = {
     LedgerReadPort,
     "calculateStats" | "listEntries" | "listEntriesBySourceDocumentIds"
   >,
-  stats: { queryEnhanced: vi.fn() } satisfies Pick<StatsReadPort, "queryEnhanced">,
   sourceDocuments: {
     documents: {
       list: vi.fn(),
@@ -88,8 +86,8 @@ vi.mock("@/modules/source-document/application/queries/get-stream-total", () => 
   getStreamTotal: getStreamTotalMock,
 }));
 
-vi.mock("@/modules/stats/application/queries/get-enhanced-stats", () => ({
-  getEnhancedStats: getEnhancedStatsMock,
+vi.mock("@/modules/stats/server/enhanced-stats-query", () => ({
+  queryEnhancedStats: getEnhancedStatsMock,
 }));
 function createPreAuthorizedLedgerDto() {
   return {
@@ -410,8 +408,7 @@ describe("getLedgerPageBootstrap", () => {
           from: expect.any(String),
           to: expect.any(String),
         }),
-      }),
-      bootstrapDependencies.stats
+      })
     );
   });
 
@@ -449,11 +446,7 @@ describe("getLedgerPageBootstrap", () => {
           mainCurrency: expect.any(String),
         })
       );
-      expect(getEnhancedStatsMock).toHaveBeenCalledWith(
-        "ledger-1",
-        expectedDescriptor.input,
-        bootstrapDependencies.stats
-      );
+      expect(getEnhancedStatsMock).toHaveBeenCalledWith("ledger-1", expectedDescriptor.input);
     } finally {
       vi.useRealTimers();
     }
@@ -591,8 +584,7 @@ describe("getLedgerPageBootstrap", () => {
       expect(statsQuery?.queryKey[2]).toMatchObject({ bookId: "book-1" });
       expect(getEnhancedStatsMock).toHaveBeenCalledWith(
         "ledger-1",
-        expect.objectContaining({ bookId: "book-1" }),
-        bootstrapDependencies.stats
+        expect.objectContaining({ bookId: "book-1" })
       );
       expect(result?.initialBookId).toBe("book-1");
     });
@@ -615,8 +607,7 @@ describe("getLedgerPageBootstrap", () => {
       expect(statsQuery?.queryKey[2]).toMatchObject({ bookId: null });
       expect(getEnhancedStatsMock).toHaveBeenCalledWith(
         "ledger-1",
-        expect.not.objectContaining({ bookId: expect.any(String) }),
-        bootstrapDependencies.stats
+        expect.not.objectContaining({ bookId: expect.any(String) })
       );
       expect(result?.initialBookId).toBeNull();
     });

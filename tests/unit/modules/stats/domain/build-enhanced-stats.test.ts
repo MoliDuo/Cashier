@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildEnhancedStatsDto,
   type EnhancedStatsBucket,
-} from "@/modules/stats/application/build-enhanced-stats";
+} from "@/modules/stats/domain/build-enhanced-stats";
 
 function bucket(
   days: Record<string, { total: string; count?: number }> = {},
