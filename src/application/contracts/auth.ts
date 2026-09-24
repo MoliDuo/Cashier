@@ -117,38 +117,3 @@ export interface UserAccountPort {
   /** The account's login addresses, oldest first. */
   listLoginEmails(userId: string): Promise<readonly LoginEmailContract[]>;
 }
-
-/**
- * First-run setup. It is the only contract that reads and writes the account
- * without a session, so it stays deliberately small: "is the instance empty"
- * and "create the whole initial state atomically".
- */
-export interface SetupContract {
-  bookNames: readonly string[];
-  email: string;
-  password: string;
-}
-
-export interface SetupPort {
-  isPending(): Promise<boolean>;
-  /**
-   * The pending setup code, issuing one when none exists or the stored one has
-   * expired. `created` tells the caller to print it: only the call that issued
-   * it knows the plaintext.
-   */
-  getOrCreateCode(): Promise<{ code: string; created: boolean; issuedAt: Date | null }>;
-  /**
-   * Constant-time comparison against the stored hash, counting failures. Once
-   * the attempts are used up the code is retired, so a fresh one is issued and
-   * printed on the next visit instead of the guess being retried forever.
-   */
-  verifyCode(code: string): Promise<SetupCodeVerdict>;
-  createInitialAccount(input: SetupContract): Promise<{ userId: string; ledgerId: string }>;
-}
-
-/**
- * `mismatch` is a wrong code that still has attempts left; `locked_out` means
- * this guess used the last one and retired the code; `expired` means the stored
- * code is past its lifetime, so a new one has to be issued and printed.
- */
-export type SetupCodeVerdict = "accepted" | "mismatch" | "locked_out" | "expired";

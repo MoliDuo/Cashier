@@ -10,10 +10,14 @@ import { createTestUser } from "../../helpers/schema-setup";
 import { postgresUserAccountAdapter } from "@/application/adapters/postgres/business-ports/users";
 import { postgresAccountSecurityAdapter } from "@/application/adapters/postgres/account-security";
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
-import { createInitialAccount } from "@/modules/setup/application/create-initial-account";
-import { postgresSetupAdapter } from "@/application/adapters/postgres/business-ports/setup";
+import { createInitialAccount, isSetupPending } from "@/modules/setup/server/initial-account";
 import { completeSetupAction } from "@/modules/setup/server-actions/setup";
-import { SETUP_CODE_MAX_ATTEMPTS, SETUP_CODE_TTL_MS } from "@/modules/setup/setup-code";
+import {
+  getOrCreateSetupCode,
+  SETUP_CODE_MAX_ATTEMPTS,
+  SETUP_CODE_TTL_MS,
+  verifySetupCode,
+} from "@/modules/setup/server/setup-code";
 import { hashOTP } from "@/modules/auth/services/otp";
 import { verifyPassword } from "@/modules/auth/services/password";
 
@@ -140,18 +144,15 @@ describe("first-run setup", () => {
     const db = getTestDb();
     await db.delete(loginEmails);
     await db.delete(users);
-    expect(await postgresSetupAdapter.isPending()).toBe(true);
+    expect(await isSetupPending()).toBe(true);
 
-    const result = await createInitialAccount(
-      {
-        bookNames: ["共同支出", "哞哞的"],
-        email: "Owner@Example.com",
-        password: "setup-pass-1",
-      },
-      postgresSetupAdapter
-    );
+    const result = await createInitialAccount({
+      bookNames: ["共同支出", "哞哞的"],
+      email: "Owner@Example.com",
+      password: "setup-pass-1",
+    });
 
-    expect(await postgresSetupAdapter.isPending()).toBe(false);
+    expect(await isSetupPending()).toBe(false);
     expect(await postgresUserAccountAdapter.findByEmail("owner@example.com")).toMatchObject({
       id: result.userId,
     });
@@ -171,14 +172,11 @@ describe("first-run setup", () => {
 
     // A second run must not create a second account or ledger.
     await expect(
-      createInitialAccount(
-        {
-          bookNames: ["另一个"],
-          email: "second@example.com",
-          password: "setup-pass-2",
-        },
-        postgresSetupAdapter
-      )
+      createInitialAccount({
+        bookNames: ["另一个"],
+        email: "second@example.com",
+        password: "setup-pass-2",
+      })
     ).rejects.toThrow(/already been completed/);
   });
 
@@ -187,21 +185,21 @@ describe("first-run setup", () => {
     await db.delete(loginEmails);
     await db.delete(users);
 
-    const first = await postgresSetupAdapter.getOrCreateCode();
+    const first = await getOrCreateSetupCode();
     expect(first.created).toBe(true);
     expect(first.code).toMatch(/^\d{8}$/);
 
     // The plaintext exists only in the caller that created it: a later read
     // knows a code is pending but cannot reproduce it, so the wizard must not
     // print a second banner with a code that no longer matches.
-    const second = await postgresSetupAdapter.getOrCreateCode();
+    const second = await getOrCreateSetupCode();
     expect(second.created).toBe(false);
     expect(second.code).toBe("");
     expect(second.issuedAt).toEqual(first.issuedAt);
 
-    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe("accepted");
-    expect(await postgresSetupAdapter.verifyCode("00000000")).toBe("mismatch");
-    expect(await postgresSetupAdapter.verifyCode("")).toBe("mismatch");
+    expect(await verifySetupCode(first.code)).toBe("accepted");
+    expect(await verifySetupCode("00000000")).toBe("mismatch");
+    expect(await verifySetupCode("")).toBe("mismatch");
     // A stored hash is not the code, and the row is not a second row.
     const rows = await db.select().from(setupState);
     expect(rows).toHaveLength(1);
@@ -213,7 +211,7 @@ describe("first-run setup", () => {
     await db.delete(loginEmails);
     await db.delete(users);
 
-    const first = await postgresSetupAdapter.getOrCreateCode();
+    const first = await getOrCreateSetupCode();
     expect(first.created).toBe(true);
 
     // Age the stored code past its lifetime. A code nobody read out of the logs
@@ -222,15 +220,15 @@ describe("first-run setup", () => {
       .update(setupState)
       .set({ createdAt: new Date(Date.now() - SETUP_CODE_TTL_MS - 1_000) });
 
-    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe("expired");
+    expect(await verifySetupCode(first.code)).toBe("expired");
 
-    const second = await postgresSetupAdapter.getOrCreateCode();
+    const second = await getOrCreateSetupCode();
     expect(second.created).toBe(true);
     expect(second.code).toMatch(/^\d{8}$/);
     expect(second.code).not.toBe(first.code);
     // The replacement is what the wizard accepts, and the old code is dead.
-    expect(await postgresSetupAdapter.verifyCode(second.code)).toBe("accepted");
-    expect(await postgresSetupAdapter.verifyCode(first.code)).toBe("mismatch");
+    expect(await verifySetupCode(second.code)).toBe("accepted");
+    expect(await verifySetupCode(first.code)).toBe("mismatch");
   });
 
   it("retires the code after five wrong guesses and issues a new one", async () => {
@@ -238,45 +236,42 @@ describe("first-run setup", () => {
     await db.delete(loginEmails);
     await db.delete(users);
 
-    const { code } = await postgresSetupAdapter.getOrCreateCode();
+    const { code } = await getOrCreateSetupCode();
     // Eight digits is not much of a secret; the attempt counter is what makes
     // guessing impractical.
     for (let attempt = 1; attempt < SETUP_CODE_MAX_ATTEMPTS; attempt += 1) {
-      expect(await postgresSetupAdapter.verifyCode("00000000")).toBe("mismatch");
+      expect(await verifySetupCode("00000000")).toBe("mismatch");
       const rows = await db.select().from(setupState);
       expect(rows[0]?.failedAttempts).toBe(attempt);
     }
 
-    expect(await postgresSetupAdapter.verifyCode("00000000")).toBe("locked_out");
+    expect(await verifySetupCode("00000000")).toBe("locked_out");
     // The row is gone, so the operator's correct code is retired with it: the
     // wizard must print a new one rather than leave a code that cannot work.
     expect(await db.select().from(setupState)).toHaveLength(0);
-    expect(await postgresSetupAdapter.verifyCode(code)).toBe("expired");
+    expect(await verifySetupCode(code)).toBe("expired");
 
-    const replacement = await postgresSetupAdapter.getOrCreateCode();
+    const replacement = await getOrCreateSetupCode();
     expect(replacement.created).toBe(true);
     // The counter belongs to the retired code, not to the instance.
-    expect(await postgresSetupAdapter.verifyCode(replacement.code)).toBe("accepted");
+    expect(await verifySetupCode(replacement.code)).toBe("accepted");
   });
 
   it("clears the pending code once the account exists", async () => {
     const db = getTestDb();
     await db.delete(loginEmails);
     await db.delete(users);
-    const { code } = await postgresSetupAdapter.getOrCreateCode();
+    const { code } = await getOrCreateSetupCode();
 
-    await createInitialAccount(
-      {
-        bookNames: ["共同支出"],
-        email: "owner@example.com",
-        password: "setup-pass-1",
-      },
-      postgresSetupAdapter
-    );
+    await createInitialAccount({
+      bookNames: ["共同支出"],
+      email: "owner@example.com",
+      password: "setup-pass-1",
+    });
 
     expect(await db.select().from(setupState)).toHaveLength(0);
     // A retired code cannot be replayed against a later, empty database either.
-    expect(await postgresSetupAdapter.verifyCode(code)).toBe("expired");
+    expect(await verifySetupCode(code)).toBe("expired");
   });
 
   it("rejects duplicate book names and a password that does not meet the policy", async () => {
@@ -285,25 +280,19 @@ describe("first-run setup", () => {
     await db.delete(users);
 
     await expect(
-      createInitialAccount(
-        {
-          bookNames: ["共同支出", "共同支出"],
-          email: "owner@example.com",
-          password: "setup-pass-1",
-        },
-        postgresSetupAdapter
-      )
+      createInitialAccount({
+        bookNames: ["共同支出", "共同支出"],
+        email: "owner@example.com",
+        password: "setup-pass-1",
+      })
     ).rejects.toThrow(/unique/);
 
     await expect(
-      createInitialAccount(
-        {
-          bookNames: ["共同支出"],
-          email: "owner@example.com",
-          password: "short",
-        },
-        postgresSetupAdapter
-      )
+      createInitialAccount({
+        bookNames: ["共同支出"],
+        email: "owner@example.com",
+        password: "short",
+      })
     ).rejects.toThrow(/8 and 128/);
   });
 
@@ -322,21 +311,21 @@ describe("first-run setup", () => {
 
     // 100 ASCII characters: a character count alone calls this fine.
     await expect(
-      createInitialAccount({ ...account, password: "a".repeat(99) + "1" }, postgresSetupAdapter)
+      createInitialAccount({ ...account, password: "a".repeat(99) + "1" })
     ).rejects.toThrow(/72 UTF-8 bytes/);
 
     // 27 characters, 77 bytes: three-byte characters are what a byte limit is
     // for, and this one is well inside the 8–128 character window.
     await expect(
-      createInitialAccount({ ...account, password: "测".repeat(25) + "a1" }, postgresSetupAdapter)
+      createInitialAccount({ ...account, password: "测".repeat(25) + "a1" })
     ).rejects.toThrow(/72 UTF-8 bytes/);
 
-    await expect(
-      createInitialAccount({ ...account, password: "12345678" }, postgresSetupAdapter)
-    ).rejects.toThrow(/letter and one number/);
+    await expect(createInitialAccount({ ...account, password: "12345678" })).rejects.toThrow(
+      /letter and one number/
+    );
 
     // Every refusal happened before anything was written.
-    expect(await postgresSetupAdapter.isPending()).toBe(true);
+    expect(await isSetupPending()).toBe(true);
   });
 
   it("accepts a password that is exactly at the byte limit and signs in with it", async () => {
@@ -347,10 +336,11 @@ describe("first-run setup", () => {
     const password = "a".repeat(71) + "1";
     expect(new TextEncoder().encode(password)).toHaveLength(72);
 
-    const result = await createInitialAccount(
-      { bookNames: ["共同支出"], email: "boundary@example.com", password },
-      postgresSetupAdapter
-    );
+    const result = await createInitialAccount({
+      bookNames: ["共同支出"],
+      email: "boundary@example.com",
+      password,
+    });
 
     const user = await db.query.users.findFirst({ where: eq(users.id, result.userId) });
     await expect(verifyPassword(password, user?.passwordHash ?? "")).resolves.toBe(true);
@@ -375,7 +365,7 @@ describe("first-run setup", () => {
       await db.delete(users);
       // A code is pending, so the answers below are about the shape of what was
       // sent rather than about there being nothing to compare it with.
-      await postgresSetupAdapter.getOrCreateCode();
+      await getOrCreateSetupCode();
 
       for (const setupCode of ["", "   ", "12345", "not-a-code"]) {
         await expect(completeSetupAction({ ...payload, setupCode })).resolves.toEqual({
@@ -389,7 +379,7 @@ describe("first-run setup", () => {
         code: "wrong_code",
       });
 
-      expect(await postgresSetupAdapter.isPending()).toBe(true);
+      expect(await isSetupPending()).toBe(true);
       expect(await db.select({ id: users.id }).from(users)).toHaveLength(0);
     });
 
@@ -397,12 +387,12 @@ describe("first-run setup", () => {
       const db = getTestDb();
       await db.delete(loginEmails);
       await db.delete(users);
-      const { code } = await postgresSetupAdapter.getOrCreateCode();
+      const { code } = await getOrCreateSetupCode();
 
       const result = await completeSetupAction({ ...payload, setupCode: code });
       if (!result.ok) throw new Error(`expected setup to succeed, got ${result.code}`);
 
-      expect(await postgresSetupAdapter.isPending()).toBe(false);
+      expect(await isSetupPending()).toBe(false);
       expect(
         await db.query.ledgers.findFirst({
           where: and(eq(ledgers.id, result.ledgerId), isNull(ledgers.deletedAt)),
@@ -420,13 +410,13 @@ describe("first-run setup", () => {
       const db = getTestDb();
       await db.delete(loginEmails);
       await db.delete(users);
-      const { code } = await postgresSetupAdapter.getOrCreateCode();
+      const { code } = await getOrCreateSetupCode();
 
       await expect(
         completeSetupAction({ ...payload, setupCode: code, password: "a".repeat(99) + "1" })
       ).resolves.toEqual({ ok: false, code: "weak_password" });
 
-      expect(await postgresSetupAdapter.isPending()).toBe(true);
+      expect(await isSetupPending()).toBe(true);
     });
   });
 });

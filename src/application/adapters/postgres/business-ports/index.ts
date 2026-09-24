@@ -6,4 +6,3 @@ export * from "./service-credentials";
 export * from "./otp-tokens";
 export * from "./users";
 export * from "./books";
-export * from "./setup";

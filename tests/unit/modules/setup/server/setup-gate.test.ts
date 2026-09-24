@@ -6,13 +6,13 @@ const redirect = vi.fn<(url: string) => never>((url: string) => {
 });
 
 vi.mock("next/navigation", () => ({ redirect }));
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: { setup: { isPending: () => isPending() } },
+vi.mock("@/modules/setup/server/initial-account", () => ({
+  isSetupPending: () => isPending(),
 }));
 
 async function loadGate() {
   vi.resetModules();
-  return import("@/modules/setup/setup-gate");
+  return import("@/modules/setup/server/setup-gate");
 }
 
 describe("redirectToSetupIfPending", () => {

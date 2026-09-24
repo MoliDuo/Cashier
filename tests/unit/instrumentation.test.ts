@@ -12,7 +12,7 @@ const validateStartupEnv = vi.fn(() => ({
   S3_BUCKET: "cashier-images",
 }));
 
-const setupPort = {
+const setupMocks = {
   isPending: vi.fn(),
   getOrCreateCode: vi.fn(),
 };
@@ -25,15 +25,19 @@ vi.mock("@/lib/env/startup", () => ({
   validateStartupEnv,
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: { setup: setupPort },
+vi.mock("@/modules/setup/server/initial-account", () => ({
+  isSetupPending: setupMocks.isPending,
+}));
+
+vi.mock("@/modules/setup/server/setup-code", () => ({
+  getOrCreateSetupCode: setupMocks.getOrCreateCode,
 }));
 
 describe("instrumentation.register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_RUNTIME = "nodejs";
-    setupPort.isPending.mockResolvedValue(false);
+    setupMocks.isPending.mockResolvedValue(false);
   });
 
   it("validates startup env without installing process-global orchestration", async () => {
@@ -56,8 +60,8 @@ describe("instrumentation.register", () => {
   });
 
   it("prints the setup code at boot while setup is pending", async () => {
-    setupPort.isPending.mockResolvedValue(true);
-    setupPort.getOrCreateCode.mockResolvedValue({
+    setupMocks.isPending.mockResolvedValue(true);
+    setupMocks.getOrCreateCode.mockResolvedValue({
       code: "12345678",
       created: true,
       issuedAt: new Date("2026-09-18T01:00:00.000Z"),
@@ -75,10 +79,10 @@ describe("instrumentation.register", () => {
   });
 
   it("names when an unreadable code was issued instead of printing nothing", async () => {
-    setupPort.isPending.mockResolvedValue(true);
+    setupMocks.isPending.mockResolvedValue(true);
     // A code that was already issued has no readable plaintext left, so the log
     // reports its age rather than claiming to hand out a new one.
-    setupPort.getOrCreateCode.mockResolvedValue({
+    setupMocks.getOrCreateCode.mockResolvedValue({
       code: "",
       created: false,
       issuedAt: new Date("2026-09-18T01:00:00.000Z"),
@@ -94,7 +98,7 @@ describe("instrumentation.register", () => {
   });
 
   it("starts the process even when the setup check cannot run", async () => {
-    setupPort.isPending.mockRejectedValue(new Error("database is not migrated yet"));
+    setupMocks.isPending.mockRejectedValue(new Error("database is not migrated yet"));
 
     const { register } = await import("@/instrumentation");
 

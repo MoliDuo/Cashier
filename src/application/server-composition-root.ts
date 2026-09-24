@@ -6,7 +6,6 @@ import {
   postgresOtpTokenAdapter,
   postgresServiceCredentialAdapter,
   postgresSettingsAdapter,
-  postgresSetupAdapter,
   postgresUserAccountAdapter,
   calculateCompletedSourceDocumentTotal,
   getTargetSourceDocument,
@@ -95,7 +94,6 @@ export const serverComposition = {
   otpTokens: postgresOtpTokenAdapter,
   serviceCredentials: postgresServiceCredentialAdapter,
   settings: postgresSettingsAdapter,
-  setup: postgresSetupAdapter,
   storedFiles: storedFileAdapter,
   sourceDocumentAggregate: postgresSourceDocumentAggregateAdapter,
   sourceDocumentReads: {

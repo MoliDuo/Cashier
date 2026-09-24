@@ -4,8 +4,8 @@ import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { normalizeEmail } from "@/lib/utils/email";
 import { parseSetupInput } from "../contract-schemas";
-import { createInitialAccount } from "../application/create-initial-account";
-import { serverComposition } from "@/application/server-composition-root";
+import { createInitialAccount, isSetupPending } from "../server/initial-account";
+import { verifySetupCode } from "../server/setup-code";
 
 export type SetupErrorCode =
   | "already_done"
@@ -32,9 +32,9 @@ function isPasswordPolicyError(error: AppError): boolean {
  */
 export async function completeSetupAction(input: unknown): Promise<SetupActionResult> {
   try {
-    if (!(await serverComposition.setup.isPending())) return { ok: false, code: "already_done" };
+    if (!(await isSetupPending())) return { ok: false, code: "already_done" };
     const parsed = parseSetupInput(input);
-    const verdict = await serverComposition.setup.verifyCode(parsed.setupCode);
+    const verdict = await verifySetupCode(parsed.setupCode);
     if (verdict !== "accepted") {
       // Logged without the attempted value: the point is to show a lockout is
       // happening, not to record what was guessed.
@@ -43,14 +43,11 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
       if (verdict === "locked_out") return { ok: false, code: "code_locked_out" };
       return { ok: false, code: "wrong_code" };
     }
-    const result = await createInitialAccount(
-      {
-        bookNames: parsed.books,
-        email: normalizeEmail(parsed.email),
-        password: parsed.password,
-      },
-      serverComposition.setup
-    );
+    const result = await createInitialAccount({
+      bookNames: parsed.books,
+      email: normalizeEmail(parsed.email),
+      password: parsed.password,
+    });
     logger.info(
       { ledgerSubject: result.ledgerId },
       "First-run setup completed; the account and its books were created"

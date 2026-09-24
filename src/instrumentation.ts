@@ -30,16 +30,12 @@ export async function register() {
   //
   // Everything it needs is imported inside this Node-only branch: `register`
   // is also bundled for the edge runtime, and a static import of the setup
-  // module would pull `node:crypto` into that bundle and fail to compile. The
-  // composition root is loaded the same way, because it builds the database and
-  // storage clients. Neither an unreachable nor a still-migrating database may
-  // stop the process from starting, so the whole check is guarded.
+  // module would pull `node:crypto` and the database client into that bundle
+  // and fail to compile. Neither an unreachable nor a still-migrating database
+  // may stop the process from starting, so the whole check is guarded.
   try {
-    const [{ logPendingSetupAtBoot }, { serverComposition }] = await Promise.all([
-      import("@/modules/setup/setup-code"),
-      import("@/application/server-composition-root"),
-    ]);
-    await logPendingSetupAtBoot(serverComposition.setup);
+    const { logPendingSetupAtBoot } = await import("@/modules/setup/server/setup-banner");
+    await logPendingSetupAtBoot();
   } catch (error) {
     logger.debug({ error }, "Skipped the first-run setup check at boot");
   }

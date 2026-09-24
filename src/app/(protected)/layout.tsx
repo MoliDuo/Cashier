@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Providers } from "@/components/providers";
 import { resolveAuthenticatedHome } from "@/modules/workspace/server/resolve-authenticated-home";
 import { UnauthorizedError } from "@/lib/errors";
-import { redirectToSetupIfPending } from "@/modules/setup/setup-gate";
+import { redirectToSetupIfPending } from "@/modules/setup/server/setup-gate";
 
 /**
  * Every route under here reads the session and the setup state, so there is
