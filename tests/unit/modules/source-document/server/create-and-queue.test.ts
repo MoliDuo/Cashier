@@ -28,9 +28,9 @@ vi.mock("@/modules/source-document/server/submissions", () => ({
 vi.mock("@/server/processing/schedule", () => ({
   scheduleProcessingAfter: scheduleProcessing,
 }));
-vi.mock("@/application/adapters/storage", () => ({
-  storedFileAdapter: { createUploadPlan, uploadTarget, finalizeUpload, abandonUploadSession },
-}));
+vi.mock("@/server/stored-files/upload-plans", () => ({ createUploadPlan, abandonUploadSession }));
+vi.mock("@/server/stored-files/proxy-uploads", () => ({ uploadTarget }));
+vi.mock("@/server/stored-files/upload-finalization", () => ({ finalizeUpload }));
 vi.mock("@/lib/storage/image-processing", () => ({ processImage }));
 
 import { createAndQueueSourceDocument } from "@/modules/source-document/server/create-and-queue";

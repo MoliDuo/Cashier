@@ -4,8 +4,7 @@ import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import type { SourceDocumentSubmissionContract } from "@/application/contracts";
 import { toSourceDocumentSubmissionContract } from "@/application/contracts";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
-import { processImage } from "@/lib/storage/image-processing";
-import { storedFileAdapter } from "@/application/adapters/storage";
+import { abandonUploadSession } from "@/server/stored-files/upload-plans";
 import { scheduleProcessingAfter } from "@/server/processing/schedule";
 import { submitSourceDocument, submitSourceDocumentIdempotently } from "./submissions";
 import type { PreparedInlineImage } from "@/modules/source-document/api-v1-policy";
@@ -56,9 +55,7 @@ export async function createAndQueueSourceDocument(
   const prepareSubmission = async () => {
     const resolvedDate = resolveDocumentDate(input.documentDate, input.timezone);
     const preparedImages =
-      inlineImages.length > 0
-        ? await prepareInlineImages(inlineImages, storedFileAdapter, processImage, input.ledgerId)
-        : null;
+      inlineImages.length > 0 ? await prepareInlineImages(inlineImages, input.ledgerId) : null;
     createdUploadSessionId = preparedImages?.uploadSessionId ?? null;
     const processedImageIds = preparedImages?.storedFileIds ?? [];
 
@@ -82,7 +79,7 @@ export async function createAndQueueSourceDocument(
   } catch (error) {
     if (createdUploadSessionId != null) {
       try {
-        await storedFileAdapter.abandonUploadSession(input.ledgerId, createdUploadSessionId);
+        await abandonUploadSession(input.ledgerId, createdUploadSessionId);
       } catch {
         // prepareInlineImages already records cleanup diagnostics; preserve the submission error.
       }

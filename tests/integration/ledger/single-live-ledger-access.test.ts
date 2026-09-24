@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import {
@@ -7,9 +7,13 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 import { ledgers, storedFiles, users } from "@/persistence";
-import { postgresAuthorizedFileRepository } from "@/application/adapters/postgres/authorized-files";
+import { readAuthorizedFile } from "@/server/stored-files/reads";
 import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
 import { createTestSourceDocument } from "tests/helpers/schema-setup";
+
+vi.mock("@/lib/storage/s3", () => ({
+  getS3Storage: () => ({ download: async () => Buffer.from("fixture") }),
+}));
 
 /**
  * The access rule that replaced the `COUPLE_*` config: the account must be live
@@ -60,8 +64,12 @@ describe("single live ledger access", () => {
 
     await createTestSourceDocument(db, ledgerId, { imageUrls: ["fixture"] });
     const file = (await db.select().from(storedFiles))[0]!;
-    expect(await postgresAuthorizedFileRepository.findForUser(userId, file.id)).not.toBeNull();
-    expect(await postgresAuthorizedFileRepository.findForUser(deleted, file.id)).toBeNull();
+    const readAs = async (id: string) => {
+      const ledger = await getLiveLedger(id);
+      return ledger == null ? null : readAuthorizedFile(ledger.id, file.id);
+    };
+    expect(await readAs(userId)).not.toBeNull();
+    expect(await readAs(deleted)).toBeNull();
   });
 
   it("never provisions a personal ledger for an account without one", async () => {

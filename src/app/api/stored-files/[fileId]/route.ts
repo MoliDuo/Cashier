@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { serverComposition } from "@/application/server-composition-root";
 import { requireAuth } from "@/lib/auth-actions";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handlers";
 import { UUID_REGEX } from "@/lib/validation";
+import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
+import { streamAuthorizedFile } from "@/server/stored-files/reads";
 
 const CACHE_CONTROL = "private, no-store";
 
@@ -19,7 +20,8 @@ export async function GET(
     if (!UUID_REGEX.test(fileId)) {
       throw new AppError("Invalid stored file ID", "VALIDATION_ERROR", 400);
     }
-    const read = await serverComposition.storedFiles.readAuthorizedStreamForUser(userId, fileId);
+    const ledger = await getLiveLedger(userId);
+    const read = ledger == null ? null : await streamAuthorizedFile(ledger.id, fileId);
     if (read == null) throw new AppError("Stored file not found", "FILE_NOT_FOUND", 404);
     return new NextResponse(read.body, {
       status: 200,

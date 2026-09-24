@@ -1,47 +1,13 @@
+import "server-only";
 import crypto from "node:crypto";
-import type { StoredFileContract, UploadFileRequestContract } from "@/application/contracts";
-import {
-  postgresAuthorizedFileRepository,
-  type AuthorizedFileRepository,
-} from "@/application/adapters/postgres/authorized-files";
-import {
-  postgresUploadSessionRepository,
-  type UploadSessionRepository,
-} from "@/application/adapters/postgres/upload-sessions";
+import type { StoredFileContract, UploadFileRequestContract } from "./types";
 import { ValidationError } from "@/lib/errors";
-import type { ObjectStore } from "@/lib/storage";
-import { getS3Storage } from "@/lib/storage/s3";
 import {
   MAX_FILES,
   MAX_ORIGINAL_BYTES_PER_FILE,
   SUPPORTED_MIME_SET,
 } from "@/lib/storage/upload-policy";
 import { storedFiles } from "@/persistence";
-
-export interface StoredFileAdapterDependencies {
-  storage?: ObjectStore;
-  now?: () => Date;
-  authorizedFiles?: AuthorizedFileRepository;
-  uploadSessions?: UploadSessionRepository;
-}
-
-export interface ResolvedStoredFileAdapterDependencies {
-  storage: ObjectStore;
-  now: () => Date;
-  authorizedFiles: AuthorizedFileRepository;
-  uploadSessions: UploadSessionRepository;
-}
-
-export function resolveStoredFileAdapterDependencies(
-  dependencies: StoredFileAdapterDependencies = {}
-): ResolvedStoredFileAdapterDependencies {
-  return {
-    storage: dependencies.storage ?? getS3Storage(),
-    now: dependencies.now ?? (() => new Date()),
-    authorizedFiles: dependencies.authorizedFiles ?? postgresAuthorizedFileRepository,
-    uploadSessions: dependencies.uploadSessions ?? postgresUploadSessionRepository,
-  };
-}
 
 export function tokenHash(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -60,7 +26,6 @@ export function safeTokenMatches(token: string, expectedHash: string): boolean {
 export function mapStoredFile(row: typeof storedFiles.$inferSelect): StoredFileContract {
   return {
     id: row.id,
-    ownerLedgerId: row.ledgerId,
     metadata: {
       contentType: row.contentType,
       byteSize: row.byteSize,

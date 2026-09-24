@@ -316,6 +316,23 @@ describe("processing outbox jobs", () => {
     ).resolves.toBe(true);
   });
 
+  it("accepts a completion once and treats a repeated completion as a no-op", async () => {
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const adapter = processingJobs();
+    await adapter.dispatch(job);
+    const claim = await adapter.claim(job.id);
+    expect(claim).not.toBeNull();
+
+    const complete = () =>
+      adapter.complete({
+        jobId: job.id,
+        claimToken: claim!.claimToken,
+        processingStatus: "completed",
+      });
+    await expect(complete()).resolves.toBe(true);
+    await expect(complete()).resolves.toBe(false);
+  });
+
   it("returns false on duplicate claim", async () => {
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();

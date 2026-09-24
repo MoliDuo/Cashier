@@ -1,4 +1,4 @@
-import type { LedgerId, StoredFileId, UploadSessionId } from "./source-documents";
+import type { LedgerId, StoredFileId, UploadSessionId } from "@/application/contracts";
 
 interface TrustedFileMetadata {
   contentType: string;
@@ -9,14 +9,13 @@ interface TrustedFileMetadata {
 
 export interface StoredFileContract {
   id: StoredFileId;
-  ownerLedgerId: LedgerId;
   metadata: TrustedFileMetadata;
   createdAt: string;
 }
 
 /**
  * A slot in an upload session. A server-side upload writes to it through the
- * adapter, so the id is all it needs; only a plan the browser has to execute
+ * server, so the id is all it needs; only a plan the browser has to execute
  * itself carries somewhere to send the bytes.
  */
 interface UploadTargetContract {
@@ -53,40 +52,10 @@ export interface UploadFinalizationContract {
   uploadSessionId: UploadSessionId;
   finalizationToken: string;
   targetIds: readonly string[];
-  ownerLedgerId?: LedgerId;
+  ledgerId: LedgerId;
 }
 
 export interface AuthorizedFileReadContract {
   file: StoredFileContract;
   body: Uint8Array;
-}
-
-interface UploadPlanningPort {
-  createUploadPlan(
-    ledgerId: LedgerId,
-    files?: readonly UploadFileRequestContract[]
-  ): Promise<UploadPlanContract>;
-}
-
-interface UploadFinalizationPort {
-  finalizeUpload(input: UploadFinalizationContract): Promise<readonly StoredFileContract[]>;
-}
-
-interface AuthorizedStoredFilePort {
-  readAuthorized(
-    ledgerId: LedgerId,
-    fileId: StoredFileId
-  ): Promise<AuthorizedFileReadContract | null>;
-}
-
-export interface StoredFilePort
-  extends UploadPlanningPort, UploadFinalizationPort, AuthorizedStoredFilePort {}
-
-export interface DirectStoredFilePort extends StoredFilePort {
-  createDirectUploadPlan(
-    ledgerId: LedgerId,
-    files: readonly UploadFileRequestContract[]
-  ): Promise<DirectUploadPlanContract>;
-  finalizeDirectUpload(input: UploadFinalizationContract): Promise<readonly StoredFileContract[]>;
-  abandonUploadSession(ledgerId: LedgerId, uploadSessionId: string): Promise<void>;
 }

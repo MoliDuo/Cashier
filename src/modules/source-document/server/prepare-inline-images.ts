@@ -1,40 +1,12 @@
-import type {
-  StoredFileContract,
-  UploadFileRequestContract,
-  UploadFinalizationContract,
-  UploadPlanContract,
-} from "@/application/contracts";
+import "server-only";
 import { ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
+import { processImage } from "@/lib/storage/image-processing";
 import type { PreparedInlineImage } from "@/modules/source-document/api-v1-policy";
-
-/**
- * Interface for the stored-files operations needed by prepareInlineImages.
- * This is a narrow local dependency shape — deliberately not the full
- * StoredFilePort so the helper stays testable without the rest of the
- * storage machinery.
- */
-export interface InlineImageUploader {
-  createUploadPlan(
-    ledgerId: string,
-    files: readonly UploadFileRequestContract[]
-  ): Promise<UploadPlanContract>;
-  uploadTarget(input: {
-    ledgerId: string;
-    uploadSessionId: string;
-    targetId: string;
-    contentType: string;
-    body: Uint8Array;
-  }): Promise<StoredFileContract>;
-  finalizeUpload(input: UploadFinalizationContract): Promise<readonly StoredFileContract[]>;
-  abandonUploadSession(ledgerId: string, uploadSessionId: string): Promise<void>;
-}
-
-export type ImageProcessor = (
-  buffer: Buffer,
-  mimeType: string
-) => Promise<{ buffer: Buffer; mimeType: string }>;
+import { uploadTarget } from "@/server/stored-files/proxy-uploads";
+import { finalizeUpload } from "@/server/stored-files/upload-finalization";
+import { abandonUploadSession, createUploadPlan } from "@/server/stored-files/upload-plans";
 
 /**
  * Process already-decoded images via Sharp, upload them to internal storage,
@@ -46,8 +18,6 @@ export type ImageProcessor = (
  */
 export async function prepareInlineImages(
   images: PreparedInlineImage[],
-  storedFiles: InlineImageUploader,
-  processImage: ImageProcessor,
   ledgerId: string
 ): Promise<{ storedFileIds: string[]; uploadSessionId: string }> {
   // Process every image before creating durable upload state.
@@ -59,7 +29,7 @@ export async function prepareInlineImages(
   );
 
   // Phase 2: create a single upload plan covering all images
-  const plan = await storedFiles.createUploadPlan(
+  const plan = await createUploadPlan(
     ledgerId,
     processedImages.map((img) => ({
       contentType: img.mimeType,
@@ -69,7 +39,7 @@ export async function prepareInlineImages(
   );
   const abandon = async () => {
     try {
-      await storedFiles.abandonUploadSession(ledgerId, plan.id);
+      await abandonUploadSession(ledgerId, plan.id);
     } catch {
       logger.error(
         {
@@ -87,7 +57,7 @@ export async function prepareInlineImages(
     await Promise.all(
       plan.targets.map(async (target, index) => {
         const processed = processedImages[index]!;
-        await storedFiles.uploadTarget({
+        await uploadTarget({
           ledgerId,
           uploadSessionId: plan.id,
           targetId: target.id,
@@ -96,7 +66,8 @@ export async function prepareInlineImages(
         });
       })
     );
-    const finalized = await storedFiles.finalizeUpload({
+    const finalized = await finalizeUpload({
+      ledgerId,
       uploadSessionId: plan.id,
       finalizationToken: plan.finalizationToken,
       targetIds: plan.targets.map((t) => t.id),

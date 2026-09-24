@@ -4,7 +4,10 @@ import type { ObjectStore } from "@/lib/storage";
 import { eq } from "drizzle-orm";
 import { Pool, type PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
-import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
+import { uploadTarget } from "@/server/stored-files/proxy-uploads";
+import { finalizeUpload } from "@/server/stored-files/upload-finalization";
+import { createUploadPlan } from "@/server/stored-files/upload-plans";
+import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import {
   ledgerEntries,
@@ -32,59 +35,22 @@ import {
 import { processingJobs } from "tests/helpers/processing-jobs";
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 
-class MemoryFileStore implements ObjectStore {
-  readonly files = new Map<string, Buffer>();
+const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
+vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
 
-  async upload(key: string, data: Buffer): Promise<string> {
-    this.files.set(key, Buffer.from(data));
-    return `/private/${key}`;
-  }
-
-  async download(key: string): Promise<Buffer> {
-    return Buffer.from(this.files.get(key) ?? []);
-  }
-
-  async stream(key: string): Promise<ReadableStream<Uint8Array>> {
-    const bytes = await this.download(key);
-    return new ReadableStream({
-      start(controller) {
-        controller.enqueue(new Uint8Array(bytes));
-        controller.close();
-      },
-    });
-  }
-
-  async presignUpload(
-    _key: string,
-    _contentType: string,
-    _sha256: string,
-    _expiresInSeconds: number
-  ): ReturnType<ObjectStore["presignUpload"]> {
-    throw new Error("Unexpected direct upload in proxy storage fixture");
-  }
-
-  async readObject(_key: string): ReturnType<ObjectStore["readObject"]> {
-    throw new Error("Unexpected object inspection in proxy storage fixture");
-  }
-
-  async delete(key: string): Promise<{ success: boolean }> {
-    return { success: this.files.delete(key) };
-  }
-}
-
-async function finalizedFile(adapter: StoredFileAdapter, ledgerId: string, body: Buffer) {
-  const plan = await adapter.createUploadPlan(ledgerId, [
+async function finalizedFile(ledgerId: string, body: Buffer) {
+  const plan = await createUploadPlan(ledgerId, [
     { contentType: "image/jpeg", byteSize: body.length, originalFilename: "receipt.jpg" },
   ]);
-  await adapter.uploadTarget({
+  await uploadTarget({
     ledgerId,
     uploadSessionId: plan.id,
     targetId: plan.targets[0]!.id,
     contentType: "image/jpeg",
     body,
   });
-  const [file] = await adapter.finalizeUpload({
-    ownerLedgerId: ledgerId,
+  const [file] = await finalizeUpload({
+    ledgerId,
     uploadSessionId: plan.id,
     finalizationToken: plan.finalizationToken,
     targetIds: [plan.targets[0]!.id],
@@ -188,8 +154,8 @@ describe("target source-document submissions", () => {
   it("atomically creates text, image, and mixed pending revisions with durable intents", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const storage = createStoredFileAdapter({ storage: new MemoryFileStore() });
-    const image = await finalizedFile(storage, ledgerId, Buffer.from("image"));
+    objectStore.current = new MemoryObjectStore();
+    const image = await finalizedFile(ledgerId, Buffer.from("image"));
 
     const text = await submitSourceDocument({
       ledgerId,
@@ -364,8 +330,8 @@ describe("target source-document submissions", () => {
   it("inherits immutable evidence on retry and deduplicates post-commit dispatch", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const storage = createStoredFileAdapter({ storage: new MemoryFileStore() });
-    const image = await finalizedFile(storage, ledgerId, Buffer.from("image"));
+    objectStore.current = new MemoryObjectStore();
+    const image = await finalizedFile(ledgerId, Buffer.from("image"));
     const initial = await submitSourceDocument({
       ledgerId,
       input: { text: "original", storedFileIds: [image.id], documentDate: null },
@@ -403,12 +369,12 @@ describe("target source-document submissions", () => {
   it("rejects inherited evidence retry when previous revision exceeds MAX_FILES", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const storage = createStoredFileAdapter({ storage: new MemoryFileStore() });
+    objectStore.current = new MemoryObjectStore();
 
     // Create MAX_FILES + 1 finalized stored files
     const body = Buffer.from("tiny");
     const files = await Promise.all(
-      Array.from({ length: MAX_FILES + 1 }, () => finalizedFile(storage, ledgerId, body))
+      Array.from({ length: MAX_FILES + 1 }, () => finalizedFile(ledgerId, body))
     );
 
     // Create a revision with MAX_FILES files via the normal path (this succeeds)
@@ -461,10 +427,10 @@ describe("target source-document submissions", () => {
       undefined,
       crypto.randomUUID()
     );
-    const storage = createStoredFileAdapter({ storage: new MemoryFileStore() });
-    const first = await finalizedFile(storage, ledgerId, Buffer.from("first"));
-    const second = await finalizedFile(storage, ledgerId, Buffer.from("second"));
-    const other = await finalizedFile(storage, otherLedgerId, Buffer.from("other"));
+    objectStore.current = new MemoryObjectStore();
+    const first = await finalizedFile(ledgerId, Buffer.from("first"));
+    const second = await finalizedFile(ledgerId, Buffer.from("second"));
+    const other = await finalizedFile(otherLedgerId, Buffer.from("other"));
     const submitted = await submitSourceDocument({
       ledgerId,
       input: { text: null, storedFileIds: [second.id, first.id], documentDate: null },
