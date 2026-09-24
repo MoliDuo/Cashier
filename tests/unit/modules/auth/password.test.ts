@@ -403,7 +403,7 @@ describe("shared password rules", () => {
       expect(closure.external).not.toContain(forbidden);
     }
     for (const file of closure.files) {
-      expect(file.startsWith("src/application/")).toBe(false);
+      expect(file.startsWith("src/server/")).toBe(false);
       expect(file.startsWith("src/persistence/")).toBe(false);
       expect(file).not.toBe("src/lib/db.ts");
     }

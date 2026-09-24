@@ -6,10 +6,10 @@ import type {
   ProcessingJobContract,
   ProcessingRecoveryConfig,
   RecoverableProcessingJobContract,
-} from "@/application/contracts";
+} from "@/server/processing/types";
 import { db } from "@/lib/db";
 import { processingOutbox } from "@/persistence";
-import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
 

@@ -3,7 +3,7 @@ import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { AppError, ConflictError } from "@/lib/errors";
 import { getCurrencyDecimals } from "@/lib/money/currency-precision";
 import { currencyRates, ledgerEntries, sourceDocuments } from "@/persistence";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 export async function recalculateCurrentEntries(
   tx: PostgresTransaction,

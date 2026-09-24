@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
 import { ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import { toStableFailureCode } from "@/application/contracts";
+import { toStableFailureCode } from "@/modules/source-document/lifecycle";
 import { accountingTotal } from "@/lib/money/accounting-total";
 import type { CredentialSourceDocumentStatusResult } from "@/modules/source-document/contracts";
 

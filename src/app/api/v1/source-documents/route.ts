@@ -3,10 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 export const maxDuration = 120;
 import { createSourceDocumentFromCredentialRequest } from "@/modules/source-document/server/create-from-credential-request";
 import { AppError, ValidationError } from "@/lib/errors";
-import {
-  ApiV1HandlerFailure,
-  handleApiV1Route,
-} from "@/application/transport/api-v1/request-pipeline";
+import { ApiV1HandlerFailure, handleApiV1Route } from "@/server/api-v1/request-pipeline";
 import { toApiV1SourceDocumentCreateResponse } from "@/app/api/v1/_shared/compatibility";
 import {
   apiV1IdempotencyKeySchema,

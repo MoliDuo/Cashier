@@ -2,10 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import {
-  lockLedgerForUpdate,
-  lockSourceDocumentForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import {
   assertExpectedSourceDocumentVersion,
   ledgerScopedRevisionWhere,

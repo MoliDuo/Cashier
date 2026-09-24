@@ -1,15 +1,11 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import "server-only";
 import type {
-  LedgerId,
-  ProcessingLeaseContract,
   RevisionFailureKind,
-  RevisionId,
   RevisionProcessingStatus,
-  SourceDocumentContract,
-  SourceDocumentId,
-  SourceDocumentRevisionContract,
-} from "@/application/contracts";
+  SupportedSourceDocumentAction,
+} from "@/modules/source-document/lifecycle";
+import type { ProcessingLeaseContract } from "@/server/processing/types";
 import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
@@ -25,8 +21,8 @@ import {
   lockBookForShare,
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+} from "@/lib/db/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
 export type CreatePendingRevisionInput = {
@@ -235,9 +231,9 @@ export async function createProcessingRevisionInTransaction(
 }
 
 export interface RecordProcessingFailureInput {
-  ledgerId: LedgerId;
-  sourceDocumentId: SourceDocumentId;
-  revisionId: RevisionId;
+  ledgerId: string;
+  sourceDocumentId: string;
+  revisionId: string;
   failureKind: RevisionFailureKind;
   /**
    * User-facing text. `null` when the failure carries no explanation, in
@@ -319,4 +315,21 @@ export async function recordProcessingFailure(
       );
     return true;
   });
+}
+
+export interface SourceDocumentContract {
+  id: string;
+  ledgerId: string;
+  version: number;
+  activeRevisionId: string | null;
+  latestSubmissionRevisionId: string | null;
+  supportedActions: readonly SupportedSourceDocumentAction[];
+}
+
+export interface SourceDocumentRevisionContract {
+  id: string;
+  sourceDocumentId: string;
+  processingStatus: RevisionProcessingStatus | null;
+  submittedAt: string;
+  finishedAt: string | null;
 }

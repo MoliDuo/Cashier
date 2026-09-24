@@ -5,7 +5,7 @@ import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare, round } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { ledgerEntries, ledgers, books, sourceDocuments } from "@/persistence";
-import type { LedgerProjectionEntryContract } from "@/application/contracts";
+import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import type {
   BatchUpdateSourceDocumentsResultDto,
   SaveSourceDocumentChangesResultDto,
@@ -20,7 +20,7 @@ import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   lockSourceDocumentsForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+} from "@/lib/db/transaction-locks";
 import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { hasEditableActiveProjection } from "./write-guards";

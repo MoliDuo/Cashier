@@ -1,6 +1,9 @@
 import { and, eq, sql } from "drizzle-orm";
 import "server-only";
-import type { ActivateRevisionInput, CreateManualDocumentInput } from "@/application/contracts";
+import type {
+  ActivateRevisionInput,
+  CreateManualDocumentInput,
+} from "@/modules/source-document/server/projections/types";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
@@ -8,7 +11,7 @@ import {
   lockBookForShare,
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+} from "@/lib/db/transaction-locks";
 import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
 import { LedgerMainCurrencyChangedError, activeDocumentWhere, replaceProjection } from "./shared";

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import { handleApiV1Route } from "@/application/transport/api-v1/request-pipeline";
+import { handleApiV1Route } from "@/server/api-v1/request-pipeline";
 
 const { rateLimiterMock, serviceCredentialsMock, getClientIPFromHeadersMock, loggerMock } =
   vi.hoisted(() => ({

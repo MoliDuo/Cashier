@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LedgerMainCurrencyChangedError } from "@/application/contracts";
+import { LedgerMainCurrencyChangedError } from "@/modules/source-document/server/projections/shared";
 import type { AIContext } from "@/lib/tasks/types";
 import { ProcessingFailure } from "@/modules/source-document/application/parse-source-document/contracts";
 

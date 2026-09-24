@@ -1,7 +1,7 @@
 import { logger } from "./logger";
 import { AppError } from "./errors";
 import { ValidationError } from "./errors";
-import { toApplicationError } from "@/application/contracts/errors";
+import { toApplicationError } from "@/lib/application-errors";
 
 /**
  * Standard error response format

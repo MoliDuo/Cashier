@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import { recalculateCurrentEntries } from "@/modules/source-document/server/projections/recalculate-current-entries";
 
 export async function recalculateLedgerForDate(ledgerId: string, date: string): Promise<number> {

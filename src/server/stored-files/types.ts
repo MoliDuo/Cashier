@@ -1,5 +1,3 @@
-import type { LedgerId, StoredFileId, UploadSessionId } from "@/application/contracts";
-
 interface TrustedFileMetadata {
   contentType: string;
   byteSize: number;
@@ -8,7 +6,7 @@ interface TrustedFileMetadata {
 }
 
 export interface StoredFileContract {
-  id: StoredFileId;
+  id: string;
   metadata: TrustedFileMetadata;
   createdAt: string;
 }
@@ -35,7 +33,7 @@ export interface UploadFileRequestContract {
 }
 
 export interface UploadPlanContract {
-  id: UploadSessionId;
+  id: string;
   expiresAt: string;
   targets: readonly UploadTargetContract[];
   finalizationToken: string;
@@ -49,10 +47,10 @@ export interface DirectUploadPlanContract extends Omit<UploadPlanContract, "targ
 }
 
 export interface UploadFinalizationContract {
-  uploadSessionId: UploadSessionId;
+  uploadSessionId: string;
   finalizationToken: string;
   targetIds: readonly string[];
-  ledgerId: LedgerId;
+  ledgerId: string;
 }
 
 export interface AuthorizedFileReadContract {

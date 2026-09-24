@@ -11,10 +11,7 @@ import type {
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
 import { convertAmounts } from "@/modules/currency/server/exchange-rates";
-import {
-  lockLedgerForUpdate,
-  lockSourceDocumentForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
 import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
 import { getSourceDocumentInTransaction } from "./reads/list";

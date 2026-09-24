@@ -3,7 +3,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import type {
   RevisionProcessingContextContract,
   RevisionProcessingRequestContract,
-} from "@/application/contracts";
+} from "@/server/processing/types";
 import { db } from "@/lib/db";
 import {
   entryCategories,

@@ -19,8 +19,8 @@ import type {
   CategoryAssignmentResultPageDto,
   CategoryAssignmentSelectionEntry,
 } from "@/modules/ledger/contracts";
-import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 const PREPARING_TTL_MS = 15 * 60_000;
 

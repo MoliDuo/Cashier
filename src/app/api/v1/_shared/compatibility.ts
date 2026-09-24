@@ -1,4 +1,4 @@
-import type { SourceDocumentSubmissionContract } from "@/application/contracts";
+import type { SourceDocumentSubmissionContract } from "@/modules/source-document/server/submissions";
 
 export interface ApiV1SourceDocumentCreateResponse {
   sourceDocumentId: string;

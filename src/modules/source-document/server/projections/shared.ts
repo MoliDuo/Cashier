@@ -1,10 +1,9 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import type { LedgerProjectionEntryContract } from "@/application/contracts";
-export { LedgerMainCurrencyChangedError } from "@/application/contracts";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { isValidDecimal } from "@/lib/money/decimal";
 import { entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 export function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
   return and(
@@ -105,4 +104,10 @@ export async function replaceProjection(
       )
     );
   await insertRevisionEntries(tx, input);
+}
+
+export class LedgerMainCurrencyChangedError extends ConflictError {
+  constructor() {
+    super("Ledger currency changed before the projection was committed");
+  }
 }

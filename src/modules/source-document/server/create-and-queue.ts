@@ -1,12 +1,14 @@
 import "server-only";
 import { ValidationError } from "@/lib/errors";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
-import type { SourceDocumentSubmissionContract } from "@/application/contracts";
-import { toSourceDocumentSubmissionContract } from "@/application/contracts";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
 import { abandonUploadSession } from "@/server/stored-files/upload-plans";
 import { scheduleProcessingAfter } from "@/server/processing/schedule";
-import { submitSourceDocument, submitSourceDocumentIdempotently } from "./submissions";
+import {
+  submitSourceDocument,
+  submitSourceDocumentIdempotently,
+  type SourceDocumentSubmissionContract,
+} from "./submissions";
 import type { PreparedInlineImage } from "@/modules/source-document/api-v1-policy";
 import { prepareInlineImages } from "./prepare-inline-images";
 
@@ -87,5 +89,9 @@ export async function createAndQueueSourceDocument(
     throw error;
   }
   if (pending.idempotencyReplay !== true) scheduleProcessingAfter(pending.job, input.requestId);
-  return toSourceDocumentSubmissionContract(pending.document, pending.revision);
+  return {
+    sourceDocumentId: pending.document.id,
+    revisionId: pending.revision.id,
+    processingStatus: "processing",
+  };
 }

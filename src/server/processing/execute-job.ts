@@ -1,5 +1,6 @@
 import "server-only";
-import type { ProcessingFailureCode, ProcessingJobContract } from "@/application/contracts";
+import type { ProcessingFailureCode } from "@/modules/source-document/lifecycle";
+import type { ProcessingJobContract } from "@/server/processing/types";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";

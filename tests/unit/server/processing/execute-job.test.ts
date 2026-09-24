@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RevisionProcessingResultContract } from "@/application/contracts/processing";
+import type { RevisionProcessingResultContract } from "@/server/processing/types";
 import { ProcessingCancelledError } from "@/modules/source-document/application/parse-source-document/contracts";
 
 const job = {

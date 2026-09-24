@@ -4,10 +4,12 @@ import {
   apiV1Compatibility,
   toApiV1SourceDocumentCreateResponse,
 } from "@/app/api/v1/_shared/compatibility";
-import { toApplicationError } from "@/application/contracts/errors";
-import type { ApplicationErrorContract } from "@/application/contracts/errors";
+import { toApplicationError, type ApplicationErrorContract } from "@/lib/application-errors";
+import {
+  supportedSourceDocumentActions,
+  toStableFailureCode,
+} from "@/modules/source-document/lifecycle";
 import { AppError } from "@/lib/errors";
-import { supportedSourceDocumentActions, toStableFailureCode } from "@/application/contracts";
 
 describe("target application contracts", () => {
   it("exposes actions for stable document lifecycle states", () => {

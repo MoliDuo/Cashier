@@ -1,6 +1,5 @@
 import "server-only";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
-import type { LedgerId, StoredFileId } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
 import {
@@ -42,7 +41,7 @@ function authorizedFileQuery() {
 }
 
 /** A finalized file the ledger still references from a live source document. */
-async function findAuthorizedFile(ledgerId: LedgerId, fileId: StoredFileId) {
+async function findAuthorizedFile(ledgerId: string, fileId: string) {
   const rows = await authorizedFileQuery()
     .where(
       and(
@@ -58,8 +57,8 @@ async function findAuthorizedFile(ledgerId: LedgerId, fileId: StoredFileId) {
 }
 
 export async function readAuthorizedFile(
-  ledgerId: LedgerId,
-  fileId: StoredFileId
+  ledgerId: string,
+  fileId: string
 ): Promise<AuthorizedFileReadContract | null> {
   const row = await findAuthorizedFile(ledgerId, fileId);
   if (row == null) return null;
@@ -68,8 +67,8 @@ export async function readAuthorizedFile(
 }
 
 export async function streamAuthorizedFile(
-  ledgerId: LedgerId,
-  fileId: StoredFileId
+  ledgerId: string,
+  fileId: string
 ): Promise<{ file: StoredFileContract; body: ReadableStream<Uint8Array> } | null> {
   const row = await findAuthorizedFile(ledgerId, fileId);
   if (row == null) return null;

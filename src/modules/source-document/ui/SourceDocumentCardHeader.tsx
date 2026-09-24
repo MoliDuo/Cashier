@@ -4,7 +4,7 @@ import type {
   SourceDocumentListItemDto,
   SourceDocumentProcessingStatus,
 } from "@/modules/source-document/contracts";
-import type { SupportedSourceDocumentAction } from "@/application/contracts";
+import type { SupportedSourceDocumentAction } from "@/modules/source-document/lifecycle";
 import { memo, useRef } from "react";
 import { ChevronDown, CircleStop, MoreVertical, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";

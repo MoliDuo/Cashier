@@ -6,7 +6,7 @@ import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup
 import { executeProcessingJob } from "@/server/processing/execute-job";
 import { renewProcessingJobLease } from "@/server/processing/jobs";
 import { processingJobs } from "tests/helpers/processing-jobs";
-import type { ProcessingJobContract } from "@/application/contracts";
+import type { ProcessingJobContract } from "@/server/processing/types";
 import {
   ledgerEntries,
   processingOutbox,

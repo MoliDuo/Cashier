@@ -1,9 +1,4 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
-import type {
-  SourceDocumentSubmissionResult,
-  SourceDocumentIdempotencyInput,
-  SourceDocumentSubmissionInput,
-} from "@/application/contracts";
 import "server-only";
 import { db } from "@/lib/db";
 import {
@@ -19,8 +14,13 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import {
+  createProcessingRevisionInTransaction,
+  type SourceDocumentContract,
+  type SourceDocumentRevisionContract,
+} from "@/modules/source-document/server/revisions";
+import type { ProcessingJobContract } from "@/server/processing/types";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 const IDEMPOTENCY_WAIT_ATTEMPTS = 10;
 const IDEMPOTENCY_LEASE_MS = 30_000;
@@ -321,4 +321,41 @@ export async function submitSourceDocumentIdempotently(
   prepare: () => Promise<SourceDocumentSubmissionInput>
 ): Promise<SourceDocumentSubmissionResult> {
   return createIdempotentSubmission(idempotency, prepare);
+}
+
+export interface SourceDocumentSubmissionContract {
+  sourceDocumentId: string;
+  revisionId: string;
+  processingStatus: "processing";
+}
+
+export interface SourceDocumentSubmissionResult {
+  document: SourceDocumentContract;
+  revision: SourceDocumentRevisionContract;
+  job: ProcessingJobContract;
+  /** True when the result was replayed from an already-completed idempotent request. */
+  idempotencyReplay?: boolean;
+}
+
+/** Atomically persists submitted evidence and the durable work needed to process it. */
+export type SourceDocumentSubmissionInput = {
+  ledgerId: string;
+  expectedVersion?: number;
+  input?: SourceDocumentInputContract;
+  inheritInput?: boolean;
+  supersedeProcessing?: boolean;
+} & ({ sourceDocumentId: string; bookId?: string } | { sourceDocumentId?: never; bookId: string });
+
+export interface SourceDocumentInputContract {
+  text: string | null;
+  storedFileIds: readonly string[];
+  documentDate: string | null;
+  dateReference?: string | null;
+}
+
+export interface SourceDocumentIdempotencyInput {
+  principalType: "credential" | "user";
+  principalId: string;
+  key: string;
+  contentFingerprint: string | null;
 }

@@ -1,9 +1,8 @@
+import type { ProcessingLeaseContract } from "@/server/processing/types";
 import type {
-  LedgerId,
-  ProcessingLeaseContract,
-  RevisionId,
-  SourceDocumentId,
-} from "./source-documents";
+  DateHint,
+  DateOrganizationSuggestion,
+} from "@/modules/source-document/date-organization-contracts";
 
 export interface LedgerProjectionEntryContract {
   id?: string;
@@ -15,27 +14,25 @@ export interface LedgerProjectionEntryContract {
   convertedAmount: string | null;
   exchangeRate: string | null;
   createdAt?: string;
-  dateHint?: import("@/modules/source-document/date-organization-contracts").DateHint;
+  dateHint?: DateHint;
 }
 
 export interface ActivateRevisionInput {
-  ledgerId: LedgerId;
+  ledgerId: string;
   expectedMainCurrency: string;
-  sourceDocumentId: SourceDocumentId;
-  revisionId: RevisionId;
+  sourceDocumentId: string;
+  revisionId: string;
   title?: string | null;
   entries: readonly LedgerProjectionEntryContract[];
-  dateOrganizationSuggestion?:
-    | import("@/modules/source-document/date-organization-contracts").DateOrganizationSuggestion
-    | null;
+  dateOrganizationSuggestion?: DateOrganizationSuggestion | null;
   lease: ProcessingLeaseContract;
 }
 
 export interface CreateManualDocumentInput {
-  ledgerId: LedgerId;
+  ledgerId: string;
   bookId: string;
   expectedMainCurrency: string;
-  sourceDocumentId?: SourceDocumentId;
+  sourceDocumentId?: string;
   inputText?: string | null;
   title?: string | null;
   entryDate?: string | null;

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import type { ProcessingJobContract } from "@/application/contracts";
+import type { ProcessingJobContract } from "@/server/processing/types";
 import {
   ledgerEntries,
   ledgers,

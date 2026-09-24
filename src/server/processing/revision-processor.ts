@@ -1,9 +1,9 @@
 import "server-only";
+import { LedgerMainCurrencyChangedError } from "@/modules/source-document/server/projections/shared";
 import type {
   RevisionProcessingRequestContract,
   RevisionProcessingResultContract,
-} from "@/application/contracts";
-import { LedgerMainCurrencyChangedError } from "@/application/contracts";
+} from "@/server/processing/types";
 import { NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";

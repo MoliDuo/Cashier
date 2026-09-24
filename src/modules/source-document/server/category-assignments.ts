@@ -9,11 +9,11 @@ import {
   ledgerEntries,
   sourceDocuments,
 } from "@/persistence";
-import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { refreshCategoryAssignmentParentJob } from "@/server/category-reclassification/assignments";
 import { ConflictError } from "@/lib/errors";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 export interface ApplyCategoryAssignmentsInput {
   ledgerId: string;

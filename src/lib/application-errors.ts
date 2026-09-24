@@ -1,3 +1,5 @@
+import { AppError } from "@/lib/errors";
+
 export type ApplicationErrorCode =
   | "VALIDATION_FAILED"
   | "UNAUTHENTICATED"
@@ -17,14 +19,6 @@ export interface ApplicationErrorContract {
   code: ApplicationErrorCode;
   message: string;
   correlationId?: string;
-}
-
-import { AppError, ConflictError } from "@/lib/errors";
-
-export class LedgerMainCurrencyChangedError extends ConflictError {
-  constructor() {
-    super("Ledger currency changed before the projection was committed");
-  }
 }
 
 const APPLICATION_CODE_BY_APP_CODE: Readonly<Record<string, ApplicationErrorCode>> = {

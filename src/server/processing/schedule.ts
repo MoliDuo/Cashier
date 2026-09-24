@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import type { ProcessingJobContract } from "@/application/contracts";
+import type { ProcessingJobContract } from "@/server/processing/types";
 import { executeProcessingJob } from "./execute-job";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";

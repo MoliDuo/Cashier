@@ -9,11 +9,8 @@ import { NotFoundError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import type { VersionedCommandResult, VersionedTarget } from "@/modules/source-document/contracts";
 import type { DeleteSourceDocumentResultDto } from "@/modules/source-document/contracts";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
-import {
-  lockLedgerForUpdate,
-  lockSourceDocumentForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
+import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 
 async function softDeleteLockedSourceDocument(
   tx: PostgresTransaction,

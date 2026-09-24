@@ -1,10 +1,10 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import type { LedgerProjectionEntryContract } from "@/application/contracts";
+import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
 import type { DateOrganizationSuggestion } from "@/modules/source-document/date-organization-contracts";
 import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing, hasEditableActiveProjection } from "../write-guards";
 
 import {

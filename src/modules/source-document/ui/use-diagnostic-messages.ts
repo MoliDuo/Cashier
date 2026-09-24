@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { ProcessingFailureCode } from "@/application/contracts";
+import type { ProcessingFailureCode } from "@/modules/source-document/lifecycle";
 
 export function useDiagnosticMessages() {
   const t = useTranslations("DiagnosticCode");

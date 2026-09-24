@@ -4,7 +4,7 @@ import type {
   ProcessingFailureCode,
   RevisionFailureKind,
   SupportedSourceDocumentAction,
-} from "@/application/contracts";
+} from "@/modules/source-document/lifecycle";
 
 export interface SourceDocumentStoredFileDto {
   id: string;

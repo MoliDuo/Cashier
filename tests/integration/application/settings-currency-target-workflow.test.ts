@@ -2,7 +2,7 @@ import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LedgerMainCurrencyChangedError } from "@/application/contracts";
+import { LedgerMainCurrencyChangedError } from "@/modules/source-document/server/projections/shared";
 import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import {
   currencyRates,

@@ -10,7 +10,7 @@ import {
 import { logError } from "@/lib/error-handlers";
 import { books, ledgers, serviceCredentials } from "@/persistence";
 import { createToken, computeHash } from "@/lib/security/service-credential-token";
-import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import type {
   AuthenticatedServiceCredential,
   CreatedServiceCredentialDto,

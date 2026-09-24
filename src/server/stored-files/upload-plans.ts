@@ -1,7 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
 import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
-import type { LedgerId } from "@/application/contracts";
 import type {
   DirectUploadPlanContract,
   UploadFileRequestContract,
@@ -27,7 +26,7 @@ import { ledgers, uploadSessionFiles, uploadSessions } from "@/persistence";
 import { temporaryKey, tokenHash, validateRequests } from "./shared";
 
 export async function createUploadPlan(
-  ledgerId: LedgerId,
+  ledgerId: string,
   files: readonly UploadFileRequestContract[] = []
 ): Promise<UploadPlanContract> {
   validateRequests(files);
@@ -65,7 +64,7 @@ export async function createUploadPlan(
 }
 
 export async function createDirectUploadPlan(
-  ledgerId: LedgerId,
+  ledgerId: string,
   files: readonly UploadFileRequestContract[]
 ): Promise<DirectUploadPlanContract> {
   validateRequests(files);
@@ -130,7 +129,7 @@ export async function createDirectUploadPlan(
 }
 
 export async function abandonUploadSession(
-  ledgerId: LedgerId,
+  ledgerId: string,
   uploadSessionId: string
 ): Promise<void> {
   const targets = await db.transaction(async (tx) => {

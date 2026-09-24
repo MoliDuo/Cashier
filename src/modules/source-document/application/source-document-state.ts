@@ -2,7 +2,7 @@ import {
   supportedSourceDocumentActions,
   type RevisionProcessingStatus,
   type SupportedSourceDocumentAction,
-} from "@/application/contracts";
+} from "@/modules/source-document/lifecycle";
 
 export function deriveSourceDocumentCapabilities(input: {
   activeRevisionId: string | null;

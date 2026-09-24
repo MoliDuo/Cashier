@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import type { ProcessingJobContract } from "@/application/contracts";
+import type { ProcessingJobContract } from "@/server/processing/types";
 import { processingOutbox, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { processingJobs } from "tests/helpers/processing-jobs";

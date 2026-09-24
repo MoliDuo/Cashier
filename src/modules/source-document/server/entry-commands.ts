@@ -1,6 +1,6 @@
 import { assertExpenseAmountDirection } from "@/lib/money/expense-amount";
 import { and, eq, getTableColumns, inArray, isNull } from "drizzle-orm";
-import type { LedgerProjectionEntryContract } from "@/application/contracts";
+import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import type {
   AtomicBatchCommandResult,
   PartialBatchCommandResult,
@@ -15,12 +15,12 @@ import { roundToCurrency } from "@/lib/money/currency-precision";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { convertAmount, convertAmounts } from "@/modules/currency/server/exchange-rates";
 import { replaceActiveProjectionInTransaction } from "./projections/manual-entries";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   lockSourceDocumentsForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+} from "@/lib/db/transaction-locks";
 import { hasEditableActiveProjection } from "./write-guards";
 
 type EntryResult = VersionedCommandResult<{ ledgerEntryId: string }>;

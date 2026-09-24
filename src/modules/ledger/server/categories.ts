@@ -20,7 +20,7 @@ import {
   lockLedgerForUpdate,
   lockSourceDocumentsForUpdate,
   type PostgresTransaction,
-} from "@/application/adapters/postgres/transaction-locks";
+} from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 import { incrementCategoryChangedDocumentVersions } from "@/modules/source-document/server/category-assignments";

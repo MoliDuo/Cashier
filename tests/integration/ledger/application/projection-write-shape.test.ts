@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { getTestDb } from "../../../setup";
-import type { LedgerProjectionEntryContract } from "@/application/contracts";
+import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-setup";
 import {
   ledgerEntries,

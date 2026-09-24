@@ -4,7 +4,7 @@ import type {
   ProcessingJobContract,
   ProcessingRecoveryConfig,
   RevisionProcessingRequestContract,
-} from "@/application/contracts";
+} from "@/server/processing/types";
 import type { AIContext } from "@/lib/tasks/types";
 import { processRevision } from "@/server/processing/revision-processor";
 import { db } from "@/lib/db";

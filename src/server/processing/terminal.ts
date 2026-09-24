@@ -1,8 +1,8 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
-import type { ProcessingLeaseContract } from "@/application/contracts";
+import type { ProcessingLeaseContract } from "@/server/processing/types";
 import { processingOutbox } from "@/persistence";
-import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 export type ProcessingTerminalStatus = "completed" | "failed";
 

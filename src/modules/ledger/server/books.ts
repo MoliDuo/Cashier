@@ -4,7 +4,7 @@ import type { BookDto } from "@/modules/ledger/contracts";
 import { db } from "@/lib/db";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { books, serviceCredentials, sourceDocuments } from "@/persistence";
-import { lockLedgerForUpdate } from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 
 type BookRow = typeof books.$inferSelect;
 

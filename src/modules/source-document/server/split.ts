@@ -13,10 +13,7 @@ import { getSourceDocumentInTransaction } from "./reads/list";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
-import {
-  lockLedgerForUpdate,
-  lockSourceDocumentForUpdate,
-} from "@/application/adapters/postgres/transaction-locks";
+import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
 
 type EntrySnapshot = typeof ledgerEntries.$inferSelect;

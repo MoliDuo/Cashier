@@ -4,7 +4,10 @@ import type {
   SourceDocumentListItemDto,
   SourceDocumentLedgerEntryDto,
 } from "@/modules/source-document/contracts";
-import { toStableFailureCode, type ProcessingFailureCode } from "@/application/contracts";
+import {
+  toStableFailureCode,
+  type ProcessingFailureCode,
+} from "@/modules/source-document/lifecycle";
 import { accountingTotal } from "@/lib/money/accounting-total";
 import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
 import { compare as decimalCompare } from "@/lib/money/decimal";
