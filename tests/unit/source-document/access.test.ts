@@ -21,8 +21,8 @@ describe("withSourceDocumentLedgerAccess", () => {
     requireLedgerAccessMock.mockRejectedValue(notFound);
 
     const wrapped = withSourceDocumentLedgerAccess(async () => "ok");
-    await expect(wrapped("ledger-id")).rejects.toBe(notFound);
-    await expect(wrapped("ledger-id")).rejects.not.toBeInstanceOf(UnauthorizedError);
+    await expect(wrapped()).rejects.toBe(notFound);
+    await expect(wrapped()).rejects.not.toBeInstanceOf(UnauthorizedError);
   });
 
   it("preserves ForbiddenError from requireLedgerAccess", async () => {
@@ -30,8 +30,8 @@ describe("withSourceDocumentLedgerAccess", () => {
     requireLedgerAccessMock.mockRejectedValue(forbidden);
 
     const wrapped = withSourceDocumentLedgerAccess(async () => "ok");
-    await expect(wrapped("ledger-id")).rejects.toBe(forbidden);
-    await expect(wrapped("ledger-id")).rejects.not.toBeInstanceOf(UnauthorizedError);
+    await expect(wrapped()).rejects.toBe(forbidden);
+    await expect(wrapped()).rejects.not.toBeInstanceOf(UnauthorizedError);
   });
 
   it("preserves ValidationError from requireLedgerAccess", async () => {
@@ -39,7 +39,7 @@ describe("withSourceDocumentLedgerAccess", () => {
     requireLedgerAccessMock.mockRejectedValue(validation);
 
     const wrapped = withSourceDocumentLedgerAccess(async () => "ok");
-    await expect(wrapped("ledger-id")).rejects.toBe(validation);
-    await expect(wrapped("ledger-id")).rejects.not.toBeInstanceOf(UnauthorizedError);
+    await expect(wrapped()).rejects.toBe(validation);
+    await expect(wrapped()).rejects.not.toBeInstanceOf(UnauthorizedError);
   });
 });

@@ -40,7 +40,6 @@ describe("createLedgerEntryAction version CAS", () => {
 
   it("creates one entry, preserves a server UUID, and increments the document once", async () => {
     const result = await createLedgerEntryAction(
-      ledgerId,
       { sourceDocumentId, expectedVersion: 1 },
       { sourceDocumentId, amount: "50", currency: "CNY", itemName: "Lunch" }
     );
@@ -61,7 +60,6 @@ describe("createLedgerEntryAction version CAS", () => {
   it("returns stale for a lost-response retry and creates no second entry", async () => {
     const command = () =>
       createLedgerEntryAction(
-        ledgerId,
         { sourceDocumentId, expectedVersion: 1 },
         { sourceDocumentId, amount: "10", currency: "CNY", itemName: "Coffee" }
       );

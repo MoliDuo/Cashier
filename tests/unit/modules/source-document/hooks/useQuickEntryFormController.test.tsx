@@ -41,7 +41,6 @@ describe("useQuickEntryFormController", () => {
   it("uses the ledger time zone for the default civil date", () => {
     const { result } = renderHook(() =>
       useQuickEntryFormController({
-        ledgerId: "ledger-1",
         categories,
         mainCurrency: "CNY",
         timeZone: "Asia/Shanghai",
@@ -55,7 +54,6 @@ describe("useQuickEntryFormController", () => {
     const { result, rerender } = renderHook(
       ({ timeZone }: { timeZone: string | undefined }) =>
         useQuickEntryFormController({
-          ledgerId: "ledger-1",
           categories,
           mainCurrency: "CNY",
           ...(timeZone != null ? { timeZone } : {}),
@@ -75,7 +73,6 @@ describe("useQuickEntryFormController", () => {
     const { result, rerender } = renderHook(
       ({ mainCurrency }: { mainCurrency: string }) =>
         useQuickEntryFormController({
-          ledgerId: "ledger-1",
           categories,
           mainCurrency,
         }),
@@ -92,7 +89,6 @@ describe("useQuickEntryFormController", () => {
   it("submits a positive decimal amount with the unchanged date contract", () => {
     const { result } = renderHook(() =>
       useQuickEntryFormController({
-        ledgerId: "ledger-1",
         categories,
         mainCurrency: "CNY",
         timeZone: "Asia/Shanghai",
@@ -118,14 +114,13 @@ describe("useQuickEntryFormController", () => {
     const onSuccess = vi.fn();
     renderHook(() =>
       useQuickEntryFormController({
-        ledgerId: "ledger-1",
         categories,
         mainCurrency: "CNY",
         onSuccess,
       })
     );
 
-    const options = useLedgerMutationMock.mock.calls[0]?.[1] as {
+    const options = useLedgerMutationMock.mock.calls[0]?.[0] as {
       successMessage: string | null;
       onSuccess: (data: { sourceDocumentId: string }, variables: { entryDate: string }) => void;
     };

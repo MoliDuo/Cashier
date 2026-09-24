@@ -17,7 +17,7 @@ describe("useSourceDocumentDetailData", () => {
     const wrapper = ({ children }: PropsWithChildren) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-    const key = queryKeys.sourceDocument("ledger-1", "source-1");
+    const key = queryKeys.sourceDocument("source-1");
     let resolve!: (value: unknown) => void;
     getSourceDocumentDetailAction.mockReturnValue(
       new Promise((done) => {
@@ -25,7 +25,7 @@ describe("useSourceDocumentDetailData", () => {
       })
     );
     const { result } = renderHook(
-      () => useSourceDocumentDetailData({ ledgerId: "ledger-1", id: "source-1", open: true }),
+      () => useSourceDocumentDetailData({ id: "source-1", open: true }),
       { wrapper }
     );
     await waitFor(() => expect(getSourceDocumentDetailAction).toHaveBeenCalled());
@@ -44,7 +44,6 @@ describe("useSourceDocumentDetailData", () => {
   beforeEach(() => {
     getSourceDocumentDetailAction.mockReset().mockResolvedValue({
       id: "11111111-1111-4111-8111-111111111111",
-      ledgerId: "ledger-1",
       title: "Lunch",
       text: "receipt",
       files: [],
@@ -71,7 +70,6 @@ describe("useSourceDocumentDetailData", () => {
     const { result } = renderHook(
       () =>
         useSourceDocumentDetailData({
-          ledgerId: "ledger-1",
           id: "11111111-1111-4111-8111-111111111111",
           open: true,
         }),
@@ -81,7 +79,6 @@ describe("useSourceDocumentDetailData", () => {
     await waitFor(() => expect(result.current.sourceDocument?.title).toBe("Lunch"));
     expect(getSourceDocumentDetailAction).toHaveBeenCalledTimes(1);
     expect(getSourceDocumentDetailAction).toHaveBeenCalledWith(
-      "ledger-1",
       "11111111-1111-4111-8111-111111111111"
     );
   });
@@ -90,25 +87,21 @@ describe("useSourceDocumentDetailData", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     });
-    queryClient.setQueryData(
-      queryKeys.sourceDocument("ledger-1", "11111111-1111-4111-8111-111111111111"),
-      {
-        id: "11111111-1111-4111-8111-111111111111",
-        ledgerId: "ledger-1",
-        title: "Cached",
-        text: "receipt",
-        files: [],
-        processingStatus: "completed",
-        failureMessage: null,
-        documentDate: "2026-07-28",
-        createdAt: "2026-07-15T00:00:00.000Z",
-        ledgerEntries: [],
-        hasImages: false,
-        supportedActions: [],
-        errorCode: null,
-        latestSubmissionRevisionId: null,
-      }
-    );
+    queryClient.setQueryData(queryKeys.sourceDocument("11111111-1111-4111-8111-111111111111"), {
+      id: "11111111-1111-4111-8111-111111111111",
+      title: "Cached",
+      text: "receipt",
+      files: [],
+      processingStatus: "completed",
+      failureMessage: null,
+      documentDate: "2026-07-28",
+      createdAt: "2026-07-15T00:00:00.000Z",
+      ledgerEntries: [],
+      hasImages: false,
+      supportedActions: [],
+      errorCode: null,
+      latestSubmissionRevisionId: null,
+    });
     const wrapper = ({ children }: PropsWithChildren) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
@@ -116,7 +109,6 @@ describe("useSourceDocumentDetailData", () => {
     const { result } = renderHook(
       () =>
         useSourceDocumentDetailData({
-          ledgerId: "ledger-1",
           id: "11111111-1111-4111-8111-111111111111",
           open: true,
         }),
@@ -132,10 +124,9 @@ describe("useSourceDocumentDetailData", () => {
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     });
     queryClient.setQueryData(
-      queryKeys.sourceDocument("ledger-1", "11111111-1111-4111-8111-111111111111"),
+      queryKeys.sourceDocument("11111111-1111-4111-8111-111111111111"),
       {
         id: "11111111-1111-4111-8111-111111111111",
-        ledgerId: "ledger-1",
         title: "Cached",
         text: "receipt",
         files: [],
@@ -158,7 +149,6 @@ describe("useSourceDocumentDetailData", () => {
     const { result } = renderHook(
       () =>
         useSourceDocumentDetailData({
-          ledgerId: "ledger-1",
           id: "11111111-1111-4111-8111-111111111111",
           open: true,
         }),

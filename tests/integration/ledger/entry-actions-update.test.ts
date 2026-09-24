@@ -13,12 +13,11 @@ import {
 
 /** A single-entry edit is a one-entry batch: the UI has no other update path. */
 function updateEntry(
-  ledgerId: string,
   target: { sourceDocumentId: string; expectedVersion: number },
   entryId: string,
-  data: Parameters<typeof batchUpdateLedgerEntriesAction>[3]
+  data: Parameters<typeof batchUpdateLedgerEntriesAction>[2]
 ) {
-  return batchUpdateLedgerEntriesAction(ledgerId, [target], [entryId], data);
+  return batchUpdateLedgerEntriesAction([target], [entryId], data);
 }
 
 describe("single-entry update version CAS", () => {
@@ -52,7 +51,7 @@ describe("single-entry update version CAS", () => {
   });
 
   it("preserves the entry ID and increments the document exactly once", async () => {
-    const result = await updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+    const result = await updateEntry({ sourceDocumentId, expectedVersion: 1 }, entryId, {
       itemName: "Dinner",
     });
     expect(result).toEqual({
@@ -68,7 +67,7 @@ describe("single-entry update version CAS", () => {
   });
 
   it("does not write or increment for a no-op", async () => {
-    const result = await updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+    const result = await updateEntry({ sourceDocumentId, expectedVersion: 1 }, entryId, {
       itemName: "Lunch",
     });
     expect(result).toMatchObject({ ok: true, versions: [{ version: 1 }] });
@@ -85,7 +84,7 @@ describe("single-entry update version CAS", () => {
       .where(eq(ledgerEntries.id, entryId));
 
     await expect(
-      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry({ sourceDocumentId, expectedVersion: 1 }, entryId, {
         amount: "-6",
       })
     ).resolves.toMatchObject({ ok: true, versions: [{ version: 2 }] });
@@ -96,7 +95,7 @@ describe("single-entry update version CAS", () => {
     expect(entry).toMatchObject({ amount: "-6.000", convertedAmount: "-6.000" });
 
     await expect(
-      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 2 }, entryId, {
+      updateEntry({ sourceDocumentId, expectedVersion: 2 }, entryId, {
         amount: "6",
       })
     ).rejects.toBeInstanceOf(ValidationError);
@@ -108,7 +107,7 @@ describe("single-entry update version CAS", () => {
       .set({ version: 2 })
       .where(eq(sourceDocuments.id, sourceDocumentId));
     await expect(
-      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry({ sourceDocumentId, expectedVersion: 1 }, entryId, {
         itemName: "Stale",
       })
     ).resolves.toMatchObject({
@@ -128,12 +127,12 @@ describe("single-entry update version CAS", () => {
       release = resolve;
     });
     const first = barrier.then(() =>
-      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry({ sourceDocumentId, expectedVersion: 1 }, entryId, {
         itemName: "Dinner",
       })
     );
     const second = barrier.then(() =>
-      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry({ sourceDocumentId, expectedVersion: 1 }, entryId, {
         description: "Team meal",
       })
     );

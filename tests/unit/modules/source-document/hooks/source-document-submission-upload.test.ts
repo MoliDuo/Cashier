@@ -13,7 +13,7 @@ function uploadImage(byteSize = 1) {
 describe("source-document inline submission preparation", () => {
   it("leaves text-only submissions unchanged", async () => {
     await expect(
-      uploadSourceDocumentSubmissionImages("ledger-1", {
+      uploadSourceDocumentSubmissionImages({
         documentDate: "2026-07-15",
         storedFileIds: [],
         text: "Lunch",
@@ -31,7 +31,6 @@ describe("source-document inline submission preparation", () => {
     const put = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     const finalize = vi.fn().mockResolvedValue(["file-1"]);
     const result = await uploadSourceDocumentSubmissionImages(
-      "ledger-1",
       {
         documentDate: "2026-07-15",
         text: null,
@@ -56,7 +55,6 @@ describe("source-document inline submission preparation", () => {
   it("rejects compression failures instead of returning original bytes", async () => {
     await expect(
       uploadSourceDocumentSubmissionImages(
-        "ledger-1",
         {
           documentDate: "2026-07-15",
           text: null,
@@ -72,7 +70,6 @@ describe("source-document inline submission preparation", () => {
     const compress = vi.fn();
     await expect(
       uploadSourceDocumentSubmissionImages(
-        "ledger-1",
         {
           documentDate: "2026-07-15",
           text: null,
@@ -105,7 +102,6 @@ describe("source-document inline submission preparation", () => {
     const put = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     const finalize = vi.fn().mockResolvedValue(["file-1", "file-2", "file-3"]);
     const submission = uploadSourceDocumentSubmissionImages(
-      "ledger-1",
       {
         documentDate: "2026-07-15",
         text: null,
@@ -162,7 +158,6 @@ describe("source-document inline submission preparation", () => {
     const put = vi.fn();
     const finalize = vi.fn();
     const submission = uploadSourceDocumentSubmissionImages(
-      "ledger-1",
       {
         documentDate: "2026-07-15",
         text: null,
@@ -225,7 +220,6 @@ describe("source-document inline submission preparation", () => {
     );
     const finalize = vi.fn();
     const submission = uploadSourceDocumentSubmissionImages(
-      "ledger-1",
       {
         documentDate: "2026-07-15",
         text: null,

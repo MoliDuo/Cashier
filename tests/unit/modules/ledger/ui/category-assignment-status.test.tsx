@@ -63,7 +63,6 @@ function renderStatus(props: Partial<React.ComponentProps<typeof CategoryAssignm
   );
   const view = render(
     <CategoryAssignmentStatus
-      ledgerId="ledger-1"
       job={job()}
       isReadError={false}
       onRefresh={vi.fn()}
@@ -125,9 +124,7 @@ describe("CategoryAssignmentStatus", () => {
 
     expect(onTaskRegistered).toHaveBeenCalledWith(restarted);
     // The page owns the cache write now, so the band must not also make one.
-    expect(
-      queryClient.getQueryData(["ledger", "ledger-1", "category-reclassification"])
-    ).toBeUndefined();
+    expect(queryClient.getQueryData(["ledger", "category-reclassification"])).toBeUndefined();
   });
 
   it("lets a finished run's band be closed", () => {

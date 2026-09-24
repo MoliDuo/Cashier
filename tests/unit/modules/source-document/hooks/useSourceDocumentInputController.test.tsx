@@ -52,10 +52,9 @@ describe("useSourceDocumentInputController", () => {
       },
     ]);
     const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
-    const { result } = renderHook(
-      () => useSourceDocumentInputController({ ledgerId: "ledger-1", messages }),
-      { wrapper }
-    );
+    const { result } = renderHook(() => useSourceDocumentInputController({ messages }), {
+      wrapper,
+    });
     const input = document.createElement("input");
     Object.defineProperty(input, "files", {
       value: [new File([new Uint8Array([1])], "receipt.png", { type: "image/png" })],
@@ -72,9 +71,7 @@ describe("useSourceDocumentInputController", () => {
 
   it("snapshots selected files before resetting an iOS-style live file list", async () => {
     loadFilesMock.mockResolvedValue([]);
-    const { result } = renderHook(() =>
-      useSourceDocumentInputController({ ledgerId: "ledger-1", messages })
-    );
+    const { result } = renderHook(() => useSourceDocumentInputController({ messages }));
     const selectedFile = new File([new Uint8Array([1])], "camera.jpg", {
       type: "image/jpeg",
     });

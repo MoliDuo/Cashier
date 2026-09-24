@@ -202,7 +202,6 @@ function modal(
       {...(overrides.sourceDocumentId != null
         ? { sourceDocumentId: overrides.sourceDocumentId }
         : {})}
-      ledgerId="ledger-1"
       sourceDocument={document}
       ledgerEntries={overrides.ledgerEntries ?? [entry]}
       categories={[]}

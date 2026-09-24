@@ -33,7 +33,6 @@ import type { BatchEntryUpdateData } from "./source-document-detail-cache";
 
 interface UseSourceDocumentDetailMutationsOptions {
   id: string;
-  ledgerId: string | undefined;
   /** Read fresh at submission time — never captured ahead of the actual click. */
   version: number | null;
   onClose: () => void;
@@ -56,7 +55,6 @@ export interface AddEntryData {
 
 export function useSourceDocumentDetailMutations({
   id,
-  ledgerId,
   version,
   onClose,
 }: UseSourceDocumentDetailMutationsOptions) {
@@ -64,13 +62,11 @@ export function useSourceDocumentDetailMutations({
 
   const { deleteDocumentMutation } = useSourceDocumentRecordMutations({
     id,
-    ledgerId,
     version,
     onClose,
   });
 
   const { batchUpdateMutation, batchDeleteMutation } = useSourceDocumentEntryMutations({
-    ledgerId,
     sourceDocumentId: id,
     version,
   });
@@ -81,7 +77,7 @@ export function useSourceDocumentDetailMutations({
    * fields the command responses leave out.
    */
   const commitDetailSnapshot = async (document: SourceDocumentDetailDto) => {
-    const key = queryKeys.sourceDocument(ledgerId!, id);
+    const key = queryKeys.sourceDocument(id);
     await queryClient.cancelQueries({ queryKey: key, exact: true });
     queryClient.setQueryData<SourceDocumentDetailDto>(key, (previous) =>
       previous != null && previous.version > document.version
@@ -97,11 +93,10 @@ export function useSourceDocumentDetailMutations({
   const saveChangesMutation = useLedgerMutation<
     SaveSourceDocumentChangesResultDto,
     SaveDetailChanges
-  >(ledgerId, {
+  >({
     invalidates: ["documents", "stats"],
     mutationFn: async ({ expectedVersion, changes }: SaveDetailChanges) => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
-      const result = await saveSourceDocumentChangesAction(ledgerId, {
+      const result = await saveSourceDocumentChangesAction({
         sourceDocumentId: id,
         expectedVersion,
         ...(Object.keys(changes.sourceDoc).length === 0
@@ -119,19 +114,18 @@ export function useSourceDocumentDetailMutations({
     successMessage: null,
     errorMessage: null,
     refreshMode: "background",
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
+    refreshQueryKey: queryKeys.sourceDocument(id),
     onSuccess: (_result, input) => input.onCommitted?.(),
   });
 
   const splitMutation = useLedgerMutation<
     SplitSourceDocumentResultDto,
     Omit<SplitSourceDocumentInput, "sourceDocumentId">
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: async (input: Omit<SplitSourceDocumentInput, "sourceDocumentId">) => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
-      const result = await splitSourceDocumentAction(ledgerId, { sourceDocumentId: id, ...input });
+      const result = await splitSourceDocumentAction({ sourceDocumentId: id, ...input });
       return unwrapVersionedCommandResult(result);
     },
     successMessage: null,
@@ -142,13 +136,12 @@ export function useSourceDocumentDetailMutations({
   const dateOrganizationMutation = useLedgerMutation<
     ApplyDateOrganizationResultDto,
     Omit<ApplyDateOrganizationInput, "sourceDocumentId" | "expectedVersion">
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
+    refreshQueryKey: queryKeys.sourceDocument(id),
     mutationFn: async (input) => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
-      const result = await applyDateOrganizationAction(ledgerId, {
+      const result = await applyDateOrganizationAction({
         sourceDocumentId: id,
         expectedVersion: requireSourceDocumentVersion(version, id),
         ...input,
@@ -163,13 +156,12 @@ export function useSourceDocumentDetailMutations({
   const dismissDateOrganizationMutation = useLedgerMutation<
     { dismissed: true },
     { suggestionId: string }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents"],
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
+    refreshQueryKey: queryKeys.sourceDocument(id),
     mutationFn: async ({ suggestionId }) => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
-      const result = await dismissDateOrganizationAction(ledgerId, {
+      const result = await dismissDateOrganizationAction({
         sourceDocumentId: id,
         expectedVersion: requireSourceDocumentVersion(version, id),
         suggestionId,
@@ -180,15 +172,13 @@ export function useSourceDocumentDetailMutations({
     errorMessage: null,
   });
 
-  const addEntryMutation = useLedgerMutation<{ ledgerEntryId: string }, AddEntryData>(ledgerId, {
+  const addEntryMutation = useLedgerMutation<{ ledgerEntryId: string }, AddEntryData>({
     refreshMode: "background",
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
+    refreshQueryKey: queryKeys.sourceDocument(id),
     invalidates: ["documents", "stats"],
     mutationFn: async (data: AddEntryData) => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
       const expectedVersion = requireSourceDocumentVersion(version, id);
       const result = await createLedgerEntryAction(
-        ledgerId,
         { sourceDocumentId: id, expectedVersion },
         { sourceDocumentId: id, ...data, amount: String(data.amount) }
       );
@@ -201,13 +191,11 @@ export function useSourceDocumentDetailMutations({
   const deleteEntryMutation = useLedgerMutation<
     { ledgerEntryId: string; deleted: true },
     { entryId: string; onCommitted?: (() => void) | undefined }
-  >(ledgerId, {
+  >({
     invalidates: ["documents", "stats"],
     mutationFn: async ({ entryId }) => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
       const expectedVersion = requireSourceDocumentVersion(version, id);
       const result = await deleteLedgerEntryAction(
-        ledgerId,
         { sourceDocumentId: id, expectedVersion },
         entryId
       );
@@ -216,7 +204,7 @@ export function useSourceDocumentDetailMutations({
     successMessage: null,
     errorMessage: null,
     refreshMode: "background",
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", id),
+    refreshQueryKey: queryKeys.sourceDocument(id),
     onSuccess: (_result, input) => input.onCommitted?.(),
   });
 

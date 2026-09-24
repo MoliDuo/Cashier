@@ -66,7 +66,7 @@ function jobSignature(job: CategoryReclassificationJob): string {
  * outlives the tab that starts it, so the band keeps reporting while the user
  * moves around the ledger.
  */
-export function useCategoryAssignmentJob(ledgerId: string): CategoryAssignmentJobState {
+export function useCategoryAssignmentJob(): CategoryAssignmentJobState {
   const queryClient = useQueryClient();
   // The last poll this hook acted on, so a repeat of the same answer is not
   // mistaken for progress and a run that stops where it stood is not missed.
@@ -86,8 +86,8 @@ export function useCategoryAssignmentJob(ledgerId: string): CategoryAssignmentJo
   const [dismissedJobId, setDismissedJobId] = useState<string | null | "none">("none");
   const [notices, setNotices] = useState<CategoryAssignmentNotice[]>([]);
   const query = useQuery<CategoryReclassificationJob | null>({
-    queryKey: queryKeys.categoryReclassification(ledgerId),
-    queryFn: () => getCategoryReclassificationJobAction(ledgerId),
+    queryKey: queryKeys.categoryReclassification(),
+    queryFn: () => getCategoryReclassificationJobAction(),
     refetchInterval: (query) => {
       if (query.state.status === "error") {
         const attempt = Math.max(0, query.state.fetchFailureCount - 1);
@@ -146,8 +146,8 @@ export function useCategoryAssignmentJob(ledgerId: string): CategoryAssignmentJo
   }, []);
   const refreshLedger = useCallback(() => {
     lastRefreshAtRef.current = Date.now();
-    void invalidateLedgerQueries(queryClient, ledgerId, [...REFRESH_GROUPS]);
-  }, [ledgerId, queryClient]);
+    void invalidateLedgerQueries(queryClient, [...REFRESH_GROUPS]);
+  }, [queryClient]);
 
   /**
    * A new run and a run that has stopped both make the ledger stale at once. A
@@ -186,9 +186,9 @@ export function useCategoryAssignmentJob(ledgerId: string): CategoryAssignmentJo
       setSubmittedJobIds((current) =>
         current.includes(submitted.id) ? current : [...current, submitted.id]
       );
-      queryClient.setQueryData(queryKeys.categoryReclassification(ledgerId), submitted);
+      queryClient.setQueryData(queryKeys.categoryReclassification(), submitted);
     },
-    [ledgerId, queryClient]
+    [queryClient]
   );
   const consumeNotice = useCallback((jobId: string) => {
     setNotices((current) => current.filter((notice) => notice.jobId !== jobId));

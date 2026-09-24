@@ -37,7 +37,7 @@ describe("SourceDocument delete CAS", () => {
 
   it("deletes once and increments the document version once", async () => {
     const document = await createDocument();
-    await expect(deleteSourceDocumentAction(ledgerId, document.id, 1)).resolves.toEqual({
+    await expect(deleteSourceDocumentAction(document.id, 1)).resolves.toEqual({
       ok: true,
       sourceDocumentId: document.id,
       version: 2,
@@ -52,10 +52,8 @@ describe("SourceDocument delete CAS", () => {
 
   it("does not durably replay a lost delete response", async () => {
     const document = await createDocument();
-    await deleteSourceDocumentAction(ledgerId, document.id, 1);
-    await expect(deleteSourceDocumentAction(ledgerId, document.id, 1)).rejects.toThrow(
-      NotFoundError
-    );
+    await deleteSourceDocumentAction(document.id, 1);
+    await expect(deleteSourceDocumentAction(document.id, 1)).rejects.toThrow(NotFoundError);
     const deleted = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });

@@ -4,12 +4,8 @@ import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { useLedgerDialogState } from "../ui/useLedgerDialogState";
 
-interface UseNewRecordDialogStateOptions {
-  ledgerId: string;
-}
-
 /** Owns the "new record" dialog's open/mode state and its unsaved-draft leave guard. */
-export function useNewRecordDialogState({ ledgerId }: UseNewRecordDialogStateOptions) {
+export function useNewRecordDialogState() {
   const { isInputOpen, setIsInputOpen, inputMode, setInputMode, handleInputDialogChange } =
     useLedgerDialogState();
   const [aiPending, setAiPending] = useState(false);
@@ -21,9 +17,9 @@ export function useNewRecordDialogState({ ledgerId }: UseNewRecordDialogStateOpt
 
   const setGlobalDirty = useUnsavedChangesStore((state) => state.setDirty);
   useEffect(() => {
-    setGlobalDirty(`new-record:${ledgerId}`, hasInputDraft);
-    return () => setGlobalDirty(`new-record:${ledgerId}`, false);
-  }, [hasInputDraft, ledgerId, setGlobalDirty]);
+    setGlobalDirty("new-record", hasInputDraft);
+    return () => setGlobalDirty("new-record", false);
+  }, [hasInputDraft, setGlobalDirty]);
 
   const guard = useUnsavedChangesGuard({
     key: "new-record-navigation",

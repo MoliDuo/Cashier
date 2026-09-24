@@ -58,15 +58,12 @@ const requestSchema = z
       "reclassification",
       "category-assignment-results",
     ]),
-    args: z.array(z.unknown()).min(1).max(2),
+    args: z.array(z.unknown()).max(1),
   })
   .strict();
 
-/**
- * The ledger-scoped reads below take exactly one argument, unlike the paginated
- * reads that also carry an input object.
- */
-const singleArgumentSchema = z.array(z.unknown()).length(1);
+/** The reads that take no input: the ledger itself is resolved from the session. */
+const noArgumentsSchema = z.array(z.unknown()).length(0);
 
 export async function POST(request: Request) {
   const headers = { "Cache-Control": "private, no-store" };
@@ -75,100 +72,93 @@ export async function POST(request: Request) {
   }
   try {
     const payload = requestSchema.parse(await request.json());
+    const input = payload.args[0];
     let result: unknown;
-    if (payload.query === "stats") {
-      const input = parseEnhancedStatsInput(payload.args[0]);
-      result = await getEnhancedStats(input);
-    } else {
-      const ledgerId = z.string().uuid().parse(payload.args[0]);
-      if (["stream", "total", "refresh"].includes(payload.query))
-        await requireLedgerAccess(ledgerId);
-      const input = payload.args[1];
-      switch (payload.query) {
-        case "detail":
-          result = await getSourceDocumentDetailAction(
-            ledgerId,
-            sourceDocumentIdSchema.parse(input)
-          );
-          break;
-        case "stream": {
-          const parsed = streamPageInputSchema.parse(input);
-          result = await listStreamPage(
-            ledgerId,
-            { ...omitUndefinedProperties(parsed), limit: parsed.limit },
-            {
-              documents: serverComposition.sourceDocumentReads,
-              ledgerReads: serverComposition.ledgerReads,
-              changes: serverComposition.ledgerChanges,
-            }
-          );
-          scheduleProcessingRecoveryAfter(ledgerId);
-          break;
-        }
-        case "total":
-          result = await getStreamTotal(
-            ledgerId,
-            omitUndefinedProperties(streamTotalInputSchema.parse(input)),
-            serverComposition.sourceDocumentReads
-          );
-          break;
-        case "refresh":
-          result = await getStreamRefresh(
-            ledgerId,
-            z.object({ afterVersion: z.string().regex(/^\d+$/) }).parse(input),
-            serverComposition.ledgerChanges
-          );
-          scheduleProcessingRecoveryAfter(ledgerId);
-          break;
-        case "entries":
-          result = await getLedgerEntriesAction(ledgerId, input);
-          break;
-        case "ledger":
-          singleArgumentSchema.parse(payload.args);
-          result = await getLedgerAction(ledgerId);
-          break;
-        case "books":
-          singleArgumentSchema.parse(payload.args);
-          result = await getBooksAction(ledgerId);
-          break;
-        case "books-including-archived":
-          singleArgumentSchema.parse(payload.args);
-          result = await getBooksIncludingArchivedAction(ledgerId);
-          break;
-        case "book":
-          result = await getBookAction(ledgerId, input);
-          break;
-        case "categories":
-          singleArgumentSchema.parse(payload.args);
-          result = await getEntryCategoriesAction(ledgerId);
-          break;
-        case "summary":
-          result = await getLedgerStatsAction(ledgerId, input ?? {});
-          break;
-        case "settings":
-          singleArgumentSchema.parse(payload.args);
-          result = await getLedgerSettingsAction(ledgerId);
-          break;
-        case "reclassification":
-          result = await getCategoryReclassificationJobAction(ledgerId);
-          // This poll is the recovery trigger: there is no cron, so a run
-          // whose after() callback died is restarted on the next poll.
-          scheduleCategoryReclassificationRecoveryAfter(ledgerId);
-          break;
-        case "category-assignment-results":
-          result = await getCategoryAssignmentResultsAction(
-            ledgerId,
-            z
-              .object({
-                jobId: z.string().uuid(),
-                cursor: z.number().int().nonnegative().optional(),
-                limit: z.number().int().min(1).max(50).optional(),
-              })
-              .strict()
-              .parse(input) as { jobId: string; cursor?: number; limit?: number }
-          );
-          break;
+    switch (payload.query) {
+      case "stats":
+        result = await getEnhancedStats(parseEnhancedStatsInput(input));
+        break;
+      case "detail":
+        result = await getSourceDocumentDetailAction(sourceDocumentIdSchema.parse(input));
+        break;
+      case "stream": {
+        const parsed = streamPageInputSchema.parse(input);
+        const { ledger } = await requireLedgerAccess();
+        result = await listStreamPage(
+          ledger.id,
+          { ...omitUndefinedProperties(parsed), limit: parsed.limit },
+          {
+            documents: serverComposition.sourceDocumentReads,
+            ledgerReads: serverComposition.ledgerReads,
+            changes: serverComposition.ledgerChanges,
+          }
+        );
+        scheduleProcessingRecoveryAfter(ledger.id);
+        break;
       }
+      case "total": {
+        const parsed = omitUndefinedProperties(streamTotalInputSchema.parse(input));
+        const { ledger } = await requireLedgerAccess();
+        result = await getStreamTotal(ledger.id, parsed, serverComposition.sourceDocumentReads);
+        break;
+      }
+      case "refresh": {
+        const parsed = z.object({ afterVersion: z.string().regex(/^\d+$/) }).parse(input);
+        const { ledger } = await requireLedgerAccess();
+        result = await getStreamRefresh(ledger.id, parsed, serverComposition.ledgerChanges);
+        scheduleProcessingRecoveryAfter(ledger.id);
+        break;
+      }
+      case "entries":
+        result = await getLedgerEntriesAction(input);
+        break;
+      case "ledger":
+        noArgumentsSchema.parse(payload.args);
+        result = await getLedgerAction();
+        break;
+      case "books":
+        noArgumentsSchema.parse(payload.args);
+        result = await getBooksAction();
+        break;
+      case "books-including-archived":
+        noArgumentsSchema.parse(payload.args);
+        result = await getBooksIncludingArchivedAction();
+        break;
+      case "book":
+        result = await getBookAction(input);
+        break;
+      case "categories":
+        noArgumentsSchema.parse(payload.args);
+        result = await getEntryCategoriesAction();
+        break;
+      case "summary":
+        result = await getLedgerStatsAction(input ?? {});
+        break;
+      case "settings":
+        noArgumentsSchema.parse(payload.args);
+        result = await getLedgerSettingsAction();
+        break;
+      case "reclassification": {
+        noArgumentsSchema.parse(payload.args);
+        const { ledger } = await requireLedgerAccess();
+        result = await getCategoryReclassificationJobAction();
+        // This poll is the recovery trigger: there is no cron, so a run
+        // whose after() callback died is restarted on the next poll.
+        scheduleCategoryReclassificationRecoveryAfter(ledger.id);
+        break;
+      }
+      case "category-assignment-results":
+        result = await getCategoryAssignmentResultsAction(
+          z
+            .object({
+              jobId: z.string().uuid(),
+              cursor: z.number().int().nonnegative().optional(),
+              limit: z.number().int().min(1).max(50).optional(),
+            })
+            .strict()
+            .parse(input) as { jobId: string; cursor?: number; limit?: number }
+        );
+        break;
     }
     return NextResponse.json(result, { headers });
   } catch (error) {

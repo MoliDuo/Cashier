@@ -128,7 +128,6 @@ describe("SettingsTab account authentication controls", () => {
         ledger={ledger}
         initialCategories={[]}
         initialBooks={BOOKS}
-        ledgerId="ledger-1"
         userEmail="person@example.com"
       />
     );
@@ -158,7 +157,6 @@ describe("SettingsTab account authentication controls", () => {
     render(
       <SettingsTab
         ledger={ledger}
-        ledgerId="ledger-1"
         initialCategories={[]}
         initialBooks={BOOKS}
         userEmail="person@example.com"
@@ -177,14 +175,9 @@ describe("SettingsTab account authentication controls", () => {
     // Retrying has to reach both book lists — the switcher's live one and the
     // archived-inclusive one the 分账 section reads — while leaving the rest of
     // the ledger alone.
-    expect(predicate({ queryKey: ["ledger", "ledger-1", "books"] })).toBe(true);
-    expect(predicate({ queryKey: ["ledger", "ledger-1", "books", "including-archived"] })).toBe(
-      true
-    );
-    expect(predicate({ queryKey: ["ledger", "ledger-2", "books"] })).toBe(false);
-    expect(predicate({ queryKey: ["ledger", "ledger-1", "source-documents", "stream"] })).toBe(
-      false
-    );
-    expect(predicate({ queryKey: ["ledger", "ledger-1", "categories"] })).toBe(true);
+    expect(predicate({ queryKey: ["ledger", "books"] })).toBe(true);
+    expect(predicate({ queryKey: ["ledger", "books", "including-archived"] })).toBe(true);
+    expect(predicate({ queryKey: ["ledger", "source-documents", "stream"] })).toBe(false);
+    expect(predicate({ queryKey: ["ledger", "categories"] })).toBe(true);
   });
 });

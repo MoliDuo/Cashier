@@ -25,10 +25,7 @@ async function getTargetEnhancedStats(
   input: Parameters<typeof getEnhancedStats>[0]
 ): ReturnType<typeof getEnhancedStats> {
   const db = getTestDb();
-  const documents = await db.query.sourceDocuments.findMany({
-    where: (documents, { eq }) => eq(documents.ledgerId, input.ledgerId),
-    columns: { id: true },
-  });
+  const documents = await db.query.sourceDocuments.findMany({ columns: { id: true } });
   for (const document of documents) {
     await activateTestSourceDocumentProjection(db, document.id);
   }
@@ -101,20 +98,9 @@ describe("Enhanced Stats Actions", () => {
   });
 
   describe("getEnhancedStats", () => {
-    it("rejects invalid ledger ids", async () => {
-      await expect(
-        getEnhancedStats({
-          ledgerId: "not-a-uuid",
-          queryRange: { from: "2024-01-01", to: "2024-01-31" },
-          compareRange: { from: "2023-12-01", to: "2023-12-31" },
-        })
-      ).rejects.toThrow(ValidationError);
-    });
-
     it("rejects invalid date ranges", async () => {
       await expect(
         getTargetEnhancedStats({
-          ledgerId: testLedgerId,
           queryRange: { from: "bad", to: "bad" },
           compareRange: { from: "bad", to: "bad" },
         })
@@ -124,16 +110,15 @@ describe("Enhanced Stats Actions", () => {
     it("rejects reversed date ranges", async () => {
       await expect(
         getTargetEnhancedStats({
-          ledgerId: testLedgerId,
           queryRange: { from: "2024-03-31", to: "2024-03-01" },
           compareRange: { from: "2024-02-29", to: "2024-02-01" },
         })
       ).rejects.toThrow(ValidationError);
     });
 
-    it("rejects access to a ledger owned by another user", async () => {
+    it("fails closed once a second live ledger makes the single ledger ambiguous", async () => {
       const db = getTestDb();
-      const { ledgerId } = await createTestUserWithLedger(
+      await createTestUserWithLedger(
         db,
         undefined,
         undefined,
@@ -142,7 +127,6 @@ describe("Enhanced Stats Actions", () => {
 
       await expect(
         getTargetEnhancedStats({
-          ledgerId,
           queryRange: { from: "2024-01-01", to: "2024-01-31" },
           compareRange: { from: "2023-12-01", to: "2023-12-31" },
         })
@@ -198,7 +182,6 @@ describe("Enhanced Stats Actions", () => {
 
       // Query for January 2024
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-01-01", to: "2024-01-31" },
         compareRange: { from: "2023-12-01", to: "2023-12-31" },
       });
@@ -235,7 +218,6 @@ describe("Enhanced Stats Actions", () => {
 
       const { statements } = await captureSqlStatements(() =>
         getEnhancedStats({
-          ledgerId: testLedgerId,
           queryRange: { from: "2024-03-01", to: "2024-03-31" },
           compareRange: { from: "2024-02-01", to: "2024-02-29" },
         })
@@ -282,7 +264,6 @@ describe("Enhanced Stats Actions", () => {
       });
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -292,7 +273,6 @@ describe("Enhanced Stats Actions", () => {
       expect(requireFirst(result.chart, "chart point").date).toBe("2024-03-10");
 
       const outside = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-11", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -329,7 +309,6 @@ describe("Enhanced Stats Actions", () => {
       }
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -376,7 +355,6 @@ describe("Enhanced Stats Actions", () => {
       }
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -421,7 +399,6 @@ describe("Enhanced Stats Actions", () => {
       });
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -487,7 +464,6 @@ describe("Enhanced Stats Actions", () => {
       });
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -522,7 +498,6 @@ describe("Enhanced Stats Actions", () => {
       });
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -566,7 +541,6 @@ describe("Enhanced Stats Actions", () => {
       });
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -607,7 +581,6 @@ describe("Enhanced Stats Actions", () => {
       }
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });
@@ -642,7 +615,6 @@ describe("Enhanced Stats Actions", () => {
       });
 
       const result = await getTargetEnhancedStats({
-        ledgerId: testLedgerId,
         queryRange: { from: "2024-03-01", to: "2024-03-31" },
         compareRange: { from: "2024-02-01", to: "2024-02-29" },
       });

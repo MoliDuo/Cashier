@@ -23,7 +23,6 @@ import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import Link from "next/link";
 
 interface QuickEntryFormProps {
-  ledgerId: string;
   bookId?: string;
   categories: EntryCategory[];
   mainCurrency?: string;
@@ -35,7 +34,6 @@ interface QuickEntryFormProps {
 }
 
 export function QuickEntryForm({
-  ledgerId,
   bookId,
   categories,
   mainCurrency = "CNY",
@@ -63,7 +61,6 @@ export function QuickEntryForm({
     handleSubmit,
     isDirty,
   } = useQuickEntryFormController({
-    ledgerId,
     ...(bookId == null ? {} : { bookId }),
     categories,
     mainCurrency,

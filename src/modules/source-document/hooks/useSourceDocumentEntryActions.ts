@@ -14,7 +14,6 @@ import { SourceDocumentStaleCommandError } from "@/modules/source-document/comma
 import type { AddEntryData } from "./useSourceDocumentDetailMutations";
 
 interface UseSourceDocumentEntryActionsOptions {
-  ledgerId: string;
   sourceDocument: SourceDocument | null;
   busy: boolean;
   interactionDisabled: boolean;
@@ -41,7 +40,6 @@ interface UseSourceDocumentEntryActionsOptions {
 
 /** Owns splitting entries into a new document, adding/deleting a single entry, and deleting the document. */
 export function useSourceDocumentEntryActions({
-  ledgerId,
   sourceDocument,
   busy,
   interactionDisabled,
@@ -61,7 +59,7 @@ export function useSourceDocumentEntryActions({
   t,
   tCommon,
 }: UseSourceDocumentEntryActionsOptions) {
-  const feedbackToastId = `source-document-entry:${ledgerId}:${sourceDocument?.id ?? ""}`;
+  const feedbackToastId = `source-document-entry:${sourceDocument?.id ?? ""}`;
   const handleOpenSplit = useCallback(() => {
     if (busy || selectedIds.length === 0) return;
     if (selectedIds.length >= ledgerEntries.length) {
@@ -96,7 +94,6 @@ export function useSourceDocumentEntryActions({
               openLedgerDetail({
                 type: "source-document",
                 id: result.splitSourceDocumentId,
-                ledgerId,
               }),
           },
         });
@@ -120,7 +117,6 @@ export function useSourceDocumentEntryActions({
       setIsSplitting,
       setShowSplitDialog,
       clearSelection,
-      ledgerId,
     ]
   );
 

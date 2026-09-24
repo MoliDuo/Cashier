@@ -55,7 +55,7 @@ describe("getSourceDocumentDetailAction", () => {
     });
     await activateTestSourceDocumentProjection(db, docData.id, { text: "Lunch for 25.50" });
 
-    const result = await getSourceDocumentDetailAction(ledgerData.id, docData.id);
+    const result = await getSourceDocumentDetailAction(docData.id);
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe(docData.id);
@@ -83,7 +83,7 @@ describe("getSourceDocumentDetailAction", () => {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
 
-    const result = await getSourceDocumentDetailAction(ledgerData.id, docData.id);
+    const result = await getSourceDocumentDetailAction(docData.id);
 
     expect(result).not.toBeNull();
     expect(result!.hasImages).toBe(true);
@@ -117,7 +117,7 @@ describe("getSourceDocumentDetailAction", () => {
     await db.insert(ledgerEntries).values(entryData);
     await activateTestSourceDocumentProjection(db, docData.id);
 
-    const result = await getSourceDocumentDetailAction(ledgerData.id, docData.id);
+    const result = await getSourceDocumentDetailAction(docData.id);
 
     expect(result).not.toBeNull();
     if (result == null) {
@@ -139,7 +139,7 @@ describe("getSourceDocumentDetailAction", () => {
     await db.insert(ledgers).values(ledgerData);
     await ensureTestLedgerBooks(db, ledgerData.id);
 
-    const result = await getSourceDocumentDetailAction(ledgerData.id, randomUUID());
+    const result = await getSourceDocumentDetailAction(randomUUID());
     expect(result).toBeNull();
   });
 
@@ -159,11 +159,6 @@ describe("getSourceDocumentDetailAction", () => {
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
 
-    await expect(getSourceDocumentDetailAction(otherLedgerId, docData.id)).rejects.toBeInstanceOf(
-      NotFoundError
-    );
-    await expect(getSourceDocumentDetailAction(randomUUID(), docData.id)).rejects.toBeInstanceOf(
-      NotFoundError
-    );
+    await expect(getSourceDocumentDetailAction(docData.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

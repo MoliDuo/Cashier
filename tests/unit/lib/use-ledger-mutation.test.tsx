@@ -32,7 +32,7 @@ function setup() {
 describe("useLedgerMutation", () => {
   it("waits only for the required detail and joins its existing refresh", async () => {
     const { queryClient, wrapper } = setup();
-    const key = queryKeys.sourceDocument("ledger-1", "document-1");
+    const key = queryKeys.sourceDocument("document-1");
     let resolveDetail!: () => void;
     let resolveList!: () => void;
     let refreshing = false;
@@ -53,8 +53,8 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () => ({
         detail: useQuery({ queryKey: key, queryFn: detailFn }),
-        list: useQuery({ queryKey: queryKeys.ledgerEntriesPrefix("ledger-1"), queryFn: listFn }),
-        mutation: useLedgerMutation("ledger-1", {
+        list: useQuery({ queryKey: queryKeys.ledgerEntriesPrefix(), queryFn: listFn }),
+        mutation: useLedgerMutation({
           refreshMode: "background",
           refreshQueryKey: key,
           invalidates: ["documents"],
@@ -95,7 +95,7 @@ describe("useLedgerMutation", () => {
     );
     const { result } = renderHook(
       () =>
-        useLedgerMutation("ledger-1", {
+        useLedgerMutation({
           refreshMode: "background",
           invalidates: ["documents"],
           mutationFn: async () => "saved",
@@ -124,7 +124,7 @@ describe("useLedgerMutation", () => {
 
     const { result } = renderHook(
       () =>
-        useLedgerMutation("ledger-1", {
+        useLedgerMutation({
           invalidates: ["credentials"],
           mutationFn: async () => "saved",
           successMessage: "Saved",
@@ -153,7 +153,7 @@ describe("useLedgerMutation", () => {
 
     const { result } = renderHook(
       () =>
-        useLedgerMutation("ledger-1", {
+        useLedgerMutation({
           invalidates: ["credentials"],
           mutationFn: async () => "saved",
           successMessage: null,
@@ -181,7 +181,7 @@ describe("useLedgerMutation", () => {
 
     const { result } = renderHook(
       () =>
-        useLedgerMutation("ledger-1", {
+        useLedgerMutation({
           invalidates: ["credentials"],
           mutationFn: async () => "saved",
           successMessage: "Saved",
@@ -209,7 +209,7 @@ describe("useLedgerMutation", () => {
         .mockResolvedValueOnce();
       const { result } = renderHook(
         () =>
-          useLedgerMutation("ledger-1", {
+          useLedgerMutation({
             invalidates: ["credentials"],
             mutationFn: async () => "saved",
             successMessage: null,
@@ -243,8 +243,8 @@ describe("useLedgerMutation", () => {
       const mutationFn = vi.fn(async () => "saved");
       const { result } = renderHook(
         () => ({
-          query: useQuery({ queryKey: queryKeys.ledgerSettings("ledger-1"), queryFn }),
-          mutation: useLedgerMutation("ledger-1", {
+          query: useQuery({ queryKey: queryKeys.ledgerSettings(), queryFn }),
+          mutation: useLedgerMutation({
             invalidates: ["credentials"],
             mutationFn,
             successMessage: null,
@@ -277,7 +277,7 @@ describe("useLedgerMutation", () => {
 
     const { result } = renderHook(
       () =>
-        useLedgerMutation("ledger-1", {
+        useLedgerMutation({
           invalidates: ["documents"],
           mutationFn: async () => {
             throw new Error("write failed");
@@ -302,12 +302,12 @@ describe("useLedgerMutation", () => {
     const { queryClient, wrapper } = setup();
     const queryFn = vi.fn(async () => "cached");
     await queryClient.fetchQuery({
-      queryKey: ["ledger", "ledger-1", "inactive"],
+      queryKey: ["ledger", "inactive"],
       queryFn,
     });
     const { result } = renderHook(
       () =>
-        useLedgerMutation("ledger-1", {
+        useLedgerMutation({
           invalidates: ["documents"],
           mutationFn: async () => "saved",
           successMessage: null,
@@ -327,8 +327,8 @@ describe("useLedgerMutation", () => {
     const queryFn = vi.fn(async () => "fresh");
     const { result } = renderHook(
       () => ({
-        query: useQuery({ queryKey: ["ledger", "ledger-1", "entries", {}], queryFn }),
-        mutation: useLedgerMutation("ledger-1", {
+        query: useQuery({ queryKey: ["ledger", "entries", {}], queryFn }),
+        mutation: useLedgerMutation({
           invalidates: ["documents"],
           mutationFn: async () => "saved",
           successMessage: null,
@@ -351,12 +351,12 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () => ({
         stream: useInfiniteQuery({
-          queryKey: ["ledger", "ledger-1", "source-documents", "stream"],
+          queryKey: ["ledger", "source-documents", "stream"],
           queryFn,
           initialPageParam: 0,
           getNextPageParam: (lastPage) => (lastPage < 4 ? lastPage + 1 : undefined),
         }),
-        mutation: useLedgerMutation("ledger-1", {
+        mutation: useLedgerMutation({
           invalidates: ["documents"],
           mutationFn: async () => "saved",
           successMessage: null,

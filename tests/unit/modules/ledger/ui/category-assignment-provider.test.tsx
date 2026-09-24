@@ -94,7 +94,7 @@ function setup() {
   });
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={queryClient}>
-      <CategoryAssignmentProvider ledgerId="ledger-1">{children}</CategoryAssignmentProvider>
+      <CategoryAssignmentProvider>{children}</CategoryAssignmentProvider>
     </QueryClientProvider>
   );
   return { queryClient, wrapper };
@@ -104,7 +104,7 @@ function setup() {
 async function poll(queryClient: QueryClient) {
   await act(async () => {
     await queryClient.refetchQueries({
-      queryKey: ["ledger", "ledger-1", "category-reclassification"],
+      queryKey: ["ledger", "category-reclassification"],
     });
   });
 }
@@ -183,41 +183,6 @@ describe("CategoryAssignmentProvider", () => {
     await waitFor(() =>
       expect(document.getElementById("category-assignment-status")).not.toBeNull()
     );
-  });
-
-  it("starts from a clean history when the page moves to another ledger", async () => {
-    getJob.mockResolvedValueOnce(job()).mockResolvedValue(succeededJob());
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-    });
-    const ledgerPage = (ledgerId: string) => (
-      <QueryClientProvider client={queryClient}>
-        <CategoryAssignmentProvider key={ledgerId} ledgerId={ledgerId}>
-          <SubmitProbe run={job()} />
-        </CategoryAssignmentProvider>
-      </QueryClientProvider>
-    );
-    const view = render(ledgerPage("ledger-1"));
-    await waitForBand();
-    await act(async () => {
-      await queryClient.refetchQueries({
-        queryKey: ["ledger", "ledger-1", "category-reclassification"],
-      });
-    });
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledTimes(1));
-    toastSuccess.mockClear();
-
-    // The same finished run is the second ledger's history, not this reader's
-    // news, so the fresh page reports nothing.
-    view.rerender(ledgerPage("ledger-2"));
-
-    await waitFor(() =>
-      expect(
-        queryClient.getQueryData(["ledger", "ledger-2", "category-reclassification"])
-      ).toMatchObject({ id: "job-1", status: "succeeded" })
-    );
-    expect(toastSuccess).not.toHaveBeenCalled();
-    expect(document.getElementById("category-assignment-status")).toBeNull();
   });
 
   it("refuses to be read outside the provider", () => {

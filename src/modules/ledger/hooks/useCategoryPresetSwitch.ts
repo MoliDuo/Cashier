@@ -125,11 +125,10 @@ function errorCode(error: Error): unknown {
 }
 
 interface UseCategoryPresetSwitchOptions {
-  ledgerId: string;
   categories: EntryCategoryWithCount[];
 }
 
-export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPresetSwitchOptions) {
+export function useCategoryPresetSwitch({ categories }: UseCategoryPresetSwitchOptions) {
   const t = useTranslations("Settings");
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -139,7 +138,6 @@ export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPre
   const [presetId, setPresetId] = useState<CategoryPresetId>(DEFAULT_PRESET_ID);
   const [drafts, setDrafts] = useState<Partial<Record<CategoryPresetId, PresetMappingDraft>>>({});
   const [snapshot, setSnapshot] = useState<{
-    ledgerId: string;
     categories: EntryCategoryWithCount[];
     signature: string;
     revision: string;
@@ -162,9 +160,7 @@ export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPre
     () => summarize(draftCategories, mappings, preset.length),
     [draftCategories, mappings, preset.length]
   );
-  const serverChanged =
-    snapshot != null &&
-    (snapshot.ledgerId !== ledgerId || categorySignature(categories) !== snapshot.signature);
+  const serverChanged = snapshot != null && categorySignature(categories) !== snapshot.signature;
   const dirty =
     snapshot != null &&
     (presetId !== snapshot.initialPresetId || !sameMapping(mappings, snapshot.initialMappings));
@@ -176,31 +172,26 @@ export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPre
   const canConfirm = !isPreparing && !serverChanged && summary.unsetCount === 0 && !noChanges;
 
   useEffect(() => {
-    const key = `settings:category-preset:${ledgerId}`;
+    const key = "settings:category-preset";
     useUnsavedChangesStore.getState().setDirty(key, open && dirty);
     return () => useUnsavedChangesStore.getState().setDirty(key, false);
-  }, [dirty, ledgerId, open]);
+  }, [dirty, open]);
 
-  const mutation = useLedgerMutation<ApplyCategoryPresetResult, ApplyCategoryPresetInput>(
-    ledgerId,
-    {
-      invalidates: ["categories", "stats", "documents"],
-      refreshMode: "background",
-      mutationFn: (input) => applyCategoryPresetAction(ledgerId, input),
-      onSuccess: (saved) => {
-        queryClient.setQueryData(queryKeys.entryCategories(ledgerId), saved.categories);
-        setConfirmOpen(false);
-        setSaveError(null);
-        setResult(saved);
-      },
-      onError: (error) => {
-        setConfirmOpen(false);
-        setSaveError(
-          errorCode(error) === "CONFLICT" ? t("updateConflict") : t("presetApplyFailed")
-        );
-      },
-    }
-  );
+  const mutation = useLedgerMutation<ApplyCategoryPresetResult, ApplyCategoryPresetInput>({
+    invalidates: ["categories", "stats", "documents"],
+    refreshMode: "background",
+    mutationFn: (input) => applyCategoryPresetAction(input),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(queryKeys.entryCategories(), saved.categories);
+      setConfirmOpen(false);
+      setSaveError(null);
+      setResult(saved);
+    },
+    onError: (error) => {
+      setConfirmOpen(false);
+      setSaveError(errorCode(error) === "CONFLICT" ? t("updateConflict") : t("presetApplyFailed"));
+    },
+  });
 
   const choosePreset = useCallback(
     (nextPresetId: CategoryPresetId) => {
@@ -225,7 +216,6 @@ export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPre
     void computeCategoryCollectionRevision(categories).then((revision) => {
       if (revisionRequestRef.current !== request) return;
       setSnapshot({
-        ledgerId,
         categories: [...categories],
         signature: categorySignature(categories),
         revision,
@@ -236,7 +226,7 @@ export function useCategoryPresetSwitch({ ledgerId, categories }: UseCategoryPre
       setDrafts({ [initialPresetId]: initialMappings });
       setIsPreparing(false);
     });
-  }, [categories, ledgerId]);
+  }, [categories]);
 
   const openDialog = useCallback(() => {
     setOpen(true);

@@ -24,7 +24,6 @@ import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignme
 import { pushLedgerUrl } from "../ledger-url-navigation";
 
 interface LedgerPageClientProps {
-  ledgerId: string;
   userId: string;
   initialLedger?: LedgerDto;
   initialTab: LedgerTab;
@@ -51,7 +50,6 @@ function Skeleton({ className }: { className?: string }) {
 }
 
 export function LedgerPageClient({
-  ledgerId,
   initialLedger,
   initialTab,
   ledgerToday,
@@ -68,7 +66,6 @@ export function LedgerPageClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { books } = useBooks({
-    ledgerId,
     ...(initialBooks !== undefined ? { initialBooks } : {}),
   });
   // null is 总账. The scope is this device's remembered choice — seeded from
@@ -87,10 +84,9 @@ export function LedgerPageClient({
   useLedgerHistorySync({
     pathname,
     searchParams,
-    ledgerId,
   });
 
-  const newRecordDialog = useNewRecordDialogState({ ledgerId });
+  const newRecordDialog = useNewRecordDialogState();
   const {
     isInputOpen,
     setIsInputOpen,
@@ -120,7 +116,6 @@ export function LedgerPageClient({
     deviceTimeZone,
     timeZoneReady,
   } = useLedgerPageEnvironment({
-    ledgerId,
     scope: recordScope,
     initialLedger,
     initialCategories,
@@ -140,7 +135,6 @@ export function LedgerPageClient({
   const { handleCategoryDrilldown, handleDateDrilldown } = useDrilldownNavigation({
     searchParams,
     pathname,
-    ledgerId,
     ...(recordScope == null ? {} : { bookId: recordScope }),
   });
   const handleGoToDetails = (validCategoryIds: readonly string[]) => {
@@ -166,7 +160,7 @@ export function LedgerPageClient({
   }
 
   return (
-    <CategoryAssignmentProvider key={ledgerId} ledgerId={ledgerId}>
+    <CategoryAssignmentProvider>
       <div>
         {/* Every tab refreshes from its own destination in the tab bar, so no
             tab carries a refresh control of its own. Only the active tab is
@@ -190,7 +184,6 @@ export function LedgerPageClient({
           books={books ?? []}
           activeTab={activeTab}
           hidden={categoriesHaveNoData}
-          ledgerId={ledgerId}
           ledger={ledger}
           categories={categories}
           periodParams={periodParams}
@@ -213,7 +206,6 @@ export function LedgerPageClient({
           isOpen={isInputOpen}
           onOpenChange={handleDialogOpenChange}
           isSubmitting={isInputSubmitting}
-          ledgerId={ledgerId}
           activeTab={activeTab}
           committedFilters={filters}
           inputMode={inputMode}

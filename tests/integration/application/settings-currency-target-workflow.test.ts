@@ -16,13 +16,12 @@ import {
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
-type UpdateLedgerData = Omit<Parameters<typeof updateLedgerUseCase>[2], "expectedUpdatedAt">;
+type UpdateLedgerData = Omit<Parameters<typeof updateLedgerUseCase>[1], "expectedUpdatedAt">;
 
-const updateLedger = async (userId: string, ledgerId: string, data: UpdateLedgerData) => {
+const updateLedger = async (ledgerId: string, data: UpdateLedgerData) => {
   const current = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
   if (current == null) throw new Error("Expected ledger fixture");
   return updateLedgerUseCase(
-    userId,
     ledgerId,
     { ...data, expectedUpdatedAt: current.updatedAt.toISOString() },
     serverComposition.settings,
@@ -72,7 +71,7 @@ describe("target Settings currency workflow", () => {
   });
 
   it("allows main currency change on empty ledger", async () => {
-    const updated = await updateLedger(TEST_USER_ID, ledgerId, {
+    const updated = await updateLedger(ledgerId, {
       settings: { mainCurrency: "USD" },
     });
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -85,7 +84,7 @@ describe("target Settings currency workflow", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
 
-    const updated = await updateLedger(TEST_USER_ID, ledgerId, {
+    const updated = await updateLedger(ledgerId, {
       settings: { mainCurrency: "USD" },
     });
     const [entry, document] = await Promise.all([
@@ -160,7 +159,7 @@ describe("target Settings currency workflow", () => {
       },
     ]);
 
-    await updateLedger(TEST_USER_ID, ledgerId, { settings: { mainCurrency: "USD" } });
+    await updateLedger(ledgerId, { settings: { mainCurrency: "USD" } });
 
     const [entries, document] = await Promise.all([
       db.query.ledgerEntries.findMany({
@@ -185,7 +184,7 @@ describe("target Settings currency workflow", () => {
   it("allows other setting changes when entries exist", async () => {
     await createEntry();
 
-    const updated = await updateLedger(TEST_USER_ID, ledgerId, {
+    const updated = await updateLedger(ledgerId, {
       settings: { aiLanguage: "en" },
     });
     expect(updated.settings.aiLanguage).toBe("en");
@@ -224,7 +223,7 @@ describe("target Settings currency workflow", () => {
       .set({ deletedAt: new Date() })
       .where(eq(sourceDocuments.id, sourceDocumentId));
 
-    const updated = await updateLedger(TEST_USER_ID, ledgerId, {
+    const updated = await updateLedger(ledgerId, {
       settings: { mainCurrency: "USD" },
     });
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -233,9 +232,9 @@ describe("target Settings currency workflow", () => {
   it("rolls back settings and conversions when a required rate is unavailable", async () => {
     await createEntry();
 
-    await expect(
-      updateLedger(TEST_USER_ID, ledgerId, { settings: { mainCurrency: "ZZZ" } })
-    ).rejects.toThrow("Currency not found: ZZZ");
+    await expect(updateLedger(ledgerId, { settings: { mainCurrency: "ZZZ" } })).rejects.toThrow(
+      "Currency not found: ZZZ"
+    );
 
     const [ledger, entry] = await Promise.all([
       getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) }),
@@ -304,7 +303,7 @@ describe("target Settings currency workflow", () => {
         json: async () => ({ base: "EUR", date: "2026-07-14", rates: { CNY: 8, USD: 1 } }),
       } as Response);
 
-      const updated = await updateLedger(TEST_USER_ID, ledgerId, {
+      const updated = await updateLedger(ledgerId, {
         settings: { mainCurrency: "USD" },
       });
 
@@ -338,7 +337,7 @@ describe("target Settings currency workflow", () => {
       } as Response);
 
       await expect(
-        updateLedger(TEST_USER_ID, ledgerId, { settings: { mainCurrency: "USD" } })
+        updateLedger(ledgerId, { settings: { mainCurrency: "USD" } })
       ).rejects.toMatchObject({ code: "EXCHANGE_RATES_UNAVAILABLE" });
 
       const [storedLedger, entries] = await Promise.all([
@@ -362,14 +361,12 @@ describe("target Settings currency workflow", () => {
 
     const results = await Promise.allSettled([
       updateLedgerUseCase(
-        TEST_USER_ID,
         ledgerId,
         input,
         serverComposition.settings,
         serverComposition.exchangeRates
       ),
       updateLedgerUseCase(
-        TEST_USER_ID,
         ledgerId,
         input,
         serverComposition.settings,
@@ -457,7 +454,7 @@ describe("settings concurrency invariants", () => {
     for (let i = 0; i < 5; i++) {
       // Run main-currency change and first entry creation concurrently on a fresh ledger.
       const results = await Promise.allSettled([
-        updateLedger(TEST_USER_ID, ledgerId, { settings: { mainCurrency: "USD" } }),
+        updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
         postgresLedgerProjectionAdapter.createManual({
           expectedMainCurrency: "CNY",
           ledgerId,
@@ -569,7 +566,7 @@ describe("settings concurrency invariants", () => {
 
       // Run main-currency change and activateRevision concurrently.
       const results = await Promise.allSettled([
-        updateLedger(TEST_USER_ID, ledgerId, { settings: { mainCurrency: "USD" } }),
+        updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
         postgresLedgerProjectionAdapter.activateRevision({
           lease,
           ledgerId,

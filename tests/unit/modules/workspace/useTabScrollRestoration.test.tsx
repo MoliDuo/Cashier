@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 
-function Harness({ ledgerId, tab }: { ledgerId: string; tab: LedgerTab }) {
-  useTabScrollRestoration(ledgerId, tab);
+function Harness({ tab }: { tab: LedgerTab }) {
+  useTabScrollRestoration(tab);
   return <div />;
 }
 
@@ -35,32 +35,23 @@ describe("useTabScrollRestoration", () => {
   });
 
   it("remembers an independent vertical position for every tab", () => {
-    const view = render(<Harness ledgerId="ledger-1" tab="stream" />);
+    const view = render(<Harness tab="stream" />);
     scrollY = 640;
 
-    act(() => view.rerender(<Harness ledgerId="ledger-1" tab="details" />));
+    act(() => view.rerender(<Harness tab="details" />));
     expect(scrollY).toBe(0);
     scrollY = 220;
 
-    act(() => view.rerender(<Harness ledgerId="ledger-1" tab="stream" />));
+    act(() => view.rerender(<Harness tab="stream" />));
     expect(scrollY).toBe(640);
 
-    act(() => view.rerender(<Harness ledgerId="ledger-1" tab="details" />));
+    act(() => view.rerender(<Harness tab="details" />));
     expect(scrollY).toBe(220);
-  });
-
-  it("clears remembered positions when the ledger changes", () => {
-    const view = render(<Harness ledgerId="ledger-1" tab="stream" />);
-    scrollY = 500;
-    act(() => view.rerender(<Harness ledgerId="ledger-1" tab="stats" />));
-    act(() => view.rerender(<Harness ledgerId="ledger-2" tab="stream" />));
-
-    expect(scrollY).toBe(0);
   });
 
   it("never scrolls again after successful restoration", () => {
     vi.useFakeTimers();
-    render(<Harness ledgerId="ledger-1" tab="stream" />);
+    render(<Harness tab="stream" />);
     scrollY = 450;
     act(() => vi.advanceTimersByTime(2000));
     expect(scrollY).toBe(450);
@@ -81,14 +72,14 @@ describe("useTabScrollRestoration", () => {
         disconnect = disconnect;
       }
     );
-    const view = render(<Harness ledgerId="ledger-1" tab="stream" />);
+    const view = render(<Harness tab="stream" />);
     scrollY = 640;
-    view.rerender(<Harness ledgerId="ledger-1" tab="stats" />);
+    view.rerender(<Harness tab="stats" />);
     Object.defineProperty(document.documentElement, "scrollHeight", {
       configurable: true,
       value: 800,
     });
-    view.rerender(<Harness ledgerId="ledger-1" tab="stream" />);
+    view.rerender(<Harness tab="stream" />);
     Object.defineProperty(document.documentElement, "scrollHeight", {
       configurable: true,
       value: 3000,

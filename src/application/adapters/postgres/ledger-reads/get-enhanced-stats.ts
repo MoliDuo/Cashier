@@ -119,7 +119,7 @@ export async function getEnhancedStatsQuery({
   compareRange,
   comparisonMode,
   bookId,
-}: GetEnhancedStatsInput): Promise<EnhancedStatsDto> {
+}: GetEnhancedStatsInput & { ledgerId: string }): Promise<EnhancedStatsDto> {
   const rows = await fetchAggregatedRows(ledgerId, queryRange, compareRange, bookId);
   const mainCurrency = rows[0]?.mainCurrency ?? "CNY";
   const current = emptyBucket();

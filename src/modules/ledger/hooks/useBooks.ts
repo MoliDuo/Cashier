@@ -7,7 +7,6 @@ import { getBooksAction, getBooksIncludingArchivedAction } from "@/lib/queries/l
 import type { BookDto } from "@/modules/ledger/contracts";
 
 interface UseBooksOptions {
-  ledgerId: string;
   /** Hydrated from the page bootstrap, so the switcher paints on the first frame. */
   initialBooks?: readonly BookDto[];
   /** 设置 and the detail page need the archived rows; the switcher must not. */
@@ -23,13 +22,10 @@ interface UseBooksOptions {
  * switcher's list: a retired book must never appear in the switcher, not even
  * between a fetch and a render.
  */
-export function useBooks({ ledgerId, initialBooks, includeArchived }: UseBooksOptions) {
+export function useBooks({ initialBooks, includeArchived }: UseBooksOptions) {
   const booksQuery = useQuery({
-    queryKey: includeArchived
-      ? queryKeys.booksIncludingArchived(ledgerId)
-      : queryKeys.books(ledgerId),
-    queryFn: () =>
-      includeArchived ? getBooksIncludingArchivedAction(ledgerId) : getBooksAction(ledgerId),
+    queryKey: includeArchived ? queryKeys.booksIncludingArchived() : queryKeys.books(),
+    queryFn: () => (includeArchived ? getBooksIncludingArchivedAction() : getBooksAction()),
     staleTime: LEDGER.STALE_TIME_MS,
     ...(initialBooks !== undefined ? { initialData: [...initialBooks] } : {}),
   });

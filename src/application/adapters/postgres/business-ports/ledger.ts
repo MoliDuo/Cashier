@@ -25,28 +25,8 @@ async function singleLiveLedger() {
   return rows.length === 1 ? rows[0]! : null;
 }
 
-/**
- * The single live ledger's id, for callers that only need to know which ledger
- * the session is allowed to touch. Exported beside the port so storage adapters
- * do not have to know how "there is one ledger" is decided.
- */
-export async function findSingleLiveLedgerId(): Promise<string | null> {
-  const rows = await db
-    .select({ id: ledgers.id })
-    .from(ledgers)
-    .where(isNull(ledgers.deletedAt))
-    .limit(2);
-  return rows.length === 1 ? rows[0]!.id : null;
-}
-
 export const postgresLedgerAdapter: LedgerPort = {
-  async canAccess(ledgerId, userId) {
-    if (!(await accountIsActive(userId))) return false;
-    const row = await singleLiveLedger();
-    return row != null && row.id === ledgerId;
-  },
-
-  async getSharedForMember(userId) {
+  async getLiveLedger(userId) {
     if (!(await accountIsActive(userId))) return null;
     const row = await singleLiveLedger();
     return row == null

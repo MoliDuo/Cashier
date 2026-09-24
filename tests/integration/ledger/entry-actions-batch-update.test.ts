@@ -102,7 +102,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
       where: eq(sourceDocuments.id, doc.id),
     });
     await batchUpdateLedgerEntriesAction(
-      ledgerId,
       [{ sourceDocumentId: doc.id, expectedVersion: before!.version }],
       ids,
       { categoryId: catId }
@@ -157,12 +156,9 @@ describe("batchUpdateLedgerEntriesAction", () => {
     }
     await activateTestSourceDocumentProjection(db, doc.id);
 
-    await batchUpdateLedgerEntriesAction(
-      ledgerId,
-      [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
-      ids,
-      { categoryId: null }
-    );
+    await batchUpdateLedgerEntriesAction([{ sourceDocumentId: doc.id, expectedVersion: 1 }], ids, {
+      categoryId: null,
+    });
 
     for (const id of ids) {
       const entry = await db.query.ledgerEntries.findFirst({
@@ -195,12 +191,9 @@ describe("batchUpdateLedgerEntriesAction", () => {
       items.map((item) => ({ convertedAmount: item.amount, exchangeRate: "1" }))
     );
 
-    await batchUpdateLedgerEntriesAction(
-      ledgerId,
-      [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
-      ids,
-      { amount: "12.00" }
-    );
+    await batchUpdateLedgerEntriesAction([{ sourceDocumentId: doc.id, expectedVersion: 1 }], ids, {
+      amount: "12.00",
+    });
 
     expect(convertBatchMock).toHaveBeenCalledTimes(1);
     expect(convertBatchMock.mock.calls[0]?.[0]).toHaveLength(20);
@@ -246,7 +239,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
     });
 
     const result = await batchUpdateLedgerEntriesAction(
-      ledgerId,
       documents.map((document) => ({ sourceDocumentId: document.id, expectedVersion: 1 })),
       entries.map((entry) => entry.id),
       { categoryId }
@@ -324,10 +316,9 @@ describe("batchUpdateLedgerEntriesAction", () => {
         .returning({ id: ledgerEntries.id })
     ).map((entry) => entry.id);
     const activeRevisionId = await activateTestSourceDocumentProjection(db, doc.id);
-    const preview = await previewBatchLedgerEntryDateAction(ledgerId, [ids[0]!]);
+    const preview = await previewBatchLedgerEntryDateAction([ids[0]!]);
 
     const committed = await batchUpdateLedgerEntryDatesAction(
-      ledgerId,
       [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
       [ids[0]!],
       "2026-01-02"

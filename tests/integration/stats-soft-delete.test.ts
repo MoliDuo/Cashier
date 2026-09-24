@@ -50,7 +50,7 @@ describe("ledger summary soft-delete regression", () => {
     ]);
     await activateTestSourceDocumentProjection(db, sourceDocument.id);
 
-    const stats = await getLedgerStatsAction(ledgerId);
+    const stats = await getLedgerStatsAction({});
 
     expect(stats.totals).toContainEqual({ currency: "CNY", total: "100", count: 1 });
   });

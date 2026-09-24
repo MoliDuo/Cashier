@@ -81,11 +81,7 @@ describe("deleteLedgerEntryAction", () => {
     }
     await activateTestSourceDocumentProjection(db, doc.id);
 
-    await deleteLedgerEntryAction(
-      ledgerId,
-      { sourceDocumentId: doc.id, expectedVersion: 1 },
-      entry.id
-    );
+    await deleteLedgerEntryAction({ sourceDocumentId: doc.id, expectedVersion: 1 }, entry.id);
 
     const updated = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entry.id),

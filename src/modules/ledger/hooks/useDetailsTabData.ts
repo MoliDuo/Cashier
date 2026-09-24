@@ -33,7 +33,6 @@ export interface UseDetailsTabDataReturn {
 }
 
 interface UseDetailsTabDataProps {
-  ledgerId: string;
   bookId?: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
@@ -48,7 +47,6 @@ interface UseDetailsTabDataProps {
 }
 
 export function useDetailsTabData({
-  ledgerId,
   bookId,
   ledger,
   periodParams,
@@ -59,19 +57,18 @@ export function useDetailsTabData({
   const descriptor = useMemo(
     () =>
       buildDetailsQueryDescriptor({
-        ledgerId,
         ...(bookId == null ? {} : { bookId }),
         periodParams,
         advancedFilters,
         ...(timeZone !== undefined ? { timeZone } : {}),
         mainCurrency,
       }),
-    [advancedFilters, bookId, ledgerId, mainCurrency, periodParams, timeZone]
+    [advancedFilters, bookId, mainCurrency, periodParams, timeZone]
   );
 
   const summaryQuery = useQuery({
     queryKey: descriptor.summaryQueryKey,
-    queryFn: () => getLedgerStatsAction(ledgerId, descriptor.summaryInput),
+    queryFn: () => getLedgerStatsAction(descriptor.summaryInput),
     enabled: true,
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     refetchOnWindowFocus: false,
@@ -81,7 +78,7 @@ export function useDetailsTabData({
   const entriesQuery = useInfiniteQuery({
     queryKey: descriptor.entriesQueryKey,
     queryFn: ({ pageParam }) =>
-      getLedgerEntriesAction(ledgerId, descriptor.getEntriesInput(pageParam as string | undefined)),
+      getLedgerEntriesAction(descriptor.getEntriesInput(pageParam as string | undefined)),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: undefined as string | undefined,
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,

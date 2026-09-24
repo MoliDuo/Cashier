@@ -48,13 +48,13 @@ const createdCredential: CreatedServiceCredentialDto = {
 describe("useCredentialMutations", () => {
   it("keeps the one-time token out of the settings query cache", async () => {
     const queryClient = new QueryClient();
-    queryClient.setQueryData(queryKeys.ledgerSettings("ledger-1"), {
+    queryClient.setQueryData(queryKeys.ledgerSettings(), {
       uncategorizedCount: 0,
       credentials: [],
     });
     createServiceCredentialAction.mockResolvedValueOnce(createdCredential);
 
-    const { result } = renderHook(() => useCredentialMutations("ledger-1"), {
+    const { result } = renderHook(() => useCredentialMutations(), {
       wrapper: createWrapper(queryClient),
     });
 
@@ -69,7 +69,7 @@ describe("useCredentialMutations", () => {
     expect(returned?.token).toBe(createdCredential.token);
     const cached = queryClient.getQueryData<{
       credentials: Array<Record<string, unknown>>;
-    }>(queryKeys.ledgerSettings("ledger-1"));
+    }>(queryKeys.ledgerSettings());
     expect(cached?.credentials).toEqual([]);
     expect(JSON.stringify(cached)).not.toContain(createdCredential.token);
   });
@@ -78,7 +78,7 @@ describe("useCredentialMutations", () => {
     const queryClient = new QueryClient();
     createServiceCredentialAction.mockResolvedValueOnce(createdCredential);
 
-    const { result } = renderHook(() => useCredentialMutations("ledger-1"), {
+    const { result } = renderHook(() => useCredentialMutations(), {
       wrapper: createWrapper(queryClient),
     });
 

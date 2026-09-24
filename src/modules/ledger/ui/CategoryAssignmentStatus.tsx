@@ -16,7 +16,6 @@ import { CategoryAssignmentResultDialog } from "./CategoryAssignmentResultDialog
 import { isCategoryAssignmentJobActive } from "./category-assignment-status-visibility";
 
 interface CategoryAssignmentStatusProps {
-  ledgerId: string;
   job: CategoryReclassificationJob | null;
   isReadError: boolean;
   onRefresh: () => Promise<unknown>;
@@ -26,7 +25,6 @@ interface CategoryAssignmentStatusProps {
 }
 
 export function CategoryAssignmentStatus({
-  ledgerId,
   job,
   isReadError,
   onRefresh,
@@ -41,16 +39,15 @@ export function CategoryAssignmentStatus({
   const retryKeyRef = useRef<{ jobId: string; requestKey: string } | null>(null);
   const retryLatestKeyRef = useRef<{ jobId: string; requestKey: string } | null>(null);
   const cancel = useMutation({
-    mutationFn: (jobId: string) => cancelCategoryAssignmentAction(ledgerId, { jobId }),
-    onSuccess: (saved) =>
-      queryClient.setQueryData(queryKeys.categoryReclassification(ledgerId), saved),
+    mutationFn: (jobId: string) => cancelCategoryAssignmentAction({ jobId }),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.categoryReclassification(), saved),
   });
   const retryLatest = useMutation({
     mutationFn: (jobId: string) => {
       if (retryLatestKeyRef.current?.jobId !== jobId) {
         retryLatestKeyRef.current = { jobId, requestKey: crypto.randomUUID() };
       }
-      return retryCategoryAssignmentLatestAction(ledgerId, retryLatestKeyRef.current);
+      return retryCategoryAssignmentLatestAction(retryLatestKeyRef.current);
     },
     onSuccess: (saved) => {
       onTaskRegistered(saved);
@@ -63,7 +60,7 @@ export function CategoryAssignmentStatus({
       if (retryKeyRef.current?.jobId !== jobId) {
         retryKeyRef.current = { jobId, requestKey: crypto.randomUUID() };
       }
-      return retryCategoryAssignmentFailuresAction(ledgerId, retryKeyRef.current);
+      return retryCategoryAssignmentFailuresAction(retryKeyRef.current);
     },
     onSuccess: (saved) => {
       onTaskRegistered(saved);
@@ -174,7 +171,6 @@ export function CategoryAssignmentStatus({
       </div>
       {job == null ? null : (
         <CategoryAssignmentResultDialog
-          ledgerId={ledgerId}
           job={job}
           open={resultsOpen}
           onOpenChange={setResultsOpen}

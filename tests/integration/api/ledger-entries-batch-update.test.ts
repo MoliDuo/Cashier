@@ -79,7 +79,6 @@ describe("Batch Update Ledger Entries Action", () => {
   it("should batch update category and currency", async () => {
     // batchUpdateLedgerEntriesAction returns void in new format
     await batchUpdateLedgerEntriesAction(
-      testLedgerId,
       [{ sourceDocumentId: testSourceDocId, expectedVersion: 1 }],
       testEntryIds,
       {
@@ -104,7 +103,6 @@ describe("Batch Update Ledger Entries Action", () => {
 
   it("normalizes a cleared currency to the ledger main currency", async () => {
     await batchUpdateLedgerEntriesAction(
-      testLedgerId,
       [{ sourceDocumentId: testSourceDocId, expectedVersion: 1 }],
       testEntryIds,
       { currency: null }
@@ -124,7 +122,6 @@ describe("Batch Update Ledger Entries Action", () => {
 
     // batchUpdateLedgerEntriesAction returns void in new format
     await batchUpdateLedgerEntriesAction(
-      testLedgerId,
       [{ sourceDocumentId: testSourceDocId, expectedVersion: 1 }],
       testEntryIds,
       {

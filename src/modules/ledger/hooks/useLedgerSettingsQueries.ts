@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSmartPolling } from "@/hooks/use-smart-polling";
 import { queryKeys } from "@/lib/query-keys";
@@ -13,20 +13,18 @@ import type { EntryCategoryWithCount, Ledger, ServiceCredential } from "@/module
 import { LEDGER } from "@/lib/constants";
 
 interface UseLedgerSettingsQueriesParams {
-  ledgerId: string;
   initialLedger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   metadataPollingSession: number;
 }
 
 export function useLedgerSettingsQueries({
-  ledgerId,
   initialLedger,
   initialCategories,
   metadataPollingSession,
 }: UseLedgerSettingsQueriesParams) {
   type QueryStatus = "pending" | "success" | "error";
-  const settingsQueryKey = useMemo(() => queryKeys.ledgerSettings(ledgerId), [ledgerId]);
+  const settingsQueryKey = queryKeys.ledgerSettings();
   const categoryMetadataPolling = useSmartPolling<EntryCategoryWithCount[]>({
     sessionKey: metadataPollingSession,
     isPollingActive: useCallback(
@@ -43,8 +41,8 @@ export function useLedgerSettingsQueries({
   });
 
   const ledgerQuery = useQuery<Ledger | null>({
-    queryKey: queryKeys.ledger(ledgerId),
-    queryFn: () => getLedgerAction(ledgerId),
+    queryKey: queryKeys.ledger(),
+    queryFn: () => getLedgerAction(),
     initialData: initialLedger,
     staleTime: LEDGER.STALE_TIME_MS,
     refetchOnWindowFocus: true,
@@ -52,8 +50,8 @@ export function useLedgerSettingsQueries({
   const ledger = ledgerQuery.data ?? initialLedger;
 
   const categoriesQuery = useQuery<EntryCategoryWithCount[]>({
-    queryKey: queryKeys.entryCategories(ledgerId),
-    queryFn: () => getEntryCategoriesAction(ledgerId),
+    queryKey: queryKeys.entryCategories(),
+    queryFn: () => getEntryCategoriesAction(),
     initialData: initialCategories,
     refetchInterval: categoryMetadataPolling,
     staleTime: LEDGER.STALE_TIME_MS,
@@ -66,7 +64,7 @@ export function useLedgerSettingsQueries({
     credentials: ServiceCredential[];
   }>({
     queryKey: settingsQueryKey,
-    queryFn: () => getLedgerSettingsAction(ledgerId),
+    queryFn: () => getLedgerSettingsAction(),
     staleTime: LEDGER.STALE_TIME_MS,
     refetchOnWindowFocus: true,
   });

@@ -46,7 +46,7 @@ describe("requireLedgerAccess", () => {
   });
 
   it("returns userId and ledger when user owns the ledger", async () => {
-    const result = await requireLedgerAccess(ledgerId);
+    const result = await requireLedgerAccess();
     expect(result.userId).toBe(TEST_USER_ID);
     expect(result.ledger.id).toBe(ledgerId);
   });
@@ -68,41 +68,11 @@ describe("requireLedgerAccess", () => {
       userId: otherUserId,
     });
 
-    await expect(requireLedgerAccess(otherLedgerId)).rejects.toThrow(NotFoundError);
-  });
-
-  it("returns 404 error for invalid UUID", async () => {
-    await expect(requireLedgerAccess("not-a-valid-uuid")).rejects.toThrow(NotFoundError);
-  });
-
-  it("returns 404 error for soft-deleted ledger", async () => {
-    const db = getTestDb();
-    const deletedLedgerId = randomUUID();
-    const anotherUserId = randomUUID();
-
-    // Use a different user to avoid unique constraint violation
-    // (TEST_USER_ID already has a ledger from beforeEach)
-    await db.insert(users).values({ id: anotherUserId }).onConflictDoNothing();
-    await db.insert(loginEmails).values({
-      userId: anotherUserId,
-      email: `deleted-ledger-${randomUUID()}@example.com`,
-      emailVerified: new Date(),
-    });
-
-    await db.insert(ledgers).values({
-      id: deletedLedgerId,
-      userId: anotherUserId,
-      deletedAt: new Date(),
-    });
-
-    // Mock session as the another user to test access to their deleted ledger
-    mockSession(anotherUserId, `deleted-ledger-${randomUUID()}@example.com`);
-
-    await expect(requireLedgerAccess(deletedLedgerId)).rejects.toThrow(NotFoundError);
+    await expect(requireLedgerAccess()).rejects.toThrow(NotFoundError);
   });
 
   it("returns 401 error when not authenticated", async () => {
     mockNoSession();
-    await expect(requireLedgerAccess(ledgerId)).rejects.toThrow(UnauthorizedError);
+    await expect(requireLedgerAccess()).rejects.toThrow(UnauthorizedError);
   });
 });

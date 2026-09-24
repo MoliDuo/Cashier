@@ -14,14 +14,12 @@ import { useTranslations } from "next-intl";
 export type UpdateLedgerData = UpdateLedgerInput["settings"];
 
 interface UseLedgerSettingsMutationParams {
-  ledgerId: string;
   expectedUpdatedAt: string;
   successMessage: string;
   errorMessage: string;
 }
 
 export function useLedgerSettingsMutation({
-  ledgerId,
   expectedUpdatedAt,
   successMessage,
   errorMessage,
@@ -45,11 +43,11 @@ export function useLedgerSettingsMutation({
     }
   };
 
-  return useLedgerMutation<Ledger, UpdateLedgerData>(ledgerId, {
+  return useLedgerMutation<Ledger, UpdateLedgerData>({
     invalidates: (_ledger, data) =>
       data.mainCurrency === undefined ? ["settings"] : ["settings", "documents", "stats"],
     mutationFn: async (data) => {
-      const result = await updateLedgerSettingsAction(ledgerId, {
+      const result = await updateLedgerSettingsAction({
         expectedUpdatedAt,
         settings: omitUndefinedProperties(data),
       });
@@ -59,7 +57,7 @@ export function useLedgerSettingsMutation({
     successMessage,
     errorMessage: null,
     onSuccess: (savedLedger) => {
-      queryClient.setQueryData(queryKeys.ledger(ledgerId), savedLedger);
+      queryClient.setQueryData(queryKeys.ledger(), savedLedger);
     },
     onError: (error) => toast.error(error.message || errorMessage),
   });

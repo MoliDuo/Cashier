@@ -24,7 +24,6 @@ const getHydratedSnapshot = () => true;
 const getServerSnapshotFalse = () => false;
 
 interface UseLedgerPageEnvironmentOptions {
-  ledgerId: string;
   /** The book being viewed, or null for 总账. */
   scope: RecordScope;
   initialLedger?: LedgerDto | undefined;
@@ -45,7 +44,6 @@ interface UseLedgerPageEnvironmentOptions {
  * that every ledger page tab depends on.
  */
 export function useLedgerPageEnvironment({
-  ledgerId,
   scope,
   initialLedger,
   initialCategories,
@@ -54,15 +52,15 @@ export function useLedgerPageEnvironment({
   setIsInputOpen,
 }: UseLedgerPageEnvironmentOptions) {
   const { data: ledger } = useQuery({
-    queryKey: queryKeys.ledger(ledgerId),
-    queryFn: () => getLedgerAction(ledgerId),
+    queryKey: queryKeys.ledger(),
+    queryFn: () => getLedgerAction(),
     staleTime: STALE_TIME,
     ...(initialLedger !== undefined ? { initialData: initialLedger } : {}),
   });
 
   const categoriesQuery = useQuery({
-    queryKey: queryKeys.entryCategories(ledgerId),
-    queryFn: () => getEntryCategoriesAction(ledgerId),
+    queryKey: queryKeys.entryCategories(),
+    queryFn: () => getEntryCategoriesAction(),
     staleTime: STALE_TIME,
     ...(initialCategories !== undefined ? { initialData: initialCategories } : {}),
   });
@@ -72,7 +70,6 @@ export function useLedgerPageEnvironment({
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const preferredCurrencies = ledger?.settings.currencies ?? [];
   const { books, booksQuery } = useBooks({
-    ledgerId,
     ...(initialBooks !== undefined ? { initialBooks } : {}),
   });
   // The viewed book's zone decides; on 总账 — every book at once — the device's

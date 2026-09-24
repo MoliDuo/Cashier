@@ -41,7 +41,6 @@ type DatePreviewState =
   | { status: "ready"; request: DatePreviewRequest };
 
 export function useDetailsBatchController(
-  ledgerId: string,
   entries: readonly ActiveLedgerEntryDto[],
   queryFingerprint: string,
   timeZone?: string,
@@ -90,12 +89,11 @@ export function useDetailsBatchController(
   const update = useLedgerMutation<
     { ledgerEntryIds: string[]; affectedCount: number },
     { categoryId?: string | null; currency?: string | null }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: async (data: { categoryId?: string | null; currency?: string | null }) => {
       const result = await batchUpdateLedgerEntriesAction(
-        ledgerId,
         targetsFor(selection.selectedIds),
         selection.selectedIds,
         data
@@ -111,7 +109,6 @@ export function useDetailsBatchController(
   });
 
   const categoryAssignment = useDetailsCategoryAssignment({
-    ledgerId,
     queryFingerprint,
     categories,
     entryById,
@@ -124,15 +121,11 @@ export function useDetailsBatchController(
   const remove = useLedgerMutation<
     Awaited<ReturnType<typeof batchDeleteLedgerEntriesAction>>,
     void
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: () =>
-      batchDeleteLedgerEntriesAction(
-        ledgerId,
-        targetsFor(selection.selectedIds),
-        selection.selectedIds
-      ),
+      batchDeleteLedgerEntriesAction(targetsFor(selection.selectedIds), selection.selectedIds),
     errorMessage: tCommon("deleteFailed"),
     onSuccess: (result) => {
       const unresolved = [...result.stale, ...result.failed].map((item) => item.id);
@@ -161,7 +154,7 @@ export function useDetailsBatchController(
       let impact: BatchDateImpact;
       let targets: VersionedTarget[];
       try {
-        impact = await previewBatchLedgerEntryDateAction(ledgerId, entryIds);
+        impact = await previewBatchLedgerEntryDateAction(entryIds);
         targets = targetsFor(entryIds);
       } catch {
         if (dateRequestIdRef.current === requestId) setDatePreview({ status: "error" });
@@ -173,7 +166,7 @@ export function useDetailsBatchController(
         request: { entryIds, targets, queryFingerprint: capturedFingerprint, impact },
       });
     })();
-  }, [ledgerId, queryFingerprint, selection.selectedIds, targetsFor]);
+  }, [queryFingerprint, selection.selectedIds, targetsFor]);
 
   const setDateDialogVisibility = useCallback((open: boolean) => {
     dateRequestIdRef.current += 1;
@@ -196,7 +189,7 @@ export function useDetailsBatchController(
     return () => {
       dateRequestIdRef.current += 1;
     };
-  }, [ledgerId]);
+  }, []);
 
   // The preview is answered for a snapshot of the selection, so a selection
   // that moved since then is no longer what the dialog describes.
@@ -208,7 +201,7 @@ export function useDetailsBatchController(
   const datePreviewFailed = datePreview.status === "error";
   const isPreviewingDate = datePreview.status === "loading";
 
-  const updateDates = useLedgerMutation<{ impact: BatchDateImpact }, void>(ledgerId, {
+  const updateDates = useLedgerMutation<{ impact: BatchDateImpact }, void>({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: async () => {
@@ -221,7 +214,6 @@ export function useDetailsBatchController(
         throw new Error("selection_changed");
       }
       const result = await batchUpdateLedgerEntryDatesAction(
-        ledgerId,
         request.targets,
         request.entryIds,
         selectedDate

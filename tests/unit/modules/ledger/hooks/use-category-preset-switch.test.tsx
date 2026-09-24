@@ -51,10 +51,9 @@ describe("useCategoryPresetSwitch", () => {
 
   it("retains a separate mapping draft while switching between presets", async () => {
     const { wrapper } = setup();
-    const { result } = renderHook(
-      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [custom] }),
-      { wrapper }
-    );
+    const { result } = renderHook(() => useCategoryPresetSwitch({ categories: [custom] }), {
+      wrapper,
+    });
     act(() => result.current.openDialog());
     await waitFor(() => expect(result.current.isPreparing).toBe(false));
 
@@ -71,10 +70,7 @@ describe("useCategoryPresetSwitch", () => {
 
   it("allows an empty ledger to apply a preset", async () => {
     const { wrapper } = setup();
-    const { result } = renderHook(
-      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [] }),
-      { wrapper }
-    );
+    const { result } = renderHook(() => useCategoryPresetSwitch({ categories: [] }), { wrapper });
     act(() => result.current.openDialog());
     await waitFor(() => expect(result.current.isPreparing).toBe(false));
 
@@ -85,7 +81,7 @@ describe("useCategoryPresetSwitch", () => {
   it("blocks a frozen draft after the server category collection changes", async () => {
     const { wrapper } = setup();
     const { result, rerender } = renderHook(
-      ({ categories }) => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories }),
+      ({ categories }) => useCategoryPresetSwitch({ categories }),
       { wrapper, initialProps: { categories: [custom] } }
     );
     act(() => result.current.openDialog());
@@ -102,10 +98,9 @@ describe("useCategoryPresetSwitch", () => {
 
   it("keeps dirty input when close is cancelled", async () => {
     const { wrapper } = setup();
-    const { result } = renderHook(
-      () => useCategoryPresetSwitch({ ledgerId: "ledger-1", categories: [custom] }),
-      { wrapper }
-    );
+    const { result } = renderHook(() => useCategoryPresetSwitch({ categories: [custom] }), {
+      wrapper,
+    });
     act(() => result.current.openDialog());
     await waitFor(() => expect(result.current.isPreparing).toBe(false));
     act(() => result.current.setMapping(custom.id, 0));

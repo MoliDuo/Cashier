@@ -77,7 +77,7 @@ describe("createQuickEntryAction", () => {
   });
 
   it("should create quick entry with valid data", async () => {
-    const result = await createQuickEntryAction(ledgerId, {
+    const result = await createQuickEntryAction({
       categoryId,
       amount: "100.5",
       currency: "CNY",
@@ -117,7 +117,7 @@ describe("createQuickEntryAction", () => {
   });
 
   it("should use category name when itemName is not provided", async () => {
-    const result = await createQuickEntryAction(ledgerId, {
+    const result = await createQuickEntryAction({
       categoryId,
       amount: "50",
     });
@@ -134,7 +134,7 @@ describe("createQuickEntryAction", () => {
   });
 
   it("should use default currency when not provided", async () => {
-    const result = await createQuickEntryAction(ledgerId, {
+    const result = await createQuickEntryAction({
       categoryId,
       amount: "100",
     });
@@ -152,7 +152,7 @@ describe("createQuickEntryAction", () => {
       .mockRejectedValue(new Error("network disabled in test"));
 
     try {
-      const result = await createQuickEntryAction(ledgerId, {
+      const result = await createQuickEntryAction({
         categoryId,
         amount: "100",
         currency: "USD",
@@ -173,7 +173,7 @@ describe("createQuickEntryAction", () => {
   });
 
   it("should use current date when entryDate not provided", async () => {
-    const result = await createQuickEntryAction(ledgerId, {
+    const result = await createQuickEntryAction({
       categoryId,
       amount: "100",
     });
@@ -208,7 +208,7 @@ describe("createQuickEntryAction", () => {
     });
 
     await expect(
-      createQuickEntryAction(otherLedgerId, {
+      createQuickEntryAction({
         categoryId,
         amount: "100",
       })
@@ -217,7 +217,7 @@ describe("createQuickEntryAction", () => {
 
   it("should reject negative amount", async () => {
     await expect(
-      createQuickEntryAction(ledgerId, {
+      createQuickEntryAction({
         categoryId,
         amount: "-100",
       })
@@ -226,7 +226,7 @@ describe("createQuickEntryAction", () => {
 
   it("should reject zero amount", async () => {
     await expect(
-      createQuickEntryAction(ledgerId, {
+      createQuickEntryAction({
         categoryId,
         amount: "0",
       })
@@ -234,7 +234,7 @@ describe("createQuickEntryAction", () => {
   });
 
   it("should create entry with null description", async () => {
-    const result = await createQuickEntryAction(ledgerId, {
+    const result = await createQuickEntryAction({
       categoryId,
       amount: "100",
       description: null,

@@ -42,7 +42,7 @@ describe("getLedgerEntriesAction", () => {
   });
 
   it("should return empty array when no ledger entries exist", async () => {
-    const data = await getLedgerEntriesAction(testLedgerId, {});
+    const data = await getLedgerEntriesAction({});
 
     expect(data.items).toEqual([]);
     expect(data.nextCursor).toBeNull();
@@ -60,7 +60,7 @@ describe("getLedgerEntriesAction", () => {
     });
     await activateTestSourceDocumentProjection(db, testSourceDocId);
 
-    const data = await getLedgerEntriesAction(testLedgerId, {});
+    const data = await getLedgerEntriesAction({});
 
     expect(data.items).toHaveLength(1);
     const firstItem = data.items[0];
@@ -101,7 +101,7 @@ describe("getLedgerEntriesAction", () => {
     ]);
     await activateTestSourceDocumentProjection(db, testSourceDocId);
 
-    const data = await getLedgerEntriesAction(testLedgerId, { categoryId: testCategoryId });
+    const data = await getLedgerEntriesAction({ categoryId: testCategoryId });
 
     expect(data.items).toHaveLength(1);
     const firstItem = data.items[0];
@@ -138,7 +138,7 @@ describe("getLedgerEntriesAction", () => {
     ]);
     await activateTestSourceDocumentProjection(db, activeSourceDocId);
 
-    const data = await getLedgerEntriesAction(testLedgerId, {});
+    const data = await getLedgerEntriesAction({});
 
     expect(data.items).toHaveLength(1);
     const firstItem = data.items[0];

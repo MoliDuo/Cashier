@@ -74,7 +74,7 @@ function setup() {
   });
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={queryClient}>
-      <CategoryAssignmentProvider ledgerId="ledger-1">{children}</CategoryAssignmentProvider>
+      <CategoryAssignmentProvider>{children}</CategoryAssignmentProvider>
     </QueryClientProvider>
   );
   return { queryClient, wrapper };
@@ -189,7 +189,7 @@ describe("useDetailsBatchController", () => {
       failed: [],
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
 
@@ -229,7 +229,7 @@ describe("useDetailsBatchController", () => {
       sourceDocumentIds: [],
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
 
@@ -264,7 +264,7 @@ describe("useDetailsBatchController", () => {
       data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
 
@@ -298,8 +298,7 @@ describe("useDetailsBatchController", () => {
       data: { impact: { affectedEntryCount: 2 } },
     });
     const { result } = renderHook(
-      () =>
-        useDetailsBatchController("ledger-1", [entry("entry-1"), entry("entry-2")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
       { wrapper }
     );
 
@@ -309,16 +308,12 @@ describe("useDetailsBatchController", () => {
     });
     act(() => result.current.openDateDialog());
     await act(async () => Promise.resolve());
-    expect(previewBatchLedgerEntryDateActionMock).toHaveBeenCalledWith("ledger-1", [
-      "entry-1",
-      "entry-2",
-    ]);
+    expect(previewBatchLedgerEntryDateActionMock).toHaveBeenCalledWith(["entry-1", "entry-2"]);
 
     await act(async () => {
       await result.current.updateDates.mutateAsync();
     });
     expect(batchUpdateLedgerEntryDatesActionMock).toHaveBeenCalledWith(
-      "ledger-1",
       [{ sourceDocumentId: "document-1", expectedVersion: 1 }],
       ["entry-1", "entry-2"],
       result.current.selectedDate
@@ -334,8 +329,7 @@ describe("useDetailsBatchController", () => {
       sourceDocumentIds: ["document-1"],
     });
     const { result } = renderHook(
-      () =>
-        useDetailsBatchController("ledger-1", [entry("entry-1"), entry("entry-2")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
       { wrapper }
     );
 
@@ -359,7 +353,7 @@ describe("useDetailsBatchController", () => {
       staleTargets: [{ sourceDocumentId: "document-1", expectedVersion: 1, currentVersion: 2 }],
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -386,7 +380,7 @@ describe("useDetailsBatchController", () => {
       staleTargets: [{ sourceDocumentId: "document-1", expectedVersion: 1, currentVersion: 2 }],
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -405,7 +399,7 @@ describe("useDetailsBatchController", () => {
     const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockRejectedValueOnce(new Error("preview down"));
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => {
@@ -422,7 +416,7 @@ describe("useDetailsBatchController", () => {
   it("starts an AI sort for the captured selection and clears it", async () => {
     const { wrapper } = setup();
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -435,17 +429,17 @@ describe("useDetailsBatchController", () => {
     await act(async () => result.current.confirmCategory());
     await act(async () => Promise.resolve());
 
-    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith({
       requestKey: expect.any(String),
       mode: { kind: "ai", candidateCategoryIds: ["category-1", "category-2"] },
       expectedEntryCount: 1,
     });
-    expect(appendCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(appendCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
       jobId: "job-1",
       chunkIndex: 0,
       entries: [{ ledgerEntryId: "entry-1", sourceDocumentId: "document-1", expectedVersion: 1 }],
     });
-    expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
       jobId: "job-1",
       expectedEntryCount: 1,
     });
@@ -462,7 +456,7 @@ describe("useDetailsBatchController", () => {
       data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -473,7 +467,6 @@ describe("useDetailsBatchController", () => {
     await act(async () => Promise.resolve());
 
     expect(batchUpdateLedgerEntriesActionMock).toHaveBeenCalledWith(
-      "ledger-1",
       expect.anything(),
       ["entry-1"],
       { categoryId: "category-1" }
@@ -490,7 +483,7 @@ describe("useDetailsBatchController", () => {
       data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
     });
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -507,7 +500,6 @@ describe("useDetailsBatchController", () => {
     await act(async () => Promise.resolve());
 
     expect(batchUpdateLedgerEntriesActionMock).toHaveBeenCalledWith(
-      "ledger-1",
       expect.anything(),
       ["entry-1"],
       { categoryId: null }
@@ -518,8 +510,7 @@ describe("useDetailsBatchController", () => {
   it("refuses to start when the selection moved under the dialog", async () => {
     const { wrapper } = setup();
     const { result } = renderHook(
-      () =>
-        useDetailsBatchController("ledger-1", [entry("entry-1"), entry("entry-2")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -543,23 +534,24 @@ describe("useDetailsBatchController", () => {
     reclassificationJobMock
       .mockResolvedValueOnce(running)
       .mockImplementation(async () => succeededJob());
-    renderHook(() => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"), {
+    renderHook(() => useDetailsBatchController([entry("entry-1")], "fingerprint"), {
       wrapper,
     });
     await waitFor(() =>
-      expect(
-        queryClient.getQueryData(["ledger", "ledger-1", "category-reclassification"])
-      ).toMatchObject({ id: "job-1", status: "running" })
+      expect(queryClient.getQueryData(["ledger", "category-reclassification"])).toMatchObject({
+        id: "job-1",
+        status: "running",
+      })
     );
 
     await act(async () => {
       await queryClient.refetchQueries({
-        queryKey: ["ledger", "ledger-1", "category-reclassification"],
+        queryKey: ["ledger", "category-reclassification"],
       });
     });
     await act(async () => {
       await queryClient.refetchQueries({
-        queryKey: ["ledger", "ledger-1", "category-reclassification"],
+        queryKey: ["ledger", "category-reclassification"],
       });
     });
     await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledTimes(1));
@@ -568,13 +560,13 @@ describe("useDetailsBatchController", () => {
   it("stays quiet about a run that finished before this page arrived", async () => {
     const { wrapper, queryClient } = setup();
     reclassificationJobMock.mockResolvedValue(succeededJob());
-    renderHook(() => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"), {
+    renderHook(() => useDetailsBatchController([entry("entry-1")], "fingerprint"), {
       wrapper,
     });
     await waitFor(() =>
-      expect(
-        queryClient.getQueryData(["ledger", "ledger-1", "category-reclassification"])
-      ).toMatchObject({ status: "succeeded" })
+      expect(queryClient.getQueryData(["ledger", "category-reclassification"])).toMatchObject({
+        status: "succeeded",
+      })
     );
     expect(toastSuccessMock).not.toHaveBeenCalled();
     expect(toastErrorMock).not.toHaveBeenCalled();
@@ -591,7 +583,6 @@ describe("useDetailsBatchController", () => {
     const { result } = renderHook(
       () =>
         useDetailsBatchController(
-          "ledger-1",
           ids.map((id) => entry(id)),
           "fingerprint"
         ),
@@ -617,7 +608,6 @@ describe("useDetailsBatchController", () => {
     const { result } = renderHook(
       () =>
         useDetailsBatchController(
-          "ledger-1",
           ids.map((id) => entry(id)),
           "fingerprint"
         ),
@@ -633,7 +623,7 @@ describe("useDetailsBatchController", () => {
     });
 
     expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
-    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith({
       requestKey: expect.any(String),
       mode: { kind: "assign", categoryId: "category-1" },
       expectedEntryCount: 101,
@@ -649,7 +639,7 @@ describe("useDetailsBatchController", () => {
       receivedCount: 1000,
     });
     appendCategoryAssignmentSelectionActionMock.mockImplementation(
-      async (_ledgerId: string, input: { chunkIndex: number }) => ({
+      async (input: { chunkIndex: number }) => ({
         jobId: "job-1",
         received: Math.min(2500, 1000 + input.chunkIndex * 1000),
         total: 2500,
@@ -658,7 +648,6 @@ describe("useDetailsBatchController", () => {
     const { result } = renderHook(
       () =>
         useDetailsBatchController(
-          "ledger-1",
           ids.map((id) => entry(id)),
           "fingerprint"
         ),
@@ -673,15 +662,15 @@ describe("useDetailsBatchController", () => {
       await Promise.resolve();
     });
     await waitFor(() =>
-      expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith("ledger-1", {
+      expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
         jobId: "job-1",
         expectedEntryCount: 2500,
       })
     );
 
     const chunks = appendCategoryAssignmentSelectionActionMock.mock.calls.map((call) => ({
-      chunkIndex: (call[1] as { chunkIndex: number }).chunkIndex,
-      size: (call[1] as { entries: unknown[] }).entries.length,
+      chunkIndex: (call[0] as { chunkIndex: number }).chunkIndex,
+      size: (call[0] as { entries: unknown[] }).entries.length,
     }));
     expect(chunks).toEqual([
       { chunkIndex: 1, size: 1000 },
@@ -693,7 +682,7 @@ describe("useDetailsBatchController", () => {
     const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockRejectedValueOnce(new Error("write failed"));
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -717,7 +706,7 @@ describe("useDetailsBatchController", () => {
       ...running,
     }));
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -735,7 +724,7 @@ describe("useDetailsBatchController", () => {
 
     // The dialog is gone but the run is not: the page still holds it, and still
     // reports its outcome once it ends.
-    const runQueryKey = ["ledger", "ledger-1", "category-reclassification"];
+    const runQueryKey = ["ledger", "category-reclassification"];
     await waitFor(() =>
       expect(queryClient.getQueryData(runQueryKey)).toMatchObject({ id: "job-1" })
     );
@@ -760,8 +749,7 @@ describe("useDetailsBatchController", () => {
       })
       .mockResolvedValueOnce(dateImpact(1));
     const { result } = renderHook(
-      () =>
-        useDetailsBatchController("ledger-1", [entry("entry-1"), entry("entry-2")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelectMany(["entry-1", "entry-2"], true));
@@ -788,7 +776,7 @@ describe("useDetailsBatchController", () => {
       .mockRejectedValueOnce(new Error("preview down"))
       .mockResolvedValueOnce(dateImpact(1));
     const { result } = renderHook(
-      () => useDetailsBatchController("ledger-1", [entry("entry-1")], "fingerprint"),
+      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
@@ -807,7 +795,7 @@ describe("useDetailsBatchController", () => {
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce(dateImpact(1));
     const { result, rerender } = renderHook(
       ({ fingerprint }: { fingerprint: string }) =>
-        useDetailsBatchController("ledger-1", [entry("entry-1")], fingerprint),
+        useDetailsBatchController([entry("entry-1")], fingerprint),
       { wrapper, initialProps: { fingerprint: "fingerprint" } }
     );
     act(() => result.current.handleSelect("entry-1", true));

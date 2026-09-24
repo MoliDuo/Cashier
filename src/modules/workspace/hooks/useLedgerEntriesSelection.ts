@@ -7,7 +7,6 @@ import { useSelection } from "@/hooks/use-selection";
 import { useBatchSourceDocumentActions } from "@/modules/source-document/hooks/useBatchSourceDocumentActions";
 
 interface UseLedgerEntriesSelectionOptions {
-  ledgerId: string;
   streamGroups: UnifiedStreamGroup[];
   periodParams: PeriodParams;
   advancedFilters?: LedgerAdvancedFilters | undefined;
@@ -15,7 +14,6 @@ interface UseLedgerEntriesSelectionOptions {
 
 /** Owns batch-selection state and the batch source-document mutations it drives. */
 export function useLedgerEntriesSelection({
-  ledgerId,
   streamGroups,
   periodParams,
   advancedFilters,
@@ -58,12 +56,7 @@ export function useLedgerEntriesSelection({
   } = useSelection({ allIds: allSourceDocumentIds, queryFingerprint });
 
   const { deleteSourceDocument, batchUpdateDates, batchDelete, batchRetry } =
-    useBatchSourceDocumentActions(
-      ledgerId,
-      clearSelection,
-      retainSelection,
-      sourceDocumentVersions
-    );
+    useBatchSourceDocumentActions(clearSelection, retainSelection, sourceDocumentVersions);
   const selectedEntryIds = useMemo(() => {
     const selected = new Set(selectedIds);
     return [

@@ -6,7 +6,6 @@ import { currencyRates, ledgerEntries, ledgers, sourceDocuments } from "@/persis
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 
 import { recalculateCurrentEntries } from "../source-document-aggregate/recalculate-current-entries";
-import { postgresLedgerAdapter } from "./ledger";
 import { mapLedgerSettings, settingsColumns } from "./shared";
 
 export const postgresSettingsAdapter: SettingsPort = {
@@ -24,8 +23,7 @@ export const postgresSettingsAdapter: SettingsPort = {
     return ledger == null ? null : mapLedgerSettings(ledger);
   },
 
-  async getRequiredExchangeRateDates(ledgerId, userId) {
-    if (!(await postgresLedgerAdapter.canAccess(ledgerId, userId))) return null;
+  async getRequiredExchangeRateDates(ledgerId) {
     const ledger = await db.query.ledgers.findFirst({
       where: and(eq(ledgers.id, ledgerId), isNull(ledgers.deletedAt)),
       columns: { mainCurrency: true },
@@ -58,7 +56,6 @@ export const postgresSettingsAdapter: SettingsPort = {
   },
 
   async updateWithCurrencyRecalculation(input) {
-    if (!(await postgresLedgerAdapter.canAccess(input.ledgerId, input.userId))) return null;
     return db.transaction(async (tx) => {
       // Lock the ledger row to serialise with concurrent first-entry creation.
       // This prevents a main-currency change from interleaving with activateRevision / createManual.

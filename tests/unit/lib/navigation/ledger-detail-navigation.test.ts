@@ -15,13 +15,12 @@ describe("openLedgerEntrySourceDocument", () => {
   });
 
   it("opens the record the entry belongs to", () => {
-    openLedgerEntrySourceDocument({ sourceDocumentId: "document-1", ledgerId: "ledger-1" });
+    openLedgerEntrySourceDocument({ sourceDocumentId: "document-1" });
 
     expect(useModalStackStore.getState().stack).toEqual([
       expect.objectContaining({
         type: "source-document",
         id: "document-1",
-        ledgerId: "ledger-1",
       }),
     ]);
   });
@@ -29,7 +28,7 @@ describe("openLedgerEntrySourceDocument", () => {
   it("writes the record into the URL so a reload reopens the same sheet", () => {
     const pushState = vi.spyOn(window.history, "pushState");
 
-    openLedgerEntrySourceDocument({ sourceDocumentId: "document-1", ledgerId: "ledger-1" });
+    openLedgerEntrySourceDocument({ sourceDocumentId: "document-1" });
 
     expect(pushState).toHaveBeenCalledWith(
       expect.objectContaining({ cashier: expect.objectContaining({ kind: "detail" }) }),
@@ -41,7 +40,7 @@ describe("openLedgerEntrySourceDocument", () => {
   it("opens nothing for an entry with no record", () => {
     const pushState = vi.spyOn(window.history, "pushState");
 
-    openLedgerEntrySourceDocument({ sourceDocumentId: null, ledgerId: "ledger-1" });
+    openLedgerEntrySourceDocument({ sourceDocumentId: null });
 
     expect(useModalStackStore.getState().stack).toEqual([]);
     expect(pushState).not.toHaveBeenCalled();

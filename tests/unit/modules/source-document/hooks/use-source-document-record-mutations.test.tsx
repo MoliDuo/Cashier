@@ -39,7 +39,6 @@ describe("useSourceDocumentRecordMutations", () => {
       () =>
         useSourceDocumentRecordMutations({
           id: "document-1",
-          ledgerId: "ledger-1",
           version: 1,
           onClose,
         }),

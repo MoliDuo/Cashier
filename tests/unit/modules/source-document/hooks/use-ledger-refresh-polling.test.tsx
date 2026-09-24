@@ -67,9 +67,9 @@ describe("useLedgerRefreshPolling", () => {
       .mockResolvedValueOnce({ ...unchanged, version: "2" });
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
+    renderHook(() => useLedgerRefreshPolling(), { wrapper });
     await flush();
-    expect(getStreamRefreshActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(getStreamRefreshActionMock).toHaveBeenCalledWith({
       afterVersion: "0",
     });
 
@@ -81,7 +81,7 @@ describe("useLedgerRefreshPolling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(getStreamRefreshActionMock).toHaveBeenLastCalledWith("ledger-1", {
+    expect(getStreamRefreshActionMock).toHaveBeenLastCalledWith({
       afterVersion: "1",
     });
 
@@ -94,13 +94,13 @@ describe("useLedgerRefreshPolling", () => {
   it("uses a hydrated baseline without refreshing during the three-second stale window", async () => {
     getStreamRefreshActionMock.mockResolvedValue(unchanged);
     const { queryClient, wrapper } = setup();
-    queryClient.setQueryData(queryKeys.sourceDocumentRefresh("ledger-1"), {
+    queryClient.setQueryData(queryKeys.sourceDocumentRefresh(), {
       ...unchanged,
       version: "7",
       hasTransitionalWork: true,
     });
 
-    renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
+    renderHook(() => useLedgerRefreshPolling(), { wrapper });
     await flush();
     expect(getStreamRefreshActionMock).not.toHaveBeenCalled();
 
@@ -112,7 +112,7 @@ describe("useLedgerRefreshPolling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(getStreamRefreshActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(getStreamRefreshActionMock).toHaveBeenCalledWith({
       afterVersion: "7",
     });
   });
@@ -123,7 +123,7 @@ describe("useLedgerRefreshPolling", () => {
       .mockResolvedValueOnce(unchanged);
     const { wrapper } = setup();
 
-    const { result } = renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useLedgerRefreshPolling(), { wrapper });
     await flush();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -138,7 +138,7 @@ describe("useLedgerRefreshPolling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(getStreamRefreshActionMock).toHaveBeenLastCalledWith("ledger-1", {
+    expect(getStreamRefreshActionMock).toHaveBeenLastCalledWith({
       afterVersion: "0",
     });
 
@@ -152,7 +152,7 @@ describe("useLedgerRefreshPolling", () => {
     getStreamRefreshActionMock.mockRejectedValue(new Error("temporary outage"));
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
+    renderHook(() => useLedgerRefreshPolling(), { wrapper });
     await flush();
     const intervals = [3_000, 6_000, 12_000, 24_000, 30_000, 30_000];
     for (const [index, interval] of intervals.entries()) {
@@ -173,7 +173,7 @@ describe("useLedgerRefreshPolling", () => {
       .mockResolvedValue(unchanged);
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
+    renderHook(() => useLedgerRefreshPolling(), { wrapper });
     await flush();
     focusManager.setFocused(false);
     await act(async () => {
@@ -200,8 +200,8 @@ describe("useLedgerRefreshPolling", () => {
     );
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
-    renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
+    renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    renderHook(() => useLedgerRefreshPolling(), { wrapper });
     await flush();
     expect(getStreamRefreshActionMock).toHaveBeenCalledTimes(1);
 

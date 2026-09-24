@@ -83,7 +83,7 @@ describe("saveEntryCategoriesAction", () => {
       })
     );
 
-    const saved = await saveEntryCategoriesAction(ledger.id, {
+    const saved = await saveEntryCategoriesAction({
       expectedRevision,
       categories: [
         {
@@ -116,14 +116,14 @@ describe("saveEntryCategoriesAction", () => {
       await db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, document.id) })
     ).toMatchObject({ version: 2 });
     expect(
-      await saveSourceDocumentChangesAction(ledger.id, {
+      await saveSourceDocumentChangesAction({
         sourceDocumentId: document.id,
         expectedVersion: 1,
         sourceDocument: { title: "Stale edit" },
         entries: [],
       })
     ).toMatchObject({ ok: false, reason: "stale", currentVersion: 2 });
-    await saveEntryCategoriesAction(ledger.id, {
+    await saveEntryCategoriesAction({
       expectedRevision: await computeCategoryCollectionRevision(saved),
       categories: saved.map(({ id, name, description, icon }) => ({ id, name, description, icon })),
     });
@@ -165,7 +165,7 @@ describe("saveEntryCategoriesAction", () => {
       where: eq(entryCategories.ledgerId, ledger.id),
     });
     await expect(
-      saveEntryCategoriesAction(ledger.id, {
+      saveEntryCategoriesAction({
         expectedRevision: await computeCategoryCollectionRevision(categories),
         categories: [],
       })
@@ -187,7 +187,7 @@ describe("saveEntryCategoriesAction", () => {
   it("requires authentication before saving a collection", async () => {
     vi.mocked(auth as unknown as () => Promise<null>).mockResolvedValueOnce(null);
     await expect(
-      saveEntryCategoriesAction(crypto.randomUUID(), {
+      saveEntryCategoriesAction({
         expectedRevision: await computeCategoryCollectionRevision([]),
         categories: [],
       })
@@ -209,7 +209,7 @@ describe("saveEntryCategoriesAction", () => {
       where: eq(entryCategories.ledgerId, ledger.id),
     });
     await expect(
-      saveEntryCategoriesAction(ledger.id, {
+      saveEntryCategoriesAction({
         expectedRevision: await computeCategoryCollectionRevision(current),
         categories: [{ id: foreignId, name: "Overwrite", description: null, icon: null }],
       })
@@ -245,7 +245,7 @@ describe("saveEntryCategoriesAction", () => {
     );
 
     await expect(
-      saveEntryCategoriesAction(ledger.id, {
+      saveEntryCategoriesAction({
         expectedRevision,
         categories: [
           {
@@ -288,7 +288,7 @@ describe("saveEntryCategoriesAction", () => {
       .where(eq(entryCategories.id, categoryId));
 
     await expect(
-      saveEntryCategoriesAction(ledger.id, {
+      saveEntryCategoriesAction({
         expectedRevision,
         categories: [{ id: categoryId, name: "Draft", description: null, icon: null }],
       })
@@ -317,7 +317,7 @@ describe("saveEntryCategoriesAction", () => {
       })
     );
 
-    const saved = await saveEntryCategoriesAction(ledger.id, {
+    const saved = await saveEntryCategoriesAction({
       expectedRevision,
       categories: categories.map((category, index) => ({
         id: category.id,

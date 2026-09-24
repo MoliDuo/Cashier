@@ -94,7 +94,6 @@ export const LedgerEntryItem = memo(function LedgerEntryItem({
 
       {/* Right: Amount */}
       <AmountDisplay
-        ledgerId={ledgerEntry.ledgerId}
         amount={ledgerEntry.amount}
         currency={ledgerEntry.currency}
         mainCurrency={mainCurrency}

@@ -27,7 +27,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 interface BookkeepingSettingsProps {
-  ledgerId: string;
   settings: Settings;
   categories: EntryCategoryWithCount[];
   uncategorizedCount: number;
@@ -42,7 +41,6 @@ interface BookkeepingSettingsProps {
 }
 
 export function BookkeepingSettings({
-  ledgerId,
   settings,
   categories,
   uncategorizedCount,
@@ -194,7 +192,6 @@ export function BookkeepingSettings({
         its 保存 — so it is a card next to 记账规则 rather than a field inside it.
       */}
       <CategorySection
-        ledgerId={ledgerId}
         categories={categories}
         uncategorizedCount={uncategorizedCount}
         onSaveCategories={onSaveCategories}

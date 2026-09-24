@@ -86,10 +86,10 @@ describe("withLedgerAccess", () => {
 
     const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 
-    await expect(action(ledgerId)).resolves.toBe(ledgerId);
+    await expect(action()).resolves.toBe(ledgerId);
   });
 
-  it("throws NotFoundError for a ledger that is not the single live one", async () => {
+  it("resolves only when exactly one ledger is live", async () => {
     const db = getTestDb();
     mockAuth.mockResolvedValue({
       user: { id: "00000000-0000-0000-0000-000000000000" },
@@ -102,14 +102,14 @@ describe("withLedgerAccess", () => {
       .insert(ledgers)
       .values({ id: otherLedgerId, userId: "00000000-0000-0000-0000-000000000000" });
     await ensureTestLedgerBooks(db, otherLedgerId);
-    // Two live ledgers make resolution ambiguous, so neither resolves; the
-    // schema change that lets a second row exist is what 0048 guards against.
-    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, otherLedgerId));
-
     const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 
-    await expect(action(otherLedgerId)).rejects.toThrow(NotFoundError);
-    await expect(action(liveLedgerId)).resolves.toBe(liveLedgerId);
+    // Two live ledgers make resolution ambiguous, so neither resolves; the
+    // schema change that lets a second row exist is what 0048 guards against.
+    await expect(action()).rejects.toThrow(NotFoundError);
+
+    await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, otherLedgerId));
+    await expect(action()).resolves.toBe(liveLedgerId);
   });
 });
 

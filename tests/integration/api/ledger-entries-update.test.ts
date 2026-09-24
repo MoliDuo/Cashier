@@ -39,14 +39,13 @@ async function seedOwnedEntry() {
 
 describe("ledger entry update transport validation", () => {
   it("rejects a malformed version target before the aggregate is reached", async () => {
-    const { ledgerId, entryId } = await seedOwnedEntry();
+    const { entryId } = await seedOwnedEntry();
     const db = getTestDb();
     const before = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
     });
 
     const rejection = await batchUpdateLedgerEntriesAction(
-      ledgerId,
       [{ sourceDocumentId: "not-a-uuid", expectedVersion: 1 }],
       [entryId],
       { itemName: "Updated" }
@@ -65,14 +64,13 @@ describe("ledger entry update transport validation", () => {
   });
 
   it("rejects an entry id that is not an identifier without touching the document", async () => {
-    const { ledgerId, sourceDocumentId } = await seedOwnedEntry();
+    const { sourceDocumentId } = await seedOwnedEntry();
     const db = getTestDb();
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
 
     const rejection = await batchUpdateLedgerEntriesAction(
-      ledgerId,
       [{ sourceDocumentId, expectedVersion: 1 }],
       ["not-an-entry"],
       { itemName: "Updated" }
@@ -85,19 +83,5 @@ describe("ledger entry update transport validation", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
     expect(after?.version).toBe(before?.version);
-  });
-
-  it("still refuses a ledger the caller does not own, before any validation", async () => {
-    const { sourceDocumentId, entryId } = await seedOwnedEntry();
-
-    const rejection = await batchUpdateLedgerEntriesAction(
-      crypto.randomUUID(),
-      [{ sourceDocumentId, expectedVersion: 1 }],
-      [entryId],
-      { itemName: "Updated" }
-    ).catch((error: unknown) => error);
-
-    expect(rejection).toBeInstanceOf(NotFoundError);
-    expect((rejection as NotFoundError).message).toBe("Ledger not found");
   });
 });

@@ -20,15 +20,10 @@ vi.mock("@/lib/auth-actions", () => ({
 vi.mock("next-intl/server", () => ({ getLocale: vi.fn().mockResolvedValue("zh") }));
 
 vi.mock("@/modules/ledger/access", () => ({
-  withLedgerAccess: <TArgs extends unknown[], TResult>(
-    handler: (ledgerId: string, ...args: TArgs) => TResult
-  ) => handler,
-  withLedgerAccessContext:
-    <TArgs extends unknown[], TResult>(
-      handler: (access: { userId: string }, ledgerId: string, ...args: TArgs) => TResult
-    ) =>
-    (ledgerId: string, ...args: TArgs) =>
-      handler({ userId: "00000000-0000-4000-8000-000000000001" }, ledgerId, ...args),
+  withLedgerAccess:
+    <TArgs extends unknown[], TResult>(handler: (ledgerId: string, ...args: TArgs) => TResult) =>
+    (...args: TArgs) =>
+      handler("ledger-1", ...args),
 }));
 
 vi.mock("@/application/server-composition-root", () => ({
@@ -80,7 +75,6 @@ describe("ledger server action omission semantics", () => {
 
   it("omits absent optional create-entry fields", async () => {
     await createLedgerEntryAction(
-      "ledger-1",
       {
         sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",
         expectedVersion: 1,
@@ -107,7 +101,6 @@ describe("ledger server action omission semantics", () => {
 
   it("omits absent optional batch-update fields", async () => {
     await batchUpdateLedgerEntriesAction(
-      "ledger-1",
       [
         {
           sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",

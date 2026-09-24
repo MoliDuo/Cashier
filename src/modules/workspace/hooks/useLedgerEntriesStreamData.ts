@@ -7,7 +7,6 @@ import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 
 interface UseLedgerEntriesStreamDataOptions {
-  ledgerId: string;
   bookId?: string;
   mainCurrency: string;
   filters: EntryFilters;
@@ -20,7 +19,6 @@ interface UseLedgerEntriesStreamDataOptions {
  * and the tab's combined error state.
  */
 export function useLedgerEntriesStreamData({
-  ledgerId,
   bookId,
   mainCurrency,
   filters,
@@ -30,7 +28,6 @@ export function useLedgerEntriesStreamData({
   const streamQueryDescriptor = useMemo(
     () =>
       buildStreamQueryDescriptor({
-        ledgerId,
         ...(bookId == null ? {} : { bookId }),
         startDate: startDateStr,
         endDate: endDateStr,
@@ -46,13 +43,12 @@ export function useLedgerEntriesStreamData({
       filters.minAmount,
       filters.search,
       filters.statuses,
-      ledgerId,
       startDateStr,
     ]
   );
   const streamTotalQuery = useQuery({
     queryKey: streamQueryDescriptor.totalQueryKey,
-    queryFn: () => getStreamTotalAction(ledgerId, streamQueryDescriptor.totalInput),
+    queryFn: () => getStreamTotalAction(streamQueryDescriptor.totalInput),
   });
   const { data: streamTotalData } = streamTotalQuery;
   const filteredTotal = streamTotalData?.total;
@@ -68,7 +64,7 @@ export function useLedgerEntriesStreamData({
     queryStatus,
     refetch,
     queryHasData,
-  } = useSourceDocumentStream(ledgerId, {
+  } = useSourceDocumentStream({
     mainCurrency,
     queryDescriptor: streamQueryDescriptor,
   });

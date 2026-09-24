@@ -31,7 +31,6 @@ type PageBootstrapResult = Awaited<ReturnType<typeof getLedgerPageBootstrap>>;
 
 interface ActiveTabBootstrapProps {
   pageDataPromise: Promise<PageBootstrapResult>;
-  ledgerId: string;
   ledgerDto: LedgerDto;
   activeTab: LedgerTab;
   session: AuthenticatedHomeContext["session"];
@@ -91,7 +90,6 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   const statsState = readStatsSearchParams(urlSearchParams);
   const pageDataPromise = getLedgerPageBootstrap(
     {
-      ledgerId,
       initialTab: activeTab,
       periodParams,
       advancedFilters,
@@ -119,11 +117,10 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   scheduleProcessingRecoveryAfter(ledgerId);
 
   return (
-    <ActiveShell ledgerId={ledgerId}>
+    <ActiveShell>
       <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
         <ActiveTabBootstrap
           pageDataPromise={pageDataPromise}
-          ledgerId={ledgerId}
           ledgerDto={ledgerDto}
           activeTab={activeTab}
           session={session}
@@ -137,19 +134,18 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
 
 async function ActiveTabBootstrap({
   pageDataPromise,
-  ledgerId,
   ledgerDto,
   activeTab,
   session,
   rememberedBookId,
   initialDeviceTimeZone,
 }: ActiveTabBootstrapProps) {
-  let pageData: PageBootstrapResult;
+  let pageData: PageBootstrapResult | null;
   try {
     pageData = await pageDataPromise;
   } catch (error) {
     logger.error(
-      { error, ledgerSubject: logIdentifier("ledger", ledgerId) },
+      { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id) },
       "Ledger page bootstrap failed; falling back to client queries"
     );
     pageData = null;
@@ -158,7 +154,6 @@ async function ActiveTabBootstrap({
   return (
     <HydrationBoundary state={pageData?.dehydratedState}>
       <ActiveContent
-        ledgerId={ledgerId}
         ledgerDto={ledgerDto}
         userId={session.user!.id}
         initialTab={activeTab}

@@ -30,7 +30,6 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 
 interface ActiveShellProps {
-  ledgerId: string;
   children: React.ReactNode;
 }
 
@@ -47,15 +46,15 @@ interface ActiveShellProps {
  * become available when LedgerPageClient registers the real handlers via
  * setOpenInput once it mounts.
  */
-export function ActiveShell({ ledgerId, children }: ActiveShellProps) {
+export function ActiveShell({ children }: ActiveShellProps) {
   return (
     <ShellControllerProvider>
-      <ActiveShellInner ledgerId={ledgerId}>{children}</ActiveShellInner>
+      <ActiveShellInner>{children}</ActiveShellInner>
     </ShellControllerProvider>
   );
 }
 
-function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
+function ActiveShellInner({ children }: ActiveShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const t = useTranslations("Common");
@@ -77,12 +76,12 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
     searchParams,
     pathname,
   });
-  useTabScrollRestoration(ledgerId, activeTab);
+  useTabScrollRestoration(activeTab);
 
   // The destination a reader is already on has nowhere to navigate, so it
   // carries the tab's refresh instead: every tab is reloaded from the same
   // gesture, and no tab needs a control of its own for it.
-  const { isRefreshing, refreshActiveTab } = useActiveTabQueryState({ ledgerId, activeTab });
+  const { isRefreshing, refreshActiveTab } = useActiveTabQueryState({ activeTab });
   const [refreshPending, setRefreshPending] = useState(false);
 
   const refreshCurrentTab = useCallback(async () => {
@@ -124,21 +123,15 @@ function ActiveShellInner({ ledgerId, children }: ActiveShellProps) {
         const scoped = getScopedLedgerSearchParams(searchParams, "details");
         void prefetchDetailsTabQuery(
           queryClient,
-          ledgerId,
           bookId,
           parsePeriodFromSearchParams(scoped),
           readLedgerFilterParams(searchParams, "details")
         );
       } else if (tab === "stats") {
-        void prefetchStatsTabQuery(
-          queryClient,
-          ledgerId,
-          bookId,
-          readStatsSearchParams(searchParams)
-        );
+        void prefetchStatsTabQuery(queryClient, bookId, readStatsSearchParams(searchParams));
       }
     },
-    [bookId, ledgerId, preloadTabCode, queryClient, searchParams]
+    [bookId, preloadTabCode, queryClient, searchParams]
   );
 
   return (

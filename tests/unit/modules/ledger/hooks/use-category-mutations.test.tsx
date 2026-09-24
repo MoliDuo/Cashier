@@ -52,7 +52,7 @@ describe("useCategoryMutations", () => {
     const { queryClient, wrapper } = setup();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     saveAction.mockRejectedValue(new Error("create failed"));
-    const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryMutations(), { wrapper });
 
     await act(async () => {
       await expect(
@@ -68,12 +68,10 @@ describe("useCategoryMutations", () => {
 
   it("stores saved categories and invalidates category-bearing queries", async () => {
     const { queryClient, wrapper } = setup();
-    queryClient.setQueryData(queryKeys.entryCategories("ledger-1"), [
-      { ...category, entryCount: 7 },
-    ]);
+    queryClient.setQueryData(queryKeys.entryCategories(), [{ ...category, entryCount: 7 }]);
     saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
     const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
-    const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryMutations(), { wrapper });
 
     await act(async () => {
       await result.current.saveCategories.mutateAsync({
@@ -82,17 +80,17 @@ describe("useCategoryMutations", () => {
       });
     });
 
-    expect(queryClient.getQueryData(queryKeys.entryCategories("ledger-1"))).toEqual([
+    expect(queryClient.getQueryData(queryKeys.entryCategories())).toEqual([
       { ...category, name: "Dining" },
     ]);
     expect(invalidate.mock.calls.map(([filters]) => filters!.queryKey)).toEqual([
-      queryKeys.entryCategories("ledger-1"),
-      queryKeys.sourceDocumentStreamPrefix("ledger-1"),
-      queryKeys.ledgerEntriesPrefix("ledger-1"),
-      queryKeys.sourceDocumentDetailPrefix("ledger-1"),
-      queryKeys.summaryPrefix("ledger-1"),
-      queryKeys.enhancedStatsPrefix("ledger-1"),
-      queryKeys.sourceDocumentStreamTotalPrefix("ledger-1"),
+      queryKeys.entryCategories(),
+      queryKeys.sourceDocumentStreamPrefix(),
+      queryKeys.ledgerEntriesPrefix(),
+      queryKeys.sourceDocumentDetailPrefix(),
+      queryKeys.summaryPrefix(),
+      queryKeys.enhancedStatsPrefix(),
+      queryKeys.sourceDocumentStreamTotalPrefix(),
     ]);
   });
 
@@ -104,7 +102,7 @@ describe("useCategoryMutations", () => {
     });
     vi.spyOn(queryClient, "invalidateQueries").mockReturnValue(refresh);
     saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
-    const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryMutations(), { wrapper });
 
     let mutation!: Promise<EntryCategory[]>;
     act(() => {
@@ -126,7 +124,7 @@ describe("useCategoryMutations", () => {
     const { queryClient, wrapper } = setup();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
     saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
-    const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryMutations(), { wrapper });
 
     await act(async () => {
       await result.current.saveCategories.mutateAsync({
@@ -136,14 +134,14 @@ describe("useCategoryMutations", () => {
     });
 
     expect(invalidate.mock.calls.map(([filters]) => filters!.queryKey)).toContainEqual(
-      queryKeys.enhancedStatsPrefix("ledger-1")
+      queryKeys.enhancedStatsPrefix()
     );
   });
 
   it("tracks metadata generation until its invalidation finishes", async () => {
     const { queryClient, wrapper } = setup();
     vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
-    const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryMutations(), { wrapper });
 
     act(() => result.current.retryCategoryMetadata(category.id));
     expect(result.current.generatingCategoryIds.has(category.id)).toBe(true);
@@ -157,7 +155,7 @@ describe("useCategoryMutations", () => {
     const onMetadataGenerated = vi.fn();
     const { result } = renderHook(
       () =>
-        useCategoryMutations("ledger-1", {
+        useCategoryMutations({
           onMetadataGenerated,
         }),
       { wrapper }

@@ -4,7 +4,6 @@ import { createContext, useContext } from "react";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 
 export interface CategoryAssignmentContextValue {
-  ledgerId: string;
   /** The ledger's most recent assignment run. */
   job: CategoryReclassificationJob | null;
   isActive: boolean;

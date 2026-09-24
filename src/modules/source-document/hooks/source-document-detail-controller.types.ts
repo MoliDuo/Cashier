@@ -10,7 +10,6 @@ import type { PendingChanges } from "@/modules/source-document/detail-types";
 import type { AddEntryData } from "./useSourceDocumentDetailMutations";
 
 export interface UseSourceDocumentDetailControllerOptions {
-  ledgerId: string;
   sourceDocument: SourceDocument | null;
   ledgerEntries: LedgerEntry[];
   open: boolean;

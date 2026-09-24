@@ -36,15 +36,11 @@ export function openLedgerDetail(item: Omit<ModalItem, "returnFocus">): void {
  * record it belongs to — the sheet the stream card opens. Entries are stored
  * with a source document, so the guard only covers a malformed payload.
  */
-export function openLedgerEntrySourceDocument(entry: {
-  sourceDocumentId: string | null;
-  ledgerId: string;
-}): void {
+export function openLedgerEntrySourceDocument(entry: { sourceDocumentId: string | null }): void {
   if (entry.sourceDocumentId == null || entry.sourceDocumentId === "") return;
   openLedgerDetail({
     type: "source-document",
     id: entry.sourceDocumentId,
-    ledgerId: entry.ledgerId,
   });
 }
 

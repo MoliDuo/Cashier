@@ -34,7 +34,6 @@ const STATS_QUERY_DEBOUNCE_MS = 250;
 interface StatsTabProps {
   /** The book the charts are narrowed to; undefined means 总账. */
   bookId?: string | undefined;
-  ledgerId?: string;
   ledger?: Ledger;
   onCategoryDrilldown?: (categoryId: string, startDate: string, endDate: string) => void;
   onDateDrilldown?: (date: string) => void;
@@ -44,7 +43,6 @@ interface StatsTabProps {
 
 export function StatsTab({
   bookId,
-  ledgerId,
   ledger,
   onCategoryDrilldown,
   onDateDrilldown,
@@ -98,14 +96,13 @@ export function StatsTab({
   const statsDescriptor = useMemo(
     () =>
       buildStatsQueryDescriptor({
-        ledgerId: ledgerId ?? "",
         ...(bookId == null ? {} : { bookId }),
         currentDate,
         mainCurrency: ledger?.settings.mainCurrency ?? "CNY",
         rangeType,
         currentPeriod: periodOffset === 0,
       }),
-    [bookId, currentDate, ledger?.settings.mainCurrency, ledgerId, periodOffset, rangeType]
+    [bookId, currentDate, ledger?.settings.mainCurrency, periodOffset, rangeType]
   );
   const queryDescriptor = useDebouncedValue(statsDescriptor, STATS_QUERY_DEBOUNCE_MS);
   // The debounce is for period changes, where the range is still being dragged
@@ -119,7 +116,6 @@ export function StatsTab({
   const statsQuery = useQuery({
     queryKey: scopeDescriptor.queryKey,
     queryFn: () => getEnhancedStats(scopeDescriptor.input),
-    enabled: ledgerId !== undefined && ledgerId !== "",
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     refetchOnWindowFocus: false,
   });

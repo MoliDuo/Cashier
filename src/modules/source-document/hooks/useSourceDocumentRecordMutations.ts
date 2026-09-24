@@ -8,7 +8,6 @@ import { useVersionedSourceDocumentMutation } from "./useVersionedSourceDocument
 
 interface UseSourceDocumentRecordMutationsOptions {
   id: string;
-  ledgerId: string | undefined;
   /** Read fresh at submission time — never captured ahead of the actual click. */
   version: number | null;
   onClose: () => void;
@@ -16,7 +15,6 @@ interface UseSourceDocumentRecordMutationsOptions {
 
 export function useSourceDocumentRecordMutations({
   id,
-  ledgerId,
   version,
   onClose,
 }: UseSourceDocumentRecordMutationsOptions) {
@@ -29,7 +27,6 @@ export function useSourceDocumentRecordMutations({
 
   const deleteDocumentMutation = useVersionedSourceDocumentMutation<DeleteSourceDocumentResultDto>({
     refreshMode: "background",
-    ledgerId,
     sourceDocumentId: id,
     expectedVersion: version,
     action: deleteSourceDocumentAction,

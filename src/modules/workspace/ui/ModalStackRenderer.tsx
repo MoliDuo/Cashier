@@ -24,7 +24,7 @@ export function ModalStackRenderer({
 }: ModalStackRendererProps) {
   const stack = useModalStackStore((state) => state.stack);
   const item = stack.at(-1);
-  const itemKey = item == null ? null : `${item.type}:${item.ledgerId}:${item.id}`;
+  const itemKey = item == null ? null : `${item.type}:${item.id}`;
   const [closingKey, setClosingKey] = useState<string | null>(null);
 
   if (item == null) return null;
@@ -33,7 +33,7 @@ export function ModalStackRenderer({
     setClosingKey(itemKey);
   };
   const requestBack = () => {
-    const guardKey = ledgerDetailLeaveGuardKey(item.type, item.ledgerId, item.id);
+    const guardKey = ledgerDetailLeaveGuardKey(item.type, item.id);
     const guards = useUnsavedChangesStore.getState();
     const guard =
       guards.getLeaveGuard("source-document-retry-navigation") ?? guards.getLeaveGuard(guardKey);
@@ -42,7 +42,7 @@ export function ModalStackRenderer({
   };
   const onExitComplete = () => {
     const current = useModalStackStore.getState().stack.at(-1);
-    if (current == null || `${current.type}:${current.ledgerId}:${current.id}` !== itemKey) {
+    if (current == null || `${current.type}:${current.id}` !== itemKey) {
       setClosingKey(null);
       return;
     }
@@ -60,12 +60,11 @@ export function ModalStackRenderer({
   };
 
   return stack.map((stackItem, index) => {
-    const key = `${stackItem.type}:${stackItem.ledgerId}:${stackItem.id}`;
+    const key = `${stackItem.type}:${stackItem.id}`;
     const isTop = index === stack.length - 1;
     const sharedProps = {
       books,
       id: stackItem.id,
-      ledgerId: stackItem.ledgerId,
       open: isTop && open,
       onClose: isTop ? startExit : () => {},
       ...(isTop && closingKey === key ? { onExitComplete } : {}),

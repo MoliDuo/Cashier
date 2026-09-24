@@ -67,7 +67,7 @@ describe("Source Document Update Actions", () => {
         .spyOn(postgresFxRateBook, "convertBatch")
         .mockResolvedValue([{ convertedAmount: "24", exchangeRate: "0.24" }]);
       try {
-        await batchUpdateSourceDocumentsAction(ledger.id, {
+        await batchUpdateSourceDocumentsAction({
           targets: documents.map((document) => ({
             sourceDocumentId: document.id,
             expectedVersion: 1,
@@ -104,7 +104,7 @@ describe("Source Document Update Actions", () => {
       await activateTestSourceDocumentProjection(db, document.id);
       const convert = vi.spyOn(postgresFxRateBook, "convertBatch");
       try {
-        await batchUpdateSourceDocumentsAction(ledger.id, {
+        await batchUpdateSourceDocumentsAction({
           targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],
           data: { documentDate: "2024-03-14" },
         });
@@ -139,7 +139,7 @@ describe("Source Document Update Actions", () => {
       await activateTestSourceDocumentProjection(db, docData2.id);
 
       // Batch update
-      await batchUpdateSourceDocumentsAction(ledgerData.id, {
+      await batchUpdateSourceDocumentsAction({
         targets: [docData1, docData2].map((document) => ({
           sourceDocumentId: document.id,
           expectedVersion: 1,
@@ -196,7 +196,7 @@ describe("Source Document Update Actions", () => {
         })
         .onConflictDoNothing();
 
-      await batchUpdateSourceDocumentsAction(ledgerData.id, {
+      await batchUpdateSourceDocumentsAction({
         targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],
         data: { documentDate: "2024-03-15" },
       });
@@ -217,7 +217,7 @@ describe("Source Document Update Actions", () => {
       await ensureTestLedgerBooks(db, ledgerData.id);
 
       await expect(
-        batchUpdateSourceDocumentsAction(ledgerData.id, {
+        batchUpdateSourceDocumentsAction({
           targets: [],
           data: { title: "Ignored" },
         })
@@ -236,7 +236,7 @@ describe("Source Document Update Actions", () => {
       });
       await activateTestSourceDocumentProjection(db, docData.id);
 
-      const result = await batchUpdateSourceDocumentsAction(ledgerData.id, {
+      const result = await batchUpdateSourceDocumentsAction({
         targets: [{ sourceDocumentId: docData.id, expectedVersion: 1 }],
         data: { title: "Same title" },
       });
@@ -275,7 +275,7 @@ describe("Source Document Update Actions", () => {
         .set({ version: 2 })
         .where(eq(sourceDocuments.id, staleDoc.id));
 
-      const result = await batchUpdateSourceDocumentsAction(ledgerData.id, {
+      const result = await batchUpdateSourceDocumentsAction({
         targets: [
           { sourceDocumentId: okDoc.id, expectedVersion: 1 },
           { sourceDocumentId: staleDoc.id, expectedVersion: 1 },

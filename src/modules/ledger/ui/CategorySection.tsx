@@ -20,7 +20,6 @@ import { toast } from "sonner";
 import { useCategoryAssignment } from "./category-assignment-context";
 
 interface CategorySectionProps {
-  ledgerId: string;
   /** Carries `entryCount`; the preset dialog sums it for its impact summary. */
   categories: EntryCategoryWithCount[];
   uncategorizedCount?: number;
@@ -34,7 +33,6 @@ interface CategorySectionProps {
 }
 
 export function CategorySection({
-  ledgerId,
   categories,
   uncategorizedCount = 0,
   onSaveCategories,
@@ -47,7 +45,7 @@ export function CategorySection({
 }: CategorySectionProps) {
   const t = useTranslations("Settings");
   const common = useTranslations("Common");
-  const preset = useCategoryPresetSwitch({ ledgerId, categories });
+  const preset = useCategoryPresetSwitch({ categories });
   const { isActive: categoryAssignmentActive } = useCategoryAssignment();
 
   const {

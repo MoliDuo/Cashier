@@ -6,17 +6,16 @@ import { useLedgerHistorySync } from "@/modules/workspace/hooks/useLedgerHistory
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import "@/instrumentation-client";
 
-const ledgerId = "ledger-1";
 const detailId = "document-1";
 const detailSearch = `detailType=source-document&detailId=${detailId}`;
-const guardKey = `source-document-detail:${ledgerId}:${detailId}`;
+const guardKey = `source-document-detail:${detailId}`;
 
 describe("useLedgerHistorySync", () => {
   beforeEach(() => {
     window.history.replaceState(
       { cashier: { ledgerNavigation: true, kind: "detail", sequence: 1 } },
       "",
-      `/ledger/${ledgerId}?${detailSearch}`
+      `/?${detailSearch}`
     );
     useModalStackStore.getState().closeAll();
     useUnsavedChangesStore.setState({
@@ -46,21 +45,20 @@ describe("useLedgerHistorySync", () => {
 
     renderHook(() =>
       useLedgerHistorySync({
-        pathname: `/ledger/${ledgerId}`,
+        pathname: "/",
         searchParams: new URLSearchParams(detailSearch),
-        ledgerId,
       })
     );
 
     await waitFor(() =>
       expect(useModalStackStore.getState().stack).toEqual([
-        { type: "source-document", id: detailId, ledgerId, returnFocus: null },
+        { type: "source-document", id: detailId, returnFocus: null },
       ])
     );
 
     act(() => {
       const state = { cashier: { ledgerNavigation: true, kind: "filter", sequence: 0 } };
-      window.history.replaceState(state, "", `/ledger/${ledgerId}`);
+      window.history.replaceState(state, "", "/");
       window.dispatchEvent(new PopStateEvent("popstate", { state }));
     });
 
@@ -69,7 +67,7 @@ describe("useLedgerHistorySync", () => {
 
     act(() => {
       const state = { cashier: { ledgerNavigation: true, kind: "detail", sequence: 1 } };
-      window.history.replaceState(state, "", `/ledger/${ledgerId}?${detailSearch}`);
+      window.history.replaceState(state, "", `/?${detailSearch}`);
       window.dispatchEvent(new PopStateEvent("popstate", { state }));
     });
 
@@ -103,9 +101,8 @@ describe("useLedgerHistorySync", () => {
     });
     const hook = renderHook(() =>
       useLedgerHistorySync({
-        pathname: `/ledger/${ledgerId}`,
+        pathname: "/",
         searchParams: new URLSearchParams(detailSearch),
-        ledgerId,
       })
     );
     try {
@@ -148,9 +145,8 @@ describe("useLedgerHistorySync", () => {
             isBlocked,
           });
           useLedgerHistorySync({
-            pathname: `/ledger/${ledgerId}`,
+            pathname: "/",
             searchParams: new URLSearchParams(search),
-            ledgerId,
           });
           return guard;
         },
@@ -158,7 +154,7 @@ describe("useLedgerHistorySync", () => {
       );
       act(() => {
         const state = { cashier: { sequence: 0 } };
-        window.history.replaceState(state, "", `/ledger/${ledgerId}`);
+        window.history.replaceState(state, "", "/");
         window.dispatchEvent(new PopStateEvent("popstate", { state }));
       });
       rerender({ search: "" });
@@ -166,7 +162,7 @@ describe("useLedgerHistorySync", () => {
       expect(go).toHaveBeenCalledWith(1);
       act(() => {
         const state = { cashier: { sequence: 1 } };
-        window.history.replaceState(state, "", `/ledger/${ledgerId}?${detailSearch}`);
+        window.history.replaceState(state, "", `/?${detailSearch}`);
         window.dispatchEvent(new PopStateEvent("popstate", { state }));
       });
       rerender({ search: detailSearch });

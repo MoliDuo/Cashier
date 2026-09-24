@@ -5,23 +5,15 @@ import { createTestUserWithLedger } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
 describe("source-document query action boundaries", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
-    const db = getTestDb();
-    const setup = await createTestUserWithLedger(db);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(getTestDb());
   });
 
   it("throws ValidationError when getSourceDocumentInputAction receives an invalid id", async () => {
-    await expect(getSourceDocumentInputAction(ledgerId, "not-a-uuid")).rejects.toThrow(
-      ValidationError
-    );
+    await expect(getSourceDocumentInputAction("not-a-uuid")).rejects.toThrow(ValidationError);
   });
 
   it("preserves NotFoundError from getSourceDocumentInputQuery", async () => {
-    await expect(getSourceDocumentInputAction(ledgerId, crypto.randomUUID())).rejects.toThrow(
-      NotFoundError
-    );
+    await expect(getSourceDocumentInputAction(crypto.randomUUID())).rejects.toThrow(NotFoundError);
   });
 });

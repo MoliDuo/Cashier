@@ -18,7 +18,6 @@ interface SourceDocumentDetailWrapperProps {
   /** The live books, for this record's own book picker. */
   books: readonly BookDto[];
   id: string;
-  ledgerId: string;
   open: boolean;
   onClose: () => void;
   onBack?: () => void;
@@ -32,7 +31,6 @@ interface SourceDocumentDetailWrapperProps {
 export function SourceDocumentDetailWrapper({
   books,
   id,
-  ledgerId,
   open,
   onClose,
   onBack,
@@ -43,18 +41,8 @@ export function SourceDocumentDetailWrapper({
   timeZone,
 }: SourceDocumentDetailWrapperProps) {
   const t = useTranslations("Common");
-  const {
-    sourceDocument,
-    currentLedgerEntries,
-    ledgerId: detailLedgerId,
-    isLoading,
-    error,
-    refetch,
-  } = useSourceDocumentDetailData({
-    id,
-    ledgerId,
-    open,
-  });
+  const { sourceDocument, currentLedgerEntries, isLoading, error, refetch } =
+    useSourceDocumentDetailData({ id, open });
 
   const {
     saveChanges,
@@ -69,13 +57,11 @@ export function SourceDocumentDetailWrapper({
     isOrganizingDates,
   } = useSourceDocumentDetailMutations({
     id,
-    ledgerId,
     version: sourceDocument?.version ?? null,
     onClose,
   });
 
   const { cancelProcessing, isCancelling } = useSourceDocumentRecoveryMutations({
-    ledgerId: detailLedgerId ?? ledgerId,
     sourceDocumentId: id,
     version: sourceDocument?.version ?? null,
     onSuccess: onClose,
@@ -94,21 +80,21 @@ export function SourceDocumentDetailWrapper({
   const recordBookId = sourceDocument?.bookId ?? null;
   const recordBookIsLive = recordBookId != null && books.some((book) => book.id === recordBookId);
   const { data: archivedRecordBook } = useQuery({
-    queryKey: queryKeys.book(ledgerId, recordBookId ?? ""),
-    queryFn: () => getBookAction(ledgerId, recordBookId!),
+    queryKey: queryKeys.book(recordBookId ?? ""),
+    queryFn: () => getBookAction(recordBookId!),
     enabled: open && recordBookId != null && !recordBookIsLive,
     staleTime: LEDGER.STALE_TIME_MS,
   });
   const archivedBookLabel =
     archivedRecordBook == null ? null : t("archivedBookOption", { name: archivedRecordBook.name });
 
-  const assignment = useLedgerMutation(ledgerId, {
+  const assignment = useLedgerMutation({
     invalidates: ["documents", "stats"],
     // A failed change used to be silent: the picker snapped back with no
     // explanation. A conflict or an archived target now says so.
     errorMessage: t("bookChangeFailed"),
     mutationFn: (bookId: string) =>
-      assignSourceDocumentBookAction(ledgerId, {
+      assignSourceDocumentBookAction({
         sourceDocumentId: id,
         expectedVersion: sourceDocument!.version,
         bookId,
@@ -125,7 +111,6 @@ export function SourceDocumentDetailWrapper({
       onAssignBook={(bookId: string) => assignment.mutate(bookId)}
       isAssigningBook={assignment.isPending}
       sourceDocumentId={id}
-      ledgerId={detailLedgerId}
       sourceDocument={sourceDocument}
       isLoading={isLoading}
       loadError={error != null}

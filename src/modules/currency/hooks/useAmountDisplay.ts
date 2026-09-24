@@ -5,7 +5,6 @@ import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { isValidDecimal } from "@/lib/money/decimal";
 
 interface UseAmountDisplayOptions {
-  ledgerId: string;
   amount: string;
   currency: string | null | undefined;
   mainCurrency: string;
@@ -43,7 +42,6 @@ interface UseAmountDisplayReturn {
  * Handles conversion logic and currency difference detection.
  */
 export function useAmountDisplay({
-  ledgerId,
   amount,
   currency,
   mainCurrency,
@@ -58,7 +56,7 @@ export function useAmountDisplay({
     persistedConvertedAmount != null && isValidDecimal(persistedConvertedAmount);
   const usePersisted = isDifferentCurrency && hasPersistedConvertedAmount;
 
-  const conversion = useConvertedAmount(ledgerId, amount, currency, mainCurrency, date, {
+  const conversion = useConvertedAmount(amount, currency, mainCurrency, date, {
     enabled: !usePersisted,
   });
   const originalCurrency = currency ?? "?";

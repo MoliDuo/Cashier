@@ -9,7 +9,6 @@ import {
 describe("ledger tab query descriptors", () => {
   it("keeps stream search filters identical in the page input, total input, and keys", () => {
     const descriptor = buildStreamQueryDescriptor({
-      ledgerId: "ledger-1",
       startDate: "2026-03-01",
       endDate: "2026-03-31",
       search: "  coffee  ",
@@ -27,7 +26,7 @@ describe("ledger tab query descriptors", () => {
       search: "coffee",
     });
     expect(descriptor.queryKey).toEqual(
-      queryKeys.sourceDocumentStream("ledger-1", {
+      queryKeys.sourceDocumentStream({
         bookId: null,
         startDate: "2026-03-01",
         endDate: "2026-03-31",
@@ -38,7 +37,7 @@ describe("ledger tab query descriptors", () => {
       })
     );
     expect(descriptor.totalQueryKey).toEqual(
-      queryKeys.sourceDocumentStreamTotal("ledger-1", {
+      queryKeys.sourceDocumentStreamTotal({
         bookId: null,
         startDate: "2026-03-01",
         endDate: "2026-03-31",
@@ -52,7 +51,6 @@ describe("ledger tab query descriptors", () => {
 
   it("keeps details search filters in both summary and entries requests", () => {
     const descriptor = buildDetailsQueryDescriptor({
-      ledgerId: "ledger-1",
       periodParams: {
         period: "custom",
         startDate: "2026-03-01",
@@ -75,7 +73,7 @@ describe("ledger tab query descriptors", () => {
       limit: 50,
     });
     expect(descriptor.summaryQueryKey).toEqual(
-      queryKeys.summary("ledger-1", {
+      queryKeys.summary({
         bookId: null,
         startDate: "2026-03-01",
         endDate: "2026-03-31",
@@ -84,7 +82,7 @@ describe("ledger tab query descriptors", () => {
       })
     );
     expect(descriptor.entriesQueryKey).toEqual(
-      queryKeys.ledgerEntries("ledger-1", {
+      queryKeys.ledgerEntries({
         bookId: null,
         mode: "infinite",
         startDate: "2026-03-01",
@@ -110,13 +108,12 @@ describe("ledger tab query descriptors", () => {
 
   it("uses the same stats date ranges for the key and the request input", () => {
     const descriptor = buildStatsQueryDescriptor({
-      ledgerId: "ledger-1",
       currentDate: new Date(2026, 2, 20),
       mainCurrency: "USD",
     });
 
     expect(descriptor.queryKey).toEqual(
-      queryKeys.enhancedStats("ledger-1", {
+      queryKeys.enhancedStats({
         bookId: null,
         startDate: descriptor.state.startDateStr,
         endDate: descriptor.state.endDateStr,
@@ -128,7 +125,6 @@ describe("ledger tab query descriptors", () => {
       })
     );
     expect(descriptor.input).toEqual({
-      ledgerId: "ledger-1",
       queryRange: {
         from: descriptor.state.startDateStr,
         to: descriptor.state.endDateStr,
@@ -143,7 +139,6 @@ describe("ledger tab query descriptors", () => {
 
   it("omits amount filters the reader cleared from the stream requests", () => {
     const descriptor = buildStreamQueryDescriptor({
-      ledgerId: "ledger-1",
       startDate: "2026-07-01",
       endDate: "2026-07-31",
       minAmount: null,
@@ -164,7 +159,6 @@ describe("ledger tab query descriptors", () => {
 
   it("canonicalizes the status ordering once, for both requests and keys", () => {
     const descriptor = buildStreamQueryDescriptor({
-      ledgerId: "ledger-1",
       minAmount: "10",
       maxAmount: "20",
       statuses: ["failed", "cancelled", "failed"],
@@ -190,9 +184,7 @@ describe("ledger tab query descriptors", () => {
       statuses: "cancelled,failed",
       search: null,
     };
-    expect(descriptor.queryKey).toEqual(queryKeys.sourceDocumentStream("ledger-1", keyFilters));
-    expect(descriptor.totalQueryKey).toEqual(
-      queryKeys.sourceDocumentStreamTotal("ledger-1", keyFilters)
-    );
+    expect(descriptor.queryKey).toEqual(queryKeys.sourceDocumentStream(keyFilters));
+    expect(descriptor.totalQueryKey).toEqual(queryKeys.sourceDocumentStreamTotal(keyFilters));
   });
 });

@@ -86,7 +86,6 @@ function setup(onSuccess: () => void) {
   return renderHook(
     () =>
       useSourceDocumentSubmitMutations({
-        ledgerId: "ledger-1",
         mode: "create",
         messages,
         onSuccess,
@@ -102,9 +101,7 @@ describe("useSourceDocumentSubmitMutations", () => {
     toastErrorMock.mockReset();
     toastSuccessMock.mockReset();
     uploadSubmissionImagesMock.mockReset();
-    uploadSubmissionImagesMock.mockImplementation(
-      async (_ledgerId: string, payload: unknown) => payload
-    );
+    uploadSubmissionImagesMock.mockImplementation(async (payload: unknown) => payload);
   });
 
   afterEach(() => {
@@ -162,12 +159,12 @@ describe("useSourceDocumentSubmitMutations", () => {
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith("create failed"));
     expect(onSuccess).not.toHaveBeenCalled();
 
-    const firstClientSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[2];
+    const firstClientSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[1];
     act(() => {
       result.current.submit({ documentDate: "2026-07-17", text: "Lunch", storedFileIds: [] });
     });
     await waitFor(() => expect(createSourceDocumentActionMock).toHaveBeenCalledTimes(2));
-    expect(createSourceDocumentActionMock.mock.calls[1]?.[2]).toBe(firstClientSubmissionId);
+    expect(createSourceDocumentActionMock.mock.calls[1]?.[1]).toBe(firstClientSubmissionId);
   });
 
   it("reuses uploaded files and submission identity after an ambiguous failure", async () => {
@@ -196,18 +193,18 @@ describe("useSourceDocumentSubmitMutations", () => {
     );
     await waitFor(() => expect(createSourceDocumentActionMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.isPending).toBe(false));
-    const firstSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[2];
+    const firstSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[1];
 
     act(() => result.current.submit(payload));
     await waitFor(() => expect(createSourceDocumentActionMock).toHaveBeenCalledTimes(2));
 
     expect(uploadSubmissionImagesMock).toHaveBeenCalledTimes(1);
-    expect(createSourceDocumentActionMock.mock.calls[1]?.[1]).toEqual({
+    expect(createSourceDocumentActionMock.mock.calls[1]?.[0]).toEqual({
       documentDate: "2026-07-17",
       text: "Lunch",
       storedFileIds: ["stored-1"],
     });
-    expect(createSourceDocumentActionMock.mock.calls[1]?.[2]).toBe(firstSubmissionId);
+    expect(createSourceDocumentActionMock.mock.calls[1]?.[1]).toBe(firstSubmissionId);
   });
 
   it("uses a new submission identity when the payload changes", async () => {
@@ -219,14 +216,14 @@ describe("useSourceDocumentSubmitMutations", () => {
     );
     await waitFor(() => expect(createSourceDocumentActionMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.isPending).toBe(false));
-    const firstSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[2];
+    const firstSubmissionId = createSourceDocumentActionMock.mock.calls[0]?.[1];
 
     act(() =>
       result.current.submit({ documentDate: "2026-07-17", text: "Dinner", storedFileIds: [] })
     );
     await waitFor(() => expect(createSourceDocumentActionMock).toHaveBeenCalledTimes(2));
 
-    expect(createSourceDocumentActionMock.mock.calls[1]?.[2]).not.toBe(firstSubmissionId);
+    expect(createSourceDocumentActionMock.mock.calls[1]?.[1]).not.toBe(firstSubmissionId);
   });
 
   it("cancels before the deferred mutation starts", async () => {
@@ -272,7 +269,6 @@ describe("useSourceDocumentSubmitMutations", () => {
     const form = (version: number, id = "source-1") => (
       <QueryClientProvider client={queryClient}>
         <SourceDocumentInput
-          ledgerId="ledger-1"
           mode="retry"
           sourceDocumentId={id}
           sourceDocumentVersion={version}
@@ -289,7 +285,6 @@ describe("useSourceDocumentSubmitMutations", () => {
     fireEvent.click(screen.getByRole("button", { name: "submit" }));
     await waitFor(() =>
       expect(retrySourceDocumentActionMock).toHaveBeenCalledWith(
-        "ledger-1",
         "source-1",
         expect.objectContaining({ text: "Unsaved" }),
         7

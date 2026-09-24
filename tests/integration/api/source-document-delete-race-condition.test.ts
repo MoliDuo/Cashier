@@ -32,8 +32,8 @@ describe("SourceDocument delete concurrency", () => {
     if (document == null) throw new Error("Expected source document");
     await activateTestSourceDocumentProjection(db, document.id);
     const results = await Promise.allSettled([
-      deleteSourceDocumentAction(ledgerId, document.id, 1),
-      deleteSourceDocumentAction(ledgerId, document.id, 1),
+      deleteSourceDocumentAction(document.id, 1),
+      deleteSourceDocumentAction(document.id, 1),
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);

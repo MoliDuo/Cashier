@@ -38,7 +38,6 @@ describe("new record success feedback", () => {
   it("shows a single action toast and preserves filters when opening the record", () => {
     showNewRecordSuccessFeedback({
       mode: "ai",
-      ledgerId: "ledger-1",
       result: { sourceDocumentId: "source-1", documentDate: "2026-07-17" },
       activeTab: "stats",
       committedFilters: {},
@@ -73,7 +72,6 @@ describe("new record success feedback", () => {
       {
         type: "source-document",
         id: "source-1",
-        ledgerId: "ledger-1",
         returnFocus: document.body,
       },
     ]);
@@ -82,7 +80,6 @@ describe("new record success feedback", () => {
   it("uses the mode-specific generic toast for an unfiltered in-range Stream record", () => {
     showNewRecordSuccessFeedback({
       mode: "quick",
-      ledgerId: "ledger-1",
       result: { sourceDocumentId: "source-2", documentDate: "2026-07-17" },
       activeTab: "stream",
       committedFilters: {
@@ -101,7 +98,6 @@ describe("new record success feedback", () => {
   it("names the book and warns that it is out of view when saved elsewhere", () => {
     showNewRecordSuccessFeedback({
       mode: "quick",
-      ledgerId: "ledger-1",
       result: { sourceDocumentId: "source-3", documentDate: "2026-07-17" },
       activeTab: "stream",
       committedFilters: {
@@ -131,7 +127,6 @@ describe("new record success feedback", () => {
 
     showNewRecordSuccessFeedback({
       mode: "ai",
-      ledgerId: "ledger-1",
       result: { sourceDocumentId: "source-4", documentDate: "2026-07-17" },
       activeTab: "stream",
       committedFilters: {},

@@ -58,7 +58,6 @@ const TIME_ZONES = [
 ] as const;
 
 interface BookSettingsProps {
-  ledgerId: string;
   /**
    * A list that already contains the archived rows. Leaving it undefined means
    * 设置 was opened without one — the workspace switcher only carries the live
@@ -73,18 +72,17 @@ interface BookSettingsProps {
  * order here is the order of the pull-down switcher, and the archived books are
  * listed apart from the live ones because they are no longer part of it.
  */
-export function BookSettings({ ledgerId, initialBooks }: BookSettingsProps) {
+export function BookSettings({ initialBooks }: BookSettingsProps) {
   const t = useTranslations("Settings.Books");
   const tCommon = useTranslations("Common");
   const tQueryError = useTranslations("LedgerQueryError");
   const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null);
   const { books, booksQuery } = useBooks({
-    ledgerId,
     ...(initialBooks !== undefined ? { initialBooks } : {}),
     includeArchived: true,
   });
   const { createBook, updateBook, reorderBooks, archiveBook, restoreBook, deleteBook } =
-    useBookMutations(ledgerId);
+    useBookMutations();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);

@@ -8,7 +8,6 @@ vi.mock("@/modules/currency/hooks/useConvertedAmount", () => ({
 }));
 
 describe("useAmountDisplay", () => {
-  const ledgerId = "10000000-0000-4000-8000-000000000001";
   beforeEach(() => {
     mockUseConvertedAmount.mockReset();
     mockUseConvertedAmount.mockReturnValue({
@@ -19,23 +18,15 @@ describe("useAmountDisplay", () => {
 
   it("uses converted value for different currencies and forwards date", () => {
     const result = useAmountDisplay({
-      ledgerId,
       amount: "100",
       currency: "CNY",
       mainCurrency: "USD",
       date: "2026-03-20",
     });
 
-    expect(mockUseConvertedAmount).toHaveBeenCalledWith(
-      ledgerId,
-      "100",
-      "CNY",
-      "USD",
-      "2026-03-20",
-      {
-        enabled: true,
-      }
-    );
+    expect(mockUseConvertedAmount).toHaveBeenCalledWith("100", "CNY", "USD", "2026-03-20", {
+      enabled: true,
+    });
     expect(result).toEqual({
       converted: "42",
       displayAmount: "42",
@@ -50,7 +41,6 @@ describe("useAmountDisplay", () => {
 
   it("uses the persisted converted amount and skips the live query", () => {
     const result = useAmountDisplay({
-      ledgerId,
       amount: "100",
       currency: "CNY",
       mainCurrency: "USD",
@@ -68,21 +58,13 @@ describe("useAmountDisplay", () => {
       originalCurrency: "CNY",
       mainCurrency: "USD",
     });
-    expect(mockUseConvertedAmount).toHaveBeenCalledWith(
-      ledgerId,
-      "100",
-      "CNY",
-      "USD",
-      "2026-03-20",
-      {
-        enabled: false,
-      }
-    );
+    expect(mockUseConvertedAmount).toHaveBeenCalledWith("100", "CNY", "USD", "2026-03-20", {
+      enabled: false,
+    });
   });
 
   it("ignores an invalid persisted value and uses live conversion", () => {
     useAmountDisplay({
-      ledgerId,
       amount: "9007199254740993.12",
       currency: "CNY",
       mainCurrency: "USD",
@@ -90,7 +72,6 @@ describe("useAmountDisplay", () => {
     });
 
     expect(mockUseConvertedAmount).toHaveBeenCalledWith(
-      ledgerId,
       "9007199254740993.12",
       "CNY",
       "USD",
@@ -103,7 +84,6 @@ describe("useAmountDisplay", () => {
     mockUseConvertedAmount.mockReturnValue({ status: "loading", converted: null });
 
     const result = useAmountDisplay({
-      ledgerId,
       amount: "100",
       currency: "CNY",
       mainCurrency: "USD",
@@ -129,7 +109,6 @@ describe("useAmountDisplay", () => {
     });
 
     const result = useAmountDisplay({
-      ledgerId,
       amount: "100",
       currency: "CNY",
       mainCurrency: "USD",
@@ -148,7 +127,6 @@ describe("useAmountDisplay", () => {
 
   it("keeps original amount when currencies are equal", () => {
     const result = useAmountDisplay({
-      ledgerId,
       amount: "88",
       currency: "USD",
       mainCurrency: "USD",
@@ -161,13 +139,11 @@ describe("useAmountDisplay", () => {
 
   it("does not treat unknown or null currency as different", () => {
     const unknown = useAmountDisplay({
-      ledgerId,
       amount: "50",
       currency: "unknown",
       mainCurrency: "USD",
     });
     const missing = useAmountDisplay({
-      ledgerId,
       amount: "50",
       currency: null,
       mainCurrency: "USD",
@@ -186,7 +162,6 @@ describe("useAmountDisplay", () => {
 
   it("does not convert when the target currency is unsupported", () => {
     const result = useAmountDisplay({
-      ledgerId,
       amount: "50",
       currency: "USD",
       mainCurrency: "unknown",

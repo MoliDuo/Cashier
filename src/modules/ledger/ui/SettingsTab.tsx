@@ -34,7 +34,6 @@ import type { BookDto } from "@/modules/ledger/contracts";
 interface SettingsTabProps {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
-  ledgerId: string;
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
   userEmail?: string;
@@ -49,7 +48,6 @@ const appearanceFields: readonly AppearanceField[] = ["theme"];
 export function SettingsTab({
   ledger,
   initialCategories,
-  ledgerId,
   initialBooks,
   userEmail,
   hasPassword = false,
@@ -101,24 +99,23 @@ export function SettingsTab({
     updateLedgerMutation,
     isPending,
     settingsQueryStatus,
-  } = useLedgerSettings({ ledgerId, ledger, initialCategories, metadataPollingSession });
+  } = useLedgerSettings({ ledger, initialCategories, metadataPollingSession });
 
   // Use reactive ledger for settings that need optimistic updates
   const settingsLedger = reactiveLedger || ledger;
 
   const { saveCategories, generatingCategoryIds, failedCategoryIds, retryCategoryMetadata } =
-    useCategoryMutations(ledgerId, {
+    useCategoryMutations({
       onMetadataGenerated: () => setMetadataPollingSession((session) => session + 1),
     });
 
-  const { createCredential, setCredentialBook, deleteCredential } =
-    useCredentialMutations(ledgerId);
+  const { createCredential, setCredentialBook, deleteCredential } = useCredentialMutations();
   // The book list is one query: the 分账 section writes it and the API-key
   // pickers read it, so a rename or reorder lands everywhere at once.
-  const { books } = useBooks({ ledgerId, initialBooks });
+  const { books } = useBooks({ initialBooks });
   const reloadCategories = async () => {
-    const latest = await getEntryCategoriesAction(ledgerId);
-    queryClient.setQueryData(queryKeys.entryCategories(ledgerId), latest);
+    const latest = await getEntryCategoriesAction();
+    queryClient.setQueryData(queryKeys.entryCategories(), latest);
     return latest;
   };
 
@@ -198,11 +195,10 @@ export function SettingsTab({
                 type: "active",
                 predicate: ({ queryKey: key }) =>
                   key[0] === "ledger" &&
-                  key[1] === ledgerId &&
-                  (key.length === 2 ||
-                    key[2] === "categories" ||
-                    key[2] === "settings" ||
-                    key[2] === "books"),
+                  (key.length === 1 ||
+                    key[1] === "categories" ||
+                    key[1] === "settings" ||
+                    key[1] === "books"),
               });
             }}
           >
@@ -249,10 +245,9 @@ export function SettingsTab({
         </SettingsField>
       </SettingsSection>
 
-      <BookSettings ledgerId={ledgerId} />
+      <BookSettings />
 
       <BookkeepingSettings
-        ledgerId={ledgerId}
         settings={settingsLedger.settings}
         categories={categories}
         uncategorizedCount={uncategorizedCount}

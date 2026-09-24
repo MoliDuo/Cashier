@@ -13,7 +13,6 @@ import { MAX_SEARCH_LENGTH, normalizeSearchTerm } from "@/lib/search";
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
 
 const uuidSchema = z.string().regex(UUID_REGEX, "Invalid UUID");
-const ledgerIdSchema = uuidSchema;
 const strictObjectSchema = <TShape extends z.ZodRawShape>(shape: TShape) =>
   z.preprocess(omitUndefinedObjectFields, z.object(shape).strict());
 const nonEmptyStrictObjectSchema = <TShape extends z.ZodRawShape>(shape: TShape) =>
@@ -327,7 +326,6 @@ export const parseServiceCredentialId = (input: unknown) =>
   parseLedgerContract(serviceCredentialIdSchema, input);
 export const parseListLedgerEntriesInput = (input: unknown) =>
   parseLedgerContract(listLedgerEntriesInputSchema, input);
-export const parseLedgerId = (input: unknown) => parseLedgerContract(ledgerIdSchema, input);
 export const parseLedgerStatsQuery = (input: unknown) =>
   parseLedgerContract(ledgerStatsQuerySchema, input);
 

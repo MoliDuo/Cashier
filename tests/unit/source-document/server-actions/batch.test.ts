@@ -51,7 +51,7 @@ describe("source document batch server actions", () => {
   it("returns a stable internal reason without exposing the original error", async () => {
     deleteDocumentsMock.mockRejectedValueOnce(new Error("database unavailable"));
 
-    const result = await batchDeleteSourceDocumentsAction(ledgerId, [
+    const result = await batchDeleteSourceDocumentsAction([
       { sourceDocumentId, expectedVersion: 1 },
     ]);
 
@@ -68,7 +68,7 @@ describe("source document batch server actions", () => {
       new AppError("storage provider unavailable", "STORAGE_UNAVAILABLE")
     );
 
-    const result = await batchRetrySourceDocumentsAction(ledgerId, [
+    const result = await batchRetrySourceDocumentsAction([
       { sourceDocumentId, expectedVersion: 1 },
     ]);
 
@@ -88,7 +88,7 @@ describe("source document batch server actions", () => {
       })
       .mockRejectedValueOnce(new Error("database unavailable"));
 
-    const result = await batchDeleteSourceDocumentsAction(ledgerId, [
+    const result = await batchDeleteSourceDocumentsAction([
       { sourceDocumentId, expectedVersion: 1 },
       { sourceDocumentId: staleId, expectedVersion: 1 },
       { sourceDocumentId: failedId, expectedVersion: 1 },
@@ -126,7 +126,7 @@ describe("source document batch server actions", () => {
     scheduleProcessingAfterMock.mockImplementation(() => order.push("schedule"));
     const failedId = "00000000-0000-4000-8000-000000000004";
 
-    const result = await batchRetrySourceDocumentsAction(ledgerId, [
+    const result = await batchRetrySourceDocumentsAction([
       { sourceDocumentId, expectedVersion: 1 },
       { sourceDocumentId: failedId, expectedVersion: 1 },
     ]);
@@ -138,9 +138,9 @@ describe("source document batch server actions", () => {
   });
 
   it("refuses an empty batch and a duplicated target", async () => {
-    await expect(batchDeleteSourceDocumentsAction(ledgerId, [])).rejects.toThrow(ValidationError);
+    await expect(batchDeleteSourceDocumentsAction([])).rejects.toThrow(ValidationError);
     await expect(
-      batchDeleteSourceDocumentsAction(ledgerId, [
+      batchDeleteSourceDocumentsAction([
         { sourceDocumentId, expectedVersion: 1 },
         { sourceDocumentId, expectedVersion: 2 },
       ])

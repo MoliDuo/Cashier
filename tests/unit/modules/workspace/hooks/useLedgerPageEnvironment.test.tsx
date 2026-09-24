@@ -77,7 +77,6 @@ function renderEnvironment(props: EnvironmentProps) {
   return renderHook(
     (current: EnvironmentProps) =>
       useLedgerPageEnvironment({
-        ledgerId: "ledger-1",
         scope: current.scope,
         ...(current.withInitialData === false
           ? {}
@@ -98,7 +97,6 @@ function renderEnvironment(props: EnvironmentProps) {
 function renderServerFrame(props: EnvironmentProps): string {
   function Probe() {
     const environment = useLedgerPageEnvironment({
-      ledgerId: "ledger-1",
       scope: props.scope,
       initialLedger: ledgerDto,
       initialCategories: [] as EntryCategoryWithCount[],
@@ -292,8 +290,8 @@ describe("useLedgerPageEnvironment time zone readiness", () => {
       withInitialData: false,
     });
 
-    await waitFor(() => expect(getLedgerActionMock).toHaveBeenCalledWith("ledger-1"));
-    expect(getEntryCategoriesActionMock).toHaveBeenCalledWith("ledger-1");
+    await waitFor(() => expect(getLedgerActionMock).toHaveBeenCalledWith());
+    expect(getEntryCategoriesActionMock).toHaveBeenCalledWith();
     await waitFor(() => expect(result.current.mainCurrency).toBe("EUR"));
   });
 

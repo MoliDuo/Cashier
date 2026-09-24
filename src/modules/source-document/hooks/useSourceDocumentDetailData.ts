@@ -7,22 +7,17 @@ import { QUERY } from "@/lib/constants";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
 
 interface UseSourceDocumentDetailDataOptions {
-  ledgerId: string;
   id: string;
   open: boolean;
 }
 
-export function useSourceDocumentDetailData({
-  ledgerId,
-  id,
-  open,
-}: UseSourceDocumentDetailDataOptions) {
+export function useSourceDocumentDetailData({ id, open }: UseSourceDocumentDetailDataOptions) {
   const queryClient = useQueryClient();
-  const key = queryKeys.sourceDocument(ledgerId, id);
+  const key = queryKeys.sourceDocument(id);
   const query = useQuery({
     queryKey: key,
     queryFn: async () => {
-      const incoming = await getSourceDocumentDetailAction(ledgerId, id);
+      const incoming = await getSourceDocumentDetailAction(id);
       const current = queryClient.getQueryData<SourceDocumentDetailDto>(key);
       return incoming != null && current != null && current.version > incoming.version
         ? current
@@ -36,13 +31,12 @@ export function useSourceDocumentDetailData({
   });
   const { data: sourceDocument, isLoading, error } = query;
 
-  useLedgerRefreshPolling(ledgerId, open && id !== "");
+  useLedgerRefreshPolling(open && id !== "");
 
   const currentLedgerEntries = sourceDocument?.ledgerEntries ?? [];
   return {
     sourceDocument: sourceDocument ?? null,
     currentLedgerEntries,
-    ledgerId: sourceDocument?.ledgerId ?? ledgerId,
     isLoading,
     error,
     refetch: query.refetch,

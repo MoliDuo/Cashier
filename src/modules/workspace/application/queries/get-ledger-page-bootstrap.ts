@@ -65,7 +65,6 @@ function isUsableTimeZone(timeZone: string | null | undefined): boolean {
 }
 
 export interface GetLedgerPageBootstrapInput {
-  ledgerId: string;
   initialTab: LedgerTab;
   periodParams: PeriodParams;
   advancedFilters?: LedgerAdvancedFilters;
@@ -98,12 +97,12 @@ export async function getLedgerPageBootstrap(
     };
     credentials: Pick<ServiceCredentialPort, "list">;
   }
-): Promise<LedgerPageBootstrapResult | null> {
-  if (input.ledgerDto.id !== input.ledgerId) return null;
+): Promise<LedgerPageBootstrapResult> {
   const ledgerDto = input.ledgerDto;
+  const ledgerId = ledgerDto.id;
 
   const queryClient = new QueryClient();
-  queryClient.setQueryData(queryKeys.ledger(input.ledgerId), ledgerDto);
+  queryClient.setQueryData(queryKeys.ledger(), ledgerDto);
 
   const mainCurrency = ledgerDto.settings.mainCurrency;
   // The categories and the settings view do not depend on the viewed book, so
@@ -111,16 +110,16 @@ export async function getLedgerPageBootstrap(
   // promise joins this chain immediately, so a failure is reported by the page
   // boundary rather than left unhandled.
   const categoriesPromise = queryClient.fetchQuery({
-    queryKey: queryKeys.entryCategories(input.ledgerId),
-    queryFn: () => listEntryCategories(input.ledgerId, dependencies.categories),
+    queryKey: queryKeys.entryCategories(),
+    queryFn: () => listEntryCategories(ledgerId, dependencies.categories),
     staleTime: LEDGER.STALE_TIME_MS,
   });
   const settingsPromise =
     input.initialTab === "settings"
       ? queryClient.prefetchQuery({
-          queryKey: queryKeys.ledgerSettings(input.ledgerId),
+          queryKey: queryKeys.ledgerSettings(),
           queryFn: () =>
-            getLedgerSettingsView(input.ledgerId, {
+            getLedgerSettingsView(ledgerId, {
               categories: dependencies.categories,
               credentials: dependencies.credentials,
             }),
@@ -128,10 +127,10 @@ export async function getLedgerPageBootstrap(
         })
       : Promise.resolve();
   const booksPromise = dependencies.books
-    .list(input.ledgerId)
+    .list(ledgerId)
     .then((rows) => rows.map(toBookDto))
     .then((books) => {
-      queryClient.setQueryData(queryKeys.books(input.ledgerId), books);
+      queryClient.setQueryData(queryKeys.books(), books);
       return books;
     });
   const [books] = await Promise.all([booksPromise, categoriesPromise, settingsPromise]);
@@ -167,7 +166,6 @@ export async function getLedgerPageBootstrap(
     ledgerToday == null
       ? null
       : buildDetailsQueryDescriptor({
-          ledgerId: input.ledgerId,
           ...(bookId == null ? {} : { bookId }),
           periodParams: input.periodParams,
           ...(input.advancedFilters !== undefined
@@ -180,7 +178,6 @@ export async function getLedgerPageBootstrap(
     ledgerToday == null
       ? null
       : buildStatsQueryDescriptor({
-          ledgerId: input.ledgerId,
           ...(bookId == null ? {} : { bookId }),
           currentDate:
             input.statsState == null
@@ -198,7 +195,6 @@ export async function getLedgerPageBootstrap(
     detailsDescriptor == null
       ? null
       : buildStreamQueryDescriptor({
-          ledgerId: input.ledgerId,
           ...(bookId == null ? {} : { bookId }),
           startDate: detailsDescriptor.startDateStr,
           endDate: detailsDescriptor.endDateStr,
@@ -216,17 +212,9 @@ export async function getLedgerPageBootstrap(
             queryKey: streamDescriptor.queryKey,
             queryFn: async ({ pageParam }) => {
               const pageInput = streamDescriptor.getPageInput(pageParam as string | undefined);
-              let page = await listStreamPage(
-                input.ledgerId,
-                pageInput,
-                dependencies.sourceDocuments
-              );
+              let page = await listStreamPage(ledgerId, pageInput, dependencies.sourceDocuments);
               if (pageParam == null && page.restartRequired) {
-                page = await listStreamPage(
-                  input.ledgerId,
-                  pageInput,
-                  dependencies.sourceDocuments
-                );
+                page = await listStreamPage(ledgerId, pageInput, dependencies.sourceDocuments);
                 if (page.restartRequired) {
                   throw new Error("Stream restart did not produce a valid first page");
                 }
@@ -241,7 +229,7 @@ export async function getLedgerPageBootstrap(
             queryKey: streamDescriptor.totalQueryKey,
             queryFn: () =>
               getStreamTotal(
-                input.ledgerId,
+                ledgerId,
                 streamDescriptor.totalInput,
                 dependencies.sourceDocuments.documents
               ),
@@ -255,7 +243,7 @@ export async function getLedgerPageBootstrap(
             queryKey: detailsDescriptor.summaryQueryKey,
             queryFn: () =>
               calculateLedgerStats(
-                input.ledgerId,
+                ledgerId,
                 detailsDescriptor.summaryInput,
                 dependencies.ledgerReads
               ),
@@ -265,7 +253,7 @@ export async function getLedgerPageBootstrap(
             queryKey: detailsDescriptor.entriesQueryKey,
             queryFn: ({ pageParam }) =>
               listLedgerEntries(
-                input.ledgerId,
+                ledgerId,
                 detailsDescriptor.getEntriesInput(pageParam as string | undefined),
                 dependencies.ledgerReads
               ),
@@ -280,7 +268,7 @@ export async function getLedgerPageBootstrap(
       ? [
           queryClient.prefetchQuery({
             queryKey: statsDescriptor.queryKey,
-            queryFn: () => getEnhancedStats(statsDescriptor.input, dependencies.stats),
+            queryFn: () => getEnhancedStats(ledgerId, statsDescriptor.input, dependencies.stats),
             staleTime: QUERY.DEFAULT_STALE_TIME_MS,
           }),
         ]
@@ -290,7 +278,7 @@ export async function getLedgerPageBootstrap(
     const stream = queryClient.getQueryData<InfiniteData<StreamPage>>(streamDescriptor.queryKey);
     const firstPage = stream?.pages[0];
     if (firstPage != null && !firstPage.restartRequired) {
-      queryClient.setQueryData(queryKeys.sourceDocumentRefresh(input.ledgerId), {
+      queryClient.setQueryData(queryKeys.sourceDocumentRefresh(), {
         version: firstPage.generation,
         changed: false,
         hasTransitionalWork: firstPage.hasTransitionalWork,

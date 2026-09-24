@@ -16,7 +16,6 @@ export function useSourceDocumentDetailController(
   const { sourceDocument, ledgerEntries, t } = options;
   const selection = useSelection({ allIds: ledgerEntries.map((entry) => entry.id) });
   const session = useSourceDocumentDetailSession({
-    ledgerId: options.ledgerId,
     sourceDocument,
     ledgerEntries,
     open: options.open,
@@ -52,7 +51,6 @@ export function useSourceDocumentDetailController(
     t,
   });
   const entryActions = useSourceDocumentEntryActions({
-    ledgerId: options.ledgerId,
     sourceDocument,
     busy: session.busy,
     interactionDisabled: session.interactionDisabled,

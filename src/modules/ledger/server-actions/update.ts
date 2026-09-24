@@ -1,29 +1,20 @@
 "use server";
-import { withAuth } from "@/lib/auth-actions";
+import { withLedgerAccess } from "@/modules/ledger/access";
 import { logError } from "@/lib/error-handlers";
 import type { UpdateLedgerActionResult } from "@/modules/ledger/contracts";
-import {
-  parseLedgerId,
-  parseUpdateLedgerInput,
-  type UpdateLedgerInput,
-} from "@/modules/ledger/contract-schemas";
+import { parseUpdateLedgerInput, type UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
 import { updateLedger } from "@/modules/ledger/application/use-cases/update-ledger";
 import { extractUpdateLedgerActionDates, toUpdateLedgerActionErrorCode } from "./update-error";
 import { serverComposition } from "@/application/server-composition-root";
 
-export const updateLedgerSettingsAction = withAuth(
-  async (
-    userId: string,
-    id: string,
-    data: UpdateLedgerInput
-  ): Promise<UpdateLedgerActionResult> => {
+export const updateLedgerSettingsAction = withLedgerAccess(
+  async (ledgerId: string, data: UpdateLedgerInput): Promise<UpdateLedgerActionResult> => {
     try {
       const validated = parseUpdateLedgerInput(data);
       return {
         ok: true,
         ledger: await updateLedger(
-          userId,
-          parseLedgerId(id),
+          ledgerId,
           validated,
           serverComposition.settings,
           serverComposition.exchangeRates

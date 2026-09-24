@@ -7,7 +7,7 @@ describe("ledger query errors", () => {
     "preserves HTTP %s for auth and retry decisions",
     async (status) => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
-      await expect(getLedgerAction("ledger")).rejects.toMatchObject({
+      await expect(getLedgerAction()).rejects.toMatchObject({
         statusCode: status,
         code: "LEDGER_QUERY_FAILED",
       });
@@ -21,7 +21,7 @@ describe("ledger query timeout", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: "ledger" }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await getLedgerAction("ledger");
+    await getLedgerAction();
 
     expect(timeout).toHaveBeenCalledWith(15_000);
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ signal: timeout.mock.results[0]?.value });

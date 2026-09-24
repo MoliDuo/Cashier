@@ -7,12 +7,7 @@ import type { SourceDocumentInputProps } from "./source-document-input.types";
 import { SourceDocumentInputView } from "./SourceDocumentInputView";
 
 export function SourceDocumentInput(props: SourceDocumentInputProps) {
-  return (
-    <SourceDocumentInputSession
-      key={`${props.ledgerId}:${props.sourceDocumentId ?? "create"}`}
-      {...props}
-    />
-  );
+  return <SourceDocumentInputSession key={props.sourceDocumentId ?? "create"} {...props} />;
 }
 
 function SourceDocumentInputSession(props: SourceDocumentInputProps) {

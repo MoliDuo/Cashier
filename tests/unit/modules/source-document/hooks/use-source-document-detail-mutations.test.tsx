@@ -53,7 +53,6 @@ describe("useSourceDocumentDetailMutations", () => {
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          ledgerId: "ledger-1",
           version: 7,
           onClose: vi.fn(),
         }),
@@ -68,7 +67,7 @@ describe("useSourceDocumentDetailMutations", () => {
         },
       });
     });
-    expect(saveMock).toHaveBeenCalledWith("ledger-1", {
+    expect(saveMock).toHaveBeenCalledWith({
       sourceDocumentId: "source-1",
       expectedVersion: 7,
       sourceDocument: { title: "Updated" },
@@ -97,7 +96,6 @@ describe("useSourceDocumentDetailMutations", () => {
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          ledgerId: "ledger-1",
           version: 7,
           onClose: vi.fn(),
         }),
@@ -110,7 +108,7 @@ describe("useSourceDocumentDetailMutations", () => {
         entryDate: "2026-08-16",
       });
     });
-    expect(splitMock).toHaveBeenCalledWith("ledger-1", {
+    expect(splitMock).toHaveBeenCalledWith({
       sourceDocumentId: "source-1",
       expectedVersion: 7,
       ledgerEntryIds: ["entry-1"],
@@ -138,7 +136,7 @@ describe("useSourceDocumentDetailMutations", () => {
         finishRefresh = resolve;
       })
     );
-    splitMock.mockImplementation(async (_ledgerId, input) => ({
+    splitMock.mockImplementation(async (input) => ({
       ok: true,
       sourceDocumentId: "source-1",
       version: input.expectedVersion + 1,
@@ -157,13 +155,12 @@ describe("useSourceDocumentDetailMutations", () => {
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          ledgerId: "ledger-1",
           version: 7,
           onClose: vi.fn(),
         }),
       { wrapper }
     );
-    const key = queryKeys.sourceDocument("ledger-1", "source-1");
+    const key = queryKeys.sourceDocument("source-1");
     for (const version of [7, 8]) {
       await act(async () => {
         await result.current.splitEntries({
@@ -228,7 +225,6 @@ describe("useSourceDocumentDetailMutations", () => {
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          ledgerId: "ledger-1",
           version: 7,
           onClose: vi.fn(),
         }),

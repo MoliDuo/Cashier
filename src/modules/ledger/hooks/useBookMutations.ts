@@ -25,7 +25,7 @@ import {
  * cache entries: the switcher's live list is that list minus the retired rows,
  * so the two views can never disagree about which books exist.
  */
-export function useBookMutations(ledgerId: string) {
+export function useBookMutations() {
   const queryClient = useQueryClient();
   const t = useTranslations("Settings.Books");
 
@@ -58,16 +58,15 @@ export function useBookMutations(ledgerId: string) {
   };
 
   const writeBooks = (books: BookDto[]) => {
-    queryClient.setQueryData(queryKeys.booksIncludingArchived(ledgerId), books);
+    queryClient.setQueryData(queryKeys.booksIncludingArchived(), books);
     queryClient.setQueryData(
-      queryKeys.books(ledgerId),
+      queryKeys.books(),
       books.filter((book) => book.archivedAt == null)
     );
   };
 
   const createBook = useMutation({
-    mutationFn: (input: { name: string; timeZone: string | null }) =>
-      createBookAction(ledgerId, input),
+    mutationFn: (input: { name: string; timeZone: string | null }) => createBookAction(input),
     onSuccess: (result) => {
       writeBooks(unwrap(result));
     },
@@ -75,7 +74,7 @@ export function useBookMutations(ledgerId: string) {
 
   const updateBook = useMutation({
     mutationFn: (input: { bookId: string; name?: string; timeZone?: string | null }) =>
-      updateBookAction(ledgerId, input.bookId, {
+      updateBookAction(input.bookId, {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
       }),
@@ -85,14 +84,14 @@ export function useBookMutations(ledgerId: string) {
   });
 
   const reorderBooks = useMutation({
-    mutationFn: (bookIds: string[]) => reorderBooksAction(ledgerId, bookIds),
+    mutationFn: (bookIds: string[]) => reorderBooksAction(bookIds),
     onSuccess: (result) => {
       writeBooks(unwrap(result));
     },
   });
 
   const archiveBook = useMutation({
-    mutationFn: (bookId: string) => archiveBookAction(ledgerId, bookId),
+    mutationFn: (bookId: string) => archiveBookAction(bookId),
     onSuccess: (result) => {
       writeBooks(unwrap(result));
       toast.success(t("archived"));
@@ -100,7 +99,7 @@ export function useBookMutations(ledgerId: string) {
   });
 
   const restoreBook = useMutation({
-    mutationFn: (bookId: string) => restoreBookAction(ledgerId, bookId),
+    mutationFn: (bookId: string) => restoreBookAction(bookId),
     onSuccess: (result) => {
       writeBooks(unwrap(result));
       toast.success(t("restored"));
@@ -108,7 +107,7 @@ export function useBookMutations(ledgerId: string) {
   });
 
   const deleteBook = useMutation({
-    mutationFn: (bookId: string) => deleteBookAction(ledgerId, bookId),
+    mutationFn: (bookId: string) => deleteBookAction(bookId),
     onSuccess: (result) => {
       writeBooks(unwrap(result));
       toast.success(t("deleted"));

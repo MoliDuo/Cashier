@@ -16,15 +16,10 @@ vi.mock("@/lib/auth-actions", () => ({
 }));
 
 vi.mock("@/modules/ledger/access", () => ({
-  withLedgerAccess: <TArgs extends unknown[], TResult>(
-    handler: (ledgerId: string, ...args: TArgs) => TResult
-  ) => handler,
-  withLedgerAccessContext:
-    <TArgs extends unknown[], TResult>(
-      handler: (access: { userId: string }, ledgerId: string, ...args: TArgs) => TResult
-    ) =>
-    (ledgerId: string, ...args: TArgs) =>
-      handler({ userId: "00000000-0000-4000-8000-000000000001" }, ledgerId, ...args),
+  withLedgerAccess:
+    <TArgs extends unknown[], TResult>(handler: (ledgerId: string, ...args: TArgs) => TResult) =>
+    (...args: TArgs) =>
+      handler("ledger-1", ...args),
 }));
 
 vi.mock("@/modules/ledger/application/use-cases/save-entry-categories", () => ({
@@ -64,7 +59,7 @@ describe("ledger server-action validation", () => {
 
   it("saveEntryCategoriesAction rejects invalid payload with ValidationError", async () => {
     await expect(
-      saveEntryCategoriesAction("ledger-1", {
+      saveEntryCategoriesAction({
         expectedRevision: "invalid",
         categories: [],
       } as never)
@@ -75,7 +70,6 @@ describe("ledger server-action validation", () => {
   it("createLedgerEntryAction rejects invalid sourceDocumentId with ValidationError", async () => {
     await expect(
       createLedgerEntryAction(
-        "ledger-1",
         {
           sourceDocumentId: "bad-id",
           expectedVersion: 1,
@@ -91,7 +85,7 @@ describe("ledger server-action validation", () => {
 
   it("createServiceCredentialAction rejects blank name with ValidationError", async () => {
     await expect(
-      createServiceCredentialAction("ledger-1", {
+      createServiceCredentialAction({
         expectedRevision: "invalid",
         categories: [],
       } as never)
@@ -100,9 +94,7 @@ describe("ledger server-action validation", () => {
   });
 
   it("deleteServiceCredentialAction rejects invalid credential id with ValidationError", async () => {
-    await expect(deleteServiceCredentialAction("ledger-1", "bad-id")).rejects.toBeInstanceOf(
-      ValidationError
-    );
+    await expect(deleteServiceCredentialAction("bad-id")).rejects.toBeInstanceOf(ValidationError);
     expect(deleteServiceCredentialMock).not.toHaveBeenCalled();
   });
 });

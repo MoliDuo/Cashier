@@ -59,7 +59,6 @@ describe("ModalStackGate", () => {
       useModalStackStore.getState().push({
         type: "source-document",
         id: "document-1",
-        ledgerId: "ledger-1",
       });
     });
 
@@ -71,7 +70,6 @@ describe("ModalStackGate", () => {
       useModalStackStore.getState().push({
         type: "source-document",
         id: "document-2",
-        ledgerId: "ledger-1",
       });
     });
     expect(loaderCalls).toHaveBeenCalledTimes(1);
@@ -81,7 +79,6 @@ describe("ModalStackGate", () => {
     useModalStackStore.getState().syncToDetail({
       type: "source-document",
       id: "document-1",
-      ledgerId: "ledger-1",
     });
 
     render(<ModalStackGate {...props} />);

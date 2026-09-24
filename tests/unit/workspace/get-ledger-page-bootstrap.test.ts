@@ -109,7 +109,6 @@ describe("getLedgerPageBootstrap", () => {
     listBooksMock.mockResolvedValue([
       {
         id: "book-1",
-        ledgerId: "ledger-1",
         name: "共同支出",
         timeZone: null,
         sortOrder: 1,
@@ -123,18 +122,6 @@ describe("getLedgerPageBootstrap", () => {
     getEnhancedStatsMock.mockResolvedValue({});
   });
 
-  it("rejects a pre-authorized DTO for another ledger", async () => {
-    await expect(
-      getLedgerPageBootstrap({
-        ledgerId: "ledger-2",
-        initialTab: "stream",
-        periodParams: { period: "thisMonth" },
-        ledgerDto: createPreAuthorizedLedgerDto(),
-      })
-    ).resolves.toBeNull();
-    expect(listStreamPageMock).not.toHaveBeenCalled();
-  });
-
   it("starts the categories read without waiting for the books", async () => {
     let releaseBooks!: (books: unknown[]) => void;
     listBooksMock.mockReturnValue(
@@ -144,7 +131,6 @@ describe("getLedgerPageBootstrap", () => {
     );
 
     const pending = getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: { period: "thisMonth" },
     });
@@ -158,7 +144,6 @@ describe("getLedgerPageBootstrap", () => {
     releaseBooks([
       {
         id: "book-1",
-        ledgerId: "ledger-1",
         name: "共同支出",
         timeZone: null,
         sortOrder: 1,
@@ -171,7 +156,6 @@ describe("getLedgerPageBootstrap", () => {
   it("accepts a pre-authorized ledger DTO and skips re-authorization", async () => {
     const preAuthDto = createPreAuthorizedLedgerDto();
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: { period: "thisMonth" },
       ledgerDto: preAuthDto,
@@ -186,7 +170,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("prefetches the first stream page without legacy header counts", async () => {
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: {
         period: "custom",
@@ -212,7 +195,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("passes min/max amount filters into stream page prefetch", async () => {
     await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: {
         period: "custom",
@@ -247,7 +229,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("passes status filters into stream page prefetch", async () => {
     await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: {
         period: "custom",
@@ -280,7 +261,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("passes search filters into both stream page and total prefetch", async () => {
     await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: {
         period: "custom",
@@ -313,7 +293,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("prefetches details tab summary and paged entries", async () => {
     await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "details",
       periodParams: { period: "thisMonth" },
       ledgerDto: createPreAuthorizedLedgerDto(),
@@ -327,7 +306,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("passes advanced filters into details tab summary and entries prefetch", async () => {
     await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "details",
       periodParams: {
         period: "custom",
@@ -373,7 +351,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("passes the details search filter to both summary and entries", async () => {
     await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "details",
       periodParams: {
         period: "custom",
@@ -404,7 +381,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("prefetches stats tab enhanced stats with the ledger main currency", async () => {
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stats",
       periodParams: { period: "thisMonth" },
       ledgerDto: createPreAuthorizedLedgerDto(),
@@ -415,14 +391,10 @@ describe("getLedgerPageBootstrap", () => {
     expect(getSourceDocumentCountsQueryMock).not.toHaveBeenCalled();
     expect(listLedgerEntriesMock).not.toHaveBeenCalled();
     const statsQuery = result?.dehydratedState.queries.find(
-      (query) =>
-        query.queryKey[0] === "ledger" &&
-        query.queryKey[1] === "ledger-1" &&
-        query.queryKey[2] === "enhanced-stats"
+      (query) => query.queryKey[0] === "ledger" && query.queryKey[1] === "enhanced-stats"
     );
     expect(statsQuery?.queryKey).toEqual([
       "ledger",
-      "ledger-1",
       "enhanced-stats",
       expect.objectContaining({
         rangeType: "month",
@@ -431,8 +403,8 @@ describe("getLedgerPageBootstrap", () => {
       }),
     ]);
     expect(getEnhancedStatsMock).toHaveBeenCalledWith(
+      "ledger-1",
       expect.objectContaining({
-        ledgerId: "ledger-1",
         queryRange: expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
         compareRange: expect.objectContaining({
           from: expect.any(String),
@@ -448,31 +420,25 @@ describe("getLedgerPageBootstrap", () => {
     vi.setSystemTime(new Date("2026-08-06T12:00:00Z"));
     try {
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stats",
         periodParams: { period: "thisMonth" },
         ledgerDto: createPreAuthorizedLedgerDto(),
       });
 
       const statsQuery = result?.dehydratedState.queries.find(
-        (query) =>
-          query.queryKey[0] === "ledger" &&
-          query.queryKey[1] === "ledger-1" &&
-          query.queryKey[2] === "enhanced-stats"
+        (query) => query.queryKey[0] === "ledger" && query.queryKey[1] === "enhanced-stats"
       );
       expect(statsQuery).toBeDefined();
 
       const expectedDescriptor = buildStatsQueryDescriptor({
-        ledgerId: "ledger-1",
         currentDate: new Date("2026-08-06T12:00:00Z"),
         mainCurrency: "USD",
       });
       expect(statsQuery?.queryKey).toEqual(expectedDescriptor.queryKey);
-      expect(statsQuery?.queryKey).toHaveLength(4);
+      expect(statsQuery?.queryKey).toHaveLength(3);
       expect(statsQuery?.queryKey[0]).toBe("ledger");
-      expect(statsQuery?.queryKey[1]).toBe("ledger-1");
-      expect(statsQuery?.queryKey[2]).toBe("enhanced-stats");
-      expect(statsQuery?.queryKey[3]).toEqual(
+      expect(statsQuery?.queryKey[1]).toBe("enhanced-stats");
+      expect(statsQuery?.queryKey[2]).toEqual(
         expect.objectContaining({
           startDate: expect.any(String),
           endDate: expect.any(String),
@@ -484,6 +450,7 @@ describe("getLedgerPageBootstrap", () => {
         })
       );
       expect(getEnhancedStatsMock).toHaveBeenCalledWith(
+        "ledger-1",
         expectedDescriptor.input,
         bootstrapDependencies.stats
       );
@@ -497,20 +464,16 @@ describe("getLedgerPageBootstrap", () => {
     vi.setSystemTime(new Date("2026-08-06T12:00:00Z"));
     try {
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stats",
         periodParams: { period: "thisMonth" },
         statsState: { range: "year", offset: -2, view: "trend" },
         ledgerDto: createPreAuthorizedLedgerDto(),
       });
       const statsQuery = result?.dehydratedState.queries.find(
-        (query) =>
-          query.queryKey[0] === "ledger" &&
-          query.queryKey[1] === "ledger-1" &&
-          query.queryKey[2] === "enhanced-stats"
+        (query) => query.queryKey[0] === "ledger" && query.queryKey[1] === "enhanced-stats"
       );
 
-      expect(statsQuery?.queryKey[3]).toMatchObject({
+      expect(statsQuery?.queryKey[2]).toMatchObject({
         rangeType: "year",
         startDate: "2024-01-01",
       });
@@ -525,7 +488,6 @@ describe("getLedgerPageBootstrap", () => {
       settings: getDefaultLedger().settings,
     };
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: { period: "thisMonth" },
       ledgerDto: dto,
@@ -542,14 +504,12 @@ describe("getLedgerPageBootstrap", () => {
         listBooksMock.mockResolvedValue([
           {
             id: "book-1",
-            ledgerId: "ledger-1",
             name: "共同支出",
             timeZone: "Asia/Shanghai",
             sortOrder: 1,
           },
         ]);
         const result = await getLedgerPageBootstrap({
-          ledgerId: "ledger-1",
           initialTab: "stream",
           periodParams: { period: "thisMonth" },
           ledgerDto: createPreAuthorizedLedgerDto(),
@@ -570,7 +530,6 @@ describe("getLedgerPageBootstrap", () => {
       vi.setSystemTime(new Date("2026-08-06T16:30:00Z"));
       try {
         const result = await getLedgerPageBootstrap({
-          ledgerId: "ledger-1",
           initialTab: "stats",
           periodParams: { period: "thisMonth" },
           ledgerDto: createPreAuthorizedLedgerDto(),
@@ -592,7 +551,6 @@ describe("getLedgerPageBootstrap", () => {
       vi.setSystemTime(new Date("2026-09-30T16:30:00Z"));
       try {
         const result = await getLedgerPageBootstrap({
-          ledgerId: "ledger-1",
           initialTab: "stream",
           periodParams: { period: "thisMonth" },
           ledgerDto: createPreAuthorizedLedgerDto(),
@@ -620,7 +578,6 @@ describe("getLedgerPageBootstrap", () => {
 
     it("prefetches the stats tab for the remembered book, not only for 总账", async () => {
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stats",
         periodParams: { period: "thisMonth" },
         statsState: { range: "month", offset: 0, view: "heatmap" },
@@ -629,13 +586,11 @@ describe("getLedgerPageBootstrap", () => {
       });
 
       const statsQuery = result?.dehydratedState.queries.find(
-        (query) =>
-          query.queryKey[0] === "ledger" &&
-          query.queryKey[1] === "ledger-1" &&
-          query.queryKey[2] === "enhanced-stats"
+        (query) => query.queryKey[0] === "ledger" && query.queryKey[1] === "enhanced-stats"
       );
-      expect(statsQuery?.queryKey[3]).toMatchObject({ bookId: "book-1" });
+      expect(statsQuery?.queryKey[2]).toMatchObject({ bookId: "book-1" });
       expect(getEnhancedStatsMock).toHaveBeenCalledWith(
+        "ledger-1",
         expect.objectContaining({ bookId: "book-1" }),
         bootstrapDependencies.stats
       );
@@ -644,7 +599,6 @@ describe("getLedgerPageBootstrap", () => {
 
     it("prefetches 总账 when the remembered book is no longer live", async () => {
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stats",
         periodParams: { period: "thisMonth" },
         statsState: { range: "month", offset: 0, view: "heatmap" },
@@ -656,13 +610,11 @@ describe("getLedgerPageBootstrap", () => {
       });
 
       const statsQuery = result?.dehydratedState.queries.find(
-        (query) =>
-          query.queryKey[0] === "ledger" &&
-          query.queryKey[1] === "ledger-1" &&
-          query.queryKey[2] === "enhanced-stats"
+        (query) => query.queryKey[0] === "ledger" && query.queryKey[1] === "enhanced-stats"
       );
-      expect(statsQuery?.queryKey[3]).toMatchObject({ bookId: null });
+      expect(statsQuery?.queryKey[2]).toMatchObject({ bookId: null });
       expect(getEnhancedStatsMock).toHaveBeenCalledWith(
+        "ledger-1",
         expect.not.objectContaining({ bookId: expect.any(String) }),
         bootstrapDependencies.stats
       );
@@ -672,7 +624,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("does not prefetch a multi-ledger list for the single-ledger workspace", async () => {
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: { period: "thisMonth" },
       ledgerDto: createPreAuthorizedLedgerDto(),
@@ -686,7 +637,6 @@ describe("getLedgerPageBootstrap", () => {
 
   it("prefetches stream query with the correct infinite query key structure", async () => {
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: { period: "thisMonth" },
       ledgerDto: createPreAuthorizedLedgerDto(),
@@ -699,9 +649,8 @@ describe("getLedgerPageBootstrap", () => {
       (q) =>
         Array.isArray(q.queryKey) &&
         q.queryKey[0] === "ledger" &&
-        q.queryKey[1] === "ledger-1" &&
-        q.queryKey[2] === "source-documents" &&
-        q.queryKey[3] === "stream"
+        q.queryKey[1] === "source-documents" &&
+        q.queryKey[2] === "stream"
     );
     expect(streamQuery).toBeDefined();
     expect(streamQuery?.state.data).toEqual({
@@ -730,7 +679,6 @@ describe("getLedgerPageBootstrap", () => {
 
     it("uses the device zone the browser reported rather than the deployment's", async () => {
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stream",
         periodParams: { period: "thisMonth" },
         ledgerDto: createPreAuthorizedLedgerDto(),
@@ -752,9 +700,9 @@ describe("getLedgerPageBootstrap", () => {
         bootstrapDependencies.sourceDocuments.documents
       );
       const streamQuery = result?.dehydratedState.queries.find(
-        (query) => query.queryKey[2] === "source-documents" && query.queryKey[3] === "stream"
+        (query) => query.queryKey[1] === "source-documents" && query.queryKey[2] === "stream"
       );
-      expect(streamQuery?.queryKey[4]).toMatchObject({
+      expect(streamQuery?.queryKey[3]).toMatchObject({
         startDate: "2026-10-01",
         endDate: "2026-10-31",
       });
@@ -762,7 +710,6 @@ describe("getLedgerPageBootstrap", () => {
 
     it("treats a device zone the runtime cannot format with as no zone at all", async () => {
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stream",
         periodParams: { period: "thisMonth" },
         ledgerDto: createPreAuthorizedLedgerDto(),
@@ -779,7 +726,6 @@ describe("getLedgerPageBootstrap", () => {
       listBooksMock.mockResolvedValue([
         {
           id: "book-1",
-          ledgerId: "ledger-1",
           name: "共同支出",
           timeZone: "Asia/Shanghai",
           sortOrder: 1,
@@ -787,7 +733,6 @@ describe("getLedgerPageBootstrap", () => {
       ]);
 
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stream",
         periodParams: { period: "thisMonth" },
         ledgerDto: createPreAuthorizedLedgerDto(),
@@ -809,7 +754,6 @@ describe("getLedgerPageBootstrap", () => {
       listBooksMock.mockResolvedValue([
         {
           id: "book-1",
-          ledgerId: "ledger-1",
           name: "共同支出",
           timeZone: "Europe/London",
           sortOrder: 1,
@@ -817,7 +761,6 @@ describe("getLedgerPageBootstrap", () => {
       ]);
 
       const result = await getLedgerPageBootstrap({
-        ledgerId: "ledger-1",
         initialTab: "stream",
         periodParams: { period: "thisMonth" },
         ledgerDto: createPreAuthorizedLedgerDto(),
@@ -852,7 +795,6 @@ describe("getLedgerPageBootstrap", () => {
     });
 
     const result = await getLedgerPageBootstrap({
-      ledgerId: "ledger-1",
       initialTab: "stream",
       periodParams: { period: "thisMonth" },
       ledgerDto: createPreAuthorizedLedgerDto(),
@@ -861,12 +803,12 @@ describe("getLedgerPageBootstrap", () => {
     expect(listStreamPageMock).toHaveBeenCalledTimes(2);
     expect(
       result?.dehydratedState.queries.some(
-        (query) => query.queryKey[2] === "source-documents" && query.queryKey[3] === "stream"
+        (query) => query.queryKey[1] === "source-documents" && query.queryKey[2] === "stream"
       )
     ).toBe(false);
     expect(
       result?.dehydratedState.queries.some(
-        (query) => query.queryKey[2] === "source-documents" && query.queryKey[3] === "refresh"
+        (query) => query.queryKey[1] === "source-documents" && query.queryKey[2] === "refresh"
       )
     ).toBe(false);
   });

@@ -41,10 +41,9 @@ function flattenAndDeduplicate(
 
 function seedRefreshBaseline(
   queryClient: ReturnType<typeof useQueryClient>,
-  ledgerId: string,
   page: { generation: string; hasTransitionalWork: boolean }
 ) {
-  const queryKey = queryKeys.sourceDocumentRefresh(ledgerId);
+  const queryKey = queryKeys.sourceDocumentRefresh();
   queryClient.setQueryData<LedgerRefreshResult>(queryKey, (current) => {
     // A page refreshes only its own projection, not every ledger cache.
     // Only the refresh consumer may advance an existing baseline.
@@ -58,7 +57,7 @@ function seedRefreshBaseline(
   });
 }
 
-export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocumentStreamOptions) {
+export function useSourceDocumentStream(options: UseSourceDocumentStreamOptions) {
   const queryClient = useQueryClient();
   const { queryDescriptor, mainCurrency } = options;
   const streamPageKey = queryDescriptor.queryKey;
@@ -70,14 +69,14 @@ export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocu
     queryKey: streamPageKey,
     queryFn: async ({ pageParam }) => {
       const pageInput = queryDescriptor.getPageInput(pageParam as string | undefined);
-      let page = await listStreamPageAction(ledgerId, pageInput);
+      let page = await listStreamPageAction(pageInput);
       if (pageParam == null && page.restartRequired) {
-        page = await listStreamPageAction(ledgerId, pageInput);
+        page = await listStreamPageAction(pageInput);
         if (page.restartRequired) {
           throw new Error("Stream restart did not produce a valid first page");
         }
       }
-      seedRefreshBaseline(queryClient, ledgerId, page);
+      seedRefreshBaseline(queryClient, page);
       return page;
     },
     initialPageParam: undefined as string | undefined,
@@ -90,7 +89,7 @@ export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocu
   // previous window must not trigger a background restart for the new key.
   useEffect(() => {
     observedRestartFingerprintRef.current = null;
-  }, [filterSignature, ledgerId]);
+  }, [filterSignature]);
 
   // Replace an invalid paginated window only after its fresh first page is
   // ready. Resetting the query first would briefly replace the loaded list
@@ -115,10 +114,10 @@ export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocu
     void (async () => {
       try {
         const firstPageInput = queryDescriptor.getPageInput(undefined);
-        let page = await listStreamPageAction(ledgerId, firstPageInput);
-        if (page.restartRequired) page = await listStreamPageAction(ledgerId, firstPageInput);
+        let page = await listStreamPageAction(firstPageInput);
+        if (page.restartRequired) page = await listStreamPageAction(firstPageInput);
         if (page.restartRequired || cancelled) return;
-        seedRefreshBaseline(queryClient, ledgerId, page);
+        seedRefreshBaseline(queryClient, page);
         queryClient.setQueryData<InfiniteData<StreamPage, string | undefined>>(streamPageKey, {
           pages: [page],
           pageParams: [undefined],
@@ -131,10 +130,10 @@ export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocu
     return () => {
       cancelled = true;
     };
-  }, [data, ledgerId, queryClient, queryDescriptor, streamPageKey]);
+  }, [data, queryClient, queryDescriptor, streamPageKey]);
 
   const firstPageAvailable = data?.pages[0] != null;
-  useLedgerRefreshPolling(ledgerId, firstPageAvailable);
+  useLedgerRefreshPolling(firstPageAvailable);
 
   const items = useMemo(() => flattenAndDeduplicate(data?.pages), [data]);
 

@@ -9,7 +9,6 @@ interface UseDrilldownNavigationOptions {
   bookId?: string;
   searchParams: URLSearchParams;
   pathname: string;
-  ledgerId: string;
 }
 
 interface UseDrilldownNavigationResult {
@@ -24,7 +23,6 @@ export function useDrilldownNavigation({
   bookId,
   searchParams,
   pathname,
-  ledgerId,
 }: UseDrilldownNavigationOptions): UseDrilldownNavigationResult {
   const queryClient = useQueryClient();
   const handleCategoryDrilldown = useCallback(
@@ -36,14 +34,13 @@ export function useDrilldownNavigation({
       });
       void prefetchDetailsTabQuery(
         queryClient,
-        ledgerId,
         bookId,
         { period: "custom", startDate, endDate },
         { categoryId }
       );
       pushLedgerUrl(pathname, params, "drilldown");
     },
-    [bookId, ledgerId, pathname, queryClient, searchParams]
+    [bookId, pathname, queryClient, searchParams]
   );
 
   const handleDateDrilldown = useCallback(
@@ -58,14 +55,13 @@ export function useDrilldownNavigation({
       });
       void prefetchDetailsTabQuery(
         queryClient,
-        ledgerId,
         bookId,
         { period: "custom", startDate: date, endDate: date },
         { categoryId: nextCategoryId, currency: filters?.currency ?? null }
       );
       pushLedgerUrl(pathname, params, "drilldown");
     },
-    [bookId, ledgerId, pathname, queryClient, searchParams]
+    [bookId, pathname, queryClient, searchParams]
   );
 
   return {

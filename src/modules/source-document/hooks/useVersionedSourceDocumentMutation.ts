@@ -10,11 +10,9 @@ import {
 
 interface UseVersionedSourceDocumentMutationOptions<TResult> {
   refreshMode?: "wait" | "background";
-  ledgerId: string | undefined;
   sourceDocumentId: string;
   expectedVersion: number | null;
   action: (
-    ledgerId: string,
     sourceDocumentId: string,
     expectedVersion: number
   ) => Promise<VersionedCommandResult<TResult>>;
@@ -26,7 +24,6 @@ interface UseVersionedSourceDocumentMutationOptions<TResult> {
 
 export function useVersionedSourceDocumentMutation<TResult>({
   refreshMode = "wait",
-  ledgerId,
   sourceDocumentId,
   expectedVersion,
   action,
@@ -35,13 +32,12 @@ export function useVersionedSourceDocumentMutation<TResult>({
   onSuccess,
   onError,
 }: UseVersionedSourceDocumentMutationOptions<TResult>) {
-  return useLedgerMutation<TResult, void | (() => void)>(ledgerId, {
+  return useLedgerMutation<TResult, void | (() => void)>({
     refreshMode,
     invalidates: ["documents", "stats"],
     mutationFn: async () => {
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
       const version = requireSourceDocumentVersion(expectedVersion, sourceDocumentId);
-      const result = await action(ledgerId, sourceDocumentId, version);
+      const result = await action(sourceDocumentId, version);
       return unwrapVersionedCommandResult(result);
     },
     successMessage,

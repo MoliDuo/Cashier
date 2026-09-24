@@ -9,7 +9,6 @@ import { runWithConcurrency } from "@/lib/concurrency";
 const RATE_PREFETCH_CONCURRENCY = 4;
 
 export async function updateLedger(
-  userId: string,
   ledgerId: string,
   data: UpdateLedgerInput,
   settings: Pick<SettingsPort, "updateWithCurrencyRecalculation" | "getRequiredExchangeRateDates">,
@@ -17,7 +16,7 @@ export async function updateLedger(
 ): Promise<LedgerDto> {
   const nextMainCurrency = data.settings?.mainCurrency;
   if (nextMainCurrency !== undefined) {
-    await ensureExchangeRatesForCurrencyChange(userId, ledgerId, nextMainCurrency, {
+    await ensureExchangeRatesForCurrencyChange(ledgerId, nextMainCurrency, {
       settings,
       exchangeRates,
     });
@@ -25,7 +24,6 @@ export async function updateLedger(
 
   const updated = await settings.updateWithCurrencyRecalculation({
     ledgerId,
-    userId,
     expectedUpdatedAt: data.expectedUpdatedAt,
     settings: omitUndefinedProperties(data.settings ?? {}),
   });
@@ -50,7 +48,6 @@ export async function updateLedger(
  * dates that are, in fact, fetchable.
  */
 async function ensureExchangeRatesForCurrencyChange(
-  userId: string,
   ledgerId: string,
   nextMainCurrency: string,
   dependencies: {
@@ -58,7 +55,7 @@ async function ensureExchangeRatesForCurrencyChange(
     exchangeRates: Pick<FxRateBook, "getRates">;
   }
 ): Promise<void> {
-  const plan = await dependencies.settings.getRequiredExchangeRateDates(ledgerId, userId);
+  const plan = await dependencies.settings.getRequiredExchangeRateDates(ledgerId);
   if (plan == null) return; // Ledger not found; updateWithCurrencyRecalculation reports that.
   if (plan.currentMainCurrency.trim().toUpperCase() === nextMainCurrency.trim().toUpperCase()) {
     return; // No actual currency change, no new conversions to cover.

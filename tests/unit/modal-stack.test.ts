@@ -7,8 +7,8 @@ describe("Modal Stack Store", () => {
   });
 
   it("pushes, pops, and closes the stack", () => {
-    useModalStackStore.getState().push({ type: "source-document", id: "1", ledgerId: "ledger-1" });
-    useModalStackStore.getState().push({ type: "source-document", id: "2", ledgerId: "ledger-1" });
+    useModalStackStore.getState().push({ type: "source-document", id: "1" });
+    useModalStackStore.getState().push({ type: "source-document", id: "2" });
     expect(useModalStackStore.getState().stack.map((item) => item.id)).toEqual(["1", "2"]);
 
     useModalStackStore.getState().pop();
@@ -20,13 +20,11 @@ describe("Modal Stack Store", () => {
 
   it("truncates the stack when revisiting an existing entity", () => {
     const state = useModalStackStore.getState();
-    state.push({ type: "source-document", id: "1", ledgerId: "ledger-1" });
-    state.push({ type: "source-document", id: "2", ledgerId: "ledger-1" });
-    state.push({ type: "source-document", id: "3", ledgerId: "ledger-1" });
-    state.push({ type: "source-document", id: "1", ledgerId: "ledger-1" });
+    state.push({ type: "source-document", id: "1" });
+    state.push({ type: "source-document", id: "2" });
+    state.push({ type: "source-document", id: "3" });
+    state.push({ type: "source-document", id: "1" });
 
-    expect(useModalStackStore.getState().stack).toEqual([
-      { type: "source-document", id: "1", ledgerId: "ledger-1" },
-    ]);
+    expect(useModalStackStore.getState().stack).toEqual([{ type: "source-document", id: "1" }]);
   });
 });

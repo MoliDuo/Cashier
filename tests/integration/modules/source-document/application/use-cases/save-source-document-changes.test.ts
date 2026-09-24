@@ -52,7 +52,7 @@ describe("saveSourceDocumentChangesAction", () => {
 
   it("commits metadata and entry changes once while preserving the entry ID", async () => {
     const fixture = await seed();
-    const result = await saveSourceDocumentChangesAction(fixture.ledger.id, {
+    const result = await saveSourceDocumentChangesAction({
       sourceDocumentId: fixture.document.id,
       expectedVersion: 1,
       sourceDocument: { title: "Updated" },
@@ -79,11 +79,11 @@ describe("saveSourceDocumentChangesAction", () => {
       sourceDocument: { title: "Updated" },
       entries: [],
     };
-    await expect(saveSourceDocumentChangesAction(fixture.ledger.id, input)).resolves.toMatchObject({
+    await expect(saveSourceDocumentChangesAction(input)).resolves.toMatchObject({
       ok: true,
       version: 2,
     });
-    await expect(saveSourceDocumentChangesAction(fixture.ledger.id, input)).resolves.toMatchObject({
+    await expect(saveSourceDocumentChangesAction(input)).resolves.toMatchObject({
       ok: false,
       reason: "stale",
       currentVersion: 2,
@@ -93,7 +93,7 @@ describe("saveSourceDocumentChangesAction", () => {
   it("returns the original version for a no-op", async () => {
     const fixture = await seed();
     await expect(
-      saveSourceDocumentChangesAction(fixture.ledger.id, {
+      saveSourceDocumentChangesAction({
         sourceDocumentId: fixture.document.id,
         expectedVersion: 1,
         sourceDocument: { title: "Original" },
@@ -107,7 +107,7 @@ describe("saveSourceDocumentChangesAction", () => {
     async (amount) => {
       const fixture = await seed();
       await expect(
-        saveSourceDocumentChangesAction(fixture.ledger.id, {
+        saveSourceDocumentChangesAction({
           sourceDocumentId: fixture.document.id,
           expectedVersion: 1,
           entries: [{ ledgerEntryId: fixture.entryId, data: { amount } }],

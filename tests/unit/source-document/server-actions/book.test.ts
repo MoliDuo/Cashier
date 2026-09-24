@@ -7,9 +7,10 @@ const { requireLedgerAccessMock, assignBookMock } = vi.hoisted(() => ({
 
 vi.mock("@/modules/ledger/access", () => ({
   requireLedgerAccess: requireLedgerAccessMock,
-  withLedgerAccess: <TArgs extends unknown[], TResult>(
-    handler: (ledgerId: string, ...args: TArgs) => TResult
-  ) => handler,
+  withLedgerAccess:
+    <TArgs extends unknown[], TResult>(handler: (ledgerId: string, ...args: TArgs) => TResult) =>
+    (...args: TArgs) =>
+      handler("ledger-1", ...args),
 }));
 
 vi.mock("@/application/server-composition-root", () => ({
@@ -52,19 +53,19 @@ describe("assignSourceDocumentBookAction failures", () => {
 
     // A record that was edited elsewhere exists; the caller is looking at an
     // older copy of it, so "not found" would send them hunting for a lost record.
-    await expect(assignSourceDocumentBookAction(LEDGER_ID, input)).rejects.toThrow(ConflictError);
+    await expect(assignSourceDocumentBookAction(input)).rejects.toThrow(ConflictError);
   });
 
   it("reports a book that was archived under the reader as a validation failure", async () => {
     assignBookMock.mockResolvedValue({ ok: false, reason: "book_unavailable" });
 
-    await expect(assignSourceDocumentBookAction(LEDGER_ID, input)).rejects.toThrow(ValidationError);
+    await expect(assignSourceDocumentBookAction(input)).rejects.toThrow(ValidationError);
   });
 
   it("returns the new version on success", async () => {
     assignBookMock.mockResolvedValue({ ok: true, version: 4 });
 
-    await expect(assignSourceDocumentBookAction(LEDGER_ID, input)).resolves.toEqual({
+    await expect(assignSourceDocumentBookAction(input)).resolves.toEqual({
       bookId: BOOK_ID,
       version: 4,
     });

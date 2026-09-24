@@ -26,7 +26,6 @@ type BookkeepingProps = ComponentProps<typeof BookkeepingSettings>;
  * and override only the props the case cares about.
  */
 const bookkeepingProps = (overrides: Partial<BookkeepingProps>): BookkeepingProps => ({
-  ledgerId: "ledger-1",
   settings: getDefaultLedger().settings,
   categories: [],
   uncategorizedCount: 0,
@@ -129,7 +128,6 @@ describe("explicit settings section drafts", () => {
     });
     render(
       <BookkeepingSettings
-        ledgerId="ledger-1"
         settings={{
           ...getDefaultLedger().settings,
           mainCurrency: "CNY",

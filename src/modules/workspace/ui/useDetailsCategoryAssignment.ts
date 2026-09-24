@@ -26,14 +26,12 @@ const SELECTION_CHUNK_SIZE = 1000;
 
 /** The selection the open dialog is asking about, fixed at the moment it opened. */
 interface CategorySnapshot {
-  ledgerId: string;
   queryFingerprint: string;
   categorySignature: string;
   entries: CategoryAssignmentSelectionEntry[];
 }
 
 interface UseDetailsCategoryAssignmentOptions {
-  ledgerId: string;
   queryFingerprint: string;
   categories: readonly EntryCategory[];
   entryById: ReadonlyMap<string, LedgerEntry>;
@@ -52,7 +50,6 @@ interface UseDetailsCategoryAssignmentOptions {
  * started.
  */
 export function useDetailsCategoryAssignment({
-  ledgerId,
   queryFingerprint,
   categories,
   entryById,
@@ -79,8 +76,7 @@ export function useDetailsCategoryAssignment({
   const { registerSubmittedJob } = useCategoryAssignment();
   const categorySelectionChanged =
     categorySnapshot != null &&
-    (categorySnapshot.ledgerId !== ledgerId ||
-      categorySnapshot.queryFingerprint !== queryFingerprint ||
+    (categorySnapshot.queryFingerprint !== queryFingerprint ||
       categorySnapshot.categorySignature !== categories.map((category) => category.id).join(":") ||
       !selectionMatches(
         categorySnapshot.entries.map((entry) => entry.ledgerEntryId),
@@ -97,7 +93,6 @@ export function useDetailsCategoryAssignment({
       setCategorySnapshot(
         open
           ? {
-              ledgerId,
               queryFingerprint,
               categorySignature: categories.map((category) => category.id).join(":"),
               entries: selectedIds.map((id) => {
@@ -116,7 +111,7 @@ export function useDetailsCategoryAssignment({
       setPickedCategoryIds([]);
       setClearCategoryPicked(false);
     },
-    [categories, entryById, ledgerId, queryFingerprint, selectedIds]
+    [categories, entryById, queryFingerprint, selectedIds]
   );
 
   // Clearing is exclusive: "no category" is not one more candidate to weigh
@@ -144,11 +139,11 @@ export function useDetailsCategoryAssignment({
       mode: CategoryAssignmentMode;
       entries: CategoryAssignmentSelectionEntry[];
     }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: async (input) => {
-      const started = await beginCategoryAssignmentAction(ledgerId, {
+      const started = await beginCategoryAssignmentAction({
         requestKey: input.requestKey,
         mode: input.mode,
         expectedEntryCount: input.entries.length,
@@ -160,14 +155,14 @@ export function useDetailsCategoryAssignment({
         offset < input.entries.length;
         offset += SELECTION_CHUNK_SIZE, chunkIndex += 1
       ) {
-        const progress = await appendCategoryAssignmentSelectionAction(ledgerId, {
+        const progress = await appendCategoryAssignmentSelectionAction({
           jobId: started.id,
           chunkIndex,
           entries: input.entries.slice(offset, offset + SELECTION_CHUNK_SIZE),
         });
         setSelectionUploadProgress({ received: progress.received, total: input.entries.length });
       }
-      return commitCategoryAssignmentSelectionAction(ledgerId, {
+      return commitCategoryAssignmentSelectionAction({
         jobId: started.id,
         expectedEntryCount: input.entries.length,
       });

@@ -25,7 +25,7 @@ describe("source-document retry action", () => {
   let ledgerId = "";
 
   const createDocument = (text: string) =>
-    createSourceDocumentAction(ledgerId, { text }, crypto.randomUUID());
+    createSourceDocumentAction({ text }, crypto.randomUUID());
 
   beforeEach(async () => {
     vi.mocked(getOpenAIClient).mockReturnValue(
@@ -71,7 +71,6 @@ describe("source-document retry action", () => {
       }) as unknown as ReturnType<typeof getOpenAIClient>
     );
     const retried = await editRetrySourceDocumentAction(
-      ledgerId,
       created.sourceDocumentId,
       { text: "晚餐 50元", storedFileIds: [], documentDate: null },
       before!.version
@@ -121,7 +120,6 @@ describe("source-document retry action", () => {
     });
     await expect(
       editRetrySourceDocumentAction(
-        ledgerId,
         created.sourceDocumentId,
         {
           images: [{ data: "/api/uploads/private.jpg", mimeType: "image/jpeg" }],
@@ -150,7 +148,6 @@ describe("source-document retry action", () => {
     } as unknown as ReturnType<typeof getOpenAIClient>);
 
     await editRetrySourceDocumentAction(
-      ledgerId,
       created.sourceDocumentId,
       { text: "修改 50元", storedFileIds: [], documentDate: null },
       before!.version
@@ -188,7 +185,6 @@ describe("source-document retry action", () => {
     );
 
     const retried = await editRetrySourceDocumentAction(
-      ledgerId,
       created.sourceDocumentId,
       { text: "晚餐 50元", storedFileIds: [], documentDate: null },
       afterFail!.version

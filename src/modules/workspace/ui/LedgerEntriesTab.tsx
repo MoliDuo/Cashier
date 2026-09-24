@@ -24,7 +24,6 @@ import { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-docum
 interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
-  ledgerId: string;
   ledger?: Ledger;
   periodParams: PeriodParams;
   onFiltersChange: (filters: EntryFilters) => void;
@@ -35,7 +34,6 @@ interface LedgerEntriesTabProps {
 
 export function LedgerEntriesTab({
   bookId,
-  ledgerId,
   ledger,
   periodParams,
   onFiltersChange,
@@ -62,10 +60,9 @@ export function LedgerEntriesTab({
     closeRetrySourceDocument,
   } = useLedgerEntriesTabState();
 
-  const recovery = useStreamSourceDocumentRecoveryMutations(ledgerId);
+  const recovery = useStreamSourceDocumentRecoveryMutations();
 
   const streamData = useLedgerEntriesStreamData({
-    ledgerId,
     ...(bookId == null ? {} : { bookId }),
     mainCurrency,
     filters,
@@ -74,7 +71,6 @@ export function LedgerEntriesTab({
   });
 
   const selection = useLedgerEntriesSelection({
-    ledgerId,
     streamGroups: streamData.streamGroups,
     periodParams,
     advancedFilters,
@@ -85,7 +81,6 @@ export function LedgerEntriesTab({
       openLedgerDetail({
         type: "source-document",
         id: group.sourceDocument.id,
-        ledgerId: group.sourceDocument.ledgerId,
       });
     },
     []
@@ -140,7 +135,7 @@ export function LedgerEntriesTab({
         onClearSelection={() => !selection.isBatchPending && selection.clearSelection()}
         onUpdateDates={selection.handleBatchUpdateDates}
         onPreviewDateImpact={(sourceDocumentIds, entryIds) =>
-          previewSourceDocumentDateImpactAction(ledgerId, {
+          previewSourceDocumentDateImpactAction({
             sourceDocumentIds,
             ledgerEntryIds: entryIds,
           })
@@ -215,7 +210,6 @@ export function LedgerEntriesTab({
         deleteLabel={tCommon("delete")}
         retrySourceDocument={retrySourceDocument}
         onRetryDialogOpenChange={(open) => !open && closeRetrySourceDocument()}
-        ledgerId={ledgerId}
       />
     </>
   );

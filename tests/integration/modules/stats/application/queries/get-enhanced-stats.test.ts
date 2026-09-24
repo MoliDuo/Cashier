@@ -21,18 +21,21 @@ import {
 } from "@/modules/stats/application/queries/get-enhanced-stats";
 import { serverComposition } from "@/application/server-composition-root";
 
-async function getTargetEnhancedStatsQuery(
-  input: Parameters<typeof getEnhancedStatsQuery>[0]
-): ReturnType<typeof getEnhancedStatsQuery> {
+async function getTargetEnhancedStatsQuery({
+  ledgerId,
+  ...input
+}: Parameters<typeof getEnhancedStatsQuery>[1] & { ledgerId: string }): ReturnType<
+  typeof getEnhancedStatsQuery
+> {
   const db = getTestDb();
   const documents = await db.query.sourceDocuments.findMany({
-    where: (documents, { eq }) => eq(documents.ledgerId, input.ledgerId),
+    where: (documents, { eq }) => eq(documents.ledgerId, ledgerId),
     columns: { id: true },
   });
   for (const document of documents) {
     await activateTestSourceDocumentProjection(db, document.id);
   }
-  return getEnhancedStatsQuery(input, serverComposition.stats);
+  return getEnhancedStatsQuery(ledgerId, input, serverComposition.stats);
 }
 
 function requireFirst<T>(rows: readonly T[], label: string): T {
@@ -66,8 +69,8 @@ describe("getEnhancedStatsQuery", () => {
   it("validates public query inputs before executing", async () => {
     await expect(
       getEnhancedStats(
+        ledgerId,
         {
-          ledgerId: "not-a-uuid",
           queryRange: { from: "2024-03-31", to: "2024-03-01" },
           compareRange: { from: "2024-02-29", to: "2024-02-01" },
         },

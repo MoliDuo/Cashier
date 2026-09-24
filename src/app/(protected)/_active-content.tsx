@@ -5,7 +5,6 @@ import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 interface ActiveContentProps {
-  ledgerId: string;
   userId: string;
   ledgerDto: LedgerDto;
   initialTab: LedgerTab;
@@ -25,7 +24,6 @@ interface ActiveContentProps {
 }
 
 export function ActiveContent({
-  ledgerId,
   userId,
   ledgerDto,
   initialTab,
@@ -40,7 +38,6 @@ export function ActiveContent({
 }: ActiveContentProps) {
   return (
     <LedgerPageClient
-      ledgerId={ledgerId}
       userId={userId}
       initialLedger={ledgerDto}
       initialTab={initialTab}

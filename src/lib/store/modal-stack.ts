@@ -7,7 +7,6 @@ import { create } from "zustand";
 export type ModalItem = {
   type: "source-document";
   id: string;
-  ledgerId: string;
   returnFocus?: HTMLElement | null;
 };
 
@@ -25,10 +24,7 @@ export const useModalStackStore = create<ModalStackState>((set) => ({
   push: (item) =>
     set((state) => {
       const existingIndex = state.stack.findIndex(
-        (existing) =>
-          existing.type === item.type &&
-          existing.id === item.id &&
-          existing.ledgerId === item.ledgerId
+        (existing) => existing.type === item.type && existing.id === item.id
       );
       const stack =
         existingIndex === -1 ? [...state.stack, item] : state.stack.slice(0, existingIndex + 1);
@@ -47,10 +43,7 @@ export const useModalStackStore = create<ModalStackState>((set) => ({
     set((state) => {
       if (item == null) return { stack: [] };
       const existingIndex = state.stack.findIndex(
-        (existing) =>
-          existing.type === item.type &&
-          existing.id === item.id &&
-          existing.ledgerId === item.ledgerId
+        (existing) => existing.type === item.type && existing.id === item.id
       );
       const stack = existingIndex === -1 ? [item] : state.stack.slice(0, existingIndex + 1);
       return { stack };

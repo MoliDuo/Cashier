@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { useVersionedSourceDocumentMutation } from "./useVersionedSourceDocumentMutation";
 
 interface UseSourceDocumentRecoveryMutationsOptions {
-  ledgerId: string;
   sourceDocumentId: string;
   /** Read fresh at submission time — never captured ahead of the actual click. */
   version: number | null;
@@ -18,7 +17,6 @@ interface UseSourceDocumentRecoveryMutationsOptions {
  * remains unchanged until the action succeeds.
  */
 export function useSourceDocumentRecoveryMutations({
-  ledgerId,
   sourceDocumentId,
   version,
   onSuccess,
@@ -27,7 +25,6 @@ export function useSourceDocumentRecoveryMutations({
   const tActions = useTranslations("SourceDocumentAction");
 
   const cancelMutation = useVersionedSourceDocumentMutation({
-    ledgerId,
     sourceDocumentId,
     expectedVersion: version,
     action: cancelSourceDocumentProcessingAction,

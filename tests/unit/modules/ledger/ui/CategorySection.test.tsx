@@ -17,7 +17,6 @@ vi.mock("@/modules/ledger/server-actions/categories", () => ({
 }));
 vi.mock("@/modules/ledger/ui/category-assignment-context", () => ({
   useCategoryAssignment: () => ({
-    ledgerId: "ledger-1",
     job: null,
     isActive: false,
     isReadError: false,
@@ -51,12 +50,7 @@ function renderSection(props: { uncategorizedCount?: number } = {}) {
     .fn()
     .mockResolvedValue([category, { ...category, id: "category-2", name: "Travel", sortOrder: 1 }]);
   render(
-    <CategorySection
-      ledgerId="ledger-1"
-      categories={[category]}
-      onSaveCategories={onSaveCategories}
-      {...props}
-    />,
+    <CategorySection categories={[category]} onSaveCategories={onSaveCategories} {...props} />,
     { wrapper }
   );
   return { onSaveCategories };
@@ -128,7 +122,7 @@ describe("CategorySection", () => {
     fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
 
     await waitFor(() => expect(applyPresetAction).toHaveBeenCalledOnce());
-    expect(applyPresetAction).toHaveBeenCalledWith("ledger-1", {
+    expect(applyPresetAction).toHaveBeenCalledWith({
       expectedRevision: expect.stringMatching(/^[0-9a-f]{64}$/),
       presetId: "concise",
       mappings: [{ fromCategoryId: "category-1", toPresetIndex: 0 }],

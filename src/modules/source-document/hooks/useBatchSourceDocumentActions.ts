@@ -21,7 +21,6 @@ import {
 } from "@/modules/source-document/command-results";
 
 export function useBatchSourceDocumentActions(
-  ledgerId: string,
   clearSelection: () => void,
   retainSelection: ((ids: string[]) => void) | undefined,
   versions: ReadonlyMap<string, number>
@@ -33,12 +32,12 @@ export function useBatchSourceDocumentActions(
   const deleteSourceDocument = useLedgerMutation<
     void,
     string | { id: string; onCommitted: () => void }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: async (input) => {
       const id = typeof input === "string" ? input : input.id;
-      const result = await deleteSourceDocumentAction(ledgerId, id, versionFor(id));
+      const result = await deleteSourceDocumentAction(id, versionFor(id));
       unwrapVersionedCommandResult(result);
     },
     successMessage: tCommon("deleteSuccess"),
@@ -52,11 +51,11 @@ export function useBatchSourceDocumentActions(
   const batchUpdateDates = useLedgerMutation<
     BatchUpdateSourceDocumentsResultDto,
     { ids: string[]; entryDate: string }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: async ({ ids, entryDate }) => {
-      const result = await batchUpdateSourceDocumentsAction(ledgerId, {
+      const result = await batchUpdateSourceDocumentsAction({
         targets: ids.map((sourceDocumentId) => ({
           sourceDocumentId,
           expectedVersion: versionFor(sourceDocumentId),
@@ -108,14 +107,11 @@ export function useBatchSourceDocumentActions(
   const batchDelete = useLedgerMutation<
     PartialBatchCommandResult,
     string[] | { ids: string[]; onCommitted: () => void }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: (input) =>
-      batchDeleteSourceDocumentsAction(
-        ledgerId,
-        targetsFor(Array.isArray(input) ? input : input.ids)
-      ),
+      batchDeleteSourceDocumentsAction(targetsFor(Array.isArray(input) ? input : input.ids)),
     onSuccess: (result, input) => {
       if (!Array.isArray(input) && result.stale.length + result.failed.length === 0)
         input.onCommitted();
@@ -124,10 +120,10 @@ export function useBatchSourceDocumentActions(
     onError: () => toast.error(tCommon("deleteFailed")),
   });
 
-  const batchRetry = useLedgerMutation<PartialBatchCommandResult, string[]>(ledgerId, {
+  const batchRetry = useLedgerMutation<PartialBatchCommandResult, string[]>({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    mutationFn: (ids) => batchRetrySourceDocumentsAction(ledgerId, targetsFor(ids)),
+    mutationFn: (ids) => batchRetrySourceDocumentsAction(targetsFor(ids)),
     onSuccess: (result) =>
       settleBatchResult(result, tBatch("retried", { count: result.succeeded.length })),
     onError: () => toast.error(tCommon("error")),

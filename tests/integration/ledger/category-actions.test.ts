@@ -22,7 +22,7 @@ async function getTargetEntryCategoriesAction(ledgerId: string) {
       await activateTestSourceDocumentProjection(db, document.id);
     }
   }
-  return getEntryCategoriesAction(ledgerId);
+  return getEntryCategoriesAction();
 }
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";

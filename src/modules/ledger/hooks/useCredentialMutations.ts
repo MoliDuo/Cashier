@@ -9,15 +9,15 @@ import {
 import type { CreatedServiceCredential, ServiceCredential } from "@/modules/ledger/contracts";
 import { toast } from "sonner";
 
-export function useCredentialMutations(ledgerId: string) {
+export function useCredentialMutations() {
   const t = useTranslations("Settings");
   const tCredentials = useTranslations("ServiceCredentials");
   const createCredential = useLedgerMutation<
     CreatedServiceCredential,
     { name: string; bookId: string }
-  >(ledgerId, {
+  >({
     invalidates: ["credentials"],
-    mutationFn: (input) => createServiceCredentialAction(ledgerId, input),
+    mutationFn: (input) => createServiceCredentialAction(input),
     successMessage: t("credentialCreated"),
     errorMessage: null,
     onError: (error) => {
@@ -31,20 +31,16 @@ export function useCredentialMutations(ledgerId: string) {
     },
   });
 
-  const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>(
-    ledgerId,
-    {
-      invalidates: ["credentials"],
-      mutationFn: (input) =>
-        updateServiceCredentialAction(ledgerId, input.id, { bookId: input.bookId }),
-      successMessage: t("credentialBookChanged"),
-      errorMessage: t("credentialBookChangeFailed"),
-    }
-  );
-
-  const deleteCredential = useLedgerMutation<void, string>(ledgerId, {
+  const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>({
     invalidates: ["credentials"],
-    mutationFn: (id) => deleteServiceCredentialAction(ledgerId, id),
+    mutationFn: (input) => updateServiceCredentialAction(input.id, { bookId: input.bookId }),
+    successMessage: t("credentialBookChanged"),
+    errorMessage: t("credentialBookChangeFailed"),
+  });
+
+  const deleteCredential = useLedgerMutation<void, string>({
+    invalidates: ["credentials"],
+    mutationFn: (id) => deleteServiceCredentialAction(id),
     successMessage: t("credentialDeleted"),
     errorMessage: t("deleteFailed"),
   });

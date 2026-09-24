@@ -89,7 +89,6 @@ async function sha256(file: File, signal?: AbortSignal): Promise<string> {
 }
 
 export async function uploadSourceDocumentSubmissionImages(
-  _ledgerId: string,
   payload: SourceDocumentSubmitPayload,
   dependencies: InlinePreparationDependencies = {},
   onProgress?: (progress: SourceDocumentSubmissionProgress) => void
@@ -154,7 +153,6 @@ export async function uploadSourceDocumentSubmissionImages(
     const checksums = await Promise.all(files.map((file) => sha256(file, dependencies.signal)));
     throwIfAborted(dependencies.signal);
     const plan = await (dependencies.createPlan ?? createSourceDocumentUploadPlanAction)(
-      _ledgerId,
       files.map((file, index) => ({
         contentType: file.type,
         byteSize: file.size,
@@ -208,14 +206,11 @@ export async function uploadSourceDocumentSubmissionImages(
     await Promise.all(Array.from({ length: Math.min(3, files.length) }, uploadWorker));
     throwIfAborted(dependencies.signal);
     onProgress?.({ phase: "finalizing", percent: 88, fileCount: files.length });
-    const storedFileIds = await (dependencies.finalize ?? finalizeSourceDocumentUploadAction)(
-      _ledgerId,
-      {
-        uploadSessionId: plan.id,
-        finalizationToken: plan.finalizationToken,
-        targetIds: plan.targets.map((target) => target.id),
-      }
-    );
+    const storedFileIds = await (dependencies.finalize ?? finalizeSourceDocumentUploadAction)({
+      uploadSessionId: plan.id,
+      finalizationToken: plan.finalizationToken,
+      targetIds: plan.targets.map((target) => target.id),
+    });
     return {
       ...base,
       storedFileIds: [...(base.storedFileIds ?? []), ...storedFileIds],

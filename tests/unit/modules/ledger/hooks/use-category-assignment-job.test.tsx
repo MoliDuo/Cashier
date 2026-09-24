@@ -75,7 +75,7 @@ describe("useCategoryAssignmentJob", () => {
 
   it("continues polling an active job beyond 205 seconds", async () => {
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     expect(result.current.job).toMatchObject({ id: "job-1", status: "running" });
 
@@ -88,7 +88,7 @@ describe("useCategoryAssignmentJob", () => {
   it("reports a query error without manufacturing a failed job", async () => {
     getJob.mockRejectedValue(new Error("offline"));
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
 
     expect(result.current.isReadError).toBe(true);
@@ -99,7 +99,7 @@ describe("useCategoryAssignmentJob", () => {
   it("does not reprint a run that finished before this page opened", async () => {
     getJob.mockResolvedValue({ ...runningJob, status: "succeeded", processedCount: 10 });
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
 
     expect(result.current.job).toMatchObject({ status: "succeeded" });
@@ -116,7 +116,7 @@ describe("useCategoryAssignmentJob", () => {
     };
     getJob.mockResolvedValueOnce(runningJob).mockResolvedValue(succeeded);
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     expect(result.current.isVisible).toBe(true);
 
@@ -135,7 +135,7 @@ describe("useCategoryAssignmentJob", () => {
       .mockResolvedValueOnce({ ...runningJob, status: "succeeded", processedCount: 10 })
       .mockResolvedValue({ ...runningJob, id: "job-2", status: "running", processedCount: 0 });
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     act(() => result.current.dismiss());
     expect(result.current.isVisible).toBe(true);
@@ -154,7 +154,7 @@ describe("useCategoryAssignmentJob", () => {
 
   it("never hides a live run behind a dismissal", async () => {
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
 
     act(() => result.current.dismiss());
@@ -172,7 +172,7 @@ describe("useCategoryAssignmentJob", () => {
     };
     const { wrapper } = setup();
     getJob.mockResolvedValueOnce(runningJob).mockResolvedValue(failed);
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     expect(invalidateLedger).toHaveBeenCalledTimes(1);
 
@@ -189,7 +189,7 @@ describe("useCategoryAssignmentJob", () => {
     const next = { ...runningJob, id: "job-2", status: "running" as const, processedCount: 10 };
     const { wrapper } = setup();
     getJob.mockResolvedValueOnce(previous).mockResolvedValue(next);
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     expect(invalidateLedger).toHaveBeenCalledTimes(1);
 
@@ -203,7 +203,7 @@ describe("useCategoryAssignmentJob", () => {
   it("holds a progress refresh to one per interval and catches up at the end", async () => {
     const { wrapper } = setup();
     getJob.mockResolvedValue(runningJob);
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     expect(invalidateLedger).toHaveBeenCalledTimes(1);
 
@@ -232,7 +232,7 @@ describe("useCategoryAssignmentJob", () => {
       confirmedCount: 1,
     };
     getJob.mockResolvedValueOnce(runningJob).mockResolvedValue(succeeded);
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
     expect(result.current.notices).toEqual([]);
 
@@ -256,7 +256,7 @@ describe("useCategoryAssignmentJob", () => {
       processedCount: 10,
     });
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
 
     expect(result.current.job).toMatchObject({ status: "succeeded" });
@@ -266,7 +266,7 @@ describe("useCategoryAssignmentJob", () => {
   it("queues a notice for the run this page submitted, even when it is already over", async () => {
     getJob.mockResolvedValue(null);
     const { wrapper } = setup();
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
 
     act(() =>
@@ -287,7 +287,7 @@ describe("useCategoryAssignmentJob", () => {
     getJob
       .mockResolvedValueOnce(runningJob)
       .mockResolvedValue({ ...runningJob, status: "cancelled" as const, processedCount: 2 });
-    const { result } = renderHook(() => useCategoryAssignmentJob("ledger-1"), { wrapper });
+    const { result } = renderHook(() => useCategoryAssignmentJob(), { wrapper });
     await flush();
 
     await act(async () => void (await result.current.refresh()));

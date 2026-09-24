@@ -28,7 +28,7 @@ describe("splitSourceDocumentAction", () => {
     const convert = vi.spyOn(postgresFxRateBook, "convertBatch");
     try {
       for (const [index, id] of fixture.ids.slice(0, 2).entries()) {
-        const result = await splitSourceDocumentAction(fixture.ledger.id, {
+        const result = await splitSourceDocumentAction({
           sourceDocumentId: fixture.document.id,
           expectedVersion: index + 1,
           ledgerEntryIds: [id],
@@ -90,7 +90,7 @@ describe("splitSourceDocumentAction", () => {
   it("moves live rows without changing entry IDs and versions both documents correctly", async () => {
     const fixture = await seed();
     const movedIds = [fixture.ids[0]!, fixture.ids[2]!];
-    const result = await splitSourceDocumentAction(fixture.ledger.id, {
+    const result = await splitSourceDocumentAction({
       sourceDocumentId: fixture.document.id,
       expectedVersion: 1,
       ledgerEntryIds: movedIds,
@@ -130,10 +130,10 @@ describe("splitSourceDocumentAction", () => {
       ledgerEntryIds: [fixture.ids[0]!],
       entryDate: "2026-08-16",
     };
-    await expect(splitSourceDocumentAction(fixture.ledger.id, input)).resolves.toMatchObject({
+    await expect(splitSourceDocumentAction(input)).resolves.toMatchObject({
       ok: true,
     });
-    await expect(splitSourceDocumentAction(fixture.ledger.id, input)).resolves.toMatchObject({
+    await expect(splitSourceDocumentAction(input)).resolves.toMatchObject({
       ok: false,
       reason: "stale",
       currentVersion: 2,
@@ -148,11 +148,9 @@ describe("splitSourceDocumentAction", () => {
       ledgerEntryIds: fixture.ids,
       entryDate: "2026-08-16",
     };
-    await expect(splitSourceDocumentAction(fixture.ledger.id, input)).rejects.toThrow(
-      /retain at least one/
-    );
+    await expect(splitSourceDocumentAction(input)).rejects.toThrow(/retain at least one/);
     await expect(
-      splitSourceDocumentAction(fixture.ledger.id, {
+      splitSourceDocumentAction({
         ...input,
         ledgerEntryIds: [crypto.randomUUID()],
       })
@@ -162,7 +160,7 @@ describe("splitSourceDocumentAction", () => {
       .mockRejectedValueOnce(new Error("FX unavailable"));
     try {
       await expect(
-        splitSourceDocumentAction(fixture.ledger.id, {
+        splitSourceDocumentAction({
           ...input,
           ledgerEntryIds: [fixture.ids[0]!],
         })
@@ -186,7 +184,7 @@ describe("splitSourceDocumentAction", () => {
     const fixture = await seed();
     const results = await Promise.all(
       fixture.ids.slice(0, 2).map((id) =>
-        splitSourceDocumentAction(fixture.ledger.id, {
+        splitSourceDocumentAction({
           sourceDocumentId: fixture.document.id,
           expectedVersion: 1,
           ledgerEntryIds: [id],
@@ -208,7 +206,7 @@ describe("splitSourceDocumentAction", () => {
   it("moves a 100-entry batch with contiguous positions", async () => {
     const fixture = await seed(101);
     const movedIds = fixture.ids.slice(0, 100);
-    const result = await splitSourceDocumentAction(fixture.ledger.id, {
+    const result = await splitSourceDocumentAction({
       sourceDocumentId: fixture.document.id,
       expectedVersion: 1,
       ledgerEntryIds: movedIds,

@@ -38,7 +38,6 @@ interface LedgerTabPanelsProps {
   books: readonly BookDto[];
   activeTab: LedgerTab;
   hidden: boolean;
-  ledgerId: string;
   ledger: LedgerDto;
   categories: EntryCategoryWithCount[];
   periodParams: PeriodParams;
@@ -70,7 +69,6 @@ export function LedgerTabPanels({
   books,
   activeTab,
   hidden,
-  ledgerId,
   ledger,
   categories,
   periodParams,
@@ -98,7 +96,6 @@ export function LedgerTabPanels({
           {timeZoneReady ? (
             <LedgerEntriesTab
               bookId={recordScope ?? undefined}
-              ledgerId={ledgerId}
               ledger={ledger}
               periodParams={periodParams}
               onFiltersChange={onFiltersChange}
@@ -117,7 +114,6 @@ export function LedgerTabPanels({
           {timeZoneReady ? (
             <DetailsTab
               bookId={recordScope ?? undefined}
-              ledgerId={ledgerId}
               categories={categories.length > 0 ? categories : []}
               ledger={ledger}
               periodParams={periodParams}
@@ -136,7 +132,6 @@ export function LedgerTabPanels({
           {timeZoneReady ? (
             <StatsTab
               bookId={recordScope ?? undefined}
-              ledgerId={ledgerId}
               ledger={ledger}
               onCategoryDrilldown={onCategoryDrilldown}
               onDateDrilldown={onDateDrilldown}
@@ -152,7 +147,6 @@ export function LedgerTabPanels({
       {activeTab === "settings" && (
         <div className="mt-0 min-w-0 max-w-full overflow-x-clip">
           <SettingsTab
-            ledgerId={ledgerId}
             ledger={ledger}
             initialCategories={categories}
             initialBooks={books}

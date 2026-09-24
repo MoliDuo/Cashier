@@ -9,9 +9,10 @@ const { requireLedgerAccessMock, createAndQueueSourceDocumentMock, resolveRecord
 
 vi.mock("@/modules/ledger/access", () => ({
   requireLedgerAccess: requireLedgerAccessMock,
-  withLedgerAccess: <TArgs extends unknown[], TResult>(
-    handler: (ledgerId: string, ...args: TArgs) => TResult
-  ) => handler,
+  withLedgerAccess:
+    <TArgs extends unknown[], TResult>(handler: (ledgerId: string, ...args: TArgs) => TResult) =>
+    (...args: TArgs) =>
+      handler("ledger-1", ...args),
 }));
 
 vi.mock("@/modules/source-document/server/resolve-record-book", () => ({
@@ -47,7 +48,7 @@ describe("createSourceDocumentAction omission semantics", () => {
   });
 
   it("omits absent optional fields when forwarding parsed input", async () => {
-    await createSourceDocumentAction("ledger-1", { text: "Lunch 12.50" }, CLIENT_SUBMISSION_ID);
+    await createSourceDocumentAction({ text: "Lunch 12.50" }, CLIENT_SUBMISSION_ID);
 
     const callInput = createAndQueueSourceDocumentMock.mock.calls[0]?.[0] as Record<
       string,
@@ -71,7 +72,7 @@ describe("createSourceDocumentAction omission semantics", () => {
   it("dates the record in the book's zone when the request omits one", async () => {
     resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: "Asia/Singapore" });
 
-    await createSourceDocumentAction("ledger-1", { text: "Lunch" }, CLIENT_SUBMISSION_ID);
+    await createSourceDocumentAction({ text: "Lunch" }, CLIENT_SUBMISSION_ID);
 
     expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({ timezone: "Asia/Singapore" })
@@ -85,7 +86,6 @@ describe("createSourceDocumentAction omission semantics", () => {
     resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: "Asia/Singapore" });
 
     await createSourceDocumentAction(
-      "ledger-1",
       { text: "Lunch", timezone: "Europe/Paris" },
       CLIENT_SUBMISSION_ID
     );
@@ -99,7 +99,6 @@ describe("createSourceDocumentAction omission semantics", () => {
     resolveRecordBookMock.mockResolvedValue({ id: BOOK_ID, timeZone: null });
 
     await createSourceDocumentAction(
-      "ledger-1",
       { text: "Lunch", timezone: "Europe/Paris" },
       CLIENT_SUBMISSION_ID
     );
@@ -112,17 +111,13 @@ describe("createSourceDocumentAction omission semantics", () => {
   it("forwards an explicitly chosen book to the resolver", async () => {
     const otherBookId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 
-    await createSourceDocumentAction(
-      "ledger-1",
-      { text: "Lunch", bookId: otherBookId },
-      CLIENT_SUBMISSION_ID
-    );
+    await createSourceDocumentAction({ text: "Lunch", bookId: otherBookId }, CLIENT_SUBMISSION_ID);
 
     expect(resolveRecordBookMock).toHaveBeenCalledWith("ledger-1", otherBookId, expect.anything());
   });
 
   it("injects scheduleProcessing into use case dependencies", async () => {
-    await createSourceDocumentAction("ledger-1", { text: "Lunch" }, CLIENT_SUBMISSION_ID);
+    await createSourceDocumentAction({ text: "Lunch" }, CLIENT_SUBMISSION_ID);
 
     const deps = createAndQueueSourceDocumentMock.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(deps).toBeDefined();
@@ -130,7 +125,7 @@ describe("createSourceDocumentAction omission semantics", () => {
   });
 
   it("scopes browser idempotency to the authenticated user and payload", async () => {
-    await createSourceDocumentAction("ledger-1", { text: "Lunch" }, CLIENT_SUBMISSION_ID);
+    await createSourceDocumentAction({ text: "Lunch" }, CLIENT_SUBMISSION_ID);
 
     expect(createAndQueueSourceDocumentMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
@@ -145,18 +140,14 @@ describe("createSourceDocumentAction omission semantics", () => {
   });
 
   it("rejects an invalid client submission ID", async () => {
-    await expect(
-      createSourceDocumentAction("ledger-1", { text: "Lunch" }, "not-a-uuid")
-    ).rejects.toThrow("Invalid UUID");
+    await expect(createSourceDocumentAction({ text: "Lunch" }, "not-a-uuid")).rejects.toThrow(
+      "Invalid UUID"
+    );
     expect(createAndQueueSourceDocumentMock).not.toHaveBeenCalled();
   });
 
   it("does not include the legacy operation ID in the business result", async () => {
-    const result = await createSourceDocumentAction(
-      "ledger-1",
-      { text: "Lunch" },
-      CLIENT_SUBMISSION_ID
-    );
+    const result = await createSourceDocumentAction({ text: "Lunch" }, CLIENT_SUBMISSION_ID);
 
     expect(createAndQueueSourceDocumentMock).toHaveBeenCalledOnce();
     expect(result).toEqual({ sourceDocumentId: "doc-1", version: 1, status: "processing" });

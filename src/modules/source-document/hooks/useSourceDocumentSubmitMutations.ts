@@ -41,7 +41,6 @@ interface CreateSubmissionIdentity {
 }
 
 type UseSourceDocumentSubmitMutationsOptions = {
-  ledgerId: string;
   bookId?: string;
   messages: SourceDocumentInputControllerMessages;
   onSuccess?: (result: CreatedRecordResult) => void;
@@ -108,7 +107,6 @@ function snapshotPayload(payload: SourceDocumentSubmitPayload): SourceDocumentSu
 // ---------------------------------------------------------------------------
 
 export function useSourceDocumentSubmitMutations({
-  ledgerId,
   mode,
   sourceDocumentId,
   sourceDocumentVersion,
@@ -134,7 +132,7 @@ export function useSourceDocumentSubmitMutations({
   const createMutation = useLedgerMutation<
     Awaited<ReturnType<typeof createSourceDocumentAction>>,
     CreateVariables
-  >(ledgerId, {
+  >({
     invalidates: ["documents", "stats"],
     mutationFn: async (variables: CreateVariables) => {
       const currentIdentity = createSubmissionIdentityRef.current;
@@ -144,7 +142,6 @@ export function useSourceDocumentSubmitMutations({
           : null;
       if (uploadedPayload == null) {
         uploadedPayload = await uploadSourceDocumentSubmissionImages(
-          ledgerId,
           variables.payload,
           { signal: variables.signal },
           setMonotonicProgress
@@ -157,7 +154,6 @@ export function useSourceDocumentSubmitMutations({
       }
       setMonotonicProgress({ phase: "submitting", percent: 90 });
       const result = await createSourceDocumentAction(
-        ledgerId,
         {
           ...(bookId == null ? {} : { bookId }),
           ...(uploadedPayload.text == null ? {} : { text: uploadedPayload.text }),
@@ -200,54 +196,46 @@ export function useSourceDocumentSubmitMutations({
   // Retry mutation
   // -----------------------------------------------------------------------
 
-  const retryMutation = useLedgerMutation<RetrySourceDocumentResponseDto, RetryVariables>(
-    ledgerId,
-    {
-      invalidates: ["documents", "stats"],
-      mutationFn: async (variables: RetryVariables) => {
-        if (sourceDocumentId == null) throw new Error("No source document ID for retry");
-        // Fail before uploading anything: a missing version must not upload
-        // files or call the action, and the form content stays intact for retry.
-        const expectedVersion = requireSourceDocumentVersion(
-          sourceDocumentVersion,
-          sourceDocumentId
-        );
-        const { payload } = variables;
-        const uploadedPayload = await uploadSourceDocumentSubmissionImages(
-          ledgerId,
-          payload,
-          { signal: variables.signal },
-          setMonotonicProgress
-        );
-        setMonotonicProgress({ phase: "submitting", percent: 90 });
-        const result = await editRetrySourceDocumentAction(
-          ledgerId,
-          sourceDocumentId,
-          uploadedPayload,
-          expectedVersion
-        );
-        return unwrapVersionedCommandResult(result);
-      },
-      successMessage: messages.retrySuccess,
-      errorMessage: null,
-      onSuccess: async (data, variables) => {
-        try {
-          setMonotonicProgress({ phase: "complete", percent: 100 });
-          await waitForPaint();
-          onSuccess?.({
-            sourceDocumentId: sourceDocumentId!,
-            documentDate: variables.payload.documentDate,
-          });
-        } finally {
-          finishUpload(variables.signal);
-        }
-      },
-      onError: (error, variables) => {
-        handleSubmitError(error, messages.retryError);
+  const retryMutation = useLedgerMutation<RetrySourceDocumentResponseDto, RetryVariables>({
+    invalidates: ["documents", "stats"],
+    mutationFn: async (variables: RetryVariables) => {
+      if (sourceDocumentId == null) throw new Error("No source document ID for retry");
+      // Fail before uploading anything: a missing version must not upload
+      // files or call the action, and the form content stays intact for retry.
+      const expectedVersion = requireSourceDocumentVersion(sourceDocumentVersion, sourceDocumentId);
+      const { payload } = variables;
+      const uploadedPayload = await uploadSourceDocumentSubmissionImages(
+        payload,
+        { signal: variables.signal },
+        setMonotonicProgress
+      );
+      setMonotonicProgress({ phase: "submitting", percent: 90 });
+      const result = await editRetrySourceDocumentAction(
+        sourceDocumentId,
+        uploadedPayload,
+        expectedVersion
+      );
+      return unwrapVersionedCommandResult(result);
+    },
+    successMessage: messages.retrySuccess,
+    errorMessage: null,
+    onSuccess: async (data, variables) => {
+      try {
+        setMonotonicProgress({ phase: "complete", percent: 100 });
+        await waitForPaint();
+        onSuccess?.({
+          sourceDocumentId: sourceDocumentId!,
+          documentDate: variables.payload.documentDate,
+        });
+      } finally {
         finishUpload(variables.signal);
-      },
-    }
-  );
+      }
+    },
+    onError: (error, variables) => {
+      handleSubmitError(error, messages.retryError);
+      finishUpload(variables.signal);
+    },
+  });
 
   // -----------------------------------------------------------------------
   // Public API

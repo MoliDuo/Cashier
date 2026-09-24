@@ -18,7 +18,7 @@ vi.mock("@/modules/source-document/server-actions/processing", () => ({
   cancelSourceDocumentProcessingAction: actions.cancel,
 }));
 vi.mock("@/lib/mutations/use-ledger-mutation", () => ({
-  useLedgerMutation: (_ledgerId: string, options: Record<string, unknown>) => {
+  useLedgerMutation: (options: Record<string, unknown>) => {
     mutationObservers();
     return {
       mutateAsync: async (variables: unknown) => {
@@ -56,7 +56,7 @@ describe("useStreamSourceDocumentRecoveryMutations", () => {
       const invalidation = deferred<void>();
       action.mockReturnValue(command.promise);
       awaitInvalidation.mockReturnValue(invalidation.promise);
-      const { result } = renderHook(() => useStreamSourceDocumentRecoveryMutations("ledger-1"));
+      const { result } = renderHook(() => useStreamSourceDocumentRecoveryMutations());
       const initialAction = result.current[method];
 
       expect(mutationObservers).toHaveBeenCalledTimes(2);

@@ -7,17 +7,16 @@ import { writeLedgerHistory } from "@/lib/navigation/ledger-history";
 import { registerLedgerHistoryTraversal } from "@/lib/navigation/ledger-history-traversal";
 import { useModalStackStore } from "@/lib/store/modal-stack";
 import { useUnsavedChangesStore, type UnsavedChangesLeaveGuard } from "@/lib/store/unsaved-changes";
+import { ledgerDetailLeaveGuardKey } from "@/lib/navigation/ledger-detail-key";
 
 interface UseLedgerHistorySyncOptions {
   pathname: string;
   searchParams: URLSearchParams;
-  ledgerId: string;
 }
 
 export function useLedgerHistorySync({
   pathname,
   searchParams,
-  ledgerId,
 }: UseLedgerHistorySyncOptions): void {
   const blockSyncRef = useRef(false);
   const restoringRef = useRef(false);
@@ -61,11 +60,10 @@ export function useLedgerHistorySync({
         : {
             type: detail.detailType,
             id: detail.detailId,
-            ledgerId,
             returnFocus: null,
           }
     );
-  }, [ledgerId, searchParams]);
+  }, [searchParams]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -126,7 +124,7 @@ export function useLedgerHistorySync({
         return;
       }
 
-      const guardKey = `${top.type}-detail:${top.ledgerId}:${top.id}`;
+      const guardKey = ledgerDetailLeaveGuardKey(top.type, top.id);
       const guard = useUnsavedChangesStore.getState().getLeaveGuard(guardKey);
       if (guard == null || span === 0) return;
       event.stopImmediatePropagation();

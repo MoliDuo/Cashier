@@ -26,7 +26,6 @@ export interface UseLedgerMutationOptions<TData, TVariables> {
 }
 
 export function useLedgerMutation<TData = unknown, TVariables = void>(
-  ledgerId: string | null | undefined,
   options: UseLedgerMutationOptions<TData, TVariables>
 ) {
   const queryClient = useQueryClient();
@@ -54,37 +53,34 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
 
       if (successMessage != null) toast.success(successMessage);
 
-      if (ledgerId != null && ledgerId !== "") {
-        const groups =
-          typeof invalidates === "function" ? invalidates(data, variables) : invalidates;
-        const refresh = async () => {
-          try {
-            await invalidateLedgerQueries(queryClient, ledgerId, groups);
-          } catch (invalidationError) {
-            console.error("[useLedgerMutation] resource invalidation failed", {
-              error: invalidationError,
-            });
-            toast.error(tCommon("savedRefreshFailed"));
-            globalThis.setTimeout(() => {
-              void invalidateLedgerQueries(queryClient, ledgerId, groups).catch((retryError) => {
-                console.error("[useLedgerMutation] resource invalidation retry failed", {
-                  error: retryError,
-                });
+      const groups = typeof invalidates === "function" ? invalidates(data, variables) : invalidates;
+      const refresh = async () => {
+        try {
+          await invalidateLedgerQueries(queryClient, groups);
+        } catch (invalidationError) {
+          console.error("[useLedgerMutation] resource invalidation failed", {
+            error: invalidationError,
+          });
+          toast.error(tCommon("savedRefreshFailed"));
+          globalThis.setTimeout(() => {
+            void invalidateLedgerQueries(queryClient, groups).catch((retryError) => {
+              console.error("[useLedgerMutation] resource invalidation retry failed", {
+                error: retryError,
               });
-            }, 1_000);
-          }
-        };
-        if (refreshMode === "background") {
-          void refresh();
-          if (refreshQueryKey != null) {
-            await queryClient.refetchQueries(
-              { queryKey: refreshQueryKey, exact: true, type: "active" },
-              { cancelRefetch: false }
-            );
-          }
-        } else {
-          await refresh();
+            });
+          }, 1_000);
         }
+      };
+      if (refreshMode === "background") {
+        void refresh();
+        if (refreshQueryKey != null) {
+          await queryClient.refetchQueries(
+            { queryKey: refreshQueryKey, exact: true, type: "active" },
+            { cancelRefetch: false }
+          );
+        }
+      } else {
+        await refresh();
       }
     },
     onError: (error, variables) => {

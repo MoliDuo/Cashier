@@ -13,7 +13,6 @@ import { usePendingChanges } from "./usePendingChanges";
 import { useSourceDocumentRevisionGuard } from "./useSourceDocumentRevisionGuard";
 
 interface UseSourceDocumentDetailSessionOptions {
-  ledgerId: string;
   sourceDocument: SourceDocument | null;
   ledgerEntries: LedgerEntry[];
   open: boolean;
@@ -33,7 +32,6 @@ interface UseSourceDocumentDetailSessionOptions {
 }
 
 export function useSourceDocumentDetailSession({
-  ledgerId,
   sourceDocument,
   ledgerEntries,
   open,
@@ -69,7 +67,7 @@ export function useSourceDocumentDetailSession({
     isSaving || isDeleting || isRetrying || isSplitting || isReloading || externalPending;
   const interactionDisabled = busy || sourceDocument == null;
   const unsavedGuard = useUnsavedChangesGuard({
-    key: ledgerDetailLeaveGuardKey("source-document", ledgerId, sourceDocument?.id ?? ""),
+    key: ledgerDetailLeaveGuardKey("source-document", sourceDocument?.id ?? ""),
     hasUnsavedChanges: sourceDocument?.id != null && (pending.hasPendingChanges || externalUnsaved),
   });
 

@@ -18,7 +18,7 @@ type UseSourceDocumentInputControllerOptions = SourceDocumentInputProps & {
 };
 
 export function useSourceDocumentInputController(options: UseSourceDocumentInputControllerOptions) {
-  const { ledgerId, onSuccess, initialData, messages, timeZone } = options;
+  const { onSuccess, initialData, messages, timeZone } = options;
   const [target] = useState(() =>
     options.mode === "retry"
       ? {
@@ -40,7 +40,6 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
     ...(timeZone != null ? { timeZone } : {}),
   });
   const submitMutations = useSourceDocumentSubmitMutations({
-    ledgerId,
     ...(options.bookId == null ? {} : { bookId: options.bookId }),
     ...target,
     messages,

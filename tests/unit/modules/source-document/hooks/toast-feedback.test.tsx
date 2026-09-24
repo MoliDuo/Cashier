@@ -68,7 +68,6 @@ describe("source document mutation toast ownership", () => {
     const { result } = renderHook(
       () =>
         useBatchSourceDocumentActions(
-          "ledger-1",
           clearSelection,
           undefined,
           new Map([
@@ -118,13 +117,7 @@ describe("source document mutation toast ownership", () => {
     });
     const clearSelection = vi.fn();
     const { result } = renderHook(
-      () =>
-        useBatchSourceDocumentActions(
-          "ledger-1",
-          clearSelection,
-          undefined,
-          new Map([["document-1", 1]])
-        ),
+      () => useBatchSourceDocumentActions(clearSelection, undefined, new Map([["document-1", 1]])),
       { wrapper: createWrapper(queryClient) }
     );
 
@@ -162,8 +155,7 @@ describe("source document mutation toast ownership", () => {
       data: { sourceDocumentId: "document-1", deleted: true },
     });
     const { result } = renderHook(
-      () =>
-        useBatchSourceDocumentActions("ledger-1", vi.fn(), undefined, new Map([["document-1", 1]])),
+      () => useBatchSourceDocumentActions(vi.fn(), undefined, new Map([["document-1", 1]])),
       { wrapper: createWrapper(queryClient) }
     );
 
@@ -186,13 +178,7 @@ describe("source document mutation toast ownership", () => {
     });
     const clearSelection = vi.fn();
     const { result } = renderHook(
-      () =>
-        useBatchSourceDocumentActions(
-          "ledger-1",
-          clearSelection,
-          undefined,
-          new Map([["document-1", 1]])
-        ),
+      () => useBatchSourceDocumentActions(clearSelection, undefined, new Map([["document-1", 1]])),
       { wrapper: createWrapper() }
     );
 

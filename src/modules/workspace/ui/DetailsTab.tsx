@@ -17,7 +17,6 @@ import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-na
 interface DetailsTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
-  ledgerId: string;
   categories: EntryCategory[];
   ledger?: Ledger;
   periodParams: PeriodParams;
@@ -34,7 +33,6 @@ interface DetailsTabProps {
 
 export function DetailsTab({
   bookId,
-  ledgerId,
   categories,
   ledger,
   periodParams,
@@ -43,7 +41,6 @@ export function DetailsTab({
   timeZone,
 }: DetailsTabProps) {
   const data = useDetailsTabData({
-    ledgerId,
     ...(bookId == null ? {} : { bookId }),
     periodParams,
     advancedFilters,
@@ -55,9 +52,7 @@ export function DetailsTab({
     void queryClient.refetchQueries({
       type: "active",
       predicate: ({ queryKey: key }) =>
-        key[0] === "ledger" &&
-        key[1] === ledgerId &&
-        (key[2] === "entries" || key[2] === "summary"),
+        key[0] === "ledger" && (key[1] === "entries" || key[1] === "summary"),
     });
   };
   const { groupedItems } = useDetailsTabGrouping(data.entries, timeZone);
@@ -71,13 +66,7 @@ export function DetailsTab({
       }),
     [advancedFilters, bookId, periodParams]
   );
-  const batch = useDetailsBatchController(
-    ledgerId,
-    data.entries,
-    queryFingerprint,
-    timeZone,
-    categories
-  );
+  const batch = useDetailsBatchController(data.entries, queryFingerprint, timeZone, categories);
   const { filters } = useDetailsTabFilters({
     periodParams,
     advancedFilters,

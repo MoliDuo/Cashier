@@ -51,7 +51,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
 
 async function getTargetLedgerEntriesAction(
   ledgerId: string,
-  input: Parameters<typeof getLedgerEntriesAction>[1]
+  input: Parameters<typeof getLedgerEntriesAction>[0]
 ) {
   const db = getTestDb();
   const documents = await db.query.sourceDocuments.findMany({
@@ -61,7 +61,7 @@ async function getTargetLedgerEntriesAction(
   for (const document of documents) {
     await activateTestSourceDocumentProjection(db, document.id);
   }
-  return getLedgerEntriesAction(ledgerId, input);
+  return getLedgerEntriesAction(input);
 }
 
 describe("getLedgerEntriesAction", () => {

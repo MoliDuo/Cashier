@@ -9,7 +9,6 @@ import type { EntryCategory } from "@/modules/ledger/contracts";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 
 interface UseQuickEntryFormControllerParams {
-  ledgerId: string;
   bookId?: string;
   categories: EntryCategory[];
   mainCurrency: string;
@@ -27,7 +26,6 @@ interface CreateQuickEntryPayload {
 }
 
 export function useQuickEntryFormController({
-  ledgerId,
   bookId,
   categories,
   mainCurrency,
@@ -61,10 +59,10 @@ export function useQuickEntryFormController({
   const mutation = useLedgerMutation<
     Awaited<ReturnType<typeof createQuickEntryAction>>,
     CreateQuickEntryPayload
-  >(ledgerId, {
+  >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    mutationFn: (data: CreateQuickEntryPayload) => createQuickEntryAction(ledgerId, data),
+    mutationFn: (data: CreateQuickEntryPayload) => createQuickEntryAction(data),
     successMessage: null,
     errorMessage: t("quickEntryError"),
     onSuccess: (data, variables) => {

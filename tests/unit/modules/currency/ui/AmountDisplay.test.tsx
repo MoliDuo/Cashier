@@ -19,13 +19,7 @@ function renderAmountDisplay(props: Partial<React.ComponentProps<typeof AmountDi
         },
       }}
     >
-      <AmountDisplay
-        ledgerId="ledger-1"
-        amount="100"
-        currency="CNY"
-        mainCurrency="USD"
-        {...props}
-      />
+      <AmountDisplay amount="100" currency="CNY" mainCurrency="USD" {...props} />
     </NextIntlClientProvider>
   );
 }

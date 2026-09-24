@@ -26,7 +26,6 @@ interface NewRecordDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   isSubmitting: boolean;
-  ledgerId: string;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
   inputMode: NewRecordInputMode;
@@ -52,7 +51,6 @@ export function NewRecordDialog({
   isOpen,
   onOpenChange,
   isSubmitting,
-  ledgerId,
   activeTab,
   committedFilters,
   inputMode,
@@ -173,7 +171,6 @@ export function NewRecordDialog({
               bookId={selectedBookId}
               viewedBookId={scope}
               savedBook={selectedBook}
-              ledgerId={ledgerId}
               activeTab={activeTab}
               committedFilters={committedFilters}
               inputMode={inputMode}

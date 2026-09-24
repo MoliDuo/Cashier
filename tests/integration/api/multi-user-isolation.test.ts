@@ -32,20 +32,12 @@ describe("Multi-User Isolation", () => {
   });
 
   describe("Ledger Actions Isolation", () => {
-    it("refuses a ledger that is not the single live one", async () => {
-      (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user: { id: TEST_USER_ID },
-      });
-
-      await expect(getLedgerAction(otherLedger)).resolves.toBeNull();
-    });
-
     it("allows the live ledger", async () => {
       (auth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         user: { id: TEST_USER_ID },
       });
 
-      const result = await getLedgerAction(liveLedger);
+      const result = await getLedgerAction();
       expect(result).not.toBeNull();
       expect(result!.id).toBe(liveLedger);
     });
@@ -59,7 +51,7 @@ describe("Multi-User Isolation", () => {
         where: eq(ledgers.id, otherLedger),
       });
       await expect(
-        updateLedgerSettingsAction(otherLedger, {
+        updateLedgerSettingsAction({
           expectedUpdatedAt: row!.updatedAt.toISOString(),
           settings: { collapseEntriesDefault: true },
         })

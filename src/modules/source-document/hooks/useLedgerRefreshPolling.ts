@@ -9,34 +9,25 @@ import { applyStreamRefreshToCache } from "./stream-refresh-cache";
 const REFRESH_INTERVAL_MS = 3_000;
 const REFRESH_STALE_TIME_MS = 3_000;
 const MAX_ERROR_INTERVAL_MS = 30_000;
-const consecutiveFailures = new WeakMap<object, Map<string, number>>();
+const consecutiveFailures = new WeakMap<object, number>();
 
-function failureMap(queryClient: object) {
-  const existing = consecutiveFailures.get(queryClient);
-  if (existing != null) return existing;
-  const created = new Map<string, number>();
-  consecutiveFailures.set(queryClient, created);
-  return created;
-}
-
-export function useLedgerRefreshPolling(ledgerId: string, enabled = true) {
+export function useLedgerRefreshPolling(enabled = true) {
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.sourceDocumentRefresh(ledgerId);
+  const queryKey = queryKeys.sourceDocumentRefresh();
 
   return useQuery({
     queryKey,
     queryFn: async (): Promise<LedgerRefreshResult> => {
       try {
         const previous = queryClient.getQueryData<LedgerRefreshResult>(queryKey);
-        const result = await getStreamRefreshAction(ledgerId, {
+        const result = await getStreamRefreshAction({
           afterVersion: previous?.version ?? "0",
         });
-        await applyStreamRefreshToCache(queryClient, ledgerId, result);
-        failureMap(queryClient).delete(ledgerId);
+        await applyStreamRefreshToCache(queryClient, result);
+        consecutiveFailures.delete(queryClient);
         return result;
       } catch (error) {
-        const failures = failureMap(queryClient);
-        failures.set(ledgerId, (failures.get(ledgerId) ?? 0) + 1);
+        consecutiveFailures.set(queryClient, (consecutiveFailures.get(queryClient) ?? 0) + 1);
         throw error;
       }
     },
@@ -47,7 +38,7 @@ export function useLedgerRefreshPolling(ledgerId: string, enabled = true) {
       if (query.state.status === "error") {
         const failureCount = Math.max(
           query.state.fetchFailureCount,
-          failureMap(queryClient).get(ledgerId) ?? 0
+          consecutiveFailures.get(queryClient) ?? 0
         );
         return Math.min(
           REFRESH_INTERVAL_MS * 2 ** Math.max(failureCount - 1, 0),

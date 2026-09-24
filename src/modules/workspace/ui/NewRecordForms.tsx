@@ -62,7 +62,6 @@ interface NewRecordFormsProps {
   viewedBookId: string | null;
   /** The book the record goes into, when it is resolvable in the live list. */
   savedBook: { id: string; name: string } | null;
-  ledgerId: string;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
   inputMode: NewRecordInputMode;
@@ -84,7 +83,6 @@ export function NewRecordForms({
   bookId,
   viewedBookId,
   savedBook,
-  ledgerId,
   activeTab,
   committedFilters,
   inputMode,
@@ -112,7 +110,6 @@ export function NewRecordForms({
 
       showNewRecordSuccessFeedback({
         mode,
-        ledgerId,
         result,
         activeTab,
         committedFilters,
@@ -141,7 +138,6 @@ export function NewRecordForms({
       activeTab,
       aiDirty,
       committedFilters,
-      ledgerId,
       quickDirty,
       savedBook,
       setInputMode,
@@ -157,8 +153,7 @@ export function NewRecordForms({
       <div className={inputMode === "ai" ? undefined : "hidden"} aria-hidden={inputMode !== "ai"}>
         <SourceDocumentInput
           bookId={bookId}
-          key={ledgerId}
-          ledgerId={ledgerId}
+
           isActive={inputMode === "ai"}
           onPendingChange={setAiPending}
           onDirtyChange={setAiDirty}
@@ -172,8 +167,7 @@ export function NewRecordForms({
       >
         <QuickEntryForm
           bookId={bookId}
-          key={ledgerId}
-          ledgerId={ledgerId}
+
           categories={categories}
           mainCurrency={mainCurrency}
           preferredCurrencies={preferredCurrencies}

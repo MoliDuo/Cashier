@@ -6,14 +6,12 @@ import { useLedgerSettingsMutation } from "./useLedgerSettingsMutation";
 import { useLedgerSettingsQueries } from "./useLedgerSettingsQueries";
 
 interface UseLedgerSettingsParams {
-  ledgerId: string;
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
   metadataPollingSession: number;
 }
 
 export function useLedgerSettings({
-  ledgerId,
   ledger: initialLedger,
   initialCategories,
   metadataPollingSession,
@@ -21,14 +19,12 @@ export function useLedgerSettings({
   const t = useTranslations("Settings");
   const { ledger, categories, uncategorizedCount, credentials, settingsQueryStatus } =
     useLedgerSettingsQueries({
-      ledgerId,
       initialLedger,
       initialCategories,
       metadataPollingSession,
     });
 
   const updateLedgerMutation = useLedgerSettingsMutation({
-    ledgerId,
     expectedUpdatedAt: ledger?.updatedAt ?? initialLedger.updatedAt,
     successMessage: t("updateSuccess"),
     errorMessage: t("updateFailed"),

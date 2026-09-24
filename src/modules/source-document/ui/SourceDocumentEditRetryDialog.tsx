@@ -16,7 +16,6 @@ import {
 } from "./source-document-retry-seed";
 
 interface SourceDocumentEditRetryDialogProps {
-  ledgerId: string;
   sourceDocument: RetrySeedSourceDocument;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,13 +24,10 @@ interface SourceDocumentEditRetryDialogProps {
 }
 
 export function SourceDocumentEditRetryDialog(props: SourceDocumentEditRetryDialogProps) {
-  return props.open ? (
-    <EditRetryDialogContent key={`${props.ledgerId}:${props.sourceDocument.id}`} {...props} />
-  ) : null;
+  return props.open ? <EditRetryDialogContent key={props.sourceDocument.id} {...props} /> : null;
 }
 
 function EditRetryDialogContent({
-  ledgerId,
   sourceDocument: sourceDocumentProp,
   open,
   onOpenChange,
@@ -75,9 +71,9 @@ function EditRetryDialogContent({
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: queryKeys.sourceDocumentInput(ledgerId, sourceDocument.id),
+    queryKey: queryKeys.sourceDocumentInput(sourceDocument.id),
     queryFn: async () => {
-      const result = await getSourceDocumentInputAction(ledgerId, sourceDocument.id);
+      const result = await getSourceDocumentInputAction(sourceDocument.id);
       if (result == null) return null;
       return result;
     },
@@ -140,7 +136,6 @@ function EditRetryDialogContent({
           ) : (
             <div className="relative">
               <SourceDocumentInput
-                ledgerId={ledgerId}
                 mode="retry"
                 sourceDocumentId={sourceDocument.id}
                 sourceDocumentVersion={sourceDocument.version}

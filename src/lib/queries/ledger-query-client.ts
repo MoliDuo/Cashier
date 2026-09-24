@@ -3,15 +3,12 @@ import { AppError } from "@/lib/errors";
 type QueryActions = {
   detail: typeof import("@/modules/source-document/server/get-document-detail").getSourceDocumentDetailAction;
   stream: (
-    ledgerId: string,
     input: import("@/modules/source-document/application/queries/list-stream-page").ListStreamPageInput
   ) => Promise<import("@/modules/source-document/contracts").StreamPage>;
   total: (
-    ledgerId: string,
     input: import("@/modules/source-document/application/queries/get-stream-total").GetStreamTotalInput
   ) => Promise<import("@/modules/source-document/contracts").StreamTotalDto>;
   refresh: (
-    ledgerId: string,
     input: import("@/modules/source-document/contract-refresh").LedgerRefreshRequest
   ) => Promise<import("@/modules/source-document/contract-refresh").LedgerRefreshResult>;
   /**
@@ -19,23 +16,16 @@ type QueryActions = {
    * both takes it untyped and the browser is the side that declares its shape.
    */
   entries: (
-    ledgerId: string,
     input: import("@/modules/ledger/contract-schemas").ListLedgerEntriesInput
   ) => Promise<import("@/modules/ledger/contracts").LedgerEntryPageDto>;
   summary: (
-    ledgerId: string,
     input: import("@/modules/ledger/contract-schemas").LedgerStatsQueryInput
   ) => Promise<import("@/modules/ledger/contracts").LedgerSummaryDto>;
   ledger: typeof import("@/modules/ledger/server/get-ledger").getLedgerAction;
   /** The three book reads the switcher, 设置 and the detail page use. */
-  books: (ledgerId: string) => Promise<import("@/modules/ledger/contracts").BookDto[]>;
-  "books-including-archived": (
-    ledgerId: string
-  ) => Promise<import("@/modules/ledger/contracts").BookDto[]>;
-  book: (
-    ledgerId: string,
-    bookId: string
-  ) => Promise<import("@/modules/ledger/contracts").BookDto | null>;
+  books: () => Promise<import("@/modules/ledger/contracts").BookDto[]>;
+  "books-including-archived": () => Promise<import("@/modules/ledger/contracts").BookDto[]>;
+  book: (bookId: string) => Promise<import("@/modules/ledger/contracts").BookDto | null>;
   categories: typeof import("@/modules/ledger/server/list-categories").getEntryCategoriesAction;
   settings: typeof import("@/modules/ledger/server/get-ledger-settings").getLedgerSettingsAction;
   stats: typeof import("@/modules/stats/server/get-enhanced-stats").getEnhancedStats;

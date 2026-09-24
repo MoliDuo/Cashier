@@ -94,7 +94,7 @@ function renderShell(queryKey: string[], queryFn: () => Promise<string>) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ActiveShell ledgerId="ledger-1">
+      <ActiveShell>
         <TabContent queryKey={queryKey} queryFn={queryFn} />
       </ActiveShell>
     </QueryClientProvider>
@@ -116,7 +116,7 @@ describe("ActiveShell tab refresh", () => {
   it("refetches the tab the reader is already on rather than navigating to it", async () => {
     const user = userEvent.setup();
     const stream = vi.fn().mockResolvedValue("stream");
-    renderShell(["ledger", "ledger-1", "source-documents", "stream"], stream);
+    renderShell(["ledger", "source-documents", "stream"], stream);
     await waitFor(() => expect(destination("stream")).toBeEnabled());
 
     await user.click(destination("stream"));
@@ -128,7 +128,7 @@ describe("ActiveShell tab refresh", () => {
   it("still navigates when the destination is another tab", async () => {
     const user = userEvent.setup();
     const stream = vi.fn().mockResolvedValue("stream");
-    renderShell(["ledger", "ledger-1", "source-documents", "stream"], stream);
+    renderShell(["ledger", "source-documents", "stream"], stream);
     await waitFor(() => expect(destination("stats")).toBeEnabled());
 
     await user.click(destination("stats"));
@@ -142,7 +142,7 @@ describe("ActiveShell tab refresh", () => {
     activeTabState.current = "settings";
     dirtyState.current = true;
     const settings = vi.fn().mockResolvedValue("settings");
-    renderShell(["ledger", "ledger-1", "settings"], settings);
+    renderShell(["ledger", "settings"], settings);
     await waitFor(() => expect(destination("settings")).toBeEnabled());
 
     await user.click(destination("settings"));
@@ -154,7 +154,7 @@ describe("ActiveShell tab refresh", () => {
   it("reports a refresh that failed, so a stale tab is not read as a fresh one", async () => {
     const user = userEvent.setup();
     const stream = vi.fn().mockResolvedValueOnce("stream").mockRejectedValue(new Error("offline"));
-    renderShell(["ledger", "ledger-1", "source-documents", "stream"], stream);
+    renderShell(["ledger", "source-documents", "stream"], stream);
     await waitFor(() => expect(destination("stream")).toBeEnabled());
 
     await user.click(destination("stream"));

@@ -15,7 +15,6 @@ import { queryKeys } from "@/lib/query-keys";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 
 interface CategoryAssignmentResultDialogProps {
-  ledgerId: string;
   job: CategoryReclassificationJob;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,7 +23,6 @@ interface CategoryAssignmentResultDialogProps {
 }
 
 export function CategoryAssignmentResultDialog({
-  ledgerId,
   job,
   open,
   onOpenChange,
@@ -78,9 +76,9 @@ export function CategoryAssignmentResultDialog({
     }
   };
   const results = useInfiniteQuery({
-    queryKey: queryKeys.categoryAssignmentResults(ledgerId, job.id),
+    queryKey: queryKeys.categoryAssignmentResults(job.id),
     queryFn: ({ pageParam }) =>
-      getCategoryAssignmentResultsAction(ledgerId, {
+      getCategoryAssignmentResultsAction({
         jobId: job.id,
         ...(pageParam == null ? {} : { cursor: pageParam }),
         limit: 50,

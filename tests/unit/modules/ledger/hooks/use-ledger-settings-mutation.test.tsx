@@ -32,7 +32,6 @@ function setup() {
   const hook = renderHook(
     () =>
       useLedgerSettingsMutation({
-        ledgerId: "ledger-1",
         expectedUpdatedAt: ledger.updatedAt,
         successMessage: "saved",
         errorMessage: "failed",
@@ -49,7 +48,7 @@ describe("useLedgerSettingsMutation", () => {
 
     await act(async () => result.current.mutateAsync({ collapseEntriesDefault: true }));
 
-    expect(updateLedgerSettingsAction).toHaveBeenCalledWith("ledger-1", {
+    expect(updateLedgerSettingsAction).toHaveBeenCalledWith({
       expectedUpdatedAt: ledger.updatedAt,
       settings: { collapseEntriesDefault: true },
     });
@@ -61,7 +60,7 @@ describe("useLedgerSettingsMutation", () => {
 
     await act(async () => result.current.mutateAsync({ currencies: ["USD", "CNY"] }));
 
-    expect(updateLedgerSettingsAction).toHaveBeenCalledWith("ledger-1", {
+    expect(updateLedgerSettingsAction).toHaveBeenCalledWith({
       expectedUpdatedAt: ledger.updatedAt,
       settings: { currencies: ["USD", "CNY"] },
     });

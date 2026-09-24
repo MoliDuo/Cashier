@@ -58,7 +58,7 @@ function renderBookSettings(props: { initialBooks?: readonly BookDto[] } = {}) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  const view = render(<BookSettings ledgerId={LEDGER_ID} {...props} />, { wrapper });
+  const view = render(<BookSettings {...props} />, { wrapper });
   return { ...view, queryClient };
 }
 
@@ -76,7 +76,7 @@ describe("设置 book list data range", () => {
     // the retired book hidden for the whole stale window.
     expect(await screen.findByText(ARCHIVED.name)).toBeInTheDocument();
     expect(screen.getByText(LIVE.name)).toBeInTheDocument();
-    expect(getBooksIncludingArchivedAction).toHaveBeenCalledWith(LEDGER_ID);
+    expect(getBooksIncludingArchivedAction).toHaveBeenCalledWith();
     expect(getBooksAction).not.toHaveBeenCalled();
   });
 
@@ -169,7 +169,7 @@ describe("设置 book list data range", () => {
     getBooksIncludingArchivedAction.mockRejectedValue(new Error("offline"));
     await act(async () => {
       await queryClient.refetchQueries({
-        queryKey: queryKeys.booksIncludingArchived(LEDGER_ID),
+        queryKey: queryKeys.booksIncludingArchived(),
       });
     });
 

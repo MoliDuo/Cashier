@@ -21,12 +21,10 @@ describe("single live ledger access", () => {
     const db = getTestDb();
     const { userId, ledgerId } = await createTestUserWithLedger(db);
 
-    expect(await serverComposition.ledgers.getSharedForMember(userId)).not.toBeNull();
-    expect(await serverComposition.ledgers.canAccess(ledgerId, userId)).toBe(true);
+    expect(await serverComposition.ledgers.getLiveLedger(userId)).toMatchObject({ id: ledgerId });
 
     await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, userId));
-    expect(await serverComposition.ledgers.getSharedForMember(userId)).toBeNull();
-    expect(await serverComposition.ledgers.canAccess(ledgerId, userId)).toBe(false);
+    expect(await serverComposition.ledgers.getLiveLedger(userId)).toBeNull();
   });
 
   it("fails closed when no ledger is live, and when more than one is", async () => {
@@ -38,14 +36,13 @@ describe("single live ledger access", () => {
 
     // Two live ledgers make "the single ledger" ambiguous: resolution closes
     // rather than picking one. 0048's guard refuses this state as well.
-    expect(await serverComposition.ledgers.getSharedForMember(userId)).toBeNull();
+    expect(await serverComposition.ledgers.getLiveLedger(userId)).toBeNull();
 
     await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, secondLedgerId));
-    expect(await serverComposition.ledgers.getSharedForMember(userId)).not.toBeNull();
-    expect(await serverComposition.ledgers.canAccess(ledgerId, userId)).toBe(true);
+    expect(await serverComposition.ledgers.getLiveLedger(userId)).toMatchObject({ id: ledgerId });
 
     await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, ledgerId));
-    expect(await serverComposition.ledgers.getSharedForMember(userId)).toBeNull();
+    expect(await serverComposition.ledgers.getLiveLedger(userId)).toBeNull();
   });
 
   it("scopes file reads to the live ledger and a live account", async () => {
@@ -65,7 +62,7 @@ describe("single live ledger access", () => {
   it("never provisions a personal ledger for an account without one", async () => {
     const db = getTestDb();
     const userId = await createTestUser(db, undefined, crypto.randomUUID());
-    expect(await serverComposition.ledgers.getSharedForMember(userId)).toBeNull();
+    expect(await serverComposition.ledgers.getLiveLedger(userId)).toBeNull();
     expect(await db.query.ledgers.findFirst({ where: eq(ledgers.userId, userId) })).toBeUndefined();
   });
 });

@@ -91,7 +91,7 @@ describe("ActiveShell tab-hover prefetch", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const shell = (
       <QueryClientProvider client={queryClient}>
-        <ActiveShell ledgerId="ledger-1">
+        <ActiveShell>
           <div />
         </ActiveShell>
       </QueryClientProvider>
@@ -110,7 +110,7 @@ describe("ActiveShell tab-hover prefetch", () => {
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <ActiveShell ledgerId="ledger-1">
+        <ActiveShell>
           <div />
         </ActiveShell>
       </QueryClientProvider>
@@ -119,7 +119,7 @@ describe("ActiveShell tab-hover prefetch", () => {
     onTabIntentRef.current?.("stats");
 
     await waitFor(() => expect(prefetchStatsTabQueryMock).toHaveBeenCalled());
-    expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[2]).toBe(BOOK_ID);
+    expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[1]).toBe(BOOK_ID);
   });
 
   it("prefetches 总账 with no book when the store holds none", async () => {
@@ -128,6 +128,6 @@ describe("ActiveShell tab-hover prefetch", () => {
     onTabIntentRef.current?.("stats");
 
     await waitFor(() => expect(prefetchStatsTabQueryMock).toHaveBeenCalled());
-    expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[2]).toBeUndefined();
+    expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[1]).toBeUndefined();
   });
 });

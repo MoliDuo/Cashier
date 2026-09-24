@@ -44,7 +44,6 @@ interface SourceDocumentDetailModalProps {
   onAssignBook?: (bookId: string) => void;
   isAssigningBook?: boolean;
   sourceDocumentId?: string;
-  ledgerId: string;
   sourceDocument: SourceDocument | null;
   isLoading?: boolean;
   loadError?: boolean;
@@ -95,7 +94,6 @@ function SourceDocumentDetailEditor({
   archivedBookLabel,
   onAssignBook,
   isAssigningBook,
-  ledgerId,
   sourceDocument,
   isLoading = false,
   loadError = false,
@@ -139,7 +137,6 @@ function SourceDocumentDetailEditor({
     setDateDraftDirty(false);
   }, []);
   const { editor, selection, status, dialogs, actions } = useSourceDocumentDetailController({
-    ledgerId,
     sourceDocument,
     ledgerEntries,
     open,
@@ -375,7 +372,6 @@ function SourceDocumentDetailEditor({
         />
       </Dialog>
       <SourceDocumentDetailOverlays
-        ledgerId={ledgerId}
         sourceDocument={sourceDocument}
         showRetryDialog={dialogs.showRetryDialog}
         setShowRetryDialog={dialogs.setShowRetryDialog}

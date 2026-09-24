@@ -85,7 +85,6 @@ describe("QuickEntryForm", () => {
   it("renders currency selector with main currency first", () => {
     const { container } = render(
       <QuickEntryForm
-        ledgerId="ledger-1"
         categories={[createCategory()]}
         mainCurrency="MYR"
         preferredCurrencies={["USD", "CNY"]}
@@ -138,7 +137,7 @@ describe("QuickEntryForm", () => {
       setAmount,
     });
 
-    render(<QuickEntryForm ledgerId="ledger-1" categories={[createCategory()]} />);
+    render(<QuickEntryForm categories={[createCategory()]} />);
     const amountInput = screen.getByRole("textbox", { name: "金额" });
 
     fireEvent.change(amountInput, { target: { value: "12.34" } });
@@ -158,11 +157,7 @@ describe("QuickEntryForm", () => {
     });
 
     const { unmount } = render(
-      <QuickEntryForm
-        ledgerId="ledger-1"
-        categories={[createCategory()]}
-        onPendingChange={onPendingChange}
-      />
+      <QuickEntryForm categories={[createCategory()]} onPendingChange={onPendingChange} />
     );
 
     expect(onPendingChange).toHaveBeenCalledWith(true);
@@ -187,7 +182,7 @@ describe("QuickEntryForm", () => {
       handleSubmit,
     });
 
-    render(<QuickEntryForm ledgerId="ledger-1" categories={[createCategory()]} />);
+    render(<QuickEntryForm categories={[createCategory()]} />);
     await user.type(screen.getByRole("textbox", { name: "名称（可选）" }), "Lunch{enter}");
 
     expect(handleSubmit).toHaveBeenCalledTimes(1);

@@ -6,6 +6,6 @@ import { serverComposition } from "@/application/server-composition-root";
 
 export async function getEnhancedStats(input: GetEnhancedStatsInput): Promise<EnhancedStatsDto> {
   const validatedInput = parseEnhancedStatsInput(input);
-  await requireLedgerAccess(validatedInput.ledgerId);
-  return getEnhancedStatsQuery(validatedInput, serverComposition.stats);
+  const { ledger } = await requireLedgerAccess();
+  return getEnhancedStatsQuery(ledger.id, validatedInput, serverComposition.stats);
 }

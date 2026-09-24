@@ -5,18 +5,12 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 
 const TAB_SCROLL_RESTORE_TOLERANCE = 1;
 
-export function useTabScrollRestoration(ledgerId: string, activeTab: LedgerTab): void {
+export function useTabScrollRestoration(activeTab: LedgerTab): void {
   const positionsRef = useRef(new Map<string, number>());
-  const ledgerIdRef = useRef(ledgerId);
 
   useLayoutEffect(() => {
     const positions = positionsRef.current;
-    if (ledgerIdRef.current !== ledgerId) {
-      positions.clear();
-      ledgerIdRef.current = ledgerId;
-    }
-
-    const key = `${ledgerId}:${activeTab}`;
+    const key = activeTab;
     const target = positions.get(key) ?? 0;
     const root = document.documentElement;
     const previousScrollBehavior = root.style.scrollBehavior;
@@ -67,5 +61,5 @@ export function useTabScrollRestoration(ledgerId: string, activeTab: LedgerTab):
       if (frame != null) window.cancelAnimationFrame(frame);
       root.style.scrollBehavior = previousScrollBehavior;
     };
-  }, [activeTab, ledgerId]);
+  }, [activeTab]);
 }

@@ -13,7 +13,6 @@ const dateRangeSchema = z
   });
 
 const getEnhancedStatsInputSchema = z.object({
-  ledgerId: z.string().regex(UUID_REGEX, "Invalid ledgerId"),
   bookId: z.string().regex(UUID_REGEX, "Invalid book").optional(),
   queryRange: dateRangeSchema,
   compareRange: dateRangeSchema,

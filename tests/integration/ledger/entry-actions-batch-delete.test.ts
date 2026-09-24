@@ -86,7 +86,6 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .from(sourceDocumentRevisions)
       .where(eq(sourceDocumentRevisions.sourceDocumentId, doc.id));
     const result = await batchDeleteLedgerEntriesAction(
-      ledgerId,
       [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
       entries.slice(0, 2).map((entry) => entry.id)
     );
@@ -146,7 +145,6 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .returning();
 
     const result = await batchDeleteLedgerEntriesAction(
-      ledgerId,
       [{ sourceDocumentId: doc!.id, expectedVersion: 1 }],
       entries.map((entry) => entry.id)
     );
@@ -183,7 +181,6 @@ describe("batchDeleteLedgerEntriesAction", () => {
     const foreignEntryId = randomUUID();
 
     const result = await batchDeleteLedgerEntriesAction(
-      ledgerId,
       [
         { sourceDocumentId: okDoc.id, expectedVersion: 1 },
         { sourceDocumentId: badDoc.id, expectedVersion: 1 },
@@ -254,7 +251,6 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .returning();
 
     const result = await batchDeleteLedgerEntriesAction(
-      ledgerId,
       [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
       [...entries.map((entry) => entry.id), inactiveEntry!.id]
     );

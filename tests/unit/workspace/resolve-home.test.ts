@@ -4,14 +4,14 @@ import { resolveHome } from "@/modules/workspace/application/use-cases/resolve-h
 describe("resolveHome", () => {
   it("returns the common ledger", async () => {
     const shared = { id: "ledger-1", settings: {}, createdAt: "", updatedAt: "" };
-    const getSharedForMember = vi.fn().mockResolvedValue(shared);
-    await expect(resolveHome("member-1", { getSharedForMember })).resolves.toBe(shared);
-    expect(getSharedForMember).toHaveBeenCalledWith("member-1");
+    const getLiveLedger = vi.fn().mockResolvedValue(shared);
+    await expect(resolveHome("member-1", { getLiveLedger })).resolves.toBe(shared);
+    expect(getLiveLedger).toHaveBeenCalledWith("member-1");
   });
 
   it("denies access if the shared ledger is unavailable", async () => {
-    const getSharedForMember = vi.fn().mockResolvedValue(null);
-    await expect(resolveHome("outsider", { getSharedForMember })).rejects.toThrow(
+    const getLiveLedger = vi.fn().mockResolvedValue(null);
+    await expect(resolveHome("outsider", { getLiveLedger })).rejects.toThrow(
       "Shared ledger is unavailable"
     );
   });

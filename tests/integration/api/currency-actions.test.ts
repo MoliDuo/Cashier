@@ -26,7 +26,7 @@ describe("currency action composition", () => {
   });
 
   it("converts with the persisted historical rate", async () => {
-    const result = await convertCurrencyAction(LEDGER_ID, "100", "CNY", "USD", "2026-02-04");
+    const result = await convertCurrencyAction("100", "CNY", "USD", "2026-02-04");
 
     expect(Number.parseFloat(result.converted)).toBeCloseTo(14.67, 1);
   });

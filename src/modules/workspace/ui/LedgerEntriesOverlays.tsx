@@ -24,7 +24,6 @@ interface LedgerEntriesOverlaysProps {
   deleteLabel: string;
   retrySourceDocument: SourceDocumentListItemDto | null;
   onRetryDialogOpenChange: (open: boolean) => void;
-  ledgerId: string;
 }
 
 export function LedgerEntriesOverlays({
@@ -34,7 +33,6 @@ export function LedgerEntriesOverlays({
   deleteLabel,
   retrySourceDocument,
   onRetryDialogOpenChange,
-  ledgerId,
 }: LedgerEntriesOverlaysProps) {
   return (
     <>
@@ -53,7 +51,6 @@ export function LedgerEntriesOverlays({
           sourceDocument={retrySourceDocument}
           open={true}
           onOpenChange={onRetryDialogOpenChange}
-          ledgerId={ledgerId}
         />
       )}
     </>

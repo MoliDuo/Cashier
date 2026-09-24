@@ -7,7 +7,7 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import { findSingleLiveLedgerId, postgresLedgerAdapter } from "./business-ports/ledger";
+import { postgresLedgerAdapter } from "./business-ports/ledger";
 
 type AuthorizedStoredFileRecord = typeof storedFiles.$inferSelect;
 
@@ -60,8 +60,8 @@ export const postgresAuthorizedFileRepository: AuthorizedFileRepository = {
     return rows[0]?.file ?? null;
   },
   async findForUser(userId, fileId) {
-    const ledgerId = await findSingleLiveLedgerId();
-    if (ledgerId == null || !(await postgresLedgerAdapter.canAccess(ledgerId, userId))) return null;
+    const ledgerId = (await postgresLedgerAdapter.getLiveLedger(userId))?.id;
+    if (ledgerId == null) return null;
     const rows = await authorizedFileQuery()
       .where(
         and(

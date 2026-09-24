@@ -172,8 +172,8 @@ describe("target upper workflows", () => {
       endDate: "2026-07-15",
     });
     const enhanced = await getEnhancedStatsQuery(
+      ledgerId,
       {
-        ledgerId,
         queryRange: { from: "2026-07-15", to: "2026-07-15" },
         compareRange: { from: "2026-07-14", to: "2026-07-14" },
       },

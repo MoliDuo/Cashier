@@ -37,7 +37,6 @@ interface DetailsQueryDescriptor {
 }
 
 export function buildDetailsQueryDescriptor(input: {
-  ledgerId: string;
   bookId?: string;
   periodParams: PeriodParams;
   advancedFilters?: LedgerAdvancedFilters | undefined;
@@ -60,14 +59,14 @@ export function buildDetailsQueryDescriptor(input: {
     startDateStr: state.startDateStr,
     endDateStr: state.endDateStr,
     filterKey,
-    summaryQueryKey: queryKeys.summary(input.ledgerId, {
+    summaryQueryKey: queryKeys.summary({
       bookId: input.bookId,
       startDate: state.startDateStr,
       endDate: state.endDateStr,
       currency: input.mainCurrency,
       filter: filterKey,
     }),
-    entriesQueryKey: queryKeys.ledgerEntries(input.ledgerId, {
+    entriesQueryKey: queryKeys.ledgerEntries({
       bookId: input.bookId,
       mode: "infinite",
       startDate: state.startDateStr,

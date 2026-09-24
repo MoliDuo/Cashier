@@ -6,8 +6,8 @@ import type {
 } from "./source-documents";
 
 export interface LedgerPort {
-  canAccess(ledgerId: LedgerId, userId: string): Promise<boolean>;
-  getSharedForMember(userId: string): Promise<LedgerContract | null>;
+  /** The single live ledger, or null when the account is gone or the ledger is ambiguous. */
+  getLiveLedger(userId: string): Promise<LedgerContract | null>;
 }
 
 /**
@@ -127,7 +127,6 @@ export interface SettingsPort {
   get(ledgerId: LedgerId): Promise<LedgerSettingsContract | null>;
   updateWithCurrencyRecalculation(input: {
     ledgerId: LedgerId;
-    userId: string;
     expectedUpdatedAt: string;
     settings: Partial<LedgerSettingsContract>;
   }): Promise<LedgerContract | null>;
@@ -140,8 +139,7 @@ export interface SettingsPort {
    * conversion before.
    */
   getRequiredExchangeRateDates(
-    ledgerId: LedgerId,
-    userId: string
+    ledgerId: LedgerId
   ): Promise<{ currentMainCurrency: string; dates: string[] } | null>;
 }
 

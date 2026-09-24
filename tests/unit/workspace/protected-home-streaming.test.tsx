@@ -139,7 +139,6 @@ describe("protected home streaming boundary", () => {
     expect(scheduleProcessingRecoveryAfterMock).toHaveBeenCalledWith("ledger-1");
     expect(getLedgerPageBootstrapMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        ledgerId: "ledger-1",
         initialTab: "stream",
         ledgerDto: expect.objectContaining({ id: "ledger-1" }),
       }),

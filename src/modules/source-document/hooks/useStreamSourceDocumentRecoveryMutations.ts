@@ -14,7 +14,7 @@ export interface StreamRecoveryVariables {
 
 type RecoveryAction = (variables: StreamRecoveryVariables) => Promise<unknown>;
 
-export function useStreamSourceDocumentRecoveryMutations(ledgerId: string) {
+export function useStreamSourceDocumentRecoveryMutations() {
   const tActions = useTranslations("SourceDocumentAction");
   const locksRef = useRef(new Set<string>());
   const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -36,20 +36,20 @@ export function useStreamSourceDocumentRecoveryMutations(ledgerId: string) {
     []
   );
 
-  const retryMutation = useLedgerMutation<unknown, StreamRecoveryVariables>(ledgerId, {
+  const retryMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
     invalidates: ["documents", "stats"],
     mutationFn: async ({ sourceDocumentId, expectedVersion }) =>
       unwrapVersionedCommandResult(
-        await retrySourceDocumentAction(ledgerId, sourceDocumentId, expectedVersion)
+        await retrySourceDocumentAction(sourceDocumentId, expectedVersion)
       ),
     successMessage: tActions("retrySuccess"),
     errorMessage: tActions("retryError"),
   });
-  const cancelMutation = useLedgerMutation<unknown, StreamRecoveryVariables>(ledgerId, {
+  const cancelMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
     invalidates: ["documents", "stats"],
     mutationFn: async ({ sourceDocumentId, expectedVersion }) =>
       unwrapVersionedCommandResult(
-        await cancelSourceDocumentProcessingAction(ledgerId, sourceDocumentId, expectedVersion)
+        await cancelSourceDocumentProcessingAction(sourceDocumentId, expectedVersion)
       ),
     successMessage: tActions("cancelSuccess"),
     errorMessage: tActions("cancelError"),

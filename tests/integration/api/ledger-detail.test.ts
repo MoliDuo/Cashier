@@ -5,6 +5,7 @@ import { getTestDb } from "../../setup";
 import { currencyRates, ledgers } from "@/persistence";
 import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
 import { eq } from "drizzle-orm";
+import { NotFoundError } from "@/lib/errors";
 
 // Helper to clean up and create test ledger for current user
 async function setupTestLedger(db: ReturnType<typeof getTestDb>) {
@@ -14,9 +15,8 @@ async function setupTestLedger(db: ReturnType<typeof getTestDb>) {
 }
 
 describe("Ledger Actions", () => {
-  it("should return null for non-existent ledger (Get)", async () => {
-    const result = await getLedgerAction("00000000-0000-4000-8000-000000000000");
-    expect(result).toBeNull();
+  it("rejects when the account has no live ledger (Get)", async () => {
+    await expect(getLedgerAction()).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("should update ledger settings", async () => {
@@ -29,7 +29,7 @@ describe("Ledger Actions", () => {
       rates: { USD: 1, CNY: 8 },
     });
 
-    const result = await updateLedgerSettingsAction(ledgerId, {
+    const result = await updateLedgerSettingsAction({
       expectedUpdatedAt: initial!.updatedAt.toISOString(),
       settings: {
         mainCurrency: "USD",
@@ -45,12 +45,12 @@ describe("Ledger Actions", () => {
     expect(result.ledger.settings.currencies).toEqual(["USD", "CNY"]);
   });
 
-  it("should return a stable conflict for a non-existent ledger (Update)", async () => {
+  it("rejects when the account has no live ledger (Update)", async () => {
     await expect(
-      updateLedgerSettingsAction("00000000-0000-4000-8000-000000000000", {
+      updateLedgerSettingsAction({
         expectedUpdatedAt: new Date().toISOString(),
         settings: { mainCurrency: "USD" },
       })
-    ).resolves.toEqual({ ok: false, code: "conflict" });
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

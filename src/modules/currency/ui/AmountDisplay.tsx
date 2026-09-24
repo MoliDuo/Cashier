@@ -5,7 +5,6 @@ import { useAmountDisplay } from "@/modules/currency/hooks/useAmountDisplay";
 import { AmountText, type AmountVariant } from "./amount-text";
 
 interface AmountDisplayProps {
-  ledgerId: string;
   amount: string;
   currency: string | null | undefined;
   mainCurrency: string;
@@ -17,7 +16,6 @@ interface AmountDisplayProps {
 }
 
 export function AmountDisplay({
-  ledgerId,
   amount,
   currency,
   mainCurrency,
@@ -30,7 +28,6 @@ export function AmountDisplay({
   const locale = useLocale();
   const t = useTranslations("Currency");
   const { displayAmount, isDifferentCurrency, originalCurrency, status } = useAmountDisplay({
-    ledgerId,
     amount,
     currency,
     mainCurrency,

@@ -73,7 +73,7 @@ describe("Stats Currency Conversion", () => {
     });
     await activateTestSourceDocumentProjection(db, sourceDoc.id);
 
-    const stats = await getLedgerStatsAction(ledgerId);
+    const stats = await getLedgerStatsAction({});
 
     expect(stats.convertedTotal?.currency).toBe("CNY");
     expect(stats.convertedTotal?.total).toBeCloseTo(617.11, 1);

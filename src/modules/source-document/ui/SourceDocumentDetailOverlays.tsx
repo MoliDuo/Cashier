@@ -7,7 +7,6 @@ import { AddLedgerEntryDialog } from "./AddLedgerEntryDialog";
 import type { AddEntryData } from "@/modules/source-document/hooks/useSourceDocumentDetailMutations";
 
 interface SourceDocumentDetailOverlaysProps {
-  ledgerId: string;
   sourceDocument: SourceDocument | null;
   showRetryDialog: boolean;
   setShowRetryDialog: (open: boolean) => void;
@@ -34,7 +33,6 @@ interface SourceDocumentDetailOverlaysProps {
 
 /** The retry, split, and add-entry dialogs that overlay the detail modal on demand. */
 export function SourceDocumentDetailOverlays({
-  ledgerId,
   sourceDocument,
   showRetryDialog,
   setShowRetryDialog,
@@ -61,7 +59,6 @@ export function SourceDocumentDetailOverlays({
     <>
       {sourceDocument && (
         <SourceDocumentEditRetryDialog
-          ledgerId={ledgerId}
           sourceDocument={sourceDocument}
           open={showRetryDialog}
           onOpenChange={setShowRetryDialog}

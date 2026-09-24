@@ -28,7 +28,7 @@ describe("session ledger query transport", () => {
     });
   });
 
-  it("returns private scoped detail and refuses an unknown ledger or document", async () => {
+  it("returns private scoped detail and refuses a caller without the live ledger", async () => {
     const db = getTestDb();
     const ledger = createLedgerData({ userId });
     await db.insert(ledgers).values(ledger);
@@ -40,31 +40,26 @@ describe("session ledger query transport", () => {
     });
     await activateTestSourceDocumentProjection(db, document.id);
 
-    const response = await POST(request("detail", [ledger.id, document.id]));
+    const response = await POST(request("detail", [document.id]));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ id: document.id, version: 1 });
 
-    // An id that is not a live ledger, and a document that is not in the live
-    // one: both are 404 rather than a distinguishable "wrong tenant" answer.
-    expect((await POST(request("detail", [crypto.randomUUID(), document.id]))).status).toBe(404);
     // An unknown document inside the live ledger is an empty read, not an
     // error: the detail loader reports "no such record" with a null body.
-    const unknownDocument = await POST(request("detail", [ledger.id, crypto.randomUUID()]));
+    const unknownDocument = await POST(request("detail", [crypto.randomUUID()]));
     expect(unknownDocument.status).toBe(200);
     expect(await unknownDocument.json()).toBeNull();
 
     vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
       user: { id: crypto.randomUUID() },
     });
-    expect((await POST(request("detail", [ledger.id, document.id]))).status).toBe(404);
+    expect((await POST(request("detail", [document.id]))).status).toBe(404);
   });
 
   it("requires a session and validates query envelopes", async () => {
     vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue(null);
-    expect((await POST(request("detail", [crypto.randomUUID(), crypto.randomUUID()]))).status).toBe(
-      401
-    );
+    expect((await POST(request("detail", [crypto.randomUUID()]))).status).toBe(401);
     expect((await POST(request("delete", [crypto.randomUUID()]))).status).toBe(400);
     expect((await POST(request("detail", ["invalid", "invalid"]))).status).toBe(400);
   });
@@ -88,7 +83,7 @@ describe("session ledger query transport", () => {
       "summary",
       "settings",
     ]) {
-      const response = await POST(request(query, [ledger.id, { unexpected: true }]));
+      const response = await POST(request(query, [{ unexpected: true }]));
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: "QUERY_FAILED" });
     }
@@ -101,31 +96,20 @@ describe("session ledger query transport", () => {
     await db.insert(ledgers).values(ledger);
     await ensureTestLedgerBooks(db, ledger.id);
 
-    const ledgerRead = await POST(request("ledger", [ledger.id]));
+    const ledgerRead = await POST(request("ledger", []));
     expect(ledgerRead.status).toBe(200);
     expect(ledgerRead.headers.get("cache-control")).toBe("private, no-store");
     expect(await ledgerRead.json()).toMatchObject({ id: ledger.id });
 
-    const categoriesRead = await POST(request("categories", [ledger.id]));
+    const categoriesRead = await POST(request("categories", []));
     expect(categoriesRead.status).toBe(200);
     expect(categoriesRead.headers.get("cache-control")).toBe("private, no-store");
     expect(await categoriesRead.json()).toEqual([]);
 
-    const settingsRead = await POST(request("settings", [ledger.id]));
+    const settingsRead = await POST(request("settings", []));
     expect(settingsRead.status).toBe(200);
     expect(settingsRead.headers.get("cache-control")).toBe("private, no-store");
     expect(await settingsRead.json()).toEqual({ uncategorizedCount: 0, credentials: [] });
-
-    // A retired ledger is not readable: the two access-checked reads answer
-    // 404, and the ledger read answers the empty body its application query
-    // already returns for a ledger this account does not have live.
-    const retiredLedgerId = crypto.randomUUID();
-    await db.insert(ledgers).values({ id: retiredLedgerId, userId, deletedAt: new Date() });
-    const foreignLedgerRead = await POST(request("ledger", [retiredLedgerId]));
-    expect(foreignLedgerRead.status).toBe(200);
-    expect(await foreignLedgerRead.json()).toBeNull();
-    expect((await POST(request("categories", [retiredLedgerId]))).status).toBe(404);
-    expect((await POST(request("settings", [retiredLedgerId]))).status).toBe(404);
   });
 
   it("serves the books reads over the same scoped transport", async () => {
@@ -137,28 +121,27 @@ describe("session ledger query transport", () => {
     const retiredBookId = books.get("旧账")!;
     await db.execute(sql`UPDATE books SET archived_at = now() WHERE id = ${retiredBookId}`);
 
-    const live = await POST(request("books", [ledger.id]));
+    const live = await POST(request("books", []));
     expect(live.status).toBe(200);
     expect(live.headers.get("cache-control")).toBe("private, no-store");
     expect((await live.json()).map((book: { id: string }) => book.id)).toEqual([liveBookId]);
 
     // The retired book is named on its own and listed beside the live one, but
     // never in the switcher's list.
-    const withArchived = await POST(request("books-including-archived", [ledger.id]));
+    const withArchived = await POST(request("books-including-archived", []));
     expect(withArchived.status).toBe(200);
     expect(withArchived.headers.get("cache-control")).toBe("private, no-store");
     expect((await withArchived.json()).map((book: { id: string }) => book.id).sort()).toEqual(
       [liveBookId, retiredBookId].sort()
     );
 
-    const retired = await POST(request("book", [ledger.id, retiredBookId]));
+    const retired = await POST(request("book", [retiredBookId]));
     expect(retired.status).toBe(200);
     expect(await retired.json()).toMatchObject({ id: retiredBookId, name: "旧账" });
-    expect(await (await POST(request("book", [ledger.id, crypto.randomUUID()]))).json()).toBeNull();
-    expect((await POST(request("book", [ledger.id, "not-a-uuid"]))).status).toBe(400);
+    expect(await (await POST(request("book", [crypto.randomUUID()]))).json()).toBeNull();
+    expect((await POST(request("book", ["not-a-uuid"]))).status).toBe(400);
 
-    // Another account's ledger, and more arguments than a read takes.
-    expect((await POST(request("books", [crypto.randomUUID()]))).status).toBe(404);
-    expect((await POST(request("books", [ledger.id, ledger.id]))).status).toBe(400);
+    // A read that takes no arguments refuses one.
+    expect((await POST(request("books", [ledger.id]))).status).toBe(400);
   });
 });

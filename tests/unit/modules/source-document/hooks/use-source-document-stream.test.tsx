@@ -47,10 +47,9 @@ function useTestSourceDocumentStream(
   } = {}
 ) {
   const { dateRange, minAmount, maxAmount, statuses, search, ...streamOptions } = options;
-  return useSourceDocumentStream(ledgerId, {
+  return useSourceDocumentStream({
     ...streamOptions,
     queryDescriptor: buildStreamQueryDescriptor({
-      ledgerId,
       startDate: dateRange?.start,
       endDate: dateRange?.end,
       minAmount,
@@ -64,7 +63,6 @@ function useTestSourceDocumentStream(
 function makeItem(id: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
-    ledgerId: "ledger-1",
     title: `Doc ${id}`,
     text: null,
     files: [],
@@ -87,25 +85,23 @@ describe("useSourceDocumentStream", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useLedgerRefreshPollingMock.mockReturnValue({ refetch: refreshRefetchMock });
-    listStreamPageActionMock.mockImplementation(
-      (_ledgerId: string, params: { cursor?: string; limit?: number }) => {
-        if (params.cursor == null) {
-          return Promise.resolve({
-            items: [
-              makeItem("doc-1", { entryDate: "2026-07-15" }),
-              makeItem("doc-2", { entryDate: "2026-07-10" }),
-            ],
-            nextCursor: "next-page-cursor",
-            generation: "1",
-          });
-        }
+    listStreamPageActionMock.mockImplementation((params: { cursor?: string; limit?: number }) => {
+      if (params.cursor == null) {
         return Promise.resolve({
-          items: [makeItem("doc-3", { entryDate: "2026-07-05" })],
-          nextCursor: null,
+          items: [
+            makeItem("doc-1", { entryDate: "2026-07-15" }),
+            makeItem("doc-2", { entryDate: "2026-07-10" }),
+          ],
+          nextCursor: "next-page-cursor",
           generation: "1",
         });
       }
-    );
+      return Promise.resolve({
+        items: [makeItem("doc-3", { entryDate: "2026-07-05" })],
+        nextCursor: null,
+        generation: "1",
+      });
+    });
   });
 
   it("does not let a newer stream page consume pending shared invalidations", async () => {
@@ -116,7 +112,7 @@ describe("useSourceDocumentStream", () => {
       hasTransitionalWork: true,
       invalidations: { categories: true, settings: true, stats: true },
     };
-    client.setQueryData(queryKeys.sourceDocumentRefresh("ledger-1"), baseline);
+    client.setQueryData(queryKeys.sourceDocumentRefresh(), baseline);
     listStreamPageActionMock.mockResolvedValueOnce({
       items: [makeItem("new")],
       nextCursor: null,
@@ -127,7 +123,7 @@ describe("useSourceDocumentStream", () => {
       wrapper: createWrapper(client),
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(client.getQueryData(queryKeys.sourceDocumentRefresh("ledger-1"))).toEqual(baseline);
+    expect(client.getQueryData(queryKeys.sourceDocumentRefresh())).toEqual(baseline);
     unmount();
     client.clear();
   });
@@ -138,7 +134,7 @@ describe("useSourceDocumentStream", () => {
     });
 
     await waitFor(() => {
-      expect(useLedgerRefreshPollingMock).toHaveBeenCalledWith("ledger-1", true);
+      expect(useLedgerRefreshPollingMock).toHaveBeenCalledWith(true);
     });
   });
 
@@ -158,7 +154,7 @@ describe("useSourceDocumentStream", () => {
     renderHook(() => useTestSourceDocumentStream("ledger-1"), {
       wrapper: createWrapper(),
     });
-    expect(useLedgerRefreshPollingMock).toHaveBeenLastCalledWith("ledger-1", false);
+    expect(useLedgerRefreshPollingMock).toHaveBeenLastCalledWith(false);
 
     resolvePage({
       items: [makeItem("doc-1")],
@@ -167,7 +163,7 @@ describe("useSourceDocumentStream", () => {
       hasTransitionalWork: true,
     });
     await waitFor(() => {
-      expect(useLedgerRefreshPollingMock).toHaveBeenLastCalledWith("ledger-1", true);
+      expect(useLedgerRefreshPollingMock).toHaveBeenLastCalledWith(true);
     });
   });
 
@@ -181,7 +177,7 @@ describe("useSourceDocumentStream", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     });
-    const refreshKey = queryKeys.sourceDocumentRefresh("ledger-1");
+    const refreshKey = queryKeys.sourceDocumentRefresh();
     queryClient.setQueryData(refreshKey, {
       version: "9",
       changed: false,
@@ -211,7 +207,7 @@ describe("useSourceDocumentStream", () => {
 
     expect(result.current.streamGroups.length).toBeGreaterThan(0);
     expect(result.current.hasNextPage).toBe(true);
-    expect(listStreamPageActionMock).toHaveBeenCalledWith("ledger-1", {
+    expect(listStreamPageActionMock).toHaveBeenCalledWith({
       cursor: undefined,
       limit: 20,
     });
@@ -230,7 +226,7 @@ describe("useSourceDocumentStream", () => {
     result.current.fetchNextPage();
 
     await waitFor(() => {
-      expect(listStreamPageActionMock).toHaveBeenCalledWith("ledger-1", {
+      expect(listStreamPageActionMock).toHaveBeenCalledWith({
         cursor: "next-page-cursor",
         limit: 20,
       });
@@ -312,7 +308,7 @@ describe("useSourceDocumentStream", () => {
     );
 
     await waitFor(() => {
-      expect(listStreamPageActionMock).toHaveBeenCalledWith("ledger-1", {
+      expect(listStreamPageActionMock).toHaveBeenCalledWith({
         startDate: "2026-07-01",
         endDate: "2026-07-31",
         cursor: undefined,
@@ -332,7 +328,7 @@ describe("useSourceDocumentStream", () => {
     );
 
     await waitFor(() => {
-      expect(listStreamPageActionMock).toHaveBeenCalledWith("ledger-1", {
+      expect(listStreamPageActionMock).toHaveBeenCalledWith({
         minAmount: "10",
         maxAmount: "100",
         cursor: undefined,
@@ -351,7 +347,7 @@ describe("useSourceDocumentStream", () => {
     );
 
     await waitFor(() => {
-      expect(listStreamPageActionMock).toHaveBeenCalledWith("ledger-1", {
+      expect(listStreamPageActionMock).toHaveBeenCalledWith({
         statuses: ["failed", "processing"], // Hook normalizes (sorts) for stable cache keys
         cursor: undefined,
         limit: 20,
@@ -431,7 +427,7 @@ describe("useSourceDocumentStream", () => {
     await waitFor(() => expect(result.current.hasNextPage).toBe(true));
     await act(() => result.current.fetchNextPage());
     listStreamPageActionMock.mockClear();
-    listStreamPageActionMock.mockImplementation((_ledgerId, params) =>
+    listStreamPageActionMock.mockImplementation((params) =>
       Promise.resolve({
         items: [makeItem(params.cursor == null ? "doc-new-1" : "doc-new-2")],
         nextCursor: params.cursor == null ? "new-cursor" : null,
@@ -442,9 +438,7 @@ describe("useSourceDocumentStream", () => {
     expect(listStreamPageActionMock).toHaveBeenCalledTimes(2);
     expect(reset).not.toHaveBeenCalled();
     expect(
-      queryClient.getQueryData<{ pages: unknown[] }>(
-        buildStreamQueryDescriptor({ ledgerId: "ledger-1" }).queryKey
-      )?.pages
+      queryClient.getQueryData<{ pages: unknown[] }>(buildStreamQueryDescriptor({}).queryKey)?.pages
     ).toHaveLength(2);
   });
 
@@ -474,7 +468,7 @@ describe("useSourceDocumentStream", () => {
 
     expect(listStreamPageActionMock).toHaveBeenCalledTimes(2);
     expect(result.current.streamGroups[0]?.items[0]?.sourceDocument.id).toBe("doc-fresh");
-    expect(queryClient.getQueryData(queryKeys.sourceDocumentRefresh("ledger-1"))).toMatchObject({
+    expect(queryClient.getQueryData(queryKeys.sourceDocumentRefresh())).toMatchObject({
       version: "2",
       hasTransitionalWork: true,
     });
@@ -498,13 +492,12 @@ describe("useSourceDocumentStream", () => {
     await waitFor(() => expect(result.current.queryStatus).toBe("error"));
 
     expect(listStreamPageActionMock).toHaveBeenCalledTimes(2);
-    expect(queryClient.getQueryData(queryKeys.sourceDocumentRefresh("ledger-1"))).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.sourceDocumentRefresh())).toBeUndefined();
   });
 
   it("renders the filtered page projection directly from the server page", async () => {
     const entryLatte = {
       id: "entry-latte",
-      ledgerId: "ledger-1",
       categoryId: null,
       sourceDocumentId: "doc-1",
       amount: "20.00",

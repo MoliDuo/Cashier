@@ -177,7 +177,6 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
           // Same two-line amount block the stream rows use: the main-currency
           // value, then the original amount it came from.
           <AmountDisplay
-            ledgerId={ledgerEntry.ledgerId}
             amount={displayData.amount}
             currency={displayData.currency}
             mainCurrency={mainCurrency}

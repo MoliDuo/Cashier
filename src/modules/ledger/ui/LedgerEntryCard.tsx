@@ -111,7 +111,6 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
               </div>
 
               <AmountDisplay
-                ledgerId={ledgerEntry.ledgerId}
                 amount={ledgerEntry.amount}
                 currency={ledgerEntry.currency}
                 mainCurrency={mainCurrency}

@@ -101,7 +101,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
 
   it("should create and list service credentials via Actions", async () => {
     // Create Credential - returns data with one-time token
-    const createRes = await createServiceCredentialAction(testLedgerId, {
+    const createRes = await createServiceCredentialAction({
       name: "Test Credential",
       bookId: await testBookId(getTestDb(), testLedgerId),
     });
@@ -143,7 +143,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
 
   it("rejects blank credential name with ValidationError", async () => {
     await expect(
-      createServiceCredentialAction(testLedgerId, {
+      createServiceCredentialAction({
         name: "",
         bookId: await testBookId(getTestDb(), testLedgerId),
       } as never)
@@ -151,9 +151,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
   });
 
   it("rejects invalid credential id with ValidationError", async () => {
-    await expect(deleteServiceCredentialAction(testLedgerId, "bad-id")).rejects.toThrow(
-      ValidationError
-    );
+    await expect(deleteServiceCredentialAction("bad-id")).rejects.toThrow(ValidationError);
   });
 
   it("should ingest ledger entry with valid service credential", async () => {
@@ -346,13 +344,13 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
   it("should delete service credential via Action", async () => {
     const db = getTestDb();
     // Create credential via action to get proper hash
-    const createRes = await createServiceCredentialAction(testLedgerId, {
+    const createRes = await createServiceCredentialAction({
       name: "Delete Credential",
       bookId: await testBookId(getTestDb(), testLedgerId),
     });
 
     // deleteServiceCredentialAction returns void
-    await deleteServiceCredentialAction(testLedgerId, createRes.id);
+    await deleteServiceCredentialAction(createRes.id);
 
     const check = await db.query.serviceCredentials.findFirst({
       where: eq(serviceCredentials.id, createRes.id),
@@ -363,7 +361,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
 
   it("tracks last use and rejects authentication immediately after revoke", async () => {
     const db = getTestDb();
-    const credential = await createServiceCredentialAction(testLedgerId, {
+    const credential = await createServiceCredentialAction({
       name: "Lifecycle Credential",
       bookId: await testBookId(getTestDb(), testLedgerId),
     });
@@ -385,7 +383,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     });
     expect(usedCredential?.lastUsedAt).toBeInstanceOf(Date);
 
-    await deleteServiceCredentialAction(testLedgerId, credential.id);
+    await deleteServiceCredentialAction(credential.id);
     const revokedResponse = await ledgerEntryPOST(
       new NextRequest("http://localhost/api/v1/source-documents", {
         method: "POST",
@@ -403,7 +401,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
 
   it("throttles lastUsedAt updates to once per five minutes", async () => {
     const db = getTestDb();
-    const credential = await createServiceCredentialAction(testLedgerId, {
+    const credential = await createServiceCredentialAction({
       name: "Throttle Credential",
       bookId: await testBookId(getTestDb(), testLedgerId),
     });
@@ -450,13 +448,13 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
 
   it("should return credentials with prefix/suffix via getLedgerSettingsAction", async () => {
     // Create a credential via action to get proper hash-based credential
-    const created = await createServiceCredentialAction(testLedgerId, {
+    const created = await createServiceCredentialAction({
       name: "New Credential",
       bookId: await testBookId(getTestDb(), testLedgerId),
     });
 
     // Get settings via getLedgerSettingsAction
-    const settings = await getLedgerSettingsAction(testLedgerId);
+    const settings = await getLedgerSettingsAction();
     const settingsCredential = requireFirst(settings.credentials, "settings credential");
 
     expect(settings.credentials).toHaveLength(1);

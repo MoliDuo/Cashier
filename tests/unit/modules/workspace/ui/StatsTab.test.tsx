@@ -37,7 +37,6 @@ function renderStatsTab(bookId?: string) {
   const view = render(
     <QueryClientProvider client={queryClient}>
       <StatsTab
-        ledgerId="ledger-1"
         {...(bookId == null ? {} : { bookId })}
         ledger={ledgerFixture}
         ledgerToday="2026-08-24"
@@ -66,12 +65,7 @@ describe("StatsTab", () => {
 
     rerender(
       <QueryClientProvider client={queryClient}>
-        <StatsTab
-          ledgerId="ledger-1"
-          bookId="book-2"
-          ledger={ledgerFixture}
-          ledgerToday="2026-08-24"
-        />
+        <StatsTab bookId="book-2" ledger={ledgerFixture} ledgerToday="2026-08-24" />
       </QueryClientProvider>
     );
     await waitFor(() =>
@@ -88,12 +82,7 @@ describe("StatsTab", () => {
     vi.mocked(getEnhancedStats).mockImplementation(() => new Promise<EnhancedStatsDto>(() => {}));
     rerender(
       <QueryClientProvider client={queryClient}>
-        <StatsTab
-          ledgerId="ledger-1"
-          bookId="book-2"
-          ledger={ledgerFixture}
-          ledgerToday="2026-08-24"
-        />
+        <StatsTab bookId="book-2" ledger={ledgerFixture} ledgerToday="2026-08-24" />
       </QueryClientProvider>
     );
 

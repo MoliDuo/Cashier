@@ -24,7 +24,6 @@ interface SavedBook {
 
 interface ShowNewRecordSuccessFeedbackOptions {
   mode: NewRecordInputMode;
-  ledgerId: string;
   result: CreatedRecordResult;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
@@ -81,7 +80,6 @@ export function shouldWarnNewRecordMayBeHidden(
 
 export function showNewRecordSuccessFeedback({
   mode,
-  ledgerId,
   result,
   activeTab,
   committedFilters,
@@ -97,7 +95,6 @@ export function showNewRecordSuccessFeedback({
           openLedgerDetail({
             type: "source-document",
             id: result.sourceDocumentId,
-            ledgerId,
           }),
       },
     });
@@ -112,7 +109,6 @@ export function showNewRecordSuccessFeedback({
           openLedgerDetail({
             type: "source-document",
             id: result.sourceDocumentId,
-            ledgerId,
           }),
       },
     });

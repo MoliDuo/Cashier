@@ -1,7 +1,3 @@
-export function ledgerDetailLeaveGuardKey(
-  type: "source-document",
-  ledgerId: string,
-  id: string
-): string {
-  return `${type}-detail:${ledgerId}:${id}`;
+export function ledgerDetailLeaveGuardKey(type: "source-document", id: string): string {
+  return `${type}-detail:${id}`;
 }

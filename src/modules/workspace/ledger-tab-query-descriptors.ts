@@ -27,7 +27,6 @@ export interface StreamQueryDescriptor {
 }
 
 export function buildStreamQueryDescriptor(input: {
-  ledgerId: string;
   bookId?: string;
   startDate?: string | null | undefined;
   endDate?: string | null | undefined;
@@ -61,8 +60,8 @@ export function buildStreamQueryDescriptor(input: {
   };
 
   return {
-    queryKey: queryKeys.sourceDocumentStream(input.ledgerId, keyFilters),
-    totalQueryKey: queryKeys.sourceDocumentStreamTotal(input.ledgerId, keyFilters),
+    queryKey: queryKeys.sourceDocumentStream(keyFilters),
+    totalQueryKey: queryKeys.sourceDocumentStreamTotal(keyFilters),
     filterSignature: JSON.stringify(keyFilters),
     getPageInput: (pageParam) => ({
       ...baseInput,
@@ -80,7 +79,6 @@ export interface StatsQueryDescriptor {
 }
 
 export function buildStatsQueryDescriptor(input: {
-  ledgerId: string;
   bookId?: string;
   currentDate: Date;
   mainCurrency: string;
@@ -97,7 +95,7 @@ export function buildStatsQueryDescriptor(input: {
 
   return {
     state,
-    queryKey: queryKeys.enhancedStats(input.ledgerId, {
+    queryKey: queryKeys.enhancedStats({
       bookId: input.bookId ?? null,
       startDate: state.startDateStr,
       endDate: state.endDateStr,
@@ -108,7 +106,6 @@ export function buildStatsQueryDescriptor(input: {
       mainCurrency: input.mainCurrency,
     }),
     input: {
-      ledgerId: input.ledgerId,
       ...(input.bookId == null ? {} : { bookId: input.bookId }),
       queryRange: {
         from: state.startDateStr,

@@ -39,14 +39,14 @@ describe("source-document delete tolerance", () => {
       })
       .returning();
     await expect(
-      deleteSourceDocumentAction(ledgerId, document!.id, document!.version)
+      deleteSourceDocumentAction(document!.id, document!.version)
     ).resolves.toMatchObject({
       ok: true,
       sourceDocumentId: document!.id,
       data: { deleted: true },
     });
-    await expect(
-      deleteSourceDocumentAction(ledgerId, document!.id, document!.version)
-    ).rejects.toThrow(NotFoundError);
+    await expect(deleteSourceDocumentAction(document!.id, document!.version)).rejects.toThrow(
+      NotFoundError
+    );
   });
 });

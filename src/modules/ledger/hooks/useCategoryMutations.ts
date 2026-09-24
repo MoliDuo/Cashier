@@ -14,7 +14,7 @@ interface UseCategoryMutationsOptions {
   onMetadataGenerated?: () => void;
 }
 
-export function useCategoryMutations(ledgerId: string, options: UseCategoryMutationsOptions = {}) {
+export function useCategoryMutations(options: UseCategoryMutationsOptions = {}) {
   const t = useTranslations("Settings");
   const queryClient = useQueryClient();
   const [generatingCategoryIds, setGeneratingCategoryIds] = useState<Set<string>>(new Set());
@@ -40,10 +40,10 @@ export function useCategoryMutations(ledgerId: string, options: UseCategoryMutat
   const generateMetadata = useLedgerMutation<
     Awaited<ReturnType<typeof generateEntryCategoryMetadataAction>>,
     { categoryId: string; requestId: number }
-  >(ledgerId, {
+  >({
     invalidates: ["categories"],
     mutationFn: ({ categoryId }: { categoryId: string; requestId: number }) =>
-      generateEntryCategoryMetadataAction(ledgerId, categoryId),
+      generateEntryCategoryMetadataAction(categoryId),
     onSuccess: (_data, { categoryId: _categoryId }) => {
       options.onMetadataGenerated?.();
     },
@@ -73,13 +73,13 @@ export function useCategoryMutations(ledgerId: string, options: UseCategoryMutat
     [generateMetadata]
   );
 
-  const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>(ledgerId, {
+  const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>({
     invalidates: ["categories", "stats"],
-    mutationFn: (input) => saveEntryCategoriesAction(ledgerId, input),
+    mutationFn: (input) => saveEntryCategoriesAction(input),
     successMessage: t("categoriesSaved"),
     errorMessage: t("saveCategoriesFailed"),
     onSuccess: (saved, input) => {
-      queryClient.setQueryData(queryKeys.entryCategories(ledgerId), saved);
+      queryClient.setQueryData(queryKeys.entryCategories(), saved);
       for (const category of input.categories) {
         if (category.clientId != null) requestCategoryMetadata(category.clientId);
       }

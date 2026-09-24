@@ -102,7 +102,7 @@ describe("applyCategoryPresetAction", () => {
       },
     ]);
 
-    const saved = await applyCategoryPresetAction(ledger.id, {
+    const saved = await applyCategoryPresetAction({
       expectedRevision: await revisionOf(ledger.id),
       presetId: "concise",
       mappings: [
@@ -159,7 +159,7 @@ describe("applyCategoryPresetAction", () => {
       { id: foodId, ledgerId: ledger.id, name: "餐饮", sortOrder: 1 },
     ]);
 
-    const saved = await applyCategoryPresetAction(ledger.id, {
+    const saved = await applyCategoryPresetAction({
       expectedRevision: await revisionOf(ledger.id),
       presetId: "concise",
       mappings: [
@@ -195,7 +195,7 @@ describe("applyCategoryPresetAction", () => {
       .where(eq(entryCategories.id, categoryId));
 
     await expect(
-      applyCategoryPresetAction(ledger.id, {
+      applyCategoryPresetAction({
         expectedRevision,
         presetId: "concise",
         mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],
@@ -218,7 +218,7 @@ describe("applyCategoryPresetAction", () => {
     ]);
 
     await expect(
-      applyCategoryPresetAction(ledger.id, {
+      applyCategoryPresetAction({
         expectedRevision: await revisionOf(ledger.id),
         presetId: "concise",
         mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],
@@ -246,7 +246,7 @@ describe("applyCategoryPresetAction", () => {
     ]);
 
     await expect(
-      applyCategoryPresetAction(ledger.id, {
+      applyCategoryPresetAction({
         expectedRevision: await revisionOf(ledger.id),
         presetId: "concise",
         mappings: [{ fromCategoryId: foreignId, toPresetIndex: 0 }],
@@ -271,7 +271,7 @@ describe("applyCategoryPresetAction", () => {
       where: eq(ledgerSyncState.ledgerId, ledger.id),
     });
 
-    await applyCategoryPresetAction(ledger.id, {
+    await applyCategoryPresetAction({
       expectedRevision: await revisionOf(ledger.id),
       presetId: "concise",
       mappings: [{ fromCategoryId: categoryId, toPresetIndex: 0 }],

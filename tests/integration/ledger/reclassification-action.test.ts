@@ -77,7 +77,7 @@ async function submitSelection(
   ledgerId: string,
   input: { ledgerEntryIds: string[]; candidateCategoryIds: string[] }
 ) {
-  const job = await beginCategoryAssignmentAction(ledgerId, {
+  const job = await beginCategoryAssignmentAction({
     requestKey: crypto.randomUUID(),
     mode: { kind: "ai", candidateCategoryIds: input.candidateCategoryIds },
     expectedEntryCount: input.ledgerEntryIds.length,
@@ -93,12 +93,12 @@ async function submitSelection(
     .where(
       and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.id, input.ledgerEntryIds))
     );
-  await appendCategoryAssignmentSelectionAction(ledgerId, {
+  await appendCategoryAssignmentSelectionAction({
     jobId: job.id,
     chunkIndex: 0,
     entries,
   });
-  return commitCategoryAssignmentSelectionAction(ledgerId, {
+  return commitCategoryAssignmentSelectionAction({
     jobId: job.id,
     expectedEntryCount: entries.length,
   });
@@ -144,7 +144,7 @@ describe("submitSelection", () => {
     await flushAfterCallbacks();
 
     expect(job).toMatchObject({ total: 2, appliedCount: 0 });
-    const stored = await getCategoryReclassificationJobAction(ledger.id);
+    const stored = await getCategoryReclassificationJobAction();
     expect(stored).toMatchObject({
       status: "succeeded",
       total: 2,
@@ -184,7 +184,7 @@ describe("submitSelection", () => {
     });
     await flushAfterCallbacks(15_000);
 
-    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
+    await expect(getCategoryReclassificationJobAction()).resolves.toMatchObject({
       status: "failed",
       appliedCount: 0,
       confirmedCount: 0,
@@ -212,28 +212,11 @@ describe("submitSelection", () => {
     });
     await flushAfterCallbacks();
 
-    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
+    await expect(getCategoryReclassificationJobAction()).resolves.toMatchObject({
       status: "succeeded",
       appliedCount: 0,
       confirmedCount: 1,
     });
-  });
-
-  it("rejects a ledger that is not the single live one", async () => {
-    const db = getTestDb();
-    const { ledger, food, home } = await setupLedger();
-    // A second ledger row exists but is not live: the wrapper refuses it by id,
-    // because with one live ledger every other id is unreachable.
-    const retired = { ...createLedgerData({ userId }), deletedAt: new Date() };
-    await db.insert(ledgers).values(retired);
-
-    await expect(
-      submitSelection(retired.id, {
-        ledgerEntryIds: [crypto.randomUUID()],
-        candidateCategoryIds: [food.id, home.id],
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
   });
 
   it("accepts selections above 100 but rejects a candidate set that is too small", async () => {
@@ -274,7 +257,7 @@ describe("submitSelection", () => {
         candidateCategoryIds: [food.id, foreignCategory.id],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
+    await expect(getCategoryReclassificationJobAction()).resolves.toBeNull();
   });
 
   it("rejects a candidate set that is no longer live before registering anything", async () => {
@@ -298,7 +281,7 @@ describe("submitSelection", () => {
         candidateCategoryIds: [food.id, home.id],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toBeNull();
+    await expect(getCategoryReclassificationJobAction()).resolves.toBeNull();
   });
 
   it("reports a provider failure without losing the run", async () => {
@@ -318,7 +301,7 @@ describe("submitSelection", () => {
     });
     await flushAfterCallbacks(15_000);
 
-    await expect(getCategoryReclassificationJobAction(ledger.id)).resolves.toMatchObject({
+    await expect(getCategoryReclassificationJobAction()).resolves.toMatchObject({
       status: "failed",
       failedCount: 1,
     });
@@ -335,7 +318,7 @@ describe("submitSelection", () => {
     });
     // A run already in flight, registered without going through the action so
     // no model call is left pending.
-    await beginCategoryAssignmentAction(ledger.id, {
+    await beginCategoryAssignmentAction({
       requestKey: crypto.randomUUID(),
       mode: { kind: "ai", candidateCategoryIds: [food.id, home.id] },
       expectedEntryCount: entryIds.length,

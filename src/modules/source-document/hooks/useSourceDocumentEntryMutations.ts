@@ -13,30 +13,26 @@ import {
 } from "@/modules/source-document/command-results";
 
 interface UseSourceDocumentEntryMutationsOptions {
-  ledgerId: string | undefined;
   sourceDocumentId: string;
   /** Read fresh at submission time — never captured ahead of the actual click. */
   version: number | null;
 }
 
 export function useSourceDocumentEntryMutations({
-  ledgerId,
   sourceDocumentId,
   version,
 }: UseSourceDocumentEntryMutationsOptions) {
   const batchUpdateMutation = useLedgerMutation<
-    { ledgerEntryIds: string[]; affectedCount: number } | undefined,
+    { ledgerEntryIds: string[]; affectedCount: number },
     { ids: string[]; data: BatchEntryUpdateData }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", sourceDocumentId),
+    refreshQueryKey: queryKeys.sourceDocument(sourceDocumentId),
     invalidates: ["documents", "stats"],
     mutationFn: async ({ ids, data }) => {
-      if (ledgerId == null || ledgerId === "") return;
       const expectedVersion = requireSourceDocumentVersion(version, sourceDocumentId);
       const { amount, ...rest } = data;
       const result = await batchUpdateLedgerEntriesAction(
-        ledgerId,
         [{ sourceDocumentId, expectedVersion }],
         ids,
         {
@@ -56,19 +52,14 @@ export function useSourceDocumentEntryMutations({
         entryIds: string[];
         onCommitted?: ((result: PartialBatchCommandResult) => void) | undefined;
       }
-  >(ledgerId, {
+  >({
     refreshMode: "background",
-    refreshQueryKey: queryKeys.sourceDocument(ledgerId ?? "", sourceDocumentId),
+    refreshQueryKey: queryKeys.sourceDocument(sourceDocumentId),
     invalidates: ["documents", "stats"],
     mutationFn: async (input) => {
       const entryIds = Array.isArray(input) ? input : input.entryIds;
-      if (ledgerId == null || ledgerId === "") throw new Error("No ledger ID");
       const expectedVersion = requireSourceDocumentVersion(version, sourceDocumentId);
-      return batchDeleteLedgerEntriesAction(
-        ledgerId,
-        [{ sourceDocumentId, expectedVersion }],
-        entryIds
-      );
+      return batchDeleteLedgerEntriesAction([{ sourceDocumentId, expectedVersion }], entryIds);
     },
     successMessage: null,
     errorMessage: null,

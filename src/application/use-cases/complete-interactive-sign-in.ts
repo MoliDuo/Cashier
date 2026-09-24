@@ -11,7 +11,7 @@ import { resolveHome } from "@/modules/workspace/application/use-cases/resolve-h
  */
 export async function completeInteractiveSignIn(
   principal: AuthenticatedPrincipal,
-  dependencies: { ledgers: Pick<LedgerPort, "getSharedForMember"> }
+  dependencies: { ledgers: Pick<LedgerPort, "getLiveLedger"> }
 ): Promise<AuthenticatedPrincipal> {
   await resolveHome(principal.id, dependencies.ledgers);
   return principal;

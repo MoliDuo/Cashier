@@ -10,8 +10,8 @@ vi.mock("@/modules/source-document/server-actions/access", () => ({
     <TArgs extends unknown[], TResult>(
       handler: (access: { ledgerId: string }, ...args: TArgs) => TResult
     ) =>
-    (ledgerId: string, ...args: TArgs) =>
-      handler({ ledgerId }, ...args),
+    (...args: TArgs) =>
+      handler({ ledgerId: "ledger-1" }, ...args),
 }));
 
 vi.mock("@/modules/source-document/application/use-cases/retry-source-document", () => ({
@@ -51,7 +51,7 @@ describe("retrySourceDocumentAction", () => {
   });
 
   it("passes the document identity without browser idempotency metadata", async () => {
-    await retrySourceDocumentAction("ledger-1", sourceDocumentId, 3);
+    await retrySourceDocumentAction(sourceDocumentId, 3);
     expect(retrySourceDocumentMock.mock.calls[0]?.[0]).toEqual({
       ledgerId: "ledger-1",
       sourceDocumentId,
@@ -67,7 +67,7 @@ describe("retrySourceDocumentAction", () => {
       expectedVersion: 2,
       currentVersion: 3,
     });
-    await expect(retrySourceDocumentAction("ledger-1", sourceDocumentId, 2)).resolves.toEqual({
+    await expect(retrySourceDocumentAction(sourceDocumentId, 2)).resolves.toEqual({
       ok: false,
       reason: "stale",
       sourceDocumentId,
@@ -77,9 +77,7 @@ describe("retrySourceDocumentAction", () => {
   });
 
   it("validates the source document id and expected version", async () => {
-    await expect(retrySourceDocumentAction("ledger-1", "not-a-uuid", 3)).rejects.toThrow(ZodError);
-    await expect(retrySourceDocumentAction("ledger-1", sourceDocumentId, 0)).rejects.toThrow(
-      ZodError
-    );
+    await expect(retrySourceDocumentAction("not-a-uuid", 3)).rejects.toThrow(ZodError);
+    await expect(retrySourceDocumentAction(sourceDocumentId, 0)).rejects.toThrow(ZodError);
   });
 });

@@ -12,17 +12,10 @@ import { CategoryAssignmentContext } from "./category-assignment-context";
 
 /**
  * Follows the ledger's assignment run above the tabs, so a run survives tab
- * changes, and renders its status band and its completion notice. Mount it with
- * `key={ledgerId}` so a ledger switch starts from a clean history.
+ * changes, and renders its status band and its completion notice.
  */
-export function CategoryAssignmentProvider({
-  ledgerId,
-  children,
-}: {
-  ledgerId: string;
-  children: ReactNode;
-}) {
-  const assignment = useCategoryAssignmentJob(ledgerId);
+export function CategoryAssignmentProvider({ children }: { children: ReactNode }) {
+  const assignment = useCategoryAssignmentJob();
   const { notices, consumeNotice } = assignment;
   // The band and the completion notice are the only readers of the details
   // messages, and only one of them may be waiting at a time.
@@ -31,7 +24,6 @@ export function CategoryAssignmentProvider({
   return (
     <CategoryAssignmentContext.Provider
       value={{
-        ledgerId,
         job: assignment.job,
         isActive: assignment.isActive,
         isReadError: assignment.isReadError,
@@ -51,7 +43,6 @@ export function CategoryAssignmentProvider({
           ))}
           {assignment.isVisible ? (
             <CategoryAssignmentStatus
-              ledgerId={ledgerId}
               job={assignment.job}
               isReadError={assignment.isReadError}
               onRefresh={assignment.refresh}

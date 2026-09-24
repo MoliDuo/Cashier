@@ -59,7 +59,6 @@ const baseProps = {
   onRecordScopeChange: vi.fn(),
   books,
   hidden: false,
-  ledgerId: "ledger-1",
   ledger: ledgerFixture,
   categories: [],
   periodParams: { period: "all" as const },
@@ -84,7 +83,7 @@ describe("LedgerTabPanels", () => {
     render(<LedgerTabPanels {...baseProps} activeTab={activeTab} />);
 
     expect(deferredProps.calls).toHaveLength(1);
-    expect(deferredProps.calls[0]).toMatchObject({ ledgerId: "ledger-1", ...expected });
+    expect(deferredProps.calls[0]).toMatchObject(expected);
   });
 
   it("hands the stream panel the book id the scope resolved to", () => {
@@ -93,7 +92,6 @@ describe("LedgerTabPanels", () => {
     expect(deferredProps.calls).toHaveLength(1);
     expect(deferredProps.calls[0]).toMatchObject({
       bookId: BOOK_SHARED,
-      ledgerId: "ledger-1",
     });
   });
 

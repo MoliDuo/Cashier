@@ -35,8 +35,8 @@ describe("SourceDocument Actions", () => {
     return first;
   }
 
-  const createDocument = (input: Parameters<typeof createSourceDocumentAction>[1]) =>
-    createSourceDocumentAction(testLedgerId, input, crypto.randomUUID());
+  const createDocument = (input: Parameters<typeof createSourceDocumentAction>[0]) =>
+    createSourceDocumentAction(input, crypto.randomUUID());
 
   beforeEach(async () => {
     // Reset mock to use multi-stage mock by default
@@ -176,8 +176,8 @@ describe("SourceDocument Actions", () => {
     const clientSubmissionId = crypto.randomUUID();
     const input = { text: "Idempotent lunch 25" };
 
-    const first = await createSourceDocumentAction(testLedgerId, input, clientSubmissionId);
-    const replay = await createSourceDocumentAction(testLedgerId, input, clientSubmissionId);
+    const first = await createSourceDocumentAction(input, clientSubmissionId);
+    const replay = await createSourceDocumentAction(input, clientSubmissionId);
 
     expect(replay).toEqual(first);
     const db = getTestDb();
@@ -199,19 +199,9 @@ describe("SourceDocument Actions", () => {
   });
 
   it("should return error when no input provided", async () => {
-    await expect(createSourceDocumentAction(testLedgerId, {}, crypto.randomUUID())).rejects.toThrow(
+    await expect(createSourceDocumentAction({}, crypto.randomUUID())).rejects.toThrow(
       "Content (text or images) is required"
     );
-  });
-
-  it("should return error for non-existent ledger", async () => {
-    await expect(
-      createSourceDocumentAction(
-        "00000000-0000-0000-0000-000000000099",
-        { text: "foo" },
-        crypto.randomUUID()
-      )
-    ).rejects.toThrow("Ledger not found");
   });
 
   it("should delete source document and associated ledger entries", async () => {
@@ -235,7 +225,7 @@ describe("SourceDocument Actions", () => {
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
-    await deleteSourceDocumentAction(testLedgerId, sourceDocumentId, document!.version);
+    await deleteSourceDocumentAction(sourceDocumentId, document!.version);
 
     // 3. Verify deletion
     const docAfter = await db.query.sourceDocuments.findFirst({

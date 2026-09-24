@@ -11,8 +11,8 @@ vi.mock("@/modules/source-document/server-actions/access", () => ({
     <TArgs extends unknown[], TResult>(
       handler: (access: { ledgerId: string }, ...args: TArgs) => TResult
     ) =>
-    (ledgerId: string, ...args: TArgs) =>
-      handler({ ledgerId }, ...args),
+    (...args: TArgs) =>
+      handler({ ledgerId: "ledger-1" }, ...args),
 }));
 
 vi.mock("@/application/server-composition-root", () => ({
@@ -35,9 +35,7 @@ describe("cancelSourceDocumentProcessingAction", () => {
   it("returns the cancelled version and processing status", async () => {
     cancelProcessingMock.mockResolvedValueOnce({ version: 4, processingStatus: "cancelled" });
 
-    await expect(
-      cancelSourceDocumentProcessingAction("ledger-1", sourceDocumentId, 3)
-    ).resolves.toEqual({
+    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 3)).resolves.toEqual({
       ok: true,
       sourceDocumentId,
       version: 4,
@@ -51,9 +49,7 @@ describe("cancelSourceDocumentProcessingAction", () => {
       new StaleSourceDocumentVersionError(sourceDocumentId, 2, 5)
     );
 
-    await expect(
-      cancelSourceDocumentProcessingAction("ledger-1", sourceDocumentId, 2)
-    ).resolves.toEqual({
+    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 2)).resolves.toEqual({
       ok: false,
       reason: "stale",
       sourceDocumentId,
@@ -65,18 +61,16 @@ describe("cancelSourceDocumentProcessingAction", () => {
   it("propagates every other failure", async () => {
     cancelProcessingMock.mockRejectedValueOnce(new Error("database unavailable"));
 
-    await expect(
-      cancelSourceDocumentProcessingAction("ledger-1", sourceDocumentId, 3)
-    ).rejects.toThrow("database unavailable");
+    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 3)).rejects.toThrow(
+      "database unavailable"
+    );
   });
 
   it("validates the source document id and expected version", async () => {
-    await expect(cancelSourceDocumentProcessingAction("ledger-1", "not-a-uuid", 3)).rejects.toThrow(
+    await expect(cancelSourceDocumentProcessingAction("not-a-uuid", 3)).rejects.toThrow(ZodError);
+    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 0)).rejects.toThrow(
       ZodError
     );
-    await expect(
-      cancelSourceDocumentProcessingAction("ledger-1", sourceDocumentId, 0)
-    ).rejects.toThrow(ZodError);
     expect(cancelProcessingMock).not.toHaveBeenCalled();
   });
 });

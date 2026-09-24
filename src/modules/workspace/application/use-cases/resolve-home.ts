@@ -4,11 +4,8 @@ import type { LedgerContract } from "@/application/contracts";
 import { UnauthorizedError } from "@/lib/errors";
 
 const resolveHomeImpl = cache(
-  async (
-    userId: string,
-    ledgers: Pick<LedgerPort, "getSharedForMember">
-  ): Promise<LedgerContract> => {
-    const ledger = await ledgers.getSharedForMember(userId);
+  async (userId: string, ledgers: Pick<LedgerPort, "getLiveLedger">): Promise<LedgerContract> => {
+    const ledger = await ledgers.getLiveLedger(userId);
     if (ledger == null) throw new UnauthorizedError("Shared ledger is unavailable");
     return ledger;
   }
@@ -16,7 +13,7 @@ const resolveHomeImpl = cache(
 
 export async function resolveHome(
   userId: string,
-  ledgers: Pick<LedgerPort, "getSharedForMember">
+  ledgers: Pick<LedgerPort, "getLiveLedger">
 ): Promise<LedgerContract> {
   return resolveHomeImpl(userId, ledgers);
 }
