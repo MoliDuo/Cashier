@@ -4,12 +4,13 @@ import { getTestDb } from "../../setup";
 import { otpTokens } from "@/persistence/schema/auth";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import {
-  authenticateWithOTP as authenticateWithOTPUseCase,
+  authenticateWithOTP,
   OTPExpiredSignInError,
   OTPInvalidSignInError,
   OTPLockedSignInError,
   OTPRateLimitedSignInError,
-} from "@/modules/auth/application/use-cases/authenticate-with-otp";
+} from "@/modules/auth/server/authenticate-with-otp";
+import * as rateLimit from "@/lib/rate-limit";
 import { serverComposition } from "@/application/server-composition-root";
 import { hashOTP } from "@/modules/auth/services/otp";
 import { completeInteractiveSignIn } from "@/application/use-cases/complete-interactive-sign-in";
@@ -25,12 +26,6 @@ vi.mock("resend", () => ({
 
 const TEST_EMAIL = "test@example.com";
 const REQUEST_HEADERS = new Headers({ "x-real-ip": "127.0.0.1" });
-const authenticateWithOTP = (input: Parameters<typeof authenticateWithOTPUseCase>[0]) =>
-  authenticateWithOTPUseCase(input, {
-    userAccounts: serverComposition.userAccounts,
-    otpTokens: serverComposition.otpTokens,
-    rateLimiter: serverComposition.rateLimiter,
-  });
 
 async function createTestOTP(email: string, otp: string, expiresAt?: Date) {
   const db = getTestDb();
@@ -104,7 +99,7 @@ describe("authenticateWithOTP", () => {
 
   it("charges the IP verification bucket before looking up a token", async () => {
     process.env.TRUSTED_PROXY = "platform";
-    const increment = vi.spyOn(serverComposition.rateLimiter, "increment");
+    const increment = vi.spyOn(rateLimit, "incrementRateLimit");
 
     await expect(
       authenticateWithOTP({

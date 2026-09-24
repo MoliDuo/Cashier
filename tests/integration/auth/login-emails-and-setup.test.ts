@@ -7,8 +7,12 @@ vi.mock("next/headers", () => ({
 import { and, eq, isNull } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUser } from "../../helpers/schema-setup";
-import { postgresUserAccountAdapter } from "@/application/adapters/postgres/business-ports/users";
-import { postgresAccountSecurityAdapter } from "@/application/adapters/postgres/account-security";
+import { findUserByEmail, findUserById, listLoginEmails } from "@/modules/auth/server/users";
+import {
+  createEmailChangeChallenge,
+  removeLoginEmail,
+  verifyEmailChangeChallenge,
+} from "@/modules/auth/server/account-security";
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
 import { createInitialAccount, isSetupPending } from "@/modules/setup/server/initial-account";
 import { completeSetupAction } from "@/modules/setup/server-actions/setup";
@@ -34,14 +38,14 @@ describe("login emails", () => {
       .insert(loginEmails)
       .values({ userId, email: "second@example.com", emailVerified: new Date() });
 
-    const first = await postgresUserAccountAdapter.findByEmail("first@example.com");
-    const second = await postgresUserAccountAdapter.findByEmail("second@example.com");
+    const first = await findUserByEmail("first@example.com");
+    const second = await findUserByEmail("second@example.com");
     expect(first?.id).toBe(userId);
     expect(second?.id).toBe(userId);
     // `email` is the caller's own address, so the account cannot be identified
     // by a stale "primary" one.
     expect(second?.email).toBe("second@example.com");
-    expect(await postgresUserAccountAdapter.findByEmail("nobody@example.com")).toBeNull();
+    expect(await findUserByEmail("nobody@example.com")).toBeNull();
   });
 
   it("reports the account's addresses oldest first and lists the first as its email", async () => {
@@ -51,9 +55,9 @@ describe("login emails", () => {
       .insert(loginEmails)
       .values({ userId, email: "second@example.com", emailVerified: new Date() });
 
-    const addresses = await postgresUserAccountAdapter.listLoginEmails(userId);
+    const addresses = await listLoginEmails(userId);
     expect(addresses.map((row) => row.email)).toEqual(["first@example.com", "second@example.com"]);
-    expect((await postgresUserAccountAdapter.findById(userId))?.email).toBe("first@example.com");
+    expect((await findUserById(userId))?.email).toBe("first@example.com");
   });
 
   it("adds an address through a verified challenge", async () => {
@@ -61,7 +65,7 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "owner@example.com");
     const otp = "123456";
 
-    const created = await postgresAccountSecurityAdapter.createEmailChangeChallenge({
+    const created = await createEmailChangeChallenge({
       userId,
       newEmail: "added@example.com",
       tokenHash: hashOTP(otp),
@@ -71,14 +75,14 @@ describe("login emails", () => {
     });
     expect(created).toBe("created");
 
-    const verified = await postgresAccountSecurityAdapter.verifyEmailChangeChallenge({
+    const verified = await verifyEmailChangeChallenge({
       userId,
       newEmail: "added@example.com",
       otp,
       now: new Date(),
     });
     expect(verified).toEqual({ status: "verified", email: "added@example.com" });
-    expect(await postgresUserAccountAdapter.findByEmail("added@example.com")).toMatchObject({
+    expect(await findUserByEmail("added@example.com")).toMatchObject({
       id: userId,
     });
   });
@@ -88,7 +92,7 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "owner@example.com");
     await createTestUser(db, "taken@example.com", crypto.randomUUID());
 
-    const created = await postgresAccountSecurityAdapter.createEmailChangeChallenge({
+    const created = await createEmailChangeChallenge({
       userId,
       newEmail: "taken@example.com",
       tokenHash: hashOTP("123456"),
@@ -107,19 +111,19 @@ describe("login emails", () => {
       .values({ userId, email: "second@example.com", emailVerified: new Date() });
     const before = (await db.query.users.findFirst({ where: eq(users.id, userId) }))!.authVersion;
 
-    const removed = await postgresAccountSecurityAdapter.removeLoginEmail({
+    const removed = await removeLoginEmail({
       userId,
       email: "second@example.com",
       now: new Date(),
     });
     expect(removed).toBe("removed");
-    expect(await postgresUserAccountAdapter.findByEmail("second@example.com")).toBeNull();
+    expect(await findUserByEmail("second@example.com")).toBeNull();
     // A session opened with the removed address must not survive the removal.
     const after = (await db.query.users.findFirst({ where: eq(users.id, userId) }))!.authVersion;
     expect(after).toBe(before + 1);
 
     expect(
-      await postgresAccountSecurityAdapter.removeLoginEmail({
+      await removeLoginEmail({
         userId,
         email: "first@example.com",
         now: new Date(),
@@ -153,7 +157,7 @@ describe("first-run setup", () => {
     });
 
     expect(await isSetupPending()).toBe(false);
-    expect(await postgresUserAccountAdapter.findByEmail("owner@example.com")).toMatchObject({
+    expect(await findUserByEmail("owner@example.com")).toMatchObject({
       id: result.userId,
     });
     const ledger = await db.query.ledgers.findFirst({

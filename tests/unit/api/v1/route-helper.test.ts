@@ -6,7 +6,6 @@ const { rateLimiterMock, serviceCredentialsMock, getClientIPFromHeadersMock, log
   vi.hoisted(() => ({
     rateLimiterMock: {
       increment: vi.fn(),
-      current: vi.fn(),
     },
     serviceCredentialsMock: {
       authenticate: vi.fn(),
@@ -21,9 +20,12 @@ const { rateLimiterMock, serviceCredentialsMock, getClientIPFromHeadersMock, log
 
 vi.mock("@/application/server-composition-root", () => ({
   serverComposition: {
-    rateLimiter: rateLimiterMock,
     serviceCredentials: serviceCredentialsMock,
   },
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  incrementRateLimit: rateLimiterMock.increment,
 }));
 
 vi.mock("@/lib/utils/ip", () => ({
@@ -55,7 +57,6 @@ describe("api/v1 route helper", () => {
     rateLimiterMock.increment.mockImplementation(async (_key: string, limit: number) =>
       successResult(limit)
     );
-    rateLimiterMock.current.mockResolvedValue(0);
     serviceCredentialsMock.authenticate.mockResolvedValue(credential);
   });
 
@@ -111,7 +112,6 @@ describe("api/v1 route helper", () => {
     expect(response.headers.get("Retry-After")).toBe("60");
     expect(response.headers.get("X-RateLimit-Limit")).toBe("120");
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
-    expect(rateLimiterMock.current).not.toHaveBeenCalled();
     expect(serviceCredentialsMock.authenticate).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
   });
@@ -255,7 +255,6 @@ describe("api/v1 route helper", () => {
     expect(rateLimiterMock.increment.mock.calls[0]?.[0]).toMatch(/^rl_api_v1_preauth:/);
     expect(rateLimiterMock.increment.mock.calls[0]?.[0]).not.toContain("unknown");
     expect(rateLimiterMock.increment.mock.calls[1]?.[0]).toMatch(/^rl_valid_cred:/);
-    expect(rateLimiterMock.current).not.toHaveBeenCalled();
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
@@ -277,7 +276,6 @@ describe("api/v1 route helper", () => {
     expect(rateLimiterMock.increment).toHaveBeenCalledOnce();
     expect(rateLimiterMock.increment.mock.calls[0]?.[0]).toMatch(/^rl_api_v1_preauth:/);
     expect(rateLimiterMock.increment.mock.calls[0]?.[0]).not.toContain("unknown");
-    expect(rateLimiterMock.current).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
   });
 });

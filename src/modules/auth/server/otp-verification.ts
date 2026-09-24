@@ -1,8 +1,8 @@
 import "server-only";
-import type { OtpTokenContract, OtpTokenPort } from "@/application/contracts";
 import { logger } from "@/lib/logger";
-import { getLockoutExpiration, getMaxAttempts } from "./otp";
-import { verificationChallenges } from "./verification-challenge";
+import { getLockoutExpiration, getMaxAttempts } from "../services/otp";
+import { verificationChallenges } from "../services/verification-challenge";
+import { consumeOtpToken, recordOtpFailure, type OtpToken } from "./otp-tokens";
 
 export interface VerificationResult {
   success: boolean;
@@ -11,18 +11,10 @@ export interface VerificationResult {
   lockedUntil?: Date;
 }
 
-export async function findOTPRecord(
-  email: string,
-  tokens: OtpTokenPort
-): Promise<OtpTokenContract | undefined> {
-  return (await tokens.find(email.toLowerCase())) ?? undefined;
-}
-
 export async function verifyOTPWithPolicy(
   email: string,
   otp: string,
-  record: OtpTokenContract,
-  tokens: OtpTokenPort
+  record: OtpToken
 ): Promise<VerificationResult> {
   const check = verificationChallenges.check(record, otp);
   if (!check.ok && check.reason === "locked") {
@@ -31,7 +23,7 @@ export async function verifyOTPWithPolicy(
   if (!check.ok && check.reason === "expired") return { success: false, reason: "expired" };
   if (!check.ok) {
     const maxAttempts = getMaxAttempts();
-    const failure = await tokens.recordFailure({
+    const failure = await recordOtpFailure({
       email: email.toLowerCase(),
       tokenHash: record.tokenHash,
       maxAttempts,
@@ -52,7 +44,7 @@ export async function verifyOTPWithPolicy(
       attemptsRemaining: maxAttempts - failure.attempts,
     };
   }
-  const consumed = await tokens.consume({
+  const consumed = await consumeOtpToken({
     email: email.toLowerCase(),
     tokenHash: record.tokenHash,
     now: new Date(),

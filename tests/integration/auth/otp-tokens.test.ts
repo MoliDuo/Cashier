@@ -1,25 +1,19 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
-  createOTPToken as createOTPTokenWithPort,
-  discardOTPToken,
-} from "@/modules/auth/repositories/otp-repository";
-import {
-  findOTPRecord as findOTPRecordWithPort,
-  verifyOTPWithPolicy as verifyOTPWithPolicyWithPort,
-} from "@/modules/auth/services/otp-verification";
+  createOtpToken as createOTPToken,
+  discardOtpToken,
+  findOtpToken as findOTPRecord,
+} from "@/modules/auth/server/otp-tokens";
+import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";
 import { generateOTP, verifyOTP } from "@/modules/auth/services/otp";
 import { otpTokens } from "@/persistence/schema/auth";
 import { eq } from "drizzle-orm";
-import { serverComposition } from "@/application/server-composition-root";
 import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
 
-const otpPort = serverComposition.otpTokens;
-const createOTPToken = (email: string, otp: string, ipAddress?: string) =>
-  createOTPTokenWithPort(email, otp, otpPort, ipAddress);
 const deleteOTPToken = async (email: string) => {
-  const token = await otpPort.find(email);
-  if (token != null) await discardOTPToken(email, token.tokenHash, otpPort);
+  const token = await findOTPRecord(email);
+  if (token != null) await discardOtpToken(email, token.tokenHash);
 };
 const cleanupExpiredOTPTokens = async () => {
   const db = getTestDb();
@@ -27,12 +21,6 @@ const cleanupExpiredOTPTokens = async () => {
   await runBoundedMaintenance();
   return before.length - (await db.select().from(otpTokens)).length;
 };
-const findOTPRecord = (email: string) => findOTPRecordWithPort(email, otpPort);
-const verifyOTPWithPolicy = (
-  email: string,
-  otp: string,
-  record: Parameters<typeof verifyOTPWithPolicyWithPort>[2]
-) => verifyOTPWithPolicyWithPort(email, otp, record, otpPort);
 
 // Helper function for tests - combines data access and business logic
 async function verifyOTPToken(email: string, otp: string) {
@@ -65,7 +53,6 @@ describe("OTP Repository", () => {
       const otp = generateOTP();
       const result = await createOTPToken(testEmail, otp, "127.0.0.1");
 
-      expect(result.success).toBe(true);
       expect(result.expiresAt).toBeInstanceOf(Date);
 
       // Verify token exists in database

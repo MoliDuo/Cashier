@@ -1,10 +1,9 @@
 "use server";
 import { headers } from "next/headers";
 import { getClientIPFromHeaders } from "@/lib/utils/ip";
-import { sendOTP } from "@/modules/auth/application/use-cases/send-otp";
+import { sendOTP } from "@/modules/auth/server/send-otp";
 import { AppError, RateLimitError } from "@/lib/errors";
 import { parseSendOTPEmail } from "../contract-schemas";
-import { serverComposition } from "@/application/server-composition-root";
 
 export type SendOTPActionResult =
   | {
@@ -63,19 +62,11 @@ export async function sendOTPAction(email: string): Promise<SendOTPActionResult>
   try {
     const validatedEmail = parseSendOTPEmail(email);
     const requestHeaders = await headers();
-    const result = await sendOTP(
-      {
-        email: validatedEmail,
-        ip: getClientIPFromHeaders(requestHeaders),
-        host: requestHeaders.get("host") ?? "localhost",
-      },
-      {
-        emailDelivery: serverComposition.email,
-        tokens: serverComposition.otpTokens,
-        users: serverComposition.userAccounts,
-        rateLimiter: serverComposition.rateLimiter,
-      }
-    );
+    const result = await sendOTP({
+      email: validatedEmail,
+      ip: getClientIPFromHeaders(requestHeaders),
+      host: requestHeaders.get("host") ?? "localhost",
+    });
     return { ok: true, ...result };
   } catch (error) {
     return sendOTPFailure(error);

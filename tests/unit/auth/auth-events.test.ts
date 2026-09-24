@@ -32,7 +32,7 @@ vi.mock("@/persistence/schema/auth", () => ({
   loginEmails: {},
 }));
 
-vi.mock("@/modules/auth/application/use-cases/authenticate-with-otp", () => ({
+vi.mock("@/modules/auth/server/authenticate-with-otp", () => ({
   authenticateWithOTP: authenticateWithOTPMock,
 }));
 
@@ -40,11 +40,11 @@ vi.mock("@/application/use-cases/complete-interactive-sign-in", () => ({
   completeInteractiveSignIn: completeInteractiveSignInMock,
 }));
 
-vi.mock("@/modules/auth/application/use-cases/authenticate-with-password", () => ({
+vi.mock("@/modules/auth/server/authenticate-with-password", () => ({
   authenticateWithPassword: authenticateWithPasswordMock,
 }));
 
-vi.mock("@/modules/auth/application/queries/get-session-user", () => ({
+vi.mock("@/modules/auth/server/session-user", () => ({
   getSessionUser: getSessionUserMock,
 }));
 
@@ -95,14 +95,11 @@ describe("auth.ts adapter wiring", () => {
       request
     );
 
-    expect(authenticateWithOTPMock).toHaveBeenCalledWith(
-      {
-        email: "user@example.com",
-        otp: "123456",
-        requestHeaders: request.headers,
-      },
-      expect.any(Object)
-    );
+    expect(authenticateWithOTPMock).toHaveBeenCalledWith({
+      email: "user@example.com",
+      otp: "123456",
+      requestHeaders: request.headers,
+    });
     expect(result).toMatchObject({ email: "user@example.com" });
   }, 30_000);
 
@@ -121,14 +118,11 @@ describe("auth.ts adapter wiring", () => {
 
     await passwordProvider?.authorize?.({ email: "user@example.com", password: "secret" }, request);
 
-    expect(authenticateWithPasswordMock).toHaveBeenCalledWith(
-      {
-        email: "user@example.com",
-        password: "secret",
-        requestHeaders: request.headers,
-      },
-      expect.any(Object)
-    );
+    expect(authenticateWithPasswordMock).toHaveBeenCalledWith({
+      email: "user@example.com",
+      password: "secret",
+      requestHeaders: request.headers,
+    });
   });
 
   it("does not register a duplicate createUser ledger hook", async () => {
@@ -174,7 +168,7 @@ describe("auth.ts adapter wiring", () => {
       token: { sub: "db-user", authVersion: 1, authenticatedAt: 1_800_000_000 },
     });
 
-    expect(getSessionUserMock).toHaveBeenCalledWith("db-user", expect.any(Object));
+    expect(getSessionUserMock).toHaveBeenCalledWith("db-user");
     expect(result).toEqual({
       user: {
         id: "db-user",

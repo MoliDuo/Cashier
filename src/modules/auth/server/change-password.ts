@@ -1,11 +1,16 @@
+import "server-only";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
 import { validatePassword } from "@/modules/auth/services/password-policy";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
-import type { AccountSecurityPort } from "../ports";
-import type { RateLimiterPort } from "@/application/contracts";
+import {
+  incrementRateLimit,
+  releaseRateLimitIncrement,
+  type RateLimitResult,
+} from "@/lib/rate-limit";
+import { getPasswordHash, replacePasswordHash } from "./account-security";
 import {
   AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
   AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
@@ -14,14 +19,13 @@ import {
 const PASSWORD_CHANGE_PREFIX = "auth:password-change:user:";
 
 async function releasePasswordChangeReservation(
-  rateLimiter: RateLimiterPort,
   key: string,
   windowSeconds: number,
   resetTime: number,
   userId: string
 ) {
   try {
-    await rateLimiter.releaseIncrement(key, windowSeconds, resetTime);
+    await releaseRateLimitIncrement(key, windowSeconds, resetTime);
   } catch (error) {
     logger.error(
       { error, subject: logIdentifier("user", userId) },
@@ -31,15 +35,12 @@ async function releasePasswordChangeReservation(
   }
 }
 
-export async function changePassword(
-  params: {
-    userId: string;
-    currentPassword: string;
-    newPassword: string;
-    confirmPassword: string;
-  },
-  dependencies: { accounts: AccountSecurityPort; rateLimiter: RateLimiterPort }
-): Promise<Date> {
+export async function changePassword(params: {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<Date> {
   if (params.newPassword !== params.confirmPassword) {
     throw new AppError("Passwords do not match", AUTH_ERROR_CODES.PASSWORD_MISMATCH, 400);
   }
@@ -48,9 +49,9 @@ export async function changePassword(
   const key = `${PASSWORD_CHANGE_PREFIX}${params.userId}`;
   const limit = AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS;
   const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
-  let reservation: Awaited<ReturnType<RateLimiterPort["increment"]>>;
+  let reservation: RateLimitResult;
   try {
-    reservation = await dependencies.rateLimiter.increment(key, limit, windowSeconds);
+    reservation = await incrementRateLimit(key, limit, windowSeconds);
     if (!reservation.success) {
       throw new AppError("Too many password change attempts", "password_rate_limited", 429);
     }
@@ -66,13 +67,12 @@ export async function changePassword(
   let currentPasswordHash: string | null | undefined;
   let currentPasswordValid: boolean;
   try {
-    currentPasswordHash = await dependencies.accounts.getPasswordHash(params.userId);
+    currentPasswordHash = await getPasswordHash(params.userId);
     currentPasswordValid =
       currentPasswordHash != null &&
       (await verifyPassword(params.currentPassword, currentPasswordHash));
   } catch (error) {
     await releasePasswordChangeReservation(
-      dependencies.rateLimiter,
       key,
       windowSeconds,
       reservation.resetTime,
@@ -82,7 +82,6 @@ export async function changePassword(
   }
   if (currentPasswordHash === undefined) {
     await releasePasswordChangeReservation(
-      dependencies.rateLimiter,
       key,
       windowSeconds,
       reservation.resetTime,
@@ -98,17 +97,11 @@ export async function changePassword(
     );
   }
 
-  await releasePasswordChangeReservation(
-    dependencies.rateLimiter,
-    key,
-    windowSeconds,
-    reservation.resetTime,
-    params.userId
-  );
+  await releasePasswordChangeReservation(key, windowSeconds, reservation.resetTime, params.userId);
 
   const passwordHash = await hashPassword(params.newPassword);
   const passwordUpdatedAt = new Date();
-  const changed = await dependencies.accounts.changePassword({
+  const changed = await replacePasswordHash({
     userId: params.userId,
     expectedPasswordHash: currentPasswordHash,
     passwordHash,

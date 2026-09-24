@@ -21,15 +21,15 @@ vi.mock("next-auth/providers/credentials", () => ({
   }),
 }));
 
-vi.mock("@/modules/auth/application/use-cases/authenticate-with-otp", () => ({
+vi.mock("@/modules/auth/server/authenticate-with-otp", () => ({
   authenticateWithOTP: vi.fn(),
 }));
 
-vi.mock("@/modules/auth/application/use-cases/authenticate-with-password", () => ({
+vi.mock("@/modules/auth/server/authenticate-with-password", () => ({
   authenticateWithPassword: vi.fn(),
 }));
 
-vi.mock("@/modules/auth/application/queries/get-session-user", () => ({
+vi.mock("@/modules/auth/server/session-user", () => ({
   getSessionUser: vi.fn(async (id: string) => ({
     id,
     email: "test@example.com",

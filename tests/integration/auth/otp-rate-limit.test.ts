@@ -1,25 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  checkSendRateLimit as checkSendRateLimitUseCase,
-  checkSendRateLimitByIP as checkSendRateLimitByIPUseCase,
-  acquireResendCooldown as acquireResendCooldownUseCase,
-  releaseResendCooldown as releaseResendCooldownUseCase,
-  checkVerifyRateLimit as checkVerifyRateLimitUseCase,
-} from "@/modules/auth/services/otp-rate-limit";
-import { postgresRateLimiter } from "@/application/adapters/postgres/api-rate-limit";
+  checkSendRateLimit,
+  checkSendRateLimitByIP,
+  acquireResendCooldown,
+  releaseResendCooldown,
+  checkVerifyRateLimit,
+} from "@/modules/auth/server/otp-rate-limit";
+import * as rateLimit from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { RateLimitUnavailableError } from "@/lib/errors";
 import { sql } from "drizzle-orm";
-
-const checkSendRateLimit = (value: string) => checkSendRateLimitUseCase(value, postgresRateLimiter);
-const checkSendRateLimitByIP = (value: string) =>
-  checkSendRateLimitByIPUseCase(value, postgresRateLimiter);
-const acquireResendCooldown = (value: string) =>
-  acquireResendCooldownUseCase(value, postgresRateLimiter);
-const releaseResendCooldown = (value: string, acquiredAt: Date) =>
-  releaseResendCooldownUseCase(value, acquiredAt, postgresRateLimiter);
-const checkVerifyRateLimit = (value: string) =>
-  checkVerifyRateLimitUseCase(value, postgresRateLimiter);
 
 describe("OTP Rate Limiting", () => {
   beforeEach(async () => {
@@ -74,7 +64,7 @@ describe("OTP Rate Limiting", () => {
     });
 
     it("should fail closed on error", async () => {
-      vi.spyOn(postgresRateLimiter, "increment").mockRejectedValue(new Error("DB error"));
+      vi.spyOn(rateLimit, "incrementRateLimit").mockRejectedValue(new Error("DB error"));
 
       await expect(checkSendRateLimit("test@example.com")).rejects.toBeInstanceOf(
         RateLimitUnavailableError
@@ -84,7 +74,7 @@ describe("OTP Rate Limiting", () => {
 
   describe("checkSendRateLimitByIP", () => {
     it("uses a hashed shared IP bucket when the client IP is unknown", async () => {
-      const increment = vi.spyOn(postgresRateLimiter, "increment");
+      const increment = vi.spyOn(rateLimit, "incrementRateLimit");
 
       const result = await checkSendRateLimitByIP("unknown");
 
@@ -122,7 +112,7 @@ describe("OTP Rate Limiting", () => {
     });
 
     it("should fail closed on error", async () => {
-      vi.spyOn(postgresRateLimiter, "increment").mockRejectedValue(new Error("DB error"));
+      vi.spyOn(rateLimit, "incrementRateLimit").mockRejectedValue(new Error("DB error"));
 
       await expect(checkSendRateLimitByIP("192.168.1.1")).rejects.toBeInstanceOf(
         RateLimitUnavailableError
@@ -152,7 +142,7 @@ describe("OTP Rate Limiting", () => {
     });
 
     it("fails closed when acquisition storage is unavailable", async () => {
-      vi.spyOn(postgresRateLimiter, "acquireCooldown").mockRejectedValue(new Error("DB error"));
+      vi.spyOn(rateLimit, "acquireCooldown").mockRejectedValue(new Error("DB error"));
 
       await expect(acquireResendCooldown("test@example.com")).rejects.toBeInstanceOf(
         RateLimitUnavailableError
@@ -162,7 +152,7 @@ describe("OTP Rate Limiting", () => {
 
   describe("checkVerifyRateLimit (brute force protection)", () => {
     it("uses a hashed shared verification bucket for an unknown IP", async () => {
-      const increment = vi.spyOn(postgresRateLimiter, "increment");
+      const increment = vi.spyOn(rateLimit, "incrementRateLimit");
 
       await expect(checkVerifyRateLimit("unknown")).resolves.toBe(true);
       expect(increment).toHaveBeenCalledWith(
@@ -194,7 +184,7 @@ describe("OTP Rate Limiting", () => {
     });
 
     it("should fail closed on verification limit errors", async () => {
-      vi.spyOn(postgresRateLimiter, "increment").mockRejectedValue(new Error("DB error"));
+      vi.spyOn(rateLimit, "incrementRateLimit").mockRejectedValue(new Error("DB error"));
 
       await expect(checkVerifyRateLimit("192.168.1.1")).rejects.toBeInstanceOf(
         RateLimitUnavailableError

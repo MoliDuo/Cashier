@@ -1,10 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { serverComposition } from "@/application/server-composition-root";
-import type {
-  AuthenticatedServiceCredentialContract,
-  RateLimitResult,
-} from "@/application/contracts";
+import type { AuthenticatedServiceCredentialContract } from "@/application/contracts";
+import { incrementRateLimit, type RateLimitResult } from "@/lib/rate-limit";
 import { UnauthorizedError, RateLimitError } from "@/lib/errors";
 import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handlers";
 import { runtimeEnv } from "@/lib/env/runtime";
@@ -102,7 +100,7 @@ export async function handleApiV1Route(
     // 1. Pre-auth ceiling. Missing trusted client data uses one fixed HMAC
     //    bucket so unauthenticated traffic is still bounded without raw IPs.
     const preAuthStart = performance.now();
-    const preAuthResult = await serverComposition.rateLimiter.increment(
+    const preAuthResult = await incrementRateLimit(
       preAuthBucketKey(clientIp),
       PRE_AUTH_IP_LIMIT_PER_MINUTE,
       RATE_LIMIT_WINDOW_SECONDS
@@ -136,7 +134,7 @@ export async function handleApiV1Route(
     const validBucketKey = validCredentialBucketKey(credential.id);
     const apiRateLimit = API_RATE_LIMIT_PER_MINUTE;
     const rateLimitStart = performance.now();
-    const validRateResult = await serverComposition.rateLimiter.increment(
+    const validRateResult = await incrementRateLimit(
       validBucketKey,
       apiRateLimit,
       RATE_LIMIT_WINDOW_SECONDS

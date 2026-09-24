@@ -12,7 +12,7 @@ vi.mock("next/headers", () => ({
   cookies: cookiesMock,
 }));
 
-vi.mock("@/modules/auth/application/use-cases/send-otp", () => ({
+vi.mock("@/modules/auth/server/send-otp", () => ({
   sendOTP: sendOTPMock,
 }));
 
@@ -43,10 +43,11 @@ describe("sendOTPAction", () => {
 
     await expect(sendOTPAction("User@Example.com")).resolves.toMatchObject({ ok: true });
 
-    expect(sendOTPMock).toHaveBeenCalledWith(
-      { email: "User@Example.com", ip: "unknown", host: "cashier.example" },
-      expect.any(Object)
-    );
+    expect(sendOTPMock).toHaveBeenCalledWith({
+      email: "User@Example.com",
+      ip: "unknown",
+      host: "cashier.example",
+    });
   });
 
   it("returns invalid_email before invoking use case", async () => {
@@ -81,10 +82,11 @@ describe("sendOTPAction", () => {
 
     await sendOTPAction("test@example.com");
 
-    expect(sendOTPMock).toHaveBeenCalledWith(
-      { email: "test@example.com", ip: "unknown", host: "localhost" },
-      expect.any(Object)
-    );
+    expect(sendOTPMock).toHaveBeenCalledWith({
+      email: "test@example.com",
+      ip: "unknown",
+      host: "localhost",
+    });
   });
 
   it("prefers x-real-ip when TRUSTED_PROXY is configured", async () => {
@@ -101,13 +103,10 @@ describe("sendOTPAction", () => {
 
     await sendOTPAction("test@example.com");
 
-    expect(sendOTPMock).toHaveBeenCalledWith(
-      {
-        email: "test@example.com",
-        ip: "198.51.100.12",
-        host: "cashier.example",
-      },
-      expect.any(Object)
-    );
+    expect(sendOTPMock).toHaveBeenCalledWith({
+      email: "test@example.com",
+      ip: "198.51.100.12",
+      host: "cashier.example",
+    });
   });
 });

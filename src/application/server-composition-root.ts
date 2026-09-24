@@ -3,10 +3,8 @@ import {
   postgresBookAdapter,
   postgresCategoryAdapter,
   postgresLedgerAdapter,
-  postgresOtpTokenAdapter,
   postgresServiceCredentialAdapter,
   postgresSettingsAdapter,
-  postgresUserAccountAdapter,
   calculateCompletedSourceDocumentTotal,
   getTargetSourceDocument,
   getSourceDocumentInput,
@@ -17,11 +15,8 @@ import {
 import { loadRevisionProcessingContext } from "@/application/adapters/postgres/revision-processing-context";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres/ledger-projections";
 import { postgresRevisionAdapter } from "@/application/adapters/postgres/revisions";
-import { postgresAccountSecurityAdapter } from "@/application/adapters/postgres/account-security";
 import { postgresCredentialSourceDocumentReadAdapter } from "@/application/adapters/postgres/credential-source-document-status";
 import { postgresLedgerChangeReadAdapter } from "@/application/adapters/postgres/ledger-changes";
-import { postgresRateLimiter } from "@/application/adapters/postgres/api-rate-limit";
-import { resendEmailAdapter } from "@/application/adapters/email/resend";
 import {
   createExecuteSingleProcessingJob,
   CurrentRevisionProcessor,
@@ -75,11 +70,8 @@ const executeSingleProcessingJob = createExecuteSingleProcessingJob({
 
 /** Composition root for the PostgreSQL-backed runtime. */
 export const serverComposition = {
-  accountSecurity: postgresAccountSecurityAdapter,
   books: postgresBookAdapter,
-  rateLimiter: postgresRateLimiter,
   categories: postgresCategoryAdapter,
-  email: resendEmailAdapter,
   ledgers: postgresLedgerAdapter,
   ledgerReads: {
     hasActiveEntries: hasActiveLedgerEntries,
@@ -91,7 +83,6 @@ export const serverComposition = {
   categoryMetadataGenerator: categoryMetadataGeneratorAdapter,
   categoryReclassificationJobs: postgresCategoryReclassificationJobAdapter,
   categoryAssignments: postgresCategoryAssignmentV2Adapter,
-  otpTokens: postgresOtpTokenAdapter,
   serviceCredentials: postgresServiceCredentialAdapter,
   settings: postgresSettingsAdapter,
   storedFiles: storedFileAdapter,
@@ -107,5 +98,4 @@ export const serverComposition = {
   processingRecovery: new PostgresProcessingJobAdapter(),
   createRevisionProcessor,
   executeSingleProcessingJob,
-  userAccounts: postgresUserAccountAdapter,
 } as const;

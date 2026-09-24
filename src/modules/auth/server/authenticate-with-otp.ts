@@ -1,15 +1,16 @@
+import "server-only";
 import { RateLimitUnavailableError } from "@/lib/errors";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { isValidOTPFormat } from "@/modules/auth/services/otp";
-import { checkVerifyRateLimit } from "@/modules/auth/services/otp-rate-limit";
-import { findOTPRecord, verifyOTPWithPolicy } from "@/modules/auth/services/otp-verification";
+import { checkVerifyRateLimit } from "./otp-rate-limit";
+import { findOtpToken } from "./otp-tokens";
+import { verifyOTPWithPolicy } from "./otp-verification";
+import { findUserByEmail } from "./users";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { normalizeEmail } from "@/lib/utils/email";
 import { getClientIPFromHeaders, type HeadersLike } from "@/lib/utils/ip";
-import type { OtpTokenPort, UserAccountPort } from "@/application/contracts";
-import type { RateLimiterPort } from "@/application/contracts";
 
 const MAX_EMAIL_LENGTH = 254;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,24 +62,17 @@ function validateCredentials(email: string, otp: string): string {
   return normalizedEmail;
 }
 
-export async function authenticateWithOTP(
-  params: {
-    email: string;
-    otp: string;
-    requestHeaders: HeadersLike;
-  },
-  dependencies: {
-    userAccounts: UserAccountPort;
-    otpTokens: OtpTokenPort;
-    rateLimiter: RateLimiterPort;
-  }
-): Promise<AuthenticatedPrincipal> {
+export async function authenticateWithOTP(params: {
+  email: string;
+  otp: string;
+  requestHeaders: HeadersLike;
+}): Promise<AuthenticatedPrincipal> {
   const normalizedEmail = validateCredentials(params.email, params.otp);
 
   const ip = getClientIPFromHeaders(params.requestHeaders);
   let isAllowed: boolean;
   try {
-    isAllowed = await checkVerifyRateLimit(ip, dependencies.rateLimiter);
+    isAllowed = await checkVerifyRateLimit(ip);
   } catch (error) {
     if (error instanceof RateLimitUnavailableError) {
       throw new OTPRateLimitUnavailableSignInError();
@@ -93,7 +87,7 @@ export async function authenticateWithOTP(
     throw new OTPRateLimitedSignInError();
   }
 
-  const record = await findOTPRecord(normalizedEmail, dependencies.otpTokens);
+  const record = await findOtpToken(normalizedEmail);
   if (record == null) {
     logger.warn(
       { subject: logIdentifier("email", normalizedEmail) },
@@ -110,12 +104,7 @@ export async function authenticateWithOTP(
     throw new OTPLockedSignInError();
   }
 
-  const result = await verifyOTPWithPolicy(
-    normalizedEmail,
-    params.otp,
-    record,
-    dependencies.otpTokens
-  );
+  const result = await verifyOTPWithPolicy(normalizedEmail, params.otp, record);
 
   if (!result.success) {
     logger.warn(
@@ -141,7 +130,7 @@ export async function authenticateWithOTP(
   // The code is spent by now. An address with a live token but no account is
   // an address that was removed from the account between send and verify;
   // burning the code there costs one resend and nothing else.
-  const user = await dependencies.userAccounts.findByEmail(normalizedEmail);
+  const user = await findUserByEmail(normalizedEmail);
   if (user == null) {
     logger.warn(
       { subject: logIdentifier("email", normalizedEmail) },

@@ -1,5 +1,4 @@
-import type { AccountSecurityPort } from "../ports";
-import type { EmailDeliveryPort } from "@/application/contracts";
+import "server-only";
 import OTPEmail from "@/emails/otp-email";
 import {
   AppError,
@@ -10,7 +9,13 @@ import {
 } from "@/lib/errors";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
-import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../../services/otp";
+import { sendEmail } from "@/lib/email-delivery";
+import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../services/otp";
+import {
+  createEmailChangeChallenge,
+  discardEmailChangeChallenge,
+  verifyEmailChangeChallenge,
+} from "./account-security";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 
@@ -19,14 +24,11 @@ import { logIdentifier } from "@/lib/security/log-identifier";
  * meaning: nothing is replaced, the account just gains another address that can
  * sign in, and the OTP is what proves the address is reachable.
  */
-export async function sendLoginEmailCode(
-  input: {
-    userId: string;
-    newEmail: string;
-    host: string;
-  },
-  dependencies: { emailDelivery: EmailDeliveryPort; accounts: AccountSecurityPort }
-) {
+export async function sendLoginEmailCode(input: {
+  userId: string;
+  newEmail: string;
+  host: string;
+}) {
   const { userId, newEmail } = input;
   if (runtimeEnv.authResendKey == null)
     throw new ValidationError("Email delivery is not configured");
@@ -34,7 +36,7 @@ export async function sendLoginEmailCode(
   const otp = generateOTP();
   const tokenHash = hashOTP(otp);
   const expiresAt = getOTPExpiration();
-  const challenge = await dependencies.accounts.createEmailChangeChallenge({
+  const challenge = await createEmailChangeChallenge({
     userId,
     newEmail,
     tokenHash,
@@ -53,7 +55,7 @@ export async function sendLoginEmailCode(
   }
 
   try {
-    const delivery = await dependencies.emailDelivery.send({
+    const delivery = await sendEmail({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: newEmail,
       subject: "Cashier 验证码",
@@ -75,7 +77,7 @@ export async function sendLoginEmailCode(
     if (delivery !== "sent") throw new Error("Email provider did not accept the message");
   } catch {
     try {
-      await dependencies.accounts.discardEmailChangeChallenge({ userId, newEmail, tokenHash });
+      await discardEmailChangeChallenge({ userId, newEmail, tokenHash });
     } catch (cleanupError) {
       logger.error(
         { error: cleanupError, subject: logIdentifier("user", userId) },
@@ -87,16 +89,11 @@ export async function sendLoginEmailCode(
   return { newEmail, expiresAt: expiresAt.getTime() };
 }
 
-export async function verifyLoginEmailCode(
-  userId: string,
-  newEmail: string,
-  otp: string,
-  accounts: AccountSecurityPort
-) {
+export async function verifyLoginEmailCode(userId: string, newEmail: string, otp: string) {
   if (!isValidOTPFormat(otp)) {
     throw new AppError("Invalid verification code", "EMAIL_CHANGE_INVALID_CODE", 400);
   }
-  const outcome = await accounts.verifyEmailChangeChallenge({
+  const outcome = await verifyEmailChangeChallenge({
     userId,
     newEmail,
     otp,

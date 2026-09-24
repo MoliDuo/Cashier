@@ -4,15 +4,11 @@ import { getTestDb } from "tests/setup";
 import { otpTokens } from "@/persistence/schema/auth";
 import { hashOTP } from "@/modules/auth/services/otp";
 import { db } from "@/lib/db";
-import {
-  findOTPRecord as findOTPRecordWithPort,
-  verifyOTPWithPolicy,
-} from "@/modules/auth/services/otp-verification";
-import { serverComposition } from "@/application/server-composition-root";
+import { findOtpToken as findOTPRecord } from "@/modules/auth/server/otp-tokens";
+import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";
 
-const findOTPRecord = (email: string) => findOTPRecordWithPort(email, serverComposition.otpTokens);
 const verify = async (email: string) =>
-  verifyOTPWithPolicy(email, "123456", (await findOTPRecord(email))!, serverComposition.otpTokens);
+  verifyOTPWithPolicy(email, "123456", (await findOTPRecord(email))!);
 
 describe("otp-verification service", () => {
   it("findOTPRecord is case-insensitive for email input", async () => {
@@ -78,7 +74,7 @@ describe("otp-verification service", () => {
     expect(result).toEqual({ success: true });
   });
 
-  it("findOTPRecord returns undefined when record does not exist", async () => {
+  it("findOTPRecord returns null when record does not exist", async () => {
     const testDb = getTestDb();
     const missingEmail = "missing@example.com";
     const existing = await testDb.query.otpTokens.findFirst({
@@ -86,6 +82,6 @@ describe("otp-verification service", () => {
     });
     expect(existing).toBeUndefined();
 
-    await expect(findOTPRecord(missingEmail)).resolves.toBeUndefined();
+    await expect(findOTPRecord(missingEmail)).resolves.toBeNull();
   });
 });

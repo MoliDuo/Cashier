@@ -9,11 +9,9 @@ import { AppError } from "@/lib/errors";
 import { normalizeEmail } from "@/lib/utils/email";
 import { logger } from "@/lib/logger";
 import { parseSendOTPEmail } from "@/modules/auth/contract-schemas";
-import {
-  sendLoginEmailCode,
-  verifyLoginEmailCode,
-} from "@/modules/auth/application/use-cases/login-emails";
-import { serverComposition } from "@/application/server-composition-root";
+import { sendLoginEmailCode, verifyLoginEmailCode } from "@/modules/auth/server/login-emails";
+import { removeLoginEmail } from "@/modules/auth/server/account-security";
+import { listLoginEmails } from "@/modules/auth/server/users";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 
 export type LoginEmailErrorCode =
@@ -70,7 +68,7 @@ function mapError(error: unknown): LoginEmailErrorCode {
 /** The account's login addresses, for the 设置 list. */
 export const listLoginEmailsAction = async (): Promise<string[]> => {
   const userId = await requireUserId();
-  return (await serverComposition.userAccounts.listLoginEmails(userId)).map((row) => row.email);
+  return (await listLoginEmails(userId)).map((row) => row.email);
 };
 
 /** Sends an OTP to an address that is not yet a login address. */
@@ -81,14 +79,11 @@ export async function sendLoginEmailCodeAction(
     const userId = await requireRecentAuth();
     const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
     const requestHeaders = await headers();
-    const result = await sendLoginEmailCode(
-      {
-        userId,
-        newEmail,
-        host: requestHeaders.get("host") ?? "Cashier",
-      },
-      { emailDelivery: serverComposition.email, accounts: serverComposition.accountSecurity }
-    );
+    const result = await sendLoginEmailCode({
+      userId,
+      newEmail,
+      host: requestHeaders.get("host") ?? "Cashier",
+    });
     return { ok: true, expiresAt: result.expiresAt };
   } catch (error) {
     const code = mapError(error);
@@ -110,10 +105,8 @@ export async function verifyLoginEmailCodeAction(
   try {
     const userId = await requireUserId();
     const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
-    await verifyLoginEmailCode(userId, newEmail, otp, serverComposition.accountSecurity);
-    const emails = (await serverComposition.userAccounts.listLoginEmails(userId)).map(
-      (row) => row.email
-    );
+    await verifyLoginEmailCode(userId, newEmail, otp);
+    const emails = (await listLoginEmails(userId)).map((row) => row.email);
     return { ok: true, emails, verified: true };
   } catch (error) {
     const code = mapError(error);
@@ -133,16 +126,14 @@ export async function removeLoginEmailAction(
   try {
     const userId = await requireRecentAuth();
     const email = normalizeEmail(parseSendOTPEmail(inputEmail));
-    const result = await serverComposition.accountSecurity.removeLoginEmail({
+    const result = await removeLoginEmail({
       userId,
       email,
       now: new Date(),
     });
     if (result === "last_email") return { ok: false, code: "last_email" };
     if (result === "not_found") return { ok: false, code: "unknown" };
-    const emails = (await serverComposition.userAccounts.listLoginEmails(userId)).map(
-      (row) => row.email
-    );
+    const emails = (await listLoginEmails(userId)).map((row) => row.email);
     return { ok: true, emails };
   } catch (error) {
     const code = mapError(error);

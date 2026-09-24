@@ -14,6 +14,7 @@ const {
   loggerWarnMock,
   loggerInfoMock,
   loggerErrorMock,
+  findUserByEmailMock,
 } = vi.hoisted(() => ({
   createOTPTokenMock: vi.fn(),
   discardOTPTokenMock: vi.fn(),
@@ -28,14 +29,19 @@ const {
   loggerWarnMock: vi.fn(),
   loggerInfoMock: vi.fn(),
   loggerErrorMock: vi.fn(),
+  findUserByEmailMock: vi.fn(),
 }));
 
-vi.mock("@/modules/auth/repositories/otp-repository", () => ({
-  createOTPToken: createOTPTokenMock,
-  discardOTPToken: discardOTPTokenMock,
+vi.mock("@/modules/auth/server/otp-tokens", () => ({
+  createOtpToken: createOTPTokenMock,
+  discardOtpToken: discardOTPTokenMock,
 }));
 
-vi.mock("@/modules/auth/services/otp-rate-limit", () => ({
+vi.mock("@/modules/auth/server/users", () => ({
+  findUserByEmail: findUserByEmailMock,
+}));
+
+vi.mock("@/modules/auth/server/otp-rate-limit", () => ({
   acquireResendCooldown: acquireResendCooldownMock,
   checkSendRateLimit: checkSendRateLimitMock,
   checkSendRateLimitByIP: checkSendRateLimitByIPMock,
@@ -75,21 +81,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { RateLimitError } from "@/lib/errors";
-import { sendOTP as sendOTPUseCase } from "@/modules/auth/application/use-cases/send-otp";
-import { serverComposition } from "@/application/server-composition-root";
-import type { OtpTokenPort, UserAccountPort } from "@/application/contracts";
-
-const tokens = {} as OtpTokenPort;
-const users = {
-  findByEmail: vi.fn().mockResolvedValue({ id: "user-1", registrationCompletedAt: new Date() }),
-} as unknown as UserAccountPort;
-const sendOTP = (input: Parameters<typeof sendOTPUseCase>[0]) =>
-  sendOTPUseCase(input, {
-    emailDelivery: serverComposition.email,
-    tokens,
-    users,
-    rateLimiter: serverComposition.rateLimiter,
-  });
+import { sendOTP } from "@/modules/auth/server/send-otp";
 
 type SendOTPInput = Parameters<typeof sendOTP>[0];
 
@@ -106,9 +98,9 @@ describe("sendOTP use case", () => {
     delete process.env.AUTH_RESEND_KEY;
     delete process.env.AUTH_EMAIL_FROM;
 
+    findUserByEmailMock.mockResolvedValue({ id: "user-1" });
     createOTPTokenMock.mockResolvedValue({
       expiresAt: new Date(Date.now() + 300_000),
-      success: true,
       tokenHash: "token-hash-1",
     });
     discardOTPTokenMock.mockResolvedValue(true);
@@ -171,12 +163,7 @@ describe("sendOTP use case", () => {
       host: "cashier.example",
     });
 
-    expect(createOTPTokenMock).toHaveBeenCalledWith(
-      "user@example.com",
-      "123456",
-      tokens,
-      "203.0.113.2"
-    );
+    expect(createOTPTokenMock).toHaveBeenCalledWith("user@example.com", "123456", "203.0.113.2");
     expect(otpEmailMock).toHaveBeenCalledWith({
       otp: "123456",
       host: "cashier.example",
@@ -194,10 +181,7 @@ describe("sendOTP use case", () => {
         react: { kind: "otp-email-component" },
       })
     );
-    expect(acquireResendCooldownMock).toHaveBeenCalledWith(
-      "user@example.com",
-      expect.objectContaining({ increment: expect.any(Function) })
-    );
+    expect(acquireResendCooldownMock).toHaveBeenCalledWith("user@example.com");
     expect(result.canResendAt).toBe(1_234_567_890);
   });
 
@@ -234,11 +218,10 @@ describe("sendOTP use case", () => {
       expect.objectContaining({ subject: expect.stringMatching(/^email:[a-f0-9]{16}$/) }),
       "Failed to send OTP email"
     );
-    expect(discardOTPTokenMock).toHaveBeenCalledWith("test@example.com", "token-hash-1", tokens);
+    expect(discardOTPTokenMock).toHaveBeenCalledWith("test@example.com", "token-hash-1");
     expect(releaseResendCooldownMock).toHaveBeenCalledWith(
       "test@example.com",
-      new Date(1_234_567_830_000),
-      expect.any(Object)
+      new Date(1_234_567_830_000)
     );
   });
 
@@ -257,35 +240,26 @@ describe("sendOTP use case", () => {
     expect(discardOTPTokenMock).not.toHaveBeenCalled();
     expect(releaseResendCooldownMock).toHaveBeenCalledWith(
       "test@example.com",
-      new Date(1_234_567_830_000),
-      expect.any(Object)
+      new Date(1_234_567_830_000)
     );
   });
 
   it("returns a virtual success without creating or sending a token for unknown users", async () => {
     process.env.AUTH_RESEND_KEY = "resend-key";
-    const findByEmail = vi.fn().mockResolvedValue(null);
+    findUserByEmailMock.mockResolvedValueOnce(null);
 
-    const result = await sendOTPUseCase(
-      {
-        email: validEmail("new@example.com"),
-        ip: "203.0.113.2",
-        host: "cashier.example",
-      },
-      {
-        emailDelivery: serverComposition.email,
-        tokens,
-        users: { findByEmail } as unknown as UserAccountPort,
-        rateLimiter: serverComposition.rateLimiter,
-      }
-    );
+    const result = await sendOTP({
+      email: validEmail("new@example.com"),
+      ip: "203.0.113.2",
+      host: "cashier.example",
+    });
 
     expect(result).toEqual({
       expiresIn: 300,
       expiresAt: expect.any(Number),
       canResendAt: expect.any(Number),
     });
-    expect(findByEmail).toHaveBeenCalledWith("new@example.com");
+    expect(findUserByEmailMock).toHaveBeenCalledWith("new@example.com");
     expect(createOTPTokenMock).not.toHaveBeenCalled();
     expect(resendSendMock).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import type { UserAccountPort } from "@/application/contracts";
+import "server-only";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { getClientIPFromHeaders, type HeadersLike } from "@/lib/utils/ip";
@@ -6,7 +6,8 @@ import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { AuthSignInError, AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { normalizeEmail } from "@/lib/utils/email";
 import { verifyPassword } from "@/modules/auth/services/password";
-import type { RateLimiterPort } from "@/application/contracts";
+import { incrementRateLimit, releaseRateLimitIncrement } from "@/lib/rate-limit";
+import { findUserByEmail, type UserAccount } from "./users";
 import {
   AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
   AUTH_PASSWORD_IP_MAX_ATTEMPTS,
@@ -21,14 +22,13 @@ type PasswordRateLimitReservation = { key: string; resetTime: number };
 
 async function reservePasswordRateLimits(
   email: string,
-  ip: string,
-  rateLimiter: RateLimiterPort
+  ip: string
 ): Promise<PasswordRateLimitReservation[]> {
   const reservations: PasswordRateLimitReservation[] = [];
   const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
   try {
     const emailKey = `${PASSWORD_EMAIL_PREFIX}${email}`;
-    const emailResult = await rateLimiter.increment(
+    const emailResult = await incrementRateLimit(
       emailKey,
       AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
       windowSeconds
@@ -39,15 +39,11 @@ async function reservePasswordRateLimits(
     reservations.push({ key: emailKey, resetTime: emailResult.resetTime });
 
     const ipKey = `${PASSWORD_IP_PREFIX}${logIdentifier("ip", ip)}`;
-    const ipResult = await rateLimiter.increment(
-      ipKey,
-      AUTH_PASSWORD_IP_MAX_ATTEMPTS,
-      windowSeconds
-    );
+    const ipResult = await incrementRateLimit(ipKey, AUTH_PASSWORD_IP_MAX_ATTEMPTS, windowSeconds);
     if (!ipResult.success) {
       await Promise.all(
         reservations.map((reservation) =>
-          rateLimiter.releaseIncrement(reservation.key, windowSeconds, reservation.resetTime)
+          releaseRateLimitIncrement(reservation.key, windowSeconds, reservation.resetTime)
         )
       );
       throw new AuthSignInError(AUTH_ERROR_CODES.PASSWORD_RATE_LIMITED);
@@ -59,7 +55,7 @@ async function reservePasswordRateLimits(
 
     await Promise.allSettled(
       reservations.map((reservation) =>
-        rateLimiter.releaseIncrement(reservation.key, windowSeconds, reservation.resetTime)
+        releaseRateLimitIncrement(reservation.key, windowSeconds, reservation.resetTime)
       )
     );
 
@@ -78,14 +74,13 @@ async function reservePasswordRateLimits(
 async function releasePasswordRateLimits(
   reservations: PasswordRateLimitReservation[],
   email: string,
-  ip: string,
-  rateLimiter: RateLimiterPort
+  ip: string
 ) {
   try {
     const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
     await Promise.all(
       reservations.map((reservation) =>
-        rateLimiter.releaseIncrement(reservation.key, windowSeconds, reservation.resetTime)
+        releaseRateLimitIncrement(reservation.key, windowSeconds, reservation.resetTime)
       )
     );
   } catch (error) {
@@ -97,21 +92,22 @@ async function releasePasswordRateLimits(
   }
 }
 
-export async function authenticateWithPassword(
-  params: { email: string; password: string; requestHeaders: HeadersLike },
-  dependencies: { users: UserAccountPort; rateLimiter: RateLimiterPort }
-): Promise<AuthenticatedPrincipal> {
+export async function authenticateWithPassword(params: {
+  email: string;
+  password: string;
+  requestHeaders: HeadersLike;
+}): Promise<AuthenticatedPrincipal> {
   const email = normalizeEmail(params.email);
   const ip = getClientIPFromHeaders(params.requestHeaders);
-  const reservations = await reservePasswordRateLimits(email, ip, dependencies.rateLimiter);
+  const reservations = await reservePasswordRateLimits(email, ip);
 
-  let user: Awaited<ReturnType<UserAccountPort["findByEmail"]>>;
+  let user: UserAccount | null;
   let valid: boolean;
   try {
-    user = email === "" ? null : await dependencies.users.findByEmail(email);
+    user = email === "" ? null : await findUserByEmail(email);
     valid = await verifyPassword(params.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
   } catch (error) {
-    await releasePasswordRateLimits(reservations, email, ip, dependencies.rateLimiter);
+    await releasePasswordRateLimits(reservations, email, ip);
     throw error;
   }
 
@@ -120,7 +116,7 @@ export async function authenticateWithPassword(
     throw new AuthSignInError(AUTH_ERROR_CODES.INVALID_CREDENTIALS);
   }
 
-  await releasePasswordRateLimits(reservations, email, ip, dependencies.rateLimiter);
+  await releasePasswordRateLimits(reservations, email, ip);
 
   return {
     id: user.id,

@@ -2,10 +2,10 @@ import NextAuth, { type NextAuthConfig } from "next-auth";
 import { CredentialsSignin } from "@auth/core/errors";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./auth.config";
-import { authenticateWithOTP } from "@/modules/auth/application/use-cases/authenticate-with-otp";
-import { authenticateWithPassword } from "@/modules/auth/application/use-cases/authenticate-with-password";
-import { authenticateDevUser } from "@/modules/auth/application/use-cases/authenticate-dev-user";
-import { getSessionUser } from "@/modules/auth/application/queries/get-session-user";
+import { authenticateWithOTP } from "@/modules/auth/server/authenticate-with-otp";
+import { authenticateWithPassword } from "@/modules/auth/server/authenticate-with-password";
+import { authenticateDevUser } from "@/modules/auth/server/authenticate-dev-user";
+import { getSessionUser } from "@/modules/auth/server/session-user";
 import { isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
 import { TIME_SECONDS } from "@/lib/constants";
 import { serverComposition } from "@/application/server-composition-root";
@@ -66,18 +66,11 @@ const providers: NextAuthConfig["providers"] = [
       const otp = credentials.otp;
 
       return authorizeInteractiveSignIn(() =>
-        authenticateWithOTP(
-          {
-            email,
-            otp,
-            requestHeaders: request.headers,
-          },
-          {
-            userAccounts: serverComposition.userAccounts,
-            otpTokens: serverComposition.otpTokens,
-            rateLimiter: serverComposition.rateLimiter,
-          }
-        )
+        authenticateWithOTP({
+          email,
+          otp,
+          requestHeaders: request.headers,
+        })
       );
     },
   }),
@@ -95,17 +88,11 @@ const providers: NextAuthConfig["providers"] = [
       const email = credentials.email;
       const password = credentials.password;
       return authorizeInteractiveSignIn(() =>
-        authenticateWithPassword(
-          {
-            email,
-            password,
-            requestHeaders: request.headers,
-          },
-          {
-            users: serverComposition.userAccounts,
-            rateLimiter: serverComposition.rateLimiter,
-          }
-        )
+        authenticateWithPassword({
+          email,
+          password,
+          requestHeaders: request.headers,
+        })
       );
     },
   }),
@@ -118,9 +105,7 @@ if (isDevAuthBypassEnabled()) {
       name: "Development",
       credentials: {},
       async authorize() {
-        return authorizeInteractiveSignIn(() =>
-          authenticateDevUser({ users: serverComposition.userAccounts })
-        );
+        return authorizeInteractiveSignIn(() => authenticateDevUser());
       },
     })
   );
@@ -148,7 +133,7 @@ export const authOptions = {
     },
     async session({ session, token }) {
       if (token.sub != null && token.sub !== "" && session.user != null) {
-        const dbUser = await getSessionUser(token.sub, serverComposition.userAccounts);
+        const dbUser = await getSessionUser(token.sub);
         const tokenAuthVersion =
           typeof token.authVersion === "number" && Number.isInteger(token.authVersion)
             ? token.authVersion

@@ -1,8 +1,9 @@
+import "server-only";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { RateLimitUnavailableError } from "@/lib/errors";
-import { getResendCooldown } from "./otp";
-import type { RateLimiterPort } from "@/application/contracts";
+import { getResendCooldown } from "../services/otp";
+import { acquireCooldown, incrementRateLimit, releaseCooldown } from "@/lib/rate-limit";
 import { createHash } from "node:crypto";
 import {
   AUTH_RATE_LIMIT_MAX,
@@ -27,17 +28,14 @@ function bucketKey(purpose: string, identifier: string): string {
   return `${purpose}:${digest}`;
 }
 
-export async function checkSendRateLimit(
-  email: string,
-  rateLimiter: RateLimiterPort
-): Promise<{
+export async function checkSendRateLimit(email: string): Promise<{
   allowed: boolean;
   remainingAttempts: number;
   retryAfter?: number;
 }> {
   const key = bucketKey(OTP_SEND_PREFIX.slice(0, -1), email);
   try {
-    const result = await rateLimiter.increment(
+    const result = await incrementRateLimit(
       key,
       AUTH_RATE_LIMIT_MAX,
       AUTH_RATE_LIMIT_WINDOW_SECONDS
@@ -69,21 +67,14 @@ export async function checkSendRateLimit(
   }
 }
 
-export async function checkSendRateLimitByIP(
-  ip: string,
-  rateLimiter: RateLimiterPort
-): Promise<{
+export async function checkSendRateLimitByIP(ip: string): Promise<{
   allowed: boolean;
   remainingAttempts: number;
   retryAfter?: number;
 }> {
   const key = bucketKey(OTP_SEND_IP_PREFIX.slice(0, -1), ip);
   try {
-    const result = await rateLimiter.increment(
-      key,
-      OTP_IP_MAX_ATTEMPTS_PER_HOUR,
-      IP_WINDOW_SECONDS
-    );
+    const result = await incrementRateLimit(key, OTP_IP_MAX_ATTEMPTS_PER_HOUR, IP_WINDOW_SECONDS);
 
     if (!result.success) {
       const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
@@ -111,10 +102,7 @@ export async function checkSendRateLimitByIP(
   }
 }
 
-export async function acquireResendCooldown(
-  email: string,
-  rateLimiter: RateLimiterPort
-): Promise<{
+export async function acquireResendCooldown(email: string): Promise<{
   acquired: boolean;
   acquiredAt: Date;
   retryAfter: number;
@@ -122,7 +110,7 @@ export async function acquireResendCooldown(
   const key = bucketKey(OTP_RESEND_PREFIX.slice(0, -1), email);
   const cooldownSeconds = getResendCooldown();
   try {
-    return await rateLimiter.acquireCooldown(key, cooldownSeconds);
+    return await acquireCooldown(key, cooldownSeconds);
   } catch (error) {
     logger.error(
       { error, subject: logIdentifier("email", email), purpose: "resend_cooldown" },
@@ -132,22 +120,15 @@ export async function acquireResendCooldown(
   }
 }
 
-export async function releaseResendCooldown(
-  email: string,
-  acquiredAt: Date,
-  rateLimiter: RateLimiterPort
-): Promise<boolean> {
+export async function releaseResendCooldown(email: string, acquiredAt: Date): Promise<boolean> {
   const key = bucketKey(OTP_RESEND_PREFIX.slice(0, -1), email);
-  return rateLimiter.releaseCooldown(key, acquiredAt);
+  return releaseCooldown(key, acquiredAt);
 }
 
-export async function checkVerifyRateLimit(
-  ip: string,
-  rateLimiter: RateLimiterPort
-): Promise<boolean> {
+export async function checkVerifyRateLimit(ip: string): Promise<boolean> {
   const key = bucketKey(OTP_VERIFY_PREFIX.slice(0, -1), ip);
   try {
-    const result = await rateLimiter.increment(
+    const result = await incrementRateLimit(
       key,
       OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE,
       VERIFY_WINDOW_SECONDS

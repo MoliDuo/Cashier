@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { getSessionUser as getSessionUserUseCase } from "@/modules/auth/application/queries/get-session-user";
-import { serverComposition } from "@/application/server-composition-root";
+import { getSessionUser } from "@/modules/auth/server/session-user";
 import { getTestDb } from "tests/setup";
 import { loginEmails, users } from "@/persistence/schema/auth";
 import { UnauthorizedError } from "@/lib/errors";
-
-const getSessionUser = (userId: string) =>
-  getSessionUserUseCase(userId, serverComposition.userAccounts);
 
 describe("getSessionUser", () => {
   it("returns selected session fields for an active user", async () => {
