@@ -1,7 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "../setup";
 import { currencyRates } from "@/persistence/schema/currency";
-import { convertAmountsBatch } from "@/modules/currency/application/use-cases/convert-amounts-batch";
 import { convertCurrency } from "@/modules/currency/application/use-cases/convert-currency";
 import { ExchangeRateService } from "@/application/adapters/postgres/exchange-rate";
 
@@ -23,40 +22,6 @@ describe("currency fallbacks integration", () => {
     });
   });
 
-  it("batch conversion rejects an unknown source currency", async () => {
-    await expect(
-      convertAmountsBatch(
-        [{ amount: "100", fromCurrency: "ZZZ", date: testDate }],
-        "USD",
-        ExchangeRateService
-      )
-    ).rejects.toThrow("Currency not found: ZZZ");
-  });
-
-  it("batch conversion rejects an unknown target currency", async () => {
-    await expect(
-      convertAmountsBatch(
-        [{ amount: "100", fromCurrency: "USD", date: testDate }],
-        "ZZZ",
-        ExchangeRateService
-      )
-    ).rejects.toThrow("Currency not found: ZZZ");
-  });
-
-  it("does not partially return a mixed batch with an unknown currency", async () => {
-    await expect(
-      convertAmountsBatch(
-        [
-          { amount: "100", fromCurrency: "CNY", date: testDate },
-          { amount: "50", fromCurrency: "ZZZ", date: testDate },
-          { amount: "25", fromCurrency: "USD", date: testDate },
-        ],
-        "USD",
-        ExchangeRateService
-      )
-    ).rejects.toThrow("Currency not found: ZZZ");
-  });
-
   it("single conversion still fails for unknown currency", async () => {
     await expect(
       convertCurrency(
@@ -64,18 +29,5 @@ describe("currency fallbacks integration", () => {
         ExchangeRateService
       )
     ).rejects.toThrow("Currency not found: ZZZ");
-  });
-
-  it("same-currency batch succeeds without stored rates or network access", async () => {
-    const fetchSpy = vi.spyOn(global, "fetch").mockRejectedValue(new Error("network down"));
-
-    const result = await convertAmountsBatch(
-      [{ amount: "100", fromCurrency: "USD", date: testDate }],
-      "USD",
-      ExchangeRateService
-    );
-
-    expect(result).toEqual([{ convertedAmount: "100.00", exchangeRate: "1" }]);
-    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

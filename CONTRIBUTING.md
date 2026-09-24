@@ -89,7 +89,7 @@ npm run test:smoke
 Starts a temporary PostgreSQL container and a uniquely named smoke database, applies real
 migrations, seeds a fictional password account, builds production assets, and runs desktop and
 mobile Chromium. No auth bypass, no real email, AI, or object storage. It covers password
-rejection and login, shared ledger access, manual entry, editing, persistence across reload,
+rejection and login, ledger access, manual entry, editing, persistence across reload,
 deletion, logout, and protected-page redirects. Failures keep screenshots and traces in
 `test-results/` and a report in `playwright-report/`.
 

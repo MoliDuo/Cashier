@@ -33,8 +33,6 @@ vi.mock("@/modules/auth/application/queries/get-session-user", () => ({
   getSessionUser: vi.fn(async (id: string) => ({
     id,
     email: "test@example.com",
-    name: "Test User",
-    image: null,
   })),
 }));
 
@@ -76,7 +74,6 @@ describe("auth runtime config", () => {
     expect(config?.providers).toHaveLength(2);
     expect(config?.providers?.[0]).toMatchObject({
       id: "otp",
-      name: "OTP",
       type: "credentials",
     });
     expect(config?.providers?.map((provider) => provider.id)).toEqual(["otp", "password"]);

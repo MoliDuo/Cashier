@@ -74,7 +74,7 @@ npm run dev
 `npm run docker:down` 只停止并移除容器，不会删除这些卷。增加 `-v` 会永久删除数据库和
 图片，执行前务必确认备份。
 
-`.env.local.example` 中的四个内部密钥是公开的固定开发值，只用于让 loopback 环境复制后
+`.env.local.example` 中的三个内部密钥是公开的固定开发值，只用于让 loopback 环境复制后
 立即启动。任何可被外部访问的部署都必须替换它们。
 
 ## 首次启动
@@ -120,7 +120,7 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 
 - PostgreSQL 数据库。
 - S3/R2/MinIO 桶中的对象。
-- Vercel 环境变量中的四个内部密钥，或你另行保存的副本。
+- Vercel 环境变量中的三个内部密钥，或你另行保存的副本。
 - 当前环境变量的非敏感配置记录；密钥应放在专用密码或密钥管理系统中。
 
 恢复时应使用彼此对应的数据库和对象存储快照。只恢复其中一项可能留下数据库记录存在但
@@ -139,7 +139,7 @@ npm run prune -- --json --batch-size 500 --orphan-grace-days 14 \
 
 默认规则：
 
-- 清理过期的限流桶、OTP、幂等记录、上传会话、变更日志批次和对象清理任务。
+- 清理过期的限流桶、OTP、幂等记录、上传会话和对象清理任务。
 - 清理超过 7 天且没有有效引用的 `stored_files` 和对应对象。
 - 清理超过 24 小时且没有开放上传会话引用的 `temporary/*` 对象。
 - 只报告对象已经缺失的数据库记录，不自动删除这些记录。

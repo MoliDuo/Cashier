@@ -4,7 +4,6 @@ import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   postgresCategoryAdapter,
-  postgresCurrencyAdapter,
   postgresLedgerAdapter,
   postgresServiceCredentialAdapter,
   postgresSettingsAdapter,
@@ -40,7 +39,6 @@ describe("current-runtime target adapters", () => {
     await expect(postgresSettingsAdapter.get(ledgerId)).resolves.toMatchObject({
       mainCurrency: "CNY",
     });
-    await expect(postgresCurrencyAdapter.convert("16", "CNY", "USD")).resolves.toBe("4.00");
     await expect(postgresServiceCredentialAdapter.authenticate("secret-key")).resolves.toEqual({
       id: credentialId,
       ledgerId,

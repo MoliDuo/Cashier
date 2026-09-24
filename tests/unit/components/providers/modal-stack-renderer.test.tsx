@@ -26,7 +26,7 @@ vi.mock("@/modules/source-document/ui/SourceDocumentDetailWrapper", () => ({
 
 describe("ModalStackRenderer", () => {
   beforeEach(() => {
-    useModalStackStore.setState({ stack: [], canGoBack: false });
+    useModalStackStore.setState({ stack: [] });
     useUnsavedChangesStore.setState({ dirtyKeys: new Set(), leaveGuards: new Map() });
   });
 

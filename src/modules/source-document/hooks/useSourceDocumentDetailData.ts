@@ -4,7 +4,6 @@ import type { SourceDocumentDetailDto } from "../contracts";
 import { queryKeys } from "@/lib/query-keys";
 import { getSourceDocumentDetailAction } from "@/lib/queries/ledger-query-client";
 import { QUERY } from "@/lib/constants";
-import { withQueryTimeout } from "@/lib/query-timeout";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
 
 interface UseSourceDocumentDetailDataOptions {
@@ -23,7 +22,7 @@ export function useSourceDocumentDetailData({
   const query = useQuery({
     queryKey: key,
     queryFn: async () => {
-      const incoming = await withQueryTimeout(getSourceDocumentDetailAction(ledgerId, id));
+      const incoming = await getSourceDocumentDetailAction(ledgerId, id);
       const current = queryClient.getQueryData<SourceDocumentDetailDto>(key);
       return incoming != null && current != null && current.version > incoming.version
         ? current

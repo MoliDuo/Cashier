@@ -195,16 +195,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       }),
   ],
   [
-    "updateEntries",
-    (ledgerId, other) =>
-      aggregate.updateEntries({
-        ledgerId,
-        target: { sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version },
-        ledgerEntryId: other.ledgerEntryId,
-        itemName: "Taken over",
-      }),
-  ],
-  [
     "deleteEntries",
     (ledgerId, other) =>
       aggregate.deleteEntries({

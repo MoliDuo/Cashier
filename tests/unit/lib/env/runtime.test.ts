@@ -54,7 +54,6 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.openaiApiKey).toBe("sk-test");
     expect(runtimeEnv.openaiBaseUrl).toBe("https://openai-proxy.example/v1");
     expect(runtimeEnv.hasOpenaiBaseUrl).toBe(true);
-    expect(runtimeEnv.appUrl).toBe("http://localhost:3000");
     expect(runtimeEnv.authResendKey).toBe("re_test");
     expect(runtimeEnv.authEmailFrom).toBe("Cashier <security@example.com>");
     expect(runtimeEnv.s3Endpoint).toBe("http://localhost:9000");
@@ -64,7 +63,6 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.trustedProxy).toBe("platform");
     expect(runtimeEnv.timeZone).toBe("UTC");
     expect(runtimeEnv.aiModel).toBe("custom-model");
-    expect(runtimeEnv.logLevel).toBe("warn");
   });
 
   it("surfaces startup validation failures through the accessor", async () => {

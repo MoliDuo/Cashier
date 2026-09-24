@@ -1,7 +1,6 @@
 import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
-import { forLedger } from "@/lib/db/scoped-query";
 import { mapLedgerEntryDto } from "./mappers";
 import {
   buildLedgerEntryCursorCondition,
@@ -36,7 +35,10 @@ export async function listLedgerEntryPage({
 }: ListLedgerEntryPageInput) {
   return db.transaction(
     async (tx) => {
-      const tenantCondition = forLedger(ledgerEntries, ledgerId).whereActive;
+      const tenantCondition = and(
+        eq(ledgerEntries.ledgerId, ledgerId),
+        isNull(ledgerEntries.deletedAt)
+      );
       const cursorCondition = buildLedgerEntryCursorCondition(cursor, ledgerId, filters, {
         effectiveDate: sql`documents.effective_date`,
         documentCreatedAt: sql`documents.created_at`,

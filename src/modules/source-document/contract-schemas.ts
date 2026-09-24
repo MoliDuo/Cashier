@@ -83,7 +83,7 @@ export const versionedTargetSchema = strictObjectSchema({
   expectedVersion: z.number().int().positive(),
 });
 
-export const versionedTargetsSchema = z
+const versionedTargetsSchema = z
   .array(versionedTargetSchema)
   .min(1)
   .max(MAX_BATCH_SIZE)
@@ -440,6 +440,10 @@ function parseSourceDocumentContract<T>(schema: z.ZodType<T>, input: unknown): T
 
 export function parseVersionedTarget(input: unknown): z.infer<typeof versionedTargetSchema> {
   return parseSourceDocumentContract(versionedTargetSchema, input);
+}
+
+export function parseVersionedTargets(input: unknown): z.infer<typeof versionedTargetsSchema> {
+  return parseSourceDocumentContract(versionedTargetsSchema, input);
 }
 
 export type CreateSourceDocumentInputContract = z.infer<typeof createSourceDocumentInputSchema>;

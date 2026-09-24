@@ -1,6 +1,6 @@
 "use server";
 import { withLedgerAccess } from "../access";
-import type { CreatedServiceCredentialDto, ServiceCredentialDto } from "@/modules/ledger/contracts";
+import type { CreatedServiceCredentialDto } from "@/modules/ledger/contracts";
 import {
   parseCreateServiceCredentialInput,
   parseServiceCredentialId,
@@ -11,13 +11,7 @@ import {
 import { setServiceCredentialBook } from "@/modules/ledger/application/use-cases/set-service-credential-book";
 import { createServiceCredential } from "@/modules/ledger/application/use-cases/create-service-credential";
 import { deleteServiceCredential } from "@/modules/ledger/application/use-cases/delete-service-credential";
-import { listServiceCredentials } from "@/modules/ledger/application/queries/list-service-credentials";
 import { serverComposition } from "@/application/server-composition-root";
-
-export const getServiceCredentialsAction = withLedgerAccess(
-  async (ledgerId: string): Promise<ServiceCredentialDto[]> =>
-    listServiceCredentials(ledgerId, serverComposition.serviceCredentials)
-);
 
 export const createServiceCredentialAction = withLedgerAccess(
   async (

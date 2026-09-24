@@ -36,7 +36,6 @@ export const entryReclassifierAdapter: EntryReclassifierPort = {
       runtimeEnv.aiModel,
       MAX_TOKENS,
       TEMPERATURE,
-      undefined,
       input.signal,
       { maxAttempts: 1, timeoutMs: AI_CATEGORY_REQUEST_TIMEOUT_MS }
     );

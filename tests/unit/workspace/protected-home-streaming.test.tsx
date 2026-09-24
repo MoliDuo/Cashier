@@ -118,11 +118,8 @@ describe("protected home streaming boundary", () => {
         user: {
           id: "user-1",
           email: "user@test.com",
-          name: "Test",
-          image: null,
         },
       },
-      locale: "en",
     });
     getMessagesMock.mockResolvedValue({
       Common: { notFound: "Not found" },

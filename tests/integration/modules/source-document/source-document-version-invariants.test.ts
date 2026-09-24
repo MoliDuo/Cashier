@@ -422,40 +422,6 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async updateEntries() {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
-    const ledgerEntryId = entryIds[0]!;
-
-    const changed = await port.updateEntries({
-      ledgerId,
-      target: { sourceDocumentId, expectedVersion: 1 },
-      ledgerEntryId,
-      itemName: "Renamed",
-    });
-    expect(changed).toMatchObject({ ok: true, version: 2 });
-    expect(await currentVersion(sourceDocumentId)).toBe(2);
-
-    // No-op: the patch already matches the entry's current value.
-    const noop = await port.updateEntries({
-      ledgerId,
-      target: { sourceDocumentId, expectedVersion: 2 },
-      ledgerEntryId,
-      itemName: "Renamed",
-    });
-    expect(noop).toMatchObject({ ok: true, version: 2 });
-    expect(await currentVersion(sourceDocumentId)).toBe(2);
-
-    const stale = await port.updateEntries({
-      ledgerId,
-      target: { sourceDocumentId, expectedVersion: 1 },
-      ledgerEntryId,
-      itemName: "Stale rename",
-    });
-    expect(stale).toMatchObject({ ok: false, reason: "stale", currentVersion: 2 });
-    expect(await currentVersion(sourceDocumentId)).toBe(2);
-  },
-
   async deleteEntries() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 2);

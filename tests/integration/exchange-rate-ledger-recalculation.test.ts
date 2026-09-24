@@ -23,7 +23,6 @@ import {
   failExchangeRateRecalculation,
 } from "@/application/adapters/postgres/exchange-rate-recalculation-jobs";
 import { runBoundedMaintenance } from "@/application/adapters/postgres/maintenance";
-import { convertAmountsBatch } from "@/modules/currency/application/use-cases/convert-amounts-batch";
 import { ExchangeRateService } from "@/application/adapters/postgres/exchange-rate";
 import * as recalculation from "@/application/orchestration/exchange-rate-ledger-recalculation";
 
@@ -342,11 +341,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       ok: true,
       json: async () => ({ base: "EUR", date: eventDate, rates: { USD: 1.08, CNY: 7.65 } }),
     } as Response);
-    await convertAmountsBatch(
-      [{ amount: "1", fromCurrency: "USD", date: eventDate }],
-      "CNY",
-      ExchangeRateService
-    );
+    await ExchangeRateService.getRates(eventDate);
     expect(recalculateLedgerForDateMock).not.toHaveBeenCalled();
     expect(await db.query.exchangeRateRecalculationJobs.findMany()).toHaveLength(2);
     await drainDueExchangeRateRecalculations();
@@ -375,11 +370,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       ok: true,
       json: async () => ({ base: "EUR", date: eventDate, rates: { USD: 1.08, CNY: 7.65 } }),
     } as Response);
-    await convertAmountsBatch(
-      [{ amount: "1", fromCurrency: "USD", date: eventDate }],
-      "CNY",
-      ExchangeRateService
-    );
+    await ExchangeRateService.getRates(eventDate);
     expect(recalculateLedgerForDateMock).not.toHaveBeenCalled();
     expect(await db.query.exchangeRateRecalculationJobs.findMany()).toHaveLength(1);
     await drainDueExchangeRateRecalculations();
@@ -401,12 +392,7 @@ describe("exchange-rate ledger recalculation orchestration", () => {
       ok: true,
       json: async () => ({ base: "EUR", date: "2024-02-10", rates: { USD: 1.08, CNY: 7.65 } }),
     } as Response);
-    const lookup = () =>
-      convertAmountsBatch(
-        [{ amount: "1", fromCurrency: "USD", date: "2024-02-10" }],
-        "CNY",
-        ExchangeRateService
-      );
+    const lookup = () => ExchangeRateService.getRates("2024-02-10");
 
     await lookup();
     await lookup();

@@ -103,8 +103,8 @@ required port through the use case boundary. Concrete runtime wiring belongs in 
 - Use Lucide icons for commands and navigation. Empty or explanatory states do not need decorative
   icons. Mobile filters use bottom drawers; date pickers, calculators, and confirmations use compact
   dialogs.
-- Filtered ledger results show the amount without a `Filtered total` prefix. Unfiltered results may
-  show `Total` / `合计`; missing bill titles use `Untitled Bill` / `未命名账单`.
+- Filtered ledger results show the amount without a `筛选合计` prefix. Unfiltered results may show
+  `合计`; missing bill titles use `未命名账单`.
 
 ### Typography
 

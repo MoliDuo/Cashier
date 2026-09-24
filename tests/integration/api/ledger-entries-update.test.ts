@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { updateLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
+import { batchUpdateLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
@@ -45,10 +45,10 @@ describe("ledger entry update transport validation", () => {
       where: eq(ledgerEntries.id, entryId),
     });
 
-    const rejection = await updateLedgerEntryAction(
+    const rejection = await batchUpdateLedgerEntriesAction(
       ledgerId,
-      { sourceDocumentId: "not-a-uuid", expectedVersion: 1 },
-      entryId,
+      [{ sourceDocumentId: "not-a-uuid", expectedVersion: 1 }],
+      [entryId],
       { itemName: "Updated" }
     ).catch((error: unknown) => error);
 
@@ -71,10 +71,10 @@ describe("ledger entry update transport validation", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
 
-    const rejection = await updateLedgerEntryAction(
+    const rejection = await batchUpdateLedgerEntriesAction(
       ledgerId,
-      { sourceDocumentId, expectedVersion: 1 },
-      "not-an-entry",
+      [{ sourceDocumentId, expectedVersion: 1 }],
+      ["not-an-entry"],
       { itemName: "Updated" }
     ).catch((error: unknown) => error);
 
@@ -90,10 +90,10 @@ describe("ledger entry update transport validation", () => {
   it("still refuses a ledger the caller does not own, before any validation", async () => {
     const { sourceDocumentId, entryId } = await seedOwnedEntry();
 
-    const rejection = await updateLedgerEntryAction(
+    const rejection = await batchUpdateLedgerEntriesAction(
       crypto.randomUUID(),
-      { sourceDocumentId, expectedVersion: 1 },
-      entryId,
+      [{ sourceDocumentId, expectedVersion: 1 }],
+      [entryId],
       { itemName: "Updated" }
     ).catch((error: unknown) => error);
 

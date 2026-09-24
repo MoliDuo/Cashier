@@ -125,8 +125,6 @@ export async function authenticateWithPassword(
   return {
     id: user.id,
     email: user.email,
-    name: user.name,
-    image: user.image,
     authVersion: user.authVersion,
   };
 }

@@ -6,7 +6,6 @@ export interface RuntimeEnv {
   readonly openaiApiKey: string;
   readonly openaiBaseUrl: string;
   readonly hasOpenaiBaseUrl: boolean;
-  readonly appUrl: string;
   readonly authResendKey: string | undefined;
   readonly authEmailFrom: string;
   readonly authOtpPepper: string;
@@ -21,8 +20,6 @@ export interface RuntimeEnv {
   readonly timeZone: string;
   readonly aiModel: string;
   readonly databasePoolMax: number;
-  readonly logLevel: string;
-  readonly devAuthBypass: boolean;
 }
 
 function hasExplicitValue(name: string): boolean {
@@ -46,9 +43,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get hasOpenaiBaseUrl() {
     return hasExplicitValue("OPENAI_BASE_URL");
-  },
-  get appUrl() {
-    return getStartupEnvValue("APP_URL");
   },
   get authResendKey() {
     return getStartupEnvValue("AUTH_RESEND_KEY");
@@ -91,11 +85,5 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get databasePoolMax() {
     return getStartupEnvValue("DATABASE_POOL_MAX");
-  },
-  get logLevel() {
-    return getStartupEnvValue("LOG_LEVEL");
-  },
-  get devAuthBypass() {
-    return getStartupEnvValue("DEV_AUTH_BYPASS") === "true";
   },
 };

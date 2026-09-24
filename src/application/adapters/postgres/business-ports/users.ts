@@ -5,8 +5,6 @@ import { loginEmails, users } from "@/persistence";
 
 const accountColumns = {
   id: true,
-  name: true,
-  image: true,
   passwordHash: true,
   passwordUpdatedAt: true,
   authVersion: true,
@@ -14,8 +12,6 @@ const accountColumns = {
 
 type AccountRow = {
   id: string;
-  name: string | null;
-  image: string | null;
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
   authVersion: number;
@@ -41,8 +37,6 @@ function toAccount(row: AccountRow, email: string) {
   return {
     id: row.id,
     email,
-    name: row.name,
-    image: row.image,
     passwordHash: row.passwordHash,
     passwordUpdatedAt: row.passwordUpdatedAt,
     authVersion: row.authVersion,
@@ -54,8 +48,6 @@ export const postgresUserAccountAdapter: UserAccountPort = {
     const row = await db
       .select({
         id: users.id,
-        name: users.name,
-        image: users.image,
         passwordHash: users.passwordHash,
         passwordUpdatedAt: users.passwordUpdatedAt,
         authVersion: users.authVersion,

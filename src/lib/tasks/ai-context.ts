@@ -50,10 +50,8 @@ export function createAIContext({ signal, getClient, model }: CreateAIContextOpt
       const maxTokens = options.maxTokens ?? 8192;
       const temperature = options.temperature ?? 1;
 
-      // Do not send response_format to the API — not all models support it.
-      // JSON validation and repair is handled post-response via extractJson/isValidJson.
-      const responseFormat = undefined;
-
+      // No response_format: not every model supports it, so JSON is validated
+      // and repaired after the response instead.
       // Call OpenAI (signal is passed internally for cancellation)
       const requestSignal =
         options.signal == null ? signal : AbortSignal.any([signal, options.signal]);
@@ -63,7 +61,6 @@ export function createAIContext({ signal, getClient, model }: CreateAIContextOpt
         model,
         maxTokens,
         temperature,
-        responseFormat,
         requestSignal
       );
 
@@ -107,7 +104,6 @@ export function createAIContext({ signal, getClient, model }: CreateAIContextOpt
             model,
             8192,
             1,
-            undefined,
             requestSignal
           );
 

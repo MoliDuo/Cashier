@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ZodError } from "zod";
-import { AppError } from "@/lib/errors";
+import { AppError, ValidationError } from "@/lib/errors";
 
 const {
   requireLedgerAccessMock,
@@ -139,13 +138,13 @@ describe("source document batch server actions", () => {
   });
 
   it("refuses an empty batch and a duplicated target", async () => {
-    await expect(batchDeleteSourceDocumentsAction(ledgerId, [])).rejects.toThrow(ZodError);
+    await expect(batchDeleteSourceDocumentsAction(ledgerId, [])).rejects.toThrow(ValidationError);
     await expect(
       batchDeleteSourceDocumentsAction(ledgerId, [
         { sourceDocumentId, expectedVersion: 1 },
         { sourceDocumentId, expectedVersion: 2 },
       ])
-    ).rejects.toThrow(ZodError);
+    ).rejects.toThrow(ValidationError);
     expect(deleteDocumentsMock).not.toHaveBeenCalled();
   });
 });

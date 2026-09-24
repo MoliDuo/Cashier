@@ -3,10 +3,7 @@ import { getTestDb } from "../../setup";
 import { currencyRates } from "@/persistence/schema/currency";
 import { ledgers } from "@/persistence";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
-import {
-  batchConvertCurrencyAction,
-  convertCurrencyAction,
-} from "@/modules/currency/server-actions/convert-currency";
+import { convertCurrencyAction } from "@/modules/currency/server-actions/convert-currency";
 
 const LEDGER_ID = "10000000-0000-4000-8000-000000000001";
 
@@ -32,23 +29,5 @@ describe("currency action composition", () => {
     const result = await convertCurrencyAction(LEDGER_ID, "100", "CNY", "USD", "2026-02-04");
 
     expect(Number.parseFloat(result.converted)).toBeCloseTo(14.67, 1);
-  });
-
-  it("uses each item's date and preserves batch input order", async () => {
-    await insertRates("2026-02-03", { CNY: 7.6, USD: 1.08 });
-
-    const result = await batchConvertCurrencyAction(
-      LEDGER_ID,
-      [
-        { amount: "100", currency: "CNY", date: "2026-02-04" },
-        { amount: "100", currency: "CNY", date: "2026-02-03" },
-      ],
-      "USD"
-    );
-
-    expect(result.results.map(Number.parseFloat)).toEqual([
-      expect.closeTo(14.67, 1),
-      expect.closeTo(14.21, 1),
-    ]);
   });
 });

@@ -13,19 +13,14 @@ export type ModalItem = {
 
 interface ModalStackState {
   stack: ModalItem[];
-  canGoBack: boolean;
   push: (item: ModalItem) => void;
   pop: () => void;
   closeAll: () => void;
   syncToDetail: (item: ModalItem | null) => void;
-
-  // Helper to check if a specific ID is open (useful for ensuring we don't open duplicates if we don't want to)
-  isOpen: (id: string) => boolean;
 }
 
-export const useModalStackStore = create<ModalStackState>((set, get) => ({
+export const useModalStackStore = create<ModalStackState>((set) => ({
   stack: [],
-  canGoBack: false,
 
   push: (item) =>
     set((state) => {
@@ -37,20 +32,20 @@ export const useModalStackStore = create<ModalStackState>((set, get) => ({
       );
       const stack =
         existingIndex === -1 ? [...state.stack, item] : state.stack.slice(0, existingIndex + 1);
-      return { stack, canGoBack: stack.length > 1 };
+      return { stack };
     }),
 
   pop: () =>
     set((state) => {
       const stack = state.stack.slice(0, -1);
-      return { stack, canGoBack: stack.length > 1 };
+      return { stack };
     }),
 
-  closeAll: () => set({ stack: [], canGoBack: false }),
+  closeAll: () => set({ stack: [] }),
 
   syncToDetail: (item) =>
     set((state) => {
-      if (item == null) return { stack: [], canGoBack: false };
+      if (item == null) return { stack: [] };
       const existingIndex = state.stack.findIndex(
         (existing) =>
           existing.type === item.type &&
@@ -58,8 +53,6 @@ export const useModalStackStore = create<ModalStackState>((set, get) => ({
           existing.ledgerId === item.ledgerId
       );
       const stack = existingIndex === -1 ? [item] : state.stack.slice(0, existingIndex + 1);
-      return { stack, canGoBack: stack.length > 1 };
+      return { stack };
     }),
-
-  isOpen: (id) => get().stack.some((item) => item.id === id),
 }));

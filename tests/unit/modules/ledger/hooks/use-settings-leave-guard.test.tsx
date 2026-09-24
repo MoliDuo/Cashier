@@ -33,25 +33,4 @@ describe("useSettingsLeaveGuard", () => {
     act(() => result.current.confirmLeave());
     expect(continuation).toHaveBeenCalledOnce();
   });
-
-  it("restores independent-page history before prompting", async () => {
-    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
-    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const { result } = renderHook(() => useSettingsLeaveGuard({ managePopState: true }));
-
-    act(() => useUnsavedChangesStore.getState().setDirty("settings:appearance", true));
-    await waitFor(() =>
-      expect(useUnsavedChangesStore.getState().getLeaveGuard("settings-navigation")).not.toBeNull()
-    );
-
-    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
-    expect(go).toHaveBeenCalledWith(1);
-    expect(result.current.leaveConfirmOpen).toBe(false);
-
-    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
-    expect(result.current.leaveConfirmOpen).toBe(true);
-
-    act(() => result.current.confirmLeave());
-    expect(back).toHaveBeenCalledOnce();
-  });
 });

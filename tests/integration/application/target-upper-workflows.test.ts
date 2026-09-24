@@ -410,10 +410,10 @@ describe("target upper workflows", () => {
     });
     const initialVersion = await currentVersion(created.sourceDocumentId);
 
-    const updated = await serverComposition.sourceDocumentAggregate.updateEntries({
+    const updated = await serverComposition.sourceDocumentAggregate.batchUpdateEntries({
       ledgerId,
-      target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: initialVersion },
-      ledgerEntryId: original!.id,
+      targets: [{ sourceDocumentId: created.sourceDocumentId, expectedVersion: initialVersion }],
+      ledgerEntryIds: [original!.id],
       amount: "18",
     });
     const document = await db.query.sourceDocuments.findFirst({
@@ -432,7 +432,7 @@ describe("target upper workflows", () => {
       ),
     });
 
-    expect(updated).toMatchObject({ ok: true, data: { ledgerEntryId: original!.id } });
+    expect(updated).toMatchObject({ ok: true, data: { ledgerEntryIds: [original!.id] } });
     expect(document?.activeRevisionId).toBe(created.revisionId);
     expect(document?.version).toBe(initialVersion + 1);
     expect(revisions).toHaveLength(1);
@@ -475,10 +475,10 @@ describe("target upper workflows", () => {
     });
 
     const versionBeforeUpdate = await currentVersion(pending.document.id);
-    await serverComposition.sourceDocumentAggregate.updateEntries({
+    await serverComposition.sourceDocumentAggregate.batchUpdateEntries({
       ledgerId,
-      target: { sourceDocumentId: pending.document.id, expectedVersion: versionBeforeUpdate },
-      ledgerEntryId: original!.id,
+      targets: [{ sourceDocumentId: pending.document.id, expectedVersion: versionBeforeUpdate }],
+      ledgerEntryIds: [original!.id],
       amount: "18",
     });
     const afterUpdate = await db.query.sourceDocuments.findFirst({
@@ -493,13 +493,15 @@ describe("target upper workflows", () => {
     expect(stats.convertedTotal).toEqual({ total: "18", currency: "CNY" });
 
     await expect(
-      serverComposition.sourceDocumentAggregate.updateEntries({
+      serverComposition.sourceDocumentAggregate.batchUpdateEntries({
         ledgerId,
-        target: {
-          sourceDocumentId: pending.document.id,
-          expectedVersion: afterUpdate!.version,
-        },
-        ledgerEntryId: original!.id,
+        targets: [
+          {
+            sourceDocumentId: pending.document.id,
+            expectedVersion: afterUpdate!.version,
+          },
+        ],
+        ledgerEntryIds: [original!.id],
         categoryId: otherCategory!.id,
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -509,13 +511,15 @@ describe("target upper workflows", () => {
     expect(afterRollback?.activeRevisionId).toBe(afterUpdate?.activeRevisionId);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(revisionCount);
     await expect(
-      serverComposition.sourceDocumentAggregate.updateEntries({
+      serverComposition.sourceDocumentAggregate.batchUpdateEntries({
         ledgerId: otherLedgerId,
-        target: {
-          sourceDocumentId: pending.document.id,
-          expectedVersion: afterUpdate!.version,
-        },
-        ledgerEntryId: original!.id,
+        targets: [
+          {
+            sourceDocumentId: pending.document.id,
+            expectedVersion: afterUpdate!.version,
+          },
+        ],
+        ledgerEntryIds: [original!.id],
         amount: "99",
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });

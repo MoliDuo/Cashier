@@ -18,10 +18,10 @@
 
 ## PostgreSQL
 
-| 变量                | 必需     | 默认值 | 说明                                           |
-| ------------------- | -------- | ------ | ---------------------------------------------- |
-| `DATABASE_URL`      | 外部模式 | 无     | 必须是 `postgres://` 或 `postgresql://` 地址。 |
-| `DATABASE_POOL_MAX` | 否       | `2`    | 连接池上限，范围 1–50。                        |
+| 变量                | 必需 | 默认值 | 说明                                           |
+| ------------------- | ---- | ------ | ---------------------------------------------- |
+| `DATABASE_URL`      | 是   | 无     | 必须是 `postgres://` 或 `postgresql://` 地址。 |
+| `DATABASE_POOL_MAX` | 否   | `2`    | 连接池上限，范围 1–50。                        |
 
 `.env.local.example` 提供指向 `docker-compose.local.yml` 中 PostgreSQL 的 `DATABASE_URL`。
 
@@ -29,12 +29,12 @@
 
 | 变量                   | 必需       | 默认值        | 说明                                   |
 | ---------------------- | ---------- | ------------- | -------------------------------------- |
-| `S3_ENDPOINT`          | 外部模式   | 无            | 服务端访问的 S3 兼容端点。             |
+| `S3_ENDPOINT`          | 是         | 无            | 服务端访问的 S3 兼容端点。             |
 | `S3_PUBLIC_ENDPOINT`   | 视部署而定 | `S3_ENDPOINT` | 浏览器直传时可访问的端点。             |
 | `S3_REGION`            | 否         | `auto`        | R2 使用 `auto`；其他服务按供应商配置。 |
-| `S3_BUCKET`            | 外部模式   | 无            | 已经存在的私有存储桶名称。             |
-| `S3_ACCESS_KEY_ID`     | 外部模式   | 无            | S3 访问密钥 ID。                       |
-| `S3_SECRET_ACCESS_KEY` | 外部模式   | 无            | S3 访问密钥。                          |
+| `S3_BUCKET`            | 是         | 无            | 已经存在的私有存储桶名称。             |
+| `S3_ACCESS_KEY_ID`     | 是         | 无            | S3 访问密钥 ID。                       |
+| `S3_SECRET_ACCESS_KEY` | 是         | 无            | S3 访问密钥。                          |
 | `S3_FORCE_PATH_STYLE`  | 否         | `false`       | MinIO 等服务通常需要设为 `true`。      |
 
 `npm run docker:local` 会启动 MinIO 并自动创建 `cashier` 桶。
@@ -46,7 +46,7 @@
 | `AUTH_SECRET`     | 运行时 | 本地模板提供                    | Auth.js 会话签名密钥。                                           |
 | `API_KEY_PEPPER`  | 运行时 | 本地模板提供                    | 服务凭证哈希使用的 pepper。                                      |
 | `AUTH_OTP_PEPPER` | 运行时 | 本地模板提供                    | 邮箱验证码哈希使用的 pepper。                                    |
-| `AUTH_RESEND_KEY` | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和注册。                         |
+| `AUTH_RESEND_KEY` | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和添加登录邮箱。                 |
 | `AUTH_EMAIL_FROM` | 否     | `Cashier <noreply@example.com>` | 邮箱验证码的发件人。                                             |
 | `DEV_AUTH_BYPASS` | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。 |
 

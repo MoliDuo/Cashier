@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { entryCategories, ledgerEntries, ledgers, loginEmails, users } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import {
   activateTestSourceDocumentProjection,
@@ -27,7 +27,7 @@ async function seedEntry(
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       documentDate: opts.entryDate ?? null,
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -39,7 +39,7 @@ async function seedEntry(
   }
 
   await db.insert(ledgerEntries).values({
-    id: uuidv4(),
+    id: randomUUID(),
     ledgerId,
     sourceDocumentId: doc.id,
     itemName: "Test Item",
@@ -58,7 +58,7 @@ describe("getLedgerStatsAction", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -114,7 +114,7 @@ describe("getLedgerStatsAction", () => {
 
   it("groups raw totals by category and effective currency", async () => {
     const db = getTestDb();
-    const categoryId = uuidv4();
+    const categoryId = randomUUID();
     await db.insert(entryCategories).values({
       id: categoryId,
       ledgerId,
@@ -192,7 +192,7 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by categoryId", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -379,7 +379,7 @@ describe("getLedgerStatsAction", () => {
       emailVerified: new Date(),
     });
 
-    const otherLedgerId = uuidv4();
+    const otherLedgerId = randomUUID();
     await db.insert(ledgers).values({
       id: otherLedgerId,
       userId: OTHER_USER_ID,

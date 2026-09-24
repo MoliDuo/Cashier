@@ -15,8 +15,6 @@ const dependencies = { ledgers };
 const principal: AuthenticatedPrincipal = {
   id: "user-1",
   email: "user@example.com",
-  name: "User",
-  image: null,
   authVersion: 1,
 };
 

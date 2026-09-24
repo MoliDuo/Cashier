@@ -49,13 +49,6 @@ export interface AIClient {
     model: string,
     maxTokens?: number,
     temperature?: number,
-    responseFormat?:
-      | { type: "text" }
-      | { type: "json_object" }
-      | {
-          type: "json_schema";
-          json_schema: { name: string; schema: Record<string, unknown>; strict?: boolean };
-        },
     signal?: AbortSignal
   ): Promise<AIResponse>;
 }

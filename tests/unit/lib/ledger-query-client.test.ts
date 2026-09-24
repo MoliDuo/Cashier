@@ -14,3 +14,17 @@ describe("ledger query errors", () => {
     }
   );
 });
+
+describe("ledger query timeout", () => {
+  it("bounds every query with a fifteen-second abort signal", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: "ledger" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getLedgerAction("ledger");
+
+    expect(timeout).toHaveBeenCalledWith(15_000);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ signal: timeout.mock.results[0]?.value });
+    timeout.mockRestore();
+  });
+});

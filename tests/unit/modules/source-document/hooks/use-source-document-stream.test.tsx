@@ -200,16 +200,6 @@ describe("useSourceDocumentStream", () => {
     });
   });
 
-  it("disables the refresh scope when enableRefresh is false", async () => {
-    renderHook(() => useTestSourceDocumentStream("ledger-1", { enableRefresh: false }), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(useLedgerRefreshPollingMock).toHaveBeenCalledWith("ledger-1", false);
-    });
-  });
-
   it("fetches the first page on mount and returns stream groups", async () => {
     const { result } = renderHook(() => useTestSourceDocumentStream("ledger-1"), {
       wrapper: createWrapper(),
@@ -452,7 +442,9 @@ describe("useSourceDocumentStream", () => {
     expect(listStreamPageActionMock).toHaveBeenCalledTimes(2);
     expect(reset).not.toHaveBeenCalled();
     expect(
-      queryClient.getQueryData<{ pages: unknown[] }>(result.current.queryKey)?.pages
+      queryClient.getQueryData<{ pages: unknown[] }>(
+        buildStreamQueryDescriptor({ ledgerId: "ledger-1" }).queryKey
+      )?.pages
     ).toHaveLength(2);
   });
 

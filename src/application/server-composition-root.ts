@@ -2,7 +2,6 @@ import "server-only";
 import {
   postgresBookAdapter,
   postgresCategoryAdapter,
-  postgresCurrencyAdapter,
   postgresLedgerAdapter,
   postgresOtpTokenAdapter,
   postgresServiceCredentialAdapter,
@@ -11,7 +10,6 @@ import {
   postgresUserAccountAdapter,
   calculateCompletedSourceDocumentTotal,
   getTargetSourceDocument,
-  getTargetSourceDocumentAccessContext,
   getSourceDocumentInput,
   PostgresProcessingJobAdapter,
   listTargetSourceDocuments,
@@ -37,10 +35,7 @@ import { calculateLedgerEntryStats } from "@/application/adapters/postgres/ledge
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-views-by-source-document-ids";
 import { hasActiveLedgerEntries } from "@/application/adapters/postgres/ledger-reads/has-active-entries";
 import { getEnhancedStatsQuery } from "@/application/adapters/postgres/ledger-reads/get-enhanced-stats";
-import {
-  postgresFxRateBook,
-  fetchWithRetry as fetchExchangeRatesWithRetry,
-} from "@/application/adapters/postgres/exchange-rate";
+import { postgresFxRateBook } from "@/application/adapters/postgres/exchange-rate";
 import { categoryMetadataGeneratorAdapter } from "@/application/adapters/ai/category-metadata-generator";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
@@ -86,10 +81,8 @@ export const serverComposition = {
   books: postgresBookAdapter,
   rateLimiter: postgresRateLimiter,
   categories: postgresCategoryAdapter,
-  currencies: postgresCurrencyAdapter,
   email: resendEmailAdapter,
   exchangeRates: postgresFxRateBook,
-  fetchExchangeRatesWithRetry,
   ledgers: postgresLedgerAdapter,
   ledgerReads: {
     hasActiveEntries: hasActiveLedgerEntries,
@@ -114,7 +107,6 @@ export const serverComposition = {
     calculateCompletedTotal: calculateCompletedSourceDocumentTotal,
     getInput: getSourceDocumentInput,
     get: getTargetSourceDocument,
-    getAccessContext: getTargetSourceDocumentAccessContext,
     list: listTargetSourceDocuments,
   },
   credentialSourceDocuments: postgresCredentialSourceDocumentReadAdapter,

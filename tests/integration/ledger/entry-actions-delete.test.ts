@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
@@ -34,7 +34,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       documentDate: entryDate ?? null,
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -53,7 +53,7 @@ describe("deleteLedgerEntryAction", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -67,7 +67,7 @@ describe("deleteLedgerEntryAction", () => {
     const [entry] = await db
       .insert(ledgerEntries)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Test",

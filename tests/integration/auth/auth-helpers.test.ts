@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, loginEmails, users } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
 // Override the global auth mock for specific tests
@@ -33,7 +33,7 @@ describe("requireLedgerAccess", () => {
   beforeEach(async () => {
     mockSession();
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
 
     // Clean up any existing ledgers for this user first (due to unique constraint)
     await db.delete(ledgers).where(eq(ledgers.userId, TEST_USER_ID));
@@ -53,7 +53,7 @@ describe("requireLedgerAccess", () => {
 
   it("returns 404 error when ledger belongs to another user", async () => {
     const db = getTestDb();
-    const otherUserId = uuidv4();
+    const otherUserId = randomUUID();
 
     await db.insert(users).values({ id: otherUserId }).onConflictDoNothing();
     await db.insert(loginEmails).values({
@@ -62,7 +62,7 @@ describe("requireLedgerAccess", () => {
       emailVerified: new Date(),
     });
 
-    const otherLedgerId = uuidv4();
+    const otherLedgerId = randomUUID();
     await db.insert(ledgers).values({
       id: otherLedgerId,
       userId: otherUserId,
@@ -77,15 +77,15 @@ describe("requireLedgerAccess", () => {
 
   it("returns 404 error for soft-deleted ledger", async () => {
     const db = getTestDb();
-    const deletedLedgerId = uuidv4();
-    const anotherUserId = uuidv4();
+    const deletedLedgerId = randomUUID();
+    const anotherUserId = randomUUID();
 
     // Use a different user to avoid unique constraint violation
     // (TEST_USER_ID already has a ledger from beforeEach)
     await db.insert(users).values({ id: anotherUserId }).onConflictDoNothing();
     await db.insert(loginEmails).values({
       userId: anotherUserId,
-      email: `deleted-ledger-${uuidv4()}@example.com`,
+      email: `deleted-ledger-${randomUUID()}@example.com`,
       emailVerified: new Date(),
     });
 
@@ -96,7 +96,7 @@ describe("requireLedgerAccess", () => {
     });
 
     // Mock session as the another user to test access to their deleted ledger
-    mockSession(anotherUserId, `deleted-ledger-${uuidv4()}@example.com`);
+    mockSession(anotherUserId, `deleted-ledger-${randomUUID()}@example.com`);
 
     await expect(requireLedgerAccess(deletedLedgerId)).rejects.toThrow(NotFoundError);
   });

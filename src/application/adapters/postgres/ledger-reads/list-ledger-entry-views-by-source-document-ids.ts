@@ -1,6 +1,5 @@
-import { and, asc, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { forLedger } from "@/lib/db/scoped-query";
 import { ledgerEntries } from "@/persistence";
 import { mapLedgerEntryEmbeddedViewDto } from "./mappers";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
@@ -23,10 +22,10 @@ export async function listLedgerEntryViewsBySourceDocumentIds({
     return entriesBySourceDocumentId;
   }
 
-  const q = forLedger(ledgerEntries, ledgerId);
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
-      q.whereActive,
+      eq(ledgerEntries.ledgerId, ledgerId),
+      isNull(ledgerEntries.deletedAt),
       inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds),
       buildLedgerEntryVisibilityCondition(ledgerId)
     ),

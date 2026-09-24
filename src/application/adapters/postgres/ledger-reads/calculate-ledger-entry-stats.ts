@@ -1,6 +1,5 @@
-import { sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { forLedger } from "@/lib/db/scoped-query";
 import { ledgerEntries } from "@/persistence";
 import {
   buildLedgerEntryEffectiveDateConditions,
@@ -40,7 +39,10 @@ export async function calculateLedgerEntryStats({
   ledgerId,
   filters,
 }: CalculateLedgerEntryStatsInput): Promise<LedgerEntrySummary> {
-  const tenantCondition = forLedger(ledgerEntries, ledgerId).whereActive;
+  const tenantCondition = and(
+    eq(ledgerEntries.ledgerId, ledgerId),
+    isNull(ledgerEntries.deletedAt)
+  );
   const { currency, ...filtersWithoutCurrency } = filters;
   const valueConditions = joinConditions(buildLedgerEntryValueConditions(filtersWithoutCurrency));
   const dateConditions = joinConditions(buildLedgerEntryEffectiveDateConditions(filters));

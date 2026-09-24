@@ -32,8 +32,8 @@ export function scheduleCategoryReclassificationAfter(jobId: string, ledgerId: s
 /**
  * Schedules a recovery pass for one ledger. Called from the status query the
  * client is already polling, so a run whose `after()` callback died (a
- * restarted process, a closed tab) is picked up on the next poll instead of
- * waiting for the periodic drain.
+ * restarted process, a closed tab) is picked up on the next poll; there is no
+ * cron to find it otherwise.
  */
 export function scheduleCategoryReclassificationRecoveryAfter(
   ledgerId: string,

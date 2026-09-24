@@ -174,8 +174,6 @@ export const authOptions = {
             ...session.user,
             id: dbUser.id,
             email: dbUser.email,
-            name: dbUser.name,
-            image: dbUser.image,
             hasPassword: dbUser.passwordHash != null,
             passwordUpdatedAt: dbUser.passwordUpdatedAt?.toISOString() ?? null,
             authenticatedAt: authenticatedAtDate.toISOString(),

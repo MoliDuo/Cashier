@@ -3,13 +3,3 @@
 export interface ConvertCurrencyResult {
   converted: string;
 }
-
-export interface BatchConversionItem {
-  amount: string;
-  currency: string;
-  date?: string;
-}
-
-export interface BatchConvertCurrencyResult {
-  results: string[];
-}

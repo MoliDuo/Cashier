@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import { entryCategories, ledgerEntries, ledgers } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 
 import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
 import {
@@ -32,7 +32,7 @@ describe("getEntryCategoriesAction", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -43,9 +43,9 @@ describe("getEntryCategoriesAction", () => {
   it("returns categories sorted by sortOrder", async () => {
     const db = getTestDb();
     await db.insert(entryCategories).values([
-      { id: uuidv4(), ledgerId, name: "B", sortOrder: 2 },
-      { id: uuidv4(), ledgerId, name: "A", sortOrder: 1 },
-      { id: uuidv4(), ledgerId, name: "C", sortOrder: 3 },
+      { id: randomUUID(), ledgerId, name: "B", sortOrder: 2 },
+      { id: randomUUID(), ledgerId, name: "A", sortOrder: 1 },
+      { id: randomUUID(), ledgerId, name: "C", sortOrder: 3 },
     ]);
 
     const result = await getTargetEntryCategoriesAction(ledgerId);
@@ -55,8 +55,8 @@ describe("getEntryCategoriesAction", () => {
   it("excludes soft-deleted categories", async () => {
     const db = getTestDb();
     await db.insert(entryCategories).values([
-      { id: uuidv4(), ledgerId, name: "Active", sortOrder: 1 },
-      { id: uuidv4(), ledgerId, name: "Deleted", sortOrder: 2, deletedAt: new Date() },
+      { id: randomUUID(), ledgerId, name: "Active", sortOrder: 1 },
+      { id: randomUUID(), ledgerId, name: "Deleted", sortOrder: 2, deletedAt: new Date() },
     ]);
 
     const result = await getTargetEntryCategoriesAction(ledgerId);
@@ -68,7 +68,7 @@ describe("getEntryCategoriesAction", () => {
 
   it("includes entry count per category", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -79,7 +79,7 @@ describe("getEntryCategoriesAction", () => {
     const [doc] = await db
       .insert(sourceDocuments)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
@@ -91,7 +91,7 @@ describe("getEntryCategoriesAction", () => {
 
     await db.insert(ledgerEntries).values([
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Item 1",
@@ -100,7 +100,7 @@ describe("getEntryCategoriesAction", () => {
         categoryId: catId,
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Item 2",
@@ -118,7 +118,7 @@ describe("getEntryCategoriesAction", () => {
 
   it("excludes entries linked to deleted source documents from category counts", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -129,7 +129,7 @@ describe("getEntryCategoriesAction", () => {
     const [activeDoc] = await db
       .insert(sourceDocuments)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
@@ -142,7 +142,7 @@ describe("getEntryCategoriesAction", () => {
     const [deletedDoc] = await db
       .insert(sourceDocuments)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         deletedAt: new Date(),
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -155,7 +155,7 @@ describe("getEntryCategoriesAction", () => {
 
     await db.insert(ledgerEntries).values([
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: activeDoc.id,
         itemName: "Active doc entry",
@@ -164,7 +164,7 @@ describe("getEntryCategoriesAction", () => {
         categoryId: catId,
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: deletedDoc.id,
         itemName: "Deleted doc entry",

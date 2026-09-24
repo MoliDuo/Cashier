@@ -16,8 +16,6 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface AccountSettingsProps {
-  /** The account's full login-email list, hydrated by the server when available. */
-  initialEmails?: readonly string[];
   /** The address this session signed in with, for the list's first frame. */
   userEmail?: string;
   hasPassword: boolean;
@@ -41,7 +39,6 @@ interface AccountSettingsProps {
 }
 
 export function AccountSettings({
-  initialEmails,
   userEmail,
   hasPassword,
   passwordUpdatedAt,
@@ -84,7 +81,6 @@ export function AccountSettings({
       />
       <SettingsSection title={t("account")}>
         <EmailSettings
-          {...(initialEmails !== undefined ? { initialEmails } : {})}
           {...(userEmail !== undefined ? { userEmail } : {})}
           onRequireReauthentication={onRequireReauthentication}
           onAllSessionsEnded={onAllSessionsEnded}

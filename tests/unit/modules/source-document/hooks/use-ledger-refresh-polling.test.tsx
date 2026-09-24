@@ -208,17 +208,4 @@ describe("useLedgerRefreshPolling", () => {
     resolve(unchanged);
     await flush();
   });
-
-  it("times out a refresh after fifteen seconds", async () => {
-    getStreamRefreshActionMock.mockReturnValue(new Promise(() => undefined));
-    const { wrapper } = setup();
-    const { result } = renderHook(() => useLedgerRefreshPolling("ledger-1"), { wrapper });
-    await flush();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(15_000);
-    });
-
-    await vi.waitFor(() => expect(result.current.isError).toBe(true));
-  });
 });

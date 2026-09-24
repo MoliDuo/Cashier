@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useEffect, useCallback } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { listStreamPageAction } from "@/lib/queries/ledger-query-client";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
@@ -10,18 +10,13 @@ import {
   buildUnifiedStreamGroups,
   type UnifiedStreamGroup,
 } from "@/modules/source-document/stream-grouping";
-import type {
-  LedgerRefreshResult,
-  StreamRefreshResult,
-} from "@/modules/source-document/contract-refresh";
+import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
 
 type StreamPage = Awaited<ReturnType<typeof listStreamPageAction>>;
 
 export interface UseSourceDocumentStreamOptions {
   mainCurrency?: string;
-  /** Enable refresh polling for this stream. */
-  enableRefresh?: boolean;
   queryDescriptor: {
     queryKey: readonly unknown[];
     filterSignature: string;
@@ -65,7 +60,7 @@ function seedRefreshBaseline(
 
 export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocumentStreamOptions) {
   const queryClient = useQueryClient();
-  const { enableRefresh = true, queryDescriptor, mainCurrency } = options;
+  const { queryDescriptor, mainCurrency } = options;
   const streamPageKey = queryDescriptor.queryKey;
   const filterSignature = queryDescriptor.filterSignature;
 
@@ -139,18 +134,7 @@ export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocu
   }, [data, ledgerId, queryClient, queryDescriptor, streamPageKey]);
 
   const firstPageAvailable = data?.pages[0] != null;
-  const refreshQuery = useLedgerRefreshPolling(ledgerId, enableRefresh && firstPageAvailable);
-  const refetchRefresh = refreshQuery.refetch;
-  const refresh = useCallback(async (): Promise<{
-    changed: boolean;
-    result?: StreamRefreshResult;
-  }> => {
-    const refreshed = await refetchRefresh();
-    return {
-      changed: refreshed.data?.changed ?? false,
-      ...(refreshed.data === undefined ? {} : { result: refreshed.data }),
-    };
-  }, [refetchRefresh]);
+  useLedgerRefreshPolling(ledgerId, firstPageAvailable);
 
   const items = useMemo(() => flattenAndDeduplicate(data?.pages), [data]);
 
@@ -162,16 +146,12 @@ export function useSourceDocumentStream(ledgerId: string, options: UseSourceDocu
   return {
     streamGroups,
     isLoading,
-    queryKey: streamPageKey,
     queryStatus: streamQuery.status,
-    queryIsFetching: streamQuery.isFetching,
     queryHasData: streamQuery.data !== undefined,
     refetch: streamQuery.refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isFetchNextPageError: streamQuery.isFetchNextPageError,
-    /** Call the bounded explicit refresh path. */
-    refresh,
   };
 }

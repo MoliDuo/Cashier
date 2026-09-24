@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { updateLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
+import { batchUpdateLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import { ValidationError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
@@ -11,12 +11,17 @@ import {
   TEST_USER_ID,
 } from "../../helpers/schema-setup";
 
-vi.mock("@/application/adapters/postgres/exchange-rate", () => {
-  const rateBook = { getRates: vi.fn(), convertBatch: vi.fn() };
-  return { ExchangeRateService: rateBook, postgresFxRateBook: rateBook, fetchWithRetry: vi.fn() };
-});
+/** A single-entry edit is a one-entry batch: the UI has no other update path. */
+function updateEntry(
+  ledgerId: string,
+  target: { sourceDocumentId: string; expectedVersion: number },
+  entryId: string,
+  data: Parameters<typeof batchUpdateLedgerEntriesAction>[3]
+) {
+  return batchUpdateLedgerEntriesAction(ledgerId, [target], [entryId], data);
+}
 
-describe("updateLedgerEntryAction version CAS", () => {
+describe("single-entry update version CAS", () => {
   let ledgerId: string;
   let sourceDocumentId: string;
   let entryId: string;
@@ -47,17 +52,13 @@ describe("updateLedgerEntryAction version CAS", () => {
   });
 
   it("preserves the entry ID and increments the document exactly once", async () => {
-    const result = await updateLedgerEntryAction(
-      ledgerId,
-      { sourceDocumentId, expectedVersion: 1 },
-      entryId,
-      { itemName: "Dinner" }
-    );
+    const result = await updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      itemName: "Dinner",
+    });
     expect(result).toEqual({
       ok: true,
-      sourceDocumentId,
-      version: 2,
-      data: { ledgerEntryId: entryId },
+      versions: [{ sourceDocumentId, version: 2 }],
+      data: { ledgerEntryIds: [entryId], affectedCount: 1 },
     });
     const entry = await getTestDb().query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
@@ -67,13 +68,10 @@ describe("updateLedgerEntryAction version CAS", () => {
   });
 
   it("does not write or increment for a no-op", async () => {
-    const result = await updateLedgerEntryAction(
-      ledgerId,
-      { sourceDocumentId, expectedVersion: 1 },
-      entryId,
-      { itemName: "Lunch" }
-    );
-    expect(result).toMatchObject({ ok: true, version: 1 });
+    const result = await updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      itemName: "Lunch",
+    });
+    expect(result).toMatchObject({ ok: true, versions: [{ version: 1 }] });
     const document = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
@@ -87,10 +85,10 @@ describe("updateLedgerEntryAction version CAS", () => {
       .where(eq(ledgerEntries.id, entryId));
 
     await expect(
-      updateLedgerEntryAction(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
         amount: "-6",
       })
-    ).resolves.toMatchObject({ ok: true, version: 2 });
+    ).resolves.toMatchObject({ ok: true, versions: [{ version: 2 }] });
 
     const entry = await getTestDb().query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
@@ -98,7 +96,7 @@ describe("updateLedgerEntryAction version CAS", () => {
     expect(entry).toMatchObject({ amount: "-6.000", convertedAmount: "-6.000" });
 
     await expect(
-      updateLedgerEntryAction(ledgerId, { sourceDocumentId, expectedVersion: 2 }, entryId, {
+      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 2 }, entryId, {
         amount: "6",
       })
     ).rejects.toBeInstanceOf(ValidationError);
@@ -110,10 +108,14 @@ describe("updateLedgerEntryAction version CAS", () => {
       .set({ version: 2 })
       .where(eq(sourceDocuments.id, sourceDocumentId));
     await expect(
-      updateLedgerEntryAction(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
         itemName: "Stale",
       })
-    ).resolves.toMatchObject({ ok: false, reason: "stale", currentVersion: 2 });
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: "stale",
+      staleTargets: [{ currentVersion: 2 }],
+    });
     const entry = await getTestDb().query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
     });
@@ -126,12 +128,12 @@ describe("updateLedgerEntryAction version CAS", () => {
       release = resolve;
     });
     const first = barrier.then(() =>
-      updateLedgerEntryAction(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
         itemName: "Dinner",
       })
     );
     const second = barrier.then(() =>
-      updateLedgerEntryAction(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
+      updateEntry(ledgerId, { sourceDocumentId, expectedVersion: 1 }, entryId, {
         description: "Team meal",
       })
     );
@@ -140,7 +142,10 @@ describe("updateLedgerEntryAction version CAS", () => {
     const results = await Promise.all([first, second]);
     expect(results.filter((result) => result.ok)).toHaveLength(1);
     expect(results.filter((result) => !result.ok)).toEqual([
-      expect.objectContaining({ reason: "stale", expectedVersion: 1, currentVersion: 2 }),
+      expect.objectContaining({
+        reason: "stale",
+        staleTargets: [expect.objectContaining({ expectedVersion: 1, currentVersion: 2 })],
+      }),
     ]);
 
     const [entry, document] = await Promise.all([

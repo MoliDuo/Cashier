@@ -151,9 +151,8 @@ export async function POST(request: Request) {
           break;
         case "reclassification":
           result = await getCategoryReclassificationJobAction(ledgerId);
-          // This poll is the recovery trigger: a run whose after() callback
-          // died is restarted on the next poll instead of waiting for the
-          // periodic drain.
+          // This poll is the recovery trigger: there is no cron, so a run
+          // whose after() callback died is restarted on the next poll.
           scheduleCategoryReclassificationRecoveryAfter(ledgerId);
           break;
         case "category-assignment-results":

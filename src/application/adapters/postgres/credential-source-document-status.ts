@@ -1,5 +1,5 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db } from "@/persistence/db";
+import { db } from "@/lib/db";
 import { ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { toStableFailureCode } from "@/application/contracts";
 import { accountingTotal } from "@/lib/money/accounting-total";

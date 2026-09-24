@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  currencyCodeSchema,
-  parseBatchConvertCurrencyInput,
-  parseConvertCurrencyInput,
-} from "@/modules/currency/contract-schemas";
+import { currencyCodeSchema, parseConvertCurrencyInput } from "@/modules/currency/contract-schemas";
 
 describe("currency contract schemas", () => {
   it("parses currency conversion input with the module contract schema", () => {
@@ -58,7 +54,7 @@ describe("currency contract schemas", () => {
     ).toThrow("Missing required parameters");
   });
 
-  it("accepts 1000 digits and rejects 1001 digits for single and batch input", () => {
+  it("accepts 1000 digits and rejects 1001 digits for conversion input", () => {
     const accepted = `1${"0".repeat(999)}`;
     const rejected = `1${"0".repeat(1000)}`;
 
@@ -66,50 +62,5 @@ describe("currency contract schemas", () => {
       accepted
     );
     expect(() => parseConvertCurrencyInput({ amount: rejected, from: "USD", to: "CNY" })).toThrow();
-    expect(
-      parseBatchConvertCurrencyInput({
-        items: [{ amount: accepted, currency: "USD" }],
-        targetCurrency: "CNY",
-      }).items[0]?.amount
-    ).toBe(accepted);
-    expect(() =>
-      parseBatchConvertCurrencyInput({
-        items: [{ amount: rejected, currency: "USD" }],
-        targetCurrency: "CNY",
-      })
-    ).toThrow();
-  });
-
-  it("rejects malformed batch input and over-sized batches", () => {
-    expect(() => parseBatchConvertCurrencyInput({ items: [], targetCurrency: "CNY" })).toThrow(
-      "Missing required parameters"
-    );
-    expect(() =>
-      parseBatchConvertCurrencyInput({
-        items: [{ amount: "1", currency: "ZZZ" }],
-        targetCurrency: "CNY",
-      })
-    ).toThrow("Missing required parameters");
-
-    const tooMany = Array.from({ length: 501 }, () => ({ amount: "1", currency: "USD" }));
-    expect(() => parseBatchConvertCurrencyInput({ items: tooMany, targetCurrency: "CNY" })).toThrow(
-      "Missing required parameters"
-    );
-  });
-
-  it("parses a valid batch with normalized currencies and optional dates", () => {
-    const parsed = parseBatchConvertCurrencyInput({
-      items: [
-        { amount: "-5", currency: " usd ", date: "2026-02-04" },
-        { amount: "0", currency: "EUR" },
-      ],
-      targetCurrency: " cny ",
-    });
-
-    expect(parsed.targetCurrency).toBe("CNY");
-    expect(parsed.items).toEqual([
-      { amount: "-5", currency: "USD", date: "2026-02-04" },
-      { amount: "0", currency: "EUR" },
-    ]);
   });
 });

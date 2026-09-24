@@ -3,18 +3,15 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useBatchSourceDocumentActions } from "@/modules/source-document/hooks/useBatchSourceDocumentActions";
-import { useSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useSourceDocumentRecoveryMutations";
 
 const {
   deleteSourceDocumentActionMock,
-  retrySourceDocumentActionMock,
   batchUpdateSourceDocumentsActionMock,
   toastSuccessMock,
   toastErrorMock,
   toastWarningMock,
 } = vi.hoisted(() => ({
   deleteSourceDocumentActionMock: vi.fn(),
-  retrySourceDocumentActionMock: vi.fn(),
   batchUpdateSourceDocumentsActionMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -41,9 +38,6 @@ vi.mock("@/modules/source-document/server-actions/batch", () => ({
 }));
 vi.mock("@/modules/source-document/server-actions/delete", () => ({
   deleteSourceDocumentAction: deleteSourceDocumentActionMock,
-}));
-vi.mock("@/modules/source-document/server-actions/retry", () => ({
-  retrySourceDocumentAction: retrySourceDocumentActionMock,
 }));
 
 function createWrapper(
@@ -212,41 +206,5 @@ describe("source document mutation toast ownership", () => {
     expect(clearSelection).not.toHaveBeenCalled();
     expect(toastSuccessMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith("selectionChanged");
-  });
-
-  it("reports direct retry success and failure exactly once", async () => {
-    const onSuccess = vi.fn();
-    const { result } = renderHook(
-      () =>
-        useSourceDocumentRecoveryMutations({
-          ledgerId: "ledger-1",
-          sourceDocumentId: "document-1",
-          version: 1,
-          onSuccess,
-        }),
-      { wrapper: createWrapper() }
-    );
-
-    retrySourceDocumentActionMock.mockResolvedValueOnce({
-      ok: true,
-      sourceDocumentId: "document-1",
-      version: 2,
-      data: { status: "processing" },
-    });
-    await act(async () => {
-      await result.current.retry();
-    });
-
-    expect(toastSuccessMock).toHaveBeenCalledWith("retrySuccess");
-    expect(toastSuccessMock).toHaveBeenCalledTimes(1);
-    expect(onSuccess).toHaveBeenCalledTimes(1);
-
-    retrySourceDocumentActionMock.mockRejectedValueOnce(new Error("retry failed"));
-    await act(async () => {
-      await expect(result.current.retry()).rejects.toThrow("retry failed");
-    });
-
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith("retryError"));
-    expect(toastErrorMock).toHaveBeenCalledTimes(1);
   });
 });

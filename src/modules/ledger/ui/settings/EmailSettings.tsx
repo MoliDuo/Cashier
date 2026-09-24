@@ -29,8 +29,6 @@ import type { LoginEmailErrorCode } from "@/modules/auth/server-actions/login-em
 import { SettingsField } from "./SettingsField";
 
 interface EmailSettingsProps {
-  /** The account's full login-email list, hydrated by the server when available. */
-  initialEmails?: readonly string[];
   /** The address this session signed in with, painted until the full list arrives. */
   userEmail?: string;
   onRequireReauthentication?: () => void | Promise<void>;
@@ -47,7 +45,6 @@ interface EmailSettingsProps {
  * 密码 and API 密钥 stand alone as cards because each saves on its own.
  */
 export function EmailSettings({
-  initialEmails,
   userEmail,
   onRequireReauthentication,
   onAllSessionsEnded,
@@ -60,7 +57,6 @@ export function EmailSettings({
     queryKey: key,
     queryFn: () => listLoginEmailsAction(),
     staleTime: LEDGER.STALE_TIME_MS,
-    ...(initialEmails !== undefined ? { initialData: [...initialEmails] } : {}),
   });
   // The in-page tab only knows the signed-in address, so the query fills in the
   // full list; until it answers (or if it fails) the address still paints, which

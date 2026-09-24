@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, sourceDocumentRevisions } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 
 const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
@@ -34,7 +34,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       documentDate: entryDate ?? null,
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -53,7 +53,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -69,7 +69,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .insert(ledgerEntries)
       .values(
         [10, 20, 30].map((amount, index) => ({
-          id: uuidv4(),
+          id: randomUUID(),
           ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Item ${index}`,
@@ -118,12 +118,12 @@ describe("batchDeleteLedgerEntriesAction", () => {
     expect(activeEntries[0]?.itemName).toBe("Item 2");
   });
 
-  it("resolves legacy projections before deletion instead of skipping their entries", async () => {
+  it("reports entries of a document without an active projection as not found", async () => {
     const db = getTestDb();
     const [doc] = await db
       .insert(sourceDocuments)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         documentDate: null,
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -134,10 +134,10 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .insert(ledgerEntries)
       .values(
         [10, 20].map((amount, index) => ({
-          id: uuidv4(),
+          id: randomUUID(),
           ledgerId,
           sourceDocumentId: doc!.id,
-          itemName: `Legacy ${index}`,
+          itemName: `Orphan ${index}`,
           amount: String(amount),
           currency: "CNY",
           convertedAmount: String(amount),
@@ -151,9 +151,8 @@ describe("batchDeleteLedgerEntriesAction", () => {
       entries.map((entry) => entry.id)
     );
 
-    // The legacy document has no canonical active projection, so the entries
-    // cannot be deleted. The per-entry delete path reports this as a failure
-    // (the projection resolution throws) instead of a silent skip.
+    // The document has no active projection, so the entries cannot be deleted.
+    // The per-entry delete path reports this as a failure instead of a silent skip.
     expect(result.succeeded).toEqual([]);
     expect(result.stale).toEqual([]);
     expect(result.failed.map((failure) => failure.id).sort()).toEqual(
@@ -169,7 +168,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     const [okEntry] = await db
       .insert(ledgerEntries)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: okDoc.id,
         itemName: "Keeper's sibling",
@@ -181,7 +180,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     await activateTestSourceDocumentProjection(db, okDoc.id);
     // A ledger entry that does not belong to `badDoc`'s active projection —
     // this group's transaction throws, so it must land in `failed`.
-    const foreignEntryId = uuidv4();
+    const foreignEntryId = randomUUID();
 
     const result = await batchDeleteLedgerEntriesAction(
       ledgerId,
@@ -215,7 +214,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .insert(ledgerEntries)
       .values(
         [10, 20].map((amount, index) => ({
-          id: uuidv4(),
+          id: randomUUID(),
           ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Group item ${index}`,
@@ -243,7 +242,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     const [inactiveEntry] = await db
       .insert(ledgerEntries)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         sourceDocumentRevisionId: otherRevision!.id,

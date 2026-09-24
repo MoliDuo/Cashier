@@ -52,7 +52,7 @@ export function buildChartPoints({
   rangeType,
   startDate,
   endDate,
-  locale = "en",
+  locale = "zh",
 }: BuildChartPointsInput): ChartPoint[] {
   if (!isValidDateString(startDate) || !isValidDateString(endDate) || startDate > endDate) {
     return [];

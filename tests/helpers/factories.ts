@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { TEST_USER_ID } from "./schema-setup";
 
 export function createLedgerData(
@@ -15,7 +15,7 @@ export function createLedgerData(
   }> = {}
 ) {
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     userId: TEST_USER_ID, // 默认使用测试用户，避免外键约束失败
     aiLanguage: "zh-CN",
     preferredCurrencies: [],
@@ -41,7 +41,7 @@ export function createCategoryData(
   }> = {}
 ) {
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     ledgerId,
     name: "餐饮",
     description: "外卖、堂食、食材采购",
@@ -70,10 +70,10 @@ export function createLedgerEntryData(
   }> = {}
 ) {
   // sourceDocumentId is required by schema, so generate one if not provided
-  const sourceDocumentId = overrides.sourceDocumentId ?? uuidv4();
+  const sourceDocumentId = overrides.sourceDocumentId ?? randomUUID();
 
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     ledgerId,
     categoryId: null,
     sourceDocumentId,
@@ -114,7 +114,7 @@ export function createSourceDocumentData(
     ...canonicalOverrides
   } = overrides;
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     ledgerId,
     title: null,
     documentDate: null,

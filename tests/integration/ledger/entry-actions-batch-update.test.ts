@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, entryCategories } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
 const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
@@ -38,7 +38,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       documentDate: entryDate ?? null,
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -57,7 +57,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -67,7 +67,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   it("batch updates categoryId for multiple entries", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -82,7 +82,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
       const [e] = await db
         .insert(ledgerEntries)
         .values({
-          id: uuidv4(),
+          id: randomUUID(),
           ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Item ${i}`,
@@ -125,7 +125,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   it("removes categories from entries when given categoryId null", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -140,7 +140,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
       const [e] = await db
         .insert(ledgerEntries)
         .values({
-          id: uuidv4(),
+          id: randomUUID(),
           ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Item ${i}`,
@@ -180,7 +180,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
         .insert(ledgerEntries)
         .values(
           Array.from({ length: 20 }, (_, index) => ({
-            id: uuidv4(),
+            id: randomUUID(),
             ledgerId,
             sourceDocumentId: doc.id,
             itemName: `Converted ${index}`,
@@ -209,7 +209,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   it("rolls back the entire atomic batch when one target is stale", async () => {
     const db = getTestDb();
-    const categoryId = uuidv4();
+    const categoryId = randomUUID();
     await db.insert(entryCategories).values({
       id: categoryId,
       ledgerId,
@@ -222,7 +222,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
         const [created] = await db
           .insert(ledgerEntries)
           .values({
-            id: uuidv4(),
+            id: randomUUID(),
             ledgerId,
             sourceDocumentId: document.id,
             itemName: `Atomic ${index}`,
@@ -305,7 +305,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
         .insert(ledgerEntries)
         .values([
           {
-            id: uuidv4(),
+            id: randomUUID(),
             ledgerId,
             sourceDocumentId: doc.id,
             itemName: "First",
@@ -313,7 +313,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
             currency: "CNY",
           },
           {
-            id: uuidv4(),
+            id: randomUUID(),
             ledgerId,
             sourceDocumentId: doc.id,
             itemName: "Second",

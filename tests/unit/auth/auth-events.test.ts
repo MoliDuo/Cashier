@@ -65,19 +65,14 @@ describe("auth.ts adapter wiring", () => {
     authenticateWithOTPMock.mockResolvedValue({
       id: "user-authenticate",
       email: "user@example.com",
-      name: "User",
-      image: null,
     });
     completeInteractiveSignInMock.mockImplementation(async (principal) => principal);
     getSessionUserMock.mockResolvedValue({
       id: "db-user",
       email: "db@example.com",
-      name: "DB User",
-      image: "db-image",
       passwordHash: "hashed-password",
       passwordUpdatedAt: new Date("2026-07-01T00:00:00.000Z"),
       authVersion: 1,
-      registrationCompletedAt: new Date("2026-06-01T00:00:00.000Z"),
     });
   });
 
@@ -115,8 +110,6 @@ describe("auth.ts adapter wiring", () => {
     authenticateWithPasswordMock.mockResolvedValueOnce({
       id: "db-user",
       email: "user@example.com",
-      name: null,
-      image: null,
       authVersion: 1,
       registrationCompletedAt: new Date(),
     });
@@ -165,8 +158,6 @@ describe("auth.ts adapter wiring", () => {
             user?: {
               id?: string;
               email?: string | null;
-              name?: string | null;
-              image?: string | null;
             };
           };
           token: { sub?: string | null; authVersion?: number; authenticatedAt?: number };
@@ -174,14 +165,12 @@ describe("auth.ts adapter wiring", () => {
           user?: {
             id?: string;
             email?: string | null;
-            name?: string | null;
-            image?: string | null;
           };
         }>)
       | undefined;
 
     const result = await sessionCallback?.({
-      session: { user: { id: "session-user", email: "old@example.com", name: "Old", image: null } },
+      session: { user: { id: "session-user", email: "old@example.com" } },
       token: { sub: "db-user", authVersion: 1, authenticatedAt: 1_800_000_000 },
     });
 
@@ -190,8 +179,6 @@ describe("auth.ts adapter wiring", () => {
       user: {
         id: "db-user",
         email: "db@example.com",
-        name: "DB User",
-        image: "db-image",
         hasPassword: true,
         passwordUpdatedAt: "2026-07-01T00:00:00.000Z",
         authenticatedAt: "2027-01-15T08:00:00.000Z",
@@ -227,8 +214,6 @@ describe("auth.ts adapter wiring", () => {
     getSessionUserMock.mockResolvedValueOnce({
       id: "db-user",
       email: "db@example.com",
-      name: null,
-      image: null,
       passwordHash: null,
       passwordUpdatedAt: null,
       authVersion: 2,
@@ -262,8 +247,6 @@ describe("auth.ts adapter wiring", () => {
             user?: {
               id?: string;
               email?: string | null;
-              name?: string | null;
-              image?: string | null;
             };
           };
           token: { sub?: string | null };
@@ -275,7 +258,7 @@ describe("auth.ts adapter wiring", () => {
     await expect(
       sessionCallback?.({
         session: {
-          user: { id: "session-user", email: "old@example.com", name: "Old", image: null },
+          user: { id: "session-user", email: "old@example.com" },
         },
         token: { sub: "missing-user" },
       })

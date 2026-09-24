@@ -8,7 +8,7 @@ import type {
 } from "@/modules/source-document/contracts";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { versionedTargetsSchema } from "@/modules/source-document/contract-schemas";
+import { parseVersionedTargets } from "@/modules/source-document/contract-schemas";
 import { retrySourceDocument } from "@/modules/source-document/application/use-cases/retry-source-document";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
@@ -94,7 +94,7 @@ async function runVersionedBatch(
 
 export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> =>
-    runVersionedBatch("delete", versionedTargetsSchema.parse(inputTargets), async (target) => {
+    runVersionedBatch("delete", parseVersionedTargets(inputTargets), async (target) => {
       const deleted = await serverComposition.sourceDocumentAggregate.deleteDocuments({
         ledgerId,
         target,
@@ -114,7 +114,7 @@ export const batchRetrySourceDocumentsAction = withSourceDocumentLedgerAccess(
     const intents: ProcessingJobContract[] = [];
     const result = await runVersionedBatch(
       "retry",
-      versionedTargetsSchema.parse(inputTargets),
+      parseVersionedTargets(inputTargets),
       async (target) => {
         const retried = await retrySourceDocument(
           {

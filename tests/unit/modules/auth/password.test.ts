@@ -70,8 +70,6 @@ describe("password authentication", () => {
     const account = {
       id: "user-id",
       email: "owner@example.com",
-      name: null,
-      image: null,
       passwordHash,
       passwordUpdatedAt: new Date(),
       authVersion: 1,
@@ -125,8 +123,6 @@ describe("password authentication", () => {
       findByEmail: vi.fn().mockResolvedValue({
         id: "user-id",
         email: "owner@example.com",
-        name: null,
-        image: null,
         passwordHash,
         passwordUpdatedAt: new Date(),
         authVersion: 2,
@@ -265,8 +261,6 @@ describe("password authentication", () => {
     const findByEmail = vi.fn().mockResolvedValue({
       id: "user-id",
       email: "owner@example.com",
-      name: null,
-      image: null,
       passwordHash,
       passwordUpdatedAt: new Date(),
       authVersion: 1,

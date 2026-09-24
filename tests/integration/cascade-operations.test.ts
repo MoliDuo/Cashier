@@ -36,7 +36,7 @@ import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categorie
 import {
   deleteLedgerEntryAction,
   createLedgerEntryAction,
-  updateLedgerEntryAction,
+  batchUpdateLedgerEntriesAction,
 } from "@/modules/ledger/server-actions/entries";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 
@@ -345,10 +345,10 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     expect(categories.find((c) => c.id === categoryB.id)?.entryCount).toBe(0);
 
     // Move entry from A to B
-    await updateLedgerEntryAction(
+    await batchUpdateLedgerEntriesAction(
       ledger.id,
-      { sourceDocumentId: entry.sourceDocumentId!, expectedVersion: 1 },
-      entry.id,
+      [{ sourceDocumentId: entry.sourceDocumentId!, expectedVersion: 1 }],
+      [entry.id],
       { categoryId: categoryB.id }
     );
 
@@ -370,10 +370,10 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     expect(await readUncategorizedCount(ledger.id)).toBe(0);
 
     // Remove category from entry
-    await updateLedgerEntryAction(
+    await batchUpdateLedgerEntriesAction(
       ledger.id,
-      { sourceDocumentId: entry.sourceDocumentId!, expectedVersion: 1 },
-      entry.id,
+      [{ sourceDocumentId: entry.sourceDocumentId!, expectedVersion: 1 }],
+      [entry.id],
       { categoryId: null }
     );
 

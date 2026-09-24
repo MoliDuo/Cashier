@@ -4,12 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getStreamRefreshAction } from "@/lib/queries/ledger-query-client";
 import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
 import { queryKeys } from "@/lib/query-keys";
-import { withQueryTimeout } from "@/lib/query-timeout";
 import { applyStreamRefreshToCache } from "./stream-refresh-cache";
 
 const REFRESH_INTERVAL_MS = 3_000;
 const REFRESH_STALE_TIME_MS = 3_000;
-const REFRESH_TIMEOUT_MS = 15_000;
 const MAX_ERROR_INTERVAL_MS = 30_000;
 const consecutiveFailures = new WeakMap<object, Map<string, number>>();
 
@@ -30,10 +28,9 @@ export function useLedgerRefreshPolling(ledgerId: string, enabled = true) {
     queryFn: async (): Promise<LedgerRefreshResult> => {
       try {
         const previous = queryClient.getQueryData<LedgerRefreshResult>(queryKey);
-        const result = await withQueryTimeout(
-          getStreamRefreshAction(ledgerId, { afterVersion: previous?.version ?? "0" }),
-          REFRESH_TIMEOUT_MS
-        );
+        const result = await getStreamRefreshAction(ledgerId, {
+          afterVersion: previous?.version ?? "0",
+        });
         await applyStreamRefreshToCache(queryClient, ledgerId, result);
         failureMap(queryClient).delete(ledgerId);
         return result;

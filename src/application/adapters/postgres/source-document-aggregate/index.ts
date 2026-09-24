@@ -28,7 +28,6 @@ export const postgresSourceDocumentAggregateAdapter: SourceDocumentAggregateWrit
   updateDocuments,
   updateEntryDates,
   addEntry: (input) => postgresLedgerEntryCommandAdapter.create(input),
-  updateEntries: (input) => postgresLedgerEntryCommandAdapter.update(input),
   deleteEntries: (input) => postgresLedgerEntryCommandAdapter.delete(input),
   batchUpdateEntries: (input) => postgresLedgerEntryCommandAdapter.batchUpdate(input),
   batchDeleteEntries: (input) => postgresLedgerEntryCommandAdapter.batchDelete(input),

@@ -1,13 +1,11 @@
 export interface AuthenticatedPrincipal {
   id: string;
   email: string | null;
-  name: string | null;
-  image: string | null;
   authVersion: number;
   /**
    * OTP-only: the verified token is claimed but not yet consumed. The
    * interactive sign-in orchestrator consumes it only after cross-module
-   * completion (shared ledger validation) succeeds, and releases it on failure.
+   * completion (live ledger validation) succeeds, and releases it on failure.
    */
 }
 

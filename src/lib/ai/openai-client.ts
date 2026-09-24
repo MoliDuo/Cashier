@@ -85,13 +85,6 @@ export class OpenAIClient {
     model: string,
     maxTokens?: number,
     temperature?: number,
-    responseFormat?:
-      | { type: "text" }
-      | { type: "json_object" }
-      | {
-          type: "json_schema";
-          json_schema: { name: string; schema: Record<string, unknown>; strict?: boolean };
-        },
     signal?: AbortSignal,
     options?: GenerateContentOptions
   ): Promise<{ content: string; usage?: { promptTokens: number; completionTokens: number } }> {
@@ -123,22 +116,12 @@ export class OpenAIClient {
           { role: "system", content: systemPrompt },
           ...messages,
         ];
-        const requestBase = {
+        const request: OpenAI.ChatCompletionCreateParamsNonStreaming = {
           model,
           messages: requestMessages,
           max_tokens: effectiveMaxTokens,
           temperature: effectiveTemperature,
         };
-        let request: OpenAI.ChatCompletionCreateParamsNonStreaming = requestBase;
-        if (responseFormat != null) {
-          request = {
-            ...requestBase,
-            response_format: responseFormat as Exclude<
-              OpenAI.ChatCompletionCreateParams["response_format"],
-              undefined
-            >,
-          };
-        }
         const requestOptions = { ...(signal !== undefined ? { signal } : {}), timeout: timeoutMs };
         const response = await this.withRequestSlot(signal, async () => {
           try {

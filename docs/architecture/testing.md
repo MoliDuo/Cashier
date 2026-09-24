@@ -35,8 +35,8 @@ flagged, and does not need a label saying so.
 Browser smoke tests live in `tests/smoke/` and run with Playwright against a production build.
 They exercise actual browser, authentication, server-action, and PostgreSQL boundaries. Each run
 owns a separate `smoke_<uuid>` database; desktop/mobile scenarios run serially with fresh browser
-contexts. The application creates the account's default ledger through its normal login flow.
-No existing user database is migrated, seeded, or truncated. See `CONTRIBUTING.md` for the command.
+contexts. The runner seeds one password account, its ledger, two books, and a few categories
+directly into that database. No existing user database is migrated, seeded, or truncated. See `CONTRIBUTING.md` for the command.
 
 Database-backed Vitest global setup provides a unique run ID and connection URL to its workers. Each
 isolated Vitest worker uses a schema
@@ -65,10 +65,6 @@ all tracked work before truncation or pool shutdown; synchronous and asynchronou
 fail the test. The bounded drain uses real timers even in fake-timer tests and retains timed-out
 work, so unfinished callbacks cannot silently cross into a fresh database fixture. Do not add
 deadlock retries around truncation to hide unfinished work.
-
-The PR selector skips integration only when every changed path is documentation (`docs/**`, root
-`README*.md`, `CONTRIBUTING.md`, or `AGENTS.md`). Empty or unknown change sets run both integration
-projects.
 
 ## Duplicate and compatibility coverage
 

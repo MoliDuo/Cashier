@@ -123,7 +123,6 @@ describe("formatRelativeDateLabel", () => {
   });
 
   it("writes an older day out in full, weekday and year included", () => {
-    expect(formatRelativeDateLabel("2026-07-15", "en-US", labels)).toBe("Wednesday, July 15, 2026");
     expect(formatRelativeDateLabel("2026-07-15", "zh", labels)).toBe("2026年7月15日 星期三");
   });
 
@@ -134,8 +133,8 @@ describe("formatRelativeDateLabel", () => {
     expect(
       formatInstantDateLabel("2026-09-11T02:00:00.000Z", "en-US", labels, "Pacific/Kiritimati")
     ).toBe("Yesterday");
-    expect(formatInstantDateLabel("2026-07-15T02:00:00.000Z", "en-US", labels, "UTC")).toBe(
-      "Wednesday, July 15, 2026"
+    expect(formatInstantDateLabel("2026-07-15T02:00:00.000Z", "zh", labels, "UTC")).toBe(
+      "2026年7月15日 星期三"
     );
   });
 

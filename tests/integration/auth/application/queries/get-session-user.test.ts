@@ -14,11 +14,7 @@ describe("getSessionUser", () => {
     const db = getTestDb();
     const userId = crypto.randomUUID();
 
-    await db.insert(users).values({
-      id: userId,
-      name: "Session Active",
-      image: "https://example.com/avatar.png",
-    });
+    await db.insert(users).values({ id: userId });
     await db.insert(loginEmails).values({
       userId: userId,
       email: "session-active@example.com",
@@ -31,8 +27,6 @@ describe("getSessionUser", () => {
     expect(result).toEqual({
       id: userId,
       email: "session-active@example.com",
-      name: "Session Active",
-      image: "https://example.com/avatar.png",
       passwordHash: null,
       passwordUpdatedAt: null,
       authVersion: 1,

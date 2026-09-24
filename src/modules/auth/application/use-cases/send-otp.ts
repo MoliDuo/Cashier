@@ -18,7 +18,6 @@ import type { RateLimiterPort } from "@/application/contracts";
 import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
 
 type OTPAuthEmailMessages = {
-  otpSubject: string;
   otpPreview: string;
   otpHeading: string;
   otpIntro: string;

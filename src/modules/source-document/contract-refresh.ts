@@ -12,5 +12,3 @@ export interface LedgerRefreshResult {
     stats: boolean;
   };
 }
-
-export type StreamRefreshResult = LedgerRefreshResult;

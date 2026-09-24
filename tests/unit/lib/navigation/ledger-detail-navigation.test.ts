@@ -4,14 +4,14 @@ import { useModalStackStore } from "@/lib/store/modal-stack";
 
 describe("openLedgerEntrySourceDocument", () => {
   beforeEach(() => {
-    useModalStackStore.setState({ stack: [], canGoBack: false });
+    useModalStackStore.setState({ stack: [] });
     window.history.replaceState({}, "", "/zh/ledger/ledger-1?tab=details");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     window.history.replaceState({}, "", "/");
-    useModalStackStore.setState({ stack: [], canGoBack: false });
+    useModalStackStore.setState({ stack: [] });
   });
 
   it("opens the record the entry belongs to", () => {

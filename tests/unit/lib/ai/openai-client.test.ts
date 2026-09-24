@@ -102,7 +102,7 @@ describe("openai-client", () => {
         new OpenAI.APIError(429, {}, "Rate limited", new Headers({ "retry-after": "120" }))
       );
       await expect(
-        client.generateContent("system", [], "model", undefined, undefined, undefined, undefined, {
+        client.generateContent("system", [], "model", undefined, undefined, undefined, {
           maxAttempts: 1,
         })
       ).rejects.toMatchObject({
@@ -137,7 +137,6 @@ describe("openai-client", () => {
         "cancelled",
         [],
         "model",
-        undefined,
         undefined,
         undefined,
         abort.signal
@@ -178,7 +177,7 @@ describe("openai-client", () => {
         client as unknown as { client: { chat: { completions: { create: unknown } } } }
       ).client.chat.completions.create = create;
       await expect(
-        client.generateContent("first", [], "model", undefined, undefined, undefined, undefined, {
+        client.generateContent("first", [], "model", undefined, undefined, undefined, {
           maxAttempts: 1,
         })
       ).rejects.toMatchObject({ code: "ai_rate_limited" });

@@ -7,19 +7,11 @@
 // Time constants (milliseconds)
 export const TIME = {
   SECOND: 1000,
-  MINUTE: 60 * 1000,
-  HOUR: 60 * 60 * 1000,
-  DAY: 24 * 60 * 60 * 1000,
-  WEEK: 7 * 24 * 60 * 60 * 1000,
 } as const;
 
 // Time constants (seconds)
 export const TIME_SECONDS = {
-  MINUTE: 60,
-  HOUR: 3600,
   DAY: 86400,
-  WEEK: 604800,
-  MONTH: 30 * 24 * 60 * 60, // 30 days
 } as const;
 
 // Ledger
@@ -36,8 +28,6 @@ export const UI = {
 export const QUERY = {
   /** 默认staleTime - 5分钟 */
   DEFAULT_STALE_TIME_MS: 5 * 60 * 1000,
-  /** Ledger数据staleTime - 10分钟（较稳定） */
-  LEDGER_STALE_TIME_MS: 10 * 60 * 1000,
   /** 源文档staleTime - 2分钟（频繁变化但避免过度刷新） */
   SOURCE_DOC_STALE_TIME_MS: 2 * 60 * 1000,
 } as const;

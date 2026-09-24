@@ -7,36 +7,11 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { MAX_ORIGINAL_BYTES_PER_FILE } from "@/lib/storage/upload-policy";
 import { storedFiles, uploadSessionFiles, uploadSessions } from "@/persistence";
-import {
-  findSingleLiveLedgerId,
-  postgresLedgerAdapter,
-} from "@/application/adapters/postgres/business-ports/ledger";
 import { checksum, mapStoredFile } from "./shared";
 import type { ResolvedStoredFileAdapterDependencies } from "./shared";
 
 export function createProxyUploadOperations(dependencies: ResolvedStoredFileAdapterDependencies) {
   const { storage, now } = dependencies;
-
-  async function uploadTargetForUser(input: {
-    userId: string;
-    uploadSessionId: string;
-    targetId: string;
-    contentType: string;
-    body: Uint8Array;
-  }): Promise<StoredFileContract> {
-    const ledgerId = await findSingleLiveLedgerId();
-    if (ledgerId == null || !(await postgresLedgerAdapter.canAccess(ledgerId, input.userId)))
-      throw new NotFoundError("Upload target");
-    const ownership = await db
-      .select({ ledgerId: uploadSessions.ledgerId })
-      .from(uploadSessions)
-      .where(
-        and(eq(uploadSessions.id, input.uploadSessionId), eq(uploadSessions.ledgerId, ledgerId))
-      )
-      .limit(1);
-    if (ownership.length === 0) throw new NotFoundError("Upload target");
-    return uploadTarget({ ...input, ledgerId });
-  }
 
   async function uploadTarget(input: {
     ledgerId: string;
@@ -138,5 +113,5 @@ export function createProxyUploadOperations(dependencies: ResolvedStoredFileAdap
     }
   }
 
-  return { uploadTargetForUser, uploadTarget };
+  return { uploadTarget };
 }

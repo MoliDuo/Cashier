@@ -1,7 +1,5 @@
 import { Suspense } from "react";
-import { getMessages } from "next-intl/server";
 import { cookies } from "next/headers";
-import { NextIntlClientProvider } from "next-intl";
 import { HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 import {
@@ -56,7 +54,6 @@ interface ActiveTabProps {
 }
 
 export async function ActiveTab({ searchParams }: ActiveTabProps) {
-  const messagesPromise = getMessages();
   const contextPromise = resolveAuthenticatedHome();
   let context;
   try {
@@ -122,21 +119,19 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   scheduleProcessingRecoveryAfter(ledgerId);
 
   return (
-    <NextIntlClientProvider messages={await messagesPromise}>
-      <ActiveShell ledgerId={ledgerId}>
-        <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
-          <ActiveTabBootstrap
-            pageDataPromise={pageDataPromise}
-            ledgerId={ledgerId}
-            ledgerDto={ledgerDto}
-            activeTab={activeTab}
-            session={session}
-            rememberedBookId={bookScopeCookie}
-            initialDeviceTimeZone={deviceTimeZone}
-          />
-        </Suspense>
-      </ActiveShell>
-    </NextIntlClientProvider>
+    <ActiveShell ledgerId={ledgerId}>
+      <Suspense fallback={<LedgerBootstrapFallback activeTab={activeTab} />}>
+        <ActiveTabBootstrap
+          pageDataPromise={pageDataPromise}
+          ledgerId={ledgerId}
+          ledgerDto={ledgerDto}
+          activeTab={activeTab}
+          session={session}
+          rememberedBookId={bookScopeCookie}
+          initialDeviceTimeZone={deviceTimeZone}
+        />
+      </Suspense>
+    </ActiveShell>
   );
 }
 

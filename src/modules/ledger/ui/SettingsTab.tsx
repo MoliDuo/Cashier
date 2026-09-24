@@ -37,15 +37,6 @@ interface SettingsTabProps {
   ledgerId: string;
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
-  /**
-   * The same list plus the archived rows, for the 分账 section. Absent when the
-   * page was opened from the workspace, whose bootstrap only knows the live
-   * books: a partial list must not seed the archived-inclusive query, or the
-   * archived rows stay invisible for the whole stale window.
-   */
-  initialBooksIncludingArchived?: readonly BookDto[];
-  /** The account's login addresses, hydrated by the page bootstrap. */
-  initialEmails?: readonly string[];
   userEmail?: string;
   hasPassword?: boolean;
   passwordUpdatedAt?: string | null;
@@ -60,8 +51,6 @@ export function SettingsTab({
   initialCategories,
   ledgerId,
   initialBooks,
-  initialBooksIncludingArchived,
-  initialEmails,
   userEmail,
   hasPassword = false,
   passwordUpdatedAt = null,
@@ -260,12 +249,7 @@ export function SettingsTab({
         </SettingsField>
       </SettingsSection>
 
-      <BookSettings
-        ledgerId={ledgerId}
-        {...(initialBooksIncludingArchived !== undefined
-          ? { initialBooks: initialBooksIncludingArchived }
-          : {})}
-      />
+      <BookSettings ledgerId={ledgerId} />
 
       <BookkeepingSettings
         ledgerId={ledgerId}
@@ -286,7 +270,6 @@ export function SettingsTab({
           was signed out, not only this one; EmailSettings announces that before
           leaving and then reuses the same credentials-changed sign-out. */}
       <AccountSettings
-        {...(initialEmails !== undefined ? { initialEmails } : {})}
         {...(userEmail !== undefined ? { userEmail } : {})}
         hasPassword={hasPassword}
         passwordUpdatedAt={passwordUpdatedAt}

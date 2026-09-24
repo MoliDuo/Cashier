@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: process.env.SMOKE_BASE_URL,
-    locale: "en-US",
+    locale: "zh-CN",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     actionTimeout: 15_000,

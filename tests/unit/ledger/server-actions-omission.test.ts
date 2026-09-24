@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   createLedgerEntryWithConversionMock,
-  updateLedgerEntryWithConversionMock,
   batchUpdateLedgerEntriesMock,
   calculateLedgerEntryStatsMock,
 } = vi.hoisted(() => ({
   createLedgerEntryWithConversionMock: vi.fn(),
-  updateLedgerEntryWithConversionMock: vi.fn(),
   batchUpdateLedgerEntriesMock: vi.fn(),
   calculateLedgerEntryStatsMock: vi.fn(),
 }));
@@ -37,7 +35,6 @@ vi.mock("@/application/server-composition-root", () => ({
   serverComposition: {
     sourceDocumentAggregate: {
       addEntry: createLedgerEntryWithConversionMock,
-      updateEntries: updateLedgerEntryWithConversionMock,
       deleteEntries: vi.fn(),
       batchUpdateEntries: batchUpdateLedgerEntriesMock,
       updateEntryDates: vi.fn(),
@@ -59,7 +56,6 @@ vi.mock("@/modules/ledger/application/use-cases/update-ledger", () => ({
 import {
   batchUpdateLedgerEntriesAction,
   createLedgerEntryAction,
-  updateLedgerEntryAction,
 } from "@/modules/ledger/server-actions/entries";
 import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
 import type { LedgerReadPort } from "@/modules/ledger/application/ports";
@@ -73,7 +69,6 @@ describe("ledger server action omission semantics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createLedgerEntryWithConversionMock.mockResolvedValue({ id: "entry-1" });
-    updateLedgerEntryWithConversionMock.mockResolvedValue({ id: "entry-1" });
     batchUpdateLedgerEntriesMock.mockResolvedValue(1);
     calculateLedgerEntryStatsMock.mockResolvedValue({
       convertedTotal: { total: 0, currency: "CNY" },
@@ -108,33 +103,6 @@ describe("ledger server action omission semantics", () => {
     expect(Object.prototype.hasOwnProperty.call(payload, "currency")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(payload, "categoryId")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(payload, "description")).toBe(false);
-  });
-
-  it("omits absent optional update-entry fields", async () => {
-    await updateLedgerEntryAction(
-      "ledger-1",
-      {
-        sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",
-        expectedVersion: 1,
-      },
-      "123e4567-e89b-42d3-a456-426614174001",
-      {
-        description: null,
-      }
-    );
-
-    const payload = updateLedgerEntryWithConversionMock.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >;
-
-    expect(payload.ledgerId).toBe("ledger-1");
-    expect(payload.ledgerEntryId).toBe("123e4567-e89b-42d3-a456-426614174001");
-    expect(payload.description).toBeNull();
-    expect(Object.prototype.hasOwnProperty.call(payload, "categoryId")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(payload, "amount")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(payload, "currency")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(payload, "itemName")).toBe(false);
   });
 
   it("omits absent optional batch-update fields", async () => {

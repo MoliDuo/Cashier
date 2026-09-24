@@ -1,7 +1,6 @@
 import "server-only";
 import { cache } from "react";
 import { auth } from "@/auth";
-import { getLocale } from "next-intl/server";
 import { resolveHome } from "@/modules/workspace/application/use-cases/resolve-home";
 import { serverComposition } from "@/application/server-composition-root";
 import { isValidUuid } from "@/lib/validation";
@@ -22,7 +21,6 @@ export interface AuthenticatedHomeContext {
       passwordUpdatedAt: string | null;
     };
   };
-  locale: string;
 }
 
 /**
@@ -40,7 +38,6 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
 
   const validSession = session!;
 
-  const locale = await getLocale();
   const ledger = await resolveHome(userId, serverComposition.ledgers);
 
   if (!isValidUuid(ledger.id)) {
@@ -61,13 +58,10 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
     session: {
       user: {
         id: userId,
-        name: validSession.user?.name ?? null,
         email: validSession.user?.email ?? null,
-        image: validSession.user?.image ?? null,
         hasPassword: validSession.user?.hasPassword ?? false,
         passwordUpdatedAt: validSession.user?.passwordUpdatedAt ?? null,
       },
     },
-    locale,
   };
 });

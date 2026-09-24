@@ -32,17 +32,17 @@ describe("DayCellLarge", () => {
           amount="12500"
           level={3}
           currency="USD"
-          locale="en-US"
+          locale="zh"
         />
       </TooltipProvider>
     );
 
     const trigger = screen.getByRole("button", {
-      name: "Wednesday, September 2, 2026, Expense: $12.5K",
+      name: "2026年9月2日 星期三, Expense: $1.3万",
     });
     fireEvent.focus(trigger);
 
-    expect(await screen.findByText("Expense: $12.5K")).toBeVisible();
+    expect(await screen.findByText("Expense: $1.3万")).toBeVisible();
   });
 
   it("shows a zero net amount when the day contains offsetting entries", () => {
@@ -55,14 +55,14 @@ describe("DayCellLarge", () => {
           count={2}
           level={0}
           currency="USD"
-          locale="en-US"
+          locale="zh"
         />
       </TooltipProvider>
     );
 
     expect(
       screen.getByRole("button", {
-        name: "Thursday, September 3, 2026, Expense: $0",
+        name: "2026年9月3日 星期四, Expense: $0",
       })
     ).toBeVisible();
   });

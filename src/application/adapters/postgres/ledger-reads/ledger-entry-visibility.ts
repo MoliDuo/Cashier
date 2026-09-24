@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { ledgerEntries } from "@/persistence";
 
-// Compatibility visibility SQL is adapter-private.
+// An entry is visible when it belongs to its document's active revision.
 
 interface SourceDocumentDateRange {
   startDate?: string | null;

@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { eq, isNull, sql, type SQL } from "drizzle-orm";
 import { ValidationError } from "@/lib/errors";
-import { forLedger } from "@/lib/db/scoped-query";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import { ledgerEntries } from "@/persistence";
 import {
@@ -84,11 +83,10 @@ export function buildLedgerEntryFilterConditions(
   ledgerId: string,
   filters: LedgerEntryFilterParams
 ): SQL<unknown>[] {
-  const q = forLedger(ledgerEntries, ledgerId);
-  const conditions: SQL<unknown>[] = [];
-  if (q.whereActive != null) {
-    conditions.push(q.whereActive);
-  }
+  const conditions: SQL<unknown>[] = [
+    eq(ledgerEntries.ledgerId, ledgerId),
+    isNull(ledgerEntries.deletedAt),
+  ];
 
   const sourceDocumentDateRange: { startDate?: string | null; endDate?: string | null } = {};
   if (filters.startDate !== undefined) {

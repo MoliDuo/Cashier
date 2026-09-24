@@ -21,11 +21,11 @@ the record in the stream, details, and statistics views.
 
 - Records expenses from receipt or invoice images and natural-language notes
 - Extracts titles, dates, amounts, currencies, categories, and line items
-- Lets you review and edit AI results, anomalies, and possible duplicates
+- Lets you review and edit AI results and retry documents that failed to parse
 - Keeps original currencies while reporting totals in the ledger's main currency
 - Provides stream, filtered detail, and statistics views
 - Creates ledger-scoped API keys for scripts, Shortcuts, and integrations
-- Includes Chinese and English interfaces
+- Ships a Chinese interface; the AI can write bill content in another language
 
 <picture>
   <source media="(max-width: 600px)" srcset="./public/readme/entry-mobile.webp">

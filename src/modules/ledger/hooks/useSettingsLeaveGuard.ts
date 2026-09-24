@@ -3,27 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUnsavedChangesStore, type UnsavedChangesLeaveGuard } from "@/lib/store/unsaved-changes";
 
-function hasSettingsDirtyChanges(): boolean {
-  return [...useUnsavedChangesStore.getState().dirtyKeys].some((key) =>
-    key.startsWith("settings:")
-  );
-}
-
-interface UseSettingsLeaveGuardOptions {
-  /** Independent settings pages need to restore browser history before prompting. */
-  managePopState?: boolean;
-}
-
-export function useSettingsLeaveGuard({
-  managePopState = false,
-}: UseSettingsLeaveGuardOptions = {}) {
+export function useSettingsLeaveGuard() {
   const hasDirtyChanges = useUnsavedChangesStore((state) =>
     [...state.dirtyKeys].some((key) => key.startsWith("settings:"))
   );
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const continueNavigationRef = useRef<(() => void) | null>(null);
-  const restoringHistoryRef = useRef(false);
-  const bypassPopStateRef = useRef(false);
 
   const requestLeave = useCallback((continueNavigation: () => void) => {
     continueNavigationRef.current = continueNavigation;
@@ -50,7 +35,6 @@ export function useSettingsLeaveGuard({
 
   const cancelLeave = useCallback(() => {
     continueNavigationRef.current = null;
-    restoringHistoryRef.current = false;
     setLeaveConfirmOpen(false);
   }, []);
 
@@ -74,29 +58,6 @@ export function useSettingsLeaveGuard({
     window.addEventListener("beforeunload", preventUnload);
     return () => window.removeEventListener("beforeunload", preventUnload);
   }, [hasDirtyChanges]);
-
-  useEffect(() => {
-    if (!managePopState) return;
-    const handlePopState = () => {
-      if (bypassPopStateRef.current) {
-        bypassPopStateRef.current = false;
-        return;
-      }
-      if (!hasSettingsDirtyChanges()) return;
-      if (restoringHistoryRef.current) {
-        restoringHistoryRef.current = false;
-        requestLeave(() => {
-          bypassPopStateRef.current = true;
-          window.history.back();
-        });
-        return;
-      }
-      restoringHistoryRef.current = true;
-      window.history.go(1);
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [managePopState, requestLeave]);
 
   return {
     hasDirtyChanges,

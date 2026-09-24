@@ -51,9 +51,6 @@ export interface SourceDocumentReadPort {
     sourceDocumentId: string
   ): Promise<import("../contracts").SourceDocumentInputDto | null>;
   get(ledgerId: string, sourceDocumentId: string): Promise<SourceDocumentDetailDto | null>;
-  getAccessContext(
-    sourceDocumentId: string
-  ): Promise<{ ledgerId: string; hasImages: boolean } | null>;
   list(input: SourceDocumentListInput): Promise<{
     items: SourceDocumentListItemDto[];
     nextCursor: string | null;
@@ -140,7 +137,6 @@ export interface SourceDocumentAggregateWritePort {
     }>
   >;
   addEntry: LedgerEntryCommandPort["create"];
-  updateEntries: LedgerEntryCommandPort["update"];
   deleteEntries: LedgerEntryCommandPort["delete"];
   batchUpdateEntries: LedgerEntryCommandPort["batchUpdate"];
   batchDeleteEntries: LedgerEntryCommandPort["batchDelete"];

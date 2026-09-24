@@ -6,15 +6,13 @@ import {
   parseCreateLedgerEntryInput,
   parseLedgerEntryId,
   parseLedgerEntryIds,
-  parseUpdateLedgerEntryInput,
   type BatchUpdateLedgerEntriesInput,
   type CreateLedgerEntryInput,
-  type UpdateLedgerEntryInput,
 } from "@/modules/ledger/contract-schemas";
 import { serverComposition } from "@/application/server-composition-root";
 import {
   parseVersionedTarget,
-  versionedTargetsSchema,
+  parseVersionedTargets,
 } from "@/modules/source-document/contract-schemas";
 import type {
   AtomicBatchCommandResult,
@@ -41,29 +39,6 @@ export const createLedgerEntryAction = withLedgerAccess(
   }
 );
 
-export const updateLedgerEntryAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    target: VersionedTarget,
-    ledgerEntryId: string,
-    data: UpdateLedgerEntryInput
-  ) => {
-    const validatedTarget = parseVersionedTarget(target);
-    const validatedLedgerEntryId = parseLedgerEntryId(ledgerEntryId);
-    const validated = parseUpdateLedgerEntryInput(data);
-    return serverComposition.sourceDocumentAggregate.updateEntries({
-      ledgerId,
-      target: validatedTarget,
-      ledgerEntryId: validatedLedgerEntryId,
-      ...(validated.categoryId === undefined ? {} : { categoryId: validated.categoryId }),
-      ...(validated.amount === undefined ? {} : { amount: String(validated.amount) }),
-      ...(validated.currency === undefined ? {} : { currency: validated.currency }),
-      ...(validated.itemName === undefined ? {} : { itemName: validated.itemName }),
-      ...(validated.description === undefined ? {} : { description: validated.description }),
-    });
-  }
-);
-
 export const deleteLedgerEntryAction = withLedgerAccess(
   async (ledgerId: string, target: VersionedTarget, ledgerEntryId: string) => {
     const validatedTarget = parseVersionedTarget(target);
@@ -83,7 +58,7 @@ export const batchUpdateLedgerEntriesAction = withLedgerAccess(
     ledgerEntryIds: string[],
     data: BatchUpdateLedgerEntriesInput
   ): Promise<AtomicBatchCommandResult<{ ledgerEntryIds: string[]; affectedCount: number }>> => {
-    const targets = versionedTargetsSchema.parse(inputTargets);
+    const targets = parseVersionedTargets(inputTargets);
     const validatedLedgerEntryIds = parseLedgerEntryIds(ledgerEntryIds);
     const validated = parseBatchUpdateLedgerEntriesInput(data);
     const payload: Parameters<
@@ -108,7 +83,7 @@ export const batchDeleteLedgerEntriesAction = withLedgerAccess(
     inputTargets: VersionedTarget[],
     inputIds: string[]
   ): Promise<PartialBatchCommandResult> => {
-    const targets = versionedTargetsSchema.parse(inputTargets);
+    const targets = parseVersionedTargets(inputTargets);
     const ids = parseLedgerEntryIds(inputIds);
     return serverComposition.sourceDocumentAggregate.batchDeleteEntries({
       ledgerId,
@@ -134,7 +109,7 @@ export const batchUpdateLedgerEntryDatesAction = withLedgerAccess(
     inputIds: string[],
     entryDate: string
   ) => {
-    const targets = versionedTargetsSchema.parse(inputTargets);
+    const targets = parseVersionedTargets(inputTargets);
     const validated = parseBatchUpdateLedgerEntryDatesInput({
       entryIds: inputIds,
       entryDate,

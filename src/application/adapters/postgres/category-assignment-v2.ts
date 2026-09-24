@@ -315,39 +315,6 @@ export const postgresCategoryAssignmentV2Adapter = {
     }
   },
 
-  async resolveSelection(ledgerId: string, ledgerEntryIds: readonly string[]) {
-    if (ledgerEntryIds.length === 0) return [];
-    const uniqueIds = [...new Set(ledgerEntryIds)];
-    const rows = await db
-      .select({
-        ledgerEntryId: ledgerEntries.id,
-        sourceDocumentId: sourceDocuments.id,
-        expectedVersion: sourceDocuments.version,
-      })
-      .from(ledgerEntries)
-      .innerJoin(
-        sourceDocuments,
-        and(
-          eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-          eq(sourceDocuments.ledgerId, ledgerId),
-          eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
-          isNull(sourceDocuments.deletedAt)
-        )
-      )
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          inArray(ledgerEntries.id, uniqueIds),
-          isNull(ledgerEntries.deletedAt)
-        )
-      );
-    const byId = new Map(rows.map((row) => [row.ledgerEntryId, row]));
-    if (byId.size !== uniqueIds.length) {
-      throw new ValidationError("Every selected entry must belong to an active document");
-    }
-    return uniqueIds.map((id) => byId.get(id)!);
-  },
-
   async resolveLatestConflictSelection(input: { ledgerId: string; jobId: string }) {
     const original = await db
       .select()

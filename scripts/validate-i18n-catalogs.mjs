@@ -90,6 +90,14 @@ try {
 }
 
 const referenceKeys = new Set();
+/** Every string literal in src: a dynamic key is built from one of these. */
+const sourceLiterals = new Set();
+const staticKeys = new Set();
+/**
+ * Namespaces read straight from the JSON rather than through a translator, so
+ * the scan below cannot see which of their keys are used.
+ */
+const DIRECTLY_READ_NAMESPACES = ["AuthEmail"];
 
 if (catalog != null) {
   for (const key of flattenKeys(catalog)) referenceKeys.add(key);
@@ -244,6 +252,7 @@ function collectTranslationUsages(sourceFile) {
     }
 
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      sourceLiterals.add(node.text);
       const parent = node.parent;
       const isUseTranslationsArgument =
         ts.isCallExpression(parent) &&
@@ -303,6 +312,7 @@ if (catalog != null) {
         continue;
       }
       const fullKey = usage.namespace === "" ? usage.key : `${usage.namespace}.${usage.key}`;
+      staticKeys.add(fullKey);
       if (getMessageValue(catalog, fullKey) === undefined) {
         errors.push(`${location}: missing message key ${fullKey}`);
       }
@@ -313,6 +323,37 @@ if (catalog != null) {
         `${relativeFileName}:${rawKey.line}: raw translation key rendered directly: ${rawKey.key}`
       );
     }
+  }
+}
+
+function leafKeys(value, prefix = "") {
+  if (value != null && typeof value === "object" && !Array.isArray(value)) {
+    return Object.entries(value).flatMap(([key, nested]) =>
+      leafKeys(nested, prefix === "" ? key : `${prefix}.${key}`)
+    );
+  }
+  return [prefix];
+}
+
+/**
+ * A message nobody can render is dead weight that survives every feature
+ * removal. A key counts as used when a translator reads it (or an object that
+ * contains it) statically, or when its last segment appears as a string literal
+ * somewhere in src — the conservative reading of a dynamic `t(key)`.
+ */
+if (catalog != null) {
+  const unused = leafKeys(catalog).filter((key) => {
+    if (DIRECTLY_READ_NAMESPACES.some((namespace) => key.startsWith(`${namespace}.`))) {
+      return false;
+    }
+    const segments = key.split(".");
+    for (let length = segments.length; length > 0; length--) {
+      if (staticKeys.has(segments.slice(0, length).join("."))) return false;
+    }
+    return !sourceLiterals.has(segments[segments.length - 1]);
+  });
+  for (const key of unused) {
+    errors.push(`${CATALOG_FILE}: unused message key ${key}`);
   }
 }
 

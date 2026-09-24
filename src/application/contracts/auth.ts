@@ -100,8 +100,6 @@ export interface OtpTokenPort {
 interface UserAccountContract {
   id: string;
   email: string;
-  name: string | null;
-  image: string | null;
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
   authVersion: number;

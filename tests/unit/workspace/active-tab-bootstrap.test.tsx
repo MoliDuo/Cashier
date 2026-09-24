@@ -138,8 +138,7 @@ describe("active tab bootstrap book scope", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
       },
-      session: { user: { id: "user-1", email: "user@test.com", name: "Test", image: null } },
-      locale: "en",
+      session: { user: { id: "user-1", email: "user@test.com" } },
     });
     getMessagesMock.mockResolvedValue({
       Common: { notFound: "Not found" },

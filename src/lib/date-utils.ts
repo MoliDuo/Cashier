@@ -273,10 +273,7 @@ export function formatInstantDateLabel(
   return formatRelativeDateLabel(formatDateKeyInTimeZone(date, timeZone), locale, labels, timeZone);
 }
 
-/**
- * A day written out in full, weekday and year included. Chinese trails the
- * weekday, English leads it — each language's own order for a written date.
- */
+/** A day written out in full, weekday and year included, weekday trailing. */
 export function formatFullDate(date: Date, locale: string): string {
   const day = getDateTimeFormatter(locale, {
     year: "numeric",
@@ -284,7 +281,7 @@ export function formatFullDate(date: Date, locale: string): string {
     day: "numeric",
   }).format(date);
   const weekday = getDateTimeFormatter(locale, { weekday: "long" }).format(date);
-  return locale.startsWith("zh") ? `${day} ${weekday}` : `${weekday}, ${day}`;
+  return `${day} ${weekday}`;
 }
 
 /** The calendar day an instant falls on, as "YYYY-MM-DD", in `timeZone`. */

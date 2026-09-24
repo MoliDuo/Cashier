@@ -127,16 +127,6 @@ export interface LedgerEntryCommandPort {
     categoryId?: string;
     description?: string | null;
   }): Promise<VersionedCommandResult<{ ledgerEntryId: string }>>;
-  update(input: {
-    ledgerId: string;
-    target: VersionedTarget;
-    ledgerEntryId: string;
-    categoryId?: string | null;
-    amount?: string;
-    currency?: string | null;
-    itemName?: string;
-    description?: string | null;
-  }): Promise<VersionedCommandResult<{ ledgerEntryId: string }>>;
   delete(input: {
     ledgerId: string;
     target: VersionedTarget;

@@ -42,25 +42,3 @@ export function parseConvertCurrencyInput(input: unknown): ConvertCurrencyInput 
 
   return result.data;
 }
-
-const batchConvertCurrencyItemSchema = z.object({
-  amount: decimalAmountSchema,
-  currency: currencyCodeSchema,
-  date: optionalDateStringSchema,
-});
-
-const batchConvertCurrencyInputSchema = z.object({
-  items: z.array(batchConvertCurrencyItemSchema).min(1).max(500),
-  targetCurrency: currencyCodeSchema,
-});
-
-export type BatchConvertCurrencyInput = z.infer<typeof batchConvertCurrencyInputSchema>;
-
-export function parseBatchConvertCurrencyInput(input: unknown): BatchConvertCurrencyInput {
-  const result = batchConvertCurrencyInputSchema.safeParse(input);
-  if (!result.success) {
-    throw new ValidationError("Missing required parameters", { issues: result.error.issues });
-  }
-
-  return result.data;
-}

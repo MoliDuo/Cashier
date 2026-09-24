@@ -12,7 +12,6 @@
 export const queryKeys = {
   // === Ledger ===
   ledger: (ledgerId: string) => ["ledger", ledgerId] as const,
-  ledgers: () => ["ledgers"] as const,
 
   // === Ledger Entries ===
   ledgerEntries: (ledgerId: string, params?: QueryKeyParams | null) =>
@@ -36,8 +35,6 @@ export const queryKeys = {
   book: (ledgerId: string, bookId: string) => ["ledger", ledgerId, "book", bookId] as const,
 
   // === Source Documents ===
-  sourceDocuments: (ledgerId: string, params?: QueryKeyParams | null) =>
-    ["ledger", ledgerId, "source-documents", normalizeQueryParams(params)] as const,
   sourceDocumentStream: (
     ledgerId: string,
     filters?: {
@@ -112,8 +109,6 @@ export const queryKeys = {
   // === Currency ===
   convert: (ledgerId: string, amount: string, from: string, to: string, date: string) =>
     ["ledger", ledgerId, "convert", amount, from, to, date] as const,
-  batchConvert: (cacheKey: string, targetCurrency: string) =>
-    ["batchConvert", cacheKey, targetCurrency] as const,
 } as const;
 
 type QueryKeyParams = Readonly<Record<string, unknown>>;

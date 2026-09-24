@@ -292,8 +292,6 @@ export const parseEntryCategoryId = (input: unknown) =>
   parseLedgerContract(entryCategoryIdSchema, input);
 export const parseCreateLedgerEntryInput = (input: unknown) =>
   parseLedgerContract(createLedgerEntryInputSchema, input);
-export const parseUpdateLedgerEntryInput = (input: unknown) =>
-  parseLedgerContract(updateLedgerEntryInputSchema, input);
 export const parseBatchUpdateLedgerEntriesInput = (input: unknown) =>
   parseLedgerContract(batchUpdateLedgerEntriesInputSchema, input);
 export const parseBatchUpdateLedgerEntryDatesInput = (input: unknown) =>

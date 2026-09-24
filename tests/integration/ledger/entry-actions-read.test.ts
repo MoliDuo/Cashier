@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, entryCategories } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
@@ -35,7 +35,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       documentDate: entryDate ?? null,
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
@@ -69,7 +69,7 @@ describe("getLedgerEntriesAction", () => {
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -83,7 +83,7 @@ describe("getLedgerEntriesAction", () => {
 
     for (let i = 0; i < 5; i++) {
       await db.insert(ledgerEntries).values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: `Item ${i}`,
@@ -109,7 +109,7 @@ describe("getLedgerEntriesAction", () => {
         .insert(ledgerEntries)
         .values([
           {
-            id: uuidv4(),
+            id: randomUUID(),
             ledgerId,
             sourceDocumentId: doc.id,
             itemName: `A-${i}`,
@@ -117,7 +117,7 @@ describe("getLedgerEntriesAction", () => {
             currency: "CNY",
           },
           {
-            id: uuidv4(),
+            id: randomUUID(),
             ledgerId,
             sourceDocumentId: doc.id,
             itemName: `B-${i}`,
@@ -160,7 +160,7 @@ describe("getLedgerEntriesAction", () => {
     const doc = await seedDoc(db, ledgerId);
     await db.insert(ledgerEntries).values([
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "First",
@@ -168,7 +168,7 @@ describe("getLedgerEntriesAction", () => {
         currency: "CNY",
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Second",
@@ -176,7 +176,7 @@ describe("getLedgerEntriesAction", () => {
         currency: "CNY",
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Third",
@@ -194,7 +194,7 @@ describe("getLedgerEntriesAction", () => {
     await expect(
       getTargetLedgerEntriesAction(ledgerId, {
         cursor: firstPage.nextCursor,
-        categoryId: uuidv4(),
+        categoryId: randomUUID(),
       })
     ).rejects.toThrow("Ledger entry cursor does not match the query");
   });
@@ -207,7 +207,7 @@ describe("getLedgerEntriesAction", () => {
       .set({ createdAt: new Date("2026-06-12T18:00:00.000Z") })
       .where(eq(sourceDocuments.id, doc.id));
     await db.insert(ledgerEntries).values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       sourceDocumentId: doc.id,
       itemName: "Undated",
@@ -229,7 +229,7 @@ describe("getLedgerEntriesAction", () => {
 
   it("filters by categoryId", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -240,7 +240,7 @@ describe("getLedgerEntriesAction", () => {
     const doc = await seedDoc(db, ledgerId);
     await db.insert(ledgerEntries).values([
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Categorized",
@@ -249,7 +249,7 @@ describe("getLedgerEntriesAction", () => {
         categoryId: catId,
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Uncategorized",
@@ -267,7 +267,7 @@ describe("getLedgerEntriesAction", () => {
 
   it("filters uncategorized entries when using the __uncategorized__ sentinel", async () => {
     const db = getTestDb();
-    const catId = uuidv4();
+    const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
       ledgerId,
@@ -280,7 +280,7 @@ describe("getLedgerEntriesAction", () => {
     const [categorizedEntry] = await db
       .insert(ledgerEntries)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Categorized",
@@ -297,7 +297,7 @@ describe("getLedgerEntriesAction", () => {
     const [uncategorizedEntry] = await db
       .insert(ledgerEntries)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Uncategorized",
@@ -323,7 +323,7 @@ describe("getLedgerEntriesAction", () => {
     const doc = await seedDoc(db, ledgerId);
     await db.insert(ledgerEntries).values([
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "CNY item",
@@ -331,7 +331,7 @@ describe("getLedgerEntriesAction", () => {
         currency: "CNY",
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "USD item",
@@ -359,7 +359,7 @@ describe("getLedgerEntriesAction", () => {
       [doc3, "Dec"],
     ] as const) {
       await db.insert(ledgerEntries).values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: name,
@@ -385,7 +385,7 @@ describe("getLedgerEntriesAction", () => {
     const [docA] = await db
       .insert(sourceDocuments)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         documentDate: "2024-01-15",
         createdAt: new Date("2024-03-01"),
@@ -401,7 +401,7 @@ describe("getLedgerEntriesAction", () => {
     const [docB] = await db
       .insert(sourceDocuments)
       .values({
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         documentDate: "2024-03-15",
         createdAt: new Date("2024-01-01"),
@@ -414,7 +414,7 @@ describe("getLedgerEntriesAction", () => {
     }
 
     await db.insert(ledgerEntries).values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       sourceDocumentId: docA.id,
       itemName: "Jan Item",
@@ -423,7 +423,7 @@ describe("getLedgerEntriesAction", () => {
     });
 
     await db.insert(ledgerEntries).values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       sourceDocumentId: docB.id,
       itemName: "Mar Item",
@@ -449,7 +449,7 @@ describe("getLedgerEntriesAction", () => {
     const doc = await seedDoc(db, ledgerId);
     await db.insert(ledgerEntries).values([
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Cheap",
@@ -458,7 +458,7 @@ describe("getLedgerEntriesAction", () => {
         convertedAmount: "10.00",
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Mid",
@@ -467,7 +467,7 @@ describe("getLedgerEntriesAction", () => {
         convertedAmount: "50.00",
       },
       {
-        id: uuidv4(),
+        id: randomUUID(),
         ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Expensive",
@@ -491,7 +491,7 @@ describe("getLedgerEntriesAction", () => {
     const db = getTestDb();
     const doc = await seedDoc(db, ledgerId);
     await db.insert(ledgerEntries).values({
-      id: uuidv4(),
+      id: randomUUID(),
       ledgerId,
       sourceDocumentId: doc.id,
       itemName: "Deleted",

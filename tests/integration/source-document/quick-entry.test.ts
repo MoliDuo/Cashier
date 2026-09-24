@@ -12,7 +12,7 @@ import {
   users,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
 // Mock auth
@@ -49,7 +49,7 @@ describe("createQuickEntryAction", () => {
     await db.delete(currencyRates);
 
     // Create test ledger
-    ledgerId = uuidv4();
+    ledgerId = randomUUID();
     await db.insert(ledgers).values({
       id: ledgerId,
       userId: TEST_USER_ID,
@@ -58,7 +58,7 @@ describe("createQuickEntryAction", () => {
     await ensureTestLedgerBooks(db, ledgerId);
 
     // Create test category
-    categoryId = uuidv4();
+    categoryId = randomUUID();
     await db.insert(entryCategories).values({
       id: categoryId,
       ledgerId,
@@ -186,8 +186,8 @@ describe("createQuickEntryAction", () => {
   });
 
   it("should throw error for unauthorized ledger", async () => {
-    const otherUserId = uuidv4();
-    const otherLedgerId = uuidv4();
+    const otherUserId = randomUUID();
+    const otherLedgerId = randomUUID();
 
     const db = getTestDb();
     // Create other user first

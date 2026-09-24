@@ -8,12 +8,9 @@ const users = { findByEmail, findById: vi.fn() } as unknown as UserAccountPort;
 const devAccount = {
   id: "user-1",
   email: "dev@cashier.local",
-  name: "Dev",
-  image: null,
   passwordHash: null,
   passwordUpdatedAt: null,
   authVersion: 1,
-  interfaceLanguage: "auto" as const,
 };
 
 describe("authenticateDevUser", () => {
