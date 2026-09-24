@@ -9,7 +9,14 @@ import {
   type BatchUpdateLedgerEntriesInput,
   type CreateLedgerEntryInput,
 } from "@/modules/ledger/contract-schemas";
-import { serverComposition } from "@/application/server-composition-root";
+import {
+  addLedgerEntry,
+  batchDeleteLedgerEntries,
+  batchUpdateLedgerEntries,
+  deleteLedgerEntry,
+  type BatchUpdateLedgerEntriesInput as BatchUpdateLedgerEntriesCommand,
+} from "@/modules/source-document/server/entry-commands";
+import { updateLedgerEntryDates } from "@/modules/source-document/server/updates";
 import { getBatchEntryDateImpact } from "../server/entry-reads/get-batch-entry-date-impact";
 import {
   parseVersionedTarget,
@@ -28,7 +35,7 @@ export const createLedgerEntryAction = withLedgerAccess(
     if (validated.sourceDocumentId !== validatedTarget.sourceDocumentId) {
       throw new Error("Source document target does not match entry payload");
     }
-    return serverComposition.sourceDocumentAggregate.addEntry({
+    return addLedgerEntry({
       ledgerId,
       target: validatedTarget,
       amount: String(validated.amount),
@@ -44,7 +51,7 @@ export const deleteLedgerEntryAction = withLedgerAccess(
   async (ledgerId: string, target: VersionedTarget, ledgerEntryId: string) => {
     const validatedTarget = parseVersionedTarget(target);
     const validatedLedgerEntryId = parseLedgerEntryId(ledgerEntryId);
-    return serverComposition.sourceDocumentAggregate.deleteEntries({
+    return deleteLedgerEntry({
       ledgerId,
       target: validatedTarget,
       ledgerEntryId: validatedLedgerEntryId,
@@ -62,9 +69,7 @@ export const batchUpdateLedgerEntriesAction = withLedgerAccess(
     const targets = parseVersionedTargets(inputTargets);
     const validatedLedgerEntryIds = parseLedgerEntryIds(ledgerEntryIds);
     const validated = parseBatchUpdateLedgerEntriesInput(data);
-    const payload: Parameters<
-      typeof serverComposition.sourceDocumentAggregate.batchUpdateEntries
-    >[0] = {
+    const payload: BatchUpdateLedgerEntriesCommand = {
       ledgerId,
       targets,
       ledgerEntryIds: validatedLedgerEntryIds,
@@ -74,7 +79,7 @@ export const batchUpdateLedgerEntriesAction = withLedgerAccess(
     if (validated.amount !== undefined) payload.amount = String(validated.amount);
     if (validated.description !== undefined) payload.description = validated.description;
     if (validated.itemName !== undefined) payload.itemName = validated.itemName;
-    return serverComposition.sourceDocumentAggregate.batchUpdateEntries(payload);
+    return batchUpdateLedgerEntries(payload);
   }
 );
 
@@ -86,7 +91,7 @@ export const batchDeleteLedgerEntriesAction = withLedgerAccess(
   ): Promise<PartialBatchCommandResult> => {
     const targets = parseVersionedTargets(inputTargets);
     const ids = parseLedgerEntryIds(inputIds);
-    return serverComposition.sourceDocumentAggregate.batchDeleteEntries({
+    return batchDeleteLedgerEntries({
       ledgerId,
       targets,
       ledgerEntryIds: ids,
@@ -115,7 +120,7 @@ export const batchUpdateLedgerEntryDatesAction = withLedgerAccess(
       entryIds: inputIds,
       entryDate,
     });
-    const impact = await serverComposition.sourceDocumentAggregate.updateEntryDates({
+    const impact = await updateLedgerEntryDates({
       ledgerId,
       targets,
       ledgerEntryIds: validated.entryIds,

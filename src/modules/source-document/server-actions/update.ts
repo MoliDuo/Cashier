@@ -12,7 +12,7 @@ import {
   type BatchUpdateSourceDocumentsInput,
 } from "@/modules/source-document/contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { serverComposition } from "@/application/server-composition-root";
+import { saveSourceDocumentChanges, updateSourceDocuments } from "../server/updates";
 /**
  * Batch update multiple source documents.
  */
@@ -25,7 +25,7 @@ export const batchUpdateSourceDocumentsAction = withSourceDocumentLedgerAccess(
     }
   ): Promise<AtomicBatchCommandResult<BatchUpdateSourceDocumentsResultDto>> => {
     const validated = batchUpdateSourceDocumentsInputSchema.parse(input);
-    return serverComposition.sourceDocumentAggregate.updateDocuments({
+    return updateSourceDocuments({
       ledgerId,
       targets: validated.targets,
       data: validated.data,
@@ -39,7 +39,7 @@ export const saveSourceDocumentChangesAction = withSourceDocumentLedgerAccess(
     input: SaveSourceDocumentChangesInput
   ): Promise<VersionedCommandResult<SaveSourceDocumentChangesResultDto>> => {
     const validated = saveSourceDocumentChangesInputSchema.parse(input);
-    return serverComposition.sourceDocumentAggregate.saveChanges({
+    return saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId: validated.sourceDocumentId,
       expectedVersion: validated.expectedVersion,

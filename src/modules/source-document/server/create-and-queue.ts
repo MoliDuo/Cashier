@@ -1,16 +1,15 @@
+import "server-only";
 import { ValidationError } from "@/lib/errors";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
-import type {
-  ProcessingJobContract,
-  SourceDocumentSubmissionContract,
-  SourceDocumentSubmissionPort,
-} from "@/application/contracts";
+import type { SourceDocumentSubmissionContract } from "@/application/contracts";
 import { toSourceDocumentSubmissionContract } from "@/application/contracts";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
-import { processImage as processImageFn } from "@/lib/storage/image-processing";
+import { processImage } from "@/lib/storage/image-processing";
+import { storedFileAdapter } from "@/application/adapters/storage";
+import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
+import { submitSourceDocument, submitSourceDocumentIdempotently } from "./submissions";
 import type { PreparedInlineImage } from "@/modules/source-document/api-v1-policy";
 import { prepareInlineImages } from "./prepare-inline-images";
-import type { InlineImageUploader } from "./prepare-inline-images";
 
 export interface CreateAndQueueSourceDocumentInput {
   ledgerId: string;
@@ -27,13 +26,8 @@ export interface CreateAndQueueSourceDocumentInput {
     key: string;
     contentFingerprint: string | null;
   };
-}
-
-interface CreateAndQueueSourceDocumentDependencies {
-  submissions: SourceDocumentSubmissionPort;
-  storedFiles: InlineImageUploader;
-  processImage: typeof processImageFn;
-  scheduleProcessing: (job: ProcessingJobContract) => void;
+  /** Correlates the processing `after()` with the request that queued it. */
+  requestId?: string;
 }
 
 function resolveDocumentDate(documentDate?: string, timezone?: string): string {
@@ -42,8 +36,7 @@ function resolveDocumentDate(documentDate?: string, timezone?: string): string {
 }
 
 export async function createAndQueueSourceDocument(
-  input: CreateAndQueueSourceDocumentInput,
-  dependencies: CreateAndQueueSourceDocumentDependencies
+  input: CreateAndQueueSourceDocumentInput
 ): Promise<SourceDocumentSubmissionContract> {
   let createdUploadSessionId: string | null = null;
   const storedInput = input.input.kind === "stored" ? input.input : null;
@@ -64,12 +57,7 @@ export async function createAndQueueSourceDocument(
     const resolvedDate = resolveDocumentDate(input.documentDate, input.timezone);
     const preparedImages =
       inlineImages.length > 0
-        ? await prepareInlineImages(
-            inlineImages,
-            dependencies.storedFiles,
-            dependencies.processImage,
-            input.ledgerId
-          )
+        ? await prepareInlineImages(inlineImages, storedFileAdapter, processImage, input.ledgerId)
         : null;
     createdUploadSessionId = preparedImages?.uploadSessionId ?? null;
     const processedImageIds = preparedImages?.storedFileIds ?? [];
@@ -89,18 +77,18 @@ export async function createAndQueueSourceDocument(
   let pending;
   try {
     pending = input.idempotency
-      ? await dependencies.submissions.submitIdempotently(input.idempotency, prepareSubmission)
-      : await dependencies.submissions.submit(await prepareSubmission());
+      ? await submitSourceDocumentIdempotently(input.idempotency, prepareSubmission)
+      : await submitSourceDocument(await prepareSubmission());
   } catch (error) {
     if (createdUploadSessionId != null) {
       try {
-        await dependencies.storedFiles.abandonUploadSession(input.ledgerId, createdUploadSessionId);
+        await storedFileAdapter.abandonUploadSession(input.ledgerId, createdUploadSessionId);
       } catch {
         // prepareInlineImages already records cleanup diagnostics; preserve the submission error.
       }
     }
     throw error;
   }
-  if (pending.idempotencyReplay !== true) dependencies.scheduleProcessing(pending.job);
+  if (pending.idempotencyReplay !== true) scheduleProcessingAfter(pending.job, input.requestId);
   return toSourceDocumentSubmissionContract(pending.document, pending.revision);
 }

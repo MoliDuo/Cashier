@@ -19,7 +19,7 @@ vi.mock("@/modules/source-document/server/resolve-record-book", () => ({
   resolveRecordBook: resolveRecordBookMock,
 }));
 
-vi.mock("@/modules/source-document/application/use-cases/create-and-queue-source-document", () => ({
+vi.mock("@/modules/source-document/server/create-and-queue", () => ({
   createAndQueueSourceDocument: createAndQueueSourceDocumentMock,
 }));
 
@@ -114,14 +114,6 @@ describe("createSourceDocumentAction omission semantics", () => {
     await createSourceDocumentAction({ text: "Lunch", bookId: otherBookId }, CLIENT_SUBMISSION_ID);
 
     expect(resolveRecordBookMock).toHaveBeenCalledWith("ledger-1", otherBookId);
-  });
-
-  it("injects scheduleProcessing into use case dependencies", async () => {
-    await createSourceDocumentAction({ text: "Lunch" }, CLIENT_SUBMISSION_ID);
-
-    const deps = createAndQueueSourceDocumentMock.mock.calls[0]?.[1] as Record<string, unknown>;
-    expect(deps).toBeDefined();
-    expect(typeof deps.scheduleProcessing).toBe("function");
   });
 
   it("scopes browser idempotency to the authenticated user and payload", async () => {

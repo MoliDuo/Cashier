@@ -7,7 +7,25 @@ import {
   testBookId,
 } from "../../helpers/schema-setup";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import { postgresSourceDocumentAggregateAdapter as aggregate } from "@/application/adapters/postgres/source-document-aggregate";
+import {
+  applyDateOrganization,
+  dismissDateOrganization,
+} from "@/modules/source-document/server/date-organization";
+import {
+  assignSourceDocumentBook,
+  saveSourceDocumentChanges,
+  updateLedgerEntryDates,
+  updateSourceDocuments,
+} from "@/modules/source-document/server/updates";
+import {
+  batchDeleteLedgerEntries,
+  batchUpdateLedgerEntries,
+  deleteLedgerEntry,
+} from "@/modules/source-document/server/entry-commands";
+import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
+import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
+import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 
 /**
  * Every write that changes a document takes a `ledgerId` beside the record ids,
@@ -109,9 +127,9 @@ type Reach = (callerLedgerId: string, other: Neighbour, callerBookId: string) =>
 
 const REACHES: Array<[name: string, reach: Reach]> = [
   [
-    "assignBook",
+    "assignSourceDocumentBook",
     (ledgerId, other, callerBookId) =>
-      aggregate.assignBook({
+      assignSourceDocumentBook({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
         expectedVersion: other.version,
@@ -119,31 +137,31 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       }),
   ],
   [
-    "deleteDocuments",
+    "deleteSourceDocumentAtomically",
     (ledgerId, other) =>
-      aggregate.deleteDocuments({
+      deleteSourceDocumentAtomically({
         ledgerId,
         target: { sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version },
       }),
   ],
   [
-    "cancelProcessing",
+    "cancelSourceDocumentProcessing",
     (ledgerId, other) =>
-      aggregate.cancelProcessing(ledgerId, other.sourceDocumentId, other.version),
+      cancelSourceDocumentProcessing(ledgerId, other.sourceDocumentId, other.version),
   ],
   [
-    "updateDocuments",
+    "updateSourceDocuments",
     (ledgerId, other) =>
-      aggregate.updateDocuments({
+      updateSourceDocuments({
         ledgerId,
         targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
         data: { title: "Taken over" },
       }),
   ],
   [
-    "saveChanges",
+    "saveSourceDocumentChanges",
     (ledgerId, other) =>
-      aggregate.saveChanges({
+      saveSourceDocumentChanges({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
         expectedVersion: other.version,
@@ -152,9 +170,9 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       }),
   ],
   [
-    "splitEntries",
+    "splitSourceDocumentAtomically",
     (ledgerId, other) =>
-      aggregate.splitEntries({
+      splitSourceDocumentAtomically({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
         expectedVersion: other.version,
@@ -163,9 +181,9 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       }),
   ],
   [
-    "updateEntryDates",
+    "updateLedgerEntryDates",
     (ledgerId, other) =>
-      aggregate.updateEntryDates({
+      updateLedgerEntryDates({
         ledgerId,
         targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
         ledgerEntryIds: [other.ledgerEntryId],
@@ -175,7 +193,7 @@ const REACHES: Array<[name: string, reach: Reach]> = [
   [
     "dismissDateOrganization",
     (ledgerId, other) =>
-      aggregate.dismissDateOrganization({
+      dismissDateOrganization({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
         expectedVersion: other.version,
@@ -185,7 +203,7 @@ const REACHES: Array<[name: string, reach: Reach]> = [
   [
     "applyDateOrganization",
     (ledgerId, other) =>
-      aggregate.applyDateOrganization({
+      applyDateOrganization({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
         expectedVersion: other.version,
@@ -195,18 +213,18 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       }),
   ],
   [
-    "deleteEntries",
+    "deleteLedgerEntry",
     (ledgerId, other) =>
-      aggregate.deleteEntries({
+      deleteLedgerEntry({
         ledgerId,
         target: { sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version },
         ledgerEntryId: other.ledgerEntryId,
       }),
   ],
   [
-    "batchUpdateEntries",
+    "batchUpdateLedgerEntries",
     (ledgerId, other) =>
-      aggregate.batchUpdateEntries({
+      batchUpdateLedgerEntries({
         ledgerId,
         targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
         ledgerEntryIds: [other.ledgerEntryId],
@@ -214,18 +232,18 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       }),
   ],
   [
-    "batchDeleteEntries",
+    "batchDeleteLedgerEntries",
     (ledgerId, other) =>
-      aggregate.batchDeleteEntries({
+      batchDeleteLedgerEntries({
         ledgerId,
         targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
         ledgerEntryIds: [other.ledgerEntryId],
       }),
   ],
   [
-    "installRetry",
+    "submitSourceDocument (retry)",
     (ledgerId, other) =>
-      aggregate.installRetry({
+      submitSourceDocument({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
         expectedVersion: other.version,

@@ -2,7 +2,6 @@ import { sql } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
-import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import {
   categoryReclassificationJobEntries,
   categoryReclassificationJobDocuments,
@@ -22,6 +21,7 @@ import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
+import { applyCategoryAssignments } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
 
 const START = new Date("2030-01-01T00:00:00.000Z");
 const AFTER_EXPIRY = new Date("2030-01-01T00:02:00.000Z");
@@ -254,7 +254,7 @@ describe("category assignment v2", () => {
     expect(second!.claimToken).not.toBe(first!.claimToken);
 
     await expect(
-      postgresSourceDocumentAggregateAdapter.applyCategoryAssignments({
+      applyCategoryAssignments({
         ledgerId: fixture.ledger.id,
         jobId: fixture.begun.id,
         sourceDocumentId: fixture.document.id,
@@ -278,7 +278,7 @@ describe("category assignment v2", () => {
     expect(unchanged).toEqual({ categoryId: null, version: 1 });
 
     await expect(
-      postgresSourceDocumentAggregateAdapter.applyCategoryAssignments({
+      applyCategoryAssignments({
         ledgerId: fixture.ledger.id,
         jobId: fixture.begun.id,
         sourceDocumentId: fixture.document.id,

@@ -1,7 +1,5 @@
 "use server";
-import type { ProcessingJobContract } from "@/application/contracts";
-import { serverComposition } from "@/application/server-composition-root";
-import { retrySourceDocument } from "@/modules/source-document/application/use-cases/retry-source-document";
+import { retrySourceDocument } from "../server/retry";
 import type {
   RetrySourceDocumentResponseDto,
   VersionedCommandResult,
@@ -14,7 +12,6 @@ import {
 import { omitUndefinedProperties } from "@/lib/validation";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
-import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 
 /**
  * Direct Retry: retry an existing source document with immutable evidence.
@@ -35,23 +32,11 @@ export const retrySourceDocumentAction = withSourceDocumentLedgerAccess(
       sourceDocumentId,
       expectedVersion,
     });
-    const scheduleProcessing = (job: ProcessingJobContract) => {
-      scheduleProcessingAfter(job);
-    };
-
-    const result = await retrySourceDocument(
-      {
-        ledgerId,
-        sourceDocumentId: identity.sourceDocumentId,
-        expectedVersion: identity.expectedVersion,
-      },
-      {
-        submissions: {
-          submit: serverComposition.sourceDocumentAggregate.installRetry,
-        },
-        scheduleProcessing,
-      }
-    );
+    const result = await retrySourceDocument({
+      ledgerId,
+      sourceDocumentId: identity.sourceDocumentId,
+      expectedVersion: identity.expectedVersion,
+    });
 
     // Also recover any missed processing intents
     scheduleProcessingRecoveryAfter(ledgerId);
@@ -87,24 +72,12 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
       ...omitUndefinedProperties({ timezone: parsedInput.timezone }),
     };
 
-    const scheduleProcessing = (job: ProcessingJobContract) => {
-      scheduleProcessingAfter(job);
-    };
-
-    const result = await retrySourceDocument(
-      {
-        ledgerId,
-        sourceDocumentId: identity.sourceDocumentId,
-        expectedVersion: identity.expectedVersion,
-        input: validatedInput,
-      },
-      {
-        submissions: {
-          submit: serverComposition.sourceDocumentAggregate.installRetry,
-        },
-        scheduleProcessing,
-      }
-    );
+    const result = await retrySourceDocument({
+      ledgerId,
+      sourceDocumentId: identity.sourceDocumentId,
+      expectedVersion: identity.expectedVersion,
+      input: validatedInput,
+    });
 
     // Also recover any missed processing intents
     scheduleProcessingRecoveryAfter(ledgerId);

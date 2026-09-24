@@ -1,46 +1,65 @@
 /**
- * Canonical version-invariant suite for every existing-document command on
- * `SourceDocumentAggregateWritePort`. Each command must, against the real
- * database: (a) advance `version` by exactly +1 when it produces a
- * user-observable change, (b) where the command supports replay at the
- * *current* version, either return success with the version unchanged (a
+ * Canonical version-invariant suite for every write that changes an existing
+ * source document under a caller-supplied `expectedVersion`. Each command
+ * must, against the real database: (a) advance `version` by exactly +1 when it
+ * produces a user-observable change, (b) where the command supports replay at
+ * the *current* version, either return success with the version unchanged (a
  * true no-op) or fail in a well-defined non-stale way — never silently
  * double-increment — and (c) reject a *stale* (already-superseded) version
  * with zero writes.
  *
- * The `Record<ExistingDocumentCommand, ...>` registry below is typed from
- * `keyof SourceDocumentAggregateWritePort`: adding a new port method changes
- * `ExistingDocumentCommand` and this file fails to compile until a scenario
- * is added for it. That is the enforcement mechanism, not a comment.
+ * A new versioned write in `src/modules/source-document/server/` needs a name
+ * in `ExistingDocumentCommand` and a scenario in the registry below.
  */
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { serverComposition } from "@/application/server-composition-root";
-import type { SourceDocumentAggregateWritePort } from "@/modules/source-document/application/ports";
 import { ConflictError, NotFoundError, StaleSourceDocumentVersionError } from "@/lib/errors";
 import { books, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
+import {
+  addLedgerEntry,
+  batchDeleteLedgerEntries,
+  batchUpdateLedgerEntries,
+  deleteLedgerEntry,
+} from "@/modules/source-document/server/entry-commands";
+import {
+  applyDateOrganization,
+  dismissDateOrganization,
+} from "@/modules/source-document/server/date-organization";
+import {
+  assignSourceDocumentBook,
+  saveSourceDocumentChanges,
+  updateLedgerEntryDates,
+  updateSourceDocuments,
+} from "@/modules/source-document/server/updates";
+import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
+import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
+import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 
 /**
- * Every command on the port that mutates an *existing* document under a
- * caller-supplied `expectedVersion` CAS. Excluded, and why:
- * - `createProcessingDocument` / `createManualDocument`: create a *new*
- *   document; there is no prior version to be a CAS against.
- *   ids, not a browser-facing versioned command.
+ * Every write that mutates an *existing* document under an `expectedVersion`
+ * CAS. Creating a document (`submitSourceDocument` without a target,
+ * `createManualDocument`) has no prior version, and category assignment is
+ * guarded by its job claim instead, so neither is listed.
  */
-type ExistingDocumentCommand = Exclude<
-  keyof SourceDocumentAggregateWritePort,
-  | "createProcessingDocument"
-  | "createIdempotentProcessingDocument"
-  | "createManualDocument"
-  | "installIdempotentRetry"
-  | "applyCategoryAssignments"
-  // A read of the document's book, not a versioned command: it has no CAS to
-  // exercise, so it is covered by its own case below.
->;
-
-const port: SourceDocumentAggregateWritePort = serverComposition.sourceDocumentAggregate;
+type ExistingDocumentCommand =
+  | "assignSourceDocumentBook"
+  | "applyDateOrganization"
+  | "dismissDateOrganization"
+  | "saveSourceDocumentChanges"
+  | "updateSourceDocuments"
+  | "updateLedgerEntryDates"
+  | "addLedgerEntry"
+  | "deleteLedgerEntry"
+  | "batchUpdateLedgerEntries"
+  | "batchDeleteLedgerEntries"
+  | "splitSourceDocumentAtomically"
+  | "retrySubmission"
+  | "cancelSourceDocumentProcessing"
+  | "deleteSourceDocumentAtomically";
 
 const entry = {
   categoryId: null,
@@ -83,7 +102,7 @@ async function currentTitle(sourceDocumentId: string): Promise<string | null> {
 
 /** An active, completed document with `count` entries — version 1. */
 async function createActiveDocument(ledgerId: string, count = 1) {
-  const created = await port.createManualDocument({
+  const created = await createManualDocument({
     expectedMainCurrency: "CNY",
     ledgerId,
     bookId: await testBookId(getTestDb(), ledgerId),
@@ -105,7 +124,7 @@ async function createActiveDocument(ledgerId: string, count = 1) {
 
 /** A document with a fresh, still-processing pending revision — version 1. */
 async function createProcessingDocument(ledgerId: string) {
-  const pending = await port.createProcessingDocument({
+  const pending = await submitSourceDocument({
     ledgerId,
     bookId: await testBookId(getTestDb(), ledgerId),
     input: { text: "Processing fixture", storedFileIds: [], documentDate: null },
@@ -114,7 +133,7 @@ async function createProcessingDocument(ledgerId: string) {
 }
 
 const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
-  async assignBook() {
+  async assignSourceDocumentBook() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
     const db = getTestDb();
@@ -140,15 +159,15 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
       bookId: currentBookId,
       version: 1,
     });
-    expect(await port.assignBook({ ...input, expectedVersion: 1 })).toEqual({
+    expect(await assignSourceDocumentBook({ ...input, expectedVersion: 1 })).toEqual({
       ok: true,
       version: 2,
     });
-    expect(await port.assignBook({ ...input, expectedVersion: 2 })).toEqual({
+    expect(await assignSourceDocumentBook({ ...input, expectedVersion: 2 })).toEqual({
       ok: true,
       version: 2,
     });
-    expect(await port.assignBook({ ...input, expectedVersion: 1 })).toEqual({
+    expect(await assignSourceDocumentBook({ ...input, expectedVersion: 1 })).toEqual({
       ok: false,
       reason: "stale",
       currentVersion: 2,
@@ -173,7 +192,9 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
       sortOrder: 3,
       archivedAt: new Date(),
     });
-    expect(await port.assignBook({ ...input, bookId: thirdBookId, expectedVersion: 2 })).toEqual({
+    expect(
+      await assignSourceDocumentBook({ ...input, bookId: thirdBookId, expectedVersion: 2 })
+    ).toEqual({
       ok: false,
       reason: "book_unavailable",
     });
@@ -218,7 +239,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
         },
       })
       .where(eq(sourceDocuments.id, sourceDocumentId));
-    const changed = await port.applyDateOrganization({
+    const changed = await applyDateOrganization({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -228,7 +249,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     expect(changed).toMatchObject({ ok: true, version: 2 });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
-    const stale = await port.applyDateOrganization({
+    const stale = await applyDateOrganization({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -256,7 +277,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
         },
       })
       .where(eq(sourceDocuments.id, sourceDocumentId));
-    const changed = await port.dismissDateOrganization({
+    const changed = await dismissDateOrganization({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -264,7 +285,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     expect(changed).toMatchObject({ ok: true, version: 2 });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
-    const stale = await port.dismissDateOrganization({
+    const stale = await dismissDateOrganization({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -273,11 +294,11 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(stale).toMatchObject({ ok: false, reason: "stale", currentVersion: 2 });
   },
 
-  async saveChanges() {
+  async saveSourceDocumentChanges() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
 
-    const changed = await port.saveChanges({
+    const changed = await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -289,7 +310,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
 
     // No-op: replaying the same (already-applied) title at the current
     // version is a true no-op — success, version unchanged.
-    const noop = await port.saveChanges({
+    const noop = await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 2,
@@ -299,7 +320,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(noop).toMatchObject({ ok: true, version: 2 });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
 
-    const stale = await port.saveChanges({
+    const stale = await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -311,12 +332,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentTitle(sourceDocumentId)).toBe("Updated");
   },
 
-  async updateDocuments() {
+  async updateSourceDocuments() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
     const target = (expectedVersion: number) => [{ sourceDocumentId, expectedVersion }];
 
-    const changed = await port.updateDocuments({
+    const changed = await updateSourceDocuments({
       ledgerId,
       targets: target(1),
       data: { title: "Batch title" },
@@ -328,7 +349,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
 
     // No-op: the title already matches — zero writes, version unchanged.
-    const noop = await port.updateDocuments({
+    const noop = await updateSourceDocuments({
       ledgerId,
       targets: target(2),
       data: { title: "Batch title" },
@@ -340,7 +361,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
 
-    const stale = await port.updateDocuments({
+    const stale = await updateSourceDocuments({
       ledgerId,
       targets: target(1),
       data: { title: "Stale batch title" },
@@ -354,12 +375,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentTitle(sourceDocumentId)).toBe("Batch title");
   },
 
-  async updateEntryDates() {
+  async updateLedgerEntryDates() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
     const targets = (expectedVersion: number) => [{ sourceDocumentId, expectedVersion }];
 
-    const changed = await port.updateEntryDates({
+    const changed = await updateLedgerEntryDates({
       ledgerId,
       targets: targets(1),
       ledgerEntryIds: entryIds,
@@ -370,7 +391,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
       versions: [{ sourceDocumentId, version: 2 }],
     });
 
-    const noop = await port.updateEntryDates({
+    const noop = await updateLedgerEntryDates({
       ledgerId,
       targets: targets(2),
       ledgerEntryIds: entryIds,
@@ -382,7 +403,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
 
-    const stale = await port.updateEntryDates({
+    const stale = await updateLedgerEntryDates({
       ledgerId,
       targets: targets(1),
       ledgerEntryIds: entryIds,
@@ -396,11 +417,11 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async addEntry() {
+  async addLedgerEntry() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
 
-    const changed = await port.addEntry({
+    const changed = await addLedgerEntry({
       ledgerId,
       target: { sourceDocumentId, expectedVersion: 1 },
       amount: "5.00",
@@ -412,7 +433,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     // No no-op case: every successful call adds a distinct new entry, so
     // there is no "replay is a no-op" scenario to exercise here.
 
-    const stale = await port.addEntry({
+    const stale = await addLedgerEntry({
       ledgerId,
       target: { sourceDocumentId, expectedVersion: 1 },
       amount: "9.00",
@@ -422,11 +443,11 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async deleteEntries() {
+  async deleteLedgerEntry() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 2);
 
-    const changed = await port.deleteEntries({
+    const changed = await deleteLedgerEntry({
       ledgerId,
       target: { sourceDocumentId, expectedVersion: 1 },
       ledgerEntryId: entryIds[0]!,
@@ -438,7 +459,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     // the exact same call is necessarily at a stale version (covered below)
     // since the first delete already advanced version.
 
-    const stale = await port.deleteEntries({
+    const stale = await deleteLedgerEntry({
       ledgerId,
       target: { sourceDocumentId, expectedVersion: 1 },
       ledgerEntryId: entryIds[1]!,
@@ -447,12 +468,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async batchUpdateEntries() {
+  async batchUpdateLedgerEntries() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
     const targets = (expectedVersion: number) => [{ sourceDocumentId, expectedVersion }];
 
-    const changed = await port.batchUpdateEntries({
+    const changed = await batchUpdateLedgerEntries({
       ledgerId,
       targets: targets(1),
       ledgerEntryIds: entryIds,
@@ -465,7 +486,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
 
     // No-op: the patch already matches every selected entry's current value.
-    const noop = await port.batchUpdateEntries({
+    const noop = await batchUpdateLedgerEntries({
       ledgerId,
       targets: targets(2),
       ledgerEntryIds: entryIds,
@@ -478,7 +499,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
 
-    const stale = await port.batchUpdateEntries({
+    const stale = await batchUpdateLedgerEntries({
       ledgerId,
       targets: targets(1),
       ledgerEntryIds: entryIds,
@@ -492,12 +513,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async batchDeleteEntries() {
+  async batchDeleteLedgerEntries() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 2);
     const targets = (expectedVersion: number) => [{ sourceDocumentId, expectedVersion }];
 
-    const changed = await port.batchDeleteEntries({
+    const changed = await batchDeleteLedgerEntries({
       ledgerId,
       targets: targets(1),
       ledgerEntryIds: [entryIds[0]!],
@@ -508,7 +529,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     // No no-op case: deleting the same entry twice is not idempotent — a
     // replay is necessarily at a stale version once the first delete commits.
 
-    const stale = await port.batchDeleteEntries({
+    const stale = await batchDeleteLedgerEntries({
       ledgerId,
       targets: targets(1),
       ledgerEntryIds: [entryIds[1]!],
@@ -520,11 +541,11 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async splitEntries() {
+  async splitSourceDocumentAtomically() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 3);
 
-    const changed = await port.splitEntries({
+    const changed = await splitSourceDocumentAtomically({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -538,7 +559,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     // entries; replaying the exact call is necessarily against a stale
     // version once the first split commits.
 
-    const stale = await port.splitEntries({
+    const stale = await splitSourceDocumentAtomically({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -549,11 +570,11 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(2);
   },
 
-  async installRetry() {
+  async retrySubmission() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
 
-    const changed = await port.installRetry({
+    const changed = await submitSourceDocument({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -568,7 +589,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     // sends) deliberately allows a second retry to lay a fresh pending
     // revision on top of one still processing — so a call at the new
     // current version is not a no-op and not rejected, it advances again.
-    const superseded = await port.installRetry({
+    const superseded = await submitSourceDocument({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 2,
@@ -579,7 +600,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(3);
 
     await expect(
-      port.installRetry({
+      submitSourceDocument({
         ledgerId,
         sourceDocumentId,
         expectedVersion: 1,
@@ -590,41 +611,41 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(await currentVersion(sourceDocumentId)).toBe(3);
   },
 
-  async cancelProcessing() {
+  async cancelSourceDocumentProcessing() {
     const ledgerId = await newLedger();
     const { sourceDocumentId, version } = await createProcessingDocument(ledgerId);
 
-    const changed = await port.cancelProcessing(ledgerId, sourceDocumentId, version);
+    const changed = await cancelSourceDocumentProcessing(ledgerId, sourceDocumentId, version);
     expect(changed).toMatchObject({ version: version + 1, processingStatus: "cancelled" });
     expect(await currentVersion(sourceDocumentId)).toBe(version + 1);
 
     // The latest input remains addressable, but its terminal revision cannot be cancelled twice.
-    await expect(port.cancelProcessing(ledgerId, sourceDocumentId, version + 1)).rejects.toThrow(
-      ConflictError
-    );
+    await expect(
+      cancelSourceDocumentProcessing(ledgerId, sourceDocumentId, version + 1)
+    ).rejects.toThrow(ConflictError);
     expect(await currentVersion(sourceDocumentId)).toBe(version + 1);
 
-    await expect(port.cancelProcessing(ledgerId, sourceDocumentId, version)).rejects.toThrow(
-      StaleSourceDocumentVersionError
-    );
+    await expect(
+      cancelSourceDocumentProcessing(ledgerId, sourceDocumentId, version)
+    ).rejects.toThrow(StaleSourceDocumentVersionError);
     expect(await currentVersion(sourceDocumentId)).toBe(version + 1);
   },
 
-  async deleteDocuments() {
+  async deleteSourceDocumentAtomically() {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
 
     // Advance the version once via an unrelated command first, so the stale
     // sub-check below can target a genuinely superseded (but still-present)
     // document, distinct from the "already deleted" case.
-    await port.updateDocuments({
+    await updateSourceDocuments({
       ledgerId,
       targets: [{ sourceDocumentId, expectedVersion: 1 }],
       data: { title: "Before delete" },
     });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
 
-    const stale = await port.deleteDocuments({
+    const stale = await deleteSourceDocumentAtomically({
       ledgerId,
       target: { sourceDocumentId, expectedVersion: 1 },
     });
@@ -636,7 +657,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     expect(beforeDelete?.deletedAt).toBeNull();
     expect(beforeDelete?.version).toBe(2);
 
-    const changed = await port.deleteDocuments({
+    const changed = await deleteSourceDocumentAtomically({
       ledgerId,
       target: { sourceDocumentId, expectedVersion: 2 },
     });
@@ -651,7 +672,7 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     // read every write path uses — a replay is rejected as `NotFoundError`,
     // not a silent no-op and not a stale-version result.
     await expect(
-      port.deleteDocuments({ ledgerId, target: { sourceDocumentId, expectedVersion: 3 } })
+      deleteSourceDocumentAtomically({ ledgerId, target: { sourceDocumentId, expectedVersion: 3 } })
     ).rejects.toThrow(NotFoundError);
   },
 };

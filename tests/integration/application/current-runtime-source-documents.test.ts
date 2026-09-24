@@ -3,17 +3,13 @@ import {
   getTargetSourceDocument,
   listTargetSourceDocuments,
 } from "@/modules/source-document/server/reads/list";
-import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import {
-  postgresLedgerProjectionAdapter,
-  postgresRevisionAdapter,
-} from "@/application/adapters/postgres";
+import { postgresRevisionAdapter } from "@/application/adapters/postgres";
 import {
   entryCategories,
   ledgerEntries,
@@ -22,6 +18,11 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
+import {
+  activateRevision,
+  createManualDocument,
+} from "@/modules/source-document/server/projections/writes";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 
 const projectionEntry = {
   categoryId: null,
@@ -77,7 +78,7 @@ describe("current-runtime target adapters", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await expect(
-      postgresLedgerProjectionAdapter.activateRevision({
+      activateRevision({
         lease: await claimRevisionForTest(retry.revision.id),
         ledgerId,
         expectedMainCurrency: "CNY",
@@ -145,7 +146,7 @@ describe("current-runtime target adapters", () => {
     });
 
     await expect(
-      postgresLedgerProjectionAdapter.activateRevision({
+      activateRevision({
         lease: await claimRevisionForTest(pending.revision.id),
         ledgerId,
         expectedMainCurrency: "CNY",
@@ -196,7 +197,7 @@ describe("current-runtime target adapters", () => {
   it("soft deletes active and pending documents without removing evidence or accepting late completion", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const active = await postgresLedgerProjectionAdapter.createManual({
+    const active = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entries: [projectionEntry],
@@ -230,19 +231,19 @@ describe("current-runtime target adapters", () => {
     const fileLinkCount = (await db.select().from(revisionFiles)).length;
 
     await expect(
-      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+      deleteSourceDocumentAtomically({
         ledgerId,
         target: { sourceDocumentId: active.sourceDocumentId, expectedVersion: 2 },
       })
     ).resolves.toMatchObject({ ok: true });
     await expect(
-      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+      deleteSourceDocumentAtomically({
         ledgerId,
         target: { sourceDocumentId: active.sourceDocumentId, expectedVersion: 2 },
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      postgresLedgerProjectionAdapter.activateRevision({
+      activateRevision({
         lease: pendingLease,
         ledgerId,
         expectedMainCurrency: "CNY",

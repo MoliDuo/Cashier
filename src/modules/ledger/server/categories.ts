@@ -21,7 +21,7 @@ import {
   lockSourceDocumentsForUpdate,
   type PostgresTransaction,
 } from "@/application/adapters/postgres/transaction-locks";
-import { assertSourceDocumentNotProcessing } from "@/application/adapters/postgres/source-document-write-guards";
+import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 import { incrementCategoryChangedDocumentVersions } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
 

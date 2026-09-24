@@ -1,6 +1,6 @@
 "use server";
 
-import { serverComposition } from "@/application/server-composition-root";
+import { applyDateOrganization, dismissDateOrganization } from "../server/date-organization";
 import {
   applyDateOrganizationInputSchema,
   dismissDateOrganizationInputSchema,
@@ -10,7 +10,7 @@ import { withSourceDocumentLedgerAccess } from "./access";
 export const applyDateOrganizationAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, input: unknown) => {
     const validated = applyDateOrganizationInputSchema.parse(input);
-    return serverComposition.sourceDocumentAggregate.applyDateOrganization({
+    return applyDateOrganization({
       ledgerId,
       ...validated,
     });
@@ -20,7 +20,7 @@ export const applyDateOrganizationAction = withSourceDocumentLedgerAccess(
 export const dismissDateOrganizationAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, input: unknown) => {
     const validated = dismissDateOrganizationInputSchema.parse(input);
-    return serverComposition.sourceDocumentAggregate.dismissDateOrganization({
+    return dismissDateOrganization({
       ledgerId,
       ...validated,
     });

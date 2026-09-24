@@ -1,10 +1,7 @@
 import "server-only";
-import {
-  PostgresProcessingJobAdapter,
-  postgresSourceDocumentAggregateAdapter,
-} from "@/application/adapters/postgres";
+import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
 import { loadRevisionProcessingContext } from "@/application/adapters/postgres/revision-processing-context";
-import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres/ledger-projections";
+import { activateRevision } from "@/modules/source-document/server/projections/writes";
 import { postgresRevisionAdapter } from "@/application/adapters/postgres/revisions";
 import {
   createExecuteSingleProcessingJob,
@@ -42,7 +39,7 @@ function createRevisionProcessor(
       ),
     getRates: getExchangeRates,
     recordProcessingFailure: (input) => postgresRevisionAdapter.recordProcessingFailure(input),
-    activateRevision: (input) => postgresLedgerProjectionAdapter.activateRevision(input),
+    activateRevision,
   });
 }
 
@@ -57,7 +54,6 @@ export const serverComposition = {
   categoryReclassificationJobs: postgresCategoryReclassificationJobAdapter,
   categoryAssignments: postgresCategoryAssignmentV2Adapter,
   storedFiles: storedFileAdapter,
-  sourceDocumentAggregate: postgresSourceDocumentAggregateAdapter,
   processingRecovery: new PostgresProcessingJobAdapter(),
   createRevisionProcessor,
   executeSingleProcessingJob,

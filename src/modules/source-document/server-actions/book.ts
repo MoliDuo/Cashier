@@ -1,7 +1,7 @@
 "use server";
 
 import { withSourceDocumentLedgerAccess } from "./access";
-import { serverComposition } from "@/application/server-composition-root";
+import { assignSourceDocumentBook } from "../server/updates";
 import { parseAssignSourceDocumentBookInput } from "@/modules/ledger/contract-schemas";
 import { ConflictError, ValidationError } from "@/lib/errors";
 
@@ -16,7 +16,7 @@ import { ConflictError, ValidationError } from "@/lib/errors";
 export const assignSourceDocumentBookAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, input: unknown): Promise<{ bookId: string; version: number }> => {
     const validated = parseAssignSourceDocumentBookInput(input);
-    const result = await serverComposition.sourceDocumentAggregate.assignBook({
+    const result = await assignSourceDocumentBook({
       ledgerId,
       sourceDocumentId: validated.sourceDocumentId,
       expectedVersion: validated.expectedVersion,

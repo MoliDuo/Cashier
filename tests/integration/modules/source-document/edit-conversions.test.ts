@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { postgresSourceDocumentAggregateAdapter as aggregate } from "@/application/adapters/postgres/source-document-aggregate";
 import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -12,7 +13,7 @@ async function fixture() {
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db);
   const bookId = await testBookId(db, ledgerId);
-  const created = await aggregate.createManualDocument({
+  const created = await createManualDocument({
     ledgerId,
     bookId: bookId,
     expectedMainCurrency: "CNY",
@@ -45,7 +46,7 @@ describe("document edit conversion scope", () => {
     const convert = vi
       .spyOn(exchangeRates, "convertAmounts")
       .mockRejectedValue(new Error("FX must not be called"));
-    const result = await aggregate.saveChanges({
+    const result = await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -70,7 +71,7 @@ describe("document edit conversion scope", () => {
     const convert = vi
       .spyOn(exchangeRates, "convertAmounts")
       .mockResolvedValue([{ convertedAmount: "140", exchangeRate: "7" }]);
-    await aggregate.saveChanges({
+    await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -94,7 +95,7 @@ describe("document edit conversion scope", () => {
       { convertedAmount: "80", exchangeRate: "8" },
       { convertedAmount: "80", exchangeRate: "8" },
     ]);
-    await aggregate.saveChanges({
+    await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
       expectedVersion: 1,
@@ -120,7 +121,7 @@ describe("document edit conversion scope", () => {
       return [{ convertedAmount: "140", exchangeRate: "7" }];
     });
     expect(
-      await aggregate.saveChanges({
+      await saveSourceDocumentChanges({
         ledgerId,
         sourceDocumentId,
         expectedVersion: 1,

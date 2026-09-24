@@ -1,26 +1,41 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ValidationError } from "@/lib/errors";
-import { createAndQueueSourceDocument } from "@/modules/source-document/application/use-cases/create-and-queue-source-document";
-import type { InlineImageUploader } from "@/modules/source-document/application/use-cases/prepare-inline-images";
+
+const {
+  submit,
+  submitIdempotently,
+  scheduleProcessing,
+  createUploadPlan,
+  uploadTarget,
+  finalizeUpload,
+  abandonUploadSession,
+  processImage,
+} = vi.hoisted(() => ({
+  submit: vi.fn(),
+  submitIdempotently: vi.fn(),
+  scheduleProcessing: vi.fn(),
+  createUploadPlan: vi.fn(),
+  uploadTarget: vi.fn(),
+  finalizeUpload: vi.fn(),
+  abandonUploadSession: vi.fn(),
+  processImage: vi.fn(),
+}));
+
+vi.mock("@/modules/source-document/server/submissions", () => ({
+  submitSourceDocument: submit,
+  submitSourceDocumentIdempotently: submitIdempotently,
+}));
+vi.mock("@/application/processing/schedule-processing", () => ({
+  scheduleProcessingAfter: scheduleProcessing,
+}));
+vi.mock("@/application/adapters/storage", () => ({
+  storedFileAdapter: { createUploadPlan, uploadTarget, finalizeUpload, abandonUploadSession },
+}));
+vi.mock("@/lib/storage/image-processing", () => ({ processImage }));
+
+import { createAndQueueSourceDocument } from "@/modules/source-document/server/create-and-queue";
 
 describe("createAndQueueSourceDocument", () => {
-  const submit = vi.fn();
-  const submitIdempotently = vi.fn();
-  const scheduleProcessing = vi.fn();
-  const createUploadPlan = vi.fn();
-  const uploadTarget = vi.fn();
-  const finalizeUpload = vi.fn();
-  const abandonUploadSession = vi.fn();
-  const processImage = vi.fn();
-  const storedFiles: InlineImageUploader = {
-    createUploadPlan,
-    uploadTarget,
-    finalizeUpload,
-    abandonUploadSession,
-  };
-  const submissions = { submit, submitIdempotently };
-  const dependencies = { submissions, storedFiles, processImage, scheduleProcessing };
-
   beforeEach(() => {
     vi.resetAllMocks();
     submit.mockResolvedValue({
@@ -36,28 +51,22 @@ describe("createAndQueueSourceDocument", () => {
 
   it("rejects empty stored evidence before creating durable state", async () => {
     await expect(
-      createAndQueueSourceDocument(
-        {
-          ledgerId: "ledger-1",
-          bookId: "user-1",
-          input: { kind: "stored", storedFileIds: [] },
-        },
-        dependencies
-      )
+      createAndQueueSourceDocument({
+        ledgerId: "ledger-1",
+        bookId: "user-1",
+        input: { kind: "stored", storedFileIds: [] },
+      })
     ).rejects.toThrow(ValidationError);
     expect(submit).not.toHaveBeenCalled();
   });
 
   it("creates stored evidence and dispatches after durable job creation", async () => {
-    const result = await createAndQueueSourceDocument(
-      {
-        ledgerId: "ledger-1",
-        bookId: "user-1",
-        input: { kind: "stored", text: "Lunch receipt", storedFileIds: ["file-1"] },
-        documentDate: "2026-07-15",
-      },
-      dependencies
-    );
+    const result = await createAndQueueSourceDocument({
+      ledgerId: "ledger-1",
+      bookId: "user-1",
+      input: { kind: "stored", text: "Lunch receipt", storedFileIds: ["file-1"] },
+      documentDate: "2026-07-15",
+    });
 
     expect(submit).toHaveBeenCalledWith({
       ledgerId: "ledger-1",
@@ -69,7 +78,7 @@ describe("createAndQueueSourceDocument", () => {
         dateReference: "2026-07-15",
       },
     });
-    expect(scheduleProcessing).toHaveBeenCalledWith({ id: "job-1" });
+    expect(scheduleProcessing.mock.calls[0]?.[0]).toEqual({ id: "job-1" });
     expect(submit.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleProcessing.mock.invocationCallOrder[0]!
     );
@@ -94,18 +103,15 @@ describe("createAndQueueSourceDocument", () => {
       contentFingerprint: "fingerprint-1",
     };
 
-    await createAndQueueSourceDocument(
-      {
-        ledgerId: "ledger-1",
-        bookId: "user-1",
-        input: {
-          kind: "inline",
-          images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],
-        },
-        idempotency,
+    await createAndQueueSourceDocument({
+      ledgerId: "ledger-1",
+      bookId: "user-1",
+      input: {
+        kind: "inline",
+        images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],
       },
-      dependencies
-    );
+      idempotency,
+    });
 
     expect(submitIdempotently).toHaveBeenCalledWith(idempotency, expect.any(Function));
     expect(processImage).not.toHaveBeenCalled();
@@ -124,17 +130,14 @@ describe("createAndQueueSourceDocument", () => {
     finalizeUpload.mockResolvedValue([{ id: "stored-1" }]);
     const bytes = Buffer.from("prepared-image");
 
-    await createAndQueueSourceDocument(
-      {
-        ledgerId: "ledger-1",
-        bookId: "user-1",
-        input: {
-          kind: "inline",
-          images: [{ bytes, mimeType: "image/jpeg", contentHash: "hash" }],
-        },
+    await createAndQueueSourceDocument({
+      ledgerId: "ledger-1",
+      bookId: "user-1",
+      input: {
+        kind: "inline",
+        images: [{ bytes, mimeType: "image/jpeg", contentHash: "hash" }],
       },
-      dependencies
-    );
+    });
 
     expect(processImage).toHaveBeenCalledOnce();
     expect(processImage).toHaveBeenCalledWith(bytes, "image/jpeg");
@@ -163,17 +166,14 @@ describe("createAndQueueSourceDocument", () => {
     submit.mockRejectedValue(new Error("write failed"));
 
     await expect(
-      createAndQueueSourceDocument(
-        {
-          ledgerId: "ledger-1",
-          bookId: "user-1",
-          input: {
-            kind: "inline",
-            images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],
-          },
+      createAndQueueSourceDocument({
+        ledgerId: "ledger-1",
+        bookId: "user-1",
+        input: {
+          kind: "inline",
+          images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],
         },
-        dependencies
-      )
+      })
     ).rejects.toThrow("write failed");
     expect(abandonUploadSession).toHaveBeenCalledWith("ledger-1", "session-1");
     expect(scheduleProcessing).not.toHaveBeenCalled();

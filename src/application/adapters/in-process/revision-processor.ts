@@ -1,5 +1,5 @@
 import type {
-  LedgerProjectionPort,
+  ActivateRevisionInput,
   RevisionProcessingRequestContract,
   RevisionProcessingContextContract,
   RevisionProcessingResultContract,
@@ -44,7 +44,7 @@ export interface CurrentRevisionProcessorOptions {
   loadStoredFiles: (ledgerId: string, storedFileIds: string[]) => Promise<LoadImageResult[]>;
   getRates: (date: string) => Promise<ExchangeRates>;
   recordProcessingFailure: SourceDocumentPort["recordProcessingFailure"];
-  activateRevision: LedgerProjectionPort["activateRevision"];
+  activateRevision: (input: ActivateRevisionInput) => Promise<boolean>;
 }
 
 export class CurrentRevisionProcessor implements RevisionProcessorPort {

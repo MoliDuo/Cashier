@@ -3,13 +3,11 @@ import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import {
-  PostgresProcessingJobAdapter,
-  postgresSourceDocumentSubmissionAdapter,
-} from "@/application/adapters/postgres";
+import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
 import { selectRecoverableProcessingJobs } from "@/modules/source-document/application/use-cases/select-recoverable-processing-jobs";
 import type { ProcessingJobContract } from "@/application/contracts";
 import { processingOutbox, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
+import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 
 /**
  * Creates a pending revision + job for a single source document.
@@ -481,7 +479,7 @@ describe("Processing retry supersession", () => {
   it("atomically cancels the old revision and invalidates its active claim", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const first = await postgresSourceDocumentSubmissionAdapter.submit({
+    const first = await submitSourceDocument({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -490,7 +488,7 @@ describe("Processing retry supersession", () => {
     const oldClaim = await processing.claim(first.job.id);
     expect(oldClaim).not.toBeNull();
 
-    const second = await postgresSourceDocumentSubmissionAdapter.submit({
+    const second = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: first.document.id,
       inheritInput: true,

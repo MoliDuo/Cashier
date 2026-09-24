@@ -1,10 +1,12 @@
+import "server-only";
 import { StaleSourceDocumentVersionError } from "@/lib/errors";
-import type { ProcessingJobContract, SourceDocumentSubmissionPort } from "@/application/contracts";
+import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 import type {
   RetrySourceDocumentResponseDto,
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
-import { staleVersionedCommandResult } from "../versioned-command-result";
+import { submitSourceDocument } from "./submissions";
+import { staleVersionedCommandResult } from "../application/versioned-command-result";
 
 interface SourceDocumentRetryPayload {
   text: string | null;
@@ -19,15 +21,12 @@ interface RetrySourceDocumentInput {
   input?: SourceDocumentRetryPayload;
 }
 
-interface RetrySourceDocumentDependencies {
-  submissions: Pick<SourceDocumentSubmissionPort, "submit">;
-  scheduleProcessing: (job: ProcessingJobContract) => void;
-}
-
-export async function retrySourceDocument(
-  { ledgerId, sourceDocumentId, expectedVersion, input }: RetrySourceDocumentInput,
-  dependencies: RetrySourceDocumentDependencies
-): Promise<VersionedCommandResult<RetrySourceDocumentResponseDto>> {
+export async function retrySourceDocument({
+  ledgerId,
+  sourceDocumentId,
+  expectedVersion,
+  input,
+}: RetrySourceDocumentInput): Promise<VersionedCommandResult<RetrySourceDocumentResponseDto>> {
   const submission = {
     ledgerId,
     sourceDocumentId,
@@ -39,14 +38,14 @@ export async function retrySourceDocument(
 
   let pending;
   try {
-    pending = await dependencies.submissions.submit(submission);
+    pending = await submitSourceDocument(submission);
   } catch (error) {
     if (error instanceof StaleSourceDocumentVersionError) {
       return staleVersionedCommandResult<RetrySourceDocumentResponseDto>(error);
     }
     throw error;
   }
-  if (pending.idempotencyReplay !== true) dependencies.scheduleProcessing(pending.job);
+  if (pending.idempotencyReplay !== true) scheduleProcessingAfter(pending.job);
 
   return {
     ok: true,

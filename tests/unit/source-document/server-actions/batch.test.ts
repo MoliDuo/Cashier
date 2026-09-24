@@ -1,37 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError, ValidationError } from "@/lib/errors";
 
-const {
-  requireLedgerAccessMock,
-  retrySourceDocumentMock,
-  scheduleProcessingAfterMock,
-  deleteDocumentsMock,
-} = vi.hoisted(() => ({
-  requireLedgerAccessMock: vi.fn(),
-  retrySourceDocumentMock: vi.fn(),
-  scheduleProcessingAfterMock: vi.fn(),
-  deleteDocumentsMock: vi.fn(),
-}));
+const { requireLedgerAccessMock, retrySourceDocumentMock, deleteDocumentsMock } = vi.hoisted(
+  () => ({
+    requireLedgerAccessMock: vi.fn(),
+    retrySourceDocumentMock: vi.fn(),
+    deleteDocumentsMock: vi.fn(),
+  })
+);
 
 vi.mock("@/modules/ledger/access", () => ({
   requireLedgerAccess: requireLedgerAccessMock,
 }));
 
-vi.mock("@/modules/source-document/application/use-cases/retry-source-document", () => ({
+vi.mock("@/modules/source-document/server/retry", () => ({
   retrySourceDocument: retrySourceDocumentMock,
 }));
 
-vi.mock("@/application/processing/schedule-processing", () => ({
-  scheduleProcessingAfter: scheduleProcessingAfterMock,
-}));
-
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    sourceDocumentAggregate: {
-      deleteDocuments: deleteDocumentsMock,
-      installRetry: vi.fn(),
-    },
-  },
+vi.mock("@/modules/source-document/server/delete", () => ({
+  deleteSourceDocumentAtomically: deleteDocumentsMock,
 }));
 
 import {
@@ -108,33 +95,23 @@ describe("source document batch server actions", () => {
     });
   });
 
-  it("schedules a retry intent only after every item has been classified", async () => {
-    const order: string[] = [];
-    retrySourceDocumentMock.mockImplementation(
-      async (
-        input: { sourceDocumentId: string },
-        dependencies: { scheduleProcessing: (job: unknown) => void }
-      ) => {
-        order.push(`item:${input.sourceDocumentId}`);
-        if (input.sourceDocumentId === sourceDocumentId) {
-          dependencies.scheduleProcessing({ id: `job:${input.sourceDocumentId}` });
-          return { ok: true, version: 2 };
-        }
+  it("keeps retrying later items after one of them fails", async () => {
+    const laterId = "00000000-0000-4000-8000-000000000004";
+    retrySourceDocumentMock.mockImplementation(async (input: { sourceDocumentId: string }) => {
+      if (input.sourceDocumentId === sourceDocumentId) {
         throw new AppError("storage provider unavailable", "STORAGE_UNAVAILABLE");
       }
-    );
-    scheduleProcessingAfterMock.mockImplementation(() => order.push("schedule"));
-    const failedId = "00000000-0000-4000-8000-000000000004";
+      return { ok: true, version: 2 };
+    });
 
     const result = await batchRetrySourceDocumentsAction([
       { sourceDocumentId, expectedVersion: 1 },
-      { sourceDocumentId: failedId, expectedVersion: 1 },
+      { sourceDocumentId: laterId, expectedVersion: 1 },
     ]);
 
-    expect(order).toEqual([`item:${sourceDocumentId}`, `item:${failedId}`, "schedule"]);
-    expect(scheduleProcessingAfterMock).toHaveBeenCalledTimes(1);
-    expect(result.succeeded).toEqual([{ id: sourceDocumentId, sourceDocumentId, version: 2 }]);
-    expect(result.failed).toEqual([{ id: failedId, code: "PROCESSING_UNAVAILABLE" }]);
+    expect(retrySourceDocumentMock).toHaveBeenCalledTimes(2);
+    expect(result.succeeded).toEqual([{ id: laterId, sourceDocumentId: laterId, version: 2 }]);
+    expect(result.failed).toEqual([{ id: sourceDocumentId, code: "PROCESSING_UNAVAILABLE" }]);
   });
 
   it("refuses an empty batch and a duplicated target", async () => {

@@ -15,12 +15,8 @@ vi.mock("@/modules/source-document/server-actions/access", () => ({
       handler({ ledgerId: "ledger-1" }, ...args),
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    sourceDocumentAggregate: {
-      cancelProcessing: cancelProcessingMock,
-    },
-  },
+vi.mock("@/modules/source-document/server/cancel-processing", () => ({
+  cancelSourceDocumentProcessing: cancelProcessingMock,
 }));
 
 import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/server-actions/processing";

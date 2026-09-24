@@ -1,6 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotFoundError, StaleSourceDocumentVersionError } from "@/lib/errors";
-import { retrySourceDocument } from "@/modules/source-document/application/use-cases/retry-source-document";
+
+const { submit, scheduleProcessing } = vi.hoisted(() => ({
+  submit: vi.fn(),
+  scheduleProcessing: vi.fn(),
+}));
+
+vi.mock("@/modules/source-document/server/submissions", () => ({
+  submitSourceDocument: submit,
+}));
+vi.mock("@/application/processing/schedule-processing", () => ({
+  scheduleProcessingAfter: scheduleProcessing,
+}));
+
+import { retrySourceDocument } from "@/modules/source-document/server/retry";
 
 const ledger = {
   id: "ledger-1",
@@ -12,9 +25,6 @@ const ledger = {
 };
 
 describe("retrySourceDocument", () => {
-  const submit = vi.fn();
-  const scheduleProcessing = vi.fn();
-
   beforeEach(() => {
     vi.clearAllMocks();
     submit.mockResolvedValue({
@@ -27,20 +37,18 @@ describe("retrySourceDocument", () => {
   it("propagates missing-document failures without dispatch", async () => {
     submit.mockRejectedValueOnce(new NotFoundError("Source document"));
     await expect(
-      retrySourceDocument(
-        { ledgerId: ledger.id, sourceDocumentId: "missing", expectedVersion: 1 },
-        { submissions: { submit }, scheduleProcessing }
-      )
+      retrySourceDocument({ ledgerId: ledger.id, sourceDocumentId: "missing", expectedVersion: 1 })
     ).rejects.toThrow(NotFoundError);
     expect(scheduleProcessing).not.toHaveBeenCalled();
   });
 
   it("reports a stale version instead of dispatching", async () => {
     submit.mockRejectedValueOnce(new StaleSourceDocumentVersionError("doc-1", 1, 2));
-    const result = await retrySourceDocument(
-      { ledgerId: ledger.id, sourceDocumentId: "doc-1", expectedVersion: 1 },
-      { submissions: { submit }, scheduleProcessing }
-    );
+    const result = await retrySourceDocument({
+      ledgerId: ledger.id,
+      sourceDocumentId: "doc-1",
+      expectedVersion: 1,
+    });
     expect(result).toEqual({
       ok: false,
       reason: "stale",
@@ -52,10 +60,11 @@ describe("retrySourceDocument", () => {
   });
 
   it("creates a new revision under the stable document identity and inherits evidence", async () => {
-    const result = await retrySourceDocument(
-      { ledgerId: ledger.id, sourceDocumentId: "doc-1", expectedVersion: 1 },
-      { submissions: { submit }, scheduleProcessing }
-    );
+    const result = await retrySourceDocument({
+      ledgerId: ledger.id,
+      sourceDocumentId: "doc-1",
+      expectedVersion: 1,
+    });
     expect(submit).toHaveBeenCalledWith({
       ledgerId: ledger.id,
       sourceDocumentId: "doc-1",
@@ -77,19 +86,16 @@ describe("retrySourceDocument", () => {
   });
 
   it("creates immutable edit-retry evidence from finalized file identities", async () => {
-    await retrySourceDocument(
-      {
-        ledgerId: ledger.id,
-        sourceDocumentId: "doc-1",
-        expectedVersion: 1,
-        input: {
-          text: "corrected",
-          documentDate: "2026-07-16",
-          storedFileIds: ["00000000-0000-4000-8000-000000000001"],
-        },
+    await retrySourceDocument({
+      ledgerId: ledger.id,
+      sourceDocumentId: "doc-1",
+      expectedVersion: 1,
+      input: {
+        text: "corrected",
+        documentDate: "2026-07-16",
+        storedFileIds: ["00000000-0000-4000-8000-000000000001"],
       },
-      { submissions: { submit }, scheduleProcessing }
-    );
+    });
     expect(submit).toHaveBeenCalledWith({
       ledgerId: ledger.id,
       sourceDocumentId: "doc-1",

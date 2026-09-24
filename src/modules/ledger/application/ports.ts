@@ -2,12 +2,6 @@ import type {
   ReclassificationCandidate,
   ReclassificationDocumentGroup,
 } from "./reclassification-protocol";
-import type {
-  AtomicBatchCommandResult,
-  PartialBatchCommandResult,
-  VersionedCommandResult,
-  VersionedTarget,
-} from "@/modules/source-document/contracts";
 
 /**
  * Places entries into one of a caller-chosen set of categories. Narrow on
@@ -71,36 +65,4 @@ export interface CategoryReclassificationJobPort {
     jobId: string;
   }): Promise<CategoryReclassificationJobRecord | null>;
   getLatest(input: { ledgerId: string }): Promise<CategoryReclassificationJobRecord | null>;
-}
-
-export interface LedgerEntryCommandPort {
-  create(input: {
-    ledgerId: string;
-    target: VersionedTarget;
-    amount: string;
-    currency?: string;
-    itemName: string;
-    categoryId?: string;
-    description?: string | null;
-  }): Promise<VersionedCommandResult<{ ledgerEntryId: string }>>;
-  delete(input: {
-    ledgerId: string;
-    target: VersionedTarget;
-    ledgerEntryId: string;
-  }): Promise<VersionedCommandResult<{ ledgerEntryId: string; deleted: true }>>;
-  batchUpdate(input: {
-    ledgerId: string;
-    targets: VersionedTarget[];
-    ledgerEntryIds: string[];
-    categoryId?: string | null;
-    amount?: string;
-    currency?: string | null;
-    itemName?: string;
-    description?: string | null;
-  }): Promise<AtomicBatchCommandResult<{ ledgerEntryIds: string[]; affectedCount: number }>>;
-  batchDelete(input: {
-    ledgerId: string;
-    targets: VersionedTarget[];
-    ledgerEntryIds: string[];
-  }): Promise<PartialBatchCommandResult>;
 }

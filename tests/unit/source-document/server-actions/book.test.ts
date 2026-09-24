@@ -13,12 +13,8 @@ vi.mock("@/modules/ledger/access", () => ({
       handler("ledger-1", ...args),
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    sourceDocumentAggregate: {
-      assignBook: assignBookMock,
-    },
-  },
+vi.mock("@/modules/source-document/server/updates", () => ({
+  assignSourceDocumentBook: assignBookMock,
 }));
 
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";

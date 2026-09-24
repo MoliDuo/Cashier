@@ -50,14 +50,14 @@ const appPattern = /^@\/app(?:\/|$)/;
 const anyModulePattern = /^@\/modules(?:\/|$)/;
 const workspaceModulePattern = /^@\/modules\/workspace(?:\/|$)/;
 const registeredSourceDocumentWriters = new Set([
-  "src/application/adapters/postgres/source-document-delete.ts",
-  "src/application/adapters/postgres/source-document-updates.ts",
-  "src/application/adapters/postgres/source-document-splits.ts",
+  "src/modules/source-document/server/delete.ts",
+  "src/modules/source-document/server/updates.ts",
+  "src/modules/source-document/server/split.ts",
+  "src/modules/source-document/server/cancel-processing.ts",
+  "src/modules/source-document/server/date-organization.ts",
+  "src/modules/source-document/server/projections/manual-entries.ts",
+  "src/modules/source-document/server/projections/writes.ts",
   "src/application/adapters/postgres/revisions.ts",
-  "src/application/adapters/postgres/ledger-projections/cancel-source-document-processing.ts",
-  "src/application/adapters/postgres/ledger-projections/manual-entries.ts",
-  "src/application/adapters/postgres/ledger-projections/adapter.ts",
-  "src/application/adapters/postgres/source-document-date-organization.ts",
   "src/application/adapters/postgres/source-document-aggregate/category-assignments.ts",
 ]);
 const forbiddenLogIdentifierProperties = [

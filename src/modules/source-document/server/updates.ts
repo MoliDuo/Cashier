@@ -15,15 +15,15 @@ import type {
   UpdateSourceDocumentInput as UpdateSourceDocumentPayload,
 } from "@/modules/source-document/contract-schemas";
 import { convertAmounts } from "@/modules/currency/server/exchange-rates";
-import { replaceActiveProjectionInTransaction } from "./ledger-projections";
+import { replaceActiveProjectionInTransaction } from "./projections/manual-entries";
 import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   lockSourceDocumentsForUpdate,
-} from "./transaction-locks";
+} from "@/application/adapters/postgres/transaction-locks";
 import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
-import { hasEditableActiveProjection } from "./source-document-write-guards";
+import { hasEditableActiveProjection } from "./write-guards";
 
 function whereSourceDocumentNotDeleted(ledgerId: string) {
   return and(eq(sourceDocuments.ledgerId, ledgerId), isNull(sourceDocuments.deletedAt))!;
@@ -38,7 +38,7 @@ export type AssignBookResult =
   | { ok: false; reason: "stale"; currentVersion: number }
   | { ok: false; reason: "book_unavailable" };
 
-export async function assignBook(input: {
+export async function assignSourceDocumentBook(input: {
   ledgerId: string;
   sourceDocumentId: string;
   expectedVersion: number;
@@ -192,7 +192,7 @@ function toManualProjectionEntry(
   };
 }
 
-export async function saveChanges(
+export async function saveSourceDocumentChanges(
   input: SaveSourceDocumentChangesAdapterInput
 ): Promise<
   import("@/modules/source-document/contracts").VersionedCommandResult<SaveSourceDocumentChangesResultDto>
@@ -401,7 +401,7 @@ export async function saveChanges(
   };
 }
 
-export async function updateDocuments({
+export async function updateSourceDocuments({
   ledgerId,
   targets,
   data,
@@ -693,7 +693,7 @@ export async function updateDocuments({
   };
 }
 
-export async function updateEntryDates(input: {
+export async function updateLedgerEntryDates(input: {
   ledgerId: string;
   targets: import("@/modules/source-document/contracts").VersionedTarget[];
   ledgerEntryIds: string[];
@@ -736,7 +736,7 @@ export async function updateEntryDates(input: {
   ) {
     throw new NotFoundError("Source document target");
   }
-  const result = await updateDocuments({
+  const result = await updateSourceDocuments({
     ledgerId: input.ledgerId,
     targets: input.targets,
     ledgerEntryIds: selectedIds,

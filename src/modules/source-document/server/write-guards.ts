@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { ConflictError } from "@/lib/errors";
 import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import type { PostgresTransaction } from "./transaction-locks";
+import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
 
 export function hasEditableActiveProjection<T extends { activeRevisionId: string | null }>(
   document: T

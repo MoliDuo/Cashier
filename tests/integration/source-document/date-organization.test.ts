@@ -1,12 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { serverComposition } from "@/application/server-composition-root";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listStreamPage as listStreamPageFor } from "@/modules/source-document/server/list-stream-page";
-
-const port = serverComposition.sourceDocumentAggregate;
+import { applyDateOrganization } from "@/modules/source-document/server/date-organization";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 
 const listStreamPage = (ledgerId: string) => listStreamPageFor(ledgerId, { limit: 20 });
 
@@ -16,7 +15,7 @@ async function createFixture() {
     db,
     `date-organization-${crypto.randomUUID()}`
   );
-  const created = await port.createManualDocument({
+  const created = await createManualDocument({
     ledgerId,
     bookId: await testBookId(db, ledgerId),
     expectedMainCurrency: "CNY",
@@ -92,7 +91,7 @@ async function activeEntryNames(ledgerId: string, sourceDocumentId: string) {
 describe("date organization", () => {
   it("keeps uncertain entries in the original bill and creates one bill per applied date", async () => {
     const fixture = await createFixture();
-    const result = await port.applyDateOrganization({
+    const result = await applyDateOrganization({
       ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       expectedVersion: 1,
@@ -130,7 +129,7 @@ describe("date organization", () => {
 
   it("keeps the original id for the newest date when every entry is organized", async () => {
     const fixture = await createFixture();
-    const result = await port.applyDateOrganization({
+    const result = await applyDateOrganization({
       ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       expectedVersion: 1,

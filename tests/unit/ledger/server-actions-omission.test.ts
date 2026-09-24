@@ -26,15 +26,14 @@ vi.mock("@/modules/ledger/access", () => ({
       handler("ledger-1", ...args),
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    sourceDocumentAggregate: {
-      addEntry: createLedgerEntryWithConversionMock,
-      deleteEntries: vi.fn(),
-      batchUpdateEntries: batchUpdateLedgerEntriesMock,
-      updateEntryDates: vi.fn(),
-    },
-  },
+vi.mock("@/modules/source-document/server/entry-commands", () => ({
+  addLedgerEntry: createLedgerEntryWithConversionMock,
+  deleteLedgerEntry: vi.fn(),
+  batchUpdateLedgerEntries: batchUpdateLedgerEntriesMock,
+  batchDeleteLedgerEntries: vi.fn(),
+}));
+vi.mock("@/modules/source-document/server/updates", () => ({
+  updateLedgerEntryDates: vi.fn(),
 }));
 vi.mock("@/modules/ledger/server/entry-reads/calculate-ledger-entry-stats", () => ({
   calculateLedgerEntryStats: calculateLedgerEntryStatsMock,

@@ -4,12 +4,12 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
-import { getTestDb } from "../../../../../setup";
+import { getTestDb } from "../../../../setup";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
-} from "../../../../../helpers/schema-setup";
-import { createLedgerData, createSourceDocumentData } from "../../../../../helpers/factories";
+} from "../../../../helpers/schema-setup";
+import { createLedgerData, createSourceDocumentData } from "../../../../helpers/factories";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 

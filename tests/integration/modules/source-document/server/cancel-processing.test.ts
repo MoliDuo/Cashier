@@ -1,19 +1,17 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import {
-  cancelSourceDocumentProcessing,
-  postgresLedgerProjectionAdapter,
-  postgresSourceDocumentSubmissionAdapter,
-} from "@/application/adapters/postgres";
+import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
 import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 
 describe("cancel source-document processing", () => {
   it("retains the latest submission input and terminates its task records", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const submission = await postgresSourceDocumentSubmissionAdapter.submit({
+    const submission = await submitSourceDocument({
       ledgerId,
       input: { text: "Lunch 12 CNY", storedFileIds: [], documentDate: "2026-09-10" },
       bookId: await testBookId(db, ledgerId),
@@ -49,7 +47,7 @@ describe("cancel source-document processing", () => {
   it("keeps the previous active result when a retry is cancelled", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const active = await postgresLedgerProjectionAdapter.createManual({
+    const active = await createManualDocument({
       ledgerId,
       expectedMainCurrency: "CNY",
       entries: [
@@ -68,7 +66,7 @@ describe("cancel source-document processing", () => {
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, active.sourceDocumentId),
     });
-    const retry = await postgresSourceDocumentSubmissionAdapter.submit({
+    const retry = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       expectedVersion: before!.version,

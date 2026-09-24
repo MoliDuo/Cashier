@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { getTestDb } from "../../../setup";
-import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
-import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import type { LedgerProjectionEntryContract } from "@/application/contracts";
 import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-setup";
 import {
@@ -13,6 +11,9 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
+import { addLedgerEntry, deleteLedgerEntry } from "@/modules/source-document/server/entry-commands";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
 
 type TestDatabase = ReturnType<typeof getTestDb>;
 
@@ -92,7 +93,7 @@ describe("projection write shape", () => {
     ]);
 
     for (const count of [1, 50, 500]) {
-      const created = await postgresLedgerProjectionAdapter.createManual({
+      const created = await createManualDocument({
         expectedMainCurrency: "CNY",
         ledgerId,
         title: `Doc ${count}`,
@@ -122,7 +123,7 @@ describe("projection write shape", () => {
 
   it("edits the active revision without duplicating files or entries", async () => {
     const db = getTestDb();
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "With file",
@@ -153,7 +154,7 @@ describe("projection write shape", () => {
       { table: "revision_files", operation: "INSERT", name: "revision_files_insert" },
     ]);
 
-    await postgresSourceDocumentAggregateAdapter.addEntry({
+    await addLedgerEntry({
       ledgerId,
       target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 1 },
       amount: "10",
@@ -219,7 +220,7 @@ describe("projection write shape", () => {
   it("preserves entry identity and order without history copies, and increments change-log version", async () => {
     const db = getTestDb();
     const pinnedCreatedAt = new Date("2026-01-02T03:04:05.000Z");
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Manual",
@@ -255,7 +256,7 @@ describe("projection write shape", () => {
       { table: "ledger_entries", operation: "UPDATE", name: "ledger_entries_update" },
     ]);
 
-    await postgresSourceDocumentAggregateAdapter.saveChanges({
+    await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       expectedVersion: 1,
@@ -323,7 +324,7 @@ describe("projection write shape", () => {
 
   it("reuses positions across repeated removals and additions without new revisions", async () => {
     const db = getTestDb();
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Repeated edits",
@@ -340,14 +341,14 @@ describe("projection write shape", () => {
       });
       const expectedVersion = 1 + iteration * 2;
       expect(
-        await postgresSourceDocumentAggregateAdapter.deleteEntries({
+        await deleteLedgerEntry({
           ledgerId,
           target: { sourceDocumentId: created.sourceDocumentId, expectedVersion },
           ledgerEntryId: rows[1]!.id,
         })
       ).toMatchObject({ ok: true, version: expectedVersion + 1 });
       expect(
-        await postgresSourceDocumentAggregateAdapter.addEntry({
+        await addLedgerEntry({
           ledgerId,
           target: {
             sourceDocumentId: created.sourceDocumentId,
@@ -360,7 +361,7 @@ describe("projection write shape", () => {
       ).toMatchObject({ ok: true, version: expectedVersion + 2 });
     }
     expect(
-      await postgresSourceDocumentAggregateAdapter.addEntry({
+      await addLedgerEntry({
         ledgerId,
         target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 1 },
         amount: "10",

@@ -2,9 +2,15 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "../transaction-locks";
-import { assertExpectedSourceDocumentVersion, ledgerScopedRevisionWhere } from "./revision-guards";
-import { activeDocumentWhere } from "./shared";
+import {
+  lockLedgerForUpdate,
+  lockSourceDocumentForUpdate,
+} from "@/application/adapters/postgres/transaction-locks";
+import {
+  assertExpectedSourceDocumentVersion,
+  ledgerScopedRevisionWhere,
+} from "./projections/revision-guards";
+import { activeDocumentWhere } from "./projections/shared";
 
 export async function cancelSourceDocumentProcessing(
   ledgerId: string,

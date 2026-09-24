@@ -87,10 +87,8 @@ vi.mock("@/application/adapters/postgres/ledger-entry-category-assignment", () =
     loadDocumentGroups: adapters.loadDocumentGroups,
   },
 }));
-vi.mock("@/application/adapters/postgres/source-document-aggregate", () => ({
-  postgresSourceDocumentAggregateAdapter: {
-    applyCategoryAssignments: adapters.applyCategoryAssignments,
-  },
+vi.mock("@/application/adapters/postgres/source-document-aggregate/category-assignments", () => ({
+  applyCategoryAssignments: adapters.applyCategoryAssignments,
 }));
 vi.mock("@/application/adapters/ai/entry-reclassifier", () => ({
   entryReclassifierAdapter: { decide: adapters.decide },

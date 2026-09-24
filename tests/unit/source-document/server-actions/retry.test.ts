@@ -14,26 +14,13 @@ vi.mock("@/modules/source-document/server-actions/access", () => ({
       handler({ ledgerId: "ledger-1" }, ...args),
 }));
 
-vi.mock("@/modules/source-document/application/use-cases/retry-source-document", () => ({
+vi.mock("@/modules/source-document/server/retry", () => ({
   retrySourceDocument: retrySourceDocumentMock,
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    sourceDocumentAggregate: {
-      installRetry: vi.fn(),
-    },
-    storedFiles: {},
-  },
-}));
-
-vi.mock("@/application/processing/schedule-processing", () => ({
-  scheduleProcessingAfter: vi.fn(),
-}));
 vi.mock("@/application/processing/schedule-processing-recovery", () => ({
   scheduleProcessingRecoveryAfter: vi.fn(),
 }));
-vi.mock("@/lib/storage/image-processing", () => ({ processImage: vi.fn() }));
 
 import { retrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
 

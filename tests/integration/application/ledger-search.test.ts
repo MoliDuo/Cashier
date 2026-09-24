@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/server/stream-total";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 
 describe("ledger search", () => {
   it("normalizes search and keeps Stream and Details contracts independent", async () => {
     const { ledgerId } = await createTestUserWithLedger(getTestDb());
-    await postgresLedgerProjectionAdapter.createManual({
+    await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Coffee Receipt",
@@ -28,7 +28,7 @@ describe("ledger search", () => {
       ],
       bookId: await testBookId(getTestDb(), ledgerId),
     });
-    await postgresLedgerProjectionAdapter.createManual({
+    await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Literal % Store",

@@ -1,6 +1,5 @@
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { describe, expect, it } from "vitest";
-import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import {
   createProcessingRevisionInTransaction,
   postgresRevisionAdapter,
@@ -8,6 +7,7 @@ import {
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 
 const activeEntry = {
   categoryId: null,
@@ -29,7 +29,7 @@ async function setupDocumentWithFailedRetry(
 ) {
   // Step 1: Create a document with an active revision and entries
   const bookId = await testBookId(db, ledgerId);
-  const created = await postgresLedgerProjectionAdapter.createManual({
+  const created = await createManualDocument({
     expectedMainCurrency: "CNY",
     ledgerId,
     title: "Original",
@@ -140,7 +140,7 @@ describe("retry active result summary", () => {
     const { ledgerId } = await createTestUserWithLedger(db, "retry-multi-entry");
 
     // Create a manual document with multiple entries
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Multi-entry",

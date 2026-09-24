@@ -1,7 +1,6 @@
 "use server";
 
-import type { ProcessingJobContract } from "@/application/contracts";
-import { serverComposition } from "@/application/server-composition-root";
+import { deleteSourceDocumentAtomically } from "../server/delete";
 import type {
   PartialBatchCommandResult,
   VersionedTarget,
@@ -9,9 +8,8 @@ import type {
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { parseVersionedTargets } from "@/modules/source-document/contract-schemas";
-import { retrySourceDocument } from "@/modules/source-document/application/use-cases/retry-source-document";
+import { retrySourceDocument } from "../server/retry";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 
 const PROCESSING_UNAVAILABLE_CODES = new Set([
   "AI_JSON_REPAIR_FAILED",
@@ -95,7 +93,7 @@ async function runVersionedBatch(
 export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> =>
     runVersionedBatch("delete", parseVersionedTargets(inputTargets), async (target) => {
-      const deleted = await serverComposition.sourceDocumentAggregate.deleteDocuments({
+      const deleted = await deleteSourceDocumentAtomically({
         ledgerId,
         target,
       });
@@ -110,37 +108,19 @@ export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
 );
 
 export const batchRetrySourceDocumentsAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> => {
-    const intents: ProcessingJobContract[] = [];
-    const result = await runVersionedBatch(
-      "retry",
-      parseVersionedTargets(inputTargets),
-      async (target) => {
-        const retried = await retrySourceDocument(
-          {
-            ledgerId,
-            sourceDocumentId: target.sourceDocumentId,
-            expectedVersion: target.expectedVersion,
-          },
-          {
-            submissions: {
-              submit: serverComposition.sourceDocumentAggregate.installRetry,
-            },
-            scheduleProcessing: (job) => intents.push(job),
-          }
-        );
-        return retried.ok
-          ? { status: "succeeded", version: retried.version }
-          : {
-              status: "stale",
-              expectedVersion: retried.expectedVersion,
-              currentVersion: retried.currentVersion,
-            };
-      }
-    );
-    // The scheduled intents run after every item has been classified, so a
-    // retry that was never created is never scheduled.
-    for (const job of intents) scheduleProcessingAfter(job);
-    return result;
-  }
+  async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> =>
+    runVersionedBatch("retry", parseVersionedTargets(inputTargets), async (target) => {
+      const retried = await retrySourceDocument({
+        ledgerId,
+        sourceDocumentId: target.sourceDocumentId,
+        expectedVersion: target.expectedVersion,
+      });
+      return retried.ok
+        ? { status: "succeeded", version: retried.version }
+        : {
+            status: "stale",
+            expectedVersion: retried.expectedVersion,
+            currentVersion: retried.currentVersion,
+          };
+    })
 );

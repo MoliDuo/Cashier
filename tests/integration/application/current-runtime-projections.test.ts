@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
+import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
+import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
 
 const projectionEntry = {
   categoryId: null,
@@ -20,7 +21,7 @@ describe("current-runtime target adapters", () => {
   it("creates and edits manual projections, and soft deletes through the aggregate", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Manual",
@@ -33,7 +34,7 @@ describe("current-runtime target adapters", () => {
     });
     expect(originalEntry).toBeDefined();
 
-    const edited = await postgresSourceDocumentAggregateAdapter.saveChanges({
+    const edited = await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       expectedVersion: 1,
@@ -56,7 +57,7 @@ describe("current-runtime target adapters", () => {
     ).toMatchObject({ amount: "18.000", deletedAt: null });
 
     await expect(
-      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+      deleteSourceDocumentAtomically({
         ledgerId,
         target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 2 },
       })

@@ -208,11 +208,3 @@ export interface SourceDocumentIdempotencyInput {
   key: string;
   contentFingerprint: string | null;
 }
-
-export interface SourceDocumentSubmissionPort {
-  submit(input: SourceDocumentSubmissionInput): Promise<SourceDocumentSubmissionResult>;
-  submitIdempotently(
-    idempotency: SourceDocumentIdempotencyInput,
-    prepare: () => Promise<SourceDocumentSubmissionInput>
-  ): Promise<SourceDocumentSubmissionResult>;
-}

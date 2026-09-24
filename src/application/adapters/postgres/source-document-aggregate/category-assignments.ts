@@ -9,7 +9,7 @@ import {
   sourceDocuments,
 } from "@/persistence";
 import { lockLedgerForUpdate } from "../transaction-locks";
-import { assertSourceDocumentNotProcessing } from "../source-document-write-guards";
+import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { refreshCategoryAssignmentParentJob } from "../category-assignment-v2";
 import { ConflictError } from "@/lib/errors";
 import type {

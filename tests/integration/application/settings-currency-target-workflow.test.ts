@@ -2,7 +2,6 @@ import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { LedgerMainCurrencyChangedError } from "@/application/contracts";
 import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import {
@@ -15,6 +14,10 @@ import {
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import { hasActiveLedgerEntries } from "@/modules/ledger/server/entry-reads/has-active-entries";
+import {
+  activateRevision,
+  createManualDocument,
+} from "@/modules/source-document/server/projections/writes";
 
 type UpdateLedgerData = Omit<Parameters<typeof updateLedgerSettings>[1], "expectedUpdatedAt">;
 
@@ -32,7 +35,7 @@ describe("target Settings currency workflow", () => {
   let sourceDocumentId: string;
 
   async function createEntry() {
-    const result = await postgresLedgerProjectionAdapter.createManual({
+    const result = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
@@ -398,7 +401,7 @@ describe("settings concurrency invariants", () => {
     await db.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
 
     await expect(
-      postgresLedgerProjectionAdapter.activateRevision({
+      activateRevision({
         ledgerId,
         expectedMainCurrency: "CNY",
         sourceDocumentId,
@@ -443,7 +446,7 @@ describe("settings concurrency invariants", () => {
       // Run main-currency change and first entry creation concurrently on a fresh ledger.
       const results = await Promise.allSettled([
         updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
-        postgresLedgerProjectionAdapter.createManual({
+        createManualDocument({
           expectedMainCurrency: "CNY",
           ledgerId,
           entryDate: "2026-07-15",
@@ -555,7 +558,7 @@ describe("settings concurrency invariants", () => {
       // Run main-currency change and activateRevision concurrently.
       const results = await Promise.allSettled([
         updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
-        postgresLedgerProjectionAdapter.activateRevision({
+        activateRevision({
           lease,
           ledgerId,
           expectedMainCurrency: "CNY",

@@ -1,8 +1,10 @@
+import "server-only";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { getCategoryName } from "@/modules/ledger/server/categories";
 import type { QuickEntryResponseDto } from "@/modules/source-document/contracts";
-import type { QuickEntryPorts } from "../ports";
+import { convertAmount } from "@/modules/currency/server/exchange-rates";
+import { createManualDocument } from "./projections/writes";
 import type { LedgerSettings } from "@/modules/ledger/contracts";
 
 export interface CreateQuickEntryPayload {
@@ -38,12 +40,11 @@ async function createQuickEntryAtomically(
   categoryName: string,
   currency: string,
   conversion: ConversionResult,
-  data: QuickEntryInsertData,
-  ports: QuickEntryPorts
+  data: QuickEntryInsertData
 ): Promise<{ sourceDocumentId: string; ledgerEntryId: string }> {
   const ledgerEntryId = crypto.randomUUID();
   const itemName = data.itemName ?? categoryName;
-  const created = await ports.projections.createManual({
+  const created = await createManualDocument({
     ledgerId,
     bookId: data.bookId,
     expectedMainCurrency,
@@ -68,8 +69,7 @@ async function createQuickEntryAtomically(
 export async function createQuickEntry(
   ledgerId: string,
   ledger: { settings: Pick<LedgerSettings, "mainCurrency"> },
-  payload: CreateQuickEntryPayload,
-  ports: QuickEntryPorts
+  payload: CreateQuickEntryPayload
 ): Promise<QuickEntryResponseDto> {
   const mainCurrency = ledger.settings.mainCurrency;
   const entryCurrency = payload.currency ?? mainCurrency;
@@ -83,7 +83,7 @@ export async function createQuickEntry(
 
   const [categoryName, conversion] = await Promise.all([
     getCategoryName(ledgerId, payload.categoryId),
-    ports.convertAmount({
+    convertAmount({
       amount: payload.amount,
       fromCurrency: entryCurrency,
       toCurrency: mainCurrency,
@@ -104,8 +104,7 @@ export async function createQuickEntry(
       description: payload.description ?? null,
       amount: payload.amount,
       entryDate,
-    },
-    ports
+    }
   );
 
   return {

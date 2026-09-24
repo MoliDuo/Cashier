@@ -1,7 +1,4 @@
 "use server";
-import type { ProcessingJobContract } from "@/application/contracts";
-import { serverComposition } from "@/application/server-composition-root";
-import { processImage as processImageFn } from "@/lib/storage/image-processing";
 import type { CreateSourceDocumentResponseDto } from "@/modules/source-document/contracts";
 import {
   createSourceDocumentInputSchema,
@@ -9,11 +6,10 @@ import {
   type CreateSourceDocumentInputContract,
 } from "@/modules/source-document/contract-schemas";
 import { omitUndefinedProperties } from "@/lib/validation";
-import { createAndQueueSourceDocument } from "../application/use-cases/create-and-queue-source-document";
+import { createAndQueueSourceDocument } from "../server/create-and-queue";
 import { resolveRecordBook } from "../server/resolve-record-book";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
-import { scheduleProcessingAfter } from "@/application/processing/schedule-processing";
 import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
 
@@ -35,39 +31,23 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     // to be, not where the record belongs. Resolved before the write, never in it.
     const book = await resolveRecordBook(ledgerId, validated.bookId);
     const timezone = book.timeZone ?? payload.timezone;
-    const scheduleProcessing = (job: ProcessingJobContract) => {
-      scheduleProcessingAfter(job);
-    };
-
-    const result = await createAndQueueSourceDocument(
-      {
-        ledgerId,
-        bookId: book.id,
-        input: {
-          kind: "stored",
-          ...(payload.text == null ? {} : { text: payload.text }),
-          storedFileIds: payload.storedFileIds ?? [],
-        },
-        ...(payload.documentDate == null ? {} : { documentDate: payload.documentDate }),
-        ...(timezone == null ? {} : { timezone }),
-        idempotency: {
-          principalType: "user",
-          principalId: userId,
-          key: `source-document:create:${ledgerId}:new:${validatedClientSubmissionId}`,
-          contentFingerprint: sourceDocumentFingerprint(payload),
-        },
+    const result = await createAndQueueSourceDocument({
+      ledgerId,
+      bookId: book.id,
+      input: {
+        kind: "stored",
+        ...(payload.text == null ? {} : { text: payload.text }),
+        storedFileIds: payload.storedFileIds ?? [],
       },
-      {
-        submissions: {
-          submit: serverComposition.sourceDocumentAggregate.createProcessingDocument,
-          submitIdempotently:
-            serverComposition.sourceDocumentAggregate.createIdempotentProcessingDocument,
-        },
-        storedFiles: serverComposition.storedFiles,
-        processImage: processImageFn,
-        scheduleProcessing,
-      }
-    );
+      ...(payload.documentDate == null ? {} : { documentDate: payload.documentDate }),
+      ...(timezone == null ? {} : { timezone }),
+      idempotency: {
+        principalType: "user",
+        principalId: userId,
+        key: `source-document:create:${ledgerId}:new:${validatedClientSubmissionId}`,
+        contentFingerprint: sourceDocumentFingerprint(payload),
+      },
+    });
 
     // Also recover any missed processing intents
     scheduleProcessingRecoveryAfter(ledgerId);

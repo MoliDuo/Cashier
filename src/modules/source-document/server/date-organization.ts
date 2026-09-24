@@ -11,10 +11,13 @@ import type {
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
 import { convertAmounts } from "@/modules/currency/server/exchange-rates";
-import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "./transaction-locks";
-import { assertSourceDocumentNotProcessing } from "./source-document-write-guards";
-import { copyRevisionFiles, createManualRevision } from "./ledger-projections";
-import { getSourceDocumentInTransaction } from "@/modules/source-document/server/reads/list";
+import {
+  lockLedgerForUpdate,
+  lockSourceDocumentForUpdate,
+} from "@/application/adapters/postgres/transaction-locks";
+import { assertSourceDocumentNotProcessing } from "./write-guards";
+import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
+import { getSourceDocumentInTransaction } from "./reads/list";
 
 function normalizeCurrency(value: string | null) {
   return value == null || value === "" ? "CNY" : value;

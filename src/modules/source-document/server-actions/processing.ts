@@ -1,6 +1,6 @@
 "use server";
 
-import { serverComposition } from "@/application/server-composition-root";
+import { cancelSourceDocumentProcessing } from "../server/cancel-processing";
 import { StaleSourceDocumentVersionError } from "@/lib/errors";
 import { staleVersionedCommandResult } from "@/modules/source-document/application/versioned-command-result";
 import type {
@@ -18,7 +18,7 @@ export const cancelSourceDocumentProcessingAction = withSourceDocumentLedgerAcce
   ): Promise<VersionedCommandResult<CancelProcessingResponseDto>> => {
     const target = versionedTargetSchema.parse({ sourceDocumentId, expectedVersion });
     try {
-      const cancelled = await serverComposition.sourceDocumentAggregate.cancelProcessing(
+      const cancelled = await cancelSourceDocumentProcessing(
         ledgerId,
         target.sourceDocumentId,
         target.expectedVersion

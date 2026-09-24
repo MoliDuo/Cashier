@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
 import { postgresEntryCategoryAssignmentAdapter } from "@/application/adapters/postgres/ledger-entry-category-assignment";
-import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
+import { applyCategoryAssignments } from "@/application/adapters/postgres/source-document-aggregate/category-assignments";
 import { entryReclassifierAdapter } from "@/application/adapters/ai/entry-reclassifier";
 import {
   isSuccessfulLoadImageResult,
@@ -42,7 +42,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
         (candidate) => candidate.sourceDocumentId === work.sourceDocumentId
       );
       if (group == null) {
-        await postgresSourceDocumentAggregateAdapter.applyCategoryAssignments({
+        await applyCategoryAssignments({
           ledgerId: work.ledgerId,
           jobId: work.jobId,
           sourceDocumentId: work.sourceDocumentId,
@@ -152,7 +152,7 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
       }
     }
     const commitStartedAt = Date.now();
-    const result = await postgresSourceDocumentAggregateAdapter.applyCategoryAssignments({
+    const result = await applyCategoryAssignments({
       ledgerId: work.ledgerId,
       jobId: work.jobId,
       sourceDocumentId: work.sourceDocumentId,

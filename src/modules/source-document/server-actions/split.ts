@@ -1,6 +1,6 @@
 "use server";
 
-import { serverComposition } from "@/application/server-composition-root";
+import { splitSourceDocumentAtomically } from "../server/split";
 import type {
   SplitSourceDocumentInput,
   VersionedCommandResult,
@@ -15,6 +15,6 @@ export const splitSourceDocumentAction = withSourceDocumentLedgerAccess(
     input: SplitSourceDocumentInput
   ): Promise<VersionedCommandResult<SplitSourceDocumentResultDto>> => {
     const validated = splitSourceDocumentInputSchema.parse(input);
-    return serverComposition.sourceDocumentAggregate.splitEntries({ ledgerId, ...validated });
+    return splitSourceDocumentAtomically({ ledgerId, ...validated });
   }
 );

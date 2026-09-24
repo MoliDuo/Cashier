@@ -7,9 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
 import {
   PostgresProcessingJobAdapter,
-  postgresLedgerProjectionAdapter,
   postgresRevisionAdapter,
-  postgresSourceDocumentSubmissionAdapter,
 } from "@/application/adapters/postgres";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import {
@@ -27,6 +25,14 @@ import { ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { createTestBooks, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb, getTestSchemaName } from "../../setup";
+import {
+  activateRevision,
+  createManualDocument,
+} from "@/modules/source-document/server/projections/writes";
+import {
+  submitSourceDocument,
+  submitSourceDocumentIdempotently,
+} from "@/modules/source-document/server/submissions";
 
 class MemoryFileStore implements ObjectStore {
   readonly files = new Map<string, Buffer>();
@@ -116,8 +122,8 @@ describe("target source-document submissions", () => {
     };
 
     const [first, replay] = await Promise.all([
-      postgresSourceDocumentSubmissionAdapter.submitIdempotently!(idempotency, prepare),
-      postgresSourceDocumentSubmissionAdapter.submitIdempotently!(idempotency, prepare),
+      submitSourceDocumentIdempotently!(idempotency, prepare),
+      submitSourceDocumentIdempotently!(idempotency, prepare),
     ]);
 
     expect(first.document.id).toBe(replay.document.id);
@@ -152,32 +158,26 @@ describe("target source-document submissions", () => {
     const started = new Promise<void>((resolve) => (signalStarted = resolve));
     const gate = new Promise<void>((resolve) => (releaseFirst = resolve));
 
-    const first = postgresSourceDocumentSubmissionAdapter.submitIdempotently!(
-      idempotency,
-      async () => {
-        signalStarted();
-        await gate;
-        return {
-          ledgerId,
-          bookId,
-          input: { text: "receipt", storedFileIds: [], documentDate: null },
-        };
-      }
-    );
+    const first = submitSourceDocumentIdempotently!(idempotency, async () => {
+      signalStarted();
+      await gate;
+      return {
+        ledgerId,
+        bookId,
+        input: { text: "receipt", storedFileIds: [], documentDate: null },
+      };
+    });
     await started;
     await db
       .update(idempotencyRecords)
       .set({ leaseExpiresAt: new Date(Date.now() - 1) })
       .where(eq(idempotencyRecords.key, idempotency.key));
 
-    const winner = await postgresSourceDocumentSubmissionAdapter.submitIdempotently!(
-      idempotency,
-      async () => ({
-        ledgerId,
-        bookId,
-        input: { text: "receipt", storedFileIds: [], documentDate: null },
-      })
-    );
+    const winner = await submitSourceDocumentIdempotently!(idempotency, async () => ({
+      ledgerId,
+      bookId,
+      input: { text: "receipt", storedFileIds: [], documentDate: null },
+    }));
     releaseFirst();
     await expect(first).rejects.toThrow("idempotency lease expired");
 
@@ -193,17 +193,17 @@ describe("target source-document submissions", () => {
     const storage = createStoredFileAdapter({ storage: new MemoryFileStore() });
     const image = await finalizedFile(storage, ledgerId, Buffer.from("image"));
 
-    const text = await postgresSourceDocumentSubmissionAdapter.submit({
+    const text = await submitSourceDocument({
       ledgerId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    const imageOnly = await postgresSourceDocumentSubmissionAdapter.submit({
+    const imageOnly = await submitSourceDocument({
       ledgerId,
       input: { text: null, storedFileIds: [image.id], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    const mixed = await postgresSourceDocumentSubmissionAdapter.submit({
+    const mixed = await submitSourceDocument({
       ledgerId,
       input: { text: "Mixed", storedFileIds: [image.id], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -235,7 +235,7 @@ describe("target source-document submissions", () => {
       .returning();
 
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId,
         input: { text: null, storedFileIds: [unfinalized!.id], documentDate: null },
         bookId: await testBookId(db, ledgerId),
@@ -254,7 +254,7 @@ describe("target source-document submissions", () => {
     async (failureKind, failureCode) => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
-      const pending = await postgresSourceDocumentSubmissionAdapter.submit({
+      const pending = await submitSourceDocument({
         ledgerId,
         input: { text: "first parse evidence", storedFileIds: [], documentDate: null },
         bookId: await testBookId(db, ledgerId),
@@ -289,7 +289,7 @@ describe("target source-document submissions", () => {
   it("preserves active results across failed/anomalous retries and rejects stale activation", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const active = await postgresLedgerProjectionAdapter.createManual({
+    const active = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entries: [entry],
@@ -299,7 +299,7 @@ describe("target source-document submissions", () => {
       where: eq(ledgerEntries.sourceDocumentRevisionId, active.revisionId),
     });
 
-    const failed = await postgresSourceDocumentSubmissionAdapter.submit({
+    const failed = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
@@ -315,7 +315,7 @@ describe("target source-document submissions", () => {
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
-    const anomalous = await postgresSourceDocumentSubmissionAdapter.submit({
+    const anomalous = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: "anomalous edit retry", storedFileIds: [], documentDate: null },
@@ -332,7 +332,7 @@ describe("target source-document submissions", () => {
     });
 
     expect(
-      await postgresLedgerProjectionAdapter.activateRevision({
+      await activateRevision({
         lease: failedLease,
         ledgerId,
         expectedMainCurrency: "CNY",
@@ -368,7 +368,7 @@ describe("target source-document submissions", () => {
     const { ledgerId } = await createTestUserWithLedger(db);
     const storage = createStoredFileAdapter({ storage: new MemoryFileStore() });
     const image = await finalizedFile(storage, ledgerId, Buffer.from("image"));
-    const initial = await postgresSourceDocumentSubmissionAdapter.submit({
+    const initial = await submitSourceDocument({
       ledgerId,
       input: { text: "original", storedFileIds: [image.id], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -381,7 +381,7 @@ describe("target source-document submissions", () => {
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
-    const retry = await postgresSourceDocumentSubmissionAdapter.submit({
+    const retry = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: initial.document.id,
       inheritInput: true,
@@ -417,7 +417,7 @@ describe("target source-document submissions", () => {
     );
 
     // Create a revision with MAX_FILES files via the normal path (this succeeds)
-    const initial = await postgresSourceDocumentSubmissionAdapter.submit({
+    const initial = await submitSourceDocument({
       ledgerId,
       input: {
         text: "initial",
@@ -448,7 +448,7 @@ describe("target source-document submissions", () => {
     // Inherited evidence retry should now reject because createProcessingRevisionInTransaction
     // enforces the MAX_FILES limit.
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId,
         sourceDocumentId: initial.document.id,
         inheritInput: true,
@@ -470,7 +470,7 @@ describe("target source-document submissions", () => {
     const first = await finalizedFile(storage, ledgerId, Buffer.from("first"));
     const second = await finalizedFile(storage, ledgerId, Buffer.from("second"));
     const other = await finalizedFile(storage, otherLedgerId, Buffer.from("other"));
-    const submitted = await postgresSourceDocumentSubmissionAdapter.submit({
+    const submitted = await submitSourceDocument({
       ledgerId,
       input: { text: null, storedFileIds: [second.id, first.id], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -490,7 +490,7 @@ describe("target source-document submissions", () => {
       failureMessage: "processing failed",
     });
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId,
         sourceDocumentId: submitted.document.id,
         input: { text: null, storedFileIds: [other.id], documentDate: null },
@@ -498,7 +498,7 @@ describe("target source-document submissions", () => {
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId: otherLedgerId,
         sourceDocumentId: submitted.document.id,
         inheritInput: true,
@@ -584,7 +584,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     });
 
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId,
         bookId: travel,
         input: { text: "late", storedFileIds: [], documentDate: null },
@@ -600,7 +600,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     await db.update(ledgers).set({ deletedAt: new Date() }).where(eq(ledgers.id, ledgerId));
 
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId,
         bookId,
         input: { text: "late", storedFileIds: [], documentDate: null },
@@ -621,7 +621,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     const foreignBookId = await testBookId(db, ledgerId);
 
     await expect(
-      postgresSourceDocumentSubmissionAdapter.submit({
+      submitSourceDocument({
         ledgerId: other.ledgerId,
         bookId: foreignBookId,
         input: { text: "cross-ledger", storedFileIds: [], documentDate: null },
@@ -642,16 +642,14 @@ describe("new-record submission against a concurrent archive or ledger delete", 
         "UPDATE books SET archived_at = now(), updated_at = now() WHERE ledger_id = $1 AND id = $2",
         [ledgerId, travel]
       );
-      const insert = postgresSourceDocumentSubmissionAdapter
-        .submit({
-          ledgerId,
-          bookId: travel,
-          input: { text: "late", storedFileIds: [], documentDate: null },
-        })
-        .then(
-          () => null,
-          (error: unknown) => error
-        );
+      const insert = submitSourceDocument({
+        ledgerId,
+        bookId: travel,
+        input: { text: "late", storedFileIds: [], documentDate: null },
+      }).then(
+        () => null,
+        (error: unknown) => error
+      );
       await waitUntilBlockedOn(pool, holderXid);
       await blocker.query("COMMIT");
       expect(await insert).toMatchObject({ code: "NOT_FOUND", message: "Book not found" });
@@ -671,16 +669,14 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     try {
       const holderXid = await lockLedgerRow(blocker, ledgerId);
       await blocker.query("UPDATE ledgers SET deleted_at = now() WHERE id = $1", [ledgerId]);
-      const insert = postgresSourceDocumentSubmissionAdapter
-        .submit({
-          ledgerId,
-          bookId,
-          input: { text: "late", storedFileIds: [], documentDate: null },
-        })
-        .then(
-          () => null,
-          (error: unknown) => error
-        );
+      const insert = submitSourceDocument({
+        ledgerId,
+        bookId,
+        input: { text: "late", storedFileIds: [], documentDate: null },
+      }).then(
+        () => null,
+        (error: unknown) => error
+      );
       await waitUntilBlockedOn(pool, holderXid);
       await blocker.query("COMMIT");
       expect(await insert).toMatchObject({ code: "NOT_FOUND", message: "Ledger not found" });
@@ -724,7 +720,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
       await pool.end();
     }
 
-    const retry = await postgresSourceDocumentSubmissionAdapter.submit({
+    const retry = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: documentId,
       input: { text: "retry", storedFileIds: [], documentDate: null },
@@ -751,14 +747,8 @@ describe("new-record submission against a concurrent archive or ledger delete", 
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
     });
 
-    const created = await postgresSourceDocumentSubmissionAdapter.submitIdempotently!(
-      idempotency,
-      prepare
-    );
-    const replay = await postgresSourceDocumentSubmissionAdapter.submitIdempotently!(
-      idempotency,
-      prepare
-    );
+    const created = await submitSourceDocumentIdempotently!(idempotency, prepare);
+    const replay = await submitSourceDocumentIdempotently!(idempotency, prepare);
 
     expect(replay.document.id).toBe(created.document.id);
     expect(replay.idempotencyReplay).toBe(true);

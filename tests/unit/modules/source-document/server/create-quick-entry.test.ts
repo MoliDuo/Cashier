@@ -19,27 +19,19 @@ vi.mock("@/lib/date-utils", () => ({
   getDateInTimezone: getDateInTimezoneMock,
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    ledgerProjections: { createManual: createManualMock },
-  },
+vi.mock("@/modules/source-document/server/projections/writes", () => ({
+  createManualDocument: createManualMock,
 }));
 
-vi.mock("@/application/orchestration/exchange-rate-ledger-recalculation", () => ({
-  initializeExchangeRateLedgerRecalculationOrchestration: vi.fn(),
+vi.mock("@/modules/currency/server/exchange-rates", () => ({
+  convertAmount: convertAmountMock,
 }));
 
 vi.mock("@/modules/ledger/server/categories", () => ({
   getCategoryName: getEntryCategoryNameMock,
 }));
 
-import { createQuickEntry } from "@/modules/source-document/application/use-cases/create-quick-entry";
-import type { QuickEntryPorts } from "@/modules/source-document/application/ports";
-
-const ports: QuickEntryPorts = {
-  projections: { createManual: createManualMock },
-  convertAmount: convertAmountMock,
-};
+import { createQuickEntry } from "@/modules/source-document/server/create-quick-entry";
 
 describe("createQuickEntry", () => {
   let randomUuidSpy: ReturnType<typeof vi.spyOn>;
@@ -68,8 +60,7 @@ describe("createQuickEntry", () => {
         categoryId: "cat-1",
         bookId: "user-1",
         amount: "100",
-      },
-      ports
+      }
     );
 
     expect(convertAmountMock).toHaveBeenCalledWith({
@@ -111,8 +102,7 @@ describe("createQuickEntry", () => {
         bookId: "user-1",
         amount: "100",
         timeZone: "Asia/Shanghai",
-      },
-      ports
+      }
     );
 
     expect(getDateInTimezoneMock).toHaveBeenCalledWith("Asia/Shanghai");
@@ -133,8 +123,7 @@ describe("createQuickEntry", () => {
         entryDate: "2026-01-31",
         itemName: "Tea",
         description: "afternoon",
-      },
-      ports
+      }
     );
 
     expect(convertAmountMock).toHaveBeenCalledWith({

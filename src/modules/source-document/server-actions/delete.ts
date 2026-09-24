@@ -1,7 +1,7 @@
 "use server";
 import { versionedTargetSchema } from "@/modules/source-document/contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { serverComposition } from "@/application/server-composition-root";
+import { deleteSourceDocumentAtomically } from "../server/delete";
 
 /**
  * Delete a single source document (soft delete with cascade).
@@ -12,6 +12,6 @@ export const deleteSourceDocumentAction = withSourceDocumentLedgerAccess(
       sourceDocumentId: sourceId,
       expectedVersion,
     });
-    return serverComposition.sourceDocumentAggregate.deleteDocuments({ ledgerId, target });
+    return deleteSourceDocumentAtomically({ ledgerId, target });
   }
 );

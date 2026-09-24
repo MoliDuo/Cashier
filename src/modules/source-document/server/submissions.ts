@@ -3,8 +3,8 @@ import type {
   SourceDocumentSubmissionResult,
   SourceDocumentIdempotencyInput,
   SourceDocumentSubmissionInput,
-  SourceDocumentSubmissionPort,
 } from "@/application/contracts";
+import "server-only";
 import { db } from "@/lib/db";
 import {
   ConflictError,
@@ -19,8 +19,8 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
-import { createProcessingRevisionInTransaction } from "./revisions";
-import type { PostgresTransaction } from "./transaction-locks";
+import { createProcessingRevisionInTransaction } from "@/application/adapters/postgres/revisions";
+import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
 
 const IDEMPOTENCY_WAIT_ATTEMPTS = 10;
 const IDEMPOTENCY_LEASE_MS = 30_000;
@@ -310,11 +310,15 @@ async function createIdempotentSubmission(
   throw new ConflictError("The idempotent request is still in progress");
 }
 
-export const postgresSourceDocumentSubmissionAdapter: SourceDocumentSubmissionPort = {
-  async submit(input): Promise<SourceDocumentSubmissionResult> {
-    return db.transaction((tx) => submitInTransaction(tx, input));
-  },
-  async submitIdempotently(idempotency, prepare) {
-    return createIdempotentSubmission(idempotency, prepare);
-  },
-};
+export async function submitSourceDocument(
+  input: SourceDocumentSubmissionInput
+): Promise<SourceDocumentSubmissionResult> {
+  return db.transaction((tx) => submitInTransaction(tx, input));
+}
+
+export async function submitSourceDocumentIdempotently(
+  idempotency: SourceDocumentIdempotencyInput,
+  prepare: () => Promise<SourceDocumentSubmissionInput>
+): Promise<SourceDocumentSubmissionResult> {
+  return createIdempotentSubmission(idempotency, prepare);
+}

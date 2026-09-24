@@ -1,14 +1,9 @@
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
-import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { and, eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import {
-  postgresLedgerProjectionAdapter,
-  postgresRevisionAdapter,
-} from "@/application/adapters/postgres";
+import { postgresRevisionAdapter } from "@/application/adapters/postgres";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
-import { serverComposition } from "@/application/server-composition-root";
 import {
   entryCategories,
   ledgerEntries,
@@ -21,6 +16,16 @@ import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+import {
+  activateRevision,
+  createManualDocument,
+} from "@/modules/source-document/server/projections/writes";
+import {
+  batchUpdateLedgerEntries,
+  deleteLedgerEntry,
+} from "@/modules/source-document/server/entry-commands";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
+import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
   const page = await listLedgerEntryPage({
@@ -54,7 +59,7 @@ describe("target upper workflows", () => {
   it("uses persisted list state and paginates without skips", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const completed = await postgresLedgerProjectionAdapter.createManual({
+    const completed = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
@@ -127,7 +132,7 @@ describe("target upper workflows", () => {
       .insert(entryCategories)
       .values({ ledgerId, name: "Food" })
       .returning();
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
@@ -185,7 +190,7 @@ describe("target upper workflows", () => {
     expect(enhanced.summary).toMatchObject({ total: "12.5", currency: "CNY" });
 
     await expect(
-      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+      deleteSourceDocumentAtomically({
         ledgerId,
         target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 3 },
       })
@@ -203,7 +208,7 @@ describe("target upper workflows", () => {
       .returning();
     const transactionAt = "2026-07-14T12:30:00.000Z";
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const;
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       title: "Receipt with adjustments",
@@ -281,7 +286,7 @@ describe("target upper workflows", () => {
     expect(stats.totals).toContainEqual({ currency: "USD", total: "11.73", count: 3 });
 
     await expect(
-      postgresSourceDocumentAggregateAdapter.saveChanges({
+      saveSourceDocumentChanges({
         ledgerId,
         sourceDocumentId: created.sourceDocumentId,
         expectedVersion: 1,
@@ -325,7 +330,7 @@ describe("target upper workflows", () => {
       .values({ ledgerId: otherLedgerId, name: "Other" })
       .returning();
     await expect(
-      postgresLedgerProjectionAdapter.createManual({
+      createManualDocument({
         expectedMainCurrency: "CNY",
         ledgerId,
         entries: [{ ...entry, categoryId: otherCategory!.id }],
@@ -336,7 +341,7 @@ describe("target upper workflows", () => {
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
 
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entries: [entry],
@@ -355,7 +360,7 @@ describe("target upper workflows", () => {
       items: [],
     });
     await expect(
-      serverComposition.sourceDocumentAggregate.saveChanges({
+      saveSourceDocumentChanges({
         ledgerId,
         sourceDocumentId: created.sourceDocumentId,
         expectedVersion: beforeDocument!.version,
@@ -378,7 +383,7 @@ describe("target upper workflows", () => {
   it("edits a manual entry in place while keeping its revision and id", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const created = await postgresLedgerProjectionAdapter.createManual({
+    const created = await createManualDocument({
       expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
@@ -393,7 +398,7 @@ describe("target upper workflows", () => {
     });
     const initialVersion = await currentVersion(created.sourceDocumentId);
 
-    const updated = await serverComposition.sourceDocumentAggregate.batchUpdateEntries({
+    const updated = await batchUpdateLedgerEntries({
       ledgerId,
       targets: [{ sourceDocumentId: created.sourceDocumentId, expectedVersion: initialVersion }],
       ledgerEntryIds: [original!.id],
@@ -442,7 +447,7 @@ describe("target upper workflows", () => {
       input: { text: "Lunch", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    await postgresLedgerProjectionAdapter.activateRevision({
+    await activateRevision({
       lease: await claimRevisionForTest(pending.revision.id),
       ledgerId,
       expectedMainCurrency: "CNY",
@@ -458,7 +463,7 @@ describe("target upper workflows", () => {
     });
 
     const versionBeforeUpdate = await currentVersion(pending.document.id);
-    await serverComposition.sourceDocumentAggregate.batchUpdateEntries({
+    await batchUpdateLedgerEntries({
       ledgerId,
       targets: [{ sourceDocumentId: pending.document.id, expectedVersion: versionBeforeUpdate }],
       ledgerEntryIds: [original!.id],
@@ -476,7 +481,7 @@ describe("target upper workflows", () => {
     expect(stats.convertedTotal).toEqual({ total: "18", currency: "CNY" });
 
     await expect(
-      serverComposition.sourceDocumentAggregate.batchUpdateEntries({
+      batchUpdateLedgerEntries({
         ledgerId,
         targets: [
           {
@@ -494,7 +499,7 @@ describe("target upper workflows", () => {
     expect(afterRollback?.activeRevisionId).toBe(afterUpdate?.activeRevisionId);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(revisionCount);
     await expect(
-      serverComposition.sourceDocumentAggregate.batchUpdateEntries({
+      batchUpdateLedgerEntries({
         ledgerId: otherLedgerId,
         targets: [
           {
@@ -508,7 +513,7 @@ describe("target upper workflows", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     await expect(
-      serverComposition.sourceDocumentAggregate.deleteEntries({
+      deleteLedgerEntry({
         ledgerId,
         target: {
           sourceDocumentId: pending.document.id,

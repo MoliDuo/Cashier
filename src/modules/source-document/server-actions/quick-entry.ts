@@ -1,13 +1,11 @@
 "use server";
-import { createQuickEntry } from "@/modules/source-document/application/use-cases/create-quick-entry";
+import { createQuickEntry } from "../server/create-quick-entry";
 import type { QuickEntryResponseDto } from "@/modules/source-document/contracts";
 import {
   createQuickEntryInputSchema,
   type CreateQuickEntryInput,
 } from "@/modules/source-document/contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { serverComposition } from "@/application/server-composition-root";
-import { convertAmount } from "@/modules/currency/server/exchange-rates";
 import { resolveRecordBook } from "../server/resolve-record-book";
 
 /**
@@ -32,9 +30,6 @@ export const createQuickEntryAction = withSourceDocumentLedgerAccess(
       ...(validated.entryDate !== undefined ? { entryDate: validated.entryDate } : {}),
     };
 
-    return createQuickEntry(ledgerId, ledger, payload, {
-      projections: { createManual: serverComposition.sourceDocumentAggregate.createManualDocument },
-      convertAmount,
-    });
+    return createQuickEntry(ledgerId, ledger, payload);
   }
 );
