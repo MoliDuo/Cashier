@@ -270,9 +270,4 @@ export interface LedgerProjectionPort {
     entryDate?: string | null;
     entries: readonly LedgerProjectionEntryContract[];
   }): Promise<{ sourceDocumentId: SourceDocumentId; revisionId: RevisionId }>;
-  recalculate(input: {
-    ledgerId: LedgerId;
-    updates: readonly { ledgerEntryId: string; convertedAmount: string; exchangeRate: string }[];
-  }): Promise<number>;
-  softDelete(ledgerId: LedgerId, sourceDocumentId: SourceDocumentId): Promise<boolean>;
 }

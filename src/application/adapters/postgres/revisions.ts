@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, lt, max, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type {
   RevisionProcessingStatus,
   SourceDocumentContract,
@@ -23,10 +23,6 @@ import {
 } from "./transaction-locks";
 import type { PostgresTransaction } from "./transaction-locks";
 import { completeProcessingLeaseInTransaction } from "./processing-terminal";
-import { softDeleteSourceDocumentInTransaction } from "./source-document-delete";
-
-const DEFAULT_PAGE_SIZE = 25;
-const MAX_PAGE_SIZE = 100;
 
 export type CreatePendingRevisionInput = {
   ledgerId: string;
@@ -78,27 +74,6 @@ function mapDocument(
           }).supportedActions
         : [],
   };
-}
-
-function encodeCursor(row: typeof sourceDocuments.$inferSelect): string {
-  return Buffer.from(JSON.stringify([row.createdAt.getTime(), row.id])).toString("base64url");
-}
-
-function decodeCursor(cursor: string): { createdAt: Date; id: string } {
-  try {
-    const parsed: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-    if (
-      !Array.isArray(parsed) ||
-      parsed.length !== 2 ||
-      typeof parsed[0] !== "number" ||
-      typeof parsed[1] !== "string"
-    ) {
-      throw new Error("invalid cursor");
-    }
-    return { createdAt: new Date(parsed[0]), id: parsed[1] };
-  } catch {
-    throw new ValidationError("Invalid source document cursor");
-  }
 }
 
 async function latestSubmissionStatuses(rows: readonly (typeof sourceDocuments.$inferSelect)[]) {
@@ -301,72 +276,6 @@ export const postgresRevisionAdapter: SourceDocumentPort = {
     return mapDocument(document, outcomes.get(document.id) ?? null);
   },
 
-  async list({ ledgerId, cursor, limit = DEFAULT_PAGE_SIZE }) {
-    const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), MAX_PAGE_SIZE);
-    const decoded = cursor == null ? null : decodeCursor(cursor);
-    const cursorCondition =
-      decoded == null
-        ? undefined
-        : or(
-            lt(sourceDocuments.createdAt, decoded.createdAt),
-            and(
-              eq(sourceDocuments.createdAt, decoded.createdAt),
-              lt(sourceDocuments.id, decoded.id)
-            )
-          );
-    const rows = await db
-      .select()
-      .from(sourceDocuments)
-      .where(
-        and(
-          eq(sourceDocuments.ledgerId, ledgerId),
-          isNull(sourceDocuments.deletedAt),
-          cursorCondition
-        )
-      )
-      .orderBy(desc(sourceDocuments.createdAt), desc(sourceDocuments.id))
-      .limit(boundedLimit + 1);
-    const hasNext = rows.length > boundedLimit;
-    const pageRows = hasNext ? rows.slice(0, boundedLimit) : rows;
-    const outcomes = await latestSubmissionStatuses(pageRows);
-    const last = pageRows.at(-1);
-    return {
-      items: pageRows.map((row) => mapDocument(row, outcomes.get(row.id) ?? null)),
-      nextCursor: hasNext && last != null ? encodeCursor(last) : null,
-    };
-  },
-
-  async createProcessingRevision(input) {
-    return db.transaction(async (tx) => createProcessingRevisionInTransaction(tx, input));
-  },
-
-  async markProcessing(input) {
-    return db.transaction(async (tx) => {
-      let document;
-      try {
-        document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
-      } catch (error) {
-        if (error instanceof NotFoundError) return false;
-        throw error;
-      }
-      if (document.latestSubmissionRevisionId !== input.revisionId) return false;
-      const updated = await tx
-        .update(sourceDocumentRevisions)
-        .set({ processingStatus: "processing" })
-        .where(
-          and(
-            eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-            eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-            eq(sourceDocumentRevisions.id, input.revisionId),
-            eq(sourceDocumentRevisions.processingStatus, "processing")
-          )
-        )
-        .returning({ id: sourceDocumentRevisions.id });
-      if (updated.length === 0) return false;
-      return true;
-    });
-  },
-
   async recordProcessingFailure(input) {
     return db.transaction(async (tx) => {
       await lockLedgerForUpdate(tx, input.ledgerId);
@@ -431,11 +340,5 @@ export const postgresRevisionAdapter: SourceDocumentPort = {
         );
       return true;
     });
-  },
-
-  async softDelete(ledgerId, sourceDocumentId) {
-    return db.transaction((tx) =>
-      softDeleteSourceDocumentInTransaction(tx, ledgerId, sourceDocumentId)
-    );
   },
 };

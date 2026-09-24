@@ -37,14 +37,6 @@ export async function getStreamRefresh(
     return { ...base, changed: false, invalidations: NO_INVALIDATIONS };
   }
 
-  const hasGap =
-    summary.firstRetainedVersion !== afterVersion + BigInt(1) ||
-    summary.lastRetainedVersion !== summary.currentVersion ||
-    summary.resetRequired;
-  if (hasGap) {
-    return { ...base, changed: true, invalidations: FULL_INVALIDATIONS };
-  }
-
   return {
     ...base,
     changed: true,

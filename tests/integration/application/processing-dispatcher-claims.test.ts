@@ -1,3 +1,4 @@
+import { createPendingRevision } from "tests/helpers/processing-revision";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
@@ -32,7 +33,7 @@ async function pendingIntent(
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
   const bookId = await testBookId(db, ledgerId);
-  const pending = await postgresRevisionAdapter.createProcessingRevision({
+  const pending = await createPendingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
@@ -208,7 +209,7 @@ describe("PostgresProcessingJobAdapter", () => {
 
     // Create a second revision (retry) after the settings change
     const bookId = await testBookId(db, ledgerId);
-    const pending2 = await postgresRevisionAdapter.createProcessingRevision({
+    const pending2 = await createPendingRevision({
       ledgerId,
       input: { text: "Dinner 25.00 USD", storedFileIds: [], documentDate: null },
       bookId,

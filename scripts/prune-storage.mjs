@@ -167,7 +167,6 @@ export async function pruneExpiredRecords(client, now, batchSize, apply) {
     otpTokens: 0,
     idempotencyRecords: 0,
     uploadSessions: 0,
-    ledgerChangeBatches: 0,
     objectCleanupJobs: 0,
   };
 
@@ -237,35 +236,6 @@ export async function pruneExpiredRecords(client, now, batchSize, apply) {
     await client.query("DELETE FROM upload_sessions WHERE id = ANY($1::uuid[])", [sessionIds]);
   }
   counts.uploadSessions = sessionIds.length;
-
-  if (apply) {
-    const changeLog = await client.query(
-      `WITH doomed AS (
-        SELECT ledger_id, version FROM ledger_change_batches batch
-        WHERE batch.created_at < $1
-          AND batch.version <= (
-            SELECT greatest(max(newer.version) - 10000, 0)
-            FROM ledger_change_batches newer WHERE newer.ledger_id = batch.ledger_id
-          )
-        LIMIT $2
-      )
-      DELETE FROM ledger_change_batches batch USING doomed
-      WHERE batch.ledger_id = doomed.ledger_id AND batch.version = doomed.version`,
-      [new Date(now.getTime() - 30 * DAY_MS), batchSize * 10]
-    );
-    counts.ledgerChangeBatches = changeLog.rowCount ?? 0;
-  } else {
-    const changeLog = await client.query(
-      `SELECT count(*)::int AS count FROM ledger_change_batches batch
-       WHERE batch.created_at < $1
-         AND batch.version <= (
-           SELECT greatest(max(newer.version) - 10000, 0)
-           FROM ledger_change_batches newer WHERE newer.ledger_id = batch.ledger_id
-         )`,
-      [new Date(now.getTime() - 30 * DAY_MS)]
-    );
-    counts.ledgerChangeBatches = Number(changeLog.rows[0]?.count ?? 0);
-  }
 
   if (apply) {
     const cleanupJobs = await client.query(

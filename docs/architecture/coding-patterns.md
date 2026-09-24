@@ -57,7 +57,9 @@ required port through the use case boundary. Concrete runtime wiring belongs in 
 
 - Use centralized query keys and `useLedgerMutation` for server state changes.
 - Load tab-specific components only when that tab is active. The message catalog is one file for
-  one language; it ships with the page rather than being fetched per feature.
+  one language; it ships with the page rather than being fetched per feature. Catalog validation checks
+  ICU syntax and statically known message keys. Chinese literals and dynamic keys are allowed;
+  dynamic keys remain the caller's responsibility.
 - Keep browser image data as `File`/`Blob` through compression and upload. Object URLs are UI
   resources and must be revoked when an image is replaced, removed, reset, or unmounted.
 - Treat Infinite Query pages and detail queries as independent server-state views. Ledger mutations

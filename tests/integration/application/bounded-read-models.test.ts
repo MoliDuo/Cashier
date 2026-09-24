@@ -1,7 +1,7 @@
+import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
-import { postgresRevisionAdapter } from "@/application/adapters/postgres/revisions";
 import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
 import { serverComposition } from "@/application/server-composition-root";
 import { getSourceDocumentFullQuery as getSourceDocumentFullQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-full";
@@ -241,7 +241,7 @@ describe("bounded target read models", () => {
       .returning({ id: storedFiles.id });
 
     const capture = await captureSqlStatements(async () =>
-      postgresRevisionAdapter.createProcessingRevision({
+      createPendingRevision({
         ledgerId,
         input: {
           text: null,

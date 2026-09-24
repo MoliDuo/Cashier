@@ -1,5 +1,4 @@
 import {
-  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
@@ -13,6 +12,18 @@ function provider(send: ReturnType<typeof vi.fn>): S3StorageProvider {
 }
 
 describe("S3StorageProvider", () => {
+  it("returns the SDK stream without buffering the object", async () => {
+    const body = new ReadableStream<Uint8Array>();
+    const transformToByteArray = vi.fn();
+    const send = vi.fn().mockResolvedValue({
+      Body: { transformToWebStream: () => body, transformToByteArray },
+    });
+
+    await expect(provider(send).stream("ledger/stored/file")).resolves.toBe(body);
+    expect(send.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
+    expect(transformToByteArray).not.toHaveBeenCalled();
+  });
+
   it("puts, gets, and idempotently deletes private objects", async () => {
     const send = vi
       .fn()
@@ -52,7 +63,7 @@ describe("S3StorageProvider", () => {
     ).rejects.toMatchObject({ code: "S3_UPLOAD_FAILED", statusCode: 503 });
   });
 
-  it("signs scoped uploads, inspects metadata, and copies within the bucket", async () => {
+  it("signs scoped uploads and reads bytes with metadata", async () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({
@@ -86,20 +97,12 @@ describe("S3StorageProvider", () => {
         metadata: { sha256: "a".repeat(64) },
       },
     });
-    await expect(
-      storage.copy("temporary/ledger/session/target", "ledger/stored/target")
-    ).resolves.toBeUndefined();
-
     expect(signer).toHaveBeenCalledWith(expect.anything(), expect.any(PutObjectCommand), {
       expiresIn: 900,
       signableHeaders: new Set(["content-type"]),
       unhoistableHeaders: new Set(["x-amz-meta-sha256"]),
     });
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
-    expect(send.mock.calls[1]?.[0]).toBeInstanceOf(CopyObjectCommand);
-    expect(send.mock.calls[1]?.[0].input.CopySource).toBe(
-      "cashier-images/temporary/ledger/session/target"
-    );
   });
 
   it("rejects unsafe object keys before calling S3", async () => {

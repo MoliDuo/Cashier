@@ -1,15 +1,15 @@
 export interface ObjectStore {
   upload(key: string, data: Buffer, contentType: string): Promise<unknown>;
   download(key: string): Promise<Buffer>;
-  stream?(key: string): Promise<ReadableStream<Uint8Array>>;
+  stream(key: string): Promise<ReadableStream<Uint8Array>>;
   delete(key: string): Promise<{ success: boolean; key?: string; error?: Error }>;
-  presignUpload?(
+  presignUpload(
     key: string,
     contentType: string,
     sha256: string,
     expiresInSeconds: number
   ): Promise<{ url: string; requiredHeaders: Readonly<Record<string, string>> }>;
-  readObject?(key: string): Promise<{
+  readObject(key: string): Promise<{
     bytes: Buffer;
     metadata: {
       byteSize: number;
@@ -17,10 +17,7 @@ export interface ObjectStore {
       metadata: Readonly<Record<string, string>>;
     };
   }>;
-  copy?(sourceKey: string, destinationKey: string): Promise<void>;
 }
-
-export type StorageProvider = ObjectStore;
 
 export function assertSafeStorageKey(key: string): void {
   if (

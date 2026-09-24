@@ -9,7 +9,7 @@ import {
 } from "tests/helpers/schema-setup";
 import { ledgers, storedFiles, uploadSessionFiles, uploadSessions, users } from "@/persistence";
 import { postgresAuthorizedFileRepository } from "@/application/adapters/postgres/authorized-files";
-import { createStoredFileAdapter } from "@/application/adapters/local/stored-files";
+import { createStoredFileAdapter } from "@/application/adapters/storage";
 import { serverComposition } from "@/application/server-composition-root";
 import { createTestSourceDocument } from "tests/helpers/schema-setup";
 
@@ -87,6 +87,21 @@ describe("single live ledger access", () => {
         },
         async download(key) {
           return storage.get(key)!;
+        },
+        async stream(key) {
+          const bytes = storage.get(key)!;
+          return new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array(bytes));
+              controller.close();
+            },
+          });
+        },
+        async presignUpload() {
+          throw new Error("Unexpected direct upload in proxy storage fixture");
+        },
+        async readObject() {
+          throw new Error("Unexpected object inspection in proxy storage fixture");
         },
         async delete(key) {
           storage.delete(key);

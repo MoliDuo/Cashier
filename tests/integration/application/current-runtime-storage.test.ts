@@ -1,10 +1,11 @@
+import { createPendingRevision } from "tests/helpers/processing-revision";
+import type { ObjectStore } from "@/lib/storage";
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { eq, sql } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { postgresRevisionAdapter } from "@/application/adapters/postgres";
 import { createStoredFileAdapter } from "@/application/adapters/storage";
 import {
   DIRECT_UPLOAD_FINALIZE_BUFFER_MS,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/storage/upload-policy";
 import { sourceDocuments, storedFiles, uploadSessions } from "@/persistence";
 
-class MemoryObjectStore {
+class MemoryObjectStore implements ObjectStore {
   readonly files = new Map<string, Buffer>();
 
   async upload(key: string, data: Buffer): Promise<string> {
@@ -27,6 +28,29 @@ class MemoryObjectStore {
     const data = this.files.get(key);
     if (data == null) throw new Error("missing file");
     return Buffer.from(data);
+  }
+
+  async stream(key: string): Promise<ReadableStream<Uint8Array>> {
+    const bytes = await this.download(key);
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(bytes));
+        controller.close();
+      },
+    });
+  }
+
+  async presignUpload(
+    _key: string,
+    _contentType: string,
+    _sha256: string,
+    _expiresInSeconds: number
+  ): ReturnType<ObjectStore["presignUpload"]> {
+    throw new Error("Unexpected direct upload in proxy storage fixture");
+  }
+
+  async readObject(_key: string): ReturnType<ObjectStore["readObject"]> {
+    throw new Error("Unexpected object inspection in proxy storage fixture");
   }
 
   async delete(key: string): Promise<{ success: boolean }> {
@@ -79,12 +103,6 @@ class DirectMemoryObjectStore extends MemoryObjectStore {
     const value = this.metadata.get(key);
     if (value == null) throw new Error("missing object");
     return { bytes: await this.download(key), metadata: value };
-  }
-
-  async copy(sourceKey: string, destinationKey: string) {
-    const value = this.files.get(sourceKey);
-    if (value == null) throw new Error("missing source");
-    this.files.set(destinationKey, Buffer.from(value));
   }
 }
 
@@ -152,7 +170,7 @@ describe("current-runtime target adapters", () => {
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-    const pending = await postgresRevisionAdapter.createProcessingRevision({
+    const pending = await createPendingRevision({
       ledgerId,
       input: { text: null, storedFileIds: [uploaded.id], documentDate: null },
       bookId: await testBookId(db, ledgerId),

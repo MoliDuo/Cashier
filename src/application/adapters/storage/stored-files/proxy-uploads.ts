@@ -69,12 +69,7 @@ export function createProxyUploadOperations(dependencies: ResolvedStoredFileAdap
         eq(uploadSessionFiles.targetId, input.targetId)
       ),
     });
-    if (
-      target == null ||
-      target.status !== "planned" ||
-      target.expectedContentType == null ||
-      target.expectedByteSize == null
-    ) {
+    if (target == null || target.status !== "planned") {
       throw new NotFoundError("Upload target");
     }
     const bytes = Buffer.from(input.body);

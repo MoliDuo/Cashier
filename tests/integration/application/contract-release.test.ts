@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
   postgresLedgerProjectionAdapter,
-  postgresRevisionAdapter,
   postgresSourceDocumentSubmissionAdapter,
   getTargetSourceDocument,
 } from "@/application/adapters/postgres";
@@ -36,11 +35,6 @@ describe("local contract release", () => {
     expect(created).not.toBeNull();
     expect(created?.latestSubmissionRevisionId).toBe(pending.revision.id);
 
-    await postgresRevisionAdapter.markProcessing({
-      ledgerId,
-      sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
-    });
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
         ledgerId,

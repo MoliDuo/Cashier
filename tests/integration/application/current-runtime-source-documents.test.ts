@@ -1,3 +1,6 @@
+import { listTargetSourceDocuments } from "@/application/adapters/postgres/source-document-reads";
+import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
+import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -37,27 +40,20 @@ describe("current-runtime target adapters", () => {
       crypto.randomUUID()
     );
 
-    const first = await postgresRevisionAdapter.createProcessingRevision({
+    const first = await createPendingRevision({
       ledgerId,
       input: { text: "first", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
     await expect(postgresRevisionAdapter.get(otherLedgerId, first.document.id)).resolves.toBeNull();
     await expect(
-      postgresRevisionAdapter.createProcessingRevision({
+      createPendingRevision({
         ledgerId,
         sourceDocumentId: first.document.id,
         input: { text: "duplicate", storedFileIds: [], documentDate: null },
         bookId: await testBookId(db, ledgerId),
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
-    await expect(
-      postgresRevisionAdapter.markProcessing({
-        ledgerId,
-        sourceDocumentId: first.document.id,
-        revisionId: first.revision.id,
-      })
-    ).resolves.toBe(true);
     await expect(
       postgresRevisionAdapter.recordProcessingFailure({
         ledgerId,
@@ -69,16 +65,11 @@ describe("current-runtime target adapters", () => {
       })
     ).resolves.toBe(true);
 
-    const retry = await postgresRevisionAdapter.createProcessingRevision({
+    const retry = await createPendingRevision({
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "retry", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
-    });
-    await postgresRevisionAdapter.markProcessing({
-      ledgerId,
-      sourceDocumentId: first.document.id,
-      revisionId: retry.revision.id,
     });
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
@@ -90,7 +81,7 @@ describe("current-runtime target adapters", () => {
       })
     ).resolves.toBe(true);
 
-    const failedRetry = await postgresRevisionAdapter.createProcessingRevision({
+    const failedRetry = await createPendingRevision({
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "bad retry", storedFileIds: [], documentDate: null },
@@ -109,13 +100,13 @@ describe("current-runtime target adapters", () => {
       latestSubmissionRevisionId: failedRetry.revision.id,
     });
 
-    const second = await postgresRevisionAdapter.createProcessingRevision({
+    const second = await createPendingRevision({
       ledgerId,
       input: { text: "second", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    const page1 = await postgresRevisionAdapter.list({ ledgerId, limit: 1 });
-    const page2 = await postgresRevisionAdapter.list({
+    const page1 = await listTargetSourceDocuments({ ledgerId, limit: 1 });
+    const page2 = await listTargetSourceDocuments({
       ledgerId,
       limit: 1,
       cursor: page1.nextCursor!,
@@ -138,7 +129,7 @@ describe("current-runtime target adapters", () => {
       .insert(entryCategories)
       .values({ ledgerId: otherLedgerId, name: "Other" })
       .returning();
-    const pending = await postgresRevisionAdapter.createProcessingRevision({
+    const pending = await createPendingRevision({
       ledgerId,
       input: { text: "receipt", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -181,7 +172,7 @@ describe("current-runtime target adapters", () => {
       .returning();
 
     await expect(
-      postgresRevisionAdapter.createProcessingRevision({
+      createPendingRevision({
         ledgerId,
         sourceDocumentId: legacy!.id,
         input: { text: "receipt", storedFileIds: [], documentDate: null },
@@ -212,7 +203,7 @@ describe("current-runtime target adapters", () => {
         finalizedAt: new Date(),
       })
       .returning();
-    const pending = await postgresRevisionAdapter.createProcessingRevision({
+    const pending = await createPendingRevision({
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: null, storedFileIds: [file!.id], documentDate: null },
@@ -228,11 +219,17 @@ describe("current-runtime target adapters", () => {
     const fileLinkCount = (await db.select().from(revisionFiles)).length;
 
     await expect(
-      postgresRevisionAdapter.softDelete(ledgerId, active.sourceDocumentId)
-    ).resolves.toBe(true);
+      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+        ledgerId,
+        target: { sourceDocumentId: active.sourceDocumentId, expectedVersion: 2 },
+      })
+    ).resolves.toMatchObject({ ok: true });
     await expect(
-      postgresRevisionAdapter.softDelete(ledgerId, active.sourceDocumentId)
-    ).resolves.toBe(false);
+      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+        ledgerId,
+        target: { sourceDocumentId: active.sourceDocumentId, expectedVersion: 2 },
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
       postgresLedgerProjectionAdapter.activateRevision({
         ledgerId,
@@ -240,13 +237,6 @@ describe("current-runtime target adapters", () => {
         sourceDocumentId: active.sourceDocumentId,
         revisionId: pending.revision.id,
         entries: [{ ...projectionEntry, amount: "99.00" }],
-      })
-    ).resolves.toBe(false);
-    await expect(
-      postgresRevisionAdapter.markProcessing({
-        ledgerId,
-        sourceDocumentId: active.sourceDocumentId,
-        revisionId: pending.revision.id,
       })
     ).resolves.toBe(false);
 

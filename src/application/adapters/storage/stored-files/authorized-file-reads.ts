@@ -8,7 +8,7 @@ import { AppError } from "@/lib/errors";
 import { mapStoredFile, type ResolvedStoredFileAdapterDependencies } from "./shared";
 
 export function createAuthorizedFileReadOperations(
-  dependencies: ResolvedStoredFileAdapterDependencies
+  dependencies: Pick<ResolvedStoredFileAdapterDependencies, "authorizedFiles" | "storage">
 ) {
   const { authorizedFiles, storage } = dependencies;
 
@@ -30,24 +30,6 @@ export function createAuthorizedFileReadOperations(
     return { file: mapStoredFile(row), body: new Uint8Array(body) };
   }
 
-  async function readAuthorizedForUser(
-    userId: string,
-    fileId: string
-  ): Promise<AuthorizedFileReadContract | null> {
-    const row = await authorizedFiles.findForUser(userId, fileId);
-    if (row == null) return null;
-    if (row.storageProvider !== "s3") {
-      throw new AppError(
-        `Unsupported stored file provider: ${row.storageProvider}`,
-        "UNSUPPORTED_STORAGE_PROVIDER",
-        500,
-        { provider: row.storageProvider, fileId: row.id }
-      );
-    }
-    const body = await storage.download(row.storageKey);
-    return { file: mapStoredFile(row), body: new Uint8Array(body) };
-  }
-
   async function readAuthorizedStreamForUser(
     userId: string,
     fileId: string
@@ -55,19 +37,6 @@ export function createAuthorizedFileReadOperations(
     file: StoredFileContract;
     body: ReadableStream<Uint8Array>;
   } | null> {
-    if (storage.stream == null) {
-      const read = await readAuthorizedForUser(userId, fileId);
-      if (read == null) return null;
-      return {
-        file: read.file,
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(read.body);
-            controller.close();
-          },
-        }),
-      };
-    }
     const row = await authorizedFiles.findForUser(userId, fileId);
     if (row == null) return null;
     if (row.storageProvider !== "s3") {
@@ -83,7 +52,6 @@ export function createAuthorizedFileReadOperations(
 
   return {
     readAuthorized,
-    readAuthorizedForUser,
     readAuthorizedStreamForUser,
   };
 }

@@ -97,6 +97,14 @@
     {
       "file": "0052_simplify_retired_workflows.sql",
       "sha256": "772e73b19bd0dd802f68abb864c211ece7c1c432f80573972b21a07246111a73"
+    },
+    {
+      "file": "0053_resource_refresh_versions.sql",
+      "sha256": "3462f62124512dc3e16c797fc15307fd2fe80cdbf3170a79691d4d89b8d41d5d"
+    },
+    {
+      "file": "0054_retire_legacy_upload_sessions.sql",
+      "sha256": "32e20337955b1f6102f24b2c88b8da0fa234f45ad93417cb524c83292f51dbc4"
     }
   ]
 }

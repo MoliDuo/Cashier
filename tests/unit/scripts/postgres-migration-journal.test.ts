@@ -31,7 +31,7 @@ describe("Postgres migration journal", () => {
     });
 
     expect(observedInversions).toEqual(allowedLegacyInversions);
-    expect(journal.entries.at(-1)?.tag).toBe("0052_simplify_retired_workflows");
+    expect(journal.entries.at(-1)?.tag).toBe("0054_retire_legacy_upload_sessions");
   });
 
   it("keeps the harmful global category reorder migration as an intentional no-op", () => {
@@ -126,7 +126,7 @@ describe("Postgres migration journal", () => {
     for (const file of discovered) expect(file).toMatch(/^\d{4}_snapshot\.json$/);
   });
 
-  it("allows db:generate when the snapshot baseline matches the journal", () => {
+  it("blocks db:generate until the snapshot includes the hand-written migrations", () => {
     let message = "";
     try {
       execFileSync(process.execPath, ["scripts/guard-drizzle-generate.mjs"], {
@@ -136,6 +136,8 @@ describe("Postgres migration journal", () => {
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
-    expect(message).toBe("");
+    expect(message).toContain("migration journal is at 0054_retire_legacy_upload_sessions");
+    expect(message).toContain("newest Drizzle snapshot is 0052_snapshot.json");
+    expect(message).toContain("Rebaseline the snapshot");
   });
 });

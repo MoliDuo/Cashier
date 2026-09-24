@@ -13,7 +13,6 @@ import {
   pgEnum,
   bigint,
   primaryKey,
-  unique,
   boolean,
   date,
 } from "drizzle-orm/pg-core";
@@ -251,9 +250,8 @@ export const uploadSessionFiles = pgTable(
     storedFileId: uuid("stored_file_id"),
     targetId: uuid("target_id").notNull(),
     position: integer("position").notNull(),
-    // Nullable only for upload sessions created by a prior compatible image.
-    expectedContentType: text("expected_content_type"),
-    expectedByteSize: bigint("expected_byte_size", { mode: "number" }),
+    expectedContentType: text("expected_content_type").notNull(),
+    expectedByteSize: bigint("expected_byte_size", { mode: "number" }).notNull(),
     originalFilename: text("original_filename"),
     expectedChecksum: text("expected_checksum"),
     status: uploadFileStatusEnum("status").notNull().default("planned"),
@@ -570,6 +568,16 @@ export const ledgerSyncState = pgTable(
     version: bigint("version", { mode: "bigint" })
       .notNull()
       .default(sql`0`),
+    transactionId: bigint("transaction_id", { mode: "bigint" }),
+    categoriesVersion: bigint("categories_version", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    settingsVersion: bigint("settings_version", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    statsVersion: bigint("stats_version", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
     updatedAt: requiredTimestamp("updated_at").$defaultFn(() => new Date()),
   },
   (table) => [
@@ -579,33 +587,5 @@ export const ledgerSyncState = pgTable(
       name: "ledger_sync_state_ledger_id_fkey",
     }).onDelete("cascade"),
     check("ledger_sync_state_version_check", sql`${table.version} >= 0`),
-  ]
-);
-
-export const ledgerChangeBatches = pgTable(
-  "ledger_change_batches",
-  {
-    ledgerId: uuid("ledger_id").notNull(),
-    version: bigint("version", { mode: "bigint" }).notNull(),
-    transactionId: bigint("transaction_id", { mode: "bigint" }).notNull(),
-    categoriesChanged: boolean("categories_changed").notNull().default(false),
-    settingsChanged: boolean("settings_changed").notNull().default(false),
-    statsChanged: boolean("stats_changed").notNull().default(false),
-    resetRequired: boolean("reset_required").notNull().default(false),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    primaryKey({ columns: [table.ledgerId, table.version] }),
-    foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "ledger_change_batches_ledger_id_fkey",
-    }).onDelete("cascade"),
-    unique("ledger_change_batches_ledger_id_transaction_id_key").on(
-      table.ledgerId,
-      table.transactionId
-    ),
-    index("idx_ledger_change_batches_created").on(table.createdAt),
-    check("ledger_change_batches_version_check", sql`${table.version} > 0`),
   ]
 );

@@ -5,7 +5,6 @@ import { cancelSourceDocumentProcessing } from "../ledger-projections/cancel-sou
 import { postgresSourceDocumentSubmissionAdapter } from "../submissions";
 import {
   assignBook,
-  getBook,
   saveChanges,
   updateDocuments,
   updateEntryDates,
@@ -19,7 +18,6 @@ import {
 import { applyCategoryAssignments } from "./category-assignments";
 
 export const postgresSourceDocumentAggregateAdapter: SourceDocumentAggregateWritePort = {
-  getBook,
   assignBook,
   applyCategoryAssignments,
   createProcessingDocument: (input) => postgresSourceDocumentSubmissionAdapter.submit(input),
@@ -40,5 +38,4 @@ export const postgresSourceDocumentAggregateAdapter: SourceDocumentAggregateWrit
   installRetry: (input) => postgresSourceDocumentSubmissionAdapter.submit(input),
   cancelProcessing: cancelSourceDocumentProcessing,
   deleteDocuments: deleteSourceDocumentAtomically,
-  completeProcessing: (input) => postgresLedgerProjectionAdapter.activateRevision(input),
 };

@@ -8,7 +8,7 @@ import {
   postgresUploadSessionRepository,
   type UploadSessionRepository,
 } from "@/application/adapters/postgres/upload-sessions";
-import { AppError, ValidationError } from "@/lib/errors";
+import { ValidationError } from "@/lib/errors";
 import type { ObjectStore } from "@/lib/storage";
 import { getS3Storage } from "@/lib/storage/s3";
 import {
@@ -17,9 +17,6 @@ import {
   SUPPORTED_MIME_SET,
 } from "@/lib/storage/upload-policy";
 import { storedFiles } from "@/persistence";
-
-type DirectObjectFileStore = Required<Pick<ObjectStore, "presignUpload" | "readObject">> &
-  ObjectStore;
 
 export interface StoredFileAdapterDependencies {
   storage?: ObjectStore;
@@ -96,13 +93,6 @@ export function validateRequests(files: readonly UploadFileRequestContract[]): v
       throw new ValidationError("Upload checksum must be a SHA-256 hex digest");
     }
   }
-}
-
-export function requireDirectStorage(storage: ObjectStore): DirectObjectFileStore {
-  if (storage.presignUpload == null || storage.readObject == null) {
-    throw new AppError("Direct upload storage is not configured", "STORAGE_UNAVAILABLE", 503);
-  }
-  return storage as DirectObjectFileStore;
 }
 
 export function temporaryKey(ledgerId: string, sessionId: string, targetId: string): string {

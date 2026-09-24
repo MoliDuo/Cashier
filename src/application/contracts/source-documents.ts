@@ -165,25 +165,6 @@ export function toSourceDocumentSubmissionContract(
 
 export interface SourceDocumentPort {
   get(ledgerId: LedgerId, id: SourceDocumentId): Promise<SourceDocumentContract | null>;
-  list(input: {
-    ledgerId: LedgerId;
-    cursor?: string;
-    limit?: number;
-  }): Promise<{ items: readonly SourceDocumentContract[]; nextCursor: string | null }>;
-  createProcessingRevision(
-    input: {
-      ledgerId: LedgerId;
-      input: SourceDocumentInputContract;
-    } & (
-      | { sourceDocumentId: SourceDocumentId; bookId?: string }
-      | { sourceDocumentId?: never; bookId: string }
-    )
-  ): Promise<{ document: SourceDocumentContract; revision: SourceDocumentRevisionContract }>;
-  markProcessing(input: {
-    ledgerId: LedgerId;
-    sourceDocumentId: SourceDocumentId;
-    revisionId: RevisionId;
-  }): Promise<boolean>;
   recordProcessingFailure(input: {
     ledgerId: LedgerId;
     sourceDocumentId: SourceDocumentId;
@@ -197,7 +178,6 @@ export interface SourceDocumentPort {
     failureCode?: string | null;
     lease?: ProcessingLeaseContract;
   }): Promise<boolean>;
-  softDelete(ledgerId: LedgerId, sourceDocumentId: SourceDocumentId): Promise<boolean>;
 }
 
 export interface SourceDocumentSubmissionResult {

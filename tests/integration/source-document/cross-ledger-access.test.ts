@@ -109,10 +109,6 @@ type Reach = (callerLedgerId: string, other: Neighbour, callerBookId: string) =>
 
 const REACHES: Array<[name: string, reach: Reach]> = [
   [
-    "getBook",
-    (ledgerId, other) => aggregate.getBook({ ledgerId, sourceDocumentId: other.sourceDocumentId }),
-  ],
-  [
     "assignBook",
     (ledgerId, other, callerBookId) =>
       aggregate.assignBook({

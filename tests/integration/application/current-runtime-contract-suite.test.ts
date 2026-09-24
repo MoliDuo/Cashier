@@ -1,3 +1,5 @@
+import { createPendingRevision } from "tests/helpers/processing-revision";
+import type { ObjectStore } from "@/lib/storage";
 import { applicationContractSuite } from "../../helpers/application-contract-suites";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
@@ -8,12 +10,9 @@ import type {
   UploadPlanContract,
 } from "@/application/contracts";
 import { createStoredFileAdapter } from "@/application/adapters/storage";
-import {
-  PostgresProcessingJobAdapter,
-  postgresRevisionAdapter,
-} from "@/application/adapters/postgres";
+import { PostgresProcessingJobAdapter } from "@/application/adapters/postgres";
 
-class ContractFileStore {
+class ContractFileStore implements ObjectStore {
   readonly files = new Map<string, Buffer>();
 
   async upload(key: string, data: Buffer): Promise<string> {
@@ -25,6 +24,29 @@ class ContractFileStore {
     const file = this.files.get(key);
     if (file == null) throw new Error("missing contract file");
     return Buffer.from(file);
+  }
+
+  async stream(key: string): Promise<ReadableStream<Uint8Array>> {
+    const bytes = await this.download(key);
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(bytes));
+        controller.close();
+      },
+    });
+  }
+
+  async presignUpload(
+    _key: string,
+    _contentType: string,
+    _sha256: string,
+    _expiresInSeconds: number
+  ): ReturnType<ObjectStore["presignUpload"]> {
+    throw new Error("Unexpected direct upload in proxy storage fixture");
+  }
+
+  async readObject(_key: string): ReturnType<ObjectStore["readObject"]> {
+    throw new Error("Unexpected object inspection in proxy storage fixture");
   }
 
   async delete(key: string): Promise<{ success: boolean }> {
@@ -52,7 +74,7 @@ applicationContractSuite("real Postgres/object-storage/in-process adapter compos
     const existing = actualIntents.get(job.id);
     if (existing != null) return existing;
     const { ledgerId } = await getSetup();
-    const pending = await postgresRevisionAdapter.createProcessingRevision({
+    const pending = await createPendingRevision({
       ledgerId,
       input: { text: "contract processing input", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -117,7 +139,7 @@ applicationContractSuite("real Postgres/object-storage/in-process adapter compos
         finalizationToken: current.finalizationToken,
         targetIds: [current.targets[0]!.id],
       });
-      await postgresRevisionAdapter.createProcessingRevision({
+      await createPendingRevision({
         ledgerId,
         input: {
           text: null,

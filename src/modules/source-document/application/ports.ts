@@ -73,11 +73,6 @@ export type ApplyCategoryAssignmentsResult =
 
 /** The only application-facing boundary for writes that change a document's visible projection. */
 export interface SourceDocumentAggregateWritePort {
-  /** The record's current book, for the detail page's book field. */
-  getBook(input: {
-    ledgerId: string;
-    sourceDocumentId: string;
-  }): Promise<{ bookId: string; version: number } | null>;
   /**
    * Moves one record to another book of the same ledger. A target that is gone
    * or archived is refused rather than written: the record would otherwise be
@@ -164,7 +159,6 @@ export interface SourceDocumentAggregateWritePort {
     ledgerId: string;
     target: VersionedTarget;
   }): Promise<VersionedCommandResult<import("../contracts").DeleteSourceDocumentResultDto>>;
-  completeProcessing: LedgerProjectionPort["activateRevision"];
 }
 
 export interface SourceDocumentCredentialPorts {
@@ -238,12 +232,9 @@ export interface LedgerChangeReadPort {
   getRefreshBaseline(ledgerId: string): Promise<{ version: bigint; hasTransitionalWork: boolean }>;
   summarizeChanges(input: { ledgerId: string; afterVersion: bigint }): Promise<{
     currentVersion: bigint;
-    firstRetainedVersion: bigint | null;
-    lastRetainedVersion: bigint | null;
     categoriesChanged: boolean;
     settingsChanged: boolean;
     statsChanged: boolean;
-    resetRequired: boolean;
     hasTransitionalWork: boolean;
   }>;
 }

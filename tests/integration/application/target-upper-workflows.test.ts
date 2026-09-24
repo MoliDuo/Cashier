@@ -1,3 +1,5 @@
+import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
+import { createPendingRevision } from "tests/helpers/processing-revision";
 import { and, eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
@@ -65,17 +67,12 @@ describe("target upper workflows", () => {
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
     });
-    const pending = await postgresRevisionAdapter.createProcessingRevision({
+    const pending = await createPendingRevision({
       ledgerId,
       input: { text: "pending", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    await postgresRevisionAdapter.markProcessing({
-      ledgerId,
-      sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
-    });
-    const failedSubmission = await postgresRevisionAdapter.createProcessingRevision({
+    const failedSubmission = await createPendingRevision({
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
@@ -125,7 +122,7 @@ describe("target upper workflows", () => {
     const activeEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
     });
-    const failedPending = await postgresRevisionAdapter.createProcessingRevision({
+    const failedPending = await createPendingRevision({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       input: { text: "failed replacement", storedFileIds: [], documentDate: null },
@@ -175,7 +172,12 @@ describe("target upper workflows", () => {
     expect(summary.convertedTotal).toEqual({ total: "12.5", currency: "CNY" });
     expect(enhanced.summary).toMatchObject({ total: "12.5", currency: "CNY" });
 
-    await postgresLedgerProjectionAdapter.softDelete(ledgerId, created.sourceDocumentId);
+    await expect(
+      postgresSourceDocumentAggregateAdapter.deleteDocuments({
+        ledgerId,
+        target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 3 },
+      })
+    ).resolves.toMatchObject({ ok: true });
     await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
     await expect(getLedgerEntryDetail(activeEntry!.id, ledgerId)).resolves.toBeNull();
   });
@@ -267,15 +269,13 @@ describe("target upper workflows", () => {
     expect(stats.totals).toContainEqual({ currency: "USD", total: "11.73", count: 3 });
 
     await expect(
-      postgresLedgerProjectionAdapter.recalculate({
+      postgresSourceDocumentAggregateAdapter.saveChanges({
         ledgerId,
-        updates: [
-          { ledgerEntryId: ids[0]!, convertedAmount: "86.38", exchangeRate: "7.000000" },
-          {
-            ledgerEntryId: crypto.randomUUID(),
-            convertedAmount: "999.00",
-            exchangeRate: "999.000000",
-          },
+        sourceDocumentId: created.sourceDocumentId,
+        expectedVersion: 1,
+        entries: [
+          { ledgerEntryId: ids[0]!, data: { itemName: "Must roll back" } },
+          { ledgerEntryId: crypto.randomUUID(), data: { itemName: "Missing" } },
         ],
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -425,7 +425,7 @@ describe("target upper workflows", () => {
       .insert(entryCategories)
       .values({ ledgerId: otherLedgerId, name: "Other" })
       .returning();
-    const pending = await postgresRevisionAdapter.createProcessingRevision({
+    const pending = await createPendingRevision({
       ledgerId,
       input: { text: "Lunch", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),

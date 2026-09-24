@@ -1,3 +1,4 @@
+import { createPendingRevision } from "tests/helpers/processing-revision";
 import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
@@ -5,7 +6,6 @@ import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup
 import {
   PostgresProcessingJobAdapter,
   postgresSourceDocumentSubmissionAdapter,
-  postgresRevisionAdapter,
 } from "@/application/adapters/postgres";
 import { selectRecoverableProcessingJobs } from "@/modules/source-document/application/use-cases/select-recoverable-processing-jobs";
 import type { ProcessingJobContract } from "@/application/contracts";
@@ -22,7 +22,7 @@ async function pendingIntent(
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
   const bookId = await testBookId(db, ledgerId);
-  const pending = await postgresRevisionAdapter.createProcessingRevision({
+  const pending = await createPendingRevision({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
@@ -267,12 +267,12 @@ describe("Processing Recovery", () => {
 
     // Create 2 more source documents in the same ledger
     const bookId = await testBookId(getTestDb(), ledgerId);
-    const pending2 = await postgresRevisionAdapter.createProcessingRevision({
+    const pending2 = await createPendingRevision({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
       bookId,
     });
-    const pending3 = await postgresRevisionAdapter.createProcessingRevision({
+    const pending3 = await createPendingRevision({
       ledgerId,
       input: { text: "Coffee 5.00 CNY", storedFileIds: [], documentDate: null },
       bookId,

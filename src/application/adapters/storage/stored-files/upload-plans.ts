@@ -19,7 +19,6 @@ import {
 import { uploadSessionFiles, uploadSessions } from "@/persistence";
 import {
   type ResolvedStoredFileAdapterDependencies,
-  requireDirectStorage,
   temporaryKey,
   tokenHash,
   validateRequests,
@@ -80,7 +79,6 @@ export function createUploadPlanOperations(dependencies: ResolvedStoredFileAdapt
       throw new ValidationError("Direct upload batch exceeds the configured total byte limit");
     }
 
-    const directStorage = requireDirectStorage(storage);
     const sessionId = crypto.randomUUID();
     const finalizationToken = crypto.randomBytes(32).toString("base64url");
     const createdAt = now();
@@ -108,7 +106,7 @@ export function createUploadPlanOperations(dependencies: ResolvedStoredFileAdapt
       const targets = await Promise.all(
         files.map(async (file, position) => {
           const targetId = targetIds[position]!;
-          const signed = await directStorage.presignUpload(
+          const signed = await storage.presignUpload(
             temporaryKey(ledgerId, sessionId, targetId),
             file.contentType,
             file.checksum!,

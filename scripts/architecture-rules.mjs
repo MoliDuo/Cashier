@@ -57,7 +57,7 @@ const registeredSourceDocumentWriters = new Set([
   "src/application/adapters/postgres/submissions.ts",
   "src/application/adapters/postgres/ledger-projections/cancel-source-document-processing.ts",
   "src/application/adapters/postgres/ledger-projections/manual-entries.ts",
-  "src/application/adapters/postgres/ledger-projections/recalculate.ts",
+  "src/application/adapters/postgres/ledger-projections/adapter.ts",
   "src/application/adapters/postgres/source-document-aggregate/recalculate-current-entries.ts",
   "src/application/adapters/postgres/source-document-date-organization.ts",
   "src/application/adapters/postgres/source-document-aggregate/category-assignments.ts",

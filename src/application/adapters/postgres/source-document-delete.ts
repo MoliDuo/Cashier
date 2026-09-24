@@ -12,22 +12,6 @@ import type { DeleteSourceDocumentResultDto } from "@/modules/source-document/co
 import type { PostgresTransaction } from "./transaction-locks";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "./transaction-locks";
 
-export async function softDeleteSourceDocumentInTransaction(
-  tx: PostgresTransaction,
-  ledgerId: string,
-  sourceDocumentId: string
-): Promise<boolean> {
-  await lockLedgerForUpdate(tx, ledgerId);
-  let document: typeof sourceDocuments.$inferSelect;
-  try {
-    document = await lockSourceDocumentForUpdate(tx, ledgerId, sourceDocumentId);
-  } catch (error) {
-    if (error instanceof NotFoundError) return false;
-    throw error;
-  }
-  return softDeleteLockedSourceDocument(tx, ledgerId, document);
-}
-
 async function softDeleteLockedSourceDocument(
   tx: PostgresTransaction,
   ledgerId: string,

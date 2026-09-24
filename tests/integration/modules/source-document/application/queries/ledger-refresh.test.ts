@@ -1,14 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getStreamRefresh } from "@/modules/source-document/application/queries/get-stream-refresh";
 import { serverComposition } from "@/application/server-composition-root";
-import {
-  ledgerChangeBatches,
-  ledgerSyncState,
-  ledgers,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { ledgerSyncState, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
@@ -57,20 +51,30 @@ describe("ledger refresh", () => {
     });
   });
 
-  it("invalidates everything when the retained log has a gap", async () => {
+  it("uses resource watermarks even for a client that has never refreshed", async () => {
     await createTestSourceDocument(getTestDb(), ledgerId);
     await getTestDb().update(ledgers).set({ aiLanguage: "en" }).where(eq(ledgers.id, ledgerId));
-    await getTestDb().update(ledgers).set({ aiLanguage: "fr" }).where(eq(ledgers.id, ledgerId));
-    await getTestDb()
-      .delete(ledgerChangeBatches)
-      .where(
-        and(eq(ledgerChangeBatches.ledgerId, ledgerId), eq(ledgerChangeBatches.version, BigInt(1)))
-      );
-
     expect(await refresh("0")).toMatchObject({
       changed: true,
-      invalidations: { categories: true, settings: true, stats: true },
+      invalidations: { categories: false, settings: true, stats: true },
     });
+  });
+
+  it("coalesces a transaction and rolls back its resource watermarks", async () => {
+    const before = await version();
+    await getTestDb().transaction(async (tx) => {
+      await tx.update(ledgers).set({ aiLanguage: "en" }).where(eq(ledgers.id, ledgerId));
+      await tx.update(ledgers).set({ aiLanguage: "zh-CN" }).where(eq(ledgers.id, ledgerId));
+    });
+    expect(await version()).toBe(before + BigInt(1));
+    const committed = await refresh(before.toString());
+    await expect(
+      getTestDb().transaction(async (tx) => {
+        await tx.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
+        throw new Error("rollback");
+      })
+    ).rejects.toThrow("rollback");
+    expect(await refresh(before.toString())).toEqual(committed);
   });
 
   it("invalidates everything after a main-currency reset", async () => {

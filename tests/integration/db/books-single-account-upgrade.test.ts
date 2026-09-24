@@ -1176,11 +1176,15 @@ describe("published migration chain upgrade to one account with books", () => {
         // change log still records a write against the new book.
         const syncStateAfterUpgrade = await readSyncState(data);
         expect(syncStateAfterUpgrade).toEqual(legacyState.syncState);
-        expect(await readChangeBatches(data)).toEqual(legacyState.changeBatches);
-        const batches = await readChangeBatches(data);
-        expect(batches.map((row) => Number(row.version))).toEqual(
-          Array.from({ length: FIXTURE_SYNC_VERSION }, (_, index) => index + 1)
+        expect(await tableExists(data, "ledger_change_batches")).toBe(false);
+        const watermarks = await data.query(
+          "SELECT categories_version::text, settings_version::text, stats_version::text FROM ledger_sync_state"
         );
+        expect(watermarks.rows[0]).toEqual({
+          categories_version: String(FIXTURE_SYNC_VERSION),
+          settings_version: String(FIXTURE_SYNC_VERSION),
+          stats_version: String(FIXTURE_SYNC_VERSION),
+        });
         const sharedBookId = firstRow(
           books.filter((book) => book.name === "共同支出"),
           "共同支出 book"
@@ -1200,12 +1204,8 @@ describe("published migration chain upgrade to one account with books", () => {
         expect(firstRow(upgradedWrite.rows, "post-upgrade document").book_id).toBe(sharedBookId);
         const syncStateAfterWrite = await readSyncState(data);
         expect(syncStateAfterWrite.version).toBe(String(FIXTURE_SYNC_VERSION + 1));
-        const batchesAfterWrite = await readChangeBatches(data);
-        expect(batchesAfterWrite).toHaveLength(FIXTURE_SYNC_VERSION + 1);
-        expect(firstRow(batchesAfterWrite.slice(-1), "newest batch")).toMatchObject({
-          version: String(FIXTURE_SYNC_VERSION + 1),
-          stats_changed: true,
-        });
+        const afterWrite = await data.query("SELECT stats_version::text FROM ledger_sync_state");
+        expect(afterWrite.rows[0].stats_version).toBe(String(FIXTURE_SYNC_VERSION + 1));
 
         // 0049 really removed the default-book structure: the column and its
         // index are gone, and the three books are ordinary rows.

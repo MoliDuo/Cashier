@@ -147,7 +147,7 @@ describe("PostgreSQL schema contract", () => {
 
     // 0016 declared these inline, so PostgreSQL auto-named them.
     expect(compact(byName.get("ledger_sync_state_version_check"))).toContain("version>=0");
-    expect(compact(byName.get("ledger_change_batches_version_check"))).toContain("version>0");
+    expect(byName.has("ledger_change_batches_version_check")).toBe(false);
   });
 
   it("removes status triggers while keeping change-log triggers", async () => {
@@ -170,12 +170,17 @@ describe("PostgreSQL schema contract", () => {
   });
 
   it("keeps only aggregate ledger change-log state", async () => {
-    const batchColumns = (await fetchColumns("ledger_change_batches")).map(
-      (column) => column.columnName
+    expect(await fetchColumns("ledger_change_batches")).toEqual([]);
+    const columns = (await fetchColumns("ledger_sync_state")).map((column) => column.columnName);
+    expect(columns).toEqual(
+      expect.arrayContaining([
+        "version",
+        "transaction_id",
+        "categories_version",
+        "settings_version",
+        "stats_version",
+      ])
     );
-
-    expect(batchColumns).toContain("reset_required");
-    expect(batchColumns).not.toContain("counts_changed");
     expect(await fetchColumns("ledger_change_items")).toEqual([]);
   });
 

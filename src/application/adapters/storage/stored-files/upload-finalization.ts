@@ -12,7 +12,6 @@ import {
   checksum,
   durableKey,
   mapStoredFile,
-  requireDirectStorage,
   type ResolvedStoredFileAdapterDependencies,
   safeTokenMatches,
   temporaryKey,
@@ -27,7 +26,7 @@ export function createUploadFinalizationOperations(
     input: UploadFinalizationContract,
     loadedSession?: typeof uploadSessions.$inferSelect
   ): Promise<readonly StoredFileContract[]> {
-    const storage = requireDirectStorage(objectStorage);
+    const storage = objectStorage;
     let session =
       loadedSession ??
       (await db.query.uploadSessions.findFirst({
@@ -59,14 +58,7 @@ export function createUploadFinalizationOperations(
     ) {
       throw new ValidationError("Upload targets must be complete and in planned order");
     }
-    if (
-      targets.some(
-        (target) =>
-          target.expectedContentType == null ||
-          target.expectedByteSize == null ||
-          target.expectedChecksum == null
-      )
-    ) {
+    if (targets.some((target) => target.expectedChecksum == null)) {
       throw new ConflictError("Direct upload targets are incomplete");
     }
 
@@ -132,7 +124,7 @@ export function createUploadFinalizationOperations(
         uploaded.map(async (actual, position) => {
           const processed = await processImage(
             actual.bytes,
-            targets[position]!.expectedContentType!
+            targets[position]!.expectedContentType
           );
           return {
             bytes: processed.buffer,
@@ -273,8 +265,8 @@ export function createUploadFinalizationOperations(
       where: eq(uploadSessions.id, input.uploadSessionId),
     });
     if (session == null) throw new NotFoundError("Upload session");
-    if (session.transport === "direct") return finalizeDirectUpload(input, session);
-    return finalizeSession(input, session);
+    if (session.transport !== "direct") throw new NotFoundError("Browser upload session");
+    return finalizeDirectUpload(input, session);
   }
 
   async function finalizeUpload(

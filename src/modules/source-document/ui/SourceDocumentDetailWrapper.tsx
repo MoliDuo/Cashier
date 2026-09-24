@@ -1,5 +1,5 @@
 "use client";
-import type { BookDto, LedgerEntry } from "@/modules/ledger/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 import { useCallback } from "react";
 import { SourceDocumentDetailModal } from "./SourceDocumentDetailModal";
 import { useSourceDocumentDetailData } from "@/modules/source-document/hooks/useSourceDocumentDetailData";
@@ -26,7 +26,6 @@ interface SourceDocumentDetailWrapperProps {
   categories: EntryCategory[];
   mainCurrency: string;
   preferredCurrencies: string[];
-  ledgerEntries?: LedgerEntry[];
   timeZone?: string;
 }
 
@@ -41,7 +40,6 @@ export function SourceDocumentDetailWrapper({
   categories,
   mainCurrency,
   preferredCurrencies,
-  ledgerEntries: initialLedgerEntries,
   timeZone,
 }: SourceDocumentDetailWrapperProps) {
   const t = useTranslations("Common");
@@ -57,7 +55,6 @@ export function SourceDocumentDetailWrapper({
     id,
     ledgerId,
     open,
-    ...(initialLedgerEntries !== undefined ? { initialLedgerEntries } : {}),
   });
 
   const {

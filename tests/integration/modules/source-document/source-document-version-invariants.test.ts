@@ -27,7 +27,6 @@ import { getTestDb } from "tests/setup";
  * caller-supplied `expectedVersion` CAS. Excluded, and why:
  * - `createProcessingDocument` / `createManualDocument`: create a *new*
  *   document; there is no prior version to be a CAS against.
- * - `completeProcessing`: provider-driven internal writes keyed by revision
  *   ids, not a browser-facing versioned command.
  */
 type ExistingDocumentCommand = Exclude<
@@ -36,11 +35,9 @@ type ExistingDocumentCommand = Exclude<
   | "createIdempotentProcessingDocument"
   | "createManualDocument"
   | "installIdempotentRetry"
-  | "completeProcessing"
   | "applyCategoryAssignments"
   // A read of the document's book, not a versioned command: it has no CAS to
   // exercise, so it is covered by its own case below.
-  | "getBook"
 >;
 
 const port: SourceDocumentAggregateWritePort = serverComposition.sourceDocumentAggregate;
@@ -134,7 +131,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
     });
     const input = { ledgerId, sourceDocumentId, bookId: targetBookId };
 
-    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
+    expect(
+      await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, sourceDocumentId),
+        columns: { bookId: true, version: true },
+      })
+    ).toEqual({
       bookId: currentBookId,
       version: 1,
     });
@@ -151,7 +153,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
       reason: "stale",
       currentVersion: 2,
     });
-    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
+    expect(
+      await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, sourceDocumentId),
+        columns: { bookId: true, version: true },
+      })
+    ).toEqual({
       bookId: targetBookId,
       version: 2,
     });
@@ -171,7 +178,12 @@ const registry: Record<ExistingDocumentCommand, () => Promise<void>> = {
       reason: "book_unavailable",
     });
     // Nothing was written, so the record is still where it was.
-    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({
+    expect(
+      await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, sourceDocumentId),
+        columns: { bookId: true, version: true },
+      })
+    ).toEqual({
       bookId: targetBookId,
       version: 2,
     });
@@ -684,13 +696,4 @@ describe("source document aggregate — version invariants", () => {
   >) {
     it(`${name}: +1 on change, no-op or well-defined replay, stale rejected with zero writes`, run);
   }
-
-  it("getBook: reports the record's book and version, and nothing for a missing document", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId } = await createActiveDocument(ledgerId);
-    const bookId = await testBookId(getTestDb(), ledgerId);
-
-    expect(await port.getBook({ ledgerId, sourceDocumentId })).toEqual({ bookId, version: 1 });
-    expect(await port.getBook({ ledgerId, sourceDocumentId: crypto.randomUUID() })).toBeNull();
-  });
 });

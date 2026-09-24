@@ -1,11 +1,10 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
 import { applyCategoryPresetAction } from "@/modules/ledger/server-actions/categories";
 import {
   entryCategories,
-  ledgerChangeBatches,
   ledgerEntries,
   ledgerSyncState,
   ledgers,
@@ -283,10 +282,9 @@ describe("applyCategoryPresetAction", () => {
     });
     expect(after?.version).toBe((before?.version ?? BigInt(0)) + BigInt(1));
 
-    const batch = await db.query.ledgerChangeBatches.findFirst({
-      where: eq(ledgerChangeBatches.ledgerId, ledger.id),
-      orderBy: desc(ledgerChangeBatches.version),
+    expect(after).toMatchObject({
+      categoriesVersion: after!.version,
+      statsVersion: after!.version,
     });
-    expect(batch).toMatchObject({ categoriesChanged: true, statsChanged: true });
   });
 });

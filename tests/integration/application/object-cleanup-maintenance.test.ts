@@ -38,6 +38,8 @@ describe("persistent object cleanup maintenance", () => {
       uploadSessionId: sessionId,
       targetId,
       position: 0,
+      expectedContentType: "image/png",
+      expectedByteSize: 10,
     });
     deleteObject.mockResolvedValueOnce({ success: false, error: new Error("unavailable") });
 

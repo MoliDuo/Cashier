@@ -102,16 +102,6 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
       }
     }
 
-    await tx.execute(sql`WITH doomed AS (
-      SELECT ledger_id, version FROM ledger_change_batches batch
-      WHERE batch.created_at < ${new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)}
-        AND batch.version <= (
-          SELECT greatest(max(newer.version) - 10000, 0)
-          FROM ledger_change_batches newer WHERE newer.ledger_id = batch.ledger_id
-        )
-      LIMIT ${LIMIT}
-    ) DELETE FROM ledger_change_batches batch USING doomed
-      WHERE batch.ledger_id = doomed.ledger_id AND batch.version = doomed.version`);
     return true;
   });
   if (!acquired) return;

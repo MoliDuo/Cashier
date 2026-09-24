@@ -372,6 +372,20 @@
       "when": 1790223763593,
       "tag": "0052_simplify_retired_workflows",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1790223763594,
+      "tag": "0053_resource_refresh_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1790223763595,
+      "tag": "0054_retire_legacy_upload_sessions",
+      "breakpoints": true
     }
   ]
 }

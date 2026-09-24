@@ -1,3 +1,4 @@
+import type { ObjectStore } from "@/lib/storage";
 /**
  * Upload Policy Integration Tests
  *
@@ -25,7 +26,7 @@ import { getTestDb } from "../../../setup";
 /**
  * Minimal in-memory object store that replaces R2 for test isolation.
  */
-class MemoryFileStore {
+class MemoryFileStore implements ObjectStore {
   readonly files = new Map<string, Buffer>();
 
   async upload(key: string, data: Buffer, _contentType: string): Promise<void> {
@@ -34,6 +35,29 @@ class MemoryFileStore {
 
   async download(key: string): Promise<Buffer> {
     return this.files.get(key) ?? Buffer.from([]);
+  }
+
+  async stream(key: string): Promise<ReadableStream<Uint8Array>> {
+    const bytes = await this.download(key);
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(bytes));
+        controller.close();
+      },
+    });
+  }
+
+  async presignUpload(
+    _key: string,
+    _contentType: string,
+    _sha256: string,
+    _expiresInSeconds: number
+  ): ReturnType<ObjectStore["presignUpload"]> {
+    throw new Error("Unexpected direct upload in proxy storage fixture");
+  }
+
+  async readObject(_key: string): ReturnType<ObjectStore["readObject"]> {
+    throw new Error("Unexpected object inspection in proxy storage fixture");
   }
 
   async delete(key: string): Promise<{ success: boolean; error?: Error }> {

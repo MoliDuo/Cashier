@@ -37,7 +37,6 @@ describe("applyStreamRefreshToCache", () => {
         refetchType: "active",
       },
       { queryKey: ["ledger", "ledger-1", "entries"], refetchType: "active" },
-      { queryKey: ["ledger", "ledger-1", "entry"], refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "source-document"], refetchType: "active" },
     ]);
     expect(
@@ -59,7 +58,6 @@ describe("applyStreamRefreshToCache", () => {
       { queryKey: ["ledger", "ledger-1", "categories"], exact: true, refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "source-documents", "stream"], refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "entries"], refetchType: "active" },
-      { queryKey: ["ledger", "ledger-1", "entry"], refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "source-document"], refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "summary"], refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "enhanced-stats"], refetchType: "active" },
@@ -83,8 +81,6 @@ describe("applyStreamRefreshToCache", () => {
       { queryKey: ["ledger", "ledger-1", "settings"], exact: true, refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "summary"], refetchType: "active" },
       { queryKey: ["ledger", "ledger-1", "enhanced-stats"], refetchType: "active" },
-      { queryKey: ["ledger", "ledger-1", "calendar"], refetchType: "active" },
-      { queryKey: ["ledger", "ledger-1", "token-stats"], exact: true, refetchType: "active" },
       {
         queryKey: ["ledger", "ledger-1", "source-documents", "stream-total"],
         refetchType: "active",

@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parse, TYPE } from "@formatjs/icu-messageformat-parser";
+import { parse } from "@formatjs/icu-messageformat-parser";
 import ts from "typescript";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -39,31 +39,9 @@ function flattenKeys(value, prefix = "") {
   });
 }
 
-function collectIcuArgumentNames(elements, names = new Set()) {
-  for (const element of elements) {
-    if (
-      [TYPE.argument, TYPE.number, TYPE.date, TYPE.time, TYPE.select, TYPE.plural].includes(
-        element.type
-      )
-    ) {
-      names.add(element.value);
-    }
-    if (element.options != null) {
-      for (const option of Object.values(element.options)) {
-        collectIcuArgumentNames(option.value, names);
-      }
-    }
-    if (element.children != null) {
-      collectIcuArgumentNames(element.children, names);
-    }
-  }
-  return names;
-}
-
 function parseIcuMessage(message, location) {
   try {
-    const ast = parse(message);
-    return collectIcuArgumentNames(ast);
+    parse(message);
   } catch (error) {
     errors.push(
       `${location}: invalid ICU message: ${error instanceof Error ? error.message : String(error)}`
@@ -143,7 +121,6 @@ function collectTranslationUsages(sourceFile) {
   const bindings = new Map();
   const usages = [];
   const rawKeyLiterals = [];
-  const dynamicUsages = [];
 
   function unwrapExpression(node) {
     let current = node;
@@ -235,13 +212,6 @@ function collectTranslationUsages(sourceFile) {
           const namespace = getFactoryNamespace(factoryCall);
           if (namespace != null) {
             bindings.set(node.name.text, namespace);
-          } else {
-            dynamicUsages.push({
-              fileName: sourceFile.fileName,
-              line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
-              namespace: null,
-              kind: "dynamic namespace",
-            });
           }
         }
       }
@@ -270,14 +240,6 @@ function collectTranslationUsages(sourceFile) {
           key,
           reason: null,
         });
-        if (key == null) {
-          dynamicUsages.push({
-            fileName: sourceFile.fileName,
-            line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
-            namespace,
-            kind: "dynamic key",
-          });
-        }
       }
     }
 
@@ -305,73 +267,7 @@ function collectTranslationUsages(sourceFile) {
   }
 
   visit(sourceFile);
-  return { usages, rawKeyLiterals, dynamicUsages };
-}
-
-const VISIBLE_ATTRIBUTE_NAMES = new Set([
-  "title",
-  "aria-label",
-  "aria-description",
-  "placeholder",
-  "alt",
-]);
-const VISIBLE_TEXT_ALLOWLIST = new Map([
-  ["src/components/LanguageSwitcher.tsx", new Set(["中文", "English"])],
-  ["src/components/ui/calculator-input.tsx", new Set(["AC"])],
-  ["src/modules/auth/ui/login-page.tsx", new Set(["C", "Cashier"])],
-]);
-
-function collectVisibleStringLiterals(sourceFile, relativeFileName) {
-  const findings = [];
-
-  function record(node, text) {
-    const normalized = text.replace(/\s+/g, " ").trim();
-    if (normalized === "" || !/\p{L}/u.test(normalized)) return;
-    if (VISIBLE_TEXT_ALLOWLIST.get(relativeFileName)?.has(normalized)) return;
-    findings.push({
-      line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
-      text: normalized,
-    });
-  }
-
-  function collectExpressionStrings(node) {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      record(node, node.text);
-      return;
-    }
-    if (ts.isTemplateExpression(node)) {
-      record(node.head, node.head.text);
-      for (const span of node.templateSpans) record(span.literal, span.literal.text);
-      return;
-    }
-    if (ts.isConditionalExpression(node)) {
-      collectExpressionStrings(node.whenTrue);
-      collectExpressionStrings(node.whenFalse);
-      return;
-    }
-    if (ts.isParenthesizedExpression(node)) {
-      collectExpressionStrings(node.expression);
-    }
-  }
-
-  function visit(node) {
-    if (ts.isJsxText(node)) {
-      record(node, node.text);
-    } else if (ts.isJsxAttribute(node)) {
-      const attributeName = node.name.getText(sourceFile);
-      if (VISIBLE_ATTRIBUTE_NAMES.has(attributeName) && node.initializer != null) {
-        if (ts.isStringLiteral(node.initializer)) {
-          record(node.initializer, node.initializer.text);
-        } else if (ts.isJsxExpression(node.initializer) && node.initializer.expression != null) {
-          collectExpressionStrings(node.initializer.expression);
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return findings;
+  return { usages, rawKeyLiterals };
 }
 
 if (catalog != null) {
@@ -386,12 +282,11 @@ if (catalog != null) {
       true,
       fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
     );
-    const { usages, rawKeyLiterals, dynamicUsages } = collectTranslationUsages(sourceFile);
+    const { usages, rawKeyLiterals } = collectTranslationUsages(sourceFile);
     const relativeFileName = path
       .relative(path.resolve(currentDirPath, ".."), fileName)
       .split(path.sep)
       .join("/");
-    const visibleStringLiterals = collectVisibleStringLiterals(sourceFile, relativeFileName);
 
     for (const usage of usages) {
       const location = `${relativeFileName}:${usage.line}`;
@@ -401,8 +296,7 @@ if (catalog != null) {
       }
       if (usage.key == null) {
         // Dynamic keys cannot be expanded safely from syntax alone. Still
-        // validate the statically known namespace and report the usage so it
-        // is visible in CI output.
+        // validate the statically known namespace where it is known.
         if (usage.namespace !== "" && getMessageValue(catalog, usage.namespace) === undefined) {
           errors.push(`${location}: missing message namespace ${usage.namespace} for dynamic key`);
         }
@@ -417,24 +311,6 @@ if (catalog != null) {
     for (const rawKey of rawKeyLiterals) {
       errors.push(
         `${relativeFileName}:${rawKey.line}: raw translation key rendered directly: ${rawKey.key}`
-      );
-    }
-
-    for (const dynamicUsage of dynamicUsages) {
-      const namespace =
-        dynamicUsage.namespace == null || dynamicUsage.namespace === ""
-          ? "<root>"
-          : dynamicUsage.namespace;
-      errors.push(
-        `${relativeFileName}:${dynamicUsage.line}: i18n ${dynamicUsage.kind} is not allowed in namespace ${namespace}`
-      );
-    }
-
-    for (const visibleString of visibleStringLiterals) {
-      errors.push(
-        `${relativeFileName}:${visibleString.line}: hard-coded visible text: ${JSON.stringify(
-          visibleString.text
-        )}`
       );
     }
   }

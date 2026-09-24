@@ -17,7 +17,7 @@ const projectionEntry = {
 } as const;
 
 describe("current-runtime target adapters", () => {
-  it("creates and edits manual projections, recalculates atomically, and soft deletes", async () => {
+  it("creates and edits manual projections, and soft deletes through the aggregate", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await postgresLedgerProjectionAdapter.createManual({
@@ -55,51 +55,12 @@ describe("current-runtime target adapters", () => {
       })
     ).toMatchObject({ amount: "18.000", deletedAt: null });
 
-    const beforeRecalculation = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
-
     await expect(
-      postgresLedgerProjectionAdapter.recalculate({
+      postgresSourceDocumentAggregateAdapter.deleteDocuments({
         ledgerId,
-        updates: [
-          {
-            ledgerEntryId: replacementEntry!.id,
-            convertedAmount: "2.50",
-            exchangeRate: "0.138889",
-          },
-        ],
+        target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 2 },
       })
-    ).resolves.toBe(1);
-    const afterRecalculation = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
-    expect(afterRecalculation?.version).toBe(beforeRecalculation!.version + 1);
-    expect(afterRecalculation!.updatedAt.getTime()).toBeGreaterThan(
-      beforeRecalculation!.updatedAt.getTime()
-    );
-
-    await expect(
-      postgresLedgerProjectionAdapter.recalculate({
-        ledgerId,
-        updates: [
-          {
-            ledgerEntryId: replacementEntry!.id,
-            convertedAmount: "2.50",
-            exchangeRate: "0.138889",
-          },
-        ],
-      })
-    ).resolves.toBe(0);
-    const afterNoopRecalculation = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
-    expect(afterNoopRecalculation?.version).toBe(afterRecalculation?.version);
-    expect(afterNoopRecalculation?.updatedAt).toEqual(afterRecalculation?.updatedAt);
-
-    await expect(
-      postgresLedgerProjectionAdapter.softDelete(ledgerId, created.sourceDocumentId)
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ ok: true });
     const deleted = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });

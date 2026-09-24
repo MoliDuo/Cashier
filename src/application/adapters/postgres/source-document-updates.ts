@@ -33,19 +33,6 @@ function whereSourceDocumentNotDeletedId(ledgerId: string, sourceDocumentId: str
   return and(whereSourceDocumentNotDeleted(ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
 }
 
-export async function getBook(input: {
-  ledgerId: string;
-  sourceDocumentId: string;
-}): Promise<{ bookId: string; version: number } | null> {
-  const row = await db
-    .select({ bookId: sourceDocuments.bookId, version: sourceDocuments.version })
-    .from(sourceDocuments)
-    .where(whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId))
-    .limit(1)
-    .then((rows) => rows[0]);
-  return row ?? null;
-}
-
 export type AssignBookResult =
   | { ok: true; version: number }
   | { ok: false; reason: "stale"; currentVersion: number }

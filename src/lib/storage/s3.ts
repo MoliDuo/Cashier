@@ -1,7 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
 import {
-  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
@@ -13,7 +12,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AppError } from "@/lib/errors";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
-import { assertSafeStorageKey, type StorageProvider } from "./index";
+import { assertSafeStorageKey, type ObjectStore } from "./index";
 
 type ObjectClient = Pick<S3Client, "send">;
 type Presign = typeof getSignedUrl;
@@ -70,7 +69,7 @@ function createS3ClientConfig(): S3ClientConfig {
   };
 }
 
-export class S3StorageProvider implements StorageProvider {
+export class S3StorageProvider implements ObjectStore {
   private client: ObjectClient | null;
   private presignClient: S3Client | null = null;
 
@@ -172,27 +171,6 @@ export class S3StorageProvider implements StorageProvider {
         throw storageError("File not found in S3", "FILE_NOT_FOUND", key, error);
       }
       throw storageError("Failed to read S3 object", "S3_DOWNLOAD_FAILED", key, error);
-    }
-  }
-
-  async copy(sourceKey: string, destinationKey: string): Promise<void> {
-    assertSafeStorageKey(sourceKey);
-    assertSafeStorageKey(destinationKey);
-    const copySource = `${this.getBucket()}/${sourceKey
-      .split("/")
-      .map(encodeURIComponent)
-      .join("/")}`;
-    try {
-      await this.getClient().send(
-        new CopyObjectCommand({
-          Bucket: this.getBucket(),
-          Key: destinationKey,
-          CopySource: copySource,
-          MetadataDirective: "COPY",
-        })
-      );
-    } catch (error) {
-      throw storageError("Failed to copy S3 object", "S3_COPY_FAILED", destinationKey, error);
     }
   }
 
