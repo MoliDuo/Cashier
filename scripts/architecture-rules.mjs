@@ -55,7 +55,6 @@ const registeredSourceDocumentWriters = new Set([
   "src/application/adapters/postgres/source-document-splits.ts",
   "src/application/adapters/postgres/revisions.ts",
   "src/application/adapters/postgres/submissions.ts",
-  "src/application/adapters/postgres/ledger-projections/duplicate-revisions.ts",
   "src/application/adapters/postgres/ledger-projections/cancel-source-document-processing.ts",
   "src/application/adapters/postgres/ledger-projections/manual-entries.ts",
   "src/application/adapters/postgres/ledger-projections/recalculate.ts",
@@ -63,7 +62,6 @@ const registeredSourceDocumentWriters = new Set([
   "src/application/adapters/postgres/source-document-date-organization.ts",
   "src/application/adapters/postgres/source-document-aggregate/category-assignments.ts",
 ]);
-const wholeLedgerDeleteWriter = "src/application/adapters/postgres/business-ports/ledger.ts";
 const forbiddenLogIdentifierProperties = [
   "userId",
   "ledgerId",
@@ -253,7 +251,7 @@ export function findBoundaryViolations(relativePath, source) {
 
   for (const property of collectRawLogIdentifierProperties(sourceFile)) {
     violations.push(
-      `${relativePath}: logger/console must hash or omit raw identifier property ${property}`
+      `${relativePath}: logger/console must use logIdentifier or omit identifier property ${property}`
     );
   }
 
@@ -264,7 +262,6 @@ export function findBoundaryViolations(relativePath, source) {
   if (
     hasSourceDocumentWrite(sourceFile) &&
     !registeredSourceDocumentWriters.has(relativePath) &&
-    relativePath !== wholeLedgerDeleteWriter &&
     !relativePath.startsWith("src/persistence/postgres-migrations/")
   ) {
     violations.push(

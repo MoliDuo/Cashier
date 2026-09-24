@@ -53,7 +53,7 @@ describe("current-runtime target adapters", () => {
       await db.query.ledgerEntries.findFirst({
         where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
       })
-    ).toMatchObject({ amount: "12.500", deletedAt: expect.any(Date) });
+    ).toMatchObject({ amount: "18.000", deletedAt: null });
 
     const beforeRecalculation = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),

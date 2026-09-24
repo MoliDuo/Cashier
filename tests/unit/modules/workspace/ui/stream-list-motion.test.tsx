@@ -72,8 +72,6 @@ function renderGroups(ids: string[]) {
       isSelectionMode={false}
       selectedIds={[]}
       onToggleSelection={vi.fn()}
-      noRecordsText="No records"
-      getItemProps={() => ({})}
     />
   );
 }
@@ -88,8 +86,6 @@ function rerenderGroups(rerender: (ui: ReactElement) => void, ids: string[]) {
       isSelectionMode={false}
       selectedIds={[]}
       onToggleSelection={vi.fn()}
-      noRecordsText="No records"
-      getItemProps={() => ({})}
     />
   );
 }
@@ -132,8 +128,6 @@ describe("stream list motion", () => {
         isSelectionMode={false}
         selectedIds={[]}
         onToggleSelection={vi.fn()}
-        noRecordsText="No records"
-        getItemProps={() => ({})}
       />
     );
 

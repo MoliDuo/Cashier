@@ -8,7 +8,7 @@ import {
 function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {
   return {
     id: "job-1",
-    formatVersion: 2,
+
     mode: { kind: "clear" },
     status: "succeeded",
     total: 10,

@@ -26,8 +26,8 @@ export const AI_RETRY_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1_000;
 /** The whole parse of one source document, across however many model calls. */
 export const AI_REVISION_DEADLINE_MS = 180_000;
 
-/** Bulk re-categorisation: a fan-out of small, independent calls. */
-export const AI_CATEGORY_CONCURRENCY = 100;
+/** Bulk re-categorisation shares one database-coordinated provider slot. */
+export const AI_CATEGORY_CONCURRENCY = 1;
 export const AI_CATEGORY_REQUEST_TIMEOUT_MS = 60_000;
 export const AI_CATEGORY_MAX_ATTEMPTS = 3;
 

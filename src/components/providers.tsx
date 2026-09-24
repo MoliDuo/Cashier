@@ -16,8 +16,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       redirectStarted = true;
       client.clear();
       const currentUrl = `${window.location.pathname}${window.location.search}`;
-      const locale = window.location.pathname.split("/")[1] || "en";
-      window.location.replace(`/${locale}/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
+      window.location.replace(`/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
     };
     const client = new QueryClient({
       queryCache: new QueryCache({

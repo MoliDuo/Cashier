@@ -65,80 +65,30 @@ export interface CategoryReclassificationJobRecord {
   id: string;
   ledgerId: string;
   status: import("../contracts").CategoryAssignmentJobStatus;
-  formatVersion?: number;
-  mode?: import("../contracts").CategoryAssignmentMode;
-  candidateSnapshot?: ReclassificationCandidate[];
-  declaredEntryCount?: number;
-  receivedEntryCount?: number;
-  ledgerEntryIds: string[];
-  candidateCategoryIds: string[];
-  cursor: number;
+  mode: import("../contracts").CategoryAssignmentMode;
+  candidateSnapshot: ReclassificationCandidate[];
+  declaredEntryCount: number;
+  receivedEntryCount: number;
   appliedCount: number;
   confirmedCount: number;
-  failedCount?: number;
-  conflictCount?: number;
-  skippedCount?: number;
-  cancelledCount?: number;
-  documentTotal?: number;
-  documentCompleted?: number;
-  attempts: number;
+  failedCount: number;
+  conflictCount: number;
+  skippedCount: number;
+  cancelledCount: number;
+  documentTotal: number;
+  documentCompleted: number;
   lastError: string | null;
-  nextAttemptAt?: string | null;
-  completedAt?: string | null;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ClaimedCategoryReclassificationJob extends CategoryReclassificationJobRecord {
-  claimToken: string;
-}
-
 export interface CategoryReclassificationJobPort {
-  enqueue(input: {
-    ledgerId: string;
-    ledgerEntryIds: readonly string[];
-    candidateCategoryIds: readonly string[];
-  }): Promise<CategoryReclassificationJobRecord>;
   get(input: {
     ledgerId: string;
     jobId: string;
   }): Promise<CategoryReclassificationJobRecord | null>;
-  /**
-   * The ledger's most recent run, running or finished. Status polling reads
-   * this: a run's terminal state is how the client learns its counts, so the
-   * last job has to stay visible after it stops being active.
-   */
   getLatest(input: { ledgerId: string }): Promise<CategoryReclassificationJobRecord | null>;
-  claim(input: {
-    now: Date;
-    leaseMs: number;
-    jobId?: string;
-    ledgerId?: string;
-    limit?: number;
-  }): Promise<readonly ClaimedCategoryReclassificationJob[]>;
-  /** `false` means the lease was taken over and the caller must stop at once. */
-  recordProgress(input: {
-    jobId: string;
-    claimToken: string;
-    cursor: number;
-    appliedCount: number;
-    confirmedCount: number;
-    now: Date;
-  }): Promise<boolean>;
-  complete(input: {
-    jobId: string;
-    claimToken: string;
-    cursor: number;
-    appliedCount: number;
-    confirmedCount: number;
-    now: Date;
-  }): Promise<boolean>;
-  fail(input: {
-    jobId: string;
-    claimToken: string;
-    now: Date;
-    errorCode: string;
-  }): Promise<"retry_scheduled" | "permanently_failed">;
 }
 
 export interface LedgerReadPort {

@@ -1,3 +1,5 @@
+import { AppError } from "@/lib/errors";
+
 type QueryActions = {
   detail: typeof import("@/modules/source-document/server/get-document-light").getSourceDocumentLightAction;
   stream: (
@@ -53,7 +55,9 @@ function query<K extends keyof QueryActions>(name: K) {
       body: JSON.stringify({ query: name, args }),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!response.ok) throw new Error(`LEDGER_QUERY_FAILED_${response.status}`);
+    if (!response.ok) {
+      throw new AppError("Ledger query failed", "LEDGER_QUERY_FAILED", response.status);
+    }
     return response.json();
   };
 }

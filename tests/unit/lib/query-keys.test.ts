@@ -3,9 +3,6 @@ import { queryKeys } from "@/lib/query-keys";
 
 describe("queryKeys", () => {
   it("isolates entity and collection caches by ledger", () => {
-    expect(queryKeys.ledgerEntry("ledger-a", "entry-1")).not.toEqual(
-      queryKeys.ledgerEntry("ledger-b", "entry-1")
-    );
     expect(queryKeys.sourceDocument("ledger-a", "document-1")).not.toEqual(
       queryKeys.sourceDocument("ledger-b", "document-1")
     );

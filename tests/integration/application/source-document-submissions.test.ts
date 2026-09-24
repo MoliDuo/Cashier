@@ -14,7 +14,6 @@ import {
   ledgerEntries,
   ledgers,
   idempotencyRecords,
-  processingAttempts,
   processingOutbox,
   revisionFiles,
   serviceCredentials,
@@ -188,7 +187,7 @@ describe("target source-document submissions", () => {
     expect(new Set([text.document.id, imageOnly.document.id, mixed.document.id]).size).toBe(3);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(3);
     expect(await db.select().from(processingOutbox)).toHaveLength(3);
-    expect(await db.select().from(processingAttempts)).toHaveLength(3);
+    expect(await db.select().from(processingOutbox)).toHaveLength(3);
     expect(await db.select().from(revisionFiles)).toHaveLength(2);
     expect(mixed.job).toMatchObject({
       sourceDocumentId: mixed.document.id,
@@ -365,7 +364,7 @@ describe("target source-document submissions", () => {
     expect(retryRevision?.inputText).toBe("original");
     expect(retryFiles.map((file) => file.storedFileId)).toEqual([image.id]);
     expect(await db.select().from(processingOutbox)).toHaveLength(2);
-    expect(await db.select().from(processingAttempts)).toHaveLength(2);
+    expect(await db.select().from(processingOutbox)).toHaveLength(2);
   });
 
   it("rejects inherited evidence retry when previous revision exceeds MAX_FILES", async () => {

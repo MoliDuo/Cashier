@@ -8,7 +8,6 @@ import {
   openLedgerEntrySourceDocument,
 } from "@/lib/navigation/ledger-detail-navigation";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
-import { useLedgerEntriesMutations } from "@/modules/ledger/hooks/useLedgerEntriesMutations";
 import { type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
 import { LedgerEntriesToolbar } from "./LedgerEntriesToolbar";
@@ -63,7 +62,6 @@ export function LedgerEntriesTab({
     closeRetrySourceDocument,
   } = useLedgerEntriesTabState();
 
-  const { deleteEntry } = useLedgerEntriesMutations(ledgerId, closeDeleteConfirm);
   const recovery = useStreamSourceDocumentRecoveryMutations(ledgerId);
 
   const streamData = useLedgerEntriesStreamData({
@@ -113,21 +111,8 @@ export function LedgerEntriesTab({
         id: deleteConfirm.id,
         onCommitted: closeDeleteConfirm,
       });
-    } else if (deleteConfirm.type === "ledgerEntry") {
-      const entry = streamData.streamGroups
-        .flatMap((group) => group.items)
-        .flatMap((item) => item.ledgerEntries)
-        .find((candidate) => candidate.id === deleteConfirm.id);
-      if (entry == null) throw new Error("Ledger entry is no longer available");
-      await deleteEntry.mutateAsync(entry);
     }
-  }, [
-    deleteConfirm,
-    selection.deleteSourceDocument,
-    deleteEntry,
-    streamData.streamGroups,
-    closeDeleteConfirm,
-  ]);
+  }, [deleteConfirm, selection.deleteSourceDocument, closeDeleteConfirm]);
 
   const sentinelRef = useInfiniteScroll({
     hasNextPage: streamData.hasNextPage,

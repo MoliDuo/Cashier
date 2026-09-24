@@ -114,7 +114,7 @@ function entry(id: string, sourceDocumentId = "document-1") {
 function assignmentJob(status: "pending" | "running" | "succeeded" = "pending") {
   return {
     id: "job-1",
-    formatVersion: 2,
+
     mode: { kind: "ai" as const, candidateCategoryIds: ["category-1", "category-2"] },
     status,
     total: 1,

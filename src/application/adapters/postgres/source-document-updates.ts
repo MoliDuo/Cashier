@@ -388,7 +388,6 @@ export async function saveChanges(
       sourceDocumentId: input.sourceDocumentId,
       expectedActiveRevisionId: lockedDocument.activeRevisionId,
       expectedStateVersion: input.expectedVersion,
-      revisionId: crypto.randomUUID(),
       entries: projection,
       ...(input.sourceDocument?.title === undefined ? {} : { title: input.sourceDocument.title }),
       ...(input.sourceDocument?.documentDate === undefined
@@ -618,7 +617,6 @@ export async function updateDocuments({
           sourceDocumentId: document.id,
           expectedActiveRevisionId: document.activeRevisionId!,
           expectedStateVersion: document.version,
-          revisionId: crypto.randomUUID(),
           entryDate: data.documentDate!,
           ...(data.title === undefined ? {} : { title: data.title }),
           entries: entries.map((entry) => {

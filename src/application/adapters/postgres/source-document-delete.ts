@@ -1,7 +1,6 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   ledgerEntries,
-  processingAttempts,
   processingOutbox,
   sourceDocumentRevisions,
   sourceDocuments,
@@ -50,33 +49,18 @@ async function softDeleteLockedSourceDocument(
   }
   await tx
     .update(processingOutbox)
-    .set({ status: "cancelled", completedAt: now, claimToken: null, claimExpiresAt: null })
+    .set({
+      status: "cancelled",
+      completedAt: now,
+      claimToken: null,
+      claimExpiresAt: null,
+      diagnosticCode: "source_document_deleted",
+    })
     .where(
       and(
         eq(processingOutbox.ledgerId, ledgerId),
         eq(processingOutbox.sourceDocumentId, sourceDocumentId),
         inArray(processingOutbox.status, ["pending", "claimed"])
-      )
-    );
-  await tx
-    .update(processingAttempts)
-    .set({ status: "cancelled", completedAt: now, diagnosticCode: "source_document_deleted" })
-    .where(
-      and(
-        eq(processingAttempts.ledgerId, ledgerId),
-        inArray(processingAttempts.status, ["queued", "processing"]),
-        inArray(
-          processingAttempts.revisionId,
-          tx
-            .select({ id: sourceDocumentRevisions.id })
-            .from(sourceDocumentRevisions)
-            .where(
-              and(
-                eq(sourceDocumentRevisions.ledgerId, ledgerId),
-                eq(sourceDocumentRevisions.sourceDocumentId, sourceDocumentId)
-              )
-            )
-        )
       )
     );
   const deleted = await tx

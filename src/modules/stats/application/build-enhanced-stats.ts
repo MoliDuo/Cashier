@@ -150,10 +150,6 @@ export function buildEnhancedStatsDto({
     summary: {
       total: current.total.toFixed(),
       currency: mainCurrency,
-      trend: {
-        percent: growth.percent,
-        amount: growth.amount,
-      },
       dailyAverage,
       comparison: {
         mode: comparisonMode ?? "same_period",

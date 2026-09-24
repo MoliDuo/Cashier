@@ -2,7 +2,7 @@
  * Centralized Query Key Factory
  *
  * All React Query keys should be defined here to ensure consistency
- * between data fetching (useQuery) and SSE cache invalidation (invalidation-hub).
+ * between data fetching and ledger-scoped cache invalidation.
  *
  * Usage:
  *   import { queryKeys } from '@/lib/query-keys';
@@ -18,9 +18,6 @@ export const queryKeys = {
   ledgerEntries: (ledgerId: string, params?: QueryKeyParams | null) =>
     ["ledger", ledgerId, "entries", normalizeQueryParams(params)] as const,
   ledgerEntriesPrefix: (ledgerId: string) => ["ledger", ledgerId, "entries"] as const,
-  ledgerEntry: (ledgerId: string, entryId: string) =>
-    ["ledger", ledgerId, "entry", entryId] as const,
-  ledgerEntryPrefix: (ledgerId: string) => ["ledger", ledgerId, "entry"] as const,
 
   // === Login emails ===
   /** The addresses that can sign in, so an add or remove shows without a reload. */
@@ -99,7 +96,6 @@ export const queryKeys = {
   summary: (ledgerId: string, params?: QueryKeyParams | null) =>
     ["ledger", ledgerId, "summary", normalizeQueryParams(params)] as const,
   summaryPrefix: (ledgerId: string) => ["ledger", ledgerId, "summary"] as const,
-  tokenStats: (ledgerId: string) => ["ledger", ledgerId, "token-stats"] as const,
   enhancedStats: (
     ledgerId: string,
     params?: {
@@ -120,28 +116,6 @@ export const queryKeys = {
     ["ledger", ledgerId, "convert", amount, from, to, date] as const,
   batchConvert: (cacheKey: string, targetCurrency: string) =>
     ["batchConvert", cacheKey, targetCurrency] as const,
-
-  // === Calendar ===
-  calendarHeatmap: (
-    ledgerId: string,
-    viewType: string,
-    anchorDate: string,
-    filters?: { currency?: string; categoryId?: string }
-  ) => ["ledger", ledgerId, "calendar", "heatmap", viewType, anchorDate, filters] as const,
-
-  calendarHeatmapForRange: (
-    ledgerId: string,
-    startDate: string,
-    endDate: string,
-    filters?: { currency?: string; categoryId?: string }
-  ) => ["ledger", ledgerId, "calendar", "heatmap-range", startDate, endDate, filters] as const,
-
-  calendarDayDetail: (
-    ledgerId: string,
-    date: string,
-    filters?: { currency?: string; categoryId?: string }
-  ) => ["ledger", ledgerId, "calendar", "day", date, filters] as const,
-  calendarPrefix: (ledgerId: string) => ["ledger", ledgerId, "calendar"] as const,
 } as const;
 
 type QueryKeyParams = Readonly<Record<string, unknown>>;

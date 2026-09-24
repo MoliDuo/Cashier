@@ -51,7 +51,9 @@ function seedRefreshBaseline(
 ) {
   const queryKey = queryKeys.sourceDocumentRefresh(ledgerId);
   queryClient.setQueryData<LedgerRefreshResult>(queryKey, (current) => {
-    if (current != null && BigInt(current.version) > BigInt(page.generation)) return current;
+    // A page refreshes only its own projection, not every ledger cache.
+    // Only the refresh consumer may advance an existing baseline.
+    if (current != null) return current;
     return {
       version: page.generation,
       changed: false,

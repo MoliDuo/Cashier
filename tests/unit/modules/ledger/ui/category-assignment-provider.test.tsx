@@ -42,7 +42,7 @@ vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
 function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {
   return {
     id: "job-1",
-    formatVersion: 2,
+
     mode: { kind: "ai", candidateCategoryIds: ["category-1"] },
     status: "running",
     total: 10,

@@ -55,7 +55,7 @@ function createRevisionProcessor(
     createAIContext({
       signal,
       getClient: getOpenAIClient,
-      modelConfig: { text: runtimeEnv.aiModel, vision: runtimeEnv.aiModel },
+      model: runtimeEnv.aiModel,
     })
 ) {
   return new CurrentRevisionProcessor({

@@ -493,8 +493,8 @@ describe("Enhanced Stats Actions", () => {
       });
 
       // Trend from 100 to 200 is 100% increase
-      expect(result.summary.trend.amount).toBe("100");
-      expect(result.summary.trend.percent).toBe(100);
+      expect(result.summary.comparison.amountDelta).toBe("100");
+      expect(result.summary.comparison.percent).toBe(100);
     });
 
     it("should calculate daily average correctly", async () => {

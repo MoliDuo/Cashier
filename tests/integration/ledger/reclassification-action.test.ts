@@ -1,8 +1,12 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, inArray } from "drizzle-orm";
 import { auth } from "@/auth";
-import { startCategoryReclassificationAction } from "@/modules/ledger/server-actions/reclassification";
+import {
+  beginCategoryAssignmentAction,
+  appendCategoryAssignmentSelectionAction,
+  commitCategoryAssignmentSelectionAction,
+} from "@/modules/ledger/server-actions/reclassification";
 import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
@@ -16,7 +20,6 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { flushAfterCallbacks } from "../../setup.common";
-import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
 
 const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
 
@@ -70,7 +73,38 @@ async function setupLedger() {
   return { ledger, food, home, document, revisionId };
 }
 
-describe("startCategoryReclassificationAction", () => {
+async function submitSelection(
+  ledgerId: string,
+  input: { ledgerEntryIds: string[]; candidateCategoryIds: string[] }
+) {
+  const job = await beginCategoryAssignmentAction(ledgerId, {
+    requestKey: crypto.randomUUID(),
+    mode: { kind: "ai", candidateCategoryIds: input.candidateCategoryIds },
+    expectedEntryCount: input.ledgerEntryIds.length,
+  });
+  const entries = await getTestDb()
+    .select({
+      ledgerEntryId: ledgerEntries.id,
+      sourceDocumentId: sourceDocuments.id,
+      expectedVersion: sourceDocuments.version,
+    })
+    .from(ledgerEntries)
+    .innerJoin(sourceDocuments, eq(ledgerEntries.sourceDocumentId, sourceDocuments.id))
+    .where(
+      and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.id, input.ledgerEntryIds))
+    );
+  await appendCategoryAssignmentSelectionAction(ledgerId, {
+    jobId: job.id,
+    chunkIndex: 0,
+    entries,
+  });
+  return commitCategoryAssignmentSelectionAction(ledgerId, {
+    jobId: job.id,
+    expectedEntryCount: entries.length,
+  });
+}
+
+describe("submitSelection", () => {
   beforeEach(() => {
     vi.mocked(
       auth as unknown as () => Promise<{
@@ -103,7 +137,7 @@ describe("startCategoryReclassificationAction", () => {
       }),
     });
 
-    const job = await startCategoryReclassificationAction(ledger.id, {
+    const job = await submitSelection(ledger.id, {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -144,7 +178,7 @@ describe("startCategoryReclassificationAction", () => {
       }),
     });
 
-    await startCategoryReclassificationAction(ledger.id, {
+    await submitSelection(ledger.id, {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -172,7 +206,7 @@ describe("startCategoryReclassificationAction", () => {
       content: JSON.stringify({ decisions: [{ entry_index: 1, category_index: 1 }] }),
     });
 
-    await startCategoryReclassificationAction(ledger.id, {
+    await submitSelection(ledger.id, {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -194,7 +228,7 @@ describe("startCategoryReclassificationAction", () => {
     await db.insert(ledgers).values(retired);
 
     await expect(
-      startCategoryReclassificationAction(retired.id, {
+      submitSelection(retired.id, {
         ledgerEntryIds: [crypto.randomUUID()],
         candidateCategoryIds: [food.id, home.id],
       })
@@ -212,7 +246,7 @@ describe("startCategoryReclassificationAction", () => {
       count: 3,
     });
     await expect(
-      startCategoryReclassificationAction(ledger.id, {
+      submitSelection(ledger.id, {
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id],
       })
@@ -235,7 +269,7 @@ describe("startCategoryReclassificationAction", () => {
     });
 
     await expect(
-      startCategoryReclassificationAction(ledger.id, {
+      submitSelection(ledger.id, {
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id, foreignCategory.id],
       })
@@ -259,7 +293,7 @@ describe("startCategoryReclassificationAction", () => {
       .where(eq(entryCategories.id, home.id));
 
     await expect(
-      startCategoryReclassificationAction(ledger.id, {
+      submitSelection(ledger.id, {
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id, home.id],
       })
@@ -278,7 +312,7 @@ describe("startCategoryReclassificationAction", () => {
     });
     generateContent.mockResolvedValue({ content: "not json at all" });
 
-    await startCategoryReclassificationAction(ledger.id, {
+    await submitSelection(ledger.id, {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -301,14 +335,14 @@ describe("startCategoryReclassificationAction", () => {
     });
     // A run already in flight, registered without going through the action so
     // no model call is left pending.
-    await postgresCategoryReclassificationJobAdapter.enqueue({
-      ledgerId: ledger.id,
-      ledgerEntryIds: entryIds,
-      candidateCategoryIds: [food.id, home.id],
+    await beginCategoryAssignmentAction(ledger.id, {
+      requestKey: crypto.randomUUID(),
+      mode: { kind: "ai", candidateCategoryIds: [food.id, home.id] },
+      expectedEntryCount: entryIds.length,
     });
 
     await expect(
-      startCategoryReclassificationAction(ledger.id, {
+      submitSelection(ledger.id, {
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id, home.id],
       })

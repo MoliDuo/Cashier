@@ -9,12 +9,7 @@ import {
 } from "@/application/adapters/postgres";
 import { selectRecoverableProcessingJobs } from "@/modules/source-document/application/use-cases/select-recoverable-processing-jobs";
 import type { ProcessingJobContract } from "@/application/contracts";
-import {
-  processingAttempts,
-  processingOutbox,
-  sourceDocuments,
-  sourceDocumentRevisions,
-} from "@/persistence";
+import { processingOutbox, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
 
 /**
  * Creates a pending revision + job for a single source document.
@@ -257,16 +252,9 @@ describe("Processing Recovery", () => {
     expect(revisionRow?.processingStatus).toBe("failed");
     expect(revisionRow?.failureCode).toBe("request_bound_retry_exhausted");
 
-    // Attempt record should be updated
-    const attemptRow = await db.query.processingAttempts.findFirst({
-      where: and(
-        eq(processingAttempts.revisionId, job.revisionId),
-        eq(processingAttempts.attemptNumber, job.attemptNumber)
-      ),
-    });
-    expect(attemptRow?.status).toBe("failed");
-    expect(attemptRow?.retryClassification).toBe("permanent");
-    expect(attemptRow?.diagnosticCode).toBe("request_bound_retry_exhausted");
+    // Diagnostics live on the same durable job.
+    expect(outboxRow?.retryClassification).toBe("permanent");
+    expect(outboxRow?.diagnosticCode).toBe("request_bound_retry_exhausted");
   });
 
   it("respects maxBatch independent of maxAttempts (returns at most maxBatch intents)", async () => {
@@ -398,15 +386,8 @@ describe("Processing Recovery", () => {
     expect(revisionRow?.processingStatus).toBe("failed");
     expect(revisionRow?.failureCode).toBe("request_bound_retry_exhausted");
 
-    // Attempt record should be updated
-    const attemptRow = await db.query.processingAttempts.findFirst({
-      where: and(
-        eq(processingAttempts.revisionId, job.revisionId),
-        eq(processingAttempts.attemptNumber, job.attemptNumber)
-      ),
-    });
-    expect(attemptRow?.status).toBe("failed");
-    expect(attemptRow?.retryClassification).toBe("permanent");
+    // Diagnostics live on the same durable job.
+    expect(outboxRow?.retryClassification).toBe("permanent");
   });
 
   it("exhaustion CAS: does not modify completed revision's outcome", async () => {
@@ -523,10 +504,10 @@ describe("Processing retry supersession", () => {
         where: eq(sourceDocumentRevisions.id, first.revision.id),
       }),
       db.query.processingOutbox.findFirst({ where: eq(processingOutbox.id, first.job.id) }),
-      db.query.processingAttempts.findFirst({
+      db.query.processingOutbox.findFirst({
         where: and(
-          eq(processingAttempts.revisionId, first.revision.id),
-          eq(processingAttempts.attemptNumber, 1)
+          eq(processingOutbox.revisionId, first.revision.id),
+          eq(processingOutbox.attemptNumber, 1)
         ),
       }),
     ]);

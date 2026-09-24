@@ -7,7 +7,6 @@ export interface AiContextContract {
   generate(options: {
     prompt: string;
     messages: Array<{ role: "user" | "assistant"; content: string | AiMessageContentPart[] }>;
-    model: "text" | "vision";
     maxTokens?: number;
     temperature?: number;
     requireJson?: boolean;

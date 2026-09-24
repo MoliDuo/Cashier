@@ -8,13 +8,7 @@ import {
 } from "@/application/adapters/postgres";
 import { serverComposition } from "@/application/server-composition-root";
 import type { ProcessingJobContract } from "@/application/contracts";
-import {
-  ledgerEntries,
-  ledgers,
-  processingAttempts,
-  processingOutbox,
-  currencyRates,
-} from "@/persistence";
+import { ledgerEntries, ledgers, processingOutbox, currencyRates } from "@/persistence";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -270,7 +264,7 @@ describe("PostgresProcessingJobAdapter", () => {
     expect(claims.filter((claim) => claim != null)).toHaveLength(1);
     expect(claims.find((claim) => claim != null)?.ledgerId).toBeDefined();
     expect(await db.select().from(processingOutbox)).toHaveLength(1);
-    expect(await db.select().from(processingAttempts)).toHaveLength(1);
+    expect(await db.select().from(processingOutbox)).toHaveLength(1);
   });
 
   it("reclaims an expired lease and rejects stale completion", async () => {

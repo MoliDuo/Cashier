@@ -87,7 +87,7 @@ export function CategoryAssignmentResultDialog({
       }),
     initialPageParam: null as number | null,
     getNextPageParam: (page) => page.nextCursor,
-    enabled: open && job.formatVersion === 2,
+    enabled: open,
   });
   const items = results.data?.pages.flatMap((page) => page.items) ?? [];
   return (
@@ -106,9 +106,7 @@ export function CategoryAssignmentResultDialog({
               {t("categoryEvidenceIncomplete")}
             </p>
           ) : null}
-          {job.formatVersion !== 2 ? (
-            <p className={textRoleClassName("bodyMuted")}>{t("categoryLegacyJob")}</p>
-          ) : results.isError ? (
+          {results.isError ? (
             <div className="space-y-3" role="alert">
               <p className={textRoleClassName("bodyMuted")}>{t("categoryJobReadFailed")}</p>
               <Button variant="outline" onClick={() => void results.refetch()}>

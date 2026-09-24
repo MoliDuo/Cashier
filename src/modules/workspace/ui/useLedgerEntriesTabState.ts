@@ -4,7 +4,7 @@ import type { SourceDocument } from "@/modules/source-document/contracts";
 
 export interface LedgerEntriesDeleteConfirmState {
   open: boolean;
-  type: "sourceDocument" | "batch" | "ledgerEntry" | null;
+  type: "sourceDocument" | null;
   id: string | null;
   title: string;
   description: string;

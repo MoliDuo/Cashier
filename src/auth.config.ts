@@ -4,7 +4,6 @@ import type { NextAuthConfig } from "next-auth";
 export const authConfig = {
   pages: {
     signIn: "/login",
-    verifyRequest: "/login/verify",
     error: "/login/error",
   },
   callbacks: {

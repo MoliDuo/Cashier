@@ -235,21 +235,23 @@ describe("runParsePipeline — single-pass flow", () => {
     }
   });
 
-  it("text-only input uses text model (no vision call)", async () => {
+  it("text-only input sends no image parts", async () => {
     const { ai, generate } = createMockAI({ firstParseResult: SIMPLE_FIRST_PARSE_RESULT });
     await runParsePipeline(
       createInput({ evidence: undefined, text: "Lunch 10 USD" }),
       buildCtx(ai)
     );
 
-    const visionCalls = generate.mock.calls.filter(
-      (c) => (c[0] as AIGenerateOptions).model === "vision"
-    );
-    expect(visionCalls).toHaveLength(0);
-    const textCalls = generate.mock.calls.filter(
-      (c) => (c[0] as AIGenerateOptions).model === "text"
-    );
-    expect(textCalls.length).toBeGreaterThan(0);
+    expect(generate).toHaveBeenCalled();
+    for (const [options] of generate.mock.calls) {
+      expect(
+        (options as AIGenerateOptions).messages.every(
+          (message) =>
+            typeof message.content === "string" ||
+            message.content.every((part) => part.type === "text")
+        )
+      ).toBe(true);
+    }
   });
 
   it("success result includes ledgerEntries from parse output", async () => {

@@ -82,7 +82,12 @@ describe("openai-client", () => {
       const client = await loadClient();
       stubSdkCreate(
         client,
-        new OpenAI.APIError(429, { message: "rate limit" }, "Rate limit reached", undefined)
+        new OpenAI.APIError(
+          429,
+          { message: "rate limit" },
+          "Rate limit reached",
+          new Headers({ "retry-after": "0" })
+        )
       );
 
       await expect(
@@ -90,6 +95,100 @@ describe("openai-client", () => {
       ).rejects.toMatchObject({
         code: "ai_rate_limited",
       });
+    });
+
+    it("preserves Retry-After for durable retries without a nested retry", async () => {
+      const { OpenAI } = await import("openai");
+      const client = await loadClient();
+      stubSdkCreate(
+        client,
+        new OpenAI.APIError(429, {}, "Rate limited", new Headers({ "retry-after": "120" }))
+      );
+      await expect(
+        client.generateContent("system", [], "model", undefined, undefined, undefined, undefined, {
+          maxAttempts: 1,
+        })
+      ).rejects.toMatchObject({
+        code: "ai_rate_limited",
+        details: { retryAfterMs: expect.any(Number) },
+      });
+      expect(
+        (client as unknown as { cooldownUntil: number }).cooldownUntil - Date.now()
+      ).toBeGreaterThan(119_000);
+    });
+
+    it("serializes requests and cancels a queued request without opening another slot", async () => {
+      const client = await loadClient();
+      let finish!: (value: unknown) => void;
+      const response = { choices: [{ message: { content: "ok" } }] };
+      const create = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finish = resolve;
+            })
+        )
+        .mockResolvedValue(response);
+      (
+        client as unknown as { client: { chat: { completions: { create: unknown } } } }
+      ).client.chat.completions.create = create;
+      const first = client.generateContent("first", [], "model");
+      await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+      const abort = new AbortController();
+      const cancelled = client.generateContent(
+        "cancelled",
+        [],
+        "model",
+        undefined,
+        undefined,
+        undefined,
+        abort.signal
+      );
+      const rejection = expect(cancelled).rejects.toMatchObject({ code: "REQUEST_ABORTED" });
+      abort.abort();
+      await rejection;
+      const third = client.generateContent("third", [], "model");
+      await Promise.resolve();
+      expect(create).toHaveBeenCalledTimes(1);
+      finish(response);
+      await expect(first).resolves.toMatchObject({ content: "ok" });
+      await expect(third).resolves.toMatchObject({ content: "ok" });
+      expect(create).toHaveBeenCalledTimes(2);
+    });
+
+    it("delays the next caller until the provider cooldown expires", async () => {
+      const { OpenAI } = await import("openai");
+      const client = await loadClient();
+      let limitedAt = 0;
+      let resumedAt = 0;
+      const create = vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          limitedAt = Date.now();
+          throw new OpenAI.APIError(
+            429,
+            {},
+            "Rate limited",
+            new Headers({ "retry-after": "0.08" })
+          );
+        })
+        .mockImplementationOnce(async () => {
+          resumedAt = Date.now();
+          return { choices: [{ message: { content: "ok" } }] };
+        });
+      (
+        client as unknown as { client: { chat: { completions: { create: unknown } } } }
+      ).client.chat.completions.create = create;
+      await expect(
+        client.generateContent("first", [], "model", undefined, undefined, undefined, undefined, {
+          maxAttempts: 1,
+        })
+      ).rejects.toMatchObject({ code: "ai_rate_limited" });
+      await expect(client.generateContent("second", [], "model")).resolves.toMatchObject({
+        content: "ok",
+      });
+      expect(resumedAt - limitedAt).toBeGreaterThanOrEqual(75);
     });
 
     it("maps exhausted 5xx retries to ai_provider_unavailable", async () => {

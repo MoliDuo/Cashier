@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
-import OpenAI from "openai";
+import { setTimeout as delay } from "node:timers/promises";
+import OpenAI, { type APIError } from "openai";
 import { type ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -21,6 +22,45 @@ function isSdkError<T extends Error>(
 
 export class OpenAIClient {
   private client: OpenAI;
+  private requestTail: Promise<void> = Promise.resolve();
+  private cooldownUntil = 0;
+
+  private async withRequestSlot<T>(
+    signal: AbortSignal | undefined,
+    run: () => Promise<T>
+  ): Promise<T> {
+    const previous = this.requestTail;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.requestTail = previous.then(() => held);
+    let abort: (() => void) | undefined;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        abort = () => reject(new AppError("Request was aborted", "REQUEST_ABORTED"));
+        signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) abort();
+        previous.then(resolve, reject);
+      });
+      signal?.throwIfAborted();
+      const waitMs = this.cooldownUntil - Date.now();
+      if (waitMs > 0) await delay(waitMs, undefined, { signal });
+      return await run();
+    } finally {
+      if (abort != null) signal?.removeEventListener("abort", abort);
+      release();
+    }
+  }
+
+  private retryAfterMs(error: unknown): number {
+    if (!isSdkError(error, OpenAI.APIError) || error.status !== 429) return 0;
+    const value = (error as APIError).headers?.get("retry-after");
+    if (value == null) return 10_000;
+    const seconds = Number(value);
+    const ms = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+    return Number.isFinite(ms) ? Math.max(0, ms) : 10_000;
+  }
 
   constructor() {
     const apiKey = runtimeEnv.openaiApiKey;
@@ -100,7 +140,17 @@ export class OpenAIClient {
           };
         }
         const requestOptions = { ...(signal !== undefined ? { signal } : {}), timeout: timeoutMs };
-        const response = await this.client.chat.completions.create(request, requestOptions);
+        const response = await this.withRequestSlot(signal, async () => {
+          try {
+            return await this.client.chat.completions.create(request, requestOptions);
+          } catch (error) {
+            this.cooldownUntil = Math.max(
+              this.cooldownUntil,
+              Date.now() + this.retryAfterMs(error)
+            );
+            throw error;
+          }
+        });
 
         if (
           response.choices == null ||
@@ -190,7 +240,18 @@ export class OpenAIClient {
             },
             "OpenAI request failed, retrying"
           );
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              signal?.removeEventListener("abort", abort);
+              resolve();
+            }, delay);
+            const abort = () => {
+              clearTimeout(timer);
+              reject(new AppError("Request was aborted", "REQUEST_ABORTED"));
+            };
+            signal?.addEventListener("abort", abort, { once: true });
+            if (signal?.aborted) abort();
+          });
           continue;
         }
 
@@ -204,7 +265,9 @@ export class OpenAIClient {
     // message text. Non-retryable 4xx errors are rethrown unchanged.
     if (isSdkError(lastError, OpenAI.APIError)) {
       if (lastError.status === 429) {
-        throw new AppError("AI provider rate limited after retries", "ai_rate_limited", 503);
+        throw new AppError("AI provider rate limited after retries", "ai_rate_limited", 503, {
+          retryAfterMs: Math.max(0, this.cooldownUntil - Date.now()),
+        });
       }
       if (lastError.status != null && lastError.status >= 500) {
         throw new AppError("AI provider unavailable after retries", "ai_provider_unavailable", 503);

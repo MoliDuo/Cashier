@@ -120,7 +120,6 @@ describe("PostgreSQL schema contract", () => {
       "fk_ledger_entries_category_ledger",
       "fk_revision_files_revision_ledger",
       "fk_revision_files_stored_file_ledger",
-      "fk_processing_attempts_revision_ledger",
       "fk_processing_outbox_revision_ledger",
       "fk_processing_outbox_document_ledger",
       "fk_upload_session_files_session_ledger",

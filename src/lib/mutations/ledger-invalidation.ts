@@ -19,7 +19,6 @@ function invalidationsForGroup(
         { queryKey: queryKeys.sourceDocumentStreamPrefix(ledgerId) },
         { queryKey: queryKeys.sourceDocumentStreamTotalPrefix(ledgerId) },
         { queryKey: queryKeys.ledgerEntriesPrefix(ledgerId) },
-        { queryKey: queryKeys.ledgerEntryPrefix(ledgerId) },
         { queryKey: queryKeys.sourceDocumentDetailPrefix(ledgerId) },
       ];
     case "categories":
@@ -27,7 +26,6 @@ function invalidationsForGroup(
         { queryKey: queryKeys.entryCategories(ledgerId), exact: true },
         { queryKey: queryKeys.sourceDocumentStreamPrefix(ledgerId) },
         { queryKey: queryKeys.ledgerEntriesPrefix(ledgerId) },
-        { queryKey: queryKeys.ledgerEntryPrefix(ledgerId) },
         { queryKey: queryKeys.sourceDocumentDetailPrefix(ledgerId) },
         { queryKey: queryKeys.summaryPrefix(ledgerId) },
         { queryKey: queryKeys.enhancedStatsPrefix(ledgerId) },
@@ -38,14 +36,11 @@ function invalidationsForGroup(
         { queryKey: queryKeys.ledgerSettings(ledgerId), exact: true },
         { queryKey: queryKeys.summaryPrefix(ledgerId) },
         { queryKey: queryKeys.enhancedStatsPrefix(ledgerId) },
-        { queryKey: queryKeys.calendarPrefix(ledgerId) },
       ];
     case "stats":
       return [
         { queryKey: queryKeys.summaryPrefix(ledgerId) },
-        { queryKey: queryKeys.tokenStats(ledgerId), exact: true },
         { queryKey: queryKeys.enhancedStatsPrefix(ledgerId) },
-        { queryKey: queryKeys.calendarPrefix(ledgerId) },
         { queryKey: queryKeys.sourceDocumentStreamTotalPrefix(ledgerId) },
       ];
     case "credentials":

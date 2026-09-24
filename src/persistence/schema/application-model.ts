@@ -37,14 +37,6 @@ export const revisionFailureKindEnum = pgEnum("revision_failure_kind", [
   "invalid_input",
   "processing_error",
 ]);
-export const processingAttemptStatusEnum = pgEnum("processing_attempt_status", [
-  "queued",
-  "processing",
-  "completed",
-  "invalid",
-  "failed",
-  "cancelled",
-]);
 export const retryClassificationEnum = pgEnum("retry_classification", [
   "retryable",
   "permanent",
@@ -174,33 +166,6 @@ export const revisionFiles = pgTable(
   ]
 );
 
-export const processingAttempts = pgTable(
-  "processing_attempts",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
-    revisionId: uuid("revision_id").notNull(),
-    attemptNumber: integer("attempt_number").notNull(),
-    status: processingAttemptStatusEnum("status").notNull().default("queued"),
-    retryClassification: retryClassificationEnum("retry_classification"),
-    diagnosticCode: text("diagnostic_code"),
-    correlationId: text("correlation_id"),
-    startedAt: timestamp("started_at", { withTimezone: true }),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.ledgerId, table.revisionId],
-      foreignColumns: [sourceDocumentRevisions.ledgerId, sourceDocumentRevisions.id],
-      name: "fk_processing_attempts_revision_ledger",
-    }).onDelete("cascade"),
-    uniqueIndex("uq_processing_attempts_revision_number").on(table.revisionId, table.attemptNumber),
-    index("idx_processing_attempts_ledger_status").on(table.ledgerId, table.status),
-    check("ck_processing_attempts_number", sql`${table.attemptNumber} > 0`),
-  ]
-);
-
 export const processingOutbox = pgTable(
   "processing_outbox",
   {
@@ -210,6 +175,10 @@ export const processingOutbox = pgTable(
     sourceDocumentId: uuid("source_document_id").notNull(),
     attemptNumber: integer("attempt_number").notNull(),
     status: processingOutboxStatusEnum("status").notNull().default("pending"),
+    retryClassification: retryClassificationEnum("retry_classification"),
+    diagnosticCode: text("diagnostic_code"),
+    correlationId: text("correlation_id"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
     requestedAt: requiredTimestamp("requested_at").$defaultFn(() => new Date()),
     availableAt: requiredTimestamp("available_at").$defaultFn(() => new Date()),
     claimToken: text("claim_token"),
@@ -365,8 +334,8 @@ export const exchangeRateRecalculationJobs = pgTable(
 );
 
 /**
- * One category assignment run. V1 compatibility columns remain on this table;
- * v2 selection, document work, persisted decisions, and final outcomes live
+ * One category assignment run. Selection, document work, persisted decisions,
+ * and final outcomes live
  * in the child tables below.
  */
 export const categoryReclassificationStatusEnum = pgEnum("category_reclassification_status", [
@@ -404,7 +373,6 @@ export const categoryReclassificationJobs = pgTable(
       .notNull()
       .references(() => ledgers.id, { onDelete: "cascade" }),
     status: categoryReclassificationStatusEnum("status").notNull().default("pending"),
-    formatVersion: integer("format_version").notNull().default(1),
     mode: text("mode").$type<"ai" | "assign" | "clear">().notNull().default("ai"),
     directCategoryId: uuid("direct_category_id"),
     candidateSnapshot: jsonb("candidate_snapshot")
@@ -416,15 +384,10 @@ export const categoryReclassificationJobs = pgTable(
     parentJobId: uuid("parent_job_id"),
     declaredEntryCount: integer("declared_entry_count").notNull().default(0),
     receivedEntryCount: integer("received_entry_count").notNull().default(0),
-    ledgerEntryIds: uuid("ledger_entry_ids")
-      .array()
-      .notNull()
-      .default(sql`ARRAY[]::uuid[]`),
     candidateCategoryIds: uuid("candidate_category_ids")
       .array()
       .notNull()
       .default(sql`ARRAY[]::uuid[]`),
-    cursor: integer("cursor").notNull().default(0),
     appliedCount: integer("applied_count").notNull().default(0),
     confirmedCount: integer("confirmed_count").notNull().default(0),
     failedCount: integer("failed_count").notNull().default(0),
@@ -433,10 +396,6 @@ export const categoryReclassificationJobs = pgTable(
     cancelledCount: integer("cancelled_count").notNull().default(0),
     documentTotal: integer("document_total").notNull().default(0),
     documentCompleted: integer("document_completed").notNull().default(0),
-    attempts: integer("attempts").notNull().default(0),
-    claimToken: uuid("claim_token"),
-    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
-    nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),
     lastError: text("last_error"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
@@ -448,17 +407,12 @@ export const categoryReclassificationJobs = pgTable(
       foreignColumns: [table.id],
       name: "category_reclassification_jobs_parent_job_id_fk",
     }).onDelete("set null"),
-    index("idx_category_reclassification_jobs_due").on(table.status, table.nextAttemptAt),
     uniqueIndex("uq_category_assignment_request_key").on(table.ledgerId, table.requestKey),
     // One run per ledger at a time: a double submit becomes a conflict instead
     // of paying for the same model calls twice.
     uniqueIndex("uq_category_reclassification_jobs_active")
       .on(table.ledgerId)
       .where(sql`${table.status} IN ('preparing', 'pending', 'running')`),
-    check(
-      "ck_category_reclassification_jobs_cursor",
-      sql`${table.cursor} >= 0 AND ${table.cursor} <= cardinality(${table.ledgerEntryIds})`
-    ),
   ]
 );
 

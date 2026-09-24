@@ -21,17 +21,14 @@ export interface UnifiedStreamGroupProps {
   onToggleSelection: (id: string) => void;
   /** Selects or clears a whole day at once. Absent where nothing selects. */
   onSetGroupSelection?: (ids: readonly string[], selected: boolean) => void;
-  noRecordsText: string;
-  getItemProps: () => Record<string, unknown>;
   timeZone?: string;
-  readOnly?: boolean;
   collapseEntriesDefault?: boolean;
   recovery?: ReturnType<typeof useStreamSourceDocumentRecoveryMutations>;
 }
 
 export type UnifiedStreamItem = UnifiedStreamGroup["items"][number];
 
-export type RendererProps = Omit<UnifiedStreamGroupProps, "readOnly"> & {
+export type RendererProps = UnifiedStreamGroupProps & {
   selectedIdSet: ReadonlySet<string>;
 };
 

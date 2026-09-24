@@ -363,7 +363,7 @@ describe("target upper workflows", () => {
     expect(await db.select().from(ledgerEntries)).toHaveLength(beforeEntryCount.length);
   });
 
-  it("edits a manual entry through an immediate revision while keeping the legacy id", async () => {
+  it("edits a manual entry in place while keeping its revision and id", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await postgresLedgerProjectionAdapter.createManual({
@@ -396,7 +396,7 @@ describe("target upper workflows", () => {
     const active = await db.query.ledgerEntries.findFirst({
       where: and(eq(ledgerEntries.id, original!.id), isNull(ledgerEntries.deletedAt)),
     });
-    const archived = await db.query.ledgerEntries.findMany({
+    const retained = await db.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
         eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId)
@@ -404,12 +404,12 @@ describe("target upper workflows", () => {
     });
 
     expect(updated).toMatchObject({ ok: true, data: { ledgerEntryId: original!.id } });
-    expect(document?.activeRevisionId).not.toBe(created.revisionId);
+    expect(document?.activeRevisionId).toBe(created.revisionId);
     expect(document?.version).toBe(initialVersion + 1);
-    expect(revisions).toHaveLength(2);
+    expect(revisions).toHaveLength(1);
     expect(active).toMatchObject({ id: original!.id, amount: "18.000" });
-    expect(archived).toHaveLength(1);
-    expect(archived[0]?.deletedAt).not.toBeNull();
+    expect(retained).toHaveLength(1);
+    expect(retained[0]?.deletedAt).toBeNull();
   });
 
   it("mutates parsed entries through target revisions with rollback and read consistency", async () => {

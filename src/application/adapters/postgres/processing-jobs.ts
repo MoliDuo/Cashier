@@ -8,12 +8,7 @@ import type {
   RecoverableProcessingJobContract,
 } from "@/application/contracts";
 import { db } from "@/lib/db";
-import {
-  processingAttempts,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { lockLedgerForUpdate } from "./transaction-locks";
 
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
@@ -73,15 +68,6 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
       if (revision == null || revision.processingStatus !== "processing") return;
 
       await tx
-        .insert(processingAttempts)
-        .values({
-          ledgerId: revision.ledgerId,
-          revisionId: job.revisionId,
-          attemptNumber: job.attemptNumber,
-          status: "queued",
-        })
-        .onConflictDoNothing();
-      await tx
         .insert(processingOutbox)
         .values({
           id: job.id,
@@ -114,7 +100,7 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
           LIMIT 1
         )
         UPDATE processing_outbox outbox
-        SET status = 'claimed', claim_token = ${claimToken}, claimed_at = ${now},
+        SET status = 'claimed', started_at = COALESCE(outbox.started_at, now()), claim_token = ${claimToken}, claimed_at = ${now},
             claim_expires_at = ${expiresAt}
         FROM candidate WHERE outbox.id = candidate.id
         RETURNING outbox.*
@@ -133,16 +119,6 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
             } as typeof processingOutbox.$inferSelect);
       if (row == null) return null;
       const job = mapJob(row);
-      await tx
-        .update(processingAttempts)
-        .set({ status: "processing", startedAt: now })
-        .where(
-          and(
-            eq(processingAttempts.revisionId, row.revisionId),
-            eq(processingAttempts.attemptNumber, row.attemptNumber),
-            eq(processingAttempts.status, "queued")
-          )
-        );
       return {
         ledgerId: row.ledgerId,
         job,
@@ -172,15 +148,7 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
               THEN 'cancelled'
               WHEN revision.processing_status = 'failed' THEN 'failed'
               ELSE 'completed'
-            END AS outbox_status,
-            CASE
-              WHEN document.deleted_at IS NOT NULL
-                OR document.latest_submission_revision_id IS DISTINCT FROM outbox.revision_id
-                OR revision.processing_status = 'cancelled'
-              THEN 'cancelled'
-              WHEN revision.processing_status = 'failed' THEN 'failed'
-              ELSE 'completed'
-            END AS attempt_status
+            END AS outbox_status
           FROM processing_outbox outbox
           JOIN source_documents document
             ON document.ledger_id = outbox.ledger_id
@@ -205,15 +173,7 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
           FROM candidate
           WHERE outbox.id = candidate.id
             AND outbox.status IN ('pending', 'claimed')
-          RETURNING candidate.revision_id, candidate.attempt_number, candidate.attempt_status
-        ), updated_attempts AS (
-          UPDATE processing_attempts attempt
-          SET status = closed.attempt_status::processing_attempt_status, completed_at = ${now}
-          FROM closed
-          WHERE attempt.revision_id = closed.revision_id
-            AND attempt.attempt_number = closed.attempt_number
-            AND attempt.status IN ('queued', 'processing')
-          RETURNING attempt.id
+          RETURNING candidate.revision_id, candidate.attempt_number
         )
         SELECT count(*) FROM closed
       `);
@@ -243,18 +203,10 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
           LIMIT ${config.maxBatch}
         ), closed AS (
           UPDATE processing_outbox outbox
-          SET status = 'failed', completed_at = ${now}, claim_token = NULL, claim_expires_at = NULL
+          SET status = 'failed', retry_classification = 'permanent', diagnostic_code = 'request_bound_retry_exhausted', completed_at = ${now}, claim_token = NULL, claim_expires_at = NULL
           FROM candidate
           WHERE outbox.id = candidate.id
           RETURNING candidate.revision_id, candidate.attempt_number
-        ), updated_attempts AS (
-          UPDATE processing_attempts attempt
-          SET status = 'failed', completed_at = ${now}, retry_classification = 'permanent',
-              diagnostic_code = 'request_bound_retry_exhausted'
-          FROM closed
-          WHERE attempt.revision_id = closed.revision_id
-            AND attempt.attempt_number = closed.attempt_number
-          RETURNING attempt.id
         ), updated_revisions AS (
           UPDATE source_document_revisions revision
           SET processing_status = 'failed', failure_kind = 'processing_error',
@@ -348,6 +300,9 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
         .update(processingOutbox)
         .set({
           status: result.processingStatus === "failed" ? "failed" : "completed",
+          retryClassification: result.processingStatus === "failed" ? "retryable" : null,
+          diagnosticCode: result.diagnostic?.code ?? null,
+          correlationId: result.diagnostic?.correlationId ?? null,
           completedAt: now,
           claimToken: null,
           claimExpiresAt: null,
@@ -365,21 +320,6 @@ export class PostgresProcessingJobAdapter implements ProcessingPort {
         })
         .then((rows) => rows[0]);
       if (row == null) return false;
-      await tx
-        .update(processingAttempts)
-        .set({
-          status: result.processingStatus,
-          completedAt: now,
-          retryClassification: result.processingStatus === "failed" ? "retryable" : null,
-          diagnosticCode: result.diagnostic?.code ?? null,
-          correlationId: result.diagnostic?.correlationId ?? null,
-        })
-        .where(
-          and(
-            eq(processingAttempts.revisionId, row.revisionId),
-            eq(processingAttempts.attemptNumber, row.attemptNumber)
-          )
-        );
       return true;
     });
   }

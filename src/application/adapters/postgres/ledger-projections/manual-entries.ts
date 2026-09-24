@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, max, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/application/contracts";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
@@ -73,12 +73,11 @@ export async function replaceManualProjection(
   const retainedIds = new Set(requestedIds);
   const retainedEntries = previousEntries.filter((previous) => retainedIds.has(previous.id));
   if (retainedEntries.length > 0) {
-    // Retained rows move to the new revision in one statement; their positions
-    // are appended after the new input entries.
+    // Free active positions before inserting or reordering entries.
     await tx.execute(sql`
       UPDATE ledger_entries entry
       SET source_document_revision_id = ${input.revisionId},
-          position = positions.position + ${input.entries.length},
+          position = positions.position + ${Math.max(input.entries.length, ...previousEntries.map((entry) => entry.position + 1))},
           updated_at = ${now}
       FROM (VALUES ${sql.join(
         retainedEntries.map((previous, index) => sql`(${previous.id}::uuid, ${index}::integer)`),
@@ -87,18 +86,6 @@ export async function replaceManualProjection(
       WHERE entry.id = positions.id
         AND entry.ledger_id = ${input.ledgerId}
     `);
-  }
-
-  if (retainedEntries.length > 0) {
-    // Preserve the historical rows as soft-deleted archives in one insert.
-    await tx.insert(ledgerEntries).values(
-      retainedEntries.map((previous) => ({
-        ...previous,
-        id: crypto.randomUUID(),
-        deletedAt: now,
-        updatedAt: now,
-      }))
-    );
   }
 
   const removedIds = previousEntries
@@ -218,7 +205,7 @@ export async function createManualRevision(
     sourceDocumentId: string;
     inputText?: string | null;
     revisionId?: string;
-    origin: "manual_edit" | "manual_entry";
+    origin: "manual_entry";
   }
 ) {
   const now = new Date();
@@ -250,7 +237,6 @@ export async function replaceActiveProjectionInTransaction(
     sourceDocumentId: string;
     expectedActiveRevisionId: string;
     expectedStateVersion: number;
-    revisionId: string;
     entries: readonly LedgerProjectionEntryContract[];
     title?: string;
     entryDate?: string;
@@ -269,46 +255,16 @@ export async function replaceActiveProjectionInTransaction(
   }
   await assertSourceDocumentNotProcessing(tx, document);
 
-  const activeRevision = await tx
-    .select({ inputText: sourceDocumentRevisions.inputText })
-    .from(sourceDocumentRevisions)
-    .where(
-      and(
-        eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-        eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-        eq(sourceDocumentRevisions.id, input.expectedActiveRevisionId),
-        or(
-          eq(sourceDocumentRevisions.processingStatus, "completed"),
-          isNull(sourceDocumentRevisions.processingStatus)
-        )
-      )
-    )
-    .then((rows) => rows[0]);
-  if (activeRevision == null) throw new ConflictError("Active revision is not completed");
-
-  const revision = await createManualRevision(tx, {
-    ledgerId: input.ledgerId,
-    sourceDocumentId: input.sourceDocumentId,
-    inputText: activeRevision.inputText,
-    origin: "manual_edit",
-    revisionId: input.revisionId,
-  });
-  await copyRevisionFiles(tx, {
-    ledgerId: input.ledgerId,
-    fromRevisionId: input.expectedActiveRevisionId,
-    toRevisionId: revision.id,
-  });
   await replaceManualProjection(tx, {
     previousEntries: input.previousEntries,
     ledgerId: input.ledgerId,
     sourceDocumentId: input.sourceDocumentId,
-    revisionId: revision.id,
+    revisionId: input.expectedActiveRevisionId,
     entries: input.entries,
   });
   const updated = await tx
     .update(sourceDocuments)
     .set({
-      activeRevisionId: revision.id,
       version: sql`${sourceDocuments.version} + 1`,
       ...(input.title === undefined ? {} : { title: input.title }),
       ...(input.entryDate === undefined
@@ -338,7 +294,7 @@ export async function replaceActiveProjectionInTransaction(
     .returning({ id: sourceDocuments.id })
     .then((rows) => rows[0]);
   if (updated == null) throw new ConflictError("Source document changed during the edit");
-  return revision.id;
+  return input.expectedActiveRevisionId;
 }
 
 export async function copyRevisionFiles(

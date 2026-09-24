@@ -26,11 +26,6 @@ export interface EnhancedStatsDto {
   summary: {
     total: string;
     currency: string;
-    /** Kept for one compatibility round; UI prefers `comparison`. */
-    trend: {
-      percent: number;
-      amount: string;
-    };
     dailyAverage: string;
     comparison: {
       mode: StatsComparisonMode;

@@ -12,14 +12,11 @@ import {
   parseEntryCategoryId,
   parseReorderEntryCategoriesInput,
   parseSaveEntryCategoriesInput,
-  parseUpdateEntryCategoryInput,
   type CreateEntryCategoryInput,
-  type UpdateEntryCategoryInput,
   type SaveEntryCategoriesInput,
 } from "@/modules/ledger/contract-schemas";
 import { applyCategoryPreset } from "@/modules/ledger/application/use-cases/apply-category-preset";
 import { createEntryCategory } from "@/modules/ledger/application/use-cases/create-entry-category";
-import { updateEntryCategory } from "@/modules/ledger/application/use-cases/update-entry-category";
 import { serverComposition } from "@/application/server-composition-root";
 import { saveEntryCategories } from "@/modules/ledger/application/use-cases/save-entry-categories";
 
@@ -33,23 +30,6 @@ export const createEntryCategoryAction = withLedgerAccess(
     if (validated.icon !== undefined) payload.icon = validated.icon;
     if (validated.sortOrder !== undefined) payload.sortOrder = validated.sortOrder;
     return createEntryCategory(ledgerId, payload, serverComposition.categories);
-  }
-);
-
-export const updateEntryCategoryAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    categoryId: string,
-    data: UpdateEntryCategoryInput
-  ): Promise<EntryCategoryDto> => {
-    const validatedCategoryId = parseEntryCategoryId(categoryId);
-    const validated = parseUpdateEntryCategoryInput(data);
-    return updateEntryCategory(
-      ledgerId,
-      validatedCategoryId,
-      validated,
-      serverComposition.categories
-    );
   }
 );
 

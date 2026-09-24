@@ -294,24 +294,6 @@ export const postgresBookAdapter: BookPort = {
       return { status: "deleted" as const };
     });
   },
-
-  async countDocuments(ledgerId, bookId) {
-    const rows = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(sourceDocuments)
-      .where(
-        and(
-          eq(sourceDocuments.ledgerId, ledgerId),
-          eq(sourceDocuments.bookId, bookId),
-          isNull(sourceDocuments.deletedAt)
-        )
-      );
-    return Number(rows[0]?.count ?? 0);
-  },
-
-  async hasCredentials(ledgerId, bookId) {
-    return (await countCredentials(db, ledgerId, bookId, { activeOnly: true })) > 0;
-  },
 };
 
 /**

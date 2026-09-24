@@ -25,7 +25,7 @@ vi.mock("@/lib/queries/ledger-query-client", () => ({
 function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {
   return {
     id: "job-1",
-    formatVersion: 2,
+
     mode: { kind: "clear" },
     status: "running",
     total: 10,

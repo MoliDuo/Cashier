@@ -9,7 +9,6 @@ import type {
   CategoryAssignmentMode,
   CategoryReclassificationJobDto,
   CommitCategoryAssignmentSelectionInput,
-  StartCategoryReclassificationInput,
 } from "@/modules/ledger/contracts";
 import {
   parseAppendCategoryAssignmentSelectionInput,
@@ -17,7 +16,6 @@ import {
   parseCancelCategoryAssignmentInput,
   parseCommitCategoryAssignmentSelectionInput,
   parseRetryCategoryAssignmentInput,
-  parseStartCategoryReclassificationInput,
 } from "../contract-schemas";
 import { toCategoryReclassificationJobDto } from "../application/queries/category-reclassification-job-dto";
 import { withLedgerAccess } from "../access";
@@ -48,10 +46,10 @@ async function validateMode(
 async function loadJob(ledgerId: string, jobId: string): Promise<CategoryReclassificationJobDto> {
   const job = await serverComposition.categoryReclassificationJobs.get({ ledgerId, jobId });
   if (job == null) throw new ValidationError("Category assignment job was not found");
-  const metrics =
-    job.formatVersion === 2
-      ? await serverComposition.categoryAssignments.getProgressMetrics({ ledgerId, jobId })
-      : undefined;
+  const metrics = await serverComposition.categoryAssignments.getProgressMetrics({
+    ledgerId,
+    jobId,
+  });
   return toCategoryReclassificationJobDto(job, metrics);
 }
 
@@ -151,42 +149,5 @@ export const retryCategoryAssignmentLatestAction = withLedgerAccess(
     });
     scheduleCategoryReclassificationAfter(committed.id, ledgerId);
     return loadJob(ledgerId, committed.id);
-  }
-);
-
-export const startCategoryReclassificationAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    input: StartCategoryReclassificationInput
-  ): Promise<CategoryReclassificationJobDto> => {
-    const validated = parseStartCategoryReclassificationInput(input);
-    const selection = await serverComposition.categoryAssignments.resolveSelection(
-      ledgerId,
-      validated.ledgerEntryIds
-    );
-    const started = await begin(ledgerId, {
-      requestKey: crypto.randomUUID(),
-      mode: { kind: "ai", candidateCategoryIds: validated.candidateCategoryIds },
-      expectedEntryCount: selection.length,
-    });
-    for (
-      let offset = 0, chunkIndex = 0;
-      offset < selection.length;
-      offset += 1000, chunkIndex += 1
-    ) {
-      await serverComposition.categoryAssignments.append({
-        ledgerId,
-        jobId: started.id,
-        chunkIndex,
-        entries: selection.slice(offset, offset + 1000),
-      });
-    }
-    await serverComposition.categoryAssignments.commit({
-      ledgerId,
-      jobId: started.id,
-      expectedEntryCount: selection.length,
-    });
-    scheduleCategoryReclassificationAfter(started.id, ledgerId);
-    return loadJob(ledgerId, started.id);
   }
 );

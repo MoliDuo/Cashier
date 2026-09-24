@@ -17,8 +17,6 @@ interface UnifiedStreamItemRowProps {
   selected: boolean;
   selectionDisabled: boolean;
   onToggleSelection: (id: string) => void;
-  getItemProps: () => Record<string, unknown>;
-  readOnly: boolean;
   defaultExpanded: boolean;
   expanded?: boolean;
   onExpandedChange?: (sourceDocumentId: string, expanded: boolean) => void;
@@ -34,13 +32,11 @@ interface UnifiedStreamItemRowProps {
 export function StreamItemRow({
   item,
   props,
-  readOnly,
   expanded,
   onExpandedChange,
 }: {
   item: UnifiedStreamItem;
   props: RendererProps;
-  readOnly: boolean;
   expanded?: boolean;
   onExpandedChange?: (sourceDocumentId: string, expanded: boolean) => void;
 }) {
@@ -64,8 +60,6 @@ export function StreamItemRow({
         props.disableUnselected === true && !props.selectedIdSet.has(sourceDocumentId)
       }
       onToggleSelection={props.onToggleSelection}
-      getItemProps={props.getItemProps}
-      readOnly={readOnly}
       defaultExpanded={!props.collapseEntriesDefault}
       {...(expanded === undefined ? {} : { expanded })}
       {...(onExpandedChange == null ? {} : { onExpandedChange })}
@@ -94,8 +88,6 @@ const UnifiedStreamItemRow = memo(function UnifiedStreamItemRow({
   selected,
   selectionDisabled,
   onToggleSelection,
-  getItemProps,
-  readOnly,
   defaultExpanded,
   expanded,
   onExpandedChange,
@@ -116,37 +108,34 @@ const UnifiedStreamItemRow = memo(function UnifiedStreamItemRow({
   };
 
   return (
-    <div {...getItemProps()}>
-      <SourceDocumentCard
-        sourceDocument={item.sourceDocument}
-        ledgerEntries={item.ledgerEntries}
-        mainCurrency={mainCurrency}
-        {...(onViewLedgerEntry != null ? { onViewLedgerEntry } : {})}
-        onViewDetails={() => onViewSourceDetail({ sourceDocument, ledgerEntries })}
-        {...(onViewSourceDetailIntent != null
-          ? { onViewDetailsIntent: () => onViewSourceDetailIntent(sourceDocument) }
-          : {})}
-        {...(onEditRetry != null ? { onEditRetry: () => onEditRetry(sourceDocument) } : {})}
-        {...(onEditRetryIntent != null ? { onEditRetryIntent } : {})}
-        onDelete={() => onDeleteSourceConfirm(sourceDocument)}
-        processingStatus={item.sourceDocument.processingStatus}
-        failureKind={item.sourceDocument.failureKind}
-        errorCode={item.sourceDocument.errorCode}
-        selectionMode={selectionMode}
-        isSelected={selected}
-        selectionDisabled={selectionDisabled}
-        onToggleSelect={() => onToggleSelection(sourceDocument.id)}
-        readOnly={readOnly}
-        defaultExpanded={defaultExpanded}
-        {...(expanded === undefined ? {} : { expanded })}
-        {...(onExpandedChange === undefined ? {} : { onExpandedChange: handleExpandedChange })}
-        isRetrying={isRetrying}
-        isCancelling={isCancelling}
-        {...(onRetry == null ? {} : { onRetry: () => onRetry(recoveryVariables) })}
-        {...(onCancelProcessing == null
-          ? {}
-          : { onCancelProcessing: () => onCancelProcessing(recoveryVariables) })}
-      />
-    </div>
+    <SourceDocumentCard
+      sourceDocument={item.sourceDocument}
+      ledgerEntries={item.ledgerEntries}
+      mainCurrency={mainCurrency}
+      {...(onViewLedgerEntry != null ? { onViewLedgerEntry } : {})}
+      onViewDetails={() => onViewSourceDetail({ sourceDocument, ledgerEntries })}
+      {...(onViewSourceDetailIntent != null
+        ? { onViewDetailsIntent: () => onViewSourceDetailIntent(sourceDocument) }
+        : {})}
+      {...(onEditRetry != null ? { onEditRetry: () => onEditRetry(sourceDocument) } : {})}
+      {...(onEditRetryIntent != null ? { onEditRetryIntent } : {})}
+      onDelete={() => onDeleteSourceConfirm(sourceDocument)}
+      processingStatus={item.sourceDocument.processingStatus}
+      failureKind={item.sourceDocument.failureKind}
+      errorCode={item.sourceDocument.errorCode}
+      selectionMode={selectionMode}
+      isSelected={selected}
+      selectionDisabled={selectionDisabled}
+      onToggleSelect={() => onToggleSelection(sourceDocument.id)}
+      defaultExpanded={defaultExpanded}
+      {...(expanded === undefined ? {} : { expanded })}
+      {...(onExpandedChange === undefined ? {} : { onExpandedChange: handleExpandedChange })}
+      isRetrying={isRetrying}
+      isCancelling={isCancelling}
+      {...(onRetry == null ? {} : { onRetry: () => onRetry(recoveryVariables) })}
+      {...(onCancelProcessing == null
+        ? {}
+        : { onCancelProcessing: () => onCancelProcessing(recoveryVariables) })}
+    />
   );
 });

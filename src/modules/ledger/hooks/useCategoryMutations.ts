@@ -4,18 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useTranslations } from "next-intl";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
-import {
-  createEntryCategoryAction,
-  updateEntryCategoryAction,
-  deleteEntryCategoryAction,
-  reorderEntryCategoriesAction,
-  saveEntryCategoriesAction,
-} from "@/modules/ledger/server-actions/categories";
+import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { generateEntryCategoryMetadataAction } from "@/modules/ledger/server-actions/category-metadata";
-import type {
-  DeleteEntryCategoryResultDto,
-  ReorderEntryCategoriesResultDto,
-} from "@/modules/ledger/contracts";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import type { SaveEntryCategoriesInput } from "@/modules/ledger/contracts";
 import { queryKeys } from "@/lib/query-keys";
@@ -85,52 +75,6 @@ export function useCategoryMutations(ledgerId: string, options: UseCategoryMutat
     [generateMetadata]
   );
 
-  const createCategory = useLedgerMutation<EntryCategory, { name: string }>(ledgerId, {
-    invalidates: ["categories"],
-    mutationFn: async (data) => {
-      const result = await createEntryCategoryAction(ledgerId, data);
-      return result;
-    },
-    successMessage: t("categoryCreated"),
-    errorMessage: t("createCategoryFailed"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
-    onSuccess: (category) => {
-      requestCategoryMetadata(category.id);
-    },
-  });
-
-  const updateCategory = useLedgerMutation<
-    EntryCategory,
-    { id: string; data: Partial<EntryCategory> }
-  >(ledgerId, {
-    invalidates: ["categories"],
-    mutationFn: ({ id, data }) =>
-      updateEntryCategoryAction(ledgerId, id, {
-        ...data,
-        description: data.description ?? undefined,
-        icon: data.icon ?? undefined,
-      }),
-    successMessage: t("categoryUpdated"),
-    errorMessage: t("updateCategoryFailed"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
-  });
-
-  const deleteCategory = useLedgerMutation<DeleteEntryCategoryResultDto, string>(ledgerId, {
-    invalidates: ["categories", "stats"],
-    mutationFn: (id) => deleteEntryCategoryAction(ledgerId, id),
-    successMessage: t("categoryDeleted"),
-    errorMessage: t("deleteCategoryFailed"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
-  });
-
-  const reorderCategories = useLedgerMutation<ReorderEntryCategoriesResultDto, string[]>(ledgerId, {
-    invalidates: ["categories"],
-    mutationFn: (categoryIds) => reorderEntryCategoriesAction(ledgerId, categoryIds),
-    successMessage: t("categoriesReordered"),
-    errorMessage: t("reorderCategoriesFailed"),
-    invalidationErrorMessage: tCommon("savedRefreshFailed"),
-  });
-
   const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>(ledgerId, {
     invalidates: ["categories", "stats"],
     mutationFn: (input) => saveEntryCategoriesAction(ledgerId, input),
@@ -146,10 +90,6 @@ export function useCategoryMutations(ledgerId: string, options: UseCategoryMutat
   });
 
   return {
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    reorderCategories,
     saveCategories,
     generatingCategoryIds,
     failedCategoryIds,

@@ -61,7 +61,6 @@ describe("postgres book adapter", () => {
       .update(sourceDocuments)
       .set({ bookId: holding.id })
       .where(eq(sourceDocuments.ledgerId, ledgerId));
-    expect(await postgresBookAdapter.countDocuments(ledgerId, holding.id)).toBe(1);
 
     // The first book is nothing special any more: 总账 is a view over every
     // book, so any book but the last can be retired.
@@ -101,7 +100,6 @@ describe("postgres book adapter", () => {
     const { ledgerId, secondBookId } = await fixture();
     await postgresServiceCredentialAdapter.create(ledgerId, "Bound", secondBookId);
 
-    expect(await postgresBookAdapter.hasCredentials(ledgerId, secondBookId)).toBe(true);
     expect(await postgresBookAdapter.archive(ledgerId, secondBookId)).toEqual({
       status: "has_credentials",
     });
@@ -157,7 +155,6 @@ describe("postgres book adapter", () => {
       .update(sourceDocuments)
       .set({ bookId: holding.id, deletedAt: new Date() })
       .where(eq(sourceDocuments.ledgerId, ledgerId));
-    expect(await postgresBookAdapter.countDocuments(ledgerId, holding.id)).toBe(0);
     expect(await postgresBookAdapter.delete(ledgerId, holding.id)).toEqual({
       status: "has_records",
     });

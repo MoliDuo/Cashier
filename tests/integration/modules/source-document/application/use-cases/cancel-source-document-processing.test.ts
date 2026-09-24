@@ -5,12 +5,7 @@ import {
   postgresLedgerProjectionAdapter,
   postgresSourceDocumentSubmissionAdapter,
 } from "@/application/adapters/postgres";
-import {
-  processingAttempts,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
@@ -31,7 +26,7 @@ describe("cancel source-document processing", () => {
       version: submission.document.version + 1,
     });
 
-    const [document, revision, outbox, attempt] = await Promise.all([
+    const [document, revision, outbox] = await Promise.all([
       db.query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, submission.document.id),
       }),
@@ -41,9 +36,6 @@ describe("cancel source-document processing", () => {
       db.query.processingOutbox.findFirst({
         where: eq(processingOutbox.revisionId, submission.revision.id),
       }),
-      db.query.processingAttempts.findFirst({
-        where: eq(processingAttempts.revisionId, submission.revision.id),
-      }),
     ]);
     expect(document?.latestSubmissionRevisionId).toBe(submission.revision.id);
     expect(revision).toMatchObject({
@@ -52,7 +44,6 @@ describe("cancel source-document processing", () => {
       inputDocumentDate: "2026-09-10",
     });
     expect(outbox?.status).toBe("cancelled");
-    expect(attempt?.status).toBe("cancelled");
   });
 
   it("keeps the previous active result when a retry is cancelled", async () => {

@@ -14,7 +14,6 @@ export function buildEnhancedStatsFixture(
     summary: {
       total: "120",
       currency: "CNY",
-      trend: { percent: 100, amount: "60" },
       dailyAverage: "20",
       comparison: {
         mode: "same_period",

@@ -14,7 +14,6 @@ import {
 } from "@/lib/errors";
 import {
   idempotencyRecords,
-  processingAttempts,
   processingOutbox,
   revisionFiles,
   sourceDocumentRevisions,
@@ -124,6 +123,7 @@ async function submitInTransaction(
           .update(processingOutbox)
           .set({
             status: "cancelled",
+            diagnosticCode: "superseded_by_retry",
             completedAt: now,
             claimToken: null,
             claimExpiresAt: null,
@@ -132,19 +132,6 @@ async function submitInTransaction(
             and(
               eq(processingOutbox.revisionId, supersededRevision.id),
               inArray(processingOutbox.status, ["pending", "claimed"])
-            )
-          );
-        await tx
-          .update(processingAttempts)
-          .set({
-            status: "cancelled",
-            completedAt: now,
-            diagnosticCode: "superseded_by_retry",
-          })
-          .where(
-            and(
-              eq(processingAttempts.revisionId, supersededRevision.id),
-              inArray(processingAttempts.status, ["queued", "processing"])
             )
           );
       }
@@ -181,12 +168,6 @@ async function submitInTransaction(
     attemptNumber: 1,
   };
 
-  await tx.insert(processingAttempts).values({
-    ledgerId: input.ledgerId,
-    revisionId: pending.revision.id,
-    attemptNumber: job.attemptNumber,
-    status: "queued",
-  });
   await tx.insert(processingOutbox).values({
     id: job.id,
     ledgerId: input.ledgerId,

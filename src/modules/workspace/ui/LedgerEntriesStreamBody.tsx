@@ -39,12 +39,6 @@ interface LedgerEntriesStreamBodyProps {
   recovery: ReturnType<typeof useStreamSourceDocumentRecoveryMutations>;
 }
 
-const EMPTY_ITEM_PROPS = Object.freeze({});
-
-function getEmptyItemProps() {
-  return EMPTY_ITEM_PROPS;
-}
-
 /** The stream tab's list body: loading state, grouped results, empty state, and pagination footer. */
 export function LedgerEntriesStreamBody({
   isLoading,
@@ -97,8 +91,6 @@ export function LedgerEntriesStreamBody({
               disableUnselected={disableUnselected}
               onToggleSelection={onToggleSelection}
               {...(onSetGroupSelection != null ? { onSetGroupSelection } : {})}
-              noRecordsText={tCommon("noRecords")}
-              getItemProps={getEmptyItemProps}
               {...(timeZone != null ? { timeZone } : {})}
               collapseEntriesDefault={collapseEntriesDefault}
               recovery={recovery}

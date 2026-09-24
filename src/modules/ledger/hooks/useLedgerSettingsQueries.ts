@@ -70,7 +70,7 @@ export function useLedgerSettingsQueries({
     staleTime: LEDGER.STALE_TIME_MS,
     refetchOnWindowFocus: true,
   });
-  const { data: settingsData, isLoading: isSettingsLoading } = settingsQuery;
+  const { data: settingsData } = settingsQuery;
   const ledgerStatus = ledgerQuery.status as QueryStatus;
   const categoriesStatus = categoriesQuery.status as QueryStatus;
   const aggregateStatus = settingsQuery.status as QueryStatus;
@@ -82,22 +82,12 @@ export function useLedgerSettingsQueries({
           aggregateStatus === "pending"
         ? "pending"
         : "success";
-  const settingsQueryIsFetching =
-    ledgerQuery.isFetching || categoriesQuery.isFetching || settingsQuery.isFetching;
-  const settingsQueryHasData =
-    ledgerQuery.data !== undefined ||
-    categoriesQuery.data !== undefined ||
-    settingsQuery.data !== undefined;
 
   return {
     ledger,
     categories,
     uncategorizedCount: settingsData?.uncategorizedCount ?? 0,
     credentials: settingsData?.credentials ?? [],
-    isSettingsLoading,
-    settingsQueryKey,
     settingsQueryStatus,
-    settingsQueryIsFetching,
-    settingsQueryHasData,
   };
 }

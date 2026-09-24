@@ -145,7 +145,6 @@ describe("useLoginFlow OTP sending", () => {
     expect(signInMock).toHaveBeenCalledWith("password", {
       email: "autofill@example.com",
       password: "autofilled-password",
-      locale: "en",
       redirect: false,
       callbackUrl: "/",
     });
@@ -179,7 +178,6 @@ describe("useLoginFlow OTP sending", () => {
     await act(() => result.current.handleDevSignIn());
 
     expect(signInMock).toHaveBeenCalledWith("dev", {
-      locale: "en",
       redirect: false,
       callbackUrl: "/",
     });

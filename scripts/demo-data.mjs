@@ -494,17 +494,18 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
           ? "permanent"
           : "retryable";
       await client.query(
-        `INSERT INTO processing_attempts
+        `INSERT INTO processing_outbox
           (ledger_id, revision_id, attempt_number, status, retry_classification,
-           diagnostic_code, completed_at, created_at)
-         VALUES ($1, $2, 1, $3, $4, $5, $6, $6)`,
+           diagnostic_code, completed_at, created_at, source_document_id, requested_at, available_at, next_available_at)
+         VALUES ($1, $2, 1, $3, $4, $5, $6, $6, $7, $6, $6, $6)`,
         [
           ledgerId,
           document.revisionId,
-          invalid ? "invalid" : "failed",
+          "failed",
           retryClassification,
           document.failureCode,
           createdAt,
+          document.id,
         ]
       );
     }

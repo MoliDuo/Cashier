@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { ProcessingLeaseContract } from "@/application/contracts";
-import { processingAttempts, processingOutbox } from "@/persistence";
+import { processingOutbox } from "@/persistence";
 import type { PostgresTransaction } from "./transaction-locks";
 
 export type ProcessingTerminalStatus = "completed" | "failed";
@@ -17,6 +17,9 @@ export async function completeProcessingLeaseInTransaction(
     .update(processingOutbox)
     .set({
       status: processingStatus,
+      retryClassification: processingStatus === "failed" ? "retryable" : null,
+      diagnosticCode: diagnostic?.code ?? null,
+      correlationId: diagnostic?.correlationId ?? null,
       completedAt: now,
       claimToken: null,
       claimExpiresAt: null,
@@ -36,20 +39,5 @@ export async function completeProcessingLeaseInTransaction(
     .then((rows) => rows[0]);
   if (row == null) return false;
 
-  await tx
-    .update(processingAttempts)
-    .set({
-      status: processingStatus,
-      completedAt: now,
-      retryClassification: processingStatus === "failed" ? "retryable" : null,
-      diagnosticCode: diagnostic?.code ?? null,
-      correlationId: diagnostic?.correlationId ?? null,
-    })
-    .where(
-      and(
-        eq(processingAttempts.revisionId, row.revisionId),
-        eq(processingAttempts.attemptNumber, row.attemptNumber)
-      )
-    );
   return true;
 }

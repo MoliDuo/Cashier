@@ -18,7 +18,7 @@ vi.mock("@/lib/mutations/ledger-invalidation", () => ({
 
 const runningJob = {
   id: "job-1",
-  formatVersion: 2,
+
   mode: { kind: "clear" as const },
   status: "running" as const,
   total: 10,

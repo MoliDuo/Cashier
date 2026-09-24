@@ -7,25 +7,23 @@ import type { CategoryReclassificationJobRecord } from "@/modules/ledger/applica
  */
 export function toCategoryReclassificationJobDto(
   job: CategoryReclassificationJobRecord,
-  metrics?: {
+  metrics: {
     activeDocumentCount: number;
     retryingDocumentCount: number;
     nextRetryAt: string | null;
     evidenceIncomplete: boolean;
   }
 ): CategoryReclassificationJobDto {
-  const formatVersion = job.formatVersion ?? 1;
-  const failedCount = job.failedCount ?? 0;
-  const conflictCount = job.conflictCount ?? 0;
-  const skippedCount = job.skippedCount ?? 0;
-  const cancelledCount = job.cancelledCount ?? 0;
-  const documentTotal = job.documentTotal ?? 0;
-  const documentCompleted = job.documentCompleted ?? 0;
-  const total = formatVersion === 2 ? (job.declaredEntryCount ?? 0) : job.ledgerEntryIds.length;
+  const failedCount = job.failedCount;
+  const conflictCount = job.conflictCount;
+  const skippedCount = job.skippedCount;
+  const cancelledCount = job.cancelledCount;
+  const documentTotal = job.documentTotal;
+  const documentCompleted = job.documentCompleted;
+  const total = job.declaredEntryCount;
   return {
     id: job.id,
-    formatVersion,
-    mode: job.mode ?? { kind: "ai", candidateCategoryIds: job.candidateCategoryIds },
+    mode: job.mode,
     status: job.status,
     total,
     processedCount:
@@ -43,16 +41,16 @@ export function toCategoryReclassificationJobDto(
     cancelledCount,
     documentTotal,
     documentCompleted,
-    activeDocumentCount: metrics?.activeDocumentCount ?? 0,
-    retryingDocumentCount: metrics?.retryingDocumentCount ?? 0,
-    nextRetryAt: metrics?.nextRetryAt ?? job.nextAttemptAt ?? null,
-    candidateCategories: job.candidateSnapshot ?? [],
-    receivedCount: job.receivedEntryCount ?? total,
+    activeDocumentCount: metrics.activeDocumentCount,
+    retryingDocumentCount: metrics.retryingDocumentCount,
+    nextRetryAt: metrics.nextRetryAt,
+    candidateCategories: job.candidateSnapshot,
+    receivedCount: job.receivedEntryCount,
     errorCode: job.lastError,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
-    completedAt: job.completedAt ?? null,
+    completedAt: job.completedAt,
     canRetryFailed: failedCount > 0 && ["partial", "failed"].includes(job.status),
-    evidenceIncomplete: metrics?.evidenceIncomplete ?? false,
+    evidenceIncomplete: metrics.evidenceIncomplete,
   };
 }

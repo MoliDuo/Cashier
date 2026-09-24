@@ -184,17 +184,6 @@ export async function applyDateOrganization(
       currentIds.some((entry) => !entriesById.has(entry.id))
     )
       throw new ConflictError("Source document entries changed before date organization");
-    const sourceRevision = await createManualRevision(tx, {
-      ledgerId: input.ledgerId,
-      sourceDocumentId: input.sourceDocumentId,
-      origin: "manual_edit",
-      inputText: activeRevision.inputText,
-    });
-    await copyRevisionFiles(tx, {
-      ledgerId: input.ledgerId,
-      fromRevisionId: activeRevision.id,
-      toRevisionId: sourceRevision.id,
-    });
     const destinationByEntry = new Map<
       string,
       { documentId: string; revisionId: string; entryDate: string }
@@ -231,6 +220,20 @@ export async function applyDateOrganization(
         .set({ activeRevisionId: revision.id, latestSubmissionRevisionId: null })
         .where(eq(sourceDocuments.id, id));
     }
+    // Free the active positions before assigning contiguous positions in the same revision.
+    const positionOffset = Math.max(0, ...entries.map((entry) => entry.position + 1));
+    await tx
+      .update(ledgerEntries)
+      .set({ position: sql`${ledgerEntries.position} + ${positionOffset}` })
+      .where(
+        and(
+          eq(ledgerEntries.ledgerId, input.ledgerId),
+          eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
+          eq(ledgerEntries.sourceDocumentRevisionId, activeRevision.id),
+          isNull(ledgerEntries.deletedAt)
+        )
+      );
+
     const positions = new Map<string, number>();
     for (const entry of entries) {
       const destination = destinationByEntry.get(entry.id);
@@ -242,7 +245,7 @@ export async function applyDateOrganization(
         .update(ledgerEntries)
         .set({
           sourceDocumentId: docId,
-          sourceDocumentRevisionId: destination?.revisionId ?? sourceRevision.id,
+          sourceDocumentRevisionId: destination?.revisionId ?? activeRevision.id,
           position,
           convertedAmount:
             conversion == null
@@ -254,14 +257,6 @@ export async function applyDateOrganization(
         })
         .where(and(eq(ledgerEntries.id, entry.id), eq(ledgerEntries.ledgerId, input.ledgerId)));
     }
-    await tx.insert(ledgerEntries).values(
-      entries.map((entry) => ({
-        ...entry,
-        id: crypto.randomUUID(),
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-      }))
-    );
     const remainingItems = lockedDocument.dateOrganizationSuggestion.items.filter(
       (item) => !assigned.has(item.ledgerEntryId)
     );
@@ -272,7 +267,6 @@ export async function applyDateOrganization(
     await tx
       .update(sourceDocuments)
       .set({
-        activeRevisionId: sourceRevision.id,
         version: sql`${sourceDocuments.version} + 1`,
         documentDate: originalGroup?.entryDate ?? lockedDocument.documentDate,
         dateOrganizationSuggestion: remainingSuggestion,

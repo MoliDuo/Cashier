@@ -120,7 +120,7 @@ describe("projection write shape", () => {
     }
   });
 
-  it("copies revision files in one statement and preserves the historical revision", async () => {
+  it("edits the active revision without duplicating files or entries", async () => {
     const db = getTestDb();
     const created = await postgresLedgerProjectionAdapter.createManual({
       expectedMainCurrency: "CNY",
@@ -161,7 +161,7 @@ describe("projection write shape", () => {
       itemName: "C",
     });
 
-    expect(await readStatementCounter(db, "revision_files_insert")).toBe(1);
+    expect(await readStatementCounter(db, "revision_files_insert")).toBe(0);
     const document = (
       await db
         .select()
@@ -169,9 +169,9 @@ describe("projection write shape", () => {
         .where(eq(sourceDocuments.id, created.sourceDocumentId))
     )[0];
     const replacedRevisionId = document!.activeRevisionId!;
-    expect(replacedRevisionId).not.toBe(created.revisionId);
+    expect(replacedRevisionId).toBe(created.revisionId);
 
-    // The copied file keeps its position on the new revision.
+    // Existing evidence keeps its position.
     const copiedFiles = await db
       .select({ position: revisionFiles.position })
       .from(revisionFiles)
@@ -184,7 +184,7 @@ describe("projection write shape", () => {
     expect(copiedFiles).toHaveLength(1);
     expect(copiedFiles[0]?.position).toBe(0);
 
-    // The old revision stays completed with its entries and file intact.
+    // The same revision retains its evidence and current entries.
     const oldRevision = (
       await db
         .select()
@@ -201,7 +201,7 @@ describe("projection write shape", () => {
       .select({ id: ledgerEntries.id })
       .from(ledgerEntries)
       .where(eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId));
-    expect(oldEntries).toHaveLength(2);
+    expect(oldEntries).toHaveLength(3);
     const newEntries = await db
       .select({ position: ledgerEntries.position, itemName: ledgerEntries.itemName })
       .from(ledgerEntries)
@@ -216,7 +216,7 @@ describe("projection write shape", () => {
     expect(newEntries.map((row) => row.itemName)).toEqual(["A", "B", "C"]);
   });
 
-  it("preserves entry identity, order, history and change-log version on manual replace", async () => {
+  it("preserves entry identity and order without history copies, and increments change-log version", async () => {
     const db = getTestDb();
     const pinnedCreatedAt = new Date("2026-01-02T03:04:05.000Z");
     const created = await postgresLedgerProjectionAdapter.createManual({
@@ -269,8 +269,8 @@ describe("projection write shape", () => {
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     }))!.activeRevisionId!;
 
-    // One archive INSERT and two set-based UPDATEs, independent of row count.
-    expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(1);
+    // No archive INSERT; two set-based UPDATEs, independent of row count.
+    expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(0);
     expect(await readStatementCounter(db, "ledger_entries_update")).toBe(2);
 
     // New active projection: input order, retained ids and created_at intact.
@@ -296,7 +296,7 @@ describe("projection write shape", () => {
       expect(row.createdAt.getTime()).toBe(original!.createdAt.getTime());
     }
 
-    // Historical rows keep the old revision as immutable soft-deleted copies.
+    // Editing does not create historical copies.
     const historyRows = await db
       .select()
       .from(ledgerEntries)
@@ -307,19 +307,8 @@ describe("projection write shape", () => {
           isNotNull(ledgerEntries.deletedAt)
         )
       );
-    expect(historyRows).toHaveLength(3);
-    expect(historyRows.map((row) => row.itemName).sort()).toEqual(["One", "Three", "Two"]);
-    expect(historyRows.find((row) => row.itemName === "Two")?.createdAt.getTime()).toBe(
-      pinnedCreatedAt.getTime()
-    );
-    for (const archived of historyRows) {
-      const original = [...originalById.values()].find((row) => row.itemName === archived.itemName);
-      // Archived copies get fresh ids but preserve the original row values.
-      expect(original, `expected original row for ${archived.itemName}`).toBeDefined();
-      expect(archived.id).not.toBe(original!.id);
-      expect(archived.createdAt.getTime()).toBe(original!.createdAt.getTime());
-      expect(archived.amount).toBe(original!.amount);
-    }
+    expect(historyRows).toHaveLength(0);
+    expect(replacedRevisionId).toBe(created.revisionId);
 
     // The change-log trigger aggregates by transaction: exactly one version
     // bump for the whole replace.
@@ -330,5 +319,74 @@ describe("projection write shape", () => {
         .where(eq(ledgerSyncState.ledgerId, ledgerId))
     )[0]?.version;
     expect(Number(versionAfterReplace)).toBe(Number(versionAfterCreate) + 1);
+  });
+
+  it("reuses positions across repeated removals and additions without new revisions", async () => {
+    const db = getTestDb();
+    const created = await postgresLedgerProjectionAdapter.createManual({
+      expectedMainCurrency: "CNY",
+      ledgerId,
+      title: "Repeated edits",
+      entries: [entry("Keep"), entry("Replace")],
+      bookId: await testBookId(db, ledgerId),
+    });
+    for (let iteration = 0; iteration < 3; iteration++) {
+      const rows = await db.query.ledgerEntries.findMany({
+        where: and(
+          eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
+          isNull(ledgerEntries.deletedAt)
+        ),
+        orderBy: ledgerEntries.position,
+      });
+      const expectedVersion = 1 + iteration * 2;
+      expect(
+        await postgresSourceDocumentAggregateAdapter.deleteEntries({
+          ledgerId,
+          target: { sourceDocumentId: created.sourceDocumentId, expectedVersion },
+          ledgerEntryId: rows[1]!.id,
+        })
+      ).toMatchObject({ ok: true, version: expectedVersion + 1 });
+      expect(
+        await postgresSourceDocumentAggregateAdapter.addEntry({
+          ledgerId,
+          target: {
+            sourceDocumentId: created.sourceDocumentId,
+            expectedVersion: expectedVersion + 1,
+          },
+          amount: "10",
+          currency: "CNY",
+          itemName: `Replacement ${iteration}`,
+        })
+      ).toMatchObject({ ok: true, version: expectedVersion + 2 });
+    }
+    expect(
+      await postgresSourceDocumentAggregateAdapter.addEntry({
+        ledgerId,
+        target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 1 },
+        amount: "10",
+        currency: "CNY",
+        itemName: "Stale",
+      })
+    ).toMatchObject({ ok: false, reason: "stale", currentVersion: 7 });
+    const document = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, created.sourceDocumentId),
+    });
+    expect(document).toMatchObject({ activeRevisionId: created.revisionId, version: 7 });
+    expect(
+      await db.query.sourceDocumentRevisions.findMany({
+        where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
+      })
+    ).toHaveLength(1);
+    const rows = await db.query.ledgerEntries.findMany({
+      where: and(
+        eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
+        isNull(ledgerEntries.deletedAt)
+      ),
+      orderBy: ledgerEntries.position,
+    });
+    expect(rows.map(({ position, itemName }) => ({ position, itemName }))).toEqual([
+      { position: 0, itemName: "Keep" },
+      { position: 1, itemName: "Replacement 2" },
+    ]);
   });
 });

@@ -34,7 +34,7 @@ describe("createAIContext", () => {
     createAIContext({
       signal: mockSignal,
       getClient: () => mockClient,
-      modelConfig: { text: "test-text-model", vision: "test-vision-model" },
+      model: "test-model",
     });
 
   it("should return an object with generate method", () => {
@@ -50,7 +50,6 @@ describe("createAIContext", () => {
     const result = await context.generate({
       prompt: "Test prompt",
       messages: [{ role: "user", content: "Hello" }],
-      model: "text" as const,
     });
 
     expect(mockGenerateContent).toHaveBeenCalled();
@@ -58,7 +57,7 @@ describe("createAIContext", () => {
     expect(result).toHaveProperty("usage");
   });
 
-  it("should throw error when text model receives image content", async () => {
+  it("accepts image content with the configured model", async () => {
     const context = createContext();
 
     await expect(
@@ -72,41 +71,23 @@ describe("createAIContext", () => {
             ],
           },
         ],
-        model: "text" as const,
       })
-    ).rejects.toThrow("text model tier does not support image content");
+    ).resolves.toHaveProperty("content");
   });
 
   it("should throw error when text model config is missing", async () => {
     const context = createAIContext({
       signal: mockSignal,
       getClient: () => mockClient,
-      modelConfig: { text: "", vision: "test-vision-model" },
+      model: "",
     });
 
     await expect(
       context.generate({
         prompt: "Test prompt",
         messages: [{ role: "user", content: "Hello" }],
-        model: "text" as const,
       })
-    ).rejects.toThrow('AI model configuration for tier "text" is required');
-  });
-
-  it("should throw error when vision model config is missing", async () => {
-    const context = createAIContext({
-      signal: mockSignal,
-      getClient: () => mockClient,
-      modelConfig: { text: "test-text-model", vision: "" },
-    });
-
-    await expect(
-      context.generate({
-        prompt: "Test prompt",
-        messages: [{ role: "user", content: "Hello" }],
-        model: "vision" as const,
-      })
-    ).rejects.toThrow('AI model configuration for tier "vision" is required');
+    ).rejects.toThrow("AI model configuration is required");
   });
 
   it("should use default maxTokens and temperature", async () => {
@@ -115,7 +96,6 @@ describe("createAIContext", () => {
     await context.generate({
       prompt: "Test prompt",
       messages: [{ role: "user", content: "Hello" }],
-      model: "text" as const,
     });
 
     const callArgs = getGenerateContentCall();
@@ -129,7 +109,7 @@ describe("createAIContext", () => {
     await context.generate({
       prompt: "Test prompt",
       messages: [{ role: "user", content: "Hello" }],
-      model: "text" as const,
+
       maxTokens: 2048,
       temperature: 0.5,
     });
@@ -148,7 +128,6 @@ describe("createAIContext", () => {
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi there" },
       ],
-      model: "text" as const,
     });
 
     const callArgs = getGenerateContentCall();
@@ -169,7 +148,6 @@ describe("createAIContext", () => {
     const result = await context.generate({
       prompt: "Test prompt",
       messages: [{ role: "user", content: "Hello" }],
-      model: "text" as const,
     });
 
     expect(Object.hasOwn(result, "usage")).toBe(false);
@@ -187,7 +165,7 @@ describe("createAIContext", () => {
     const result = await context.generate({
       prompt: "Test prompt",
       messages: [{ role: "user", content: "Hello" }],
-      model: "text" as const,
+
       requireJson: true,
     });
 

@@ -19,22 +19,13 @@ export function useLedgerSettings({
   metadataPollingSession,
 }: UseLedgerSettingsParams) {
   const t = useTranslations("Settings");
-  const {
-    ledger,
-    categories,
-    uncategorizedCount,
-    credentials,
-    isSettingsLoading,
-    settingsQueryKey,
-    settingsQueryStatus,
-    settingsQueryIsFetching,
-    settingsQueryHasData,
-  } = useLedgerSettingsQueries({
-    ledgerId,
-    initialLedger,
-    initialCategories,
-    metadataPollingSession,
-  });
+  const { ledger, categories, uncategorizedCount, credentials, settingsQueryStatus } =
+    useLedgerSettingsQueries({
+      ledgerId,
+      initialLedger,
+      initialCategories,
+      metadataPollingSession,
+    });
 
   const updateLedgerMutation = useLedgerSettingsMutation({
     ledgerId,
@@ -50,10 +41,6 @@ export function useLedgerSettings({
     credentials,
     updateLedgerMutation,
     isPending: updateLedgerMutation.isPending,
-    isSettingsLoading,
-    settingsQueryKey,
     settingsQueryStatus,
-    settingsQueryIsFetching,
-    settingsQueryHasData,
   };
 }

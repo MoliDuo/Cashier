@@ -88,13 +88,6 @@ const createEntryCategoryInputSchema = strictObjectSchema({
   sortOrder: z.number().int().min(0).optional(),
 });
 
-const updateEntryCategoryInputSchema = nonEmptyStrictObjectSchema({
-  name: z.string().trim().min(1).max(100).optional(),
-  description: z.string().max(500).nullable().optional(),
-  icon: z.string().max(100).nullable().optional(),
-  sortOrder: z.number().int().min(0).optional(),
-});
-
 const reorderEntryCategoriesInputSchema = z.array(uuidSchema).min(1).max(MAX_BATCH_SIZE);
 const categoryCollectionRevisionSchema = z
   .string()
@@ -154,13 +147,6 @@ const candidateCategoryIdsSchema = z.preprocess(
   (value) => (Array.isArray(value) ? [...new Set(value)] : value),
   z.array(uuidSchema).min(2)
 );
-const startCategoryReclassificationInputSchema = strictObjectSchema({
-  ledgerEntryIds: z.preprocess(
-    (value) => (Array.isArray(value) ? [...new Set(value)] : value),
-    z.array(uuidSchema).min(1)
-  ),
-  candidateCategoryIds: candidateCategoryIdsSchema,
-});
 const categoryAssignmentModeSchema = z.union([
   strictObjectSchema({ kind: z.literal("ai"), candidateCategoryIds: candidateCategoryIdsSchema }),
   strictObjectSchema({ kind: z.literal("assign"), categoryId: uuidSchema }),
@@ -308,8 +294,6 @@ export const parseUpdateLedgerInput = (input: unknown) =>
   parseLedgerContract(updateLedgerInputSchema, input);
 export const parseCreateEntryCategoryInput = (input: unknown) =>
   parseLedgerContract(createEntryCategoryInputSchema, input);
-export const parseUpdateEntryCategoryInput = (input: unknown) =>
-  parseLedgerContract(updateEntryCategoryInputSchema, input);
 export const parseReorderEntryCategoriesInput = (input: unknown) =>
   parseLedgerContract(reorderEntryCategoriesInputSchema, input);
 export const parseSaveEntryCategoriesInput = (input: unknown) =>
@@ -330,8 +314,6 @@ export const parseLedgerEntryId = (input: unknown) =>
   parseLedgerContract(ledgerEntryIdSchema, input);
 export const parseLedgerEntryIds = (input: unknown) =>
   parseLedgerContract(ledgerEntryIdsSchema, input);
-export const parseStartCategoryReclassificationInput = (input: unknown) =>
-  parseLedgerContract(startCategoryReclassificationInputSchema, input);
 export const parseBeginCategoryAssignmentInput = (input: unknown) =>
   parseLedgerContract(beginCategoryAssignmentInputSchema, input);
 export const parseAppendCategoryAssignmentSelectionInput = (input: unknown) =>
@@ -365,7 +347,6 @@ export const parseLedgerStatsQuery = (input: unknown) =>
 
 export type UpdateLedgerInput = z.infer<typeof updateLedgerInputSchema>;
 export type CreateEntryCategoryInput = z.infer<typeof createEntryCategoryInputSchema>;
-export type UpdateEntryCategoryInput = z.infer<typeof updateEntryCategoryInputSchema>;
 export type SaveEntryCategoriesInput = z.infer<typeof saveEntryCategoriesInputSchema>;
 export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntryInputSchema>;
 export type UpdateLedgerEntryInput = z.infer<typeof updateLedgerEntryInputSchema>;

@@ -26,27 +26,6 @@ function groupSelectionFor(
   };
 }
 
-export function StaticUnifiedGroups(props: RendererProps & { readOnly: true }) {
-  return (
-    <div className="space-y-4">
-      {props.streamGroups.map((dateGroup) => (
-        <div key={dateGroup.date} className="ledger-list-group space-y-2">
-          <UnifiedGroupHeader
-            group={dateGroup}
-            mainCurrency={props.mainCurrency}
-            {...(props.timeZone != null ? { timeZone: props.timeZone } : {})}
-          />
-          <div className="space-y-4 px-2">
-            {dateGroup.items.map((item) => (
-              <StreamItemRow key={item.sourceDocument.id} item={item} props={props} readOnly />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function InteractiveUnifiedGroups(props: RendererProps) {
   const [expandedById, setExpandedById] = useState(() => new Map<string, boolean>());
   const defaultExpanded = !props.collapseEntriesDefault;
@@ -112,7 +91,6 @@ function AnimatedInteractiveGroups(props: ControlledRendererProps) {
           <StreamItemRow
             item={item}
             props={props}
-            readOnly={false}
             expanded={props.getExpanded(item.sourceDocument.id)}
             onExpandedChange={props.onExpandedChange}
           />
@@ -222,7 +200,6 @@ function VirtualizedInteractiveGroups(props: ControlledRendererProps) {
                 <StreamItemRow
                   item={row.item}
                   props={props}
-                  readOnly={false}
                   expanded={props.getExpanded(row.item.sourceDocument.id)}
                   onExpandedChange={props.onExpandedChange}
                 />

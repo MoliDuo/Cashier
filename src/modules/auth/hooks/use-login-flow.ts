@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { signIn, type SignInResponse } from "next-auth/react";
-import { useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
@@ -79,7 +78,6 @@ export function useLoginFlow(
   { initialMode = "password", isDevAuthAvailable = false }: LoginFlowOptions = {}
 ) {
   const router = useRouter();
-  const locale = useLocale();
   const callbackUrl = sanitizeCallbackUrl(useSearchParams().get("callbackUrl"));
 
   // The whole flow is one page's worth of state. Reloading in the middle of it
@@ -142,7 +140,6 @@ export function useLoginFlow(
         await signIn("password", {
           email: submittedEmail,
           password: submittedPassword,
-          locale,
           redirect: false,
           callbackUrl,
         })
@@ -190,7 +187,7 @@ export function useLoginFlow(
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await signIn("otp", { email, otp, locale, redirect: false, callbackUrl }));
+      finishSignIn(await signIn("otp", { email, otp, redirect: false, callbackUrl }));
     } catch {
       setError(t("unexpectedError"));
       setIsLoading(false);
@@ -229,7 +226,7 @@ export function useLoginFlow(
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await signIn("dev", { locale, redirect: false, callbackUrl }));
+      finishSignIn(await signIn("dev", { redirect: false, callbackUrl }));
     } catch {
       setError(t("devSignInFailed"));
       setIsLoading(false);

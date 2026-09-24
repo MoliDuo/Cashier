@@ -60,45 +60,48 @@ describe("useCategoryMutations", () => {
   it("does not invalidate server state after a failed write", async () => {
     const { queryClient, wrapper } = setup();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-    createAction.mockRejectedValue(new Error("create failed"));
+    saveAction.mockRejectedValue(new Error("create failed"));
     const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
 
     await act(async () => {
-      await expect(result.current.createCategory.mutateAsync({ name: "New" })).rejects.toThrow(
-        "create failed"
-      );
+      await expect(
+        result.current.saveCategories.mutateAsync({
+          expectedRevision: "a".repeat(64),
+          categories: [],
+        })
+      ).rejects.toThrow("create failed");
     });
 
     expect(invalidate).not.toHaveBeenCalled();
   });
 
-  it("keeps cached categories unchanged and invalidates category-bearing queries", async () => {
+  it("stores saved categories and invalidates category-bearing queries", async () => {
     const { queryClient, wrapper } = setup();
     queryClient.setQueryData(queryKeys.entryCategories("ledger-1"), [
       { ...category, entryCount: 7 },
     ]);
-    updateAction.mockResolvedValue({ ...category, name: "Dining" });
+    saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
     const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
     const { result } = renderHook(() => useCategoryMutations("ledger-1"), { wrapper });
 
     await act(async () => {
-      await result.current.updateCategory.mutateAsync({
-        id: category.id,
-        data: { name: "Dining" },
+      await result.current.saveCategories.mutateAsync({
+        expectedRevision: "a".repeat(64),
+        categories: [{ id: category.id, name: "Dining", description: null, icon: null }],
       });
     });
 
     expect(queryClient.getQueryData(queryKeys.entryCategories("ledger-1"))).toEqual([
-      { ...category, entryCount: 7 },
+      { ...category, name: "Dining" },
     ]);
     expect(invalidate.mock.calls.map(([filters]) => filters!.queryKey)).toEqual([
       queryKeys.entryCategories("ledger-1"),
       queryKeys.sourceDocumentStreamPrefix("ledger-1"),
       queryKeys.ledgerEntriesPrefix("ledger-1"),
-      queryKeys.ledgerEntryPrefix("ledger-1"),
       queryKeys.sourceDocumentDetailPrefix("ledger-1"),
       queryKeys.summaryPrefix("ledger-1"),
       queryKeys.enhancedStatsPrefix("ledger-1"),
+      queryKeys.sourceDocumentStreamTotalPrefix("ledger-1"),
     ]);
   });
 
@@ -128,7 +131,7 @@ describe("useCategoryMutations", () => {
     await waitFor(() => expect(result.current.saveCategories.isSuccess).toBe(true));
   });
 
-  it("invalidates calendar queries after a bulk category save", async () => {
+  it("invalidates statistics queries after a bulk category save", async () => {
     const { queryClient, wrapper } = setup();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
     saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
@@ -142,7 +145,7 @@ describe("useCategoryMutations", () => {
     });
 
     expect(invalidate.mock.calls.map(([filters]) => filters!.queryKey)).toContainEqual(
-      queryKeys.calendarPrefix("ledger-1")
+      queryKeys.enhancedStatsPrefix("ledger-1")
     );
   });
 

@@ -70,10 +70,6 @@ export interface BookPort {
    * book with no API keys bound to it.
    */
   delete(ledgerId: LedgerId, bookId: string): Promise<DeleteBookResult>;
-  /** How many live records the book holds; 0 means it can be archived. */
-  countDocuments(ledgerId: LedgerId, bookId: string): Promise<number>;
-  /** Whether any API key is still bound to the book. */
-  hasCredentials(ledgerId: LedgerId, bookId: string): Promise<boolean>;
 }
 
 export type ArchiveBookResult =

@@ -310,7 +310,7 @@ export const postgresLedgerEntryCommandAdapter: LedgerEntryCommandPort = {
         sourceDocumentId: document.id,
         expectedActiveRevisionId: document.activeRevisionId,
         expectedStateVersion: input.target.expectedVersion,
-        revisionId: crypto.randomUUID(),
+
         entries: [
           ...entries.map(toProjectionEntry),
           {
@@ -388,7 +388,7 @@ export const postgresLedgerEntryCommandAdapter: LedgerEntryCommandPort = {
         sourceDocumentId: document.id,
         expectedActiveRevisionId: document.activeRevisionId,
         expectedStateVersion: input.target.expectedVersion,
-        revisionId: crypto.randomUUID(),
+
         entries: entries.map((entry) =>
           entry.id === target.id
             ? {
@@ -448,7 +448,7 @@ export const postgresLedgerEntryCommandAdapter: LedgerEntryCommandPort = {
         sourceDocumentId: document.id,
         expectedActiveRevisionId: document.activeRevisionId,
         expectedStateVersion: input.target.expectedVersion,
-        revisionId: crypto.randomUUID(),
+
         entries: entries.filter((entry) => entry.id !== input.ledgerEntryId).map(toProjectionEntry),
       });
       return {
@@ -590,7 +590,7 @@ export const postgresLedgerEntryCommandAdapter: LedgerEntryCommandPort = {
           sourceDocumentId: document.id,
           expectedActiveRevisionId: document.activeRevisionId!,
           expectedStateVersion: document.version,
-          revisionId: crypto.randomUUID(),
+
           entries: entries.map((entry) => nextById.get(entry.id) ?? toProjectionEntry(entry)),
         });
       }
@@ -672,7 +672,7 @@ export const postgresLedgerEntryCommandAdapter: LedgerEntryCommandPort = {
             sourceDocumentId,
             expectedActiveRevisionId: document.activeRevisionId,
             expectedStateVersion: target.expectedVersion,
-            revisionId: crypto.randomUUID(),
+
             entries: entries.filter((entry) => !selected.has(entry.id)).map(toProjectionEntry),
           });
           return null;

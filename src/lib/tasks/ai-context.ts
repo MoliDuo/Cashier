@@ -1,21 +1,14 @@
 import crypto from "node:crypto";
-import type {
-  AIClientFactory,
-  AIContext,
-  AIGenerateOptions,
-  AIModelConfig,
-  AIResponse,
-  AIModelTier,
-} from "./types";
+import type { AIClientFactory, AIContext, AIGenerateOptions, AIResponse } from "./types";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { isValidJson, extractJson, buildRepairPrompt } from "./json-utils";
-import { AppError, ValidationError } from "@/lib/errors";
+import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
 interface CreateAIContextOptions {
   signal: AbortSignal;
   getClient: AIClientFactory;
-  modelConfig: AIModelConfig;
+  model: string;
 }
 
 /**
@@ -24,11 +17,7 @@ interface CreateAIContextOptions {
  * Provides AI capabilities with JSON validation/repair and
  * abort signal propagation.
  */
-export function createAIContext({
-  signal,
-  getClient,
-  modelConfig,
-}: CreateAIContextOptions): AIContext {
+export function createAIContext({ signal, getClient, model }: CreateAIContextOptions): AIContext {
   return {
     async generate(options: AIGenerateOptions): Promise<AIResponse> {
       const correlationId = crypto.randomUUID();
@@ -55,31 +44,8 @@ export function createAIContext({
               }),
       })) as ChatCompletionMessageParam[];
 
-      // Guard: text tier must not receive image content
-      if (options.model === "text") {
-        const hasImages = options.messages.some(
-          (msg) =>
-            Array.isArray(msg.content) && msg.content.some((part) => part.type === "image_url")
-        );
-        if (hasImages) {
-          throw new ValidationError(
-            "text model tier does not support image content — use vision tier for image inputs"
-          );
-        }
-      }
-
-      // Resolve model tier to concrete model name from startup configuration
-      const modelMap: Record<AIModelTier, string | undefined> = {
-        text: modelConfig.text,
-        vision: modelConfig.vision,
-      };
-      const model = modelMap[options.model];
-      if (model == null || model === "") {
-        throw new AppError(
-          `AI model configuration for tier "${options.model}" is required`,
-          "AI_MODEL_CONFIG_REQUIRED"
-        );
-      }
+      if (!model)
+        throw new AppError("AI model configuration is required", "AI_MODEL_CONFIG_REQUIRED");
 
       const maxTokens = options.maxTokens ?? 8192;
       const temperature = options.temperature ?? 1;
@@ -131,15 +97,6 @@ export function createAIContext({
             "AI returned invalid JSON, attempting repair"
           );
 
-          // Use text model for repair (via AIModelTier selection)
-          const textModel = modelMap["text"];
-          if (textModel == null || textModel === "") {
-            throw new AppError(
-              'AI model configuration for tier "text" is required for JSON repair',
-              "AI_MODEL_CONFIG_REQUIRED"
-            );
-          }
-
           const repairPrompt = buildRepairPrompt(result.content);
 
           // Internal call to client.generateContent, not through generate()
@@ -147,7 +104,7 @@ export function createAIContext({
           const repairResult = await client.generateContent(
             repairPrompt,
             [{ role: "user", content: "Please fix the JSON." }],
-            textModel,
+            model,
             8192,
             1,
             undefined,
@@ -160,7 +117,7 @@ export function createAIContext({
             logger.error(
               {
                 correlationId,
-                model: textModel,
+                model,
                 durationMs: Date.now() - startedAt,
                 errorCode: "AI_JSON_REPAIR_FAILED",
                 originalLength: result.content.length,

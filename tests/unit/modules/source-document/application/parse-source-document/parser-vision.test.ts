@@ -86,13 +86,15 @@ describe("executeParser — single-pass receipt parser", () => {
 
   // === Model selection ===
 
-  it("uses vision model when image evidence is provided", async () => {
+  it("uses the configured model when image evidence is provided", async () => {
     await executeParser(
       { evidence: { images: [{ dataUrl: "data:image/jpeg;base64,abc" }] }, originalCategories: [] },
       mockAI
     );
 
-    expect(getFirstGenerateCall(mockAI.generate as ReturnType<typeof vi.fn>).model).toBe("vision");
+    expect(getFirstGenerateCall(mockAI.generate as ReturnType<typeof vi.fn>)).not.toHaveProperty(
+      "model"
+    );
   });
 
   it("passes preloaded image evidence to the AI", async () => {
@@ -145,10 +147,12 @@ describe("executeParser — single-pass receipt parser", () => {
     expect(generate).toHaveBeenCalledTimes(1);
   });
 
-  it("uses text model when only text is provided", async () => {
+  it("uses the configured model when only text is provided", async () => {
     await executeParser({ text: "Taxi fare SGD 28.00", originalCategories: [] }, mockAI);
 
-    expect(getFirstGenerateCall(mockAI.generate as ReturnType<typeof vi.fn>).model).toBe("text");
+    expect(getFirstGenerateCall(mockAI.generate as ReturnType<typeof vi.fn>)).not.toHaveProperty(
+      "model"
+    );
   });
 
   it("uses vision model for mixed text+image input", async () => {
@@ -161,7 +165,9 @@ describe("executeParser — single-pass receipt parser", () => {
       mockAI
     );
 
-    expect(getFirstGenerateCall(mockAI.generate as ReturnType<typeof vi.fn>).model).toBe("vision");
+    expect(getFirstGenerateCall(mockAI.generate as ReturnType<typeof vi.fn>)).not.toHaveProperty(
+      "model"
+    );
   });
 
   // === Outcome branches ===

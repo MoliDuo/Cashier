@@ -289,14 +289,12 @@ export const postgresCategoryAssignmentV2Adapter = {
           .values({
             ledgerId: input.ledgerId,
             status: "preparing",
-            formatVersion: 2,
             requestKey: input.requestKey,
             declaredEntryCount: input.expectedEntryCount,
             candidateSnapshot: input.candidates,
             customPromptSnapshot: input.customPrompt,
             parentJobId: input.parentJobId ?? null,
             ...modeColumns(input.mode),
-            nextAttemptAt: now,
             createdAt: now,
             updatedAt: now,
           })
@@ -358,7 +356,6 @@ export const postgresCategoryAssignmentV2Adapter = {
         and(
           eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
           eq(categoryReclassificationJobs.id, input.jobId),
-          eq(categoryReclassificationJobs.formatVersion, 2),
           inArray(categoryReclassificationJobs.status, ["partial", "failed", "cancelled"])
         )
       )
@@ -704,7 +701,6 @@ export const postgresCategoryAssignmentV2Adapter = {
         .set({
           status: "pending",
           documentTotal: documents.length,
-          nextAttemptAt: now,
           updatedAt: now,
         })
         .where(eq(categoryReclassificationJobs.id, input.jobId))
@@ -757,8 +753,7 @@ export const postgresCategoryAssignmentV2Adapter = {
           FROM ${categoryReclassificationJobDocuments} AS work
           INNER JOIN ${categoryReclassificationJobs} AS job
             ON job.id = work.job_id AND job.ledger_id = work.ledger_id
-          WHERE job.format_version = 2
-            AND job.status IN ('pending', 'running')
+          WHERE job.status IN ('pending', 'running')
             AND work.next_attempt_at <= ${input.now}
             AND (
               work.status = 'pending'
@@ -1196,7 +1191,6 @@ export const postgresCategoryAssignmentV2Adapter = {
         .values({
           ledgerId: input.ledgerId,
           status: "pending",
-          formatVersion: 2,
           mode: original.mode,
           directCategoryId: original.directCategoryId,
           candidateCategoryIds: original.candidateCategoryIds,
@@ -1207,7 +1201,6 @@ export const postgresCategoryAssignmentV2Adapter = {
           declaredEntryCount: failedEntries.length,
           receivedEntryCount: failedEntries.length,
           documentTotal: failedDocuments.length,
-          nextAttemptAt: now,
           createdAt: now,
           updatedAt: now,
         })

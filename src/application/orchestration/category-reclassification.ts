@@ -180,7 +180,14 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
       claimToken: work.claimToken,
       errorCode,
       maxAttempts: AI_CATEGORY_MAX_ATTEMPTS,
-      ...(errorCode === "ai_rate_limited" ? { retryAfterMs: 10_000 } : {}),
+      ...(errorCode === "ai_rate_limited"
+        ? {
+            retryAfterMs:
+              error instanceof AppError && typeof error.details?.retryAfterMs === "number"
+                ? error.details.retryAfterMs
+                : 10_000,
+          }
+        : {}),
       now: new Date(),
     });
     logger.warn(

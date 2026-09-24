@@ -108,6 +108,30 @@ describe("useSourceDocumentStream", () => {
     );
   });
 
+  it("does not let a newer stream page consume pending shared invalidations", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const baseline = {
+      version: "1",
+      changed: true,
+      hasTransitionalWork: true,
+      invalidations: { categories: true, settings: true, stats: true },
+    };
+    client.setQueryData(queryKeys.sourceDocumentRefresh("ledger-1"), baseline);
+    listStreamPageActionMock.mockResolvedValueOnce({
+      items: [makeItem("new")],
+      nextCursor: null,
+      generation: "8",
+      hasTransitionalWork: false,
+    });
+    const { result, unmount } = renderHook(() => useTestSourceDocumentStream("ledger-1"), {
+      wrapper: createWrapper(client),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(client.getQueryData(queryKeys.sourceDocumentRefresh("ledger-1"))).toEqual(baseline);
+    unmount();
+    client.clear();
+  });
+
   it("enables the shared refresh scope by default", async () => {
     renderHook(() => useTestSourceDocumentStream("ledger-1"), {
       wrapper: createWrapper(),

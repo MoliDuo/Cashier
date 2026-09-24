@@ -1,12 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import {
-  processingAttempts,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "../transaction-locks";
 import { assertExpectedSourceDocumentVersion, ledgerScopedRevisionWhere } from "./revision-guards";
 import { activeDocumentWhere } from "./shared";
@@ -44,15 +39,6 @@ export async function cancelSourceDocumentProcessing(
         and(
           eq(processingOutbox.revisionId, revisionId),
           inArray(processingOutbox.status, ["pending", "claimed"])
-        )
-      );
-    await tx
-      .update(processingAttempts)
-      .set({ status: "cancelled", completedAt: now })
-      .where(
-        and(
-          eq(processingAttempts.revisionId, revisionId),
-          inArray(processingAttempts.status, ["queued", "processing"])
         )
       );
 

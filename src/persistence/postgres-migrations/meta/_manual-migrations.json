@@ -93,6 +93,10 @@
     {
       "file": "0047_member_profiles.sql",
       "sha256": "8d5c3d7024119191186e1d68149d006ba03583abebd1ab37ea979ade28c5886c"
+    },
+    {
+      "file": "0052_simplify_retired_workflows.sql",
+      "sha256": "772e73b19bd0dd802f68abb864c211ece7c1c432f80573972b21a07246111a73"
     }
   ]
 }

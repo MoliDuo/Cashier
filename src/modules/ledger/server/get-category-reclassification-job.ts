@@ -13,13 +13,10 @@ export const getCategoryReclassificationJobAction = withLedgerAccess(
   async (ledgerId: string): Promise<CategoryReclassificationJobDto | null> => {
     const job = await serverComposition.categoryReclassificationJobs.getLatest({ ledgerId });
     if (job == null) return null;
-    const metrics =
-      job.formatVersion === 2
-        ? await serverComposition.categoryAssignments.getProgressMetrics({
-            ledgerId,
-            jobId: job.id,
-          })
-        : undefined;
+    const metrics = await serverComposition.categoryAssignments.getProgressMetrics({
+      ledgerId,
+      jobId: job.id,
+    });
     return toCategoryReclassificationJobDto(job, metrics);
   }
 );

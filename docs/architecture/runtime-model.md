@@ -41,8 +41,7 @@ worker or scheduler, Cashier does not promise automatic recovery after that term
 
 ## Unified Stream
 
-The ledger home shows one Stream containing queued, processing, invalid, duplicate-review, failed,
-and completed source documents. Server-side keyset pagination orders records by
+The ledger home shows one Stream containing processing, failed, and completed source documents. Server-side keyset pagination orders records by
 `entryDate DESC, createdAt DESC, id DESC`; the browser preserves server order.
 
 ## Refresh ownership
@@ -74,9 +73,7 @@ safe check.
 
 Source-document images are not persisted in IndexedDB or a service-worker cache. Every view uses the
 authenticated `/api/stored-files/{fileId}` route, whose responses use `Cache-Control: private,
-no-store`. Reopening an image therefore performs a new authorized read. On the first startup after
-upgrading from the former persistent image-cache implementation, the browser deletes the retired
-`cashier-cache` IndexedDB database.
+no-store`. Reopening an image therefore performs a new authorized read.
 
 ## Storage boundaries
 
@@ -109,3 +106,23 @@ instrumentation lifecycle token.
 Jobs remain durable and use claim leases, fencing tokens, bounded concurrency, exponential retry,
 and a permanent-failure state. Migration `0035_maintenance_work_lifecycle.sql` backfills historical
 snapshots once. Runtime maintenance does not repeatedly scan history to recreate missing jobs.
+
+## Simplified persistence
+
+Processing leases, scheduling state, timestamps, and diagnostic fields live in processing_outbox.
+There is no second attempts table to synchronize. Historical terminal diagnostics are migrated into
+these rows; existing claim tokens and expiry times are preserved.
+
+Manual edits update the active projection and increment the document version without creating a
+revision or copying entry history. Splits keep the original active revision and create evidence
+revisions only for newly created documents. Existing history stays intact. The latest submission
+revision still identifies original input for retry; it is distinct from the active result.
+
+AI text, image, and JSON repair requests use the single configured model. Category document slots
+are limited to one across database-coordinated workers. The AI client serializes provider requests
+within each process and honors Retry-After cooldowns; this is not a provider-wide quota across
+multiple application instances.
+
+Migration 0052 refuses to retire V1 category results still within their seven-day retention window,
+or active processing attempts lacking durable jobs. It transfers diagnostics before dropping the
+old attempts table. Run migrations with old application workers stopped before starting new code.

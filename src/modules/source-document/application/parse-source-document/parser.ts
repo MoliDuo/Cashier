@@ -161,16 +161,14 @@ export async function executeParser(
   const aiLanguage = input.aiLanguage ?? "zh-CN";
   const images = input.evidence?.images;
   const hasImages = (images?.length ?? 0) > 0;
-  const model = hasImages ? "vision" : "text";
 
   const prompt = buildPrompt(input, aiLanguage);
 
-  logger.debug({ model, hasImages }, "parser: calling AI");
+  logger.debug({ hasImages }, "parser: calling AI");
 
   let response: Awaited<ReturnType<AiContextContract["generate"]>>;
   try {
     response = await ai.generate({
-      model,
       prompt,
       messages: [{ role: "user", content: buildMessageContent(images) }],
       requireJson: true,

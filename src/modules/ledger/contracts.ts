@@ -90,11 +90,6 @@ export interface ApplyCategoryPresetResult {
   retainedCategoryCount: number;
 }
 
-export interface StartCategoryReclassificationInput {
-  ledgerEntryIds: string[];
-  candidateCategoryIds: string[];
-}
-
 export type CategoryAssignmentMode =
   | { kind: "ai"; candidateCategoryIds: string[] }
   | { kind: "assign"; categoryId: string }
@@ -134,7 +129,6 @@ export interface CategoryAssignmentCandidateSnapshot {
  */
 export interface CategoryReclassificationJobDto {
   id: string;
-  formatVersion: number;
   mode: CategoryAssignmentMode;
   status: CategoryAssignmentJobStatus;
   /** How many entries the run covers. */

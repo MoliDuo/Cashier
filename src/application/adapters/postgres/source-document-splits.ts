@@ -156,12 +156,6 @@ export async function splitSourceDocumentAtomically(input: {
       throw new ConflictError("Source document entries changed before the split");
     }
 
-    const sourceRevision = await createManualRevision(tx, {
-      ledgerId: input.ledgerId,
-      sourceDocumentId: input.sourceDocumentId,
-      origin: "manual_edit",
-      inputText: activeRevision.inputText,
-    });
     await tx.insert(sourceDocuments).values({
       id: splitSourceDocumentId,
       ledgerId: input.ledgerId,
@@ -180,24 +174,33 @@ export async function splitSourceDocumentAtomically(input: {
     await copyRevisionFiles(tx, {
       ledgerId: input.ledgerId,
       fromRevisionId: activeRevision.id,
-      toRevisionId: sourceRevision.id,
-    });
-    await copyRevisionFiles(tx, {
-      ledgerId: input.ledgerId,
-      fromRevisionId: activeRevision.id,
       toRevisionId: splitRevision.id,
     });
 
+    // Free the active positions before assigning contiguous positions in the same revision.
+    const positionOffset = Math.max(0, ...currentEntries.map((entry) => entry.position + 1));
+    await tx
+      .update(ledgerEntries)
+      .set({ position: sql`${ledgerEntries.position} + ${positionOffset}` })
+      .where(
+        and(
+          eq(ledgerEntries.ledgerId, input.ledgerId),
+          eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
+          eq(ledgerEntries.sourceDocumentRevisionId, activeRevision.id),
+          isNull(ledgerEntries.deletedAt)
+        )
+      );
+
     const now = new Date();
-    let sourcePosition = 0;
     let splitPosition = 0;
+    let sourcePosition = 0;
     const entryPatches = currentEntries.map((entry) => {
       const movedIndex = movedIndexById.get(entry.id);
       const isMoved = movedIndex != null;
       return {
         id: entry.id,
         source_document_id: isMoved ? splitSourceDocumentId : input.sourceDocumentId,
-        source_document_revision_id: isMoved ? splitRevision.id : sourceRevision.id,
+        source_document_revision_id: isMoved ? splitRevision.id : activeRevision.id,
         position: isMoved ? splitPosition++ : sourcePosition++,
         converted_amount:
           isMoved && conversions != null
@@ -236,20 +239,9 @@ export async function splitSourceDocumentAtomically(input: {
     if (updatedEntries.rows.length !== currentEntries.length) {
       throw new ConflictError("Source document entries changed during the split");
     }
-    if (currentEntries.length > 0) {
-      await tx.insert(ledgerEntries).values(
-        currentEntries.map((entry) => ({
-          ...entry,
-          id: crypto.randomUUID(),
-          deletedAt: now,
-          updatedAt: now,
-        }))
-      );
-    }
     await tx
       .update(sourceDocuments)
       .set({
-        activeRevisionId: sourceRevision.id,
         dateOrganizationSuggestion: null,
         version: sql`${sourceDocuments.version} + 1`,
         updatedAt: now,

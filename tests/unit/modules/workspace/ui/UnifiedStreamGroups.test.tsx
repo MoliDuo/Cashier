@@ -98,8 +98,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         isSelectionMode={false}
         selectedIds={[]}
         onToggleSelection={vi.fn()}
-        noRecordsText="No records"
-        getItemProps={() => ({})}
       />
     );
 
@@ -133,8 +131,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         isSelectionMode={false}
         selectedIds={[]}
         onToggleSelection={vi.fn()}
-        noRecordsText="No records"
-        getItemProps={() => ({})}
       />
     );
 
@@ -169,8 +165,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         isSelectionMode={false}
         selectedIds={[]}
         onToggleSelection={vi.fn()}
-        noRecordsText="No records"
-        getItemProps={() => ({})}
         collapseEntriesDefault
       />
     );
@@ -211,8 +205,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         selectedIds={["document-1"]}
         disableUnselected
         onToggleSelection={vi.fn()}
-        noRecordsText="No records"
-        getItemProps={() => ({})}
       />
     );
 
@@ -250,7 +242,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
     const onViewSourceDetail = vi.fn();
     const onDeleteSourceConfirm = vi.fn();
     const onToggleSelection = vi.fn();
-    const getItemProps = () => ({});
     cardProps.mockClear();
 
     const { rerender } = render(
@@ -262,8 +253,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         isSelectionMode
         selectedIds={[]}
         onToggleSelection={onToggleSelection}
-        noRecordsText="No records"
-        getItemProps={getItemProps}
       />
     );
     expect(cardProps).toHaveBeenCalledTimes(2);
@@ -277,8 +266,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         isSelectionMode
         selectedIds={["document-1"]}
         onToggleSelection={onToggleSelection}
-        noRecordsText="No records"
-        getItemProps={getItemProps}
       />
     );
 
@@ -463,8 +450,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
           isSelectionMode={false}
           selectedIds={[]}
           onToggleSelection={vi.fn()}
-          noRecordsText="No records"
-          getItemProps={() => ({})}
         />
       </div>
     );
