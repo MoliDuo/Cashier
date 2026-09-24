@@ -17,8 +17,6 @@ export default defineConfig([
     "playwright-report/**",
     "test-results/**",
     "public/sw.js",
-    "public/worker-*.js",
-    "public/fallback-*.js",
   ]),
   {
     files: ["**/*.ts", "**/*.tsx"],

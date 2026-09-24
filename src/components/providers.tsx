@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QUERY } from "@/lib/constants";
-import { ServiceWorkerUpdate } from "@/components/ServiceWorkerUpdate";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => {
@@ -41,7 +40,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         {children}
-        <ServiceWorkerUpdate />
         <Toaster position="top-center" richColors closeButton />
       </ThemeProvider>
     </QueryClientProvider>

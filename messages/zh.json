@@ -853,19 +853,6 @@
     "description": "加载账本数据时发生错误。这可能是由于网络问题或账本不存在导致。",
     "backToHome": "返回主页"
   },
-  "ServiceWorkerUpdate": {
-    "title": "需要重新加载应用",
-    "description": "服务器已更新。请先保存当前修改，然后重新加载以继续使用。",
-    "updateNow": "重新加载",
-    "later": "稍后",
-    "updating": "正在重新加载…",
-    "dirtyBlocked": "请先保存或放弃当前修改，再重新加载应用",
-    "requestBlocked": "有请求正在进行，完成后会自动重新加载应用",
-    "dialogBlocked": "请先关闭当前弹窗，再重新加载应用",
-    "focusBlocked": "请先离开输入框，再重新加载应用",
-    "batchBlocked": "请先结束批量选择，再重新加载应用",
-    "offlineBlocked": "请先恢复网络连接，再重新加载应用"
-  },
   "LedgerQueryError": {
     "emptyDescription": "无法加载当前页面，请检查网络后重试。",
     "description": "数据刷新失败，当前显示的内容可能不是最新的。",

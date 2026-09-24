@@ -63,15 +63,10 @@ cursor consistency.
 
 ## Client caching
 
-Cashier does not provide offline availability. The service worker precaches immutable assets but
-does not serve navigation requests or cached API responses.
-
-Production PWA updates are browser-side service-worker handoffs, not two server deployments. The
-current worker keeps controlling an open page while a newly installed worker waits. The app asks
-the waiting worker to activate only when one Cashier window remains and the visible page has no
-dirty editor, active request, open dialog, batch selection, or focused text input. A successful
-handoff triggers one reload under the new worker; otherwise the old page continues until a later
-safe check.
+Cashier does not provide offline availability and registers no service worker; every page load
+fetches the current deployment. The web manifest keeps the app installable from the browser menu
+and the iOS share sheet. `public/sw.js` only retires the precaching worker older releases
+installed: it activates immediately, deletes every cache, and unregisters itself.
 
 Source-document images are not persisted in IndexedDB or a service-worker cache. Every view uses the
 authenticated `/api/stored-files/{fileId}` route, whose responses use `Cache-Control: private,

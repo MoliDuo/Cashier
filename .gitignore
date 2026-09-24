@@ -37,8 +37,6 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Service worker build output
-public/sw.js
 
 # local tools and worktrees
 .claude/

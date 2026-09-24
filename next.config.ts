@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import withSerwistInit from "@serwist/next";
 
 const withNextIntl = createNextIntlPlugin();
 const demoProject = process.env.CASHIER_DEMO_PROJECT;
@@ -53,23 +52,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-/**
- * How the service worker is built and what it is allowed to precache.
- *
- * `cacheOnNavigation: false` is the one that matters: the app shell is
- * per-account and per-locale, so a cached navigation could hand a reader a
- * shell that is not theirs.
- */
-const serwistOptions = {
-  swSrc: "src/service-worker.ts",
-  swDest: "public/sw.js",
-  swUrl: "/sw.js",
-  cacheOnNavigation: false,
-  reloadOnOnline: false,
-  disable: process.env.NODE_ENV === "development",
-  exclude: [/middleware-manifest\.json$/, /app-build-manifest\.json$/, /chunks\/app\/api\//],
-};
-
-const withSerwist = withSerwistInit(serwistOptions);
-
-export default withSerwist(withNextIntl(nextConfig));
+export default withNextIntl(nextConfig);

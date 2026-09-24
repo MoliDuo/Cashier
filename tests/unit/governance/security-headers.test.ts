@@ -1,14 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-// Both Next plugins pull the same native file watcher in, and a native addon
+// The next-intl plugin pulls a native file watcher in, and a native addon
 // loaded from two worker threads at once fails to register. Nothing here needs
-// either plugin's behaviour — only the config object they are handed.
-vi.mock("@serwist/next", () => ({
-  default:
-    () =>
-    <T>(config: T) =>
-      config,
-}));
+// the plugin's behaviour — only the config object it is handed.
 vi.mock("next-intl/plugin", () => ({
   default:
     () =>
