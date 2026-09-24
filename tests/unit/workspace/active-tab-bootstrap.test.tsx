@@ -19,7 +19,7 @@ vi.mock("@/modules/workspace/server/resolve-authenticated-home", () => ({
   resolveAuthenticatedHome: resolveAuthenticatedHomeMock,
 }));
 
-vi.mock("@/modules/workspace/application/queries/get-ledger-page-bootstrap", () => ({
+vi.mock("@/modules/workspace/server/ledger-page-bootstrap", () => ({
   getLedgerPageBootstrap: getLedgerPageBootstrapMock,
 }));
 

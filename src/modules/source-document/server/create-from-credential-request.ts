@@ -1,5 +1,6 @@
 import type { ProcessingJobContract } from "@/application/contracts";
-import type { AuthenticatedServiceCredentialContract } from "@/application/contracts";
+import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
+import { getBook } from "@/modules/ledger/server/books";
 import { serverComposition } from "@/application/server-composition-root";
 import { scheduleRequestMaintenance } from "@/application/transport/request-maintenance";
 import type { SourceDocumentSubmissionContract } from "@/application/contracts";
@@ -15,7 +16,7 @@ import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedu
  * and request-bound `after()` callbacks for the credential ingestion use case.
  */
 export async function createSourceDocumentFromCredentialRequest(input: {
-  credential: AuthenticatedServiceCredentialContract;
+  credential: AuthenticatedServiceCredential;
   idempotencyKey?: string;
   requestId?: string;
   payload: PreparedApiV1SourceDocumentInput;
@@ -27,10 +28,7 @@ export async function createSourceDocumentFromCredentialRequest(input: {
   // The key's book owns the date zone: an upload through 梁梁的 is dated in that
   // book's day rather than the server's, and a book with no zone of its own
   // falls back to the server date.
-  const book = await serverComposition.books.get(
-    input.credential.ledgerId,
-    input.credential.bookId
-  );
+  const book = await getBook(input.credential.ledgerId, input.credential.bookId);
 
   const result = await createSourceDocumentFromCredential(
     {

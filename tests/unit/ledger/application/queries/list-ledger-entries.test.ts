@@ -1,26 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
-import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import type { LedgerReadPort } from "@/modules/ledger/application/ports";
+const { listEntries, calculateStats } = vi.hoisted(() => ({
+  listEntries: vi.fn(),
+  calculateStats: vi.fn(),
+}));
 
-const listEntries = vi.fn();
-const calculateStats = vi.fn();
-const reads = { listEntries } as unknown as LedgerReadPort;
-const listLedgerEntries = (
-  ledgerId: string,
-  input: Parameters<typeof listLedgerEntriesUseCase>[1]
-) => listLedgerEntriesUseCase(ledgerId, input, reads);
+vi.mock("@/modules/ledger/access", () => ({ withLedgerAccess: vi.fn() }));
+vi.mock("@/modules/ledger/server/entry-reads/list-ledger-entry-page", () => ({
+  listLedgerEntryPage: listEntries,
+}));
+vi.mock("@/modules/ledger/server/entry-reads/calculate-ledger-entry-stats", () => ({
+  calculateLedgerEntryStats: calculateStats,
+}));
+
+import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
+import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 
 describe("listLedgerEntries", () => {
   beforeEach(() => {
     listEntries.mockReset();
   });
 
-  it("validates params, builds filters, and normalizes nextCursor to null", async () => {
+  it("validates params and builds filters", async () => {
     listEntries.mockResolvedValueOnce({
       items: [{ id: "entry-1" }],
-      nextCursor: undefined,
+      nextCursor: null,
     });
 
     const result = await listLedgerEntries("ledger-1", {
@@ -91,9 +95,7 @@ describe("listLedgerEntries", () => {
     };
 
     await listLedgerEntries("ledger-1", { ...window, limit: 20 });
-    await calculateLedgerStatsUseCase("ledger-1", window, {
-      calculateStats,
-    } as unknown as LedgerReadPort);
+    await calculateLedgerStats("ledger-1", window);
 
     expect(listEntries.mock.calls[0]![0].filters).toEqual({
       startDate: "2026-03-01",

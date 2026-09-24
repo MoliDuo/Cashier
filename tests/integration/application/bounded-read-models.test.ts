@@ -2,7 +2,6 @@ import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
-import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
 import { serverComposition } from "@/application/server-composition-root";
 import { getSourceDocumentInputQuery as getSourceDocumentInputQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-input";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
@@ -13,14 +12,10 @@ import {
   testBookId,
 } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
+import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 
-const listLedgerEntries = (
-  ledgerId: string,
-  input: Parameters<typeof listLedgerEntriesUseCase>[1]
-) => listLedgerEntriesUseCase(ledgerId, input, serverComposition.ledgerReads);
 const queryPorts = {
   documents: serverComposition.sourceDocumentReads,
-  ledgerReads: serverComposition.ledgerReads,
   changes: serverComposition.ledgerChanges,
 };
 const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>

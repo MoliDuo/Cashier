@@ -7,8 +7,6 @@ import {
   postgresLedgerProjectionAdapter,
   postgresRevisionAdapter,
 } from "@/application/adapters/postgres";
-import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { serverComposition } from "@/application/server-composition-root";
@@ -20,23 +18,18 @@ import {
 } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
+import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
+import { calculateLedgerStats } from "@/modules/ledger/server/stats";
+import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
-  const page = await serverComposition.ledgerReads.listEntries({
+  const page = await listLedgerEntryPage({
     ledgerId,
     limit: 100,
     filters: {},
   });
   return page.items.find((entry) => entry.id === id) ?? null;
 };
-const listLedgerEntries = (
-  ledgerId: string,
-  input: Parameters<typeof listLedgerEntriesUseCase>[1]
-) => listLedgerEntriesUseCase(ledgerId, input, serverComposition.ledgerReads);
-const calculateLedgerStats = (
-  ledgerId: string,
-  query: Parameters<typeof calculateLedgerStatsUseCase>[1] = {}
-) => calculateLedgerStatsUseCase(ledgerId, query, serverComposition.ledgerReads);
 async function currentVersion(sourceDocumentId: string): Promise<number> {
   const db = getTestDb();
   const row = await db.query.sourceDocuments.findFirst({
@@ -49,7 +42,6 @@ async function currentVersion(sourceDocumentId: string): Promise<number> {
 const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>
   listStreamPageUseCase(ledgerId, input, {
     documents: serverComposition.sourceDocumentReads,
-    ledgerReads: serverComposition.ledgerReads,
     changes: serverComposition.ledgerChanges,
   });
 
@@ -483,7 +475,7 @@ describe("target upper workflows", () => {
     const revisionCount = (await db.select().from(sourceDocumentRevisions)).length;
     const stream = await listLedgerEntries(ledgerId, { limit: 20 });
     const detail = await findVisibleEntry(original!.id, ledgerId);
-    const stats = await calculateLedgerStats(ledgerId);
+    const stats = await calculateLedgerStats(ledgerId, {});
     expect(stream.items[0]).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(detail).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(stats.convertedTotal).toEqual({ total: "18", currency: "CNY" });
@@ -536,7 +528,7 @@ describe("target upper workflows", () => {
     });
     await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
     await expect(findVisibleEntry(original!.id, ledgerId)).resolves.toBeNull();
-    await expect(calculateLedgerStats(ledgerId)).resolves.toMatchObject({
+    await expect(calculateLedgerStats(ledgerId, {})).resolves.toMatchObject({
       convertedTotal: { total: "0", currency: "CNY" },
     });
   });

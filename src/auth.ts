@@ -8,8 +8,7 @@ import { authenticateDevUser } from "@/modules/auth/server/authenticate-dev-user
 import { getSessionUser } from "@/modules/auth/server/session-user";
 import { isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
 import { TIME_SECONDS } from "@/lib/constants";
-import { serverComposition } from "@/application/server-composition-root";
-import { completeInteractiveSignIn } from "@/application/use-cases/complete-interactive-sign-in";
+import { completeInteractiveSignIn } from "@/modules/auth/server/complete-interactive-sign-in";
 import { AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { UnauthorizedError } from "@/lib/errors";
@@ -22,17 +21,13 @@ class AuthCredentialsSigninError extends CredentialsSignin {
   }
 }
 
-async function completeSignIn(principal: AuthenticatedPrincipal) {
-  return completeInteractiveSignIn(principal, { ledgers: serverComposition.ledgers });
-}
-
 async function authorizeInteractiveSignIn(
   authenticate: () => Promise<AuthenticatedPrincipal | null>
 ) {
   try {
     const principal = await authenticate();
     if (principal == null) return null;
-    return await completeSignIn(principal);
+    return await completeInteractiveSignIn(principal);
   } catch (error) {
     if (error instanceof AuthSignInError) {
       throw new AuthCredentialsSigninError(error.code);

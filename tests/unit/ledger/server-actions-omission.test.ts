@@ -34,31 +34,19 @@ vi.mock("@/application/server-composition-root", () => ({
       batchUpdateEntries: batchUpdateLedgerEntriesMock,
       updateEntryDates: vi.fn(),
     },
-    categories: {},
-    ledgerReads: {},
   },
 }));
-vi.mock("@/modules/ledger/application/use-cases/create-service-credential", () => ({
-  createServiceCredential: vi.fn(),
-}));
-vi.mock("@/modules/ledger/application/use-cases/delete-service-credential", () => ({
-  deleteServiceCredential: vi.fn(),
-}));
-vi.mock("@/modules/ledger/application/use-cases/update-ledger", () => ({
-  updateLedger: vi.fn(),
+vi.mock("@/modules/ledger/server/entry-reads/calculate-ledger-entry-stats", () => ({
+  calculateLedgerEntryStats: calculateLedgerEntryStatsMock,
 }));
 
 import {
   batchUpdateLedgerEntriesAction,
   createLedgerEntryAction,
 } from "@/modules/ledger/server-actions/entries";
-import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import type { LedgerReadPort } from "@/modules/ledger/application/ports";
+import { calculateLedgerStats as calculateLedgerStatsQuery } from "@/modules/ledger/server/stats";
 
-const calculateLedgerStats = (ledgerId: string) =>
-  calculateLedgerStatsUseCase(ledgerId, {}, {
-    calculateStats: calculateLedgerEntryStatsMock,
-  } as unknown as LedgerReadPort);
+const calculateLedgerStats = (ledgerId: string) => calculateLedgerStatsQuery(ledgerId, {});
 
 describe("ledger server action omission semantics", () => {
   beforeEach(() => {

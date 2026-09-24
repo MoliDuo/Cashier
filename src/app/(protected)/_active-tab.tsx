@@ -21,7 +21,7 @@ import { BOOK_SCOPE_COOKIE, parseBookScopeCookie } from "@/lib/book-scope-cookie
 import { ActiveContent } from "./_active-content";
 import { ActiveShell } from "./_active-shell";
 import { LedgerBootstrapFallback } from "./_ledger-bootstrap-fallback";
-import { getLedgerPageBootstrap } from "@/modules/workspace/application/queries/get-ledger-page-bootstrap";
+import { getLedgerPageBootstrap } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
 import { serverComposition } from "@/application/server-composition-root";
 import type { LedgerDto } from "@/modules/ledger/contracts";
@@ -99,15 +99,10 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
       ...(deviceTimeZone == null ? {} : { deviceTimeZone }),
     },
     {
-      categories: serverComposition.categories,
-      books: serverComposition.books,
-      ledgerReads: serverComposition.ledgerReads,
       sourceDocuments: {
         documents: serverComposition.sourceDocumentReads,
-        ledgerReads: serverComposition.ledgerReads,
         changes: serverComposition.ledgerChanges,
       },
-      credentials: serverComposition.serviceCredentials,
     }
   );
   // Authenticated request boundary for processing recovery: the bootstrap

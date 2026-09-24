@@ -1,12 +1,22 @@
 import { withLedgerAccess } from "../access";
-import { calculateLedgerStats } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import { serverComposition } from "@/application/server-composition-root";
+import { parseLedgerStatsQuery } from "@/modules/ledger/contract-schemas";
+import type { LedgerSummaryDto } from "@/modules/ledger/contracts";
+import { toLedgerEntryFilters } from "../domain/to-ledger-entry-filters";
+import { calculateLedgerEntryStats } from "./entry-reads/calculate-ledger-entry-stats";
 
 /**
- * The ledger's totals. The query parses its own filters, so an unvalidated
- * object can never reach the read port through this wrapper.
+ * The ledger's totals for one filtered window. It validates here rather than in
+ * the transport above it, so the session route and the server-side prefetch
+ * cannot disagree about what a query means.
  */
+export async function calculateLedgerStats(
+  ledgerId: string,
+  query: unknown
+): Promise<LedgerSummaryDto> {
+  const validated = parseLedgerStatsQuery(query);
+  return calculateLedgerEntryStats({ ledgerId, filters: toLedgerEntryFilters(validated) });
+}
+
 export const getLedgerStatsAction = withLedgerAccess(
-  async (ledgerId: string, query: unknown = {}) =>
-    calculateLedgerStats(ledgerId, query, serverComposition.ledgerReads)
+  async (ledgerId: string, query: unknown = {}) => calculateLedgerStats(ledgerId, query)
 );

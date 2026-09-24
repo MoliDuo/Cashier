@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import type { LedgerReadPort } from "@/modules/ledger/application/ports";
+const { calculateStats } = vi.hoisted(() => ({ calculateStats: vi.fn() }));
 
-const calculateStats = vi.fn();
-const reads = { calculateStats } as unknown as LedgerReadPort;
-const calculateLedgerStats = (
-  ledgerId: string,
-  query: Parameters<typeof calculateLedgerStatsUseCase>[1] = {}
-) => calculateLedgerStatsUseCase(ledgerId, query, reads);
+vi.mock("@/modules/ledger/access", () => ({ withLedgerAccess: vi.fn() }));
+vi.mock("@/modules/ledger/server/entry-reads/calculate-ledger-entry-stats", () => ({
+  calculateLedgerEntryStats: calculateStats,
+}));
+
+import { calculateLedgerStats as calculateLedgerStatsQuery } from "@/modules/ledger/server/stats";
+
+const calculateLedgerStats = (ledgerId: string, query: unknown = {}) =>
+  calculateLedgerStatsQuery(ledgerId, query);
 
 describe("calculateLedgerStats", () => {
   beforeEach(() => {
@@ -64,7 +66,7 @@ describe("calculateLedgerStats", () => {
     expect(calculateStats).toHaveBeenCalledWith({ ledgerId: "ledger-2", filters: {} });
   });
 
-  it("rejects a query it cannot read before the port is asked to count it", async () => {
+  it("rejects a query it cannot read before the database is asked to count it", async () => {
     await expect(calculateLedgerStats("ledger-1", { minAmount: "abc" })).rejects.toThrow(
       "Validation failed"
     );

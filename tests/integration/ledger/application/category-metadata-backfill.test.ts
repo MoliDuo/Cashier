@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../../setup";
-import { postgresCategoryAdapter } from "@/application/adapters/postgres";
+import { updateMissingCategoryMetadata } from "@/modules/ledger/server/categories";
 import { createTestUserWithLedger } from "../../../helpers/schema-setup";
 import { entryCategories } from "@/persistence";
 
@@ -45,7 +45,7 @@ describe("category metadata backfill", () => {
   it("backfills only missing fields and reports wrote flags from the update", async () => {
     const category = await createCategory({ icon: "existing-icon" });
 
-    const result = await postgresCategoryAdapter.updateMissingMetadata(ledgerId, category.id, {
+    const result = await updateMissingCategoryMetadata(ledgerId, category.id, {
       icon: "new-icon",
       description: "new-description",
       expectedName: category.name,
@@ -64,7 +64,7 @@ describe("category metadata backfill", () => {
   it("is a no-op when nothing is missing", async () => {
     const category = await createCategory({ icon: "icon", description: "description" });
 
-    const result = await postgresCategoryAdapter.updateMissingMetadata(ledgerId, category.id, {
+    const result = await updateMissingCategoryMetadata(ledgerId, category.id, {
       icon: "other-icon",
       description: "other-description",
       expectedName: category.name,
@@ -79,12 +79,12 @@ describe("category metadata backfill", () => {
     const category = await createCategory();
 
     const [first, second] = await Promise.all([
-      postgresCategoryAdapter.updateMissingMetadata(ledgerId, category.id, {
+      updateMissingCategoryMetadata(ledgerId, category.id, {
         icon: "icon-a",
         description: "description-a",
         expectedName: category.name,
       }),
-      postgresCategoryAdapter.updateMissingMetadata(ledgerId, category.id, {
+      updateMissingCategoryMetadata(ledgerId, category.id, {
         icon: "icon-b",
         description: "description-b",
         expectedName: category.name,

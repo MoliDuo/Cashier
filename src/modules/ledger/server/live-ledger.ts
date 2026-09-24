@@ -1,9 +1,10 @@
+import "server-only";
+import { cache } from "react";
 import { and, eq, isNull } from "drizzle-orm";
-import type { LedgerPort } from "@/application/contracts";
 import { db } from "@/lib/db";
 import { ledgers, users } from "@/persistence";
-
-import { mapLedgerSettings } from "./shared";
+import type { LedgerDto } from "@/modules/ledger/contracts";
+import { mapLedgerSettings } from "./settings";
 
 async function accountIsActive(userId: string): Promise<boolean> {
   const rows = await db
@@ -25,17 +26,20 @@ async function singleLiveLedger() {
   return rows.length === 1 ? rows[0]! : null;
 }
 
-export const postgresLedgerAdapter: LedgerPort = {
-  async getLiveLedger(userId) {
-    if (!(await accountIsActive(userId))) return null;
-    const row = await singleLiveLedger();
-    return row == null
-      ? null
-      : {
-          id: row.id,
-          settings: mapLedgerSettings(row),
-          createdAt: row.createdAt.toISOString(),
-          updatedAt: row.updatedAt.toISOString(),
-        };
-  },
-};
+/**
+ * The single live ledger, or null when the account is gone or the ledger is
+ * ambiguous. Cached per request, so the page boundary, the session check and
+ * every action in one render share a single lookup.
+ */
+export const getLiveLedger = cache(async (userId: string): Promise<LedgerDto | null> => {
+  if (!(await accountIsActive(userId))) return null;
+  const row = await singleLiveLedger();
+  return row == null
+    ? null
+    : {
+        id: row.id,
+        settings: mapLedgerSettings(row),
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+});

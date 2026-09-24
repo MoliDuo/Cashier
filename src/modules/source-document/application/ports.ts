@@ -1,6 +1,5 @@
 import type {
   RecoverableProcessingJobContract,
-  CategoryPort,
   DirectStoredFilePort,
   LedgerProjectionPort,
   StoredFileContract,
@@ -133,7 +132,7 @@ export interface SourceDocumentAggregateWritePort {
     entryDate: string;
   }): Promise<
     AtomicBatchCommandResult<{
-      impact: import("@/modules/ledger/application/ports").BatchEntryDateImpact;
+      impact: import("@/modules/ledger/contracts").BatchEntryDateImpact;
     }>
   >;
   addEntry: LedgerEntryCommandPort["create"];
@@ -171,7 +170,6 @@ export interface SourceDocumentCredentialPorts {
 }
 
 export interface QuickEntryPorts {
-  categories: Pick<CategoryPort, "get">;
   projections: Pick<LedgerProjectionPort, "createManual">;
   convertAmount(input: {
     amount: string;

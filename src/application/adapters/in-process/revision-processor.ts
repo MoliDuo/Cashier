@@ -4,9 +4,9 @@ import type {
   RevisionProcessingContextContract,
   RevisionProcessingResultContract,
   RevisionProcessorPort,
-  SettingsPort,
   SourceDocumentPort,
 } from "@/application/contracts";
+import type { LedgerSettings } from "@/modules/ledger/contracts";
 import { LedgerMainCurrencyChangedError } from "@/application/contracts";
 import { NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -40,7 +40,7 @@ export interface CurrentRevisionProcessorOptions {
   loadContext: (
     request: RevisionProcessingRequestContract
   ) => Promise<RevisionProcessingContextContract>;
-  getSettings: SettingsPort["get"];
+  getSettings: (ledgerId: string) => Promise<LedgerSettings | null>;
   loadStoredFiles: (ledgerId: string, storedFileIds: string[]) => Promise<LoadImageResult[]>;
   getRates: (date: string) => Promise<ExchangeRates>;
   recordProcessingFailure: SourceDocumentPort["recordProcessingFailure"];

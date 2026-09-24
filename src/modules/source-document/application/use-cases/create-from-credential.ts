@@ -1,8 +1,8 @@
 import type {
-  AuthenticatedServiceCredentialContract,
   ProcessingJobContract,
   SourceDocumentSubmissionContract,
 } from "@/application/contracts";
+import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
 import { processImage as processImageFn } from "@/lib/storage/image-processing";
 import { createAndQueueSourceDocument } from "./create-and-queue-source-document";
 import { createHash } from "crypto";
@@ -31,7 +31,7 @@ function contentFingerprint(payload: PreparedApiV1SourceDocumentInput): string {
 
 export async function createSourceDocumentFromCredential(
   input: {
-    credential: AuthenticatedServiceCredentialContract;
+    credential: AuthenticatedServiceCredential;
     idempotencyKey?: string;
     payload: PreparedApiV1SourceDocumentInput;
     /**

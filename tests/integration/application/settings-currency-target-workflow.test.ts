@@ -4,9 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
 import { LedgerMainCurrencyChangedError } from "@/application/contracts";
-import { updateLedger as updateLedgerUseCase } from "@/modules/ledger/application/use-cases/update-ledger";
-import { serverComposition } from "@/application/server-composition-root";
-import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
+import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import {
   currencyRates,
   ledgerEntries,
@@ -16,18 +14,17 @@ import {
 } from "@/persistence";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
+import { hasActiveLedgerEntries } from "@/modules/ledger/server/entry-reads/has-active-entries";
 
-type UpdateLedgerData = Omit<Parameters<typeof updateLedgerUseCase>[1], "expectedUpdatedAt">;
+type UpdateLedgerData = Omit<Parameters<typeof updateLedgerSettings>[1], "expectedUpdatedAt">;
 
 const updateLedger = async (ledgerId: string, data: UpdateLedgerData) => {
   const current = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
   if (current == null) throw new Error("Expected ledger fixture");
-  return updateLedgerUseCase(
-    ledgerId,
-    { ...data, expectedUpdatedAt: current.updatedAt.toISOString() },
-    serverComposition.settings,
-    { getRates: getExchangeRates }
-  );
+  return updateLedgerSettings(ledgerId, {
+    ...data,
+    expectedUpdatedAt: current.updatedAt.toISOString(),
+  });
 };
 
 describe("target Settings currency workflow", () => {
@@ -193,17 +190,17 @@ describe("target Settings currency workflow", () => {
   });
 
   it("hasActiveEntries returns false for empty ledger", async () => {
-    expect(await serverComposition.ledgerReads.hasActiveEntries(ledgerId)).toBe(false);
+    expect(await hasActiveLedgerEntries(ledgerId)).toBe(false);
   });
 
   it("hasActiveEntries returns true after entry creation", async () => {
     await createEntry();
-    expect(await serverComposition.ledgerReads.hasActiveEntries(ledgerId)).toBe(true);
+    expect(await hasActiveLedgerEntries(ledgerId)).toBe(true);
   });
 
   it("hasActiveEntries returns false after source document is soft-deleted", async () => {
     await createEntry();
-    expect(await serverComposition.ledgerReads.hasActiveEntries(ledgerId)).toBe(true);
+    expect(await hasActiveLedgerEntries(ledgerId)).toBe(true);
 
     // Soft-delete the source document so its entries are no longer active
     const db = getTestDb();
@@ -212,7 +209,7 @@ describe("target Settings currency workflow", () => {
       .set({ deletedAt: new Date() })
       .where(eq(sourceDocuments.id, sourceDocumentId));
 
-    expect(await serverComposition.ledgerReads.hasActiveEntries(ledgerId)).toBe(false);
+    expect(await hasActiveLedgerEntries(ledgerId)).toBe(false);
   });
 
   it("allows main currency change after source document is soft-deleted", async () => {
@@ -361,12 +358,8 @@ describe("target Settings currency workflow", () => {
     } as const;
 
     const results = await Promise.allSettled([
-      updateLedgerUseCase(ledgerId, input, serverComposition.settings, {
-        getRates: getExchangeRates,
-      }),
-      updateLedgerUseCase(ledgerId, input, serverComposition.settings, {
-        getRates: getExchangeRates,
-      }),
+      updateLedgerSettings(ledgerId, input),
+      updateLedgerSettings(ledgerId, input),
     ]);
 
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);

@@ -36,7 +36,7 @@ vi.mock("@/modules/auth/server/authenticate-with-otp", () => ({
   authenticateWithOTP: authenticateWithOTPMock,
 }));
 
-vi.mock("@/application/use-cases/complete-interactive-sign-in", () => ({
+vi.mock("@/modules/auth/server/complete-interactive-sign-in", () => ({
   completeInteractiveSignIn: completeInteractiveSignInMock,
 }));
 

@@ -3,7 +3,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import { formatDateTimeForApi } from "@/lib/date-utils";
-import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
+import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import {
   Dialog,
   DialogContent,

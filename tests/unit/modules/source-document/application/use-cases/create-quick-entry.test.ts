@@ -29,15 +29,14 @@ vi.mock("@/application/orchestration/exchange-rate-ledger-recalculation", () => 
   initializeExchangeRateLedgerRecalculationOrchestration: vi.fn(),
 }));
 
-vi.mock("@/modules/ledger/source-document-queries", () => ({
-  getEntryCategoryName: getEntryCategoryNameMock,
+vi.mock("@/modules/ledger/server/categories", () => ({
+  getCategoryName: getEntryCategoryNameMock,
 }));
 
 import { createQuickEntry } from "@/modules/source-document/application/use-cases/create-quick-entry";
 import type { QuickEntryPorts } from "@/modules/source-document/application/ports";
 
 const ports: QuickEntryPorts = {
-  categories: { get: vi.fn() },
   projections: { createManual: createManualMock },
   convertAmount: convertAmountMock,
 };

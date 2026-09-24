@@ -22,7 +22,7 @@ import {
   lockSourceDocumentsForUpdate,
 } from "./transaction-locks";
 import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
-import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
+import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { hasEditableActiveProjection } from "./source-document-write-guards";
 
 function whereSourceDocumentNotDeleted(ledgerId: string) {

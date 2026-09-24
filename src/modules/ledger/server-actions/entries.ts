@@ -10,6 +10,7 @@ import {
   type CreateLedgerEntryInput,
 } from "@/modules/ledger/contract-schemas";
 import { serverComposition } from "@/application/server-composition-root";
+import { getBatchEntryDateImpact } from "../server/entry-reads/get-batch-entry-date-impact";
 import {
   parseVersionedTarget,
   parseVersionedTargets,
@@ -95,7 +96,7 @@ export const batchDeleteLedgerEntriesAction = withLedgerAccess(
 export const previewBatchLedgerEntryDateAction = withLedgerAccess(
   async (ledgerId: string, inputIds: string[]) => {
     const entryIds = parseLedgerEntryIds(inputIds);
-    return serverComposition.ledgerReads.getBatchEntryDateImpact({
+    return getBatchEntryDateImpact({
       ledgerId,
       ledgerEntryIds: entryIds,
     });

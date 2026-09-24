@@ -1,9 +1,9 @@
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { roundToCurrency } from "@/lib/money/currency-precision";
-import { getEntryCategoryName } from "@/modules/ledger/source-document-queries";
+import { getCategoryName } from "@/modules/ledger/server/categories";
 import type { QuickEntryResponseDto } from "@/modules/source-document/contracts";
 import type { QuickEntryPorts } from "../ports";
-import type { LedgerSettingsContract } from "@/application/contracts";
+import type { LedgerSettings } from "@/modules/ledger/contracts";
 
 export interface CreateQuickEntryPayload {
   /** The book the record is filed under; also decides its default date zone. */
@@ -67,7 +67,7 @@ async function createQuickEntryAtomically(
 
 export async function createQuickEntry(
   ledgerId: string,
-  ledger: { settings: Pick<LedgerSettingsContract, "mainCurrency"> },
+  ledger: { settings: Pick<LedgerSettings, "mainCurrency"> },
   payload: CreateQuickEntryPayload,
   ports: QuickEntryPorts
 ): Promise<QuickEntryResponseDto> {
@@ -82,7 +82,7 @@ export async function createQuickEntry(
     formatDateTimeForApi(new Date());
 
   const [categoryName, conversion] = await Promise.all([
-    getEntryCategoryName(ledgerId, payload.categoryId, ports.categories),
+    getCategoryName(ledgerId, payload.categoryId),
     ports.convertAmount({
       amount: payload.amount,
       fromCurrency: entryCurrency,

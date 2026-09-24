@@ -113,7 +113,7 @@ describe("createSourceDocumentAction omission semantics", () => {
 
     await createSourceDocumentAction({ text: "Lunch", bookId: otherBookId }, CLIENT_SUBMISSION_ID);
 
-    expect(resolveRecordBookMock).toHaveBeenCalledWith("ledger-1", otherBookId, expect.anything());
+    expect(resolveRecordBookMock).toHaveBeenCalledWith("ledger-1", otherBookId);
   });
 
   it("injects scheduleProcessing into use case dependencies", async () => {

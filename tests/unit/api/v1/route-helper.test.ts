@@ -18,10 +18,8 @@ const { rateLimiterMock, serviceCredentialsMock, getClientIPFromHeadersMock, log
     },
   }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    serviceCredentials: serviceCredentialsMock,
-  },
+vi.mock("@/modules/ledger/server/service-credentials", () => ({
+  authenticateServiceCredential: serviceCredentialsMock.authenticate,
 }));
 
 vi.mock("@/lib/rate-limit", () => ({

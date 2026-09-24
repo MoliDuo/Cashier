@@ -1,4 +1,4 @@
-import { serverComposition } from "@/application/server-composition-root";
+import { listCategories } from "@/modules/ledger/server/categories";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import { sql } from "drizzle-orm";
@@ -437,7 +437,7 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
 });
 
 async function removeCategoryFromCollection(ledgerId: string, categoryId: string) {
-  const categories = await serverComposition.categories.list(ledgerId);
+  const categories = await listCategories(ledgerId);
   return saveEntryCategoriesAction({
     expectedRevision: await computeCategoryCollectionRevision(categories),
     categories: categories

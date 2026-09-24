@@ -8,16 +8,12 @@ import {
   createSourceDocumentData,
 } from "tests/helpers/factories";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
-import { serverComposition } from "@/application/server-composition-root";
 import {
   activateTestSourceDocumentProjection,
   createTestUser,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
-
-const listLedgerEntryViewsBySourceDocumentIds = (
-  input: Parameters<typeof serverComposition.ledgerReads.listEntriesBySourceDocumentIds>[0]
-) => serverComposition.ledgerReads.listEntriesBySourceDocumentIds(input);
+import { listLedgerEntryViewsBySourceDocumentIds } from "@/modules/ledger/server/entry-reads/list-ledger-entry-views-by-source-document-ids";
 
 describe("ledger source-document linkage", () => {
   let ledgerId = "";

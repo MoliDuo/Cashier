@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { books, serviceCredentials } from "@/persistence";
-import { listServiceCredentials as listServiceCredentialsUseCase } from "@/modules/ledger/application/queries/list-service-credentials";
-import { createServiceCredential } from "@/modules/ledger/application/use-cases/create-service-credential";
-import { setServiceCredentialBook } from "@/modules/ledger/application/use-cases/set-service-credential-book";
-import { serverComposition } from "@/application/server-composition-root";
+import {
+  createServiceCredential,
+  listServiceCredentials,
+  setServiceCredentialBook,
+} from "@/modules/ledger/server/service-credentials";
 
 /** Every field a key is published with, and nothing else. */
 const PUBLISHED_CREDENTIAL_FIELDS = [
@@ -20,9 +21,6 @@ const PUBLISHED_CREDENTIAL_FIELDS = [
   "tokenPrefix",
   "tokenSuffix",
 ];
-
-const listServiceCredentials = (ledgerId: string) =>
-  listServiceCredentialsUseCase(ledgerId, serverComposition.serviceCredentials);
 
 describe("listServiceCredentials", () => {
   let ledgerId = "";
@@ -92,23 +90,17 @@ describe("listServiceCredentials", () => {
       .values({ ledgerId, name: "存证", sortOrder: 2 })
       .returning({ id: books.id });
 
-    const created = await createServiceCredential(
-      ledgerId,
-      { name: "CI", bookId: firstBook!.id },
-      serverComposition.serviceCredentials
-    );
+    const created = await createServiceCredential(ledgerId, {
+      name: "CI",
+      bookId: firstBook!.id,
+    });
     expect(Object.keys(created).sort()).toEqual([...PUBLISHED_CREDENTIAL_FIELDS, "token"].sort());
     expect(created.token).not.toBe("");
 
     const listed = await listServiceCredentials(ledgerId);
     expect(Object.keys(listed[0]!).sort()).toEqual(PUBLISHED_CREDENTIAL_FIELDS);
 
-    const rebound = await setServiceCredentialBook(
-      ledgerId,
-      created.id,
-      secondBook!.id,
-      serverComposition.serviceCredentials
-    );
+    const rebound = await setServiceCredentialBook(ledgerId, created.id, secondBook!.id);
     expect(Object.keys(rebound).sort()).toEqual(PUBLISHED_CREDENTIAL_FIELDS);
     expect(rebound.bookId).toBe(secondBook!.id);
   });

@@ -9,7 +9,6 @@ import { getTestDb } from "tests/setup";
 const port = serverComposition.sourceDocumentAggregate;
 const queryPorts = {
   documents: serverComposition.sourceDocumentReads,
-  ledgerReads: serverComposition.ledgerReads,
   changes: serverComposition.ledgerChanges,
 };
 

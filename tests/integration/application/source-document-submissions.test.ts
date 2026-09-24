@@ -1,3 +1,4 @@
+import { archiveBook } from "@/modules/ledger/server/books";
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import type { ObjectStore } from "@/lib/storage";
 import { eq } from "drizzle-orm";
@@ -6,7 +7,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createStoredFileAdapter, type StoredFileAdapter } from "@/application/adapters/storage";
 import {
   PostgresProcessingJobAdapter,
-  postgresBookAdapter,
   postgresLedgerProjectionAdapter,
   postgresRevisionAdapter,
   postgresSourceDocumentSubmissionAdapter,
@@ -579,7 +579,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
-    expect(await postgresBookAdapter.archive(ledgerId, travel)).toMatchObject({
+    expect(await archiveBook(ledgerId, travel)).toMatchObject({
       status: "archived",
     });
 
@@ -712,7 +712,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
         [documentId, ledgerId, travel]
       );
 
-      const archive = postgresBookAdapter.archive(ledgerId, travel).then(
+      const archive = archiveBook(ledgerId, travel).then(
         (result) => result,
         (error: unknown) => error
       );

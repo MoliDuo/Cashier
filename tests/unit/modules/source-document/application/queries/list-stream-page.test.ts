@@ -4,7 +4,6 @@ import { listStreamPage } from "@/modules/source-document/application/queries/li
 function createPorts() {
   return {
     documents: { list: vi.fn().mockResolvedValue({ items: [], nextCursor: null }) },
-    ledgerReads: { listEntriesBySourceDocumentIds: vi.fn().mockResolvedValue(new Map()) },
     changes: {
       getVersion: vi.fn().mockResolvedValue(BigInt(7)),
       getRefreshBaseline: vi.fn().mockResolvedValue({

@@ -15,8 +15,7 @@ import {
   createServiceCredentialAction,
   deleteServiceCredentialAction,
 } from "@/modules/ledger/server-actions/credentials";
-import { listServiceCredentials } from "@/modules/ledger/application/queries/list-service-credentials";
-import { serverComposition } from "@/application/server-composition-root";
+import { listServiceCredentials } from "@/modules/ledger/server/service-credentials";
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { ValidationError } from "@/lib/errors";
@@ -125,10 +124,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     expect(computeHash(createRes.token)).toBe(stored?.tokenHash);
 
     // List Credentials
-    const listRes = await listServiceCredentials(
-      testLedgerId,
-      serverComposition.serviceCredentials
-    );
+    const listRes = await listServiceCredentials(testLedgerId);
     const listedCredential = requireFirst(listRes, "service credential");
 
     expect(listRes).toHaveLength(1);

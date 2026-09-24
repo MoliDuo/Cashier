@@ -1,4 +1,5 @@
-import type { BookPort } from "@/application/contracts";
+import "server-only";
+import { getBook, listBooks } from "@/modules/ledger/server/books";
 import { ValidationError } from "@/lib/errors";
 
 /**
@@ -10,15 +11,14 @@ import { ValidationError } from "@/lib/errors";
  */
 export async function resolveRecordBook(
   ledgerId: string,
-  requestedBookId: string | null | undefined,
-  books: Pick<BookPort, "get" | "list">
+  requestedBookId: string | null | undefined
 ): Promise<{ id: string; timeZone: string | null }> {
   if (requestedBookId != null) {
-    const requested = await books.get(ledgerId, requestedBookId);
+    const requested = await getBook(ledgerId, requestedBookId);
     if (requested == null) throw new ValidationError("Unknown book");
     return { id: requested.id, timeZone: requested.timeZone };
   }
-  const live = await books.list(ledgerId);
+  const live = await listBooks(ledgerId);
   const fallback = live[0] ?? null;
   if (fallback == null) throw new ValidationError("A book is required");
   return { id: fallback.id, timeZone: fallback.timeZone };

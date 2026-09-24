@@ -7,10 +7,5 @@ import type { LedgerDto } from "@/modules/ledger/contracts";
  */
 export async function getLedgerAction(): Promise<LedgerDto> {
   const { ledger } = await requireLedgerAccess();
-  return {
-    id: ledger.id,
-    settings: ledger.settings,
-    createdAt: ledger.createdAt,
-    updatedAt: ledger.updatedAt,
-  };
+  return ledger;
 }

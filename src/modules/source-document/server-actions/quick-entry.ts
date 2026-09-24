@@ -17,7 +17,7 @@ import { resolveRecordBook } from "../server/resolve-record-book";
 export const createQuickEntryAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId, ledger }, data: CreateQuickEntryInput): Promise<QuickEntryResponseDto> => {
     const validated = createQuickEntryInputSchema.parse(data);
-    const book = await resolveRecordBook(ledgerId, validated.bookId, serverComposition.books);
+    const book = await resolveRecordBook(ledgerId, validated.bookId);
     // The book owns the record's date zone, exactly as the AI path resolves it;
     // the request's own zone is only a fallback for a book without one.
     const zone = book.timeZone ?? validated.timezone;
@@ -33,7 +33,6 @@ export const createQuickEntryAction = withSourceDocumentLedgerAccess(
     };
 
     return createQuickEntry(ledgerId, ledger, payload, {
-      categories: serverComposition.categories,
       projections: { createManual: serverComposition.sourceDocumentAggregate.createManualDocument },
       convertAmount,
     });

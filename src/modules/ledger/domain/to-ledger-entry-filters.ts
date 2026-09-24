@@ -1,5 +1,5 @@
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
-import type { LedgerEntryFilterParams } from "../../filters";
+import type { LedgerEntryFilterParams } from "../filters";
 
 /** The filters a validated entry query carries, before they are translated. */
 export interface LedgerEntryQueryFilters {

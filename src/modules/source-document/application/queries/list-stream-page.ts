@@ -3,7 +3,7 @@ import type { SourceDocumentListItemDto, StreamPage } from "../../contracts";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import { normalizeSearchTerm } from "@/lib/search";
 import type { LedgerChangeReadPort, SourceDocumentReadPort } from "../ports";
-import type { LedgerReadPort } from "@/modules/ledger/application/ports";
+import { listLedgerEntryViewsBySourceDocumentIds } from "@/modules/ledger/server/entry-reads/list-ledger-entry-views-by-source-document-ids";
 import { filterStreamEntries } from "../../stream-filter-policy";
 import { createHash } from "node:crypto";
 import {
@@ -83,7 +83,6 @@ export async function listStreamPage(
   input: ListStreamPageInput,
   ports: {
     documents: Pick<SourceDocumentReadPort, "list">;
-    ledgerReads: Pick<LedgerReadPort, "listEntriesBySourceDocumentIds">;
     changes: Pick<LedgerChangeReadPort, "getVersion" | "getRefreshBaseline">;
   }
 ): Promise<StreamPage> {
@@ -130,7 +129,7 @@ export async function listStreamPage(
   });
 
   // Batch-load ledger entries for items that need them (completed cards etc.)
-  const entriesByDocId = await ports.ledgerReads.listEntriesBySourceDocumentIds({
+  const entriesByDocId = await listLedgerEntryViewsBySourceDocumentIds({
     ledgerId,
     sourceDocumentIds: page.items.map((item) => item.id),
   });

@@ -1,9 +1,16 @@
-import type { LedgerSettingsContract } from "@/application/contracts/ledger";
 import type { CategoryPresetId } from "@/config/category-presets";
+
+export interface LedgerSettings {
+  aiLanguage: string;
+  currencies: string[];
+  mainCurrency: string;
+  collapseEntriesDefault: boolean;
+  aiCustomPrompt: string;
+}
 
 export type LedgerDto = {
   id: string;
-  settings: LedgerSettingsContract;
+  settings: LedgerSettings;
   createdAt: string;
   updatedAt: string;
 };
@@ -25,6 +32,13 @@ export type BookDto = {
   /** Set while the book is retired; the switcher hides those rows. */
   archivedAt: string | null;
 };
+
+/** What an API request authenticates as: the key, its ledger and the book it files into. */
+export interface AuthenticatedServiceCredential {
+  id: string;
+  ledgerId: string;
+  bookId: string;
+}
 
 export type ServiceCredentialDto = {
   id: string;
@@ -209,7 +223,7 @@ export type LedgerEntryEmbeddedViewDto = Omit<LedgerEntryDto, "sourceDocument">;
 
 type LedgerSettingsDto = {
   id?: string;
-} & LedgerSettingsContract;
+} & LedgerSettings;
 export type Settings = LedgerSettingsDto;
 
 export interface LedgerSummaryDto {
@@ -246,4 +260,12 @@ export interface LedgerEntryPageDto {
 export interface LedgerSettingsViewDto {
   uncategorizedCount: number;
   credentials: ServiceCredentialDto[];
+}
+
+/** What a date change to the selected entries would move along with them. */
+export interface BatchEntryDateImpact {
+  selectedEntryCount: number;
+  sourceDocumentCount: number;
+  affectedEntryCount: number;
+  sourceDocumentIds: string[];
 }

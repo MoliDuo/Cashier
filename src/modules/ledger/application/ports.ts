@@ -1,10 +1,4 @@
 import type {
-  ActiveLedgerEntryDto,
-  LedgerEntryEmbeddedViewDto,
-  LedgerEntrySummary,
-} from "../contracts";
-import type { LedgerEntryFilterParams } from "../filters";
-import type {
   ReclassificationCandidate,
   ReclassificationDocumentGroup,
 } from "./reclassification-protocol";
@@ -14,22 +8,6 @@ import type {
   VersionedCommandResult,
   VersionedTarget,
 } from "@/modules/source-document/contracts";
-
-export interface BatchEntryDateImpact {
-  selectedEntryCount: number;
-  sourceDocumentCount: number;
-  affectedEntryCount: number;
-  sourceDocumentIds: string[];
-}
-
-export interface CategoryMetadataGeneratorPort {
-  generate(input: {
-    categoryName: string;
-    existingCategoryNames: readonly string[];
-    language?: string;
-    customPrompt?: string;
-  }): Promise<{ icon: string; description: string }>;
-}
 
 /**
  * Places entries into one of a caller-chosen set of categories. Narrow on
@@ -93,28 +71,6 @@ export interface CategoryReclassificationJobPort {
     jobId: string;
   }): Promise<CategoryReclassificationJobRecord | null>;
   getLatest(input: { ledgerId: string }): Promise<CategoryReclassificationJobRecord | null>;
-}
-
-export interface LedgerReadPort {
-  hasActiveEntries(ledgerId: string): Promise<boolean>;
-  listEntries(input: {
-    ledgerId: string;
-    limit?: number;
-    cursor?: string | null;
-    filters: LedgerEntryFilterParams;
-  }): Promise<{ items: ActiveLedgerEntryDto[]; nextCursor: string | null }>;
-  calculateStats(input: {
-    ledgerId: string;
-    filters: LedgerEntryFilterParams;
-  }): Promise<LedgerEntrySummary>;
-  getBatchEntryDateImpact(input: {
-    ledgerId: string;
-    ledgerEntryIds: string[];
-  }): Promise<BatchEntryDateImpact>;
-  listEntriesBySourceDocumentIds(input: {
-    ledgerId: string;
-    sourceDocumentIds: string[];
-  }): Promise<Map<string, LedgerEntryEmbeddedViewDto[]>>;
 }
 
 export interface LedgerEntryCommandPort {

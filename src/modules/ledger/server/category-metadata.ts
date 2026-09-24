@@ -1,0 +1,115 @@
+import "server-only";
+import { z } from "zod";
+import { COMMON_LUCIDE_ICONS } from "@/config/icons";
+import { buildAiOutputLocaleInstruction } from "@/config/ai-output-locales";
+import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { runtimeEnv } from "@/lib/env/runtime";
+import { AppError, NotFoundError } from "@/lib/errors";
+import { extractJson } from "@/lib/tasks/json-utils";
+import { getLedgerSettings } from "./settings";
+import { getCategory, listCategories, updateMissingCategoryMetadata } from "./categories";
+
+const metadataSchema = z.object({
+  icon: z.enum(COMMON_LUCIDE_ICONS),
+  description: z.string().trim().min(1).max(120),
+});
+
+export interface CategoryMetadataResult {
+  categoryId: string;
+  icon: string;
+  description: string;
+  status: "updated" | "already_complete" | "stale";
+  wroteIcon: boolean;
+  wroteDescription: boolean;
+}
+
+export async function generateCategoryMetadata(input: {
+  categoryName: string;
+  existingCategoryNames: readonly string[];
+  language?: string;
+  customPrompt?: string;
+}): Promise<{ icon: string; description: string }> {
+  const prompt = `Generate bookkeeping category metadata. Return JSON only. The icon must be selected from the provided Lucide icon names. Keep the description short and concrete.
+${input.customPrompt == null || input.customPrompt === "" ? "" : `\n### Additional Instructions\n${input.customPrompt}\n`}
+${buildAiOutputLocaleInstruction(input.language)}
+Only the category description is user-visible in this response; apply the mandatory output locale to it.`;
+  const result = await getOpenAIClient().generateContent(
+    prompt,
+    [
+      {
+        role: "user",
+        content: JSON.stringify({
+          category: input.categoryName,
+          existingCategories: input.existingCategoryNames,
+          language: input.language,
+          allowedIcons: COMMON_LUCIDE_ICONS,
+          output: { icon: "Lucide icon name", description: "maximum 120 characters" },
+        }),
+      },
+    ],
+    runtimeEnv.aiModel,
+    180,
+    0.2
+  );
+  try {
+    return metadataSchema.parse(JSON.parse(extractJson(result.content)));
+  } catch (error) {
+    throw new AppError("AI category metadata response was invalid", "AI_JSON_REPAIR_FAILED", 502, {
+      cause: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
+}
+
+/**
+ * Fills in the icon and description a category is missing. The write only lands
+ * while the category still has the name the model was asked about, so a rename
+ * racing the AI call reports `stale` instead of attaching the wrong text.
+ */
+export async function generateEntryCategoryMetadata(input: {
+  ledgerId: string;
+  categoryId: string;
+}): Promise<CategoryMetadataResult> {
+  const category = await getCategory(input.ledgerId, input.categoryId);
+  if (category == null) throw new NotFoundError("Category");
+  const categoryComplete =
+    category.icon != null &&
+    category.icon !== "" &&
+    category.description != null &&
+    category.description !== "";
+  if (categoryComplete) {
+    return {
+      categoryId: input.categoryId,
+      icon: category.icon!,
+      description: category.description!,
+      status: "already_complete",
+      wroteIcon: false,
+      wroteDescription: false,
+    };
+  }
+  const [settings, existingCategories] = await Promise.all([
+    getLedgerSettings(input.ledgerId),
+    listCategories(input.ledgerId),
+  ]);
+  if (settings == null) throw new NotFoundError("Ledger");
+
+  const metadata = await generateCategoryMetadata({
+    categoryName: category.name,
+    existingCategoryNames: existingCategories.map((existing) => existing.name),
+    language: settings.aiLanguage,
+    customPrompt: settings.aiCustomPrompt,
+  });
+  const written = await updateMissingCategoryMetadata(input.ledgerId, input.categoryId, {
+    ...metadata,
+    expectedName: category.name,
+  });
+  if (written.status === "not_found") throw new NotFoundError("Category");
+
+  return {
+    categoryId: input.categoryId,
+    icon: metadata.icon,
+    description: metadata.description,
+    status: written.status,
+    wroteIcon: written.wroteIcon,
+    wroteDescription: written.wroteDescription,
+  };
+}

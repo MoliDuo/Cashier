@@ -1,10 +1,5 @@
 import "server-only";
 import {
-  postgresBookAdapter,
-  postgresCategoryAdapter,
-  postgresLedgerAdapter,
-  postgresServiceCredentialAdapter,
-  postgresSettingsAdapter,
   calculateCompletedSourceDocumentTotal,
   getTargetSourceDocument,
   getSourceDocumentInput,
@@ -23,13 +18,8 @@ import {
   loadStoredFilesForAI,
 } from "@/application/adapters/in-process";
 import { storedFileAdapter } from "@/application/adapters/storage";
-import { listLedgerEntryPage } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-page";
-import { getBatchEntryDateImpact } from "@/application/adapters/postgres/ledger-reads/get-batch-entry-date-impact";
-import { calculateLedgerEntryStats } from "@/application/adapters/postgres/ledger-reads/calculate-ledger-entry-stats";
-import { listLedgerEntryViewsBySourceDocumentIds } from "@/application/adapters/postgres/ledger-reads/list-ledger-entry-views-by-source-document-ids";
-import { hasActiveLedgerEntries } from "@/application/adapters/postgres/ledger-reads/has-active-entries";
 import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { categoryMetadataGeneratorAdapter } from "@/application/adapters/ai/category-metadata-generator";
+import { getLedgerSettings } from "@/modules/ledger/server/settings";
 import { postgresCategoryReclassificationJobAdapter } from "@/application/adapters/postgres/category-reclassification-jobs";
 import { postgresCategoryAssignmentV2Adapter } from "@/application/adapters/postgres/category-assignment-v2";
 import { createAIContext } from "@/lib/tasks/ai-context";
@@ -48,7 +38,7 @@ function createRevisionProcessor(
   return new CurrentRevisionProcessor({
     createAIContext: createContext,
     loadContext: loadRevisionProcessingContext,
-    getSettings: (ledgerId) => postgresSettingsAdapter.get(ledgerId),
+    getSettings: getLedgerSettings,
     loadStoredFiles: (ledgerId, storedFileIds) =>
       loadStoredFilesForAI(
         (authorizedLedgerId, storedFileId) =>
@@ -70,21 +60,8 @@ const executeSingleProcessingJob = createExecuteSingleProcessingJob({
 
 /** Composition root for the PostgreSQL-backed runtime. */
 export const serverComposition = {
-  books: postgresBookAdapter,
-  categories: postgresCategoryAdapter,
-  ledgers: postgresLedgerAdapter,
-  ledgerReads: {
-    hasActiveEntries: hasActiveLedgerEntries,
-    calculateStats: calculateLedgerEntryStats,
-    getBatchEntryDateImpact,
-    listEntries: listLedgerEntryPage,
-    listEntriesBySourceDocumentIds: listLedgerEntryViewsBySourceDocumentIds,
-  },
-  categoryMetadataGenerator: categoryMetadataGeneratorAdapter,
   categoryReclassificationJobs: postgresCategoryReclassificationJobAdapter,
   categoryAssignments: postgresCategoryAssignmentV2Adapter,
-  serviceCredentials: postgresServiceCredentialAdapter,
-  settings: postgresSettingsAdapter,
   storedFiles: storedFileAdapter,
   sourceDocumentAggregate: postgresSourceDocumentAggregateAdapter,
   sourceDocumentReads: {

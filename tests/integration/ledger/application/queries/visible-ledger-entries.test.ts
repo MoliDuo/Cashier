@@ -8,14 +8,14 @@ import {
   createSourceDocumentData,
 } from "tests/helpers/factories";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
-import { serverComposition } from "@/application/server-composition-root";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
+import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
-  const page = await serverComposition.ledgerReads.listEntries({
+  const page = await listLedgerEntryPage({
     ledgerId,
     limit: 100,
     filters: {},

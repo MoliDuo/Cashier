@@ -17,7 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import type { ReactNode } from "react";
 import { usePeriodLabel } from "./usePeriodLabel";
-import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
+import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 
 interface LedgerEntriesToolbarProps {
   isSelectionMode: boolean;

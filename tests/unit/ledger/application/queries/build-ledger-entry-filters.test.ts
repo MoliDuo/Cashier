@@ -3,8 +3,8 @@ import {
   buildLedgerEntryCursorCondition,
   buildLedgerEntryFilterConditions,
   encodeLedgerEntryCursor,
-} from "@/application/adapters/postgres/ledger-reads/build-ledger-entry-filters";
-import type { LedgerEntryFilterParams } from "@/application/adapters/postgres/ledger-reads/build-ledger-entry-filters";
+} from "@/modules/ledger/server/entry-reads/build-ledger-entry-filters";
+import type { LedgerEntryFilterParams } from "@/modules/ledger/server/entry-reads/build-ledger-entry-filters";
 
 describe("buildLedgerEntryCursorCondition", () => {
   it("rejects malformed cursors", () => {

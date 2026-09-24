@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { PeriodParams } from "@/lib/period-utils";
-import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
+import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { LedgerEntriesToolbar } from "@/modules/workspace/ui/LedgerEntriesToolbar";
 
 const defaultPeriodParams: PeriodParams = { period: "thisMonth" };

@@ -33,7 +33,7 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     // filed into 哞哞的 is dated in that book's zone. The request's own zone is
     // only a fallback for a book that has none — it is where the reader happened
     // to be, not where the record belongs. Resolved before the write, never in it.
-    const book = await resolveRecordBook(ledgerId, validated.bookId, serverComposition.books);
+    const book = await resolveRecordBook(ledgerId, validated.bookId);
     const timezone = book.timeZone ?? payload.timezone;
     const scheduleProcessing = (job: ProcessingJobContract) => {
       scheduleProcessingAfter(job);

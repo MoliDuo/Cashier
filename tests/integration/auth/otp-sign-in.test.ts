@@ -11,9 +11,8 @@ import {
   OTPRateLimitedSignInError,
 } from "@/modules/auth/server/authenticate-with-otp";
 import * as rateLimit from "@/lib/rate-limit";
-import { serverComposition } from "@/application/server-composition-root";
 import { hashOTP } from "@/modules/auth/services/otp";
-import { completeInteractiveSignIn } from "@/application/use-cases/complete-interactive-sign-in";
+import { completeInteractiveSignIn } from "@/modules/auth/server/complete-interactive-sign-in";
 import { createTestUserWithLedger } from "../../helpers/schema-setup";
 
 vi.mock("resend", () => ({
@@ -69,7 +68,7 @@ describe("authenticateWithOTP", () => {
       await db.query.otpTokens.findFirst({ where: eq(otpTokens.email, TEST_EMAIL) })
     ).toBeUndefined();
 
-    await completeInteractiveSignIn(principal, { ledgers: serverComposition.ledgers });
+    await completeInteractiveSignIn(principal);
   });
 
   it("returns otp_invalid for an incorrect OTP", async () => {

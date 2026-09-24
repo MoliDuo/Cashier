@@ -21,7 +21,7 @@ import {
   getBookAction,
   getBooksAction,
   getBooksIncludingArchivedAction,
-} from "@/modules/ledger/server/books";
+} from "@/modules/ledger/server/list-books";
 import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categories";
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import {
@@ -89,7 +89,6 @@ export async function POST(request: Request) {
           { ...omitUndefinedProperties(parsed), limit: parsed.limit },
           {
             documents: serverComposition.sourceDocumentReads,
-            ledgerReads: serverComposition.ledgerReads,
             changes: serverComposition.ledgerChanges,
           }
         );

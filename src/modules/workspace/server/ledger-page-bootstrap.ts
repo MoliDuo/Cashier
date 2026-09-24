@@ -1,3 +1,4 @@
+import "server-only";
 import {
   QueryClient,
   dehydrate,
@@ -8,9 +9,11 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER, QUERY } from "@/lib/constants";
 import { resolveRequestTimeZone } from "@/lib/time-zone-cookie";
-import { calculateLedgerStats } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import { listEntryCategories } from "@/modules/ledger/application/queries/list-entry-categories";
-import { listLedgerEntries } from "@/modules/ledger/application/queries/list-ledger-entries";
+import { calculateLedgerStats } from "@/modules/ledger/server/stats";
+import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
+import { listCategoriesWithCount } from "@/modules/ledger/server/categories";
+import { listBooks } from "@/modules/ledger/server/books";
+import { getLedgerSettingsView } from "@/modules/ledger/server/get-ledger-settings";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { listStreamPage } from "@/modules/source-document/application/queries/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/application/queries/get-stream-total";
@@ -20,17 +23,11 @@ import type { PeriodParams } from "@/lib/period-utils";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { addPeriod, getDateInTimezone, isValidTimeZone, parseDateString } from "@/lib/date-utils";
-import type { CategoryPort } from "@/application/contracts";
-import type { ServiceCredentialPort } from "@/application/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
-import type { BookPort } from "@/application/contracts";
-import type { LedgerReadPort } from "@/modules/ledger/application/ports";
 import type {
   LedgerChangeReadPort,
   SourceDocumentReadPort,
 } from "@/modules/source-document/application/ports";
-import { getLedgerSettingsView } from "@/modules/ledger/application/queries/get-ledger-settings-view";
-import { toBookDto } from "@/modules/ledger/application/queries/list-books";
 import type { EntryCategoryWithCountDto } from "@/modules/ledger/contracts";
 import {
   buildDetailsQueryDescriptor,
@@ -82,18 +79,10 @@ export interface GetLedgerPageBootstrapInput {
 export async function getLedgerPageBootstrap(
   input: GetLedgerPageBootstrapInput,
   dependencies: {
-    categories: Pick<CategoryPort, "listWithCount" | "countUncategorized">;
-    books: Pick<BookPort, "list">;
-    ledgerReads: Pick<
-      LedgerReadPort,
-      "calculateStats" | "listEntries" | "listEntriesBySourceDocumentIds"
-    >;
     sourceDocuments: {
       documents: Pick<SourceDocumentReadPort, "list" | "calculateCompletedTotal">;
-      ledgerReads: Pick<LedgerReadPort, "listEntriesBySourceDocumentIds">;
       changes: Pick<LedgerChangeReadPort, "getVersion" | "getRefreshBaseline">;
     };
-    credentials: Pick<ServiceCredentialPort, "list">;
   }
 ): Promise<LedgerPageBootstrapResult> {
   const ledgerDto = input.ledgerDto;
@@ -109,28 +98,21 @@ export async function getLedgerPageBootstrap(
   // boundary rather than left unhandled.
   const categoriesPromise = queryClient.fetchQuery({
     queryKey: queryKeys.entryCategories(),
-    queryFn: () => listEntryCategories(ledgerId, dependencies.categories),
+    queryFn: () => listCategoriesWithCount(ledgerId),
     staleTime: LEDGER.STALE_TIME_MS,
   });
   const settingsPromise =
     input.initialTab === "settings"
       ? queryClient.prefetchQuery({
           queryKey: queryKeys.ledgerSettings(),
-          queryFn: () =>
-            getLedgerSettingsView(ledgerId, {
-              categories: dependencies.categories,
-              credentials: dependencies.credentials,
-            }),
+          queryFn: () => getLedgerSettingsView(ledgerId),
           staleTime: LEDGER.STALE_TIME_MS,
         })
       : Promise.resolve();
-  const booksPromise = dependencies.books
-    .list(ledgerId)
-    .then((rows) => rows.map(toBookDto))
-    .then((books) => {
-      queryClient.setQueryData(queryKeys.books(), books);
-      return books;
-    });
+  const booksPromise = listBooks(ledgerId).then((books) => {
+    queryClient.setQueryData(queryKeys.books(), books);
+    return books;
+  });
   const [books] = await Promise.all([booksPromise, categoriesPromise, settingsPromise]);
   // The remembered scope can name a book that has since been archived or
   // deleted. The live list is the authority: the scope resets to 总账 on the
@@ -239,12 +221,7 @@ export async function getLedgerPageBootstrap(
       ? [
           queryClient.prefetchQuery({
             queryKey: detailsDescriptor.summaryQueryKey,
-            queryFn: () =>
-              calculateLedgerStats(
-                ledgerId,
-                detailsDescriptor.summaryInput,
-                dependencies.ledgerReads
-              ),
+            queryFn: () => calculateLedgerStats(ledgerId, detailsDescriptor.summaryInput),
             staleTime: QUERY.DEFAULT_STALE_TIME_MS,
           }),
           queryClient.prefetchInfiniteQuery({
@@ -252,8 +229,7 @@ export async function getLedgerPageBootstrap(
             queryFn: ({ pageParam }) =>
               listLedgerEntries(
                 ledgerId,
-                detailsDescriptor.getEntriesInput(pageParam as string | undefined),
-                dependencies.ledgerReads
+                detailsDescriptor.getEntriesInput(pageParam as string | undefined)
               ),
             initialPageParam: undefined as string | undefined,
             getNextPageParam: (lastPage: Awaited<ReturnType<typeof listLedgerEntries>>) =>

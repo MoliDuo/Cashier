@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { serverComposition } from "@/application/server-composition-root";
-import type { AuthenticatedServiceCredentialContract } from "@/application/contracts";
+import { authenticateServiceCredential } from "@/modules/ledger/server/service-credentials";
+import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
 import { incrementRateLimit, type RateLimitResult } from "@/lib/rate-limit";
 import { UnauthorizedError, RateLimitError } from "@/lib/errors";
 import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handlers";
@@ -11,7 +11,7 @@ import { logger } from "@/lib/logger";
 import { API_RATE_LIMIT_PER_MINUTE } from "@/config/tuning";
 
 interface ApiV1Context {
-  credential: AuthenticatedServiceCredentialContract;
+  credential: AuthenticatedServiceCredential;
   request: NextRequest;
   requestId: string;
 }
@@ -123,7 +123,7 @@ export async function handleApiV1Route(
 
     // 3. Authenticate the credential.
     const authStart = performance.now();
-    const credential = await serverComposition.serviceCredentials.authenticate(token);
+    const credential = await authenticateServiceCredential(token);
     stages.credentialAuthMs = Math.round(performance.now() - authStart);
 
     if (credential == null) {

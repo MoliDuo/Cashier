@@ -19,12 +19,14 @@ import {
 } from "../contract-schemas";
 import { toCategoryReclassificationJobDto } from "../application/queries/category-reclassification-job-dto";
 import { withLedgerAccess } from "../access";
+import { listCategories } from "../server/categories";
+import { getLedgerSettings } from "../server/settings";
 
 async function validateMode(
   ledgerId: string,
   mode: CategoryAssignmentMode
 ): Promise<CategoryAssignmentCandidateSnapshot[]> {
-  const categories = await serverComposition.categories.list(ledgerId);
+  const categories = await listCategories(ledgerId);
   const byId = new Map(categories.map((category) => [category.id, category]));
   const ids =
     mode.kind === "ai"
@@ -59,7 +61,7 @@ async function begin(
   parentJobId?: string
 ): Promise<CategoryReclassificationJobDto> {
   const candidates = await validateMode(ledgerId, input.mode);
-  const settings = await serverComposition.settings.get(ledgerId);
+  const settings = await getLedgerSettings(ledgerId);
   const job = await serverComposition.categoryAssignments.begin({
     ledgerId,
     requestKey: input.requestKey,

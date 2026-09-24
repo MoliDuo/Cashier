@@ -22,24 +22,14 @@ vi.mock("@/modules/ledger/access", () => ({
       handler("ledger-1", ...args),
 }));
 
-vi.mock("@/modules/ledger/application/use-cases/save-entry-categories", () => ({
+vi.mock("@/modules/ledger/server/categories", () => ({
   saveEntryCategories: saveEntryCategoriesMock,
+  applyCategoryPreset: vi.fn(),
 }));
-vi.mock("@/modules/ledger/application/use-cases/create-service-credential", () => ({
+vi.mock("@/modules/ledger/server/service-credentials", () => ({
   createServiceCredential: createServiceCredentialMock,
-}));
-vi.mock("@/modules/ledger/application/use-cases/delete-service-credential", () => ({
-  deleteServiceCredential: deleteServiceCredentialMock,
-}));
-
-vi.mock("@/modules/ledger/application/queries/list-entry-categories", () => ({
-  listEntryCategories: vi.fn(),
-}));
-vi.mock("@/modules/ledger/application/queries/list-ledger-entries", () => ({
-  listLedgerEntries: vi.fn(),
-}));
-vi.mock("@/modules/ledger/application/queries/list-service-credentials", () => ({
-  listServiceCredentials: vi.fn(),
+  revokeServiceCredential: deleteServiceCredentialMock,
+  setServiceCredentialBook: vi.fn(),
 }));
 
 import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";

@@ -1,25 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
-import { calculateLedgerStats as calculateLedgerStatsUseCase } from "@/modules/ledger/application/queries/calculate-ledger-stats";
-import { listLedgerEntries as listLedgerEntriesUseCase } from "@/modules/ledger/application/queries/list-ledger-entries";
 import { serverComposition } from "@/application/server-composition-root";
 import { getStreamTotal as getStreamTotalUseCase } from "@/modules/source-document/application/queries/get-stream-total";
 import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
+import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
+import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 
-const listLedgerEntries = (
-  ledgerId: string,
-  input: Parameters<typeof listLedgerEntriesUseCase>[1]
-) => listLedgerEntriesUseCase(ledgerId, input, serverComposition.ledgerReads);
-const calculateLedgerStats = (
-  ...args: Parameters<typeof calculateLedgerStatsUseCase> extends [...infer Head, unknown]
-    ? Head
-    : never
-) => calculateLedgerStatsUseCase(...args, serverComposition.ledgerReads);
 const queryPorts = {
   documents: serverComposition.sourceDocumentReads,
-  ledgerReads: serverComposition.ledgerReads,
   changes: serverComposition.ledgerChanges,
 };
 const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>

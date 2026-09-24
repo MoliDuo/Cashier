@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import type { BatchEntryDateImpact } from "@/modules/ledger/application/ports";
+import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 
 export async function getBatchEntryDateImpact(input: {
   ledgerId: string;

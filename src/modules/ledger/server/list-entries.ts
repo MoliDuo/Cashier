@@ -1,12 +1,27 @@
 import { withLedgerAccess } from "../access";
-import { serverComposition } from "@/application/server-composition-root";
-import { listLedgerEntries } from "../application/queries/list-ledger-entries";
+import { parseListLedgerEntriesInput } from "@/modules/ledger/contract-schemas";
+import type { LedgerEntryPageDto } from "@/modules/ledger/contracts";
+import { toLedgerEntryFilters } from "../domain/to-ledger-entry-filters";
+import { listLedgerEntryPage } from "./entry-reads/list-ledger-entry-page";
 
 /**
- * The ledger's entries. The query validates whatever it is handed, so this
- * wrapper only authorizes the ledger and supplies the read port — the session
- * query route and the server-side prefetch call it the same way.
+ * The ledger's entries, one page at a time. This is the single entry point for
+ * the query — the session route and the server-side prefetch both reach it — so
+ * it validates its own input.
  */
+export async function listLedgerEntries(
+  ledgerId: string,
+  params: unknown
+): Promise<LedgerEntryPageDto> {
+  const validated = parseListLedgerEntriesInput(params);
+  return listLedgerEntryPage({
+    ledgerId,
+    limit: validated.limit,
+    cursor: validated.cursor ?? null,
+    filters: toLedgerEntryFilters(validated),
+  });
+}
+
 export const getLedgerEntriesAction = withLedgerAccess((ledgerId: string, params: unknown) =>
-  listLedgerEntries(ledgerId, params, serverComposition.ledgerReads)
+  listLedgerEntries(ledgerId, params)
 );

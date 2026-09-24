@@ -4,7 +4,9 @@ const reads = vi.hoisted(() => ({
   getBatchEntryDateImpact: vi.fn(),
 }));
 
-import { previewSourceDocumentDateImpact } from "@/modules/workspace/application/use-cases/preview-source-document-date-impact";
+vi.mock("@/modules/ledger/server/entry-reads/get-batch-entry-date-impact", () => reads);
+
+import { previewSourceDocumentDateImpact } from "@/modules/workspace/server/source-document-date-impact";
 
 describe("previewSourceDocumentDateImpact", () => {
   beforeEach(() => {
@@ -13,10 +15,11 @@ describe("previewSourceDocumentDateImpact", () => {
 
   it("returns a valid preview for selected documents without ledger entries", async () => {
     await expect(
-      previewSourceDocumentDateImpact(
-        { ledgerId: "ledger-1", sourceDocumentIds: ["document-1"], ledgerEntryIds: [] },
-        reads
-      )
+      previewSourceDocumentDateImpact({
+        ledgerId: "ledger-1",
+        sourceDocumentIds: ["document-1"],
+        ledgerEntryIds: [],
+      })
     ).resolves.toEqual({
       selectedEntryCount: 0,
       sourceDocumentCount: 1,
@@ -35,14 +38,11 @@ describe("previewSourceDocumentDateImpact", () => {
     });
 
     await expect(
-      previewSourceDocumentDateImpact(
-        {
-          ledgerId: "ledger-1",
-          sourceDocumentIds: ["document-1", "document-2"],
-          ledgerEntryIds: ["entry-1"],
-        },
-        reads
-      )
+      previewSourceDocumentDateImpact({
+        ledgerId: "ledger-1",
+        sourceDocumentIds: ["document-1", "document-2"],
+        ledgerEntryIds: ["entry-1"],
+      })
     ).resolves.toEqual({
       selectedEntryCount: 1,
       sourceDocumentCount: 2,

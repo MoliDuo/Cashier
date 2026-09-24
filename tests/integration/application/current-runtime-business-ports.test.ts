@@ -2,12 +2,10 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import {
-  postgresCategoryAdapter,
-  postgresLedgerAdapter,
-  postgresServiceCredentialAdapter,
-  postgresSettingsAdapter,
-} from "@/application/adapters/postgres";
+import { listCategories } from "@/modules/ledger/server/categories";
+import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
+import { authenticateServiceCredential } from "@/modules/ledger/server/service-credentials";
+import { getLedgerSettings } from "@/modules/ledger/server/settings";
 import { currencyRates, entryCategories, ledgers, serviceCredentials } from "@/persistence";
 import { computeHash } from "@/lib/security/service-credential-token";
 
@@ -34,14 +32,14 @@ describe("current-runtime target adapters", () => {
       name: "API",
     });
 
-    await expect(postgresLedgerAdapter.getLiveLedger(userId)).resolves.toMatchObject({
+    await expect(getLiveLedger(userId)).resolves.toMatchObject({
       id: ledgerId,
     });
-    await expect(postgresCategoryAdapter.list(ledgerId)).resolves.toHaveLength(1);
-    await expect(postgresSettingsAdapter.get(ledgerId)).resolves.toMatchObject({
+    await expect(listCategories(ledgerId)).resolves.toHaveLength(1);
+    await expect(getLedgerSettings(ledgerId)).resolves.toMatchObject({
       mainCurrency: "CNY",
     });
-    await expect(postgresServiceCredentialAdapter.authenticate("secret-key")).resolves.toEqual({
+    await expect(authenticateServiceCredential("secret-key")).resolves.toEqual({
       id: credentialId,
       ledgerId,
       bookId: bookId,

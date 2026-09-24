@@ -10,9 +10,15 @@ import {
   type CreateBookInput,
   type UpdateBookInput,
 } from "@/modules/ledger/contract-schemas";
-import { toBookDto } from "@/modules/ledger/application/queries/list-books";
-import { listBooksIncludingArchived } from "../server/books";
-import { serverComposition } from "@/application/server-composition-root";
+import { listBooksIncludingArchived } from "../server/list-books";
+import {
+  archiveBook,
+  createBook,
+  deleteBook,
+  reorderBooks,
+  restoreBook,
+  updateBook,
+} from "../server/books";
 import { AppError, ValidationError } from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
 
@@ -76,12 +82,12 @@ export const createBookAction = withLedgerAccess(
   (ledgerId: string, data: CreateBookInput): Promise<BookMutationResult> =>
     runBookMutation(async () => {
       const validated = parseCreateBookInput(data);
-      const created = await serverComposition.books.create(ledgerId, {
+      const created = await createBook(ledgerId, {
         name: validated.name,
         timeZone: validated.timeZone ?? null,
       });
       return {
-        book: toBookDto(created),
+        book: created,
         books: await listBooksIncludingArchived(ledgerId),
       };
     })
@@ -92,13 +98,13 @@ export const updateBookAction = withLedgerAccess(
     runBookMutation(async () => {
       const validatedId = parseBookId(bookId);
       const validated = parseUpdateBookInput(data);
-      const updated = await serverComposition.books.update(ledgerId, validatedId, {
+      const updated = await updateBook(ledgerId, validatedId, {
         ...(validated.name === undefined ? {} : { name: validated.name }),
         ...(validated.timeZone === undefined ? {} : { timeZone: validated.timeZone }),
       });
       if (updated == null) throw new AppError("Book not found", "NOT_FOUND", 404);
       return {
-        book: toBookDto(updated),
+        book: updated,
         books: await listBooksIncludingArchived(ledgerId),
       };
     })
@@ -108,7 +114,7 @@ export const reorderBooksAction = withLedgerAccess(
   (ledgerId: string, bookIds: string[]): Promise<BookMutationResult> =>
     runBookMutation(async () => {
       const validated = parseReorderBooksInput(bookIds);
-      await serverComposition.books.reorder(ledgerId, validated);
+      await reorderBooks(ledgerId, validated);
       return { books: await listBooksIncludingArchived(ledgerId) };
     })
 );
@@ -122,7 +128,7 @@ export const archiveBookAction = withLedgerAccess(
   async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
-      const result = await serverComposition.books.archive(ledgerId, validatedId);
+      const result = await archiveBook(ledgerId, validatedId);
       if (result.status !== "archived") return { ok: false, code: result.status };
       return { ok: true, books: await listBooksIncludingArchived(ledgerId) };
     } catch (error) {
@@ -137,10 +143,10 @@ export const restoreBookAction = withLedgerAccess(
   async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
-      const restored = await serverComposition.books.restore(ledgerId, validatedId);
+      const restored = await restoreBook(ledgerId, validatedId);
       return {
         ok: true,
-        book: toBookDto(restored),
+        book: restored,
         books: await listBooksIncludingArchived(ledgerId),
       };
     } catch (error) {
@@ -155,7 +161,7 @@ export const deleteBookAction = withLedgerAccess(
   async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
-      const result = await serverComposition.books.delete(ledgerId, validatedId);
+      const result = await deleteBook(ledgerId, validatedId);
       if (result.status !== "deleted") return { ok: false, code: result.status };
       return { ok: true, books: await listBooksIncludingArchived(ledgerId) };
     } catch (error) {

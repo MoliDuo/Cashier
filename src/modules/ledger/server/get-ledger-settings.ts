@@ -1,17 +1,19 @@
 import { withLedgerAccess } from "../access";
 import type { LedgerSettingsViewDto } from "@/modules/ledger/contracts";
-import { getLedgerSettingsView } from "@/modules/ledger/application/queries/get-ledger-settings-view";
-import { serverComposition } from "@/application/server-composition-root";
+import { countUncategorizedEntries } from "./categories";
+import { listServiceCredentials } from "./service-credentials";
+
+export async function getLedgerSettingsView(ledgerId: string): Promise<LedgerSettingsViewDto> {
+  const [uncategorizedCount, credentials] = await Promise.all([
+    countUncategorizedEntries(ledgerId),
+    listServiceCredentials(ledgerId),
+  ]);
+  return { uncategorizedCount, credentials };
+}
 
 /**
  * Returns uncategorizedCount and credentials only. Categories are read
  * separately through getEntryCategoriesAction so optimistic category edits
  * keep sharing one cache entry with the category mutations.
  */
-export const getLedgerSettingsAction = withLedgerAccess(
-  async (ledgerId: string): Promise<LedgerSettingsViewDto> =>
-    getLedgerSettingsView(ledgerId, {
-      categories: serverComposition.categories,
-      credentials: serverComposition.serviceCredentials,
-    })
-);
+export const getLedgerSettingsAction = withLedgerAccess(getLedgerSettingsView);
