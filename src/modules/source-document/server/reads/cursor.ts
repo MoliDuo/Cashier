@@ -3,7 +3,7 @@ import { sourceDocuments } from "@/persistence";
 import {
   decodeSourceDocumentPageCursor,
   encodeSourceDocumentPageCursor,
-} from "@/modules/source-document/application/queries/source-document-cursor";
+} from "../../stream-cursor";
 
 import type { SourceDocumentRow } from "./mappers";
 

@@ -10,8 +10,8 @@ import {
   postgresLedgerProjectionAdapter,
   postgresRevisionAdapter,
   postgresSourceDocumentSubmissionAdapter,
-  getTargetSourceDocument,
 } from "@/application/adapters/postgres";
+import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import {
   ledgerEntries,
   ledgers,

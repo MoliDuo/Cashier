@@ -4,7 +4,7 @@ import {
   mapSourceDocumentDetail,
   type SourceDocumentRow,
   type SourceDocumentHydrationRow,
-} from "@/application/adapters/postgres/source-document-reads/mappers";
+} from "@/modules/source-document/server/reads/mappers";
 
 const row: SourceDocumentRow = {
   id: "doc",

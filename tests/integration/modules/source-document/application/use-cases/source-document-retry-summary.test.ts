@@ -5,7 +5,7 @@ import {
   createProcessingRevisionInTransaction,
   postgresRevisionAdapter,
 } from "@/application/adapters/postgres/revisions";
-import { getTargetSourceDocument } from "@/application/adapters/postgres/source-document-reads";
+import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 

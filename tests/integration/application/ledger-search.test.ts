@@ -1,21 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
-import { serverComposition } from "@/application/server-composition-root";
-import { getStreamTotal as getStreamTotalUseCase } from "@/modules/source-document/application/queries/get-stream-total";
-import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
-
-const queryPorts = {
-  documents: serverComposition.sourceDocumentReads,
-  changes: serverComposition.ledgerChanges,
-};
-const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>
-  listStreamPageUseCase(ledgerId, input, queryPorts);
-const getStreamTotal = (ledgerId: string, input: Parameters<typeof getStreamTotalUseCase>[1]) =>
-  getStreamTotalUseCase(ledgerId, input, queryPorts.documents);
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+import { getStreamTotal } from "@/modules/source-document/server/stream-total";
 
 describe("ledger search", () => {
   it("normalizes search and keeps Stream and Details contracts independent", async () => {

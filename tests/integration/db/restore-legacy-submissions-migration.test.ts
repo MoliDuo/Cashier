@@ -1,10 +1,8 @@
 import { readFileSync } from "node:fs";
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import {
-  getSourceDocumentInput,
-  getTargetSourceDocument,
-} from "@/application/adapters/postgres/source-document-reads";
+import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
+import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import {
   revisionFiles,
   sourceDocumentRevisions,

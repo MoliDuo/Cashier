@@ -1,19 +1,10 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { NotFoundError } from "@/lib/errors";
-import { getSourceDocumentInputQuery as getSourceDocumentInputQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-input";
 import { sourceDocuments } from "@/persistence";
-import { serverComposition } from "@/application/server-composition-root";
+import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
-
-const getSourceDocumentInputQuery = (ledgerId: string, sourceDocumentId: string) =>
-  getSourceDocumentInputQueryUseCase(
-    ledgerId,
-    sourceDocumentId,
-    serverComposition.sourceDocumentReads
-  );
 
 describe("source-document full query", () => {
   let ledgerId = "";
@@ -30,7 +21,7 @@ describe("source-document full query", () => {
       entryDate: "2026-03-22",
     });
 
-    const existing = await getSourceDocumentInputQuery(ledgerId, docId);
+    const existing = await getSourceDocumentInput(ledgerId, docId);
 
     expect(existing).toMatchObject({
       id: docId,
@@ -40,9 +31,7 @@ describe("source-document full query", () => {
       createdAt: expect.any(String),
     });
     expect(existing).not.toHaveProperty("imageUrls");
-    await expect(getSourceDocumentInputQuery(ledgerId, crypto.randomUUID())).rejects.toThrow(
-      NotFoundError
-    );
+    expect(await getSourceDocumentInput(ledgerId, crypto.randomUUID())).toBeNull();
   });
 
   it("hides soft-deleted documents", async () => {
@@ -58,9 +47,7 @@ describe("source-document full query", () => {
       .returning();
 
     expect(deletedDocument).toBeDefined();
-    await expect(getSourceDocumentInputQuery(ledgerId, deletedDocument!.id)).rejects.toThrow(
-      NotFoundError
-    );
+    expect(await getSourceDocumentInput(ledgerId, deletedDocument!.id)).toBeNull();
 
     const stored = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, deletedDocument!.id),

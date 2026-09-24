@@ -3,12 +3,11 @@ import { z } from "zod";
 import { AppError } from "@/lib/errors";
 import { omitUndefinedProperties } from "@/lib/validation";
 import { requireLedgerAccess } from "@/modules/ledger/access";
-import { serverComposition } from "@/application/server-composition-root";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
 import { getSourceDocumentDetailAction } from "@/modules/source-document/server/get-document-detail";
-import { listStreamPage } from "@/modules/source-document/application/queries/list-stream-page";
-import { getStreamTotal } from "@/modules/source-document/application/queries/get-stream-total";
-import { getStreamRefresh } from "@/modules/source-document/application/queries/get-stream-refresh";
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+import { getStreamTotal } from "@/modules/source-document/server/stream-total";
+import { getStreamRefresh } from "@/modules/source-document/server/stream-refresh";
 import {
   sourceDocumentIdSchema,
   streamPageInputSchema,
@@ -84,27 +83,23 @@ export async function POST(request: Request) {
       case "stream": {
         const parsed = streamPageInputSchema.parse(input);
         const { ledger } = await requireLedgerAccess();
-        result = await listStreamPage(
-          ledger.id,
-          { ...omitUndefinedProperties(parsed), limit: parsed.limit },
-          {
-            documents: serverComposition.sourceDocumentReads,
-            changes: serverComposition.ledgerChanges,
-          }
-        );
+        result = await listStreamPage(ledger.id, {
+          ...omitUndefinedProperties(parsed),
+          limit: parsed.limit,
+        });
         scheduleProcessingRecoveryAfter(ledger.id);
         break;
       }
       case "total": {
         const parsed = omitUndefinedProperties(streamTotalInputSchema.parse(input));
         const { ledger } = await requireLedgerAccess();
-        result = await getStreamTotal(ledger.id, parsed, serverComposition.sourceDocumentReads);
+        result = await getStreamTotal(ledger.id, parsed);
         break;
       }
       case "refresh": {
         const parsed = z.object({ afterVersion: z.string().regex(/^\d+$/) }).parse(input);
         const { ledger } = await requireLedgerAccess();
-        result = await getStreamRefresh(ledger.id, parsed, serverComposition.ledgerChanges);
+        result = await getStreamRefresh(ledger.id, parsed);
         scheduleProcessingRecoveryAfter(ledger.id);
         break;
       }

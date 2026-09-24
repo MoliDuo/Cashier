@@ -14,12 +14,10 @@ vi.mock("@/modules/ledger/access", () => ({
   }),
 }));
 
-vi.mock("@/application/server-composition-root", () => ({
-  serverComposition: {
-    sourceDocumentReads: {
-      get: vi.fn().mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111" }),
-    },
-  },
+vi.mock("@/modules/source-document/server/reads/list", () => ({
+  getTargetSourceDocument: vi
+    .fn()
+    .mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111" }),
 }));
 const sourceDocumentId = "11111111-1111-4111-8111-111111111111";
 

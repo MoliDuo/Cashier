@@ -4,7 +4,7 @@ import { useMemo, useRef, useEffect } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { listStreamPageAction } from "@/lib/queries/ledger-query-client";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import type { ListStreamPageInput } from "../application/queries/list-stream-page";
+import type { ListStreamPageInput } from "../contracts";
 import { queryKeys } from "@/lib/query-keys";
 import {
   buildUnifiedStreamGroups,

@@ -1,5 +1,6 @@
-import type { LedgerRefreshRequest, LedgerRefreshResult } from "../../contract-refresh";
-import type { LedgerChangeReadPort } from "../ports";
+import "server-only";
+import type { LedgerRefreshRequest, LedgerRefreshResult } from "../contract-refresh";
+import { summarizeLedgerChanges } from "./ledger-changes";
 
 const MAX_BIGINT_VERSION = BigInt("9223372036854775807");
 const FULL_INVALIDATIONS = { categories: true, settings: true, stats: true } as const;
@@ -16,14 +17,13 @@ function parseVersion(value: string): bigint | null {
 
 export async function getStreamRefresh(
   ledgerId: string,
-  request: LedgerRefreshRequest,
-  changes: LedgerChangeReadPort
+  request: LedgerRefreshRequest
 ): Promise<LedgerRefreshResult> {
   const parsedVersion = parseVersion(request.afterVersion);
   const requestVersionIsInvalid =
     parsedVersion == null || parsedVersion < BigInt(0) || parsedVersion > MAX_BIGINT_VERSION;
   const afterVersion = requestVersionIsInvalid ? BigInt(0) : parsedVersion;
-  const summary = await changes.summarizeChanges({ ledgerId, afterVersion });
+  const summary = await summarizeLedgerChanges({ ledgerId, afterVersion });
   const base = {
     version: summary.currentVersion.toString(),
     hasTransitionalWork: summary.hasTransitionalWork,

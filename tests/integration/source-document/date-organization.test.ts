@@ -2,18 +2,13 @@ import { and, eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { serverComposition } from "@/application/server-composition-root";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
+import { listStreamPage as listStreamPageFor } from "@/modules/source-document/server/list-stream-page";
 
 const port = serverComposition.sourceDocumentAggregate;
-const queryPorts = {
-  documents: serverComposition.sourceDocumentReads,
-  changes: serverComposition.ledgerChanges,
-};
 
-const listStreamPage = (ledgerId: string) =>
-  listStreamPageUseCase(ledgerId, { limit: 20 }, queryPorts);
+const listStreamPage = (ledgerId: string) => listStreamPageFor(ledgerId, { limit: 20 });
 
 async function createFixture() {
   const db = getTestDb();

@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getStreamRefresh } from "@/modules/source-document/application/queries/get-stream-refresh";
-import { serverComposition } from "@/application/server-composition-root";
+import { getStreamRefresh } from "@/modules/source-document/server/stream-refresh";
 import { ledgerSyncState, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
@@ -18,8 +17,7 @@ describe("ledger refresh", () => {
     ));
   });
 
-  const refresh = (afterVersion: string) =>
-    getStreamRefresh(ledgerId, { afterVersion }, serverComposition.ledgerChanges);
+  const refresh = (afterVersion: string) => getStreamRefresh(ledgerId, { afterVersion });
 
   async function version(): Promise<bigint> {
     const state = await getTestDb().query.ledgerSyncState.findFirst({

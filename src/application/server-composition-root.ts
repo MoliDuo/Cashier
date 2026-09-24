@@ -1,17 +1,11 @@
 import "server-only";
 import {
-  calculateCompletedSourceDocumentTotal,
-  getTargetSourceDocument,
-  getSourceDocumentInput,
   PostgresProcessingJobAdapter,
-  listTargetSourceDocuments,
   postgresSourceDocumentAggregateAdapter,
 } from "@/application/adapters/postgres";
 import { loadRevisionProcessingContext } from "@/application/adapters/postgres/revision-processing-context";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres/ledger-projections";
 import { postgresRevisionAdapter } from "@/application/adapters/postgres/revisions";
-import { postgresCredentialSourceDocumentReadAdapter } from "@/application/adapters/postgres/credential-source-document-status";
-import { postgresLedgerChangeReadAdapter } from "@/application/adapters/postgres/ledger-changes";
 import {
   createExecuteSingleProcessingJob,
   CurrentRevisionProcessor,
@@ -64,14 +58,6 @@ export const serverComposition = {
   categoryAssignments: postgresCategoryAssignmentV2Adapter,
   storedFiles: storedFileAdapter,
   sourceDocumentAggregate: postgresSourceDocumentAggregateAdapter,
-  sourceDocumentReads: {
-    calculateCompletedTotal: calculateCompletedSourceDocumentTotal,
-    getInput: getSourceDocumentInput,
-    get: getTargetSourceDocument,
-    list: listTargetSourceDocuments,
-  },
-  credentialSourceDocuments: postgresCredentialSourceDocumentReadAdapter,
-  ledgerChanges: postgresLedgerChangeReadAdapter,
   processingRecovery: new PostgresProcessingJobAdapter(),
   createRevisionProcessor,
   executeSingleProcessingJob,

@@ -2,7 +2,7 @@ import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import {
   getTargetSourceDocument,
   listTargetSourceDocuments,
-} from "@/application/adapters/postgres/source-document-reads";
+} from "@/modules/source-document/server/reads/list";
 import { postgresSourceDocumentAggregateAdapter } from "@/application/adapters/postgres/source-document-aggregate";
 import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";

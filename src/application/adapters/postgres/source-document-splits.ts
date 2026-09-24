@@ -9,7 +9,7 @@ import type {
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
 import { convertAmounts } from "@/modules/currency/server/exchange-rates";
-import { getSourceDocumentInTransaction } from "./source-document-reads/list";
+import { getSourceDocumentInTransaction } from "@/modules/source-document/server/reads/list";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { copyRevisionFiles, createManualRevision } from "./ledger-projections";

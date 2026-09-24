@@ -1,11 +1,10 @@
 "use server";
-import { ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import { withLedgerAccess } from "@/modules/ledger/access";
-import { getSourceDocumentInputQuery } from "@/modules/source-document/application/queries/get-source-document-input";
+import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import type { SourceDocumentInputDto } from "@/modules/source-document/contracts";
 import { sourceDocumentIdSchema } from "@/modules/source-document/contract-schemas";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
-import { serverComposition } from "@/application/server-composition-root";
 
 export const getSourceDocumentInputAction = withLedgerAccess(
   async (ledgerId: string, sourceDocumentId: string): Promise<SourceDocumentInputDto> => {
@@ -14,10 +13,8 @@ export const getSourceDocumentInputAction = withLedgerAccess(
       throw new ValidationError("Validation failed", { issues: parsed.error.issues });
     }
     scheduleProcessingRecoveryAfter(ledgerId);
-    return getSourceDocumentInputQuery(
-      ledgerId,
-      parsed.data,
-      serverComposition.sourceDocumentReads
-    );
+    const document = await getSourceDocumentInput(ledgerId, parsed.data);
+    if (document == null) throw new NotFoundError("Source document");
+    return document;
   }
 );

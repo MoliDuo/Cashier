@@ -16,45 +16,10 @@ import type {
   BatchUpdateSourceDocumentsResultDto,
   SaveSourceDocumentChangesResultDto,
   SplitSourceDocumentResultDto,
-  SourceDocumentDetailDto,
-  SourceDocumentListItemDto,
-  SourceDocumentProcessingStatus,
   AtomicBatchCommandResult,
   VersionedCommandResult,
   VersionedTarget,
 } from "../contracts";
-
-interface SourceDocumentFilterInput {
-  ledgerId: string;
-  bookId?: string;
-  statuses?: readonly SourceDocumentProcessingStatus[];
-  startDate?: string | null;
-  endDate?: string | null;
-  minAmount?: string;
-  maxAmount?: string;
-  search?: string;
-}
-
-interface SourceDocumentListInput extends SourceDocumentFilterInput {
-  cursor?: string | null;
-  limit: number;
-}
-
-export interface SourceDocumentReadPort {
-  calculateCompletedTotal(input: SourceDocumentFilterInput): Promise<{
-    total: string;
-    unconvertedCount: number;
-  }>;
-  getInput(
-    ledgerId: string,
-    sourceDocumentId: string
-  ): Promise<import("../contracts").SourceDocumentInputDto | null>;
-  get(ledgerId: string, sourceDocumentId: string): Promise<SourceDocumentDetailDto | null>;
-  list(input: SourceDocumentListInput): Promise<{
-    items: SourceDocumentListItemDto[];
-    nextCursor: string | null;
-  }>;
-}
 
 export interface ApplyCategoryAssignmentsInput {
   ledgerId: string;
@@ -184,51 +149,4 @@ export interface ProcessingRecoveryPort {
     ledgerId: string,
     config: import("@/application/contracts").ProcessingRecoveryConfig
   ): Promise<readonly RecoverableProcessingJobContract[]>;
-}
-
-export interface CredentialSourceDocumentStatusResult {
-  sourceDocumentId: string;
-  revisionId: string;
-  status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
-  submittedAt: string;
-  finalizedAt: string | null;
-  entryDate: string | null;
-  result: null | {
-    title: string | null;
-    /** Accounting total in the ledger's main currency (convertedAmount sum). */
-    total: string;
-    /** Three-letter ISO currency code of `total`, from the ledger's main currency. */
-    totalCurrency: string;
-    entries: Array<{
-      name: string;
-      description: string | null;
-      amount: string;
-      currency: string | null;
-      category: string | null;
-    }>;
-  };
-  /**
-   * Sanitized failure information. `code` is always a stable, non-empty
-   * public code; `message` is an optional user-facing explanation.
-   */
-  error: null | { code: string; message?: string | null };
-}
-
-export interface CredentialSourceDocumentReadPort {
-  getStatus(
-    ledgerId: string,
-    sourceDocumentId: string
-  ): Promise<CredentialSourceDocumentStatusResult | null>;
-}
-
-export interface LedgerChangeReadPort {
-  getVersion(ledgerId: string): Promise<bigint>;
-  getRefreshBaseline(ledgerId: string): Promise<{ version: bigint; hasTransitionalWork: boolean }>;
-  summarizeChanges(input: { ledgerId: string; afterVersion: bigint }): Promise<{
-    currentVersion: bigint;
-    categoriesChanged: boolean;
-    settingsChanged: boolean;
-    statsChanged: boolean;
-    hasTransitionalWork: boolean;
-  }>;
 }

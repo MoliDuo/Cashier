@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { handleApiV1Route } from "@/application/transport/api-v1/request-pipeline";
-import { getCredentialSourceDocumentStatus } from "@/modules/source-document/application/queries/get-credential-source-document-status";
-import { serverComposition } from "@/application/server-composition-root";
+import { getCredentialSourceDocumentStatus } from "@/modules/source-document/server/credential-status";
 import { sourceDocumentIdSchema } from "@/modules/source-document/contract-schemas";
 import { NotFoundError } from "@/lib/errors";
 
@@ -15,11 +14,7 @@ export async function GET(
       const { sourceDocumentId: rawId } = await context.params;
       const parsed = sourceDocumentIdSchema.safeParse(rawId);
       if (!parsed.success) throw new NotFoundError("Source document");
-      const status = await getCredentialSourceDocumentStatus(
-        credential.ledgerId,
-        parsed.data,
-        serverComposition.credentialSourceDocuments
-      );
+      const status = await getCredentialSourceDocumentStatus(credential.ledgerId, parsed.data);
       if (status == null) throw new NotFoundError("Source document");
       const response = NextResponse.json(status);
       if (status.status === "processing") response.headers.set("Retry-After", "5");

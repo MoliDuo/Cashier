@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   postgresLedgerProjectionAdapter,
   postgresSourceDocumentSubmissionAdapter,
-  getTargetSourceDocument,
 } from "@/application/adapters/postgres";
+import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { ledgerEntries, processingOutbox, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";

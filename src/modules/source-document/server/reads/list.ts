@@ -10,7 +10,7 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import type { PostgresTransaction } from "../transaction-locks";
+import type { PostgresTransaction } from "@/application/adapters/postgres/transaction-locks";
 
 import type { TargetSourceDocumentListInput } from "./filters";
 import { baseConditions } from "./filters";

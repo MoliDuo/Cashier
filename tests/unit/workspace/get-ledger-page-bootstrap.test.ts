@@ -2,25 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 import { getLedgerPageBootstrap as getLedgerPageBootstrapUseCase } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
-import type {
-  SourceDocumentReadPort,
-  LedgerChangeReadPort,
-} from "@/modules/source-document/application/ports";
 
 const listBooksMock = vi.hoisted(() => vi.fn());
 
-const bootstrapDependencies = {
-  sourceDocuments: {
-    documents: {
-      list: vi.fn(),
-      calculateCompletedTotal: vi.fn(),
-    },
-    changes: { getVersion: vi.fn(), getRefreshBaseline: vi.fn() },
-  } satisfies {
-    documents: Pick<SourceDocumentReadPort, "list" | "calculateCompletedTotal">;
-    changes: Pick<LedgerChangeReadPort, "getVersion" | "getRefreshBaseline">;
-  },
-};
 /**
  * The zone a repeat visit arrives with: the browser has already written its
  * cookie, so every date read below has an answer to date by. The first visit —
@@ -33,14 +17,11 @@ const getLedgerPageBootstrap = (
   input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto"> &
     Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto">>
 ) =>
-  getLedgerPageBootstrapUseCase(
-    {
-      deviceTimeZone: REPORTED_DEVICE_TIME_ZONE,
-      ...input,
-      ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto(),
-    },
-    bootstrapDependencies
-  );
+  getLedgerPageBootstrapUseCase({
+    deviceTimeZone: REPORTED_DEVICE_TIME_ZONE,
+    ...input,
+    ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto(),
+  });
 
 const listEntryCategoriesMock = vi.hoisted(() => vi.fn());
 const calculateLedgerStatsMock = vi.hoisted(() => vi.fn());
@@ -66,10 +47,10 @@ vi.mock("@/modules/ledger/server/list-entries", () => ({
   listLedgerEntries: listLedgerEntriesMock,
 }));
 
-vi.mock("@/modules/source-document/application/queries/list-stream-page", () => ({
+vi.mock("@/modules/source-document/server/list-stream-page", () => ({
   listStreamPage: listStreamPageMock,
 }));
-vi.mock("@/modules/source-document/application/queries/get-stream-total", () => ({
+vi.mock("@/modules/source-document/server/stream-total", () => ({
   getStreamTotal: getStreamTotalMock,
 }));
 
@@ -168,11 +149,10 @@ describe("getLedgerPageBootstrap", () => {
     expect(result).not.toBeNull();
     expect(getSourceDocumentCountsQueryMock).not.toHaveBeenCalled();
     expect(listStreamPageMock).toHaveBeenCalled();
-    expect(getStreamTotalMock).toHaveBeenCalledWith(
-      "ledger-1",
-      { startDate: "2026-03-01", endDate: "2026-03-31" },
-      bootstrapDependencies.sourceDocuments.documents
-    );
+    expect(getStreamTotalMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-03-01",
+      endDate: "2026-03-31",
+    });
     expect(calculateLedgerStatsMock).not.toHaveBeenCalled();
     expect(listLedgerEntriesMock).not.toHaveBeenCalled();
     expect(getEnhancedStatsMock).not.toHaveBeenCalled();
@@ -193,23 +173,20 @@ describe("getLedgerPageBootstrap", () => {
       ledgerDto: createPreAuthorizedLedgerDto(),
     });
 
-    expect(listStreamPageMock).toHaveBeenCalledWith(
-      "ledger-1",
-      {
-        startDate: "2026-03-01",
-        endDate: "2026-03-31",
-        minAmount: "20",
-        maxAmount: "100",
-        cursor: undefined,
-        limit: 20,
-      },
-      bootstrapDependencies.sourceDocuments
-    );
-    expect(getStreamTotalMock).toHaveBeenCalledWith(
-      "ledger-1",
-      { startDate: "2026-03-01", endDate: "2026-03-31", minAmount: "20", maxAmount: "100" },
-      bootstrapDependencies.sourceDocuments.documents
-    );
+    expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-03-01",
+      endDate: "2026-03-31",
+      minAmount: "20",
+      maxAmount: "100",
+      cursor: undefined,
+      limit: 20,
+    });
+    expect(getStreamTotalMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-03-01",
+      endDate: "2026-03-31",
+      minAmount: "20",
+      maxAmount: "100",
+    });
   });
 
   it("passes status filters into stream page prefetch", async () => {
@@ -226,22 +203,18 @@ describe("getLedgerPageBootstrap", () => {
       ledgerDto: createPreAuthorizedLedgerDto(),
     });
 
-    expect(listStreamPageMock).toHaveBeenCalledWith(
-      "ledger-1",
-      {
-        startDate: "2026-07-01",
-        endDate: "2026-07-31",
-        statuses: ["failed", "processing"],
-        cursor: undefined,
-        limit: 20,
-      },
-      bootstrapDependencies.sourceDocuments
-    );
-    expect(getStreamTotalMock).toHaveBeenCalledWith(
-      "ledger-1",
-      { startDate: "2026-07-01", endDate: "2026-07-31", statuses: ["failed", "processing"] },
-      bootstrapDependencies.sourceDocuments.documents
-    );
+    expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      statuses: ["failed", "processing"],
+      cursor: undefined,
+      limit: 20,
+    });
+    expect(getStreamTotalMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      statuses: ["failed", "processing"],
+    });
   });
 
   it("passes search filters into both stream page and total prefetch", async () => {
@@ -258,22 +231,18 @@ describe("getLedgerPageBootstrap", () => {
       ledgerDto: createPreAuthorizedLedgerDto(),
     });
 
-    expect(listStreamPageMock).toHaveBeenCalledWith(
-      "ledger-1",
-      {
-        startDate: "2026-07-01",
-        endDate: "2026-07-31",
-        search: "coffee",
-        cursor: undefined,
-        limit: 20,
-      },
-      bootstrapDependencies.sourceDocuments
-    );
-    expect(getStreamTotalMock).toHaveBeenCalledWith(
-      "ledger-1",
-      { startDate: "2026-07-01", endDate: "2026-07-31", search: "coffee" },
-      bootstrapDependencies.sourceDocuments.documents
-    );
+    expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      search: "coffee",
+      cursor: undefined,
+      limit: 20,
+    });
+    expect(getStreamTotalMock).toHaveBeenCalledWith("ledger-1", {
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      search: "coffee",
+    });
   });
 
   it("prefetches details tab summary and paged entries", async () => {
@@ -655,16 +624,16 @@ describe("getLedgerPageBootstrap", () => {
       // September: the range the client is about to ask for, so hydration is a
       // cache hit instead of a second request for the wrong month.
       expect(result?.ledgerToday).toBe("2026-10-01");
-      expect(listStreamPageMock).toHaveBeenCalledWith(
-        "ledger-1",
-        { startDate: "2026-10-01", endDate: "2026-10-31", cursor: undefined, limit: 20 },
-        bootstrapDependencies.sourceDocuments
-      );
-      expect(getStreamTotalMock).toHaveBeenCalledWith(
-        "ledger-1",
-        { startDate: "2026-10-01", endDate: "2026-10-31" },
-        bootstrapDependencies.sourceDocuments.documents
-      );
+      expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
+        startDate: "2026-10-01",
+        endDate: "2026-10-31",
+        cursor: undefined,
+        limit: 20,
+      });
+      expect(getStreamTotalMock).toHaveBeenCalledWith("ledger-1", {
+        startDate: "2026-10-01",
+        endDate: "2026-10-31",
+      });
       const streamQuery = result?.dehydratedState.queries.find(
         (query) => query.queryKey[1] === "source-documents" && query.queryKey[2] === "stream"
       );
@@ -709,11 +678,12 @@ describe("getLedgerPageBootstrap", () => {
 
       expect(result?.ledgerToday).toBe("2026-09-30");
       expect(result?.initialBookId).toBeNull();
-      expect(listStreamPageMock).toHaveBeenCalledWith(
-        "ledger-1",
-        { startDate: "2026-09-01", endDate: "2026-09-30", cursor: undefined, limit: 20 },
-        bootstrapDependencies.sourceDocuments
-      );
+      expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
+        startDate: "2026-09-01",
+        endDate: "2026-09-30",
+        cursor: undefined,
+        limit: 20,
+      });
     });
 
     it("lets a viewed book's fixed zone beat the device zone across the month boundary", async () => {
@@ -737,17 +707,13 @@ describe("getLedgerPageBootstrap", () => {
       // Shanghai is already into October; the book the page is narrowed to is
       // not, and the book is the authority for its own records.
       expect(result?.ledgerToday).toBe("2026-09-30");
-      expect(listStreamPageMock).toHaveBeenCalledWith(
-        "ledger-1",
-        {
-          bookId: "book-1",
-          startDate: "2026-09-01",
-          endDate: "2026-09-30",
-          cursor: undefined,
-          limit: 20,
-        },
-        bootstrapDependencies.sourceDocuments
-      );
+      expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
+        bookId: "book-1",
+        startDate: "2026-09-01",
+        endDate: "2026-09-30",
+        cursor: undefined,
+        limit: 20,
+      });
     });
   });
 

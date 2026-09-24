@@ -2,7 +2,7 @@ import type { SourceDocumentDetailDto } from "@/modules/source-document/contract
 import { withLedgerAccess } from "@/modules/ledger/access";
 import { sourceDocumentIdSchema } from "../contract-schemas";
 import { ValidationError } from "@/lib/errors";
-import { serverComposition } from "@/application/server-composition-root";
+import { getTargetSourceDocument } from "./reads/list";
 
 /**
  * Fetch the complete document detail used by the editor.
@@ -13,6 +13,6 @@ export const getSourceDocumentDetailAction = withLedgerAccess(
     if (!parsed.success) {
       throw new ValidationError("Validation failed", { issues: parsed.error.issues });
     }
-    return serverComposition.sourceDocumentReads.get(ledgerId, parsed.data);
+    return getTargetSourceDocument(ledgerId, parsed.data);
   }
 );

@@ -2,9 +2,6 @@ import { createPendingRevision } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { postgresLedgerProjectionAdapter } from "@/application/adapters/postgres";
-import { serverComposition } from "@/application/server-composition-root";
-import { getSourceDocumentInputQuery as getSourceDocumentInputQueryUseCase } from "@/modules/source-document/application/queries/get-source-document-input";
-import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { ledgerEntries, sourceDocuments, storedFiles } from "@/persistence";
 import {
   activateTestSourceDocumentProjection,
@@ -13,15 +10,10 @@ import {
 } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
-
-const queryPorts = {
-  documents: serverComposition.sourceDocumentReads,
-  changes: serverComposition.ledgerChanges,
-};
-const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>
-  listStreamPageUseCase(ledgerId, input, queryPorts);
-const getSourceDocumentInputQuery = (ledgerId: string, sourceDocumentId: string) =>
-  getSourceDocumentInputQueryUseCase(ledgerId, sourceDocumentId, queryPorts.documents);
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+import { listTargetSourceDocuments } from "@/modules/source-document/server/reads/list";
+import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
+import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 
 const SOURCE_LIST_KEYS = [
   "bookId",
@@ -180,11 +172,11 @@ describe("bounded target read models", () => {
         .filter((statement) => /^(select|with)\b/.test(statement))
         .filter((statement, index, normalized) => statement !== normalized[index - 1]);
     const capture = await captureSqlStatements(async (getStatements) => {
-      const list = await serverComposition.sourceDocumentReads.list({ ledgerId, limit: 20 });
+      const list = await listTargetSourceDocuments({ ledgerId, limit: 20 });
       const afterList = readStatements(getStatements()).length;
-      const detail = await serverComposition.sourceDocumentReads.get(ledgerId, document!.id);
+      const detail = await getTargetSourceDocument(ledgerId, document!.id);
       const afterDetail = readStatements(getStatements()).length;
-      const evidence = await serverComposition.sourceDocumentReads.getInput(ledgerId, document!.id);
+      const evidence = await getSourceDocumentInput(ledgerId, document!.id);
       const afterEvidence = readStatements(getStatements()).length;
       await listStreamPage(ledgerId, { limit: 20 });
       const afterStream = readStatements(getStatements()).length;
@@ -306,7 +298,7 @@ describe("bounded target read models", () => {
       expect(serialized).not.toContain(forbidden);
     }
 
-    const detail = await getSourceDocumentInputQuery(ledgerId, documents[0]!.id);
+    const detail = (await getSourceDocumentInput(ledgerId, documents[0]!.id))!;
     expect(Object.keys(detail).sort()).toEqual(
       ["createdAt", "documentDate", "files", "id", "processingStatus", "text"].sort()
     );

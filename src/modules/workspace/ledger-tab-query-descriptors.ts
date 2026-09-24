@@ -2,8 +2,7 @@ import {
   canonicalizeSourceDocumentProcessingStatuses,
   type SourceDocumentProcessingStatus,
 } from "@/modules/source-document/types";
-import type { GetStreamTotalInput } from "@/modules/source-document/application/queries/get-stream-total";
-import type { ListStreamPageInput } from "@/modules/source-document/application/queries/list-stream-page";
+import type { GetStreamTotalInput, ListStreamPageInput } from "@/modules/source-document/contracts";
 import type { GetEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 import { normalizeSearchTerm } from "@/lib/search";
 import { queryKeys } from "@/lib/query-keys";

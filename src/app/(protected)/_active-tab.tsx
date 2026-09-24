@@ -23,7 +23,6 @@ import { ActiveShell } from "./_active-shell";
 import { LedgerBootstrapFallback } from "./_ledger-bootstrap-fallback";
 import { getLedgerPageBootstrap } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { scheduleProcessingRecoveryAfter } from "@/application/processing/schedule-processing-recovery";
-import { serverComposition } from "@/application/server-composition-root";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 
@@ -88,23 +87,15 @@ export async function ActiveTab({ searchParams }: ActiveTabProps) {
   );
   const advancedFilters = readLedgerFilterParams(urlSearchParams, filterScope);
   const statsState = readStatsSearchParams(urlSearchParams);
-  const pageDataPromise = getLedgerPageBootstrap(
-    {
-      initialTab: activeTab,
-      periodParams,
-      advancedFilters,
-      statsState,
-      ledgerDto,
-      ...(bookScopeCookie == null ? {} : { bookId: bookScopeCookie }),
-      ...(deviceTimeZone == null ? {} : { deviceTimeZone }),
-    },
-    {
-      sourceDocuments: {
-        documents: serverComposition.sourceDocumentReads,
-        changes: serverComposition.ledgerChanges,
-      },
-    }
-  );
+  const pageDataPromise = getLedgerPageBootstrap({
+    initialTab: activeTab,
+    periodParams,
+    advancedFilters,
+    statsState,
+    ledgerDto,
+    ...(bookScopeCookie == null ? {} : { bookId: bookScopeCookie }),
+    ...(deviceTimeZone == null ? {} : { deviceTimeZone }),
+  });
   // Authenticated request boundary for processing recovery: the bootstrap
   // query stays side-effect free, but every visit to this route still gets
   // a recovery pass after the response finishes.

@@ -4,7 +4,9 @@ import type {
   splitSourceDocumentInputSchema,
 } from "./contract-schemas";
 
-export type { SourceDocumentProcessingStatus } from "./types";
+import type { SourceDocumentProcessingStatus } from "./types";
+
+export type { SourceDocumentProcessingStatus };
 export type {
   SourceDocumentActiveResultSummary,
   SourceDocumentDetailDto,
@@ -129,4 +131,54 @@ export interface DeleteSourceDocumentResultDto {
 
 export interface CancelProcessingResponseDto {
   processingStatus: "cancelled";
+}
+
+export interface ListStreamPageInput {
+  bookId?: string;
+  startDate?: string | null | undefined;
+  endDate?: string | null | undefined;
+  minAmount?: string;
+  maxAmount?: string;
+  statuses?: string[];
+  search?: string;
+  cursor?: string | null | undefined;
+  limit: number;
+}
+
+export interface GetStreamTotalInput {
+  bookId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  minAmount?: string;
+  maxAmount?: string;
+  statuses?: readonly SourceDocumentProcessingStatus[];
+  search?: string;
+}
+
+export interface CredentialSourceDocumentStatusResult {
+  sourceDocumentId: string;
+  revisionId: string;
+  status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
+  submittedAt: string;
+  finalizedAt: string | null;
+  entryDate: string | null;
+  result: null | {
+    title: string | null;
+    /** Accounting total in the ledger's main currency (convertedAmount sum). */
+    total: string;
+    /** Three-letter ISO currency code of `total`, from the ledger's main currency. */
+    totalCurrency: string;
+    entries: Array<{
+      name: string;
+      description: string | null;
+      amount: string;
+      currency: string | null;
+      category: string | null;
+    }>;
+  };
+  /**
+   * Sanitized failure information. `code` is always a stable, non-empty
+   * public code; `message` is an optional user-facing explanation.
+   */
+  error: null | { code: string; message?: string | null };
 }

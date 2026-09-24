@@ -3,10 +3,10 @@ import { AppError } from "@/lib/errors";
 type QueryActions = {
   detail: typeof import("@/modules/source-document/server/get-document-detail").getSourceDocumentDetailAction;
   stream: (
-    input: import("@/modules/source-document/application/queries/list-stream-page").ListStreamPageInput
+    input: import("@/modules/source-document/contracts").ListStreamPageInput
   ) => Promise<import("@/modules/source-document/contracts").StreamPage>;
   total: (
-    input: import("@/modules/source-document/application/queries/get-stream-total").GetStreamTotalInput
+    input: import("@/modules/source-document/contracts").GetStreamTotalInput
   ) => Promise<import("@/modules/source-document/contracts").StreamTotalDto>;
   refresh: (
     input: import("@/modules/source-document/contract-refresh").LedgerRefreshRequest

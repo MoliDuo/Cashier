@@ -8,7 +8,6 @@ import {
   postgresRevisionAdapter,
 } from "@/application/adapters/postgres";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
-import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
 import { serverComposition } from "@/application/server-composition-root";
 import {
   entryCategories,
@@ -21,6 +20,7 @@ import { getTestDb } from "../../setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
   const page = await listLedgerEntryPage({
@@ -39,11 +39,6 @@ async function currentVersion(sourceDocumentId: string): Promise<number> {
   if (row == null) throw new Error("Source document not found");
   return row.version;
 }
-const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>
-  listStreamPageUseCase(ledgerId, input, {
-    documents: serverComposition.sourceDocumentReads,
-    changes: serverComposition.ledgerChanges,
-  });
 
 const entry = {
   categoryId: null,

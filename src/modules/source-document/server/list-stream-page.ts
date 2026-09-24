@@ -1,30 +1,20 @@
+import "server-only";
 import { ValidationError } from "@/lib/errors";
-import type { SourceDocumentListItemDto, StreamPage } from "../../contracts";
+import type { ListStreamPageInput, SourceDocumentListItemDto, StreamPage } from "../contracts";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import { normalizeSearchTerm } from "@/lib/search";
-import type { LedgerChangeReadPort, SourceDocumentReadPort } from "../ports";
+import { getLedgerRefreshBaseline, getLedgerVersion } from "./ledger-changes";
+import { listTargetSourceDocuments } from "./reads/list";
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/modules/ledger/server/entry-reads/list-ledger-entry-views-by-source-document-ids";
-import { filterStreamEntries } from "../../stream-filter-policy";
+import { filterStreamEntries } from "../stream-filter-policy";
 import { createHash } from "node:crypto";
 import {
   decodeSourceDocumentStreamCursor,
   encodeSourceDocumentPageCursor,
   encodeSourceDocumentStreamCursor,
-} from "./source-document-cursor";
+} from "../stream-cursor";
 
 const STREAM_PAGE_LIMIT = 20;
-
-export interface ListStreamPageInput {
-  bookId?: string;
-  startDate?: string | null | undefined;
-  endDate?: string | null | undefined;
-  minAmount?: string;
-  maxAmount?: string;
-  statuses?: string[];
-  search?: string;
-  cursor?: string | null | undefined;
-  limit: number;
-}
 
 // ---------------------------------------------------------------------------
 // Stream cursor helpers
@@ -80,17 +70,13 @@ function filterFingerprint(input: ListStreamPageInput, search: string | undefine
 
 export async function listStreamPage(
   ledgerId: string,
-  input: ListStreamPageInput,
-  ports: {
-    documents: Pick<SourceDocumentReadPort, "list">;
-    changes: Pick<LedgerChangeReadPort, "getVersion" | "getRefreshBaseline">;
-  }
+  input: ListStreamPageInput
 ): Promise<StreamPage> {
   // Enforce page size cap (defense in depth beyond the action schema)
   const limit = Math.min(input.limit, STREAM_PAGE_LIMIT);
   const search = normalizeSearchTerm(input.search);
   const filterHash = filterFingerprint(input, search);
-  const beforeVersion = await ports.changes.getVersion(ledgerId);
+  const beforeVersion = await getLedgerVersion(ledgerId);
   const generation = beforeVersion.toString();
 
   // Validate cursor against ledger identity and filter compatibility.
@@ -101,7 +87,7 @@ export async function listStreamPage(
     innerCursor = validateCursor(input.cursor, ledgerId, generation, filterHash);
   } catch (error) {
     if (error instanceof ValidationError) {
-      const baseline = await ports.changes.getRefreshBaseline(ledgerId);
+      const baseline = await getLedgerRefreshBaseline(ledgerId);
       return {
         items: [],
         nextCursor: null,
@@ -113,7 +99,7 @@ export async function listStreamPage(
     throw error;
   }
 
-  const page = await ports.documents.list({
+  const page = await listTargetSourceDocuments({
     ledgerId,
     ...(input.bookId == null ? {} : { bookId: input.bookId }),
     ...(input.statuses != null && input.statuses.length > 0
@@ -142,7 +128,7 @@ export async function listStreamPage(
       ...(search != null ? { search } : {}),
     }),
   }));
-  const baseline = await ports.changes.getRefreshBaseline(ledgerId);
+  const baseline = await getLedgerRefreshBaseline(ledgerId);
   if (baseline.version !== beforeVersion) {
     return {
       items: [],

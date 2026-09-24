@@ -6,15 +6,7 @@ import {
   createTestUserWithLedger,
 } from "tests/helpers/schema-setup";
 import { sourceDocuments } from "@/persistence";
-import { listStreamPage as listStreamPageUseCase } from "@/modules/source-document/application/queries/list-stream-page";
-import { serverComposition } from "@/application/server-composition-root";
-
-const queryPorts = {
-  documents: serverComposition.sourceDocumentReads,
-  changes: serverComposition.ledgerChanges,
-};
-const listStreamPage = (ledgerId: string, input: Parameters<typeof listStreamPageUseCase>[1]) =>
-  listStreamPageUseCase(ledgerId, input, queryPorts);
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
 describe("source-document-queries", () => {
   let ledgerId = "";

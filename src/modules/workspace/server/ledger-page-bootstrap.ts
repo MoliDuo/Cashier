@@ -15,8 +15,8 @@ import { listCategoriesWithCount } from "@/modules/ledger/server/categories";
 import { listBooks } from "@/modules/ledger/server/books";
 import { getLedgerSettingsView } from "@/modules/ledger/server/get-ledger-settings";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
-import { listStreamPage } from "@/modules/source-document/application/queries/list-stream-page";
-import { getStreamTotal } from "@/modules/source-document/application/queries/get-stream-total";
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+import { getStreamTotal } from "@/modules/source-document/server/stream-total";
 import type { StreamPage } from "@/modules/source-document/contracts";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
 import type { PeriodParams } from "@/lib/period-utils";
@@ -24,10 +24,6 @@ import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { addPeriod, getDateInTimezone, isValidTimeZone, parseDateString } from "@/lib/date-utils";
 import type { BookDto } from "@/modules/ledger/contracts";
-import type {
-  LedgerChangeReadPort,
-  SourceDocumentReadPort,
-} from "@/modules/source-document/application/ports";
 import type { EntryCategoryWithCountDto } from "@/modules/ledger/contracts";
 import {
   buildDetailsQueryDescriptor,
@@ -77,13 +73,7 @@ export interface GetLedgerPageBootstrapInput {
 }
 
 export async function getLedgerPageBootstrap(
-  input: GetLedgerPageBootstrapInput,
-  dependencies: {
-    sourceDocuments: {
-      documents: Pick<SourceDocumentReadPort, "list" | "calculateCompletedTotal">;
-      changes: Pick<LedgerChangeReadPort, "getVersion" | "getRefreshBaseline">;
-    };
-  }
+  input: GetLedgerPageBootstrapInput
 ): Promise<LedgerPageBootstrapResult> {
   const ledgerDto = input.ledgerDto;
   const ledgerId = ledgerDto.id;
@@ -192,9 +182,9 @@ export async function getLedgerPageBootstrap(
             queryKey: streamDescriptor.queryKey,
             queryFn: async ({ pageParam }) => {
               const pageInput = streamDescriptor.getPageInput(pageParam as string | undefined);
-              let page = await listStreamPage(ledgerId, pageInput, dependencies.sourceDocuments);
+              let page = await listStreamPage(ledgerId, pageInput);
               if (pageParam == null && page.restartRequired) {
-                page = await listStreamPage(ledgerId, pageInput, dependencies.sourceDocuments);
+                page = await listStreamPage(ledgerId, pageInput);
                 if (page.restartRequired) {
                   throw new Error("Stream restart did not produce a valid first page");
                 }
@@ -207,12 +197,7 @@ export async function getLedgerPageBootstrap(
           }),
           queryClient.prefetchQuery({
             queryKey: streamDescriptor.totalQueryKey,
-            queryFn: () =>
-              getStreamTotal(
-                ledgerId,
-                streamDescriptor.totalInput,
-                dependencies.sourceDocuments.documents
-              ),
+            queryFn: () => getStreamTotal(ledgerId, streamDescriptor.totalInput),
             staleTime: QUERY.DEFAULT_STALE_TIME_MS,
           }),
         ]
