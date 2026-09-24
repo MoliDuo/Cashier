@@ -1,6 +1,6 @@
 import { withLedgerAccess } from "../access";
 import type { CategoryReclassificationJobDto } from "@/modules/ledger/contracts";
-import { toCategoryReclassificationJobDto } from "../application/queries/category-reclassification-job-dto";
+import { toCategoryReclassificationJobDto } from "@/modules/ledger/server/category-reclassification-job-dto";
 import type { CategoryAssignmentResultPageDto } from "@/modules/ledger/contracts";
 import {
   getCategoryAssignmentProgress,

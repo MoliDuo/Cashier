@@ -10,7 +10,7 @@ import {
   resolveReclassificationDecisions,
   type ReclassificationCandidate,
   type ReclassificationDocumentGroup,
-} from "@/modules/ledger/application/reclassification-protocol";
+} from "@/modules/ledger/domain/reclassification-protocol";
 import { AI_CATEGORY_REQUEST_TIMEOUT_MS } from "@/config/tuning";
 
 /** One document can be a full receipt: up to MAX_BATCH_SIZE rows, one decision each. */

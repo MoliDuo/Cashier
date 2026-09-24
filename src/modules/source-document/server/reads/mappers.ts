@@ -9,7 +9,7 @@ import {
   type ProcessingFailureCode,
 } from "@/modules/source-document/lifecycle";
 import { accountingTotal } from "@/lib/money/accounting-total";
-import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
+import { deriveSourceDocumentCapabilities } from "@/modules/source-document/domain/source-document-state";
 import { compare as decimalCompare } from "@/lib/money/decimal";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 

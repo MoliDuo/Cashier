@@ -6,7 +6,7 @@ import {
   readScenarioToken,
   selectScenario,
 } from "../../../scripts/demo-ai-server.mjs";
-import { parserOutputSchema } from "@/modules/source-document/application/parse-source-document/parser-schema";
+import { parserOutputSchema } from "@/modules/source-document/domain/parse/parser-schema";
 
 const PARSE_SCENARIOS = ["success", "slow", "foreign", "unparsable"] as const;
 

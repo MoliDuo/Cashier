@@ -11,7 +11,7 @@ import {
 import type {
   ReclassificationDocumentGroup,
   ReclassificationSubject,
-} from "@/modules/ledger/application/reclassification-protocol";
+} from "@/modules/ledger/domain/reclassification-protocol";
 
 /**
  * Entries grouped by the source document their evidence hangs off. Entries

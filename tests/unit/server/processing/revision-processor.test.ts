@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LedgerMainCurrencyChangedError } from "@/modules/source-document/server/projections/shared";
 import type { AIContext } from "@/lib/tasks/types";
-import { ProcessingFailure } from "@/modules/source-document/application/parse-source-document/contracts";
+import { ProcessingFailure } from "@/modules/source-document/domain/parse/contracts";
 
 const {
   runParsePipelineMock,
@@ -23,10 +23,10 @@ const {
   recordProcessingFailure: vi.fn(),
 }));
 
-vi.mock("@/modules/source-document/application/parse-source-document/pipeline", () => ({
+vi.mock("@/modules/source-document/domain/parse/pipeline", () => ({
   runParsePipeline: runParsePipelineMock,
 }));
-vi.mock("@/modules/source-document/application/parse-source-document/result-mapper", () => ({
+vi.mock("@/modules/source-document/domain/parse/result-mapper", () => ({
   toParseSourceDocumentOutput: toOutputMock,
 }));
 vi.mock("@/server/processing/context", () => ({ loadRevisionProcessingContext: loadContext }));

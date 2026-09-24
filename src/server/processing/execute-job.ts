@@ -7,7 +7,7 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import {
   ProcessingCancelledError,
   ProcessingFailure,
-} from "@/modules/source-document/application/parse-source-document/contracts";
+} from "@/modules/source-document/domain/parse/contracts";
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 import { claimProcessingJob, completeProcessingJob, renewProcessingJobLease } from "./jobs";
 import { processRevision } from "./revision-processor";

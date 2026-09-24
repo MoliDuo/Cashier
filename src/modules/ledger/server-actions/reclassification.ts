@@ -16,7 +16,7 @@ import {
   parseCommitCategoryAssignmentSelectionInput,
   parseRetryCategoryAssignmentInput,
 } from "../contract-schemas";
-import { toCategoryReclassificationJobDto } from "../application/queries/category-reclassification-job-dto";
+import { toCategoryReclassificationJobDto } from "@/modules/ledger/server/category-reclassification-job-dto";
 import { withLedgerAccess } from "../access";
 import { listCategories } from "../server/categories";
 import { getLedgerSettings } from "../server/settings";

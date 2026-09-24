@@ -6,7 +6,7 @@ import type {
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
 import { submitSourceDocument } from "./submissions";
-import { staleVersionedCommandResult } from "../application/versioned-command-result";
+import { staleVersionedCommandResult } from "@/modules/source-document/domain/versioned-command-result";
 
 interface SourceDocumentRetryPayload {
   text: string | null;

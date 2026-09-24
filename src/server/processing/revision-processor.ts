@@ -14,15 +14,15 @@ import {
   buildEntriesForInsert,
   getEntryFallbackDate,
   validateEntries,
-} from "@/modules/source-document/application/parse-source-document/entry-builder";
-import { runParsePipeline } from "@/modules/source-document/application/parse-source-document/pipeline";
-import { toParseSourceDocumentOutput } from "@/modules/source-document/application/parse-source-document/result-mapper";
+} from "@/modules/source-document/domain/parse/entry-builder";
+import { runParsePipeline } from "@/modules/source-document/domain/parse/pipeline";
+import { toParseSourceDocumentOutput } from "@/modules/source-document/domain/parse/result-mapper";
 import {
   ProcessingCancelledError,
   ProcessingFailure,
   throwIfProcessingCancelled,
   type InvalidDiagnostic,
-} from "@/modules/source-document/application/parse-source-document/contracts";
+} from "@/modules/source-document/domain/parse/contracts";
 import { normalizeFailureReason } from "@/modules/source-document/failure-reason-policy";
 import {
   isFailedLoadImageResult,

@@ -3,7 +3,7 @@ import type { AIMessageContentPart } from "@/lib/tasks/types";
 import type {
   ReclassificationCandidate,
   ReclassificationDocumentGroup,
-} from "@/modules/ledger/application/reclassification-protocol";
+} from "@/modules/ledger/domain/reclassification-protocol";
 import { decideEntryCategories } from "@/server/category-reclassification/reclassifier";
 
 const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));

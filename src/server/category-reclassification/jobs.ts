@@ -6,7 +6,7 @@ import type {
   CategoryAssignmentJobStatus,
   CategoryAssignmentMode,
 } from "@/modules/ledger/contracts";
-import type { ReclassificationCandidate } from "@/modules/ledger/application/reclassification-protocol";
+import type { ReclassificationCandidate } from "@/modules/ledger/domain/reclassification-protocol";
 import { rowMode } from "./assignments";
 
 /** A job as stored, including the ids a run has to walk. */

@@ -7,7 +7,7 @@ import {
   type ReclassificationCandidate,
   type ReclassificationDocumentGroup,
   type ReclassificationSubject,
-} from "@/modules/ledger/application/reclassification-protocol";
+} from "@/modules/ledger/domain/reclassification-protocol";
 
 const candidates: ReclassificationCandidate[] = [
   { id: "cat-food", name: "吃喝", description: "正餐与饮品" },

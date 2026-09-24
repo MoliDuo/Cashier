@@ -13,7 +13,7 @@ import {
   buildEntriesForInsert,
   getEntryFallbackDate,
   validateEntries,
-} from "@/modules/source-document/application/parse-source-document/entry-builder";
+} from "@/modules/source-document/domain/parse/entry-builder";
 
 describe("entry-builder", () => {
   beforeEach(() => {

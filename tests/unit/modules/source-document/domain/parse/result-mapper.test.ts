@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { ProcessingCancelledError } from "@/modules/source-document/application/parse-source-document/contracts";
-import type { ParsePipelineResult } from "@/modules/source-document/application/parse-source-document/pipeline";
+import { ProcessingCancelledError } from "@/modules/source-document/domain/parse/contracts";
+import type { ParsePipelineResult } from "@/modules/source-document/domain/parse/pipeline";
 import {
   convertToParsedEntries,
   toParseSourceDocumentOutput,
-} from "@/modules/source-document/application/parse-source-document/result-mapper";
+} from "@/modules/source-document/domain/parse/result-mapper";
 import type {
   NormalizedLedgerEntry,
   NormalizedOrderAdjustment,
-} from "@/modules/source-document/application/parse-source-document/parser-schema";
+} from "@/modules/source-document/domain/parse/parser-schema";
 
 describe("convertToParsedEntries", () => {
   const item = (

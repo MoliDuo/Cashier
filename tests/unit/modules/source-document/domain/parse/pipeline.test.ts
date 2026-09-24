@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import type { AIContext, AIGenerateOptions, AIResponse } from "@/lib/tasks/types";
-import type { ParseSourceDocumentInput } from "@/modules/source-document/application/parse-source-document/contracts";
+import type { ParseSourceDocumentInput } from "@/modules/source-document/domain/parse/contracts";
 import {
   runParsePipeline,
   buildParserInput,
-} from "@/modules/source-document/application/parse-source-document/pipeline";
+} from "@/modules/source-document/domain/parse/pipeline";
 
 // Mock DB so pipeline unit tests don't need a real database
 vi.mock("@/lib/db", () => ({

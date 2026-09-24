@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
+import { deriveSourceDocumentCapabilities } from "@/modules/source-document/domain/source-document-state";
 
 describe("source document capabilities", () => {
   it("blocks manual writes while the latest submission is processing", () => {

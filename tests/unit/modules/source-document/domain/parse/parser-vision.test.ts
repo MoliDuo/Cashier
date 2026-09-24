@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { executeParser } from "@/modules/source-document/application/parse-source-document/parser";
+import { executeParser } from "@/modules/source-document/domain/parse/parser";
 import type { AIContext, AIGenerateOptions } from "@/lib/tasks/types";
 
 const SIMPLE_SUCCESS_RESPONSE = {

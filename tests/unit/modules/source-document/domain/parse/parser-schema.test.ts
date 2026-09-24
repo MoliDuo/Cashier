@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeResult,
   parserOutputSchema,
-} from "@/modules/source-document/application/parse-source-document/parser-schema";
+} from "@/modules/source-document/domain/parse/parser-schema";
 
 const simpleSuccess = {
   outcome: "success",

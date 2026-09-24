@@ -6,7 +6,7 @@ import type {
   SupportedSourceDocumentAction,
 } from "@/modules/source-document/lifecycle";
 import type { ProcessingLeaseContract } from "@/server/processing/types";
-import { deriveSourceDocumentCapabilities } from "@/modules/source-document/application/source-document-state";
+import { deriveSourceDocumentCapabilities } from "@/modules/source-document/domain/source-document-state";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { MAX_FILES, MAX_NORMALIZED_BYTES_PER_REVISION } from "@/lib/storage/upload-policy";

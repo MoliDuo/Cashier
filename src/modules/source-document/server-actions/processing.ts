@@ -2,7 +2,7 @@
 
 import { cancelSourceDocumentProcessing } from "../server/cancel-processing";
 import { StaleSourceDocumentVersionError } from "@/lib/errors";
-import { staleVersionedCommandResult } from "@/modules/source-document/application/versioned-command-result";
+import { staleVersionedCommandResult } from "@/modules/source-document/domain/versioned-command-result";
 import type {
   CancelProcessingResponseDto,
   VersionedCommandResult,
