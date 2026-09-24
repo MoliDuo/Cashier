@@ -34,15 +34,15 @@ function hasClientDirective(source) {
   return /^(?:"use client"|'use client');?/.test(rest);
 }
 
-const serverCompositionRootPattern = /^@\/application\/server-composition-root(?:\/|$)/;
 const persistencePattern = /^@\/persistence(?:\/|$)/;
 const libDbPattern = /^@\/lib\/db(?:\/|$)/;
-const applicationAdaptersPattern = /^@\/application\/adapters(?:\/|$)/;
 const s3Pattern = /^@\/lib\/storage\/s3(?:\/|$)/;
 const openaiClientPattern = /^@\/lib\/ai\/openai-client(?:\/|$)/;
-const moduleUiPattern = /^@\/modules\/[^/]+\/ui(?:\/|$)/;
+const serverPattern = /^@\/server(?:\/|$)/;
+const moduleServerPattern = /^@\/modules\/[^/]+\/server(?:\/|$)/;
+const moduleUiPattern = /^@\/modules\/[^/]+\/(?:ui|hooks)(?:\/|$)/;
 const providerSdkPattern = /^(?:pg|openai|resend)$|^drizzle-orm(?:\/|$)|^@aws-sdk\//;
-const transportFrameworkPattern = /^(?:next(?:\/|$)|next-auth(?:\/|$)|@auth(?:\/|$))/;
+const frameworkPattern = /^(?:next(?:\/|$)|next-auth(?:\/|$)|@auth(?:\/|$))|^server-only$/;
 const moduleServerActionsPattern = /^@\/modules\/[^/]+\/server-actions(?:\/|$)/;
 const moduleActionsBarrelPattern = /^@\/modules\/[^/]+\/actions$/;
 const relativeModuleActionsBarrelPattern = /^(?:\.\/|(?:\.\.\/)+)actions$/;
@@ -230,15 +230,14 @@ export function findBoundaryViolations(relativePath, source) {
   const specifiers = rawSpecifiers.map((specifier) =>
     normalizeImportSpecifier(relativePath, specifier)
   );
-  const isModuleApplication = /^src\/modules\/[^/]+\/application\//.test(relativePath);
   const moduleMatch = /^src\/modules\/([^/]+)\//.exec(relativePath);
   const isModule = moduleMatch != null;
   const isWorkspaceModule = moduleMatch?.[1] === "workspace";
-  const isAuthInternal = /^src\/modules\/auth\/(services|repositories)\//.test(relativePath);
+  const isDomain = /^src\/modules\/[^/]+\/domain\//.test(relativePath);
   const isServerAction = /^src\/modules\/[^/]+\/server-actions\//.test(relativePath);
+  const isServerFlow = /^src\/server\//.test(relativePath);
   const isLib = /^src\/lib\//.test(relativePath);
   const isProviders = /^src\/components\/providers\//.test(relativePath);
-  const isContracts = /^src\/application\/contracts\//.test(relativePath);
   const isPersistence = /^src\/persistence\//.test(relativePath);
   const isApiRoute = /^src\/app\/api\//.test(relativePath);
   const isClientComponent = hasClientDirective(source);
@@ -259,7 +258,7 @@ export function findBoundaryViolations(relativePath, source) {
     !relativePath.startsWith("src/persistence/postgres-migrations/")
   ) {
     violations.push(
-      `${relativePath}: sourceDocuments writes must use the registered aggregate gateway`
+      `${relativePath}: sourceDocuments writes must live in a registered source-document writer`
     );
   }
   if (registeredSourceDocumentWriters.has(relativePath) && !hasSourceDocumentWrite(sourceFile)) {
@@ -270,6 +269,10 @@ export function findBoundaryViolations(relativePath, source) {
 
   for (const [index, specifier] of specifiers.entries()) {
     const rawSpecifier = rawSpecifiers[index];
+    const isDataAccess =
+      libDbPattern.test(specifier) ||
+      persistencePattern.test(specifier) ||
+      providerSdkPattern.test(specifier);
     if (isModule && appPattern.test(specifier)) {
       violations.push(`${relativePath}: modules must not import app entrypoints`);
     }
@@ -277,71 +280,62 @@ export function findBoundaryViolations(relativePath, source) {
       isLib &&
       (anyModulePattern.test(specifier) ||
         appPattern.test(specifier) ||
-        applicationAdaptersPattern.test(specifier))
+        serverPattern.test(specifier))
     ) {
-      violations.push(
-        `${relativePath}: src/lib must not import modules, app, or application adapters`
-      );
+      violations.push(`${relativePath}: src/lib must not import modules, app, or src/server`);
     }
-    if (isPersistence && anyModulePattern.test(specifier)) {
-      violations.push(`${relativePath}: persistence must not import domain modules`);
+    if (isPersistence && (anyModulePattern.test(specifier) || serverPattern.test(specifier))) {
+      violations.push(`${relativePath}: persistence must not import modules or src/server`);
     }
     if (isModule && !isWorkspaceModule && workspaceModulePattern.test(specifier)) {
       violations.push(`${relativePath}: domain modules must not depend on workspace orchestration`);
     }
-    if (isModuleApplication && transportFrameworkPattern.test(specifier)) {
-      violations.push(`${relativePath}: application code must not import transport frameworks`);
-    }
-    if ((isModuleApplication || isAuthInternal) && serverCompositionRootPattern.test(specifier)) {
-      violations.push(`${relativePath}: application code must receive ports explicitly`);
-    }
     if (
-      (isModuleApplication || isAuthInternal) &&
-      (persistencePattern.test(specifier) ||
-        libDbPattern.test(specifier) ||
-        applicationAdaptersPattern.test(specifier))
+      isDomain &&
+      (isDataAccess ||
+        frameworkPattern.test(specifier) ||
+        serverPattern.test(specifier) ||
+        moduleServerPattern.test(specifier))
     ) {
-      violations.push(`${relativePath}: application code must not import infrastructure adapters`);
+      violations.push(
+        `${relativePath}: domain code must stay pure (no database, providers, frameworks, or server code)`
+      );
     }
     if (
-      isServerAction &&
-      (specifier === "drizzle-orm" ||
-        libDbPattern.test(specifier) ||
-        persistencePattern.test(specifier) ||
-        applicationAdaptersPattern.test(specifier) ||
+      isServerFlow &&
+      (appPattern.test(specifier) ||
+        moduleServerActionsPattern.test(specifier) ||
+        moduleUiPattern.test(specifier))
+    ) {
+      violations.push(
+        `${relativePath}: src/server must not import app entrypoints, server actions, or UI`
+      );
+    }
+    if (
+      (isServerAction || isApiRoute) &&
+      (isDataAccess ||
+        s3Pattern.test(specifier) ||
+        openaiClientPattern.test(specifier) ||
         /^(?:ai|openai|resend)$/.test(specifier) ||
         /^@(?:ai-sdk|aws-sdk|google|anthropic-ai)\//.test(specifier))
     ) {
-      violations.push(`${relativePath}: server actions must call application ports/use cases`);
-    }
-    if (isLib && serverCompositionRootPattern.test(specifier)) {
-      violations.push(`${relativePath}: src/lib must not import the server composition root`);
+      violations.push(
+        `${relativePath}: server actions and api routes must call server functions, not the database or providers`
+      );
     }
     if (isProviders && moduleUiPattern.test(specifier)) {
       violations.push(`${relativePath}: src/components/providers must not import module UI`);
     }
     if (
-      isContracts &&
-      (persistencePattern.test(specifier) ||
-        libDbPattern.test(specifier) ||
-        applicationAdaptersPattern.test(specifier) ||
-        providerSdkPattern.test(specifier))
-    ) {
-      violations.push(
-        `${relativePath}: application contracts must not import persistence, database, provider SDKs, or application adapters`
-      );
-    }
-    if (
       isClientComponent &&
       (libDbPattern.test(specifier) ||
         persistencePattern.test(specifier) ||
-        serverCompositionRootPattern.test(specifier) ||
+        serverPattern.test(specifier) ||
+        moduleServerPattern.test(specifier) ||
         s3Pattern.test(specifier) ||
         openaiClientPattern.test(specifier))
     ) {
-      violations.push(
-        `${relativePath}: client components must not import server-only infrastructure`
-      );
+      violations.push(`${relativePath}: client components must not import server-only code`);
     }
     if (
       isClientComponent &&
@@ -351,14 +345,6 @@ export function findBoundaryViolations(relativePath, source) {
       violations.push(
         `${relativePath}: client components must import concrete server actions, not module actions barrels`
       );
-    }
-    if (
-      isApiRoute &&
-      (applicationAdaptersPattern.test(specifier) ||
-        persistencePattern.test(specifier) ||
-        libDbPattern.test(specifier))
-    ) {
-      violations.push(`${relativePath}: api routes must not import infrastructure adapters or db`);
     }
     if (
       isApiRoute &&

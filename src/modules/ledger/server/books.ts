@@ -95,7 +95,7 @@ async function countDocumentsIncludingDeleted(
 
 /**
  * The refusal shared by archive and delete: the last live book would leave the
- * instance with nowhere to file anything. Thrown as the port's own code rather
+ * instance with nowhere to file anything. Thrown with its own code rather
  * than matched on message text, so rewording it cannot break the caller's error
  * mapping.
  */

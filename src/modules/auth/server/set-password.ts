@@ -1,8 +1,8 @@
 import "server-only";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
-import { hashPassword } from "@/modules/auth/services/password";
-import { validatePassword } from "@/modules/auth/services/password-policy";
+import { hashPassword } from "@/modules/auth/domain/password";
+import { validatePassword } from "@/modules/auth/domain/password-policy";
 import { setInitialPasswordHash } from "./account-security";
 
 export async function setPassword(params: {

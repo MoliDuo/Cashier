@@ -86,11 +86,10 @@ Authenticated reads stream through `/api/stored-files/{fileId}`.
 API v1 inline images use the server-side upload path. The public v1 response contract is independent
 of internal server-action reconciliation DTOs.
 
-The stored-file implementation lives in `src/application/adapters/storage/`. Its `ObjectStore`
-contract requires streaming reads, signed uploads, and reads with metadata.
-The stored-file adapter is assembled with `createStoredFileAdapter(dependencies)`. Upload planning,
-proxy upload, finalization and compensation, and authorized reads are responsibility-focused
-functions sharing explicit storage, clock, authorization-query, and upload-session dependencies.
+The stored-file implementation lives in `src/server/stored-files/`. Its `ObjectStore` contract
+requires streaming reads, signed uploads, and reads with metadata. Upload planning, proxy upload,
+finalization and compensation, and authorized reads are separate files of plain functions over
+`getS3Storage()`; tests replace the object store by mocking `@/lib/storage/s3`.
 
 Finalization replay is read-only after authorization. Evidence reads fetch bytes and metadata in
 one object-store GET and share a promise only within one processing invocation.

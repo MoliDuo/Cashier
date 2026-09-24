@@ -10,7 +10,7 @@ import {
 import { runtimeEnv } from "@/lib/env/runtime";
 import { DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
 import { sendEmail } from "@/lib/email-delivery";
-import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../services/otp";
+import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../domain/otp";
 import {
   createEmailChangeChallenge,
   discardEmailChangeChallenge,

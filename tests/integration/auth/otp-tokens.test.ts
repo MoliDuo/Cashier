@@ -6,7 +6,7 @@ import {
   findOtpToken as findOTPRecord,
 } from "@/modules/auth/server/otp-tokens";
 import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";
-import { generateOTP, verifyOTP } from "@/modules/auth/services/otp";
+import { generateOTP, verifyOTP } from "@/modules/auth/domain/otp";
 import { otpTokens } from "@/persistence/schema/auth";
 import { eq } from "drizzle-orm";
 import { runBoundedMaintenance } from "@/server/maintenance/run";

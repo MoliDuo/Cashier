@@ -1,8 +1,8 @@
 import "server-only";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
-import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
-import { validatePassword } from "@/modules/auth/services/password-policy";
+import { hashPassword, verifyPassword } from "@/modules/auth/domain/password";
+import { validatePassword } from "@/modules/auth/domain/password-policy";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import {

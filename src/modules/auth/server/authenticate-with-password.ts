@@ -5,7 +5,7 @@ import { getClientIPFromHeaders, type HeadersLike } from "@/lib/utils/ip";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { AuthSignInError, AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { normalizeEmail } from "@/lib/utils/email";
-import { verifyPassword } from "@/modules/auth/services/password";
+import { verifyPassword } from "@/modules/auth/domain/password";
 import { incrementRateLimit, releaseRateLimitIncrement } from "@/lib/rate-limit";
 import { findUserByEmail, type UserAccount } from "./users";
 import {

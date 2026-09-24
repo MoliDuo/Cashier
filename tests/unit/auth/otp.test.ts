@@ -8,7 +8,7 @@ import {
   hashOTP,
   isValidOTPFormat,
   verifyOTP,
-} from "@/modules/auth/services/otp";
+} from "@/modules/auth/domain/otp";
 
 describe("OTP security contracts", () => {
   it("generates and validates exactly six decimal digits", () => {

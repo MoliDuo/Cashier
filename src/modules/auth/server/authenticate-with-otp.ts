@@ -2,7 +2,7 @@ import "server-only";
 import { RateLimitUnavailableError } from "@/lib/errors";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
-import { isValidOTPFormat } from "@/modules/auth/services/otp";
+import { isValidOTPFormat } from "@/modules/auth/domain/otp";
 import { checkVerifyRateLimit } from "./otp-rate-limit";
 import { findOtpToken } from "./otp-tokens";
 import { verifyOTPWithPolicy } from "./otp-verification";

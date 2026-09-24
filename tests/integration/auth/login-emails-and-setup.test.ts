@@ -22,8 +22,8 @@ import {
   SETUP_CODE_TTL_MS,
   verifySetupCode,
 } from "@/modules/setup/server/setup-code";
-import { hashOTP } from "@/modules/auth/services/otp";
-import { verifyPassword } from "@/modules/auth/services/password";
+import { hashOTP } from "@/modules/auth/domain/otp";
+import { verifyPassword } from "@/modules/auth/domain/password";
 
 /**
  * The one account and its login addresses. Every address signs in; the password

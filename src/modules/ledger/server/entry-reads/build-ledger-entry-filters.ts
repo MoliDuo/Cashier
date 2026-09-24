@@ -12,7 +12,7 @@ import { serializeLedgerQuery } from "@/modules/ledger/ledger-query";
 import { z } from "zod";
 import { dateStringSchema, UUID_REGEX } from "@/lib/validation";
 
-// PostgreSQL query construction remains private to the adapter.
+// PostgreSQL query construction remains private to this module.
 
 export type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
 

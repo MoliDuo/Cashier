@@ -15,7 +15,7 @@ import {
   checkSendRateLimitByIP,
   releaseResendCooldown,
 } from "./otp-rate-limit";
-import { generateOTP, getResendCooldown } from "@/modules/auth/services/otp";
+import { generateOTP, getResendCooldown } from "@/modules/auth/domain/otp";
 import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
 
 type OTPAuthEmailMessages = {

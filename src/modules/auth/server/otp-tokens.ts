@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { otpTokens } from "@/persistence";
-import { getOTPExpiration, hashOTP } from "@/modules/auth/services/otp";
+import { getOTPExpiration, hashOTP } from "@/modules/auth/domain/otp";
 
 export interface OtpToken {
   email: string;

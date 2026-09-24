@@ -2,7 +2,7 @@
  * API v1 upload policy
  *
  * Shared limits and the internal prepared-input contract for the stable v1
- * public API. The route, contract schemas, credential use case, and client
+ * public API. The route, contract schemas, credential submission, and client
  * preflight all read the same constants from this module so the
  * source-document domain never depends on src/app.
  */

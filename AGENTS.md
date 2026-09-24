@@ -5,11 +5,11 @@ coding style, test workflow, commit conventions, and pull request requirements.
 
 ## Agent behavior
 
-- Read `docs/architecture/coding-patterns.md` before changing module boundaries, application
-  contracts, adapters, server actions, or runtime composition.
-- Preserve inward dependency direction. Keep routes and API handlers in `src/app/`, business
-  logic in `src/modules/`, shared infrastructure in `src/application/` and `src/lib/`, and database
-  definitions and migrations in `src/persistence/`.
+- Read `docs/architecture/coding-patterns.md` before changing module boundaries, server actions,
+  server functions, or cross-module flows.
+- Preserve inward dependency direction. Keep routes and API handlers in `src/app/`, feature logic
+  in `src/modules/`, cross-module background flows in `src/server/`, shared infrastructure in
+  `src/lib/`, and database definitions and migrations in `src/persistence/`.
 - Prefer existing repository patterns over new abstractions. Keep changes scoped, avoid unrelated
   rewrites, and do not revert user changes in a dirty worktree.
 - Add focused regression coverage for behavior changes. Run the narrowest relevant checks while

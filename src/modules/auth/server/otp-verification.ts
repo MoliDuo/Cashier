@@ -1,7 +1,7 @@
 import "server-only";
 import { logger } from "@/lib/logger";
-import { getLockoutExpiration, getMaxAttempts } from "../services/otp";
-import { verificationChallenges } from "../services/verification-challenge";
+import { getLockoutExpiration, getMaxAttempts } from "../domain/otp";
+import { verificationChallenges } from "../domain/verification-challenge";
 import { consumeOtpToken, recordOtpFailure, type OtpToken } from "./otp-tokens";
 
 export interface VerificationResult {

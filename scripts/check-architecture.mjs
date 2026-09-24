@@ -72,25 +72,6 @@ for (const file of files) {
   const relative = path.relative(root, file).split(path.sep).join("/");
   const source = readFileSync(file, "utf8");
   violations.push(...findBoundaryViolations(relative, source));
-  const moduleName = relative.match(/^src\/modules\/([^/]+)\//)?.[1] ?? null;
-  const isModuleApplication = /^src\/modules\/[^/]+\/application\//.test(relative);
-  for (const specifier of collectImportSpecifiers(source, file)) {
-    const target = resolveImport(file, specifier);
-    if (isModuleApplication && target != null) {
-      const targetRelative = path.relative(root, target).split(path.sep).join("/");
-      const targetModule = targetRelative.match(/^src\/modules\/([^/]+)\//)?.[1] ?? null;
-      if (
-        moduleName != null &&
-        targetModule != null &&
-        targetModule !== moduleName &&
-        /^src\/modules\/[^/]+\/application\/use-cases\//.test(targetRelative)
-      ) {
-        violations.push(
-          `${relative}: application use cases must not call another domain's use case (${targetRelative})`
-        );
-      }
-    }
-  }
 }
 
 if (cycles.length > 0 || violations.length > 0) {

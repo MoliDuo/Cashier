@@ -23,7 +23,7 @@ export function toErrorResponse(error: unknown): ErrorResponse {
 
 /**
  * API boundaries use this projection. It has stable codes and intentionally does
- * not send adapter messages, paths, provider payloads, or error details to clients.
+ * not send internal messages, paths, provider payloads, or error details to clients.
  */
 export function toSanitizedErrorResponse(error: unknown): ErrorResponse {
   const applicationError = toApplicationError(error);

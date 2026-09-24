@@ -81,7 +81,7 @@ function applyRateLimitHeaders(
   limit: number,
   result: RateLimitResult
 ): void {
-  // The wire contract uses Unix seconds; the adapter keeps milliseconds internally.
+  // The wire contract uses Unix seconds; the rate limiter keeps milliseconds internally.
   response.headers.set("X-RateLimit-Limit", String(limit));
   response.headers.set("X-RateLimit-Remaining", String(result.remaining));
   response.headers.set("X-RateLimit-Reset", String(Math.floor(result.resetTime / 1000)));

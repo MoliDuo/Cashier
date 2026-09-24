@@ -47,8 +47,9 @@ Never commit `.env`, provider credentials, real receipts, API keys, or raw perso
 ## Where things live
 
 - `src/app/` — routes and API handlers
-- `src/modules/` — business logic and feature UI
-- `src/application/`, `src/lib/`, `src/components/`, `src/persistence/` — shared contracts and infrastructure
+- `src/modules/` — per-feature server actions, server functions, pure domain logic, and UI
+- `src/server/` — cross-module background flows (processing, reclassification, maintenance, stored files)
+- `src/lib/`, `src/components/`, `src/persistence/` — shared infrastructure, UI primitives, and schema
 - `src/persistence/postgres-migrations/` — PostgreSQL migrations
 - `messages/` — translations
 - `tests/unit/`, `tests/integration/`

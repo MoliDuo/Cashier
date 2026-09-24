@@ -2,7 +2,7 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { RateLimitUnavailableError } from "@/lib/errors";
-import { getResendCooldown } from "../services/otp";
+import { getResendCooldown } from "../domain/otp";
 import { acquireCooldown, incrementRateLimit, releaseCooldown } from "@/lib/rate-limit";
 import { createHash } from "node:crypto";
 import {

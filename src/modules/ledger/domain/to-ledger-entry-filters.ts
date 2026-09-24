@@ -14,9 +14,9 @@ export interface LedgerEntryQueryFilters {
 }
 
 /**
- * The one translation from a validated query to the read port's filter shape.
+ * The one translation from a validated query to the entry read's filter shape.
  * Listing and statistics ask the same question, so they have to ask it the same
- * way — the uncategorized sentinel above all, which the port never sees: it is
+ * way — the uncategorized sentinel above all, which the read never sees: it is
  * an answer of "no category", not the id of one.
  */
 export function toLedgerEntryFilters(query: LedgerEntryQueryFilters): LedgerEntryFilterParams {

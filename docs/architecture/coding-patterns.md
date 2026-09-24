@@ -2,21 +2,32 @@
 
 ## Dependency direction
 
-Cashier is split into domain modules, application contracts, infrastructure adapters, and transport
-entrypoints. Dependencies point inward:
+Cashier has one runtime (Vercel, PostgreSQL, S3-compatible storage), so there are no ports,
+adapters, or composition root. Code calls the function that does the work:
 
-1. Domain and application use cases depend on module-owned contracts or application ports.
-2. Infrastructure adapters implement ports and may depend on PostgreSQL, S3, email, or AI clients.
-3. Server actions and API routes authenticate, validate with Zod, invoke one use case, and map results.
-4. The server composition root is the only place that assembles concrete adapters.
+```
+src/app/                  routes and API handlers: authenticate, validate, call, map the response
+src/modules/<m>/
+  server-actions/         Zod validation + withLedgerAccess, then call server/ functions directly
+  server/                 drizzle data access and transactions ("server-only")
+  domain/                 pure decisions: state, amounts, parsing, prompts (no db, framework, IO)
+  hooks/ ui/              client code
+src/server/               cross-module background flows: processing, category reclassification,
+                          exchange-rate recalculation, maintenance, stored files, API v1 pipeline
+src/lib/                  shared infrastructure: db, locks, S3, AI client, email, logger, env
+src/persistence/          schema and migrations
+```
 
-An application layer is justified by business decisions, transaction orchestration, or contract
-mapping, not by a fixed number of calls. A server action may call an injected port directly when an
-intermediate function would only rename and forward the same arguments.
+1. `app` → `modules` / `server` → `lib` → `persistence`. `src/lib` and `src/persistence` never import
+   modules or `src/server`; `src/server` never imports routes, server actions, or UI.
+2. Modules and `src/server` may call each other's `server/` functions, as long as there are no
+   file-level import cycles.
+3. Server actions and API routes never touch the database or provider SDKs directly.
+4. A function that only renames and forwards arguments should not exist; call the target instead.
 
-Transport DTOs do not cross into persistence adapters. Database rows and provider response types do
-not cross into modules. New code must not add a service locator lookup inside domain logic; pass the
-required port through the use case boundary. Concrete runtime wiring belongs in the server composition root.
+Pull a decision out into `domain/` when it has branches worth unit-testing; leave straight-line data
+access in `server/` and cover it with PostgreSQL integration tests. Unit tests replace collaborators
+with `vi.mock` of the concrete module rather than injected fakes.
 
 ## Runtime boundaries
 
@@ -35,8 +46,8 @@ required port through the use case boundary. Concrete runtime wiring belongs in 
 - Keep keyset ordering and cursor fields identical. A cursor includes a fingerprint of its query.
 - Use the persisted accounting amount for Details, Stats, and Stream summaries. Cross-currency 1:1
   fallback is forbidden.
-- Source-document writes go through the versioned aggregate (`SourceDocumentAggregateWritePort`), not
-  a second write path. External IO — FX conversion, provider calls — runs before the transaction
+- Source-document writes live in the registered writers under `src/modules/source-document/server/`
+  (the architecture check lists them), not a second write path. External IO — FX conversion, provider calls — runs before the transaction
   starts, never inside it; a write transaction locks the ledger row first, then locks the target
   document row(s) in ascending ID order, and only then compares the locked row's `version`
   against the caller's `expectedVersion`. Ledger-wide configuration the write depends on (for example
@@ -48,13 +59,13 @@ required port through the use case boundary. Concrete runtime wiring belongs in 
 - Document details use one complete detail contract, including entries and evidence file metadata.
   Historical revision numbers remain stored for audit; new revisions use UUID identities and document
   versions for concurrency, without allocating sequential revision numbers.
-- Use the narrowest read port that satisfies the caller. Edit-retry evidence uses `getInput`; it
-  must not load ledger entries or category projections that the caller discards.
+- Use the narrowest read that satisfies the caller. Edit-retry evidence reads only the revision
+  input; it must not load ledger entries or category projections that the caller discards.
 - Loaded ledger settings are complete contracts; only update inputs are partial. Do not repeat
   defaults at each consumer. Metadata-only edits preserve stored amounts and FX results; amount,
   currency, and document-date changes recalculate only affected entries before acquiring locks.
 - Projection replacement is an internal helper of the versioned aggregate, not an independent
-  write port. Pass already locked documents and projections into transaction helpers.
+  writer. Pass already locked documents and projections into transaction helpers.
 
 ## Frontend
 

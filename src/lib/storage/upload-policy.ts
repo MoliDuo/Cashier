@@ -142,7 +142,7 @@ export function validateFileCount(count: number): void {
  * Validate that the combined total of stored-file IDs, inline images,
  * and original images does not exceed the per-revision file limit.
  *
- * Called at schema, use-case, and transaction layers for defense in depth.
+ * Called at schema, server-function, and transaction layers for defense in depth.
  */
 export function validateAggregateFileCount(
   storedFileIdsCount: number,

@@ -43,7 +43,7 @@ function blamesName(error: ValidationError): boolean {
 /**
  * The expected refusals are returned as codes rather than thrown: a server
  * action's thrown message is not a stable contract, and every one of these is
- * something the 设置 UI has to explain to the reader. The port raises its own
+ * something the 设置 UI has to explain to the reader. The server function raises its own
  * `AppError` codes, so the mapping never matches on message text.
  */
 function toBookMutationErrorCode(error: unknown): BookMutationErrorCode {
@@ -58,7 +58,7 @@ function toBookMutationErrorCode(error: unknown): BookMutationErrorCode {
     case "NOT_FOUND":
       return "not_found";
     case "VALIDATION_ERROR":
-      // The contract rejects a bad name before the port runs, and both sides
+      // The contract rejects a bad name before the server function runs, and both sides
       // point the issue at the `name` field.
       return error instanceof ValidationError && blamesName(error) ? "invalid_name" : "unexpected";
     default:

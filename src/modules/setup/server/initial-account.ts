@@ -3,8 +3,8 @@ import { isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
-import { hashPassword } from "@/modules/auth/services/password";
-import { validatePassword } from "@/modules/auth/services/password-policy";
+import { hashPassword } from "@/modules/auth/domain/password";
+import { validatePassword } from "@/modules/auth/domain/password-policy";
 import { getCategoryPreset } from "@/config/category-presets";
 
 export interface SetupInput {

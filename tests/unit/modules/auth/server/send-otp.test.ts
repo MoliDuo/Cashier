@@ -48,7 +48,7 @@ vi.mock("@/modules/auth/server/otp-rate-limit", () => ({
   releaseResendCooldown: releaseResendCooldownMock,
 }));
 
-vi.mock("@/modules/auth/services/otp", () => ({
+vi.mock("@/modules/auth/domain/otp", () => ({
   generateOTP: generateOTPMock,
   getResendCooldown: getResendCooldownMock,
 }));

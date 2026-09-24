@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { otpTokens } from "@/persistence/schema/auth";
-import { hashOTP } from "@/modules/auth/services/otp";
+import { hashOTP } from "@/modules/auth/domain/otp";
 import { db } from "@/lib/db";
 import { findOtpToken as findOTPRecord } from "@/modules/auth/server/otp-tokens";
 import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";

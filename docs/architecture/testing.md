@@ -22,7 +22,7 @@ the container after the Vitest run. The first run may download PostgreSQL and re
   Node; component tests and tests that actually use browser APIs run in happy-dom. External
   boundaries are mocked or replaced with in-memory fakes.
 - Integration tests verify PostgreSQL behavior, route and server-action composition, transactions,
-  concurrency, and persistence-backed adapters.
+  concurrency, and persistence-backed server functions.
 - The same behavior is fully verified at the lowest suitable layer. Higher layers focus on
   authorization, validation, error mapping, and composition.
 
@@ -75,6 +75,5 @@ Compatibility or legacy tests must state the input format, migration, or compati
 they protect. When the corresponding compatibility code is removed, remove the test at the same
 time.
 
-Contract suites may intentionally run against both a fake harness and the real PostgreSQL/storage
-adapter. This repetition protects the shared contract rather than duplicating an implementation
-test.
+There is one implementation of each server function, so test it directly: unit tests `vi.mock`
+the concrete modules it calls, and integration tests call it against the real PostgreSQL database.

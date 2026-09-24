@@ -11,7 +11,7 @@ import {
   OTPRateLimitedSignInError,
 } from "@/modules/auth/server/authenticate-with-otp";
 import * as rateLimit from "@/lib/rate-limit";
-import { hashOTP } from "@/modules/auth/services/otp";
+import { hashOTP } from "@/modules/auth/domain/otp";
 import { completeInteractiveSignIn } from "@/modules/auth/server/complete-interactive-sign-in";
 import { createTestUserWithLedger } from "../../helpers/schema-setup";
 

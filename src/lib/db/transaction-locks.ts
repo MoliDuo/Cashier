@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { books, ledgers, sourceDocuments } from "@/persistence";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 
-/** Drizzle transaction client type used by all Postgres adapters. */
+/** Drizzle transaction client type shared by every transactional server function. */
 export type PostgresTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**

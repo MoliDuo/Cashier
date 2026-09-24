@@ -83,7 +83,7 @@ function mapDocument(
  * The checks the caller already ran happened outside any lock, so an archive or
  * a ledger delete can commit between them and the insert. Lock the ledger first
  * and then the book — the documented ledger → book order — so the insert either
- * sees both live or refuses with the port's own error.
+ * sees both live or refuses with its own error.
  */
 async function insertNewSourceDocument(
   tx: PostgresTransaction,

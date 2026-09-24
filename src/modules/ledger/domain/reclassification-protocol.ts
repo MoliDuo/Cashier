@@ -7,7 +7,7 @@ import type { AIMessageContentPart } from "@/lib/tasks/types";
  * run. Deliberately index-based, mirroring the parser's `category_index`
  * protocol: models copy small integers far more reliably than UUIDs.
  *
- * Pure functions only — no ports, no adapters, no locale instruction. The
+ * Pure functions only — no IO, no locale instruction. The
  * response carries integers and nothing a user reads, so an output-locale
  * directive would be noise.
  */

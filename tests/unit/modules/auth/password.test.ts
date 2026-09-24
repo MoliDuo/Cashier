@@ -11,8 +11,8 @@ import {
   PASSWORD_RULE_MESSAGES,
   type PasswordRuleViolation,
 } from "@/modules/auth/password-rules";
-import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
-import { validatePassword } from "@/modules/auth/services/password-policy";
+import { hashPassword, verifyPassword } from "@/modules/auth/domain/password";
+import { validatePassword } from "@/modules/auth/domain/password-policy";
 import { collectImportSpecifiers } from "../../../../scripts/architecture-imports.mjs";
 
 const {
@@ -391,7 +391,7 @@ describe("shared password rules", () => {
     // The closure has to be walked at all before the exclusions mean anything.
     expect(closure.files).toContain("src/lib/errors.ts");
     expect(closure.external).toContain("zod");
-    expect(closure.files).not.toContain("src/modules/auth/services/password-policy.ts");
+    expect(closure.files).not.toContain("src/modules/auth/domain/password-policy.ts");
     for (const forbidden of [
       "bcryptjs",
       "bcrypt",

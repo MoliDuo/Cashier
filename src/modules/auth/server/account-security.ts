@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { emailChangeChallenges, loginEmails, users } from "@/persistence";
-import { verificationChallenges } from "@/modules/auth/services/verification-challenge";
+import { verificationChallenges } from "@/modules/auth/domain/verification-challenge";
 
 export async function getPasswordHash(userId: string): Promise<string | null | undefined> {
   const user = await db.query.users.findFirst({
