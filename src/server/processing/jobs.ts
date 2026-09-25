@@ -2,7 +2,6 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import type {
   ProcessingClaimContract,
-  ProcessingCompletionContract,
   ProcessingJobContract,
   ProcessingRecoveryConfig,
   RecoverableProcessingJobContract,
@@ -38,12 +37,27 @@ export async function claimProcessingJob(
   const claimToken = crypto.randomUUID();
   const expiresAt = new Date(now.getTime() + (clock.leaseMs ?? DEFAULT_LEASE_MS));
   return db.transaction(async (tx) => {
+    // Only the document's current submission, still processing, is claimable.
+    // A row whose revision already finished or was superseded is left for the
+    // recovery pass to close instead of being parsed again.
     const claimed = await tx.execute<typeof processingOutbox.$inferSelect>(sql`
       WITH candidate AS (
-        SELECT id FROM processing_outbox
-        WHERE id = ${jobId}
-          AND (status = 'pending' OR (status = 'claimed' AND claim_expires_at <= ${now}))
-        FOR UPDATE SKIP LOCKED
+        SELECT outbox.id FROM processing_outbox outbox
+        JOIN source_documents document
+          ON document.ledger_id = outbox.ledger_id
+         AND document.id = outbox.source_document_id
+         AND document.latest_submission_revision_id = outbox.revision_id
+         AND document.deleted_at IS NULL
+        JOIN source_document_revisions revision
+          ON revision.ledger_id = outbox.ledger_id
+         AND revision.id = outbox.revision_id
+         AND revision.processing_status = 'processing'
+        WHERE outbox.id = ${jobId}
+          AND (
+            outbox.status = 'pending'
+            OR (outbox.status = 'claimed' AND outbox.claim_expires_at <= ${now})
+          )
+        FOR UPDATE OF outbox SKIP LOCKED
       )
       UPDATE processing_outbox outbox
       SET status = 'claimed', started_at = COALESCE(outbox.started_at, now()), claim_token = ${claimToken},
@@ -241,27 +255,4 @@ export async function renewProcessingJobLease(
     )
     .returning({ id: processingOutbox.id });
   return renewed.length === 1 ? expiresAt.toISOString() : null;
-}
-
-export async function completeProcessingJob(
-  result: ProcessingCompletionContract,
-  clock: ProcessingJobClock = {}
-): Promise<boolean> {
-  const completed = await db
-    .update(processingOutbox)
-    .set({
-      status: result.processingStatus === "failed" ? "failed" : "completed",
-      completedAt: clock.now?.() ?? new Date(),
-      claimToken: null,
-      claimExpiresAt: null,
-    })
-    .where(
-      and(
-        eq(processingOutbox.id, result.jobId),
-        eq(processingOutbox.status, "claimed"),
-        eq(processingOutbox.claimToken, result.claimToken)
-      )
-    )
-    .returning({ id: processingOutbox.id });
-  return completed.length === 1;
 }

@@ -76,14 +76,13 @@ export async function processRevision(
   ]);
   const { revision, document, storedFileIds, categories } = context;
   if (revision == null || document == null) throw new NotFoundError("Pending revision");
+  // The claim only hands out the current, still-processing submission; one that
+  // finished or was superseded since is someone else's to close.
   if (
-    document.activeRevisionId === request.revisionId &&
-    revision.processingStatus === "completed"
+    document.latestSubmissionRevisionId !== request.revisionId ||
+    revision.processingStatus !== "processing"
   ) {
-    return { processingStatus: "completed", completion: "residual" };
-  }
-  if (document.latestSubmissionRevisionId !== request.revisionId) {
-    throw new Error("Revision processing request is stale");
+    throw new ProcessingCancelledError();
   }
   throwIfProcessingCancelled(signal);
 
@@ -138,7 +137,6 @@ export async function processRevision(
     return {
       processingStatus: "failed",
       ...(failureMessage == null ? {} : { failureMessage }),
-      completion: "atomic",
     };
   }
 
@@ -161,7 +159,7 @@ export async function processRevision(
     if (!preserved) {
       throw new ProcessingCancelledError();
     }
-    return { processingStatus: "failed", completion: "atomic" };
+    return { processingStatus: "failed" };
   }
   const { fallbackDate } = getEntryFallbackDate(revision.inputDocumentDate);
   const validEntries = output.ledgerEntries.filter(
@@ -227,7 +225,7 @@ export async function processRevision(
       if (!activated) {
         throw new ProcessingCancelledError();
       }
-      return { processingStatus: "completed", completion: "atomic" };
+      return { processingStatus: "completed" };
     } catch (error) {
       if (!(error instanceof LedgerMainCurrencyChangedError)) throw error;
     }

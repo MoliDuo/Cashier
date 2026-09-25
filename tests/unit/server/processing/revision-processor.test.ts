@@ -101,7 +101,6 @@ describe("processRevision", () => {
 
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "completed",
-      completion: "atomic",
     });
 
     expect(getRates).toHaveBeenCalledTimes(1);
@@ -117,7 +116,6 @@ describe("processRevision", () => {
 
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "completed",
-      completion: "atomic",
     });
 
     expect(runParsePipelineMock).toHaveBeenCalledTimes(1);
@@ -157,7 +155,6 @@ describe("processRevision", () => {
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "failed",
       failureMessage: "This is a refund, not an expense.",
-      completion: "atomic",
     });
 
     expect(recordProcessingFailure).toHaveBeenCalledWith(
@@ -188,7 +185,6 @@ describe("processRevision", () => {
 
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "failed",
-      completion: "atomic",
     });
 
     expect(recordProcessingFailure).toHaveBeenCalledWith(

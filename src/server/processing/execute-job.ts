@@ -9,7 +9,7 @@ import {
   ProcessingFailure,
 } from "@/modules/source-document/domain/parse/contracts";
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
-import { claimProcessingJob, completeProcessingJob, renewProcessingJobLease } from "./jobs";
+import { claimProcessingJob, renewProcessingJobLease } from "./jobs";
 import { processRevision } from "./revision-processor";
 
 function toFailureCode(error: unknown): ProcessingFailureCode {
@@ -73,20 +73,13 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
   renewalTimer = setTimeout(() => void renewLease(), 15_000);
 
   try {
-    const result = await processRevision({
+    await processRevision({
       ledgerId: claim.ledgerId,
       sourceDocumentId: claim.job.sourceDocumentId,
       revisionId: claim.job.revisionId,
       signal: controller.signal,
       lease: { jobId: claim.job.id, claimToken: claim.claimToken },
     });
-    if (result.completion === "residual") {
-      await completeProcessingJob({
-        jobId: claim.job.id,
-        claimToken: claim.claimToken,
-        processingStatus: result.processingStatus,
-      });
-    }
   } catch (error) {
     if (error instanceof ProcessingCancelledError || controller.signal.aborted) return true;
     await recordProcessingFailure({

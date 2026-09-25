@@ -501,12 +501,6 @@ describe("Processing retry supersession", () => {
       status: "cancelled",
       diagnosticCode: "superseded_by_retry",
     });
-    await expect(
-      processing.complete({
-        jobId: first.job.id,
-        claimToken: oldClaim!.claimToken,
-        processingStatus: "completed",
-      })
-    ).resolves.toBe(false);
+    await expect(processing.renew(first.job.id, oldClaim!.claimToken)).resolves.toBeNull();
   });
 });

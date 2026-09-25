@@ -186,7 +186,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
   });
 
-  it("handles processing failure: recordProcessingFailure guard on stale revision", async () => {
+  it("does not run a job whose revision was superseded", async () => {
     const db = getTestDb();
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
@@ -210,14 +210,15 @@ describe("executeProcessingJob — standalone function with real adapter/process
       .where(eq(sourceDocuments.id, job.sourceDocumentId));
 
     const result = await executeProcessingJob(job);
-    expect(result).toBe(true);
+    expect(result).toBe(false);
+    expect(generate).not.toHaveBeenCalled();
 
     const row = await db.query.processingOutbox.findFirst({
       where: eq(processingOutbox.id, job.id),
     });
-    expect(row?.status).toBe("claimed");
+    expect(row?.status).toBe("pending");
 
-    // The stale worker cannot terminally update either side; lease recovery owns the retry.
+    // The claim refuses the superseded revision; the recovery pass closes its row.
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });

@@ -7,11 +7,9 @@ const job = {
   sourceDocumentId: "document",
   revisionId: "revision",
   requestedAt: "2026-09-01T00:00:00Z",
-  attemptNumber: 1,
 };
 
-const { complete, process, recordProcessingFailure } = vi.hoisted(() => ({
-  complete: vi.fn(),
+const { process, recordProcessingFailure } = vi.hoisted(() => ({
   process: vi.fn(),
   recordProcessingFailure: vi.fn(),
 }));
@@ -19,7 +17,6 @@ const { complete, process, recordProcessingFailure } = vi.hoisted(() => ({
 vi.mock("@/server/processing/jobs", () => ({
   claimProcessingJob: vi.fn(async () => ({ job, ledgerId: "ledger", claimToken: "token" })),
   renewProcessingJobLease: vi.fn(async () => null),
-  completeProcessingJob: complete,
 }));
 vi.mock("@/server/processing/revision-processor", () => ({ processRevision: process }));
 vi.mock("@/modules/source-document/server/revisions", () => ({ recordProcessingFailure }));
@@ -29,34 +26,19 @@ import { executeProcessingJob } from "@/server/processing/execute-job";
 describe("single processing job completion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    complete.mockResolvedValue(true);
     recordProcessingFailure.mockResolvedValue(true);
   });
 
   it.each(["completed", "failed"] as const)(
-    "does not complete an atomic %s twice",
+    "records nothing more after a %s outcome",
     async (processingStatus) => {
-      process.mockResolvedValue({
-        processingStatus,
-        completion: "atomic",
-      } satisfies RevisionProcessingResultContract);
+      process.mockResolvedValue({ processingStatus } satisfies RevisionProcessingResultContract);
       await expect(executeProcessingJob(job)).resolves.toBe(true);
-      expect(complete).not.toHaveBeenCalled();
       expect(recordProcessingFailure).not.toHaveBeenCalled();
     }
   );
 
-  it("completes a residual job with its claim token", async () => {
-    process.mockResolvedValue({ processingStatus: "completed", completion: "residual" });
-    await executeProcessingJob(job);
-    expect(complete).toHaveBeenCalledExactlyOnceWith({
-      jobId: "job",
-      claimToken: "token",
-      processingStatus: "completed",
-    });
-  });
-
-  it("preserves an error atomically without another completion", async () => {
+  it("records an error under the job's lease", async () => {
     process.mockRejectedValue(new Error("failed"));
     await executeProcessingJob(job);
     expect(recordProcessingFailure).toHaveBeenCalledExactlyOnceWith(
@@ -65,13 +47,11 @@ describe("single processing job completion", () => {
         lease: { jobId: "job", claimToken: "token" },
       })
     );
-    expect(complete).not.toHaveBeenCalled();
   });
 
   it("leaves a cancelled claim untouched", async () => {
     process.mockRejectedValue(new ProcessingCancelledError());
     await executeProcessingJob(job);
-    expect(complete).not.toHaveBeenCalled();
     expect(recordProcessingFailure).not.toHaveBeenCalled();
   });
 });

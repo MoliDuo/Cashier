@@ -1,6 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type {
-  ProcessingCompletionContract,
   ProcessingJobContract,
   ProcessingRecoveryConfig,
   RevisionProcessingRequestContract,
@@ -11,7 +10,6 @@ import { db } from "@/lib/db";
 import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import {
   claimProcessingJob,
-  completeProcessingJob,
   recoverProcessingJobs,
   renewProcessingJobLease,
   type ProcessingJobClock,
@@ -69,7 +67,6 @@ export function processingJobs(clock: ProcessingJobClock = {}) {
     dispatch: dispatchProcessingJob,
     claim: (jobId: string) => claimProcessingJob(jobId, clock),
     renew: (jobId: string, claimToken: string) => renewProcessingJobLease(jobId, claimToken, clock),
-    complete: (result: ProcessingCompletionContract) => completeProcessingJob(result, clock),
     recoverBatch: (ledgerId: string, config: ProcessingRecoveryConfig) =>
       recoverProcessingJobs(ledgerId, config, clock),
   };

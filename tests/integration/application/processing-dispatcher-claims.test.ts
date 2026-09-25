@@ -10,8 +10,10 @@ import {
   ledgers,
   processingOutbox,
   currencyRates,
+  sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
+import { ProcessingCancelledError } from "@/modules/source-document/domain/parse/contracts";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -89,7 +91,7 @@ describe("processing outbox jobs", () => {
         lease,
         signal: new AbortController().signal,
       })
-    ).resolves.toEqual({ processingStatus: "completed", completion: "atomic" });
+    ).resolves.toEqual({ processingStatus: "completed" });
     await expect(
       processor.process({
         ledgerId,
@@ -98,7 +100,7 @@ describe("processing outbox jobs", () => {
         lease,
         signal: new AbortController().signal,
       })
-    ).resolves.toEqual({ processingStatus: "completed", completion: "residual" });
+    ).rejects.toBeInstanceOf(ProcessingCancelledError);
 
     expect(generate).toHaveBeenCalledTimes(1);
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
@@ -283,7 +285,7 @@ describe("processing outbox jobs", () => {
     expect(await db.select().from(processingOutbox)).toHaveLength(1);
   });
 
-  it("reclaims an expired lease and rejects stale completion", async () => {
+  it("reclaims an expired lease and fences out the previous holder", async () => {
     let now = new Date("2026-07-15T00:00:00.000Z");
     const { job } = await pendingIntent(now.toISOString(), crypto.randomUUID());
     const adapter = processingJobs({ leaseMs: 1_000, now: () => now });
@@ -299,37 +301,21 @@ describe("processing outbox jobs", () => {
     expect(second).not.toBeNull();
     expect(second!.claimToken).not.toBe(first!.claimToken);
 
-    await expect(
-      adapter.complete({
-        jobId: job.id,
-        claimToken: first!.claimToken,
-        processingStatus: "completed",
-      })
-    ).resolves.toBe(false);
-    await expect(
-      adapter.complete({
-        jobId: job.id,
-        claimToken: second!.claimToken,
-        processingStatus: "failed",
-      })
-    ).resolves.toBe(true);
+    await expect(adapter.renew(job.id, first!.claimToken)).resolves.toBeNull();
+    await expect(adapter.renew(job.id, second!.claimToken)).resolves.not.toBeNull();
   });
 
-  it("accepts a completion once and treats a repeated completion as a no-op", async () => {
+  it("does not hand out a job whose revision already finished", async () => {
+    const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
     await adapter.dispatch(job);
-    const claim = await adapter.claim(job.id);
-    expect(claim).not.toBeNull();
+    await db
+      .update(sourceDocumentRevisions)
+      .set({ processingStatus: "completed" })
+      .where(eq(sourceDocumentRevisions.id, job.revisionId));
 
-    const complete = () =>
-      adapter.complete({
-        jobId: job.id,
-        claimToken: claim!.claimToken,
-        processingStatus: "completed",
-      });
-    await expect(complete()).resolves.toBe(true);
-    await expect(complete()).resolves.toBe(false);
+    await expect(adapter.claim(job.id)).resolves.toBeNull();
   });
 
   it("returns false on duplicate claim", async () => {

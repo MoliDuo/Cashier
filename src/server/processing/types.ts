@@ -17,12 +17,6 @@ export interface ProcessingLeaseContract {
   claimToken: string;
 }
 
-export interface ProcessingCompletionContract {
-  jobId: string;
-  claimToken: string;
-  processingStatus: Extract<RevisionProcessingStatus, "completed" | "failed">;
-}
-
 export interface ProcessingClaimContract {
   ledgerId: string;
   job: ProcessingJobContract;
@@ -50,7 +44,6 @@ export interface RevisionProcessingRequestContract {
 }
 
 export interface RevisionProcessingResultContract {
-  completion: "atomic" | "residual";
   processingStatus: Extract<RevisionProcessingStatus, "completed" | "failed">;
   failureMessage?: string;
 }
