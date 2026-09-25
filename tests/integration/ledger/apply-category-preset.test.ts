@@ -175,6 +175,59 @@ describe("applyCategoryPresetAction", () => {
     expect(others[0]?.icon).toBe("Star");
   });
 
+  it("frees a preset name held by a category that migrates elsewhere", async () => {
+    const db = getTestDb();
+    const ledger = createLedgerData();
+    const travelId = crypto.randomUUID();
+    const document = createSourceDocumentData(ledger.id);
+    const entryId = crypto.randomUUID();
+
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
+    // "出行" is the preset's third slot, but this one is folded into the first.
+    await db
+      .insert(entryCategories)
+      .values({ id: travelId, ledgerId: ledger.id, name: "出行", sortOrder: 0 });
+    await db.insert(sourceDocuments).values({
+      ...document,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+    });
+    await activateTestSourceDocumentProjection(db, document.id);
+    await db.insert(ledgerEntries).values({
+      id: entryId,
+      ledgerId: ledger.id,
+      sourceDocumentId: document.id,
+      itemName: "Metro",
+      amount: "6.00",
+      currency: "CNY",
+      categoryId: travelId,
+    });
+
+    const saved = await applyCategoryPresetAction({
+      expectedRevision: await revisionOf(ledger.id),
+      presetId: "concise",
+      mappings: [{ fromCategoryId: travelId, toPresetIndex: 0 }],
+    });
+
+    expect(saved.movedEntryCount).toBe(1);
+    expect(saved.categories.map((category) => category.name)).toEqual([
+      "吃喝",
+      "居家",
+      "出行",
+      "健康",
+      "娱乐",
+      "其他",
+    ]);
+    const food = saved.categories.find((category) => category.name === "吃喝");
+    expect(food?.entryCount).toBe(1);
+    expect(
+      await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, entryId) })
+    ).toMatchObject({ categoryId: food?.id });
+    expect(
+      await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, travelId) })
+    ).toBeUndefined();
+  });
+
   it("rejects a stale category collection revision without writing", async () => {
     const db = getTestDb();
     const ledger = createLedgerData();

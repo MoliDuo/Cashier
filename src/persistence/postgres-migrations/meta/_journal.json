@@ -71,6 +71,13 @@
       "when": 1790341355296,
       "tag": "0009_category_job_lease",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790344350221,
+      "tag": "0010_category_job_contract",
+      "breakpoints": true
     }
   ]
 }

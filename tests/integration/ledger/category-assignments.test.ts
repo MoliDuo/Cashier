@@ -21,6 +21,7 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import {
   cancelCategoryAssignment,
   claimCategoryAssignmentJob,
@@ -344,6 +345,34 @@ describe("running a category assignment", () => {
     await expect(nextCategoryAssignmentDocument(recovered!)).resolves.toEqual({ kind: "done" });
     await releaseCategoryAssignmentJob(recovered!);
     expect(await storedJob(started.id)).toMatchObject({ status: "succeeded" });
+  });
+
+  it("drops a document deleted mid-run and settles the job on what is left", async () => {
+    const fixture = await seedLedger();
+    const second = await addDocument(fixture.ledger.id, ["Coffee"]);
+    const started = await startAssign(fixture, [fixture.entryIds[0]!, second.entryIds[0]!]);
+    const job = await claimCategoryAssignmentJob({ jobId: started.id });
+    await expect(nextCategoryAssignmentDocument(job!)).resolves.toMatchObject({
+      document: { sourceDocumentId: fixture.documentId },
+    });
+
+    await deleteSourceDocumentAtomically({
+      ledgerId: fixture.ledger.id,
+      sourceDocumentId: fixture.documentId,
+    });
+    await expect(
+      applyCategoryAssignments({ lease: job!, sourceDocumentId: fixture.documentId })
+    ).resolves.toEqual({ status: "skipped" });
+    await expect(nextCategoryAssignmentDocument(job!)).resolves.toMatchObject({
+      document: { sourceDocumentId: second.documentId },
+    });
+    await applyCategoryAssignments({ lease: job!, sourceDocumentId: second.documentId });
+    await releaseCategoryAssignmentJob(job!);
+
+    expect(await storedJob(started.id)).toMatchObject({ status: "succeeded" });
+    await expect(
+      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+    ).resolves.toMatchObject({ entryCount: 1, appliedCount: 1, documentTotal: 1 });
   });
 
   it("marks only an entry recategorized after selection as a conflict", async () => {

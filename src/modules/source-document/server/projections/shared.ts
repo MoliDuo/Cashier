@@ -88,10 +88,8 @@ export async function replaceProjection(
 ): Promise<void> {
   assertEntryValues(input.entries);
   await assertCategoryOwnership(tx, input.ledgerId, input.entries);
-  const now = new Date();
   await tx
-    .update(ledgerEntries)
-    .set({ deletedAt: now, updatedAt: now })
+    .delete(ledgerEntries)
     .where(
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),

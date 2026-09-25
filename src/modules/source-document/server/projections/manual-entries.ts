@@ -88,8 +88,7 @@ export async function replaceManualProjection(
     .map((previous) => previous.id);
   if (removedIds.length > 0) {
     await tx
-      .update(ledgerEntries)
-      .set({ deletedAt: now, updatedAt: now })
+      .delete(ledgerEntries)
       .where(
         and(
           eq(ledgerEntries.ledgerId, input.ledgerId),

@@ -18,7 +18,7 @@ const projectionEntry = {
 } as const;
 
 describe("current-runtime target adapters", () => {
-  it("creates and edits manual projections, and soft deletes through the aggregate", async () => {
+  it("creates and edits manual projections, and deletes through the aggregate", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await createManualDocument({
@@ -63,16 +63,15 @@ describe("current-runtime target adapters", () => {
         sourceDocumentId: created.sourceDocumentId,
       })
     ).resolves.toMatchObject({ deleted: true });
-    const deleted = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
-    expect(deleted).toMatchObject({ deletedAt: expect.any(Date) });
     expect(
-      (
-        await db.query.ledgerEntries.findFirst({
-          where: eq(ledgerEntries.id, replacementEntry!.id),
-        })
-      )?.deletedAt
-    ).not.toBeNull();
+      await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, created.sourceDocumentId),
+      })
+    ).toBeUndefined();
+    expect(
+      await db.query.ledgerEntries.findFirst({
+        where: eq(ledgerEntries.id, replacementEntry!.id),
+      })
+    ).toBeUndefined();
   });
 });

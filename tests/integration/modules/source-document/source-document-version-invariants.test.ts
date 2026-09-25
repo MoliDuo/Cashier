@@ -344,7 +344,7 @@ describe("source document version — other writes leave it alone", () => {
     expect(await currentVersion(sourceDocumentId)).toBe(1);
   });
 
-  it("delete soft-deletes without a bump and a replay is not found", async () => {
+  it("delete removes the document and a replay is not found", async () => {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
 
@@ -352,9 +352,6 @@ describe("source document version — other writes leave it alone", () => {
       sourceDocumentId,
       deleted: true,
     });
-    const row = await readDocument(sourceDocumentId);
-    expect(row.deletedAt).not.toBeNull();
-    expect(row.version).toBe(1);
     await expect(deleteSourceDocumentAtomically({ ledgerId, sourceDocumentId })).rejects.toThrow(
       "not found"
     );

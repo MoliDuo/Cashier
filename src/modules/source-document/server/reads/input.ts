@@ -56,8 +56,7 @@ export async function getSourceDocumentInput(
           storedFiles,
           and(
             eq(storedFiles.ledgerId, sourceDocumentFiles.ledgerId),
-            eq(storedFiles.id, sourceDocumentFiles.storedFileId),
-            isNull(storedFiles.deletedAt)
+            eq(storedFiles.id, sourceDocumentFiles.storedFileId)
           )
         )
         .where(

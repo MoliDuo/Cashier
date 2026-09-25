@@ -225,15 +225,11 @@ describe("SourceDocument Actions", () => {
     const docAfter = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
-    expect(docAfter).toBeDefined();
-    expect(docAfter?.deletedAt).not.toBeNull();
+    expect(docAfter).toBeUndefined();
 
     const entriesAfter = await db.query.ledgerEntries.findMany({
       where: eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
     });
-    expect(entriesAfter.length).toBeGreaterThan(0);
-    entriesAfter.forEach((entry) => {
-      expect(entry.deletedAt).not.toBeNull();
-    });
+    expect(entriesAfter).toEqual([]);
   });
 });

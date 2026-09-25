@@ -111,7 +111,7 @@ describe("saveEntryCategoriesAction", () => {
     const entry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
     });
-    expect(removed?.deletedAt).not.toBeNull();
+    expect(removed).toBeUndefined();
     expect(entry?.categoryId).toBeNull();
     // Clearing a deleted category does not make an open draft stale.
     expect(

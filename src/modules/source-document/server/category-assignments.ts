@@ -62,6 +62,9 @@ export async function applyCategoryAssignments(
       .for("update")
       .then((rows) => rows[0]);
     if (job == null) return { status: "claim_lost" };
+    // Deleting the document took its work and entry rows with it, so there is
+    // no outcome left to record.
+    if (document == null) return { status: "skipped" };
     const work = await tx
       .select({ status: categoryReclassificationJobDocuments.status })
       .from(categoryReclassificationJobDocuments)
@@ -99,7 +102,7 @@ export async function applyCategoryAssignments(
       return { status } as const;
     };
 
-    if (document == null || document.deletedAt != null) {
+    if (document.deletedAt != null) {
       return finishWithoutWrite("skipped", "document_unavailable");
     }
     try {

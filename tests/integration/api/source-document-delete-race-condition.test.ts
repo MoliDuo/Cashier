@@ -40,7 +40,6 @@ describe("SourceDocument delete concurrency", () => {
     const deleted = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });
-    expect(deleted?.deletedAt).not.toBeNull();
-    expect(deleted?.version).toBe(document.version);
+    expect(deleted).toBeUndefined();
   });
 });

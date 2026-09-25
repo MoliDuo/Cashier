@@ -35,7 +35,7 @@ describe("SourceDocument delete idempotency", () => {
     return document;
   }
 
-  it("deletes once without bumping the document version", async () => {
+  it("deletes the document outright", async () => {
     const document = await createDocument();
     await expect(deleteSourceDocumentAction(document.id)).resolves.toEqual({
       sourceDocumentId: document.id,
@@ -44,17 +44,12 @@ describe("SourceDocument delete idempotency", () => {
     const deleted = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });
-    expect(deleted?.deletedAt).not.toBeNull();
-    expect(deleted?.version).toBe(document.version);
+    expect(deleted).toBeUndefined();
   });
 
   it("does not durably replay a lost delete response", async () => {
     const document = await createDocument();
     await deleteSourceDocumentAction(document.id);
     await expect(deleteSourceDocumentAction(document.id)).rejects.toThrow(NotFoundError);
-    const deleted = await getTestDb().query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, document.id),
-    });
-    expect(deleted?.version).toBe(document.version);
   });
 });

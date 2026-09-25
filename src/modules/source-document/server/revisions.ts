@@ -171,7 +171,6 @@ export async function createProcessingRevisionInTransaction(
             and(
               eq(storedFiles.ledgerId, input.ledgerId),
               inArray(storedFiles.id, fileIds),
-              isNull(storedFiles.deletedAt),
               isNotNull(storedFiles.finalizedAt)
             )
           );

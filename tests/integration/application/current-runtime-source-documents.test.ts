@@ -128,6 +128,43 @@ describe("current-runtime target adapters", () => {
     );
   });
 
+  it("replaces a reparsed document's entries without leaving the old rows behind", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const bookId = await testBookId(db, ledgerId);
+    const first = await createPendingRevision({
+      ledgerId,
+      input: { text: "first", storedFileIds: [], documentDate: null },
+      bookId,
+    });
+    await activateRevision({
+      lease: await claimRevisionForTest(first.revision.id),
+      ledgerId,
+      sourceDocumentId: first.document.id,
+      revisionId: first.revision.id,
+      entries: [projectionEntry, projectionEntry],
+    });
+    const reparse = await createPendingRevision({
+      ledgerId,
+      sourceDocumentId: first.document.id,
+      input: { text: "reparse", storedFileIds: [], documentDate: null },
+      bookId,
+    });
+    await activateRevision({
+      lease: await claimRevisionForTest(reparse.revision.id),
+      ledgerId,
+      sourceDocumentId: first.document.id,
+      revisionId: reparse.revision.id,
+      entries: [{ ...projectionEntry, amount: "20.00" }],
+    });
+
+    expect(
+      await db.query.ledgerEntries.findMany({
+        where: eq(ledgerEntries.sourceDocumentId, first.document.id),
+      })
+    ).toEqual([expect.objectContaining({ amount: "20.000" })]);
+  });
+
   it("rolls back activation when a projection violates ledger ownership", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
@@ -192,7 +229,7 @@ describe("current-runtime target adapters", () => {
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
 
-  it("soft deletes active and pending documents without removing evidence or accepting late completion", async () => {
+  it("deletes a document with everything it owns but its stored files, and refuses late completion", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const active = await createManualDocument({
@@ -223,8 +260,7 @@ describe("current-runtime target adapters", () => {
       "delete",
     ]);
     const pendingLease = await claimRevisionForTest(pending.revision.id);
-    const revisionCount = (await db.select().from(sourceDocumentRevisions)).length;
-    const fileLinkCount = (await db.select().from(sourceDocumentFiles)).length;
+    expect(await db.select().from(sourceDocumentFiles)).toHaveLength(1);
 
     await expect(
       deleteSourceDocumentAtomically({
@@ -248,21 +284,14 @@ describe("current-runtime target adapters", () => {
       })
     ).resolves.toBe(false);
 
-    const deleted = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, active.sourceDocumentId),
-    });
-    expect(deleted).toMatchObject({
-      deletedAt: expect.any(Date),
-      latestSubmissionRevisionId: pending.revision.id,
-    });
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(revisionCount);
-    expect(fileLinkCount).toBe(1);
-    expect(await db.select().from(sourceDocumentFiles)).toHaveLength(fileLinkCount);
-    expect(await db.select().from(storedFiles)).toHaveLength(1);
     expect(
-      await db.query.ledgerEntries.findFirst({
-        where: eq(ledgerEntries.sourceDocumentId, active.sourceDocumentId),
+      await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, active.sourceDocumentId),
       })
-    ).toMatchObject({ deletedAt: expect.any(Date) });
+    ).toBeUndefined();
+    expect(await db.select().from(sourceDocumentRevisions)).toEqual([]);
+    expect(await db.select().from(sourceDocumentFiles)).toEqual([]);
+    expect(await db.select().from(ledgerEntries)).toEqual([]);
+    expect(await db.select().from(storedFiles)).toHaveLength(1);
   });
 });

@@ -50,8 +50,7 @@ describe("Ledger Entry Delete Action", () => {
     const deletedEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, testEntryId),
     });
-    expect(deletedEntry).toBeDefined();
-    expect(deletedEntry?.deletedAt).not.toBeNull();
+    expect(deletedEntry).toBeUndefined();
   });
 
   it("refuses every ledger once a second live one exists, which is the deployment's rule", async () => {

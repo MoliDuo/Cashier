@@ -76,8 +76,7 @@ async function loadSourceDocumentDetailSnapshot(
       storedFiles,
       and(
         eq(storedFiles.ledgerId, sourceDocumentFiles.ledgerId),
-        eq(storedFiles.id, sourceDocumentFiles.storedFileId),
-        isNull(storedFiles.deletedAt)
+        eq(storedFiles.id, sourceDocumentFiles.storedFileId)
       )
     )
     .where(
@@ -179,7 +178,6 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
             INNER JOIN ${storedFiles} list_stored_file
               ON list_stored_file.ledger_id = list_document_file.ledger_id
              AND list_stored_file.id = list_document_file.stored_file_id
-             AND list_stored_file.deleted_at IS NULL
             WHERE list_document_file.ledger_id = ${input.ledgerId}
               AND list_document_file.source_document_id = ${sourceDocuments.id}
           )`,

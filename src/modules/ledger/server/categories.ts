@@ -266,8 +266,7 @@ export async function saveEntryCategories(
           )
         );
       await tx
-        .update(entryCategories)
-        .set({ deletedAt: now, updatedAt: now })
+        .delete(entryCategories)
         .where(
           and(
             eq(entryCategories.ledgerId, ledgerId),
@@ -446,9 +445,8 @@ export async function applyCategoryPreset(
 
     const now = new Date();
 
-    // Soft-delete what migrates away before inserting anything. The rows stay
-    // (only `deleted_at` is set) so the composite foreign key from
-    // ledger_entries keeps holding and step 3 can still match `from_id`.
+    // Delete what migrates away before inserting anything, so a preset name
+    // that a migrating category already holds is free again.
     const reusableTargetByIndex = new Map<number, string>();
     for (const mapping of mappings) {
       const category = currentById.get(mapping.fromCategoryId)!;
@@ -490,10 +488,33 @@ export async function applyCategoryPreset(
             .then((rows) => rows.map((row) => row.id).sort());
     const lockedDocuments = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
     for (const document of lockedDocuments) await assertSourceDocumentNotProcessing(tx, document);
+    // Deleting a category unsets its entries, so the entries each migrating
+    // category holds are noted first and moved onto their target once the
+    // preset exists.
+    const migratingEntries =
+      migratedIds.length === 0
+        ? []
+        : await tx
+            .select({ id: ledgerEntries.id, categoryId: ledgerEntries.categoryId })
+            .from(ledgerEntries)
+            .innerJoin(
+              sourceDocuments,
+              and(
+                eq(sourceDocuments.ledgerId, ledgerId),
+                eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
+                isNull(sourceDocuments.deletedAt)
+              )
+            )
+            .where(
+              and(
+                eq(ledgerEntries.ledgerId, ledgerId),
+                inArray(ledgerEntries.categoryId, migratedIds),
+                isNull(ledgerEntries.deletedAt)
+              )
+            );
     if (migratedIds.length > 0) {
       await tx
-        .update(entryCategories)
-        .set({ deletedAt: now, updatedAt: now })
+        .delete(entryCategories)
         .where(
           and(
             eq(entryCategories.ledgerId, ledgerId),
@@ -539,35 +560,35 @@ export async function applyCategoryPreset(
         insertedByName.get(preset.name)!
     );
 
-    // Move every migrated category's entries onto its target. Set-based, so
-    // many-to-one collapses naturally.
+    // Put the noted entries onto their migrated category's target.
     let movedEntryCount = 0;
-    if (migrating.length > 0) {
+    if (migratingEntries.length > 0) {
+      const targetByCategory = new Map(
+        migrating.map((mapping) => [
+          mapping.fromCategoryId,
+          presetTargetIds[mapping.toPresetIndex]!,
+        ])
+      );
       const transfers = JSON.stringify(
-        migrating.map((mapping) => ({
-          from_id: mapping.fromCategoryId,
-          to_id: presetTargetIds[mapping.toPresetIndex]!,
+        migratingEntries.map((entry) => ({
+          id: entry.id,
+          to_id: targetByCategory.get(entry.categoryId!)!,
         }))
       );
-      const moved = await tx.execute<{ source_document_id: string }>(sql`
+      const moved = await tx.execute<{ id: string }>(sql`
         WITH transfers AS (
           SELECT * FROM jsonb_to_recordset(${transfers}::jsonb) AS value(
-            from_id uuid,
+            id uuid,
             to_id uuid
           )
         )
         UPDATE ledger_entries AS entry
         SET category_id = transfers.to_id,
             updated_at = ${now}
-        FROM transfers, source_documents AS document
+        FROM transfers
         WHERE entry.ledger_id = ${ledgerId}
-          AND entry.category_id = transfers.from_id
-          AND entry.deleted_at IS NULL
-          AND document.ledger_id = ${ledgerId}
-          AND document.id = entry.source_document_id
-          AND document.deleted_at IS NULL
-          AND entry.category_id IS DISTINCT FROM transfers.to_id
-        RETURNING entry.source_document_id
+          AND entry.id = transfers.id
+        RETURNING entry.id
       `);
       movedEntryCount = moved.rows.length;
     }

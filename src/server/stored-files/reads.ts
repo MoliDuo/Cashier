@@ -39,7 +39,6 @@ async function findAuthorizedFile(ledgerId: string, fileId: string) {
         eq(storedFiles.ledgerId, ledgerId),
         eq(storedFiles.id, fileId),
         isNotNull(storedFiles.finalizedAt),
-        isNull(storedFiles.deletedAt),
         referencedByLiveDocument()
       )
     )

@@ -41,7 +41,8 @@ with `vi.mock` of the concrete module rather than injected fakes.
 
 ## Data access
 
-- Scope tenant data by `ledgerId` in SQL and include soft-delete predicates.
+- Scope tenant data by `ledgerId` in SQL. Deletes remove rows; keep the `deleted_at IS NULL`
+  predicates only until the tombstones written before hard deletion are purged.
 - Prefer set-based statements (`UPDATE FROM`, CTEs, and `unnest`) to per-row queries.
 - Keep keyset ordering and cursor fields identical. A cursor includes a fingerprint of its query.
 - Convert amounts at read time with the `convert_amount` SQL function (the only conversion

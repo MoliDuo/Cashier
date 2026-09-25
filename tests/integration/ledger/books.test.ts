@@ -21,6 +21,7 @@ import {
 } from "@/modules/ledger/server/service-credentials";
 import { books, serviceCredentials, sourceDocuments } from "@/persistence";
 import { createTestSourceDocument } from "../../helpers/schema-setup";
+import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 
 /**
  * The 分账 rules the product states, checked against the real adapter: order is
@@ -166,6 +167,19 @@ describe("books", () => {
     expect(await deleteBook(ledgerId, holding.id)).toEqual({
       status: "has_records",
     });
+  });
+
+  it("deletes a book once every record it held is deleted", async () => {
+    const { db, ledgerId, secondBookId } = await fixture();
+    const sourceDocumentId = await createTestSourceDocument(db, ledgerId);
+    await db
+      .update(sourceDocuments)
+      .set({ bookId: secondBookId })
+      .where(eq(sourceDocuments.id, sourceDocumentId));
+    expect(await deleteBook(ledgerId, secondBookId)).toEqual({ status: "has_records" });
+
+    await deleteSourceDocumentAtomically({ ledgerId, sourceDocumentId });
+    expect(await deleteBook(ledgerId, secondBookId)).toEqual({ status: "deleted" });
   });
 
   it("refuses to delete the last live book, with the port's own code", async () => {
