@@ -106,11 +106,7 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
   let expiresAt: Date;
 
   try {
-    const token = await createOtpToken(
-      normalizedEmail,
-      otp,
-      params.ip === "unknown" ? undefined : params.ip
-    );
+    const token = await createOtpToken(normalizedEmail, otp);
     expiresAt = token.expiresAt;
     tokenHash = token.tokenHash;
     const expiresInMinutes = Math.ceil(OTP_EXPIRES_SECONDS / 60);

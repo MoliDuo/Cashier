@@ -17,7 +17,6 @@ const coverageConfig = {
   reportsDirectory: "./coverage",
   // The coverage runner creates reportsDirectory/.tmp before Vitest starts.
   clean: false,
-  all: true,
   include: ["src/**/*.ts", "src/**/*.tsx"],
   /**
    * Module UI used to be excluded, although 59 test files cover it: the

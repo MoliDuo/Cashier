@@ -7,7 +7,6 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-  inet,
   check,
 } from "drizzle-orm/pg-core";
 import { sql, type InferSelectModel } from "drizzle-orm";
@@ -106,7 +105,6 @@ export const otpTokens = pgTable(
       .notNull()
       .$defaultFn(() => new Date()),
     lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
-    ipAddress: inet("ip_address"),
   },
   (table) => [
     uniqueIndex("uniq_otp_tokens_email").on(table.email),

@@ -51,7 +51,7 @@ describe("OTP Repository", () => {
   describe("createOTPToken", () => {
     it("should create a new OTP token", async () => {
       const otp = generateOTP();
-      const result = await createOTPToken(testEmail, otp, "127.0.0.1");
+      const result = await createOTPToken(testEmail, otp);
 
       expect(result.expiresAt).toBeInstanceOf(Date);
 
@@ -60,15 +60,14 @@ describe("OTP Repository", () => {
       expect(tokens).toHaveLength(1);
       const token = requireDefined(tokens[0], "Expected created OTP token");
       expect(token.email).toBe(testEmail.toLowerCase());
-      expect(token.ipAddress).toBe("127.0.0.1");
     });
 
     it("should delete old OTP when creating new one", async () => {
       const otp1 = generateOTP();
       const otp2 = generateOTP();
 
-      await createOTPToken(testEmail, otp1, "127.0.0.1");
-      await createOTPToken(testEmail, otp2, "127.0.0.1");
+      await createOTPToken(testEmail, otp1);
+      await createOTPToken(testEmail, otp2);
 
       // Should only have one token
       const tokens = await db.select().from(otpTokens);
@@ -81,7 +80,7 @@ describe("OTP Repository", () => {
 
     it("should normalize email to lowercase", async () => {
       const otp = generateOTP();
-      await createOTPToken("Test@Example.COM", otp, "127.0.0.1");
+      await createOTPToken("Test@Example.COM", otp);
 
       const tokens = await db.select().from(otpTokens);
       const token = requireDefined(tokens[0], "Expected normalized OTP token");
@@ -90,7 +89,7 @@ describe("OTP Repository", () => {
 
     it("should store hashed OTP, not plain text", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const tokens = await db.select().from(otpTokens);
       const token = requireDefined(tokens[0], "Expected stored OTP token");
@@ -103,7 +102,7 @@ describe("OTP Repository", () => {
   describe("verifyOTPToken", () => {
     it("should verify correct OTP", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const result = await verifyOTPToken(testEmail, otp);
 
@@ -113,7 +112,7 @@ describe("OTP Repository", () => {
 
     it("should reject incorrect OTP", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const result = await verifyOTPToken(testEmail, "000000");
 
@@ -124,7 +123,7 @@ describe("OTP Repository", () => {
 
     it("should increment attempts on failed verification", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       await verifyOTPToken(testEmail, "000000");
       await verifyOTPToken(testEmail, "111111");
@@ -135,7 +134,7 @@ describe("OTP Repository", () => {
 
     it("should lock account after max attempts", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       // Attempt 5 times with wrong OTP
       for (let i = 0; i < 4; i++) {
@@ -152,7 +151,7 @@ describe("OTP Repository", () => {
 
     it("should reject verification when account is locked", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       // Lock the account
       for (let i = 0; i < 5; i++) {
@@ -168,7 +167,7 @@ describe("OTP Repository", () => {
 
     it("should reject expired OTP", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       // Manually set expiration to past
       // Manually set expiration to past
@@ -192,7 +191,7 @@ describe("OTP Repository", () => {
 
     it("spends the OTP the moment it verifies", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const result = await verifyOTPToken(testEmail, otp);
 
@@ -202,7 +201,7 @@ describe("OTP Repository", () => {
 
     it("should allow only one concurrent successful consumption", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const results = await Promise.all([
         verifyOTPToken(testEmail, otp),
@@ -215,7 +214,7 @@ describe("OTP Repository", () => {
 
     it("refuses an OTP that has already been spent", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       expect((await verifyOTPToken(testEmail, otp)).success).toBe(true);
       expect((await verifyOTPToken(testEmail, otp)).reason).toBe("not_found");
@@ -223,7 +222,7 @@ describe("OTP Repository", () => {
 
     it("counts concurrent failed attempts without lost updates", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       await Promise.all([
         verifyOTPToken(testEmail, "000000"),
@@ -247,7 +246,7 @@ describe("OTP Repository", () => {
 
     it("should return false when account is not locked", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const result = await verifyOTPToken(testEmail, otp);
       expect(result.success).toBe(true);
@@ -255,7 +254,7 @@ describe("OTP Repository", () => {
 
     it("should return true when account is locked", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       // Lock the account
       for (let i = 0; i < 5; i++) {
@@ -269,7 +268,7 @@ describe("OTP Repository", () => {
 
     it("should return false when lockout has expired", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       // Set lockout to past
       // Set lockout to past
@@ -347,7 +346,7 @@ describe("OTP Repository", () => {
   describe("deleteOTPToken", () => {
     it("should delete OTP token", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       await deleteOTPToken(testEmail);
 
@@ -365,8 +364,8 @@ describe("OTP Repository", () => {
       const otp1 = generateOTP();
       const otp2 = generateOTP();
 
-      await createOTPToken("user1@example.com", otp1, "127.0.0.1");
-      await createOTPToken("user2@example.com", otp2, "127.0.0.1");
+      await createOTPToken("user1@example.com", otp1);
+      await createOTPToken("user2@example.com", otp2);
 
       // Expire first token - use a fixed past date to be absolutely sure
       // Expire first token - use a fixed past date to be absolutely sure
@@ -387,7 +386,7 @@ describe("OTP Repository", () => {
 
     it("should not delete valid tokens", async () => {
       const otp = generateOTP();
-      await createOTPToken(testEmail, otp, "127.0.0.1");
+      await createOTPToken(testEmail, otp);
 
       const deleted = await cleanupExpiredOTPTokens();
 

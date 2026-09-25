@@ -25,18 +25,6 @@ async function validJpegBase64(): Promise<string> {
   return buffer.toString("base64");
 }
 
-const { submitMock } = vi.hoisted(() => ({
-  submitMock: vi.fn().mockResolvedValue("mock-task-id"),
-}));
-
-vi.mock("@/lib/tasks", async (importOriginal) => {
-  const original = await importOriginal();
-  return {
-    ...(original as Record<string, unknown>),
-    submitTask: submitMock,
-  };
-});
-
 // Hoisted shared memory store so the beforeEach and vi.mock factory share the same Map
 const mockR2 = vi.hoisted(() => {
   const files = new Map<string, Buffer>();

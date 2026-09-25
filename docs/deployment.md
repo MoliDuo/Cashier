@@ -4,9 +4,9 @@
 `docker-compose.local.yml` 启动 PostgreSQL 和 MinIO 两个基础服务，应用本身用
 `npm run dev` 运行。
 
-反向代理不是必需项。仅当入口会覆盖客户端提供的 `X-Real-IP` 时设置
-`TRUSTED_PROXY=platform`；直连部署应保持未设置。在 Vercel 上显式设置该值后读取
-平台的单值 `X-Vercel-Forwarded-For`，非法或多值头不会被信任。
+在 Vercel 上必须设置 `TRUSTED_PROXY=platform`，应用才会读取平台覆盖的单值
+`X-Vercel-Forwarded-For`；非法或多值头不会被信任。未设置时所有请求的客户端 IP 都记为
+`unknown`，按 IP 的登录限流会变成所有人共用的一个桶，陌生人的请求也会把你挡在登录页外。
 
 ## Vercel 部署
 
@@ -18,6 +18,7 @@
   S3 或 R2 配置，桶必须预先创建。
 - `S3_PUBLIC_ENDPOINT`：浏览器可以访问的对象存储端点。
 - `OPENAI_API_KEY`：AI 服务密钥。
+- `TRUSTED_PROXY=platform`：让按 IP 的限流拿到真实客户端 IP（见上文）。
 - `AUTH_SECRET`、`API_KEY_PEPPER`、`AUTH_OTP_PEPPER`：三个内部密钥，
   必须是安全随机值，并且在同一部署的重启、预览实例和多次构建之间保持一致。
 

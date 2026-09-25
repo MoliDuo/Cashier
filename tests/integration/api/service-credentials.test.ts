@@ -67,19 +67,7 @@ vi.mock("@/lib/storage/s3", () => ({
   getS3Storage: () => new mockR2.R2StorageProvider(),
 }));
 
-const { submitMock } = vi.hoisted(() => ({
-  submitMock: vi.fn().mockResolvedValue("mock-task-id"),
-}));
-
 // Mock Task Runtime
-vi.mock("@/lib/tasks", async (importOriginal) => {
-  const original = await importOriginal();
-  return {
-    ...(original as Record<string, unknown>),
-    submitTask: submitMock,
-  };
-});
-
 // Mock Tasks
 
 describe("Service Credentials & Ledger Entry Ingestion", () => {

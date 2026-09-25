@@ -19,7 +19,6 @@ async function replaceOtpToken(input: {
   email: string;
   tokenHash: string;
   expiresAt: Date;
-  ipAddress?: string;
 }): Promise<void> {
   const now = new Date();
   const recentFailureCutoff = new Date(now.getTime() - OTP_LOCKOUT_MINUTES * 60 * 1000);
@@ -29,7 +28,6 @@ async function replaceOtpToken(input: {
       email: input.email,
       tokenHash: input.tokenHash,
       expires: input.expiresAt,
-      ...(input.ipAddress === undefined ? {} : { ipAddress: input.ipAddress }),
     })
     .onConflictDoUpdate({
       target: otpTokens.email,
@@ -48,7 +46,6 @@ async function replaceOtpToken(input: {
         lockedUntil: sql`case
           when ${otpTokens.lockedUntil} > ${now} then ${otpTokens.lockedUntil}
         end`,
-        ipAddress: input.ipAddress ?? null,
         createdAt: now,
       },
     });
@@ -138,8 +135,7 @@ async function deleteOtpToken(input: { email: string; tokenHash: string }): Prom
 /** Issues a token for `otp`, replacing any earlier one for the same address. */
 export async function createOtpToken(
   email: string,
-  otp: string,
-  ipAddress?: string
+  otp: string
 ): Promise<{ expiresAt: Date; tokenHash: string }> {
   const normalizedEmail = email.toLowerCase();
   const expiresAt = getOTPExpiration();
@@ -148,7 +144,6 @@ export async function createOtpToken(
     email: normalizedEmail,
     tokenHash,
     expiresAt,
-    ...(ipAddress === undefined ? {} : { ipAddress }),
   });
   logger.info({ subject: logIdentifier("email", normalizedEmail) }, "OTP token created");
   return { expiresAt, tokenHash };

@@ -164,7 +164,7 @@ describe("sendOTP use case", () => {
       host: "cashier.example",
     });
 
-    expect(createOTPTokenMock).toHaveBeenCalledWith("user@example.com", "123456", "203.0.113.2");
+    expect(createOTPTokenMock).toHaveBeenCalledWith("user@example.com", "123456");
     expect(otpEmailMock).toHaveBeenCalledWith({
       otp: "123456",
       host: "cashier.example",
