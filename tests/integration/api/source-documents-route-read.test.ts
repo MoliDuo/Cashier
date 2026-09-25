@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { POST } from "@/app/api/v1/source-documents/route";
 import { GET } from "@/app/api/v1/source-documents/[sourceDocumentId]/route";
 import { getTestDb } from "../../setup";
+import { flushAfterCallbacks } from "../../setup.common";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   ledgers,
@@ -149,6 +150,9 @@ describe("API v1 source-documents route", () => {
         body: JSON.stringify({ images: [{ data: image, mimeType: "image/jpeg" }] }),
       })
     ).then((response) => response.json());
+    // Let the parse the POST scheduled finish before rewriting its rows by hand;
+    // otherwise both sides take ledger row locks and can deadlock.
+    await flushAfterCallbacks();
     const db = getTestDb();
     await db.insert(ledgerEntries).values({
       ledgerId,
