@@ -7,6 +7,8 @@ coding style, test workflow, commit conventions, and pull request requirements.
 
 - Read `docs/architecture/coding-patterns.md` before changing module boundaries, server actions,
   server functions, or cross-module flows.
+- Read `docs/architecture/target-architecture.md` before changing the data model or restructuring a
+  module. Refactors move toward it; a change that departs from it updates that document first.
 - Preserve inward dependency direction. Keep routes and API handlers in `src/app/`, feature logic
   in `src/modules/`, cross-module background flows in `src/server/`, shared infrastructure in
   `src/lib/`, and database definitions and migrations in `src/persistence/`.

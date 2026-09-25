@@ -87,6 +87,7 @@ npm run dev
 - [参与开发](./CONTRIBUTING.md)
 - [运行时架构](./docs/architecture/runtime-model.md)
 - [架构与编码约定](./docs/architecture/coding-patterns.md)
+- [目标架构（总纲）](./docs/architecture/target-architecture.md)
 
 ## 本地开发
 

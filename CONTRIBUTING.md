@@ -57,6 +57,8 @@ Never commit `.env`, provider credentials, real receipts, API keys, or raw perso
 [Architecture and Coding Patterns](./docs/architecture/coding-patterns.md) describes the import
 boundaries, which `npm run check:architecture` enforces.
 [Testing Architecture](./docs/architecture/testing.md) covers test placement and isolation.
+[Target Architecture](./docs/architecture/target-architecture.md) is where the codebase is heading;
+read it before changing the data model or restructuring a module.
 
 ## Checks
 
