@@ -257,6 +257,9 @@ describe("settings concurrency invariants", () => {
   it("concurrent main-currency change and first createManual are serialised by the ledger lock", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db, "settings-race-create-manual");
+    // Resolved up front: awaiting it inside the array below would leave the
+    // settings update running with no handler attached until it returned.
+    const bookId = await testBookId(db, ledgerId);
 
     for (let i = 0; i < 5; i++) {
       // Run main-currency change and first entry creation concurrently on a fresh ledger.
@@ -274,7 +277,7 @@ describe("settings concurrency invariants", () => {
               description: null,
             },
           ],
-          bookId: await testBookId(getTestDb(), ledgerId),
+          bookId,
         }),
       ]);
 
