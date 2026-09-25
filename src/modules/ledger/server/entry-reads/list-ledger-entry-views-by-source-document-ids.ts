@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ledgerEntries } from "@/persistence";
 import {
@@ -29,7 +29,6 @@ export async function listLedgerEntryViewsBySourceDocumentIds({
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
-      isNull(ledgerEntries.deletedAt),
       inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds),
       buildLedgerEntryVisibilityCondition(ledgerId)
     ),

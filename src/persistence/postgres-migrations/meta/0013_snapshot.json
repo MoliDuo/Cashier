@@ -1,6 +1,6 @@
 {
-  "id": "2b350401-3e73-47c2-8d4d-f347115dec28",
-  "prevId": "18bcb825-1ea1-455e-808e-63b2e911094d",
+  "id": "4ba5db81-c43e-47c4-9c32-4f39f959860f",
+  "prevId": "2b350401-3e73-47c2-8d4d-f347115dec28",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -693,12 +693,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -858,12 +852,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -1455,12 +1443,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -2798,12 +2780,6 @@
         },
         "finalized_at": {
           "name": "finalized_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

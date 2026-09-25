@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
@@ -38,8 +38,7 @@ async function createFixture() {
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
-      eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-      isNull(ledgerEntries.deletedAt)
+      eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
     ),
     orderBy: (row, { asc }) => [asc(row.position)],
   });
@@ -78,12 +77,11 @@ async function activeEntryNames(ledgerId: string, sourceDocumentId: string) {
   const document = await db.query.sourceDocuments.findFirst({
     where: and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)),
   });
-  if (document == null || document.deletedAt != null) throw new Error("Live document expected");
+  if (document == null) throw new Error("Live document expected");
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
-      eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-      isNull(ledgerEntries.deletedAt)
+      eq(ledgerEntries.sourceDocumentId, sourceDocumentId)
     ),
     orderBy: (row, { asc }) => [asc(row.position)],
   });

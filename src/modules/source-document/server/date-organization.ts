@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
@@ -29,8 +29,7 @@ export async function dismissDateOrganization(
   const current = await db.query.sourceDocuments.findFirst({
     where: and(
       eq(sourceDocuments.ledgerId, input.ledgerId),
-      eq(sourceDocuments.id, input.sourceDocumentId),
-      isNull(sourceDocuments.deletedAt)
+      eq(sourceDocuments.id, input.sourceDocumentId)
     ),
     columns: { id: true },
   });
@@ -42,8 +41,7 @@ export async function dismissDateOrganization(
       and(
         eq(sourceDocuments.ledgerId, input.ledgerId),
         eq(sourceDocuments.id, input.sourceDocumentId),
-        sql`${sourceDocuments.dateOrganizationSuggestion}->>'id' = ${input.suggestionId}`,
-        isNull(sourceDocuments.deletedAt)
+        sql`${sourceDocuments.dateOrganizationSuggestion}->>'id' = ${input.suggestionId}`
       )
     );
   return { dismissed: true };
@@ -60,8 +58,7 @@ export async function applyDateOrganization(
     db.query.sourceDocuments.findFirst({
       where: and(
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.id, input.sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.id, input.sourceDocumentId)
       ),
     }),
   ]);
@@ -71,8 +68,7 @@ export async function applyDateOrganization(
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, input.ledgerId),
-      eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-      isNull(ledgerEntries.deletedAt)
+      eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
     ),
     orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
   });
@@ -138,8 +134,7 @@ export async function applyDateOrganization(
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
+        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
       ),
       columns: { id: true, position: true },
       orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],

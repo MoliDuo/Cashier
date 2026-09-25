@@ -72,7 +72,6 @@ function makeItem(id: string, overrides: Record<string, unknown> = {}) {
     metadata: {},
     createdAt: "2026-07-01T10:00:00.000Z",
     updatedAt: "2026-07-01T10:00:00.000Z",
-    deletedAt: null,
     hasImages: false,
     supportedActions: [],
     errorCode: null,
@@ -543,7 +542,6 @@ describe("useSourceDocumentStream", () => {
       exchangeRate: "1.000000",
       createdAt: "2026-07-01T10:00:00.000Z",
       updatedAt: "2026-07-01T10:00:00.000Z",
-      deletedAt: null,
       category: null,
     };
     listStreamPageActionMock.mockResolvedValue({

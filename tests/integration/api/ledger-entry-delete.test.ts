@@ -74,6 +74,6 @@ describe("Ledger Entry Delete Action", () => {
     const survivor = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, testEntryId),
     });
-    expect(survivor?.deletedAt).toBeNull();
+    expect(survivor).toBeDefined();
   });
 });

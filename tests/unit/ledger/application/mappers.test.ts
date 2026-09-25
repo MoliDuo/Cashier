@@ -19,7 +19,6 @@ describe("mapLedgerEntryDto", () => {
       exchangeRate: "1",
       createdAt: new Date("2026-03-19T12:00:00.000Z"),
       updatedAt: new Date("2026-03-19T12:00:00.000Z"),
-      deletedAt: null,
     };
 
     expect(() => mapLedgerEntryDto(entry)).toThrow("Active entry has no matching source document");
@@ -31,7 +30,6 @@ describe("mapLedgerEntryDto", () => {
       documentDate: null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
-      deletedAt: null,
     };
     const dto = mapLedgerEntryDto({ ...entry, sourceDocument });
     expect("category" in dto).toBe(false);

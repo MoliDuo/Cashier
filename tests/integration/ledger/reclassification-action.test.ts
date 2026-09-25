@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/reclassification";
 import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
@@ -128,7 +128,7 @@ describe("submitSelection", () => {
     const rows = await db
       .select({ id: ledgerEntries.id, categoryId: ledgerEntries.categoryId })
       .from(ledgerEntries)
-      .where(and(eq(ledgerEntries.ledgerId, ledger.id), isNull(ledgerEntries.deletedAt)));
+      .where(eq(ledgerEntries.ledgerId, ledger.id));
     expect(rows.every((row) => row.categoryId === food.id)).toBe(true);
   });
 
@@ -233,10 +233,7 @@ describe("submitSelection", () => {
       categoryId: null,
       count: 1,
     });
-    await db
-      .update(entryCategories)
-      .set({ deletedAt: new Date() })
-      .where(eq(entryCategories.id, home.id));
+    await db.delete(entryCategories).where(eq(entryCategories.id, home.id));
 
     await expect(
       submitSelection(ledger.id, {

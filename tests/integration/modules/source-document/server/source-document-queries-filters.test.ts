@@ -190,33 +190,4 @@ describe("source-document-queries", () => {
       }
     );
   });
-
-  it("excludes deleted rows from the stream", async () => {
-    const db = getTestDb();
-    const active = await db
-      .insert(sourceDocuments)
-      .values({
-        ledgerId,
-        documentDate: "2026-03-20",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-      })
-      .returning();
-    const deleted = await db
-      .insert(sourceDocuments)
-      .values({
-        ledgerId,
-        documentDate: "2026-03-19",
-        deletedAt: new Date(),
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-      })
-      .returning();
-    for (const doc of [...active, ...deleted]) {
-      await activateTestSourceDocumentProjection(db, doc.id);
-    }
-
-    const page = await listStreamPage(ledgerId, { limit: 10 });
-
-    expect(page.items.some((i) => i.id === deleted[0]!.id)).toBe(false);
-    expect(page.items.some((i) => i.id === active[0]!.id)).toBe(true);
-  });
 });

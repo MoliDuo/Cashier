@@ -57,7 +57,6 @@ function createCategory(overrides: Partial<EntryCategory> = {}): EntryCategory {
     sortOrder: 1,
     createdAt: "2026-03-23T00:00:00.000Z",
     updatedAt: "2026-03-23T00:00:00.000Z",
-    deletedAt: null,
     ...overrides,
   };
 }

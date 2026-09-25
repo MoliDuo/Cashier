@@ -20,7 +20,6 @@ const ledgerEntry: LedgerEntry = {
   exchangeRate: "1",
   createdAt: "2026-09-11T00:00:00.000Z",
   updatedAt: "2026-09-11T00:00:00.000Z",
-  deletedAt: null,
   sourceDocument: {
     id: "document-1",
     version: 1,

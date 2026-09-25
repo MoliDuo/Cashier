@@ -464,21 +464,4 @@ describe("getLedgerEntriesAction", () => {
     expect(midEntry).toBeDefined();
     expect(midEntry?.itemName).toBe("Mid");
   });
-
-  it("excludes soft-deleted entries", async () => {
-    const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
-    await db.insert(ledgerEntries).values({
-      id: randomUUID(),
-      ledgerId,
-      sourceDocumentId: doc.id,
-      itemName: "Deleted",
-      amount: "10.00",
-      currency: "CNY",
-      deletedAt: new Date(),
-    });
-
-    const result = await getTargetLedgerEntriesAction(ledgerId, {});
-    expect(result.items).toHaveLength(0);
-  });
 });

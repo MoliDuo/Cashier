@@ -88,7 +88,6 @@ function entry(id: string, sourceDocumentId = "document-1") {
     exchangeRate: "1",
     createdAt: "2026-09-04T00:00:00.000Z",
     updatedAt: "2026-09-04T00:00:00.000Z",
-    deletedAt: null,
     sourceDocument: {
       id: sourceDocumentId,
       version: 1,

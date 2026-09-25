@@ -12,7 +12,6 @@ const defaultCategory: EntryCategory = {
   sortOrder: 1,
   createdAt: "2024-01-01",
   updatedAt: "2024-01-01",
-  deletedAt: null,
 };
 
 function createEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
@@ -31,7 +30,6 @@ function createEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     sourceDocument: null,
     createdAt: "2024-01-01",
     updatedAt: "2024-01-01",
-    deletedAt: null,
     ...overrides,
   };
 }

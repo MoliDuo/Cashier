@@ -164,7 +164,7 @@ export async function createTestSourceDocument(
   ledgerId: string,
   overrides: Partial<{
     text: string;
-    status: "processing" | "completed" | "invalid" | "failed" | "cancelled" | "deleted";
+    status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
     imageUrls: string[];
     entryDate: string | null;
     title: string | null;
@@ -217,12 +217,6 @@ export async function createTestSourceDocument(
       .set({ latestSubmissionRevisionId: revision.id })
       .where(eq(schema.sourceDocuments.id, doc.id));
     await insertTestDocumentFiles(tx, doc, overrides.imageUrls ?? []);
-    if (status === "deleted") {
-      await tx
-        .update(schema.sourceDocuments)
-        .set({ deletedAt: new Date() })
-        .where(eq(schema.sourceDocuments.id, doc.id));
-    }
     return doc.id;
   });
 }
@@ -287,7 +281,7 @@ export async function activateTestSourceDocumentProjection(
       FROM (
         SELECT id, (row_number() OVER (ORDER BY created_at, position, ctid) - 1)::integer AS position
         FROM ledger_entries
-        WHERE source_document_id = ${sourceDocumentId} AND deleted_at IS NULL
+        WHERE source_document_id = ${sourceDocumentId}
       ) AS ordered
       WHERE entry.id = ordered.id AND entry.position <> ordered.position
     `);

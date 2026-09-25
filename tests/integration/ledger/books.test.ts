@@ -154,7 +154,7 @@ describe("books", () => {
       status: "has_credentials",
     });
 
-    // A soft-deleted record still points at the book, so it blocks a delete too.
+    // A record points at the book, so it blocks a delete too.
     const holding = await createBook(ledgerId, {
       name: "有记录的",
       timeZone: null,
@@ -162,7 +162,7 @@ describe("books", () => {
     await createTestSourceDocument(db, ledgerId);
     await db
       .update(sourceDocuments)
-      .set({ bookId: holding.id, deletedAt: new Date() })
+      .set({ bookId: holding.id })
       .where(eq(sourceDocuments.ledgerId, ledgerId));
     expect(await deleteBook(ledgerId, holding.id)).toEqual({
       status: "has_records",

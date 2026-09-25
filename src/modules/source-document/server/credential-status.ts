@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
 import { ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
@@ -42,7 +42,6 @@ export async function getCredentialSourceDocumentStatus(
           LEFT JOIN entry_categories category ON category.id = entry.category_id
           WHERE entry.source_document_id = ${sourceDocuments.id}
             AND entry.ledger_id = ${ledgerId}
-            AND entry.deleted_at IS NULL
         ), '[]'::jsonb)`,
     })
     .from(sourceDocuments)
@@ -55,13 +54,7 @@ export async function getCredentialSourceDocumentStatus(
       )
     )
     .innerJoin(ledgers, eq(ledgers.id, sourceDocuments.ledgerId))
-    .where(
-      and(
-        eq(sourceDocuments.id, sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt)
-      )
-    )
+    .where(and(eq(sourceDocuments.id, sourceDocumentId), eq(sourceDocuments.ledgerId, ledgerId)))
     .limit(1);
   const row = rows[0];
   if (row == null) return null;

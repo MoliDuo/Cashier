@@ -59,12 +59,6 @@ describe("ledger source-document linkage", () => {
         itemName: "first entry",
       }),
       createLedgerEntryData(ledgerId, {
-        sourceDocumentId: firstDoc.id,
-        categoryId: category.id,
-        itemName: "deleted entry",
-        deletedAt: new Date(),
-      } as never),
-      createLedgerEntryData(ledgerId, {
         sourceDocumentId: secondDoc.id,
         categoryId: category.id,
         itemName: "second entry",

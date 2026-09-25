@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
@@ -28,8 +28,7 @@ async function submitInTransaction(
       .where(
         and(
           eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, input.sourceDocumentId),
-          isNull(sourceDocuments.deletedAt)
+          eq(sourceDocuments.id, input.sourceDocumentId)
         )
       )
       .for("update")

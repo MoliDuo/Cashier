@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
@@ -15,15 +15,13 @@ export async function getBatchEntryDateImpact(input: {
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, input.ledgerId)
       )
     )
     .where(
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.id, input.ledgerEntryIds),
-        isNull(ledgerEntries.deletedAt)
+        inArray(ledgerEntries.id, input.ledgerEntryIds)
       )
     );
   const sourceDocumentIds = [
@@ -46,15 +44,11 @@ export async function getBatchEntryDateImpact(input: {
   const affected = await db
     .select({ id: ledgerEntries.id })
     .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(eq(sourceDocuments.id, ledgerEntries.sourceDocumentId), isNull(sourceDocuments.deletedAt))
-    )
+    .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
     .where(
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds),
-        isNull(ledgerEntries.deletedAt)
+        inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds)
       )
     );
 

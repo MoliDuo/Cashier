@@ -64,7 +64,7 @@ async function newLedger() {
 async function readDocument(sourceDocumentId: string) {
   const row = await getTestDb().query.sourceDocuments.findFirst({
     where: eq(sourceDocuments.id, sourceDocumentId),
-    columns: { version: true, title: true, bookId: true, deletedAt: true },
+    columns: { version: true, title: true, bookId: true },
   });
   if (row == null) throw new Error("Source document not found");
   return row;
@@ -96,8 +96,7 @@ async function createActiveDocument(ledgerId: string, count = 1) {
     })),
   });
   const entries = await getTestDb().query.ledgerEntries.findMany({
-    where: (row, { eq: eqOp, and, isNull }) =>
-      and(eqOp(row.sourceDocumentId, created.sourceDocumentId), isNull(row.deletedAt)),
+    where: (row, { eq: eqOp, and }) => and(eqOp(row.sourceDocumentId, created.sourceDocumentId)),
     orderBy: (row, { asc }) => [asc(row.position)],
   });
   return { sourceDocumentId: created.sourceDocumentId, entryIds: entries.map((row) => row.id) };

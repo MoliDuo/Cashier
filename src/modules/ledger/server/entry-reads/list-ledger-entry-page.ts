@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { mapLedgerEntryDto } from "./mappers";
@@ -39,10 +39,7 @@ export async function listLedgerEntryPage({
 }: ListLedgerEntryPageInput) {
   return db.transaction(
     async (tx) => {
-      const tenantCondition = and(
-        eq(ledgerEntries.ledgerId, ledgerId),
-        isNull(ledgerEntries.deletedAt)
-      );
+      const tenantCondition = and(eq(ledgerEntries.ledgerId, ledgerId));
       const cursorCondition = buildLedgerEntryCursorCondition(cursor, ledgerId, filters, {
         effectiveDate: sql`documents.effective_date`,
         documentCreatedAt: sql`documents.created_at`,
@@ -74,7 +71,6 @@ export async function listLedgerEntryPage({
       INNER JOIN source_documents documents
         ON documents.ledger_id = ledger_entries.ledger_id
        AND documents.id = ledger_entries.source_document_id
-       AND documents.deleted_at IS NULL
        ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     )
@@ -118,7 +114,6 @@ export async function listLedgerEntryPage({
               .findMany({
                 where: and(
                   eq(ledgerEntries.ledgerId, ledgerId),
-                  isNull(ledgerEntries.deletedAt),
                   inArray(
                     ledgerEntries.id,
                     pagedRows.map((row) => row.id)
@@ -127,7 +122,6 @@ export async function listLedgerEntryPage({
                 SELECT 1 FROM source_documents active_documents
                 WHERE active_documents.ledger_id = ${ledgerEntries.ledgerId}
                   AND active_documents.id = ${ledgerEntries.sourceDocumentId}
-                  AND active_documents.deleted_at IS NULL
               )`
                 ),
                 with: {
@@ -141,7 +135,6 @@ export async function listLedgerEntryPage({
                       documentDate: true,
                       createdAt: true,
                       updatedAt: true,
-                      deletedAt: true,
                     },
                   },
                 },

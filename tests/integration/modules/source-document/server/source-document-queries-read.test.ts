@@ -1,7 +1,4 @@
-import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
-import { sourceDocuments } from "@/persistence";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
@@ -32,26 +29,5 @@ describe("source-document full query", () => {
     });
     expect(existing).not.toHaveProperty("imageUrls");
     expect(await getSourceDocumentInput(ledgerId, crypto.randomUUID())).toBeNull();
-  });
-
-  it("hides soft-deleted documents", async () => {
-    const db = getTestDb();
-    const [deletedDocument] = await db
-      .insert(sourceDocuments)
-      .values({
-        ledgerId,
-        deletedAt: new Date(),
-        documentDate: "2026-03-22",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-      })
-      .returning();
-
-    expect(deletedDocument).toBeDefined();
-    expect(await getSourceDocumentInput(ledgerId, deletedDocument!.id)).toBeNull();
-
-    const stored = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, deletedDocument!.id),
-    });
-    expect(stored?.deletedAt).not.toBeNull();
   });
 });

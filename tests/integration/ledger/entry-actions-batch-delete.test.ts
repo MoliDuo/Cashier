@@ -4,7 +4,7 @@ import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, sourceDocumentRevisions } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { batchDeleteLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import {
@@ -84,7 +84,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     expect(afterRevisionCount).toHaveLength(beforeRevisionCount.length);
 
     const activeEntries = await db.query.ledgerEntries.findMany({
-      where: and(eq(ledgerEntries.sourceDocumentId, doc.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.sourceDocumentId, doc.id),
     });
     expect(activeEntries).toHaveLength(1);
     expect(activeEntries[0]?.itemName).toBe("Item 2");
@@ -127,7 +127,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
       entries.map((entry) => entry.id).sort()
     );
     const remaining = await db.query.ledgerEntries.findMany({
-      where: and(eq(ledgerEntries.sourceDocumentId, doc!.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.sourceDocumentId, doc!.id),
     });
     expect(remaining).toEqual([]);
   });
@@ -216,7 +216,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     // Zero writes: the document's version and entries are untouched.
     expect(document?.version).toBe(1);
     const activeEntries = await db.query.ledgerEntries.findMany({
-      where: and(eq(ledgerEntries.sourceDocumentId, doc.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.sourceDocumentId, doc.id),
     });
     expect(activeEntries.map((entry) => entry.id).sort()).toEqual(
       entries.map((entry) => entry.id).sort()

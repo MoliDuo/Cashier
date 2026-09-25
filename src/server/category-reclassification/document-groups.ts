@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   entryCategories,
@@ -43,16 +43,14 @@ export async function loadReclassificationDocumentGroups(input: {
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, input.ledgerId)
       )
     )
     .leftJoin(
       entryCategories,
       and(
         eq(entryCategories.id, ledgerEntries.categoryId),
-        eq(entryCategories.ledgerId, input.ledgerId),
-        isNull(entryCategories.deletedAt)
+        eq(entryCategories.ledgerId, input.ledgerId)
       )
     )
     // The file join is a LEFT join on purpose: a text-only record has no
@@ -69,8 +67,7 @@ export async function loadReclassificationDocumentGroups(input: {
     .where(
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.id, input.ledgerEntryIds),
-        isNull(ledgerEntries.deletedAt)
+        inArray(ledgerEntries.id, input.ledgerEntryIds)
       )
     )
     .orderBy(ledgerEntries.position, ledgerEntries.id, sourceDocumentFiles.position);

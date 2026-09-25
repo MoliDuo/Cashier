@@ -44,7 +44,6 @@ function makeEntry(
     exchangeRate: "1.000000",
     createdAt: "2026-08-05T00:00:00.000Z",
     updatedAt: "2026-08-05T00:00:00.000Z",
-    deletedAt: null,
     category: null,
     ...overrides,
   };

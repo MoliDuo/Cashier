@@ -237,7 +237,6 @@ describe("SourceDocumentViewDetails selection", () => {
       description: null,
       convertedAmount: "12.00",
       exchangeRate: "1",
-      deletedAt: null,
       createdAt: "2026-07-28T00:00:00.000Z",
       updatedAt: "2026-07-28T00:00:00.000Z",
     };
@@ -277,7 +276,6 @@ describe("SourceDocumentViewDetails selection", () => {
       description: null,
       convertedAmount: "12.00",
       exchangeRate: "1",
-      deletedAt: null,
       createdAt: "2026-07-28T00:00:00.000Z",
       updatedAt: "2026-07-28T00:00:00.000Z",
     };
@@ -336,7 +334,6 @@ describe("SourceDocumentViewDetails entry row outline", () => {
     description: null,
     convertedAmount: "12.00",
     exchangeRate: "1",
-    deletedAt: null,
     createdAt: "2026-07-28T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",
   });

@@ -38,7 +38,6 @@ export async function claimProcessingJob(
         ON document.ledger_id = revision.ledger_id
        AND document.id = revision.source_document_id
        AND document.latest_submission_revision_id = revision.id
-       AND document.deleted_at IS NULL
       WHERE revision.id = ${revisionId}
         AND revision.processing_status = 'processing'
         AND revision.next_available_at <= clock_timestamp()
@@ -93,7 +92,6 @@ export async function recoverProcessingJobs(
       ON document.ledger_id = revision.ledger_id
      AND document.id = revision.source_document_id
      AND document.latest_submission_revision_id = revision.id
-     AND document.deleted_at IS NULL
     WHERE revision.ledger_id = ${ledgerId}
       AND revision.processing_status = 'processing'
       AND revision.next_available_at <= clock_timestamp()

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, exists, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, exists, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
 import { ledgers, sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
@@ -21,8 +21,7 @@ function referencedByLiveDocument() {
     .where(
       and(
         eq(sourceDocumentFiles.ledgerId, storedFiles.ledgerId),
-        eq(sourceDocumentFiles.storedFileId, storedFiles.id),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocumentFiles.storedFileId, storedFiles.id)
       )
     );
   return exists(byDocument);

@@ -1,6 +1,6 @@
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { createPendingRevision } from "tests/helpers/processing-revision";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import {
@@ -275,13 +275,10 @@ describe("target upper workflows", () => {
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
     const targetLinks = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
       orderBy: (entries, { asc }) => [asc(entries.position)],
     });
-    expect(afterRollback).toMatchObject({ itemName: "Meal", deletedAt: null });
+    expect(afterRollback).toMatchObject({ itemName: "Meal" });
     expect(activeDocument?.version).toBe(1);
     expect(new Set(targetLinks.map((link) => link.id))).toEqual(new Set(ids));
   });
@@ -358,10 +355,7 @@ describe("target upper workflows", () => {
       bookId: await testBookId(db, ledgerId),
     });
     const original = await db.query.ledgerEntries.findFirst({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
     });
     const initialVersion = await currentVersion(created.sourceDocumentId);
 
@@ -378,7 +372,7 @@ describe("target upper workflows", () => {
       where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
     });
     const active = await db.query.ledgerEntries.findFirst({
-      where: and(eq(ledgerEntries.id, original!.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.id, original!.id),
     });
     const retained = await db.query.ledgerEntries.findMany({
       where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
@@ -389,7 +383,6 @@ describe("target upper workflows", () => {
     expect(revisions).toHaveLength(0);
     expect(active).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(retained).toHaveLength(1);
-    expect(retained[0]?.deletedAt).toBeNull();
   });
 
   it("mutates parsed entries in place with rollback and read consistency", async () => {
@@ -418,10 +411,7 @@ describe("target upper workflows", () => {
       entries: [entry],
     });
     const original = await db.query.ledgerEntries.findFirst({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, pending.document.id),
-        isNull(ledgerEntries.deletedAt)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, pending.document.id)),
     });
 
     await batchUpdateLedgerEntries({

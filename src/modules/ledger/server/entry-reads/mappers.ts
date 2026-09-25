@@ -8,9 +8,8 @@ import type {
   SourceDocumentReferenceDto,
 } from "@/modules/ledger/contracts";
 
-type DateFields = { createdAt: Date; updatedAt: Date; deletedAt: Date | null };
-type EntryCategoryRow = Omit<EntryCategoryDto, "createdAt" | "updatedAt" | "deletedAt"> &
-  DateFields;
+type DateFields = { createdAt: Date; updatedAt: Date };
+type EntryCategoryRow = Omit<EntryCategoryDto, "createdAt" | "updatedAt"> & DateFields;
 type SourceDocumentRow = Pick<
   SourceDocumentReferenceDto,
   "id" | "ledgerId" | "title" | "documentDate"
@@ -20,7 +19,7 @@ type SourceDocumentRow = Pick<
   };
 type LedgerEntryRow = Omit<
   LedgerEntryDto,
-  "createdAt" | "updatedAt" | "deletedAt" | "category" | "sourceDocument" | "sourceDocumentId"
+  "createdAt" | "updatedAt" | "category" | "sourceDocument" | "sourceDocumentId"
 > &
   DateFields & { sourceDocumentId: string | null };
 
@@ -43,21 +42,13 @@ function mapEntryCategoryDto(category: EntryCategoryRow): EntryCategoryDto {
     sortOrder: category.sortOrder,
     createdAt: toIso(category.createdAt)!,
     updatedAt: toIso(category.updatedAt)!,
-    deletedAt: toIso(category.deletedAt),
   };
 }
 
 function mapSourceDocumentReferenceDto(
   doc: Pick<
     SourceDocumentRow,
-    | "id"
-    | "version"
-    | "ledgerId"
-    | "title"
-    | "documentDate"
-    | "createdAt"
-    | "updatedAt"
-    | "deletedAt"
+    "id" | "version" | "ledgerId" | "title" | "documentDate" | "createdAt" | "updatedAt"
   >
 ): SourceDocumentReferenceDto {
   return {
@@ -87,7 +78,6 @@ export function mapLedgerEntryEmbeddedViewDto(
     | "exchangeRate"
     | "createdAt"
     | "updatedAt"
-    | "deletedAt"
   > & {
     category?: EntryCategoryRow | null;
   }
@@ -108,7 +98,6 @@ export function mapLedgerEntryEmbeddedViewDto(
     exchangeRate: mapExchangeRate(entry.exchangeRate),
     createdAt: toIso(entry.createdAt)!,
     updatedAt: toIso(entry.updatedAt)!,
-    deletedAt: toIso(entry.deletedAt),
     ...(entry.category ? { category: mapEntryCategoryDto(entry.category) } : {}),
   };
 }
@@ -128,7 +117,6 @@ export function mapLedgerEntryDto(
     | "exchangeRate"
     | "createdAt"
     | "updatedAt"
-    | "deletedAt"
   > & {
     category?: EntryCategoryRow | null;
     sourceDocument?: SourceDocumentRow | null;

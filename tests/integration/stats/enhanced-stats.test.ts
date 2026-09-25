@@ -192,7 +192,7 @@ describe("Enhanced Stats Actions", () => {
       expect(januaryPoint.total).toBe("100");
     });
 
-    it("keeps ledger/date/deleted constraints inside SQL for entry fetches", async () => {
+    it("keeps ledger/date constraints inside SQL for entry fetches", async () => {
       const db = getTestDb();
       const createdDoc = await db
         .insert(sourceDocuments)
@@ -228,9 +228,7 @@ describe("Enhanced Stats Actions", () => {
       expect(entryQueries).toHaveLength(1);
       const query = entryQueries[0]!;
       expect(query).toContain("entries.ledger_id = documents.ledger_id");
-      expect(query).toContain("entries.deleted_at is null");
       expect(query).toContain("documents.ledger_id = $");
-      expect(query).toContain("documents.deleted_at is null");
       expect(query).toContain(
         "documents.effective_date between ranges.from_date and ranges.to_date"
       );
@@ -494,46 +492,6 @@ describe("Enhanced Stats Actions", () => {
 
       // Daily average = Total / Days in range = 300 / 31
       expect(result.summary.dailyAverage).toBeCloseTo(300 / 31, 2);
-    });
-
-    it("should exclude deleted entries", async () => {
-      const db = getTestDb();
-
-      const createdDoc = await db
-        .insert(sourceDocuments)
-        .values({
-          ledgerId: testLedgerId,
-          documentDate: "2024-03-01",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${testLedgerId} ORDER BY sort_order LIMIT 1)`,
-        })
-        .returning();
-      const doc = requireFirst(createdDoc, "source document");
-
-      await db.insert(ledgerEntries).values({
-        ledgerId: testLedgerId,
-        sourceDocumentId: doc.id,
-        amount: "100",
-        currency: "CNY",
-        itemName: "Active Item",
-        categoryId: testCategoryId,
-      });
-
-      await db.insert(ledgerEntries).values({
-        ledgerId: testLedgerId,
-        sourceDocumentId: doc.id,
-        amount: "200",
-        currency: "CNY",
-        itemName: "Deleted Item",
-        categoryId: testCategoryId,
-        deletedAt: new Date(),
-      });
-
-      const result = await getTargetEnhancedStats({
-        queryRange: { from: "2024-03-01", to: "2024-03-31" },
-        compareRange: { from: "2024-02-01", to: "2024-02-29" },
-      });
-
-      expect(result.summary.total).toBe("100");
     });
 
     it("should generate correct heatmap data", async () => {

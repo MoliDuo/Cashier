@@ -34,7 +34,6 @@ function mapCategory(row: typeof entryCategories.$inferSelect): EntryCategoryDto
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    deletedAt: null,
   };
 }
 
@@ -70,7 +69,7 @@ export async function listCategories(ledgerId: string): Promise<EntryCategoryDto
   const rows = await db
     .select()
     .from(entryCategories)
-    .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+    .where(eq(entryCategories.ledgerId, ledgerId))
     .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
   return rows.map(mapCategory);
 }
@@ -80,11 +79,7 @@ export async function getCategory(
   categoryId: string
 ): Promise<EntryCategoryDto | null> {
   const row = await db.query.entryCategories.findFirst({
-    where: and(
-      eq(entryCategories.ledgerId, ledgerId),
-      eq(entryCategories.id, categoryId),
-      isNull(entryCategories.deletedAt)
-    ),
+    where: and(eq(entryCategories.ledgerId, ledgerId), eq(entryCategories.id, categoryId)),
   });
   return row == null ? null : mapCategory(row);
 }
@@ -109,21 +104,16 @@ export async function listCategoriesWithCount(
     .from(entryCategories)
     .leftJoin(
       ledgerEntries,
-      and(
-        eq(ledgerEntries.ledgerId, ledgerId),
-        eq(ledgerEntries.categoryId, entryCategories.id),
-        isNull(ledgerEntries.deletedAt)
-      )
+      and(eq(ledgerEntries.ledgerId, ledgerId), eq(ledgerEntries.categoryId, entryCategories.id))
     )
     .leftJoin(
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, ledgerId)
       )
     )
-    .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+    .where(eq(entryCategories.ledgerId, ledgerId))
     .groupBy(entryCategories.id)
     .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
   return rows.map(({ category, entryCount }) => ({
@@ -150,13 +140,7 @@ export async function updateMissingCategoryMetadata(
         description: entryCategories.description,
       })
       .from(entryCategories)
-      .where(
-        and(
-          eq(entryCategories.id, categoryId),
-          eq(entryCategories.ledgerId, ledgerId),
-          isNull(entryCategories.deletedAt)
-        )
-      )
+      .where(and(eq(entryCategories.id, categoryId), eq(entryCategories.ledgerId, ledgerId)))
       .for("update")
       .then((rows) => rows[0]);
     if (category == null) {
@@ -178,13 +162,7 @@ export async function updateMissingCategoryMetadata(
         ...(wroteDescription ? { description: input.description } : {}),
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(entryCategories.id, categoryId),
-          eq(entryCategories.ledgerId, ledgerId),
-          isNull(entryCategories.deletedAt)
-        )
-      );
+      .where(and(eq(entryCategories.id, categoryId), eq(entryCategories.ledgerId, ledgerId)));
     return { status: "updated" as const, wroteIcon, wroteDescription };
   });
 }
@@ -200,7 +178,7 @@ export async function saveEntryCategories(
     const current = await tx
       .select()
       .from(entryCategories)
-      .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+      .where(eq(entryCategories.ledgerId, ledgerId))
       .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id)
       .for("update");
     const actualRevision = await computeCategoryCollectionRevision(current);
@@ -241,16 +219,11 @@ export async function saveEntryCategories(
           sourceDocuments,
           and(
             eq(sourceDocuments.ledgerId, ledgerId),
-            eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            isNull(sourceDocuments.deletedAt)
+            eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
           )
         )
         .where(
-          and(
-            eq(ledgerEntries.ledgerId, ledgerId),
-            inArray(ledgerEntries.categoryId, removedIds),
-            isNull(ledgerEntries.deletedAt)
-          )
+          and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.categoryId, removedIds))
         )
         .then((rows) => rows.map((row) => row.id).sort());
       const documents = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
@@ -259,20 +232,12 @@ export async function saveEntryCategories(
         .update(ledgerEntries)
         .set({ categoryId: null, updatedAt: now })
         .where(
-          and(
-            eq(ledgerEntries.ledgerId, ledgerId),
-            inArray(ledgerEntries.categoryId, removedIds),
-            isNull(ledgerEntries.deletedAt)
-          )
+          and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.categoryId, removedIds))
         );
       await tx
         .delete(entryCategories)
         .where(
-          and(
-            eq(entryCategories.ledgerId, ledgerId),
-            inArray(entryCategories.id, removedIds),
-            isNull(entryCategories.deletedAt)
-          )
+          and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, removedIds))
         );
     }
 
@@ -311,7 +276,6 @@ export async function saveEntryCategories(
         FROM changes
         WHERE category.id = changes.id
           AND category.ledger_id = ${ledgerId}
-          AND category.deleted_at IS NULL
         RETURNING category.id
       `);
       if (updated.rows.length !== existingTargets.length) {
@@ -339,13 +303,7 @@ export async function saveEntryCategories(
     const saved = await tx
       .select()
       .from(entryCategories)
-      .where(
-        and(
-          eq(entryCategories.ledgerId, ledgerId),
-          inArray(entryCategories.id, savedIds),
-          isNull(entryCategories.deletedAt)
-        )
-      )
+      .where(and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, savedIds)))
       .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
     if (saved.length !== savedIds.length) {
       throw new ConflictError("Category save changed during update");
@@ -386,7 +344,7 @@ export async function applyCategoryPreset(
     const current = await tx
       .select()
       .from(entryCategories)
-      .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+      .where(eq(entryCategories.ledgerId, ledgerId))
       .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id)
       .for("update");
     const actualRevision = await computeCategoryCollectionRevision(current);
@@ -445,15 +403,13 @@ export async function applyCategoryPreset(
               sourceDocuments,
               and(
                 eq(sourceDocuments.ledgerId, ledgerId),
-                eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-                isNull(sourceDocuments.deletedAt)
+                eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
               )
             )
             .where(
               and(
                 eq(ledgerEntries.ledgerId, ledgerId),
-                inArray(ledgerEntries.categoryId, migratedIds),
-                isNull(ledgerEntries.deletedAt)
+                inArray(ledgerEntries.categoryId, migratedIds)
               )
             )
             .then((rows) => rows.map((row) => row.id).sort());
@@ -472,26 +428,20 @@ export async function applyCategoryPreset(
               sourceDocuments,
               and(
                 eq(sourceDocuments.ledgerId, ledgerId),
-                eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-                isNull(sourceDocuments.deletedAt)
+                eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
               )
             )
             .where(
               and(
                 eq(ledgerEntries.ledgerId, ledgerId),
-                inArray(ledgerEntries.categoryId, migratedIds),
-                isNull(ledgerEntries.deletedAt)
+                inArray(ledgerEntries.categoryId, migratedIds)
               )
             );
     if (migratedIds.length > 0) {
       await tx
         .delete(entryCategories)
         .where(
-          and(
-            eq(entryCategories.ledgerId, ledgerId),
-            inArray(entryCategories.id, migratedIds),
-            isNull(entryCategories.deletedAt)
-          )
+          and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, migratedIds))
         );
     }
 
@@ -590,7 +540,6 @@ export async function applyCategoryPreset(
       FROM ordering
       WHERE category.id = ordering.id
         AND category.ledger_id = ${ledgerId}
-        AND category.deleted_at IS NULL
         AND category.sort_order IS DISTINCT FROM ordering.sort_order
     `);
 
@@ -602,21 +551,16 @@ export async function applyCategoryPreset(
       .from(entryCategories)
       .leftJoin(
         ledgerEntries,
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.categoryId, entryCategories.id),
-          isNull(ledgerEntries.deletedAt)
-        )
+        and(eq(ledgerEntries.ledgerId, ledgerId), eq(ledgerEntries.categoryId, entryCategories.id))
       )
       .leftJoin(
         sourceDocuments,
         and(
           eq(sourceDocuments.ledgerId, ledgerId),
-          eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-          isNull(sourceDocuments.deletedAt)
+          eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
         )
       )
-      .where(and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)))
+      .where(eq(entryCategories.ledgerId, ledgerId))
       .groupBy(entryCategories.id)
       .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
     const orderingChanged = [...orderById].some(
@@ -647,17 +591,10 @@ export async function countUncategorizedEntries(ledgerId: string): Promise<numbe
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, ledgerId)
       )
     )
-    .where(
-      and(
-        eq(ledgerEntries.ledgerId, ledgerId),
-        isNull(ledgerEntries.categoryId),
-        isNull(ledgerEntries.deletedAt)
-      )
-    )
+    .where(and(eq(ledgerEntries.ledgerId, ledgerId), isNull(ledgerEntries.categoryId)))
     .then((rows) => rows[0]);
   return Number(row?.count ?? 0);
 }

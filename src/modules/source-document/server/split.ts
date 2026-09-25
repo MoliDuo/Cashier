@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
@@ -31,8 +31,7 @@ export async function splitSourceDocumentAtomically(input: {
     db.query.sourceDocuments.findFirst({
       where: and(
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.id, input.sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.id, input.sourceDocumentId)
       ),
     }),
   ]);
@@ -40,8 +39,7 @@ export async function splitSourceDocumentAtomically(input: {
   const initialEntries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, input.ledgerId),
-      eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-      isNull(ledgerEntries.deletedAt)
+      eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
     ),
     orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
   });
@@ -84,8 +82,7 @@ export async function splitSourceDocumentAtomically(input: {
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
+        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
       ),
       orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
     });
@@ -141,7 +138,6 @@ export async function splitSourceDocumentAtomically(input: {
       FROM patches
       WHERE entry.id = patches.id
         AND entry.ledger_id = ${input.ledgerId}
-        AND entry.deleted_at IS NULL
       RETURNING entry.id
     `);
     if (updatedEntries.rows.length !== currentEntries.length) {

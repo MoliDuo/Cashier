@@ -35,7 +35,6 @@ const category: EntryCategoryWithCount = {
   sortOrder: 0,
   createdAt: "2026-08-07T00:00:00.000Z",
   updatedAt: "2026-08-07T00:00:00.000Z",
-  deletedAt: null,
   entryCount: 3,
 };
 

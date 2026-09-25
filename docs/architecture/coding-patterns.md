@@ -41,8 +41,8 @@ with `vi.mock` of the concrete module rather than injected fakes.
 
 ## Data access
 
-- Scope tenant data by `ledgerId` in SQL. Deletes remove rows and no tombstones remain; the
-  leftover `deleted_at IS NULL` predicates match every row and go when the column does.
+- Scope tenant data by `ledgerId` in SQL. Deletes remove rows, so reads need no soft-delete
+  predicate. Service credentials are the exception: their `deleted_at` marks a revoked key.
 - Prefer set-based statements (`UPDATE FROM`, CTEs, and `unnest`) to per-row queries.
 - Keep keyset ordering and cursor fields identical. A cursor includes a fingerprint of its query.
 - Convert amounts at read time with the `convert_amount` SQL function (the only conversion

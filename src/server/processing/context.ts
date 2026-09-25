@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type {
   RevisionProcessingContextContract,
   RevisionProcessingRequestContract,
@@ -30,8 +30,7 @@ export async function loadRevisionProcessingContext(
         sourceDocuments,
         and(
           eq(sourceDocuments.ledgerId, sourceDocumentRevisions.ledgerId),
-          eq(sourceDocuments.id, sourceDocumentRevisions.sourceDocumentId),
-          isNull(sourceDocuments.deletedAt)
+          eq(sourceDocuments.id, sourceDocumentRevisions.sourceDocumentId)
         )
       )
       .where(
@@ -61,7 +60,7 @@ export async function loadRevisionProcessingContext(
         description: entryCategories.description,
       })
       .from(entryCategories)
-      .where(and(eq(entryCategories.ledgerId, request.ledgerId), isNull(entryCategories.deletedAt)))
+      .where(eq(entryCategories.ledgerId, request.ledgerId))
       .orderBy(
         asc(entryCategories.sortOrder),
         asc(entryCategories.createdAt),

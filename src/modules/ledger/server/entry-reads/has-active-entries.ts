@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 
@@ -10,11 +10,10 @@ export async function hasActiveLedgerEntries(ledgerId: string): Promise<boolean>
       sourceDocuments,
       and(
         eq(sourceDocuments.ledgerId, ledgerId),
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
       )
     )
-    .where(and(eq(ledgerEntries.ledgerId, ledgerId), isNull(ledgerEntries.deletedAt)))
+    .where(eq(ledgerEntries.ledgerId, ledgerId))
     .limit(1)
     .then((rows) => rows[0]);
   return row != null;

@@ -80,10 +80,7 @@ export function buildLedgerEntryFilterConditions(
   ledgerId: string,
   filters: LedgerEntryFilterParams
 ): SQL<unknown>[] {
-  const conditions: SQL<unknown>[] = [
-    eq(ledgerEntries.ledgerId, ledgerId),
-    isNull(ledgerEntries.deletedAt),
-  ];
+  const conditions: SQL<unknown>[] = [eq(ledgerEntries.ledgerId, ledgerId)];
 
   const sourceDocumentDateRange: { startDate?: string | null; endDate?: string | null } = {};
   if (filters.startDate !== undefined) {

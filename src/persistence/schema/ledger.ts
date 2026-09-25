@@ -117,7 +117,6 @@ export const entryCategories = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("uq_entry_categories_ledger_id_id").on(table.ledgerId, table.id),
@@ -156,7 +155,6 @@ export const ledgerEntries = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("uq_ledger_entries_ledger_id_id").on(table.ledgerId, table.id),

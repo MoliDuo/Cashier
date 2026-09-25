@@ -42,7 +42,6 @@ export async function getLedgerRefreshBaseline(
            AND revision.source_document_id = document.id
            AND revision.id = document.latest_submission_revision_id
           WHERE document.ledger_id = ${ledgerId}
-            AND document.deleted_at IS NULL
             AND revision.processing_status = 'processing'
         ) AS "hasTransitionalWork"
     `);
@@ -78,7 +77,6 @@ export async function summarizeLedgerChanges({
            AND revision.source_document_id = document.id
            AND revision.id = document.latest_submission_revision_id
           WHERE document.ledger_id = ${ledgerId}
-            AND document.deleted_at IS NULL
             AND revision.processing_status = 'processing'
         ) AS "hasTransitionalWork"
       FROM (SELECT 1) baseline

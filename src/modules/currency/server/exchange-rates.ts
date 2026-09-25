@@ -248,8 +248,7 @@ export async function refreshExchangeRates(now = new Date()): Promise<void> {
   const wanted = await db.execute<{ rate_date: string }>(sql`
     SELECT DISTINCT documents.effective_date::text AS rate_date
     FROM source_documents documents
-    WHERE documents.deleted_at IS NULL
-      AND documents.effective_date <= ${today}::date
+    WHERE documents.effective_date <= ${today}::date
       AND NOT EXISTS (
         SELECT 1 FROM exchange_rates rates
         WHERE rates.rate_date = documents.effective_date AND rates.currency = 'EUR'

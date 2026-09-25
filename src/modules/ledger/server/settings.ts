@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { ledgers, sourceDocuments } from "@/persistence";
@@ -129,7 +129,7 @@ async function ensureExchangeRatesForLedger(ledgerId: string): Promise<void> {
   const rows = await db
     .selectDistinct({ effectiveDate: sourceDocuments.effectiveDate })
     .from(sourceDocuments)
-    .where(and(eq(sourceDocuments.ledgerId, ledgerId), isNull(sourceDocuments.deletedAt)));
+    .where(eq(sourceDocuments.ledgerId, ledgerId));
   await ensureExchangeRates(rows.map((row) => row.effectiveDate));
 }
 

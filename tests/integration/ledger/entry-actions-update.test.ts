@@ -56,7 +56,6 @@ describe("single-entry update", () => {
       where: eq(ledgerEntries.id, entryId),
     });
     expect(entry?.itemName).toBe("Dinner");
-    expect(entry?.deletedAt).toBeNull();
     const document = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });

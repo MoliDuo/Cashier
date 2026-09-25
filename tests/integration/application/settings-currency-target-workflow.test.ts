@@ -1,6 +1,6 @@
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import { sql } from "drizzle-orm";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
@@ -113,28 +113,21 @@ describe("target Settings currency workflow", () => {
     expect(await hasActiveLedgerEntries(ledgerId)).toBe(true);
   });
 
-  it("hasActiveEntries returns false after source document is soft-deleted", async () => {
+  it("hasActiveEntries returns false after the source document is deleted", async () => {
     await createEntry();
     expect(await hasActiveLedgerEntries(ledgerId)).toBe(true);
 
-    // Soft-delete the source document so its entries are no longer active
     const db = getTestDb();
-    await db
-      .update(sourceDocuments)
-      .set({ deletedAt: new Date() })
-      .where(eq(sourceDocuments.id, sourceDocumentId));
+    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, sourceDocumentId));
 
     expect(await hasActiveLedgerEntries(ledgerId)).toBe(false);
   });
 
-  it("allows main currency change after source document is soft-deleted", async () => {
+  it("allows main currency change after the source document is deleted", async () => {
     await createEntry();
 
     const db = getTestDb();
-    await db
-      .update(sourceDocuments)
-      .set({ deletedAt: new Date() })
-      .where(eq(sourceDocuments.id, sourceDocumentId));
+    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, sourceDocumentId));
 
     const updated = await updateLedger(ledgerId, {
       settings: { mainCurrency: "USD" },
@@ -288,7 +281,7 @@ describe("settings concurrency invariants", () => {
         where: eq(ledgers.id, ledgerId),
       });
       const activeEntries = await db.query.ledgerEntries.findMany({
-        where: and(eq(ledgerEntries.ledgerId, ledgerId), isNull(ledgerEntries.deletedAt)),
+        where: eq(ledgerEntries.ledgerId, ledgerId),
       });
 
       // Invariant: if entries were created, settings either succeeded before entry creation
@@ -324,16 +317,8 @@ describe("settings concurrency invariants", () => {
 
       // Clean up for next iteration
       if (createResult.status === "fulfilled") {
-        await db.transaction(async (tx) => {
-          await tx
-            .update(sourceDocuments)
-            .set({ deletedAt: new Date(), updatedAt: new Date() })
-            .where(eq(sourceDocuments.ledgerId, ledgerId));
-          await tx
-            .update(ledgerEntries)
-            .set({ deletedAt: new Date(), updatedAt: new Date() })
-            .where(eq(ledgerEntries.ledgerId, ledgerId));
-        });
+        // Deleting the documents takes their entries with them.
+        await db.delete(sourceDocuments).where(eq(sourceDocuments.ledgerId, ledgerId));
       }
       // Reset main currency if it was changed
       if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
@@ -396,7 +381,7 @@ describe("settings concurrency invariants", () => {
         where: eq(ledgers.id, ledgerId),
       });
       const activeEntries = await db.query.ledgerEntries.findMany({
-        where: and(eq(ledgerEntries.ledgerId, ledgerId), isNull(ledgerEntries.deletedAt)),
+        where: eq(ledgerEntries.ledgerId, ledgerId),
       });
       expect(ledger).not.toBeNull();
 
@@ -424,16 +409,8 @@ describe("settings concurrency invariants", () => {
 
       // Clean up
       if (activateResult.status === "fulfilled" && activateResult.value === true) {
-        await db.transaction(async (tx) => {
-          await tx
-            .update(sourceDocuments)
-            .set({ deletedAt: new Date(), updatedAt: new Date() })
-            .where(eq(sourceDocuments.ledgerId, ledgerId));
-          await tx
-            .update(ledgerEntries)
-            .set({ deletedAt: new Date(), updatedAt: new Date() })
-            .where(eq(ledgerEntries.ledgerId, ledgerId));
-        });
+        // Deleting the documents takes their entries with them.
+        await db.delete(sourceDocuments).where(eq(sourceDocuments.ledgerId, ledgerId));
       }
       if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
         await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));

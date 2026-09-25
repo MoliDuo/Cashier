@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/contracts";
@@ -28,10 +28,7 @@ export interface TargetSourceDocumentListInput extends TargetSourceDocumentFilte
 }
 
 export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unknown>[] {
-  const conditions: SQL<unknown>[] = [
-    eq(sourceDocuments.ledgerId, input.ledgerId),
-    isNull(sourceDocuments.deletedAt),
-  ];
+  const conditions: SQL<unknown>[] = [eq(sourceDocuments.ledgerId, input.ledgerId)];
   if (input.bookId != null) conditions.push(eq(sourceDocuments.bookId, input.bookId));
   if (input.statuses != null && input.statuses.length > 0) {
     conditions.push(
@@ -67,7 +64,6 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
       FROM ledger_entries AS matched_entries
       WHERE matched_entries.ledger_id = ${input.ledgerId}
         AND matched_entries.source_document_id = ${sourceDocuments.id}
-        AND matched_entries.deleted_at IS NULL
         ${input.minAmount !== undefined ? sql`AND ${matchedConverted} >= ${input.minAmount}` : sql``}
         ${input.maxAmount !== undefined ? sql`AND ${matchedConverted} <= ${input.maxAmount}` : sql``}
         ${
@@ -116,7 +112,6 @@ export async function calculateCompletedSourceDocumentTotal(
       and(
         eq(ledgerEntries.ledgerId, sourceDocuments.ledgerId),
         eq(ledgerEntries.sourceDocumentId, sourceDocuments.id),
-        isNull(ledgerEntries.deletedAt),
         ...matchedEntryConditions
       )
     )

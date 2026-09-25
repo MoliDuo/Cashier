@@ -111,14 +111,12 @@ async function snapshot(other: Neighbour) {
     version: document?.version ?? null,
     title: document?.title ?? null,
     bookId: document?.bookId ?? null,
-    deletedAt: document?.deletedAt ?? null,
     documentDate: document?.documentDate ?? null,
     entries: entries.map((entry) => ({
       id: entry.id,
       amount: entry.amount,
       itemName: entry.itemName,
       categoryId: entry.categoryId,
-      deletedAt: entry.deletedAt,
     })),
   };
 }

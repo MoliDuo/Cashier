@@ -145,10 +145,7 @@ describe("Processing Recovery", () => {
     const adapter = processingJobs();
 
     const db = getTestDb();
-    await db
-      .update(sourceDocuments)
-      .set({ deletedAt: new Date(), latestSubmissionRevisionId: null })
-      .where(eq(sourceDocuments.id, job.sourceDocumentId));
+    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, job.sourceDocumentId));
 
     const recoverable = await adapter.recoverBatch(ledgerId, maxBatch);
     expect(recoverable).toHaveLength(0);

@@ -77,11 +77,11 @@ async function countCredentials(
 }
 
 /**
- * Every record the book ever held, soft-deleted ones included. Deleting the book
- * would have to break the records' foreign key, so this is the count that
- * decides whether a delete is possible at all.
+ * Every record the book holds. Deleting the book would have to break the
+ * records' foreign key, so this is the count that decides whether a delete is
+ * possible at all.
  */
-async function countDocumentsIncludingDeleted(
+async function countDocuments(
   tx: Pick<typeof db, "select">,
   ledgerId: string,
   bookId: string
@@ -314,7 +314,7 @@ export async function deleteBook(ledgerId: string, bookId: string): Promise<Dele
     if (book == null) return { status: "not_found" as const };
     // Soft-deleted records count too: the foreign key still points at this
     // book, so removing the row would fail or orphan them.
-    if ((await countDocumentsIncludingDeleted(tx, ledgerId, bookId)) > 0) {
+    if ((await countDocuments(tx, ledgerId, bookId)) > 0) {
       return { status: "has_records" as const };
     }
     if ((await countCredentials(tx, ledgerId, bookId, { activeOnly: true })) > 0) {

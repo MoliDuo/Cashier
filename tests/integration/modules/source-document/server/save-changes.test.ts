@@ -71,7 +71,6 @@ describe("saveSourceDocumentChangesAction", () => {
       where: eq(ledgerEntries.id, fixture.entryId),
     });
     expect(entry?.itemName).toBe("Updated entry");
-    expect(entry?.deletedAt).toBeNull();
   });
 
   it("keeps a category another writer set while the save was in flight", async () => {

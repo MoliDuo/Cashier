@@ -24,7 +24,7 @@ import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 
 function whereSourceDocumentNotDeleted(ledgerId: string) {
-  return and(eq(sourceDocuments.ledgerId, ledgerId), isNull(sourceDocuments.deletedAt))!;
+  return eq(sourceDocuments.ledgerId, ledgerId);
 }
 
 function whereSourceDocumentNotDeletedId(ledgerId: string, sourceDocumentId: string) {
@@ -143,8 +143,7 @@ async function ensureRatesForDateChange(
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, ledgerId)
       )
     )
     .innerJoin(ledgers, eq(ledgers.id, ledgerEntries.ledgerId))
@@ -152,7 +151,6 @@ async function ensureRatesForDateChange(
       and(
         eq(ledgerEntries.ledgerId, ledgerId),
         inArray(ledgerEntries.sourceDocumentId, [...sourceDocumentIds]),
-        isNull(ledgerEntries.deletedAt),
         sql`${ledgerEntries.currency} <> ${ledgers.mainCurrency}`
       )
     )
@@ -183,8 +181,7 @@ export async function saveSourceDocumentChanges(
     db.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
+        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
       ),
       orderBy: (entries, { asc: orderAscending }) => [
         orderAscending(entries.position),
@@ -319,13 +316,7 @@ export async function updateSourceDocuments({
       documentDate: sourceDocuments.documentDate,
     })
     .from(sourceDocuments)
-    .where(
-      and(
-        eq(sourceDocuments.ledgerId, ledgerId),
-        inArray(sourceDocuments.id, requestedIds),
-        isNull(sourceDocuments.deletedAt)
-      )
-    )
+    .where(and(eq(sourceDocuments.ledgerId, ledgerId), inArray(sourceDocuments.id, requestedIds)))
     .orderBy(asc(sourceDocuments.id));
   if (initialDocuments.length !== requestedIds.length) {
     throw new ConflictError("Source document is not editable");
@@ -364,17 +355,10 @@ export async function updateSourceDocuments({
           sourceDocuments,
           and(
             eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            eq(sourceDocuments.ledgerId, ledgerId),
-            isNull(sourceDocuments.deletedAt)
+            eq(sourceDocuments.ledgerId, ledgerId)
           )
         )
-        .where(
-          and(
-            eq(ledgerEntries.ledgerId, ledgerId),
-            inArray(ledgerEntries.id, selectedIds),
-            isNull(ledgerEntries.deletedAt)
-          )
-        );
+        .where(and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.id, selectedIds)));
       const selectedDocumentIds = [
         ...new Set(
           selected.flatMap((entry) =>
@@ -396,15 +380,13 @@ export async function updateSourceDocuments({
           sourceDocuments,
           and(
             eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            eq(sourceDocuments.ledgerId, ledgerId),
-            isNull(sourceDocuments.deletedAt)
+            eq(sourceDocuments.ledgerId, ledgerId)
           )
         )
         .where(
           and(
             eq(ledgerEntries.ledgerId, ledgerId),
-            inArray(ledgerEntries.sourceDocumentId, requestedIds),
-            isNull(ledgerEntries.deletedAt)
+            inArray(ledgerEntries.sourceDocumentId, requestedIds)
           )
         );
       impact = {
@@ -515,17 +497,10 @@ export async function updateLedgerEntryDates(input: {
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, input.ledgerId)
       )
     )
-    .where(
-      and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.id, selectedIds),
-        isNull(ledgerEntries.deletedAt)
-      )
-    );
+    .where(and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, selectedIds)));
   if (selected.length !== selectedIds.length) throw new NotFoundError("Selected ledger entry");
   const sourceDocumentIds = [
     ...new Set(
@@ -561,15 +536,13 @@ function loadProjectionEntriesForDocuments(
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, ledgerId)
       )
     )
     .where(
       and(
         eq(ledgerEntries.ledgerId, ledgerId),
-        inArray(ledgerEntries.sourceDocumentId, [...sourceDocumentIds]),
-        isNull(ledgerEntries.deletedAt)
+        inArray(ledgerEntries.sourceDocumentId, [...sourceDocumentIds])
       )
     )
     .orderBy(ledgerEntries.sourceDocumentId, ledgerEntries.position, ledgerEntries.id);

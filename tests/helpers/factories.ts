@@ -90,11 +90,10 @@ export function createSourceDocumentData(
     text: string | null;
     imageUrls: string[];
     metadata: Record<string, unknown>;
-    status: "processing" | "completed" | "invalid" | "failed" | "cancelled" | "deleted";
+    status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
     documentDate: string | null;
     createdAt: Date;
     updatedAt: Date;
-    deletedAt: Date | null;
   }> = {}
 ) {
   const now = new Date();
@@ -102,8 +101,7 @@ export function createSourceDocumentData(
     text: _text,
     imageUrls: _imageUrls,
     metadata: _metadata,
-    status = "completed",
-    deletedAt,
+    status: _status,
     ...canonicalOverrides
   } = overrides;
   return {
@@ -113,7 +111,6 @@ export function createSourceDocumentData(
     documentDate: null,
     createdAt: now,
     updatedAt: now,
-    deletedAt: status === "deleted" ? (deletedAt ?? now) : (deletedAt ?? null),
     ...canonicalOverrides,
   };
 }

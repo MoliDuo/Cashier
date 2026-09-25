@@ -74,13 +74,7 @@ export async function lockSourceDocumentForUpdate(
   const rows = await tx
     .select()
     .from(sourceDocuments)
-    .where(
-      and(
-        eq(sourceDocuments.ledgerId, ledgerId),
-        eq(sourceDocuments.id, sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
-      )
-    )
+    .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)))
     .for("update");
 
   if (rows.length === 0) {
@@ -113,13 +107,7 @@ export async function lockSourceDocumentsForUpdate(
   const rows = await tx
     .select()
     .from(sourceDocuments)
-    .where(
-      and(
-        eq(sourceDocuments.ledgerId, ledgerId),
-        inArray(sourceDocuments.id, orderedIds),
-        isNull(sourceDocuments.deletedAt)
-      )
-    )
+    .where(and(eq(sourceDocuments.ledgerId, ledgerId), inArray(sourceDocuments.id, orderedIds)))
     .orderBy(asc(sourceDocuments.id))
     .for("update");
 

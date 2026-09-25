@@ -25,7 +25,7 @@ import {
   createTestUserWithLedger,
   ensureTestLedgerBooks,
 } from "../helpers/schema-setup";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 vi.mock("next-intl/server", () => ({ getLocale: vi.fn().mockResolvedValue("zh") }));
 
@@ -43,12 +43,10 @@ async function getTargetEntryCategoriesAction(ledgerId: string) {
   const db = getTestDb();
   const documents = await db.query.sourceDocuments.findMany({
     where: (documents, { eq }) => eq(documents.ledgerId, ledgerId),
-    columns: { id: true, deletedAt: true },
+    columns: { id: true },
   });
   for (const document of documents) {
-    if (document.deletedAt == null) {
-      await activateTestSourceDocumentProjection(db, document.id);
-    }
+    await activateTestSourceDocumentProjection(db, document.id);
   }
   return getEntryCategoriesAction();
 }
@@ -298,10 +296,9 @@ describe("E2: Delete Entry → Related Counts Update", () => {
 
     // Verify source document still exists and unchanged
     const doc = await db.query.sourceDocuments.findFirst({
-      where: and(eq(sourceDocuments.id, sourceDoc.id), isNull(sourceDocuments.deletedAt)),
+      where: eq(sourceDocuments.id, sourceDoc.id),
     });
     expect(doc).toBeDefined();
-    expect(doc?.deletedAt).toBeNull();
   });
 });
 
@@ -380,16 +377,16 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
     // Verify: Source document is deleted (soft)
     // Note: findFirst returns undefined when not found, not null
     const deletedDoc = await db.query.sourceDocuments.findFirst({
-      where: and(eq(sourceDocuments.id, sourceDoc.id), isNull(sourceDocuments.deletedAt)),
+      where: eq(sourceDocuments.id, sourceDoc.id),
     });
     expect(deletedDoc).toBeUndefined();
 
     // Verify: Related entries are also deleted (soft)
     const deletedEntry1 = await db.query.ledgerEntries.findFirst({
-      where: and(eq(ledgerEntries.id, entry1.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.id, entry1.id),
     });
     const deletedEntry2 = await db.query.ledgerEntries.findFirst({
-      where: and(eq(ledgerEntries.id, entry2.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.id, entry2.id),
     });
 
     expect(deletedEntry1).toBeUndefined();
@@ -412,7 +409,7 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
 
     // Entry B should still exist
     const remainingEntryB = await db.query.ledgerEntries.findFirst({
-      where: and(eq(ledgerEntries.id, entryB.id), isNull(ledgerEntries.deletedAt)),
+      where: eq(ledgerEntries.id, entryB.id),
     });
     expect(remainingEntryB).not.toBeNull();
   });

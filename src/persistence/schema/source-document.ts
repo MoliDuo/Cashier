@@ -52,7 +52,6 @@ export const sourceDocuments = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("uq_source_documents_ledger_id_id").on(table.ledgerId, table.id),

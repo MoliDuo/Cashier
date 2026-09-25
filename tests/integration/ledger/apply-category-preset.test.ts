@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { applyCategoryPresetAction } from "@/modules/ledger/server-actions/categories";
 import { applyCategoryPreset } from "@/modules/ledger/server/categories";
@@ -28,7 +28,7 @@ const userId = "00000000-0000-0000-0000-000000000000";
 async function activeCategories(ledgerId: string) {
   const db = getTestDb();
   return db.query.entryCategories.findMany({
-    where: and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)),
+    where: eq(entryCategories.ledgerId, ledgerId),
     orderBy: entryCategories.sortOrder,
   });
 }
@@ -37,7 +37,7 @@ async function revisionOf(ledgerId: string) {
   const db = getTestDb();
   return computeCategoryCollectionRevision(
     await db.query.entryCategories.findMany({
-      where: and(eq(entryCategories.ledgerId, ledgerId), isNull(entryCategories.deletedAt)),
+      where: eq(entryCategories.ledgerId, ledgerId),
       orderBy: entryCategories.sortOrder,
     })
   );

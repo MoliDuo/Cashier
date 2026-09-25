@@ -34,7 +34,6 @@ const entry: LedgerEntry = {
   exchangeRate: "1",
   createdAt: "2026-09-10T00:00:00.000Z",
   updatedAt: "2026-09-10T00:00:00.000Z",
-  deletedAt: null,
 };
 
 function renderItem(readOnly: boolean) {

@@ -1,7 +1,7 @@
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { saveEntryCategories } from "@/modules/ledger/server/categories";
@@ -182,7 +182,7 @@ describe("saveEntryCategoriesAction", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
     expect(
       await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, categoryId) })
-    ).toMatchObject({ deletedAt: null });
+    ).toBeDefined();
     const entries = await db.query.ledgerEntries.findMany({
       where: eq(ledgerEntries.ledgerId, ledger.id),
     });
@@ -228,10 +228,10 @@ describe("saveEntryCategoriesAction", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     expect(
       await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, ownId) })
-    ).toMatchObject({ name: "Own", deletedAt: null });
+    ).toMatchObject({ name: "Own" });
     expect(
       await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, foreignId) })
-    ).toMatchObject({ name: "Foreign", deletedAt: null });
+    ).toMatchObject({ name: "Foreign" });
   });
 
   it("allows every category to be edited and deleted", async () => {
@@ -271,7 +271,6 @@ describe("saveEntryCategoriesAction", () => {
     ).resolves.toHaveLength(1);
 
     const active = await db.query.entryCategories.findMany({
-      where: isNull(entryCategories.deletedAt),
       orderBy: entryCategories.sortOrder,
     });
     expect(active.map((category) => category.name)).toEqual(["Changed"]);

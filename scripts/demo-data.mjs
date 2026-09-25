@@ -299,7 +299,7 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
   const categoryIds = new Map();
   for (const category of fixture.categories) {
     const existing = await client.query(
-      "SELECT id FROM entry_categories WHERE ledger_id = $1 AND name = $2 AND deleted_at IS NULL",
+      "SELECT id FROM entry_categories WHERE ledger_id = $1 AND name = $2",
       [ledgerId, category.name]
     );
     const categoryId = existing.rows[0]?.id ?? category.id;

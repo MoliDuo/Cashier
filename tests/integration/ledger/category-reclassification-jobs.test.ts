@@ -20,7 +20,7 @@ describe("category assignment job reads", () => {
   it("counts progress from the rows and scopes both lookup paths to the ledger", async () => {
     const db = getTestDb();
     const ledger = createLedgerData();
-    const other = { ...createLedgerData(), deletedAt: new Date() };
+    const other = createLedgerData();
     await db.insert(ledgers).values([ledger, other]);
     await ensureTestLedgerBooks(db, ledger.id);
     const documents = [createSourceDocumentData(ledger.id), createSourceDocumentData(ledger.id)];

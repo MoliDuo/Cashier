@@ -1,5 +1,5 @@
 import { assertExpenseAmountDirection } from "@/lib/money/expense-amount";
-import { and, eq, getTableColumns, inArray, isNull } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import type { PartialBatchCommandResult } from "@/modules/source-document/contracts";
 import "server-only";
@@ -26,8 +26,7 @@ async function listProjectionEntries(
   return tx.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
-      eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-      isNull(ledgerEntries.deletedAt)
+      eq(ledgerEntries.sourceDocumentId, sourceDocumentId)
     ),
     orderBy: (entries, { asc }) => [asc(entries.position), asc(entries.id)],
   });
@@ -88,8 +87,7 @@ async function prepareCreate(input: {
     .where(
       and(
         eq(sourceDocuments.id, input.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.ledgerId, input.ledgerId)
       )
     )
     .then((rows) => rows[0]);
@@ -125,8 +123,7 @@ async function prepareBatchUpdate(input: {
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        inArray(sourceDocuments.id, input.sourceDocumentIds),
-        isNull(sourceDocuments.deletedAt)
+        inArray(sourceDocuments.id, input.sourceDocumentIds)
       )
     )
     .innerJoin(
@@ -134,11 +131,7 @@ async function prepareBatchUpdate(input: {
       and(eq(ledgers.id, sourceDocuments.ledgerId), eq(ledgers.id, input.ledgerId))
     )
     .where(
-      and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.id, requestedIds),
-        isNull(ledgerEntries.deletedAt)
-      )
+      and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, requestedIds))
     );
   if (rows.length !== requestedIds.length) {
     throw new NotFoundError("Active ledger entry projection");
@@ -254,8 +247,7 @@ export async function batchUpdateLedgerEntries(
         sourceDocuments,
         and(
           eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-          eq(sourceDocuments.ledgerId, input.ledgerId),
-          isNull(sourceDocuments.deletedAt)
+          eq(sourceDocuments.ledgerId, input.ledgerId)
         )
       )
       .where(
@@ -264,8 +256,7 @@ export async function batchUpdateLedgerEntries(
           inArray(
             ledgerEntries.sourceDocumentId,
             documents.map((document) => document.id)
-          ),
-          isNull(ledgerEntries.deletedAt)
+          )
         )
       )
       .orderBy(ledgerEntries.sourceDocumentId, ledgerEntries.position, ledgerEntries.id);
@@ -349,11 +340,7 @@ export async function batchDeleteLedgerEntries(input: {
     })
     .from(ledgerEntries)
     .where(
-      and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.id, requestedIds),
-        isNull(ledgerEntries.deletedAt)
-      )
+      and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, requestedIds))
     );
   const ownershipById = new Map(ownership.map((row) => [row.id, row] as const));
   const groups = new Map<string, string[]>();

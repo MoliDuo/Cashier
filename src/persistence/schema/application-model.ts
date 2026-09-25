@@ -97,7 +97,6 @@ export const storedFiles = pgTable(
     checksum: text("checksum"),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
     finalizedAt: timestamp("finalized_at", { withTimezone: true }),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("uq_stored_files_ledger_id_id").on(table.ledgerId, table.id),

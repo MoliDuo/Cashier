@@ -92,6 +92,13 @@
       "when": 1790353182326,
       "tag": "0012_idempotent_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790354835604,
+      "tag": "0013_drop_idempotency_records",
+      "breakpoints": true
     }
   ]
 }

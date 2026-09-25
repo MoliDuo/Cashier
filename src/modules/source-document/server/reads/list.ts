@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { SourceDocumentDetailDto } from "@/modules/source-document/contracts";
 import {
@@ -54,13 +54,7 @@ async function loadSourceDocumentDetailSnapshot(
         eq(sourceDocumentRevisions.id, sourceDocuments.latestSubmissionRevisionId)
       )
     )
-    .where(
-      and(
-        eq(sourceDocuments.ledgerId, ledgerId),
-        eq(sourceDocuments.id, sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
-      )
-    )
+    .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)))
     .then((rows) => rows[0]);
   if (baseRow == null) return null;
 
@@ -101,7 +95,6 @@ async function loadSourceDocumentDetailSnapshot(
       exchangeRate: entryExchangeRateSql(),
       createdAt: ledgerEntries.createdAt,
       updatedAt: ledgerEntries.updatedAt,
-      deletedAt: ledgerEntries.deletedAt,
       category: entryCategories,
     })
     .from(ledgerEntries)
@@ -109,15 +102,13 @@ async function loadSourceDocumentDetailSnapshot(
       entryCategories,
       and(
         eq(entryCategories.ledgerId, ledgerEntries.ledgerId),
-        eq(entryCategories.id, ledgerEntries.categoryId),
-        isNull(entryCategories.deletedAt)
+        eq(entryCategories.id, ledgerEntries.categoryId)
       )
     )
     .where(
       and(
         eq(ledgerEntries.ledgerId, ledgerId),
-        eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
+        eq(ledgerEntries.sourceDocumentId, sourceDocumentId)
       )
     )
     .orderBy(asc(ledgerEntries.position), asc(ledgerEntries.id));
@@ -134,7 +125,6 @@ async function loadSourceDocumentDetailSnapshot(
     exchangeRate: entry.exchangeRate,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
-    deletedAt: entry.deletedAt?.toISOString() ?? null,
     category:
       entry.category == null
         ? null
@@ -142,7 +132,6 @@ async function loadSourceDocumentDetailSnapshot(
             ...entry.category,
             createdAt: entry.category.createdAt.toISOString(),
             updatedAt: entry.category.updatedAt.toISOString(),
-            deletedAt: entry.category.deletedAt?.toISOString() ?? null,
           },
   }));
   const hydration: SourceDocumentHydrationRow = {

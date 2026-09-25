@@ -77,6 +77,6 @@ describe("cancel source-document processing", () => {
       await db.query.ledgerEntries.findMany({
         where: eq(ledgerEntries.sourceDocumentId, active.sourceDocumentId),
       })
-    ).toEqual([expect.objectContaining({ itemName: "Original", deletedAt: null })]);
+    ).toEqual([expect.objectContaining({ itemName: "Original" })]);
   });
 });

@@ -18,7 +18,6 @@ async function seedProjectedEntry(input: {
   categoryId: string | null;
   documentId: string;
   position?: number;
-  deletedAt?: Date;
   itemName?: string;
 }): Promise<string> {
   const db = getTestDb();
@@ -27,7 +26,6 @@ async function seedProjectedEntry(input: {
     id,
     ledgerId: input.ledgerId,
     sourceDocumentId: input.documentId,
-    deletedAt: input.deletedAt ?? null,
     position: input.position ?? 0,
     amount: "10.00",
     currency: "CNY",
@@ -179,24 +177,21 @@ describe("loadDocumentGroups", () => {
       categoryId: null,
       documentId,
     });
-    // An entry a later parse replaced is soft-deleted, not moved to a revision.
+    // A later parse deletes the entries it replaces.
     const replacedEntryId = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: null,
       documentId,
       position: 1,
-      deletedAt: new Date(),
     });
+    await db.delete(ledgerEntries).where(eq(ledgerEntries.id, replacedEntryId));
     const deleted = await setupDocument({ ledgerId: ledger.id });
     const deletedDocumentEntryId = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: null,
       documentId: deleted.documentId,
     });
-    await db
-      .update(sourceDocuments)
-      .set({ deletedAt: new Date() })
-      .where(eq(sourceDocuments.id, deleted.documentId));
+    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, deleted.documentId));
 
     const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,

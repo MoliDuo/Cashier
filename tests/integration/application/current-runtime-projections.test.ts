@@ -54,7 +54,6 @@ describe("current-runtime target adapters", () => {
     expect(replacementEntry).toMatchObject({
       id: originalEntry!.id,
       amount: "18.000",
-      deletedAt: null,
     });
 
     await expect(

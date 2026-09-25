@@ -319,7 +319,7 @@ describe("target source-document submissions", () => {
     });
     expect(
       await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, activeEntry!.id) })
-    ).toMatchObject({ amount: "12.500", deletedAt: null });
+    ).toMatchObject({ amount: "12.500" });
   });
 
   it("inherits immutable evidence on retry and queues only the retry attempt", async () => {

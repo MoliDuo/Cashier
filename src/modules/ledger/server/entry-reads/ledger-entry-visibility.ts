@@ -17,7 +17,6 @@ export function buildLedgerEntryVisibilityCondition(
     FROM source_documents AS active_documents
     WHERE active_documents.ledger_id = ${ledgerId}
       AND active_documents.id = ${ledgerEntries.sourceDocumentId}
-      AND active_documents.deleted_at IS NULL
       ${
         dateRange?.startDate != null && dateRange.startDate !== ""
           ? sql`AND active_documents.effective_date >= ${dateRange.startDate}::date`

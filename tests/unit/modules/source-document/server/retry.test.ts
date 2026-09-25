@@ -27,7 +27,6 @@ const ledger = {
   metadata: {},
   createdAt: new Date(),
   updatedAt: new Date(),
-  deletedAt: null,
 };
 
 describe("retrySourceDocument", () => {

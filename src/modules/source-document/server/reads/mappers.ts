@@ -24,7 +24,6 @@ export interface SourceDocumentRow {
   version: number;
   createdAt: Date;
   updatedAt: Date;
-  deletedAt: Date | null;
   dateOrganizationSuggestion:
     | import("@/modules/source-document/date-organization-contracts").DateOrganizationSuggestion
     | null;
@@ -62,7 +61,6 @@ interface SourceDocumentEntryCategoryAggregateRow {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
 }
 
 export interface SourceDocumentLedgerEntryAggregateRow {
@@ -78,7 +76,6 @@ export interface SourceDocumentLedgerEntryAggregateRow {
   exchangeRate: string | null;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
   category: SourceDocumentEntryCategoryAggregateRow | null;
 }
 
@@ -115,7 +112,6 @@ function mapLedgerEntryAggregateDto(
         : entry.exchangeRate,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
-    deletedAt: entry.deletedAt,
     ...(entry.category == null ? {} : { category: entry.category }),
   };
 }

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { SourceDocumentInputDto } from "@/modules/source-document/contracts";
 import {
@@ -34,11 +34,7 @@ export async function getSourceDocumentInput(
           )
         )
         .where(
-          and(
-            eq(sourceDocuments.ledgerId, ledgerId),
-            eq(sourceDocuments.id, sourceDocumentId),
-            isNull(sourceDocuments.deletedAt)
-          )
+          and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))
         )
         .limit(1)
         .then((rows) => rows[0]);

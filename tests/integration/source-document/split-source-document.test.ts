@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
 import {
@@ -98,7 +98,7 @@ describe("splitSourceDocumentAction", () => {
     const live = await fixture.db
       .select()
       .from(ledgerEntries)
-      .where(and(eq(ledgerEntries.ledgerId, fixture.ledger.id), isNull(ledgerEntries.deletedAt)));
+      .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
     expect(
       live
         .filter((entry) => entry.sourceDocumentId === result.splitSourceDocumentId)
@@ -269,7 +269,7 @@ describe("splitSourceDocumentAction", () => {
     const live = await fixture.db
       .select()
       .from(ledgerEntries)
-      .where(and(eq(ledgerEntries.ledgerId, fixture.ledger.id), isNull(ledgerEntries.deletedAt)));
+      .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
     const splitEntries = live
       .filter((entry) => entry.sourceDocumentId === result.splitSourceDocumentId)
       .sort((left, right) => left.position - right.position);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getTestDb } from "../../../setup";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-setup";
@@ -107,8 +107,7 @@ describe("projection write shape", () => {
         .where(
           and(
             eq(ledgerEntries.ledgerId, ledgerId),
-            eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-            isNull(ledgerEntries.deletedAt)
+            eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
           )
         );
       expect(rows).toHaveLength(count);
@@ -194,8 +193,7 @@ describe("projection write shape", () => {
       .where(
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-          isNull(ledgerEntries.deletedAt)
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
         )
       )
       .orderBy(ledgerEntries.position);
@@ -266,8 +264,7 @@ describe("projection write shape", () => {
       .where(
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-          isNull(ledgerEntries.deletedAt)
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
         )
       )
       .orderBy(ledgerEntries.position);
@@ -281,19 +278,6 @@ describe("projection write shape", () => {
       expect(original, `expected original row for ${row.id}`).toBeDefined();
       expect(row.createdAt.getTime()).toBe(original!.createdAt.getTime());
     }
-
-    // Editing does not create historical copies.
-    const historyRows = await db
-      .select()
-      .from(ledgerEntries)
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-          isNotNull(ledgerEntries.deletedAt)
-        )
-      );
-    expect(historyRows).toHaveLength(0);
 
     // The change-log trigger aggregates by transaction: exactly one version
     // bump for the whole replace.
@@ -316,10 +300,7 @@ describe("projection write shape", () => {
     });
     for (let iteration = 0; iteration < 3; iteration++) {
       const rows = await db.query.ledgerEntries.findMany({
-        where: and(
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-          isNull(ledgerEntries.deletedAt)
-        ),
+        where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
         orderBy: ledgerEntries.position,
       });
       expect(
@@ -350,10 +331,7 @@ describe("projection write shape", () => {
       })
     ).toHaveLength(0);
     const rows = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
       orderBy: ledgerEntries.position,
     });
     expect(rows.map(({ position, itemName }) => ({ position, itemName }))).toEqual([

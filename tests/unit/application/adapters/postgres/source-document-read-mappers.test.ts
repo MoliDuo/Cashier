@@ -17,7 +17,6 @@ const row: SourceDocumentRow = {
   version: 3,
   createdAt: new Date("2026-09-24"),
   updatedAt: new Date("2026-09-24"),
-  deletedAt: null,
   dateOrganizationSuggestion: null,
 };
 const hydration: SourceDocumentHydrationRow = {
@@ -44,7 +43,6 @@ const hydration: SourceDocumentHydrationRow = {
       exchangeRate: "0.01234",
       createdAt: "2026-09-24",
       updatedAt: "2026-09-24",
-      deletedAt: null,
       category: null,
     },
   ],

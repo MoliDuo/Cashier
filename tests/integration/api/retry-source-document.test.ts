@@ -1,4 +1,4 @@
-import { asc, eq, isNull, and } from "drizzle-orm";
+import { asc, eq, and } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
@@ -86,16 +86,12 @@ describe("source-document retry action", () => {
       orderBy: asc(sourceDocumentRevisions.createdAt),
     });
     const activeEntries = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
     });
 
     // The completed retry replaces the document's entries immediately.
     expect(after).toMatchObject({
       id: created.sourceDocumentId,
-      deletedAt: null,
     });
     expect(after?.latestSubmissionRevisionId).toBe(revisions[1]?.id);
     expect(after?.inputText).toBe("晚餐 50元");
@@ -127,10 +123,7 @@ describe("source-document retry action", () => {
     });
     const liveEntries = () =>
       db.query.ledgerEntries.findMany({
-        where: and(
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-          isNull(ledgerEntries.deletedAt)
-        ),
+        where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
       });
     const originalEntries = await liveEntries();
     expect(originalEntries.length).toBeGreaterThan(0);

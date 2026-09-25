@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { isValidDecimal } from "@/lib/money/decimal";
@@ -6,11 +6,7 @@ import { entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 export function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
-  return and(
-    eq(sourceDocuments.ledgerId, ledgerId),
-    eq(sourceDocuments.id, sourceDocumentId),
-    isNull(sourceDocuments.deletedAt)
-  )!;
+  return and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
 }
 
 export function assertEntryValues(entries: readonly LedgerProjectionEntryContract[]): void {
@@ -40,13 +36,7 @@ export async function assertCategoryOwnership(
   const owned = await tx
     .select({ id: entryCategories.id })
     .from(entryCategories)
-    .where(
-      and(
-        eq(entryCategories.ledgerId, ledgerId),
-        inArray(entryCategories.id, categoryIds),
-        isNull(entryCategories.deletedAt)
-      )
-    );
+    .where(and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, categoryIds)));
   if (owned.length !== categoryIds.length) {
     throw new NotFoundError("Entry category");
   }
@@ -93,8 +83,7 @@ export async function replaceProjection(
     .where(
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-        isNull(ledgerEntries.deletedAt)
+        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
       )
     );
   await insertDocumentEntries(tx, input);

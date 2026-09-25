@@ -202,16 +202,11 @@ export async function startCategoryAssignment(input: {
           sourceDocuments,
           and(
             eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            eq(sourceDocuments.ledgerId, input.ledgerId),
-            isNull(sourceDocuments.deletedAt)
+            eq(sourceDocuments.ledgerId, input.ledgerId)
           )
         )
         .where(
-          and(
-            eq(ledgerEntries.ledgerId, input.ledgerId),
-            inArray(ledgerEntries.id, entryIds),
-            isNull(ledgerEntries.deletedAt)
-          )
+          and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, entryIds))
         );
       const byId = new Map(rows.map((row) => [row.id, row]));
       if (byId.size !== entryIds.length) {
@@ -224,8 +219,7 @@ export async function startCategoryAssignment(input: {
           .where(
             and(
               eq(entryCategories.id, input.mode.categoryId),
-              eq(entryCategories.ledgerId, input.ledgerId),
-              isNull(entryCategories.deletedAt)
+              eq(entryCategories.ledgerId, input.ledgerId)
             )
           )
           .then((result) => result[0]);
@@ -326,16 +320,14 @@ export async function resolveLatestConflictSelection(input: { ledgerId: string; 
       ledgerEntries,
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.id, categoryReclassificationJobEntries.ledgerEntryId),
-        isNull(ledgerEntries.deletedAt)
+        eq(ledgerEntries.id, categoryReclassificationJobEntries.ledgerEntryId)
       )
     )
     .innerJoin(
       sourceDocuments,
       and(
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
+        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
       )
     )
     .where(
@@ -849,7 +841,7 @@ export async function retryCategoryAssignmentFailures(input: {
     if (created == null) throw new ConflictError("Retry assignment could not be created");
     const changedDocuments = new Set<string>();
     for (const { work, current } of failedDocuments) {
-      const changed = current == null || current.deletedAt != null;
+      const changed = current == null;
       if (changed) changedDocuments.add(work.sourceDocumentId);
       await tx.insert(categoryReclassificationJobDocuments).values({
         jobId: created.id,

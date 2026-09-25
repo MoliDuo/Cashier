@@ -64,7 +64,6 @@ export type EntryCategoryDto = {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
 };
 export type EntryCategory = EntryCategoryDto;
 
@@ -195,7 +194,6 @@ export type LedgerEntryDto = {
   exchangeRate: string | null;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
   category?: EntryCategoryDto | null;
   sourceDocument?: SourceDocumentReferenceDto | null;
 };

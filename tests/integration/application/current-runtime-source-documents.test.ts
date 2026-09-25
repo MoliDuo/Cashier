@@ -4,7 +4,6 @@ import {
   listTargetSourceDocuments,
 } from "@/modules/source-document/server/reads/list";
 import { createPendingRevision } from "tests/helpers/processing-revision";
-import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
@@ -110,7 +109,7 @@ describe("current-runtime target adapters", () => {
       await db.query.ledgerEntries.findMany({
         where: eq(ledgerEntries.sourceDocumentId, first.document.id),
       })
-    ).toEqual([expect.objectContaining({ amount: "12.500", deletedAt: null })]);
+    ).toEqual([expect.objectContaining({ amount: "12.500" })]);
 
     const second = await createPendingRevision({
       ledgerId,
@@ -202,30 +201,6 @@ describe("current-runtime target adapters", () => {
     });
     expect(document).toMatchObject({ latestSubmissionRevisionId: pending.revision.id });
     expect(revision?.processingStatus).toBe("processing");
-    expect(await db.select().from(ledgerEntries)).toHaveLength(0);
-  });
-
-  it("never creates target projections for an already-deleted legacy bill", async () => {
-    const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const [legacy] = await db
-      .insert(sourceDocuments)
-      .values({
-        ledgerId,
-        deletedAt: new Date(),
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-      })
-      .returning();
-
-    await expect(
-      createPendingRevision({
-        ledgerId,
-        sourceDocumentId: legacy!.id,
-        input: { text: "receipt", storedFileIds: [], documentDate: null },
-        bookId: await testBookId(db, ledgerId),
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
 

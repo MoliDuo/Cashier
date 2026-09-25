@@ -255,10 +255,7 @@ describe("Source Document Update Actions", () => {
       ]);
       await activateTestSourceDocumentProjection(db, okDoc.id);
       await activateTestSourceDocumentProjection(db, deletedDoc.id);
-      await db
-        .update(sourceDocuments)
-        .set({ deletedAt: new Date() })
-        .where(eq(sourceDocuments.id, deletedDoc.id));
+      await db.delete(sourceDocuments).where(eq(sourceDocuments.id, deletedDoc.id));
 
       await expect(
         batchUpdateSourceDocumentsAction({

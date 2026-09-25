@@ -46,12 +46,10 @@ async function fetchAggregatedRows(
     JOIN source_documents documents
       ON documents.ledger_id = ${ledgerId}
       AND documents.effective_date BETWEEN ranges.from_date AND ranges.to_date
-      AND documents.deleted_at IS NULL
       ${bookId == null ? sql`` : sql`AND documents.book_id = ${bookId}`}
     JOIN ledger_entries entries
       ON entries.ledger_id = documents.ledger_id
       AND entries.source_document_id = documents.id
-      AND entries.deleted_at IS NULL
     JOIN ledgers ON ledgers.id = documents.ledger_id
     CROSS JOIN LATERAL (
       SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
@@ -60,7 +58,6 @@ async function fetchAggregatedRows(
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
       AND categories.ledger_id = entries.ledger_id
-      AND categories.deleted_at IS NULL
     GROUP BY ranges.period, documents.effective_date, entries.currency, entries.category_id,
       categories.name, categories.icon, ledgers.main_currency
     UNION ALL

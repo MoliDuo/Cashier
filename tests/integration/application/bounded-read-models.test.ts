@@ -103,7 +103,6 @@ const LEDGER_LIST_KEYS = [
   "convertedAmount",
   "createdAt",
   "currency",
-  "deletedAt",
   "description",
   "exchangeRate",
   "id",

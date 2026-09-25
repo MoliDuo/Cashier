@@ -46,7 +46,6 @@ const entry: LedgerEntryEmbeddedViewDto = {
   exchangeRate: "1",
   createdAt: "2026-09-10T00:00:00.000Z",
   updatedAt: "2026-09-10T00:00:00.000Z",
-  deletedAt: null,
 };
 
 function renderWithTimeZone(timeZone: string) {
@@ -101,7 +100,6 @@ describe("SourceDocumentDateOrganization", () => {
         sortOrder: 0,
         createdAt: "2026-09-10T00:00:00.000Z",
         updatedAt: "2026-09-10T00:00:00.000Z",
-        deletedAt: null,
       },
     };
 
@@ -158,7 +156,6 @@ describe("SourceDocumentDateOrganization", () => {
         sortOrder: 0,
         createdAt: "2026-09-10T00:00:00.000Z",
         updatedAt: "2026-09-10T00:00:00.000Z",
-        deletedAt: null,
       },
     };
 

@@ -150,7 +150,6 @@ const entry: LedgerEntry = {
   exchangeRate: "1",
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
-  deletedAt: null,
 };
 
 const secondEntry: LedgerEntry = {

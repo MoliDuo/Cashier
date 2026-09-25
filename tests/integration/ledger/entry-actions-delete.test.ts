@@ -64,9 +64,9 @@ describe("deleteLedgerEntryAction", () => {
 
     await deleteLedgerEntryAction(doc.id, entry.id);
 
-    const updated = await db.query.ledgerEntries.findFirst({
+    const deleted = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entry.id),
     });
-    expect(updated?.deletedAt).not.toBeNull();
+    expect(deleted).toBeUndefined();
   });
 });

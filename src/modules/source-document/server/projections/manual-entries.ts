@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
@@ -90,11 +90,7 @@ export async function replaceManualProjection(
     await tx
       .delete(ledgerEntries)
       .where(
-        and(
-          eq(ledgerEntries.ledgerId, input.ledgerId),
-          inArray(ledgerEntries.id, removedIds),
-          isNull(ledgerEntries.deletedAt)
-        )
+        and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, removedIds))
       );
   }
 
@@ -146,7 +142,6 @@ export async function replaceManualProjection(
           currency = updates.currency,
           item_name = updates.item_name,
           description = updates.description,
-          deleted_at = NULL,
           updated_at = ${now}
       FROM (VALUES ${sql.join(
         updatedEntries.map(

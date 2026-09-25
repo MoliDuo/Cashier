@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ledgerEntries } from "@/persistence";
 import {
@@ -39,10 +39,7 @@ export async function calculateLedgerEntryStats({
   ledgerId,
   filters,
 }: CalculateLedgerEntryStatsInput): Promise<LedgerEntrySummary> {
-  const tenantCondition = and(
-    eq(ledgerEntries.ledgerId, ledgerId),
-    isNull(ledgerEntries.deletedAt)
-  );
+  const tenantCondition = and(eq(ledgerEntries.ledgerId, ledgerId));
   const { currency, ...filtersWithoutCurrency } = filters;
   const valueConditions = joinConditions(buildLedgerEntryValueConditions(filtersWithoutCurrency));
   const dateConditions = joinConditions(buildLedgerEntryEffectiveDateConditions(filters));
@@ -70,12 +67,10 @@ export async function calculateLedgerEntryStats({
       INNER JOIN source_documents documents
         ON documents.ledger_id = ledger_entries.ledger_id
        AND documents.id = ledger_entries.source_document_id
-       AND documents.deleted_at IS NULL
        ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
       LEFT JOIN entry_categories categories
         ON categories.ledger_id = ledger_entries.ledger_id
        AND categories.id = ledger_entries.category_id
-       AND categories.deleted_at IS NULL
       WHERE ${tenantCondition}
         ${dateConditions}
         ${valueConditions}

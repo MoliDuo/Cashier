@@ -22,7 +22,6 @@ const custom: EntryCategoryWithCount = {
   sortOrder: 0,
   createdAt: "2026-09-14T00:00:00.000Z",
   updatedAt: "2026-09-14T00:00:00.000Z",
-  deletedAt: null,
   entryCount: 3,
 };
 

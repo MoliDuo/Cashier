@@ -102,9 +102,6 @@ export async function applyCategoryAssignments(
       return { status } as const;
     };
 
-    if (document.deletedAt != null) {
-      return finishWithoutWrite("skipped", "document_unavailable");
-    }
     try {
       await assertSourceDocumentNotProcessing(tx, document);
     } catch (error) {
@@ -119,7 +116,6 @@ export async function applyCategoryAssignments(
         work: categoryReclassificationJobEntries,
         currentCategoryId: ledgerEntries.categoryId,
         sourceDocumentId: ledgerEntries.sourceDocumentId,
-        deletedAt: ledgerEntries.deletedAt,
       })
       .from(categoryReclassificationJobEntries)
       .leftJoin(
@@ -138,13 +134,12 @@ export async function applyCategoryAssignments(
       )
       .orderBy(categoryReclassificationJobEntries.selectionOrder);
     // A reparse replaces the entries and a split moves them to another
-    // document; either way the selection no longer describes this one.
+    // document; either way the selection no longer describes this one. An
+    // entry that is gone joins as null and so fails the document check.
     if (
       selected.some(
         (entry) =>
-          entry.deletedAt != null ||
-          entry.sourceDocumentId !== input.sourceDocumentId ||
-          !entry.work.decisionPersisted
+          entry.sourceDocumentId !== input.sourceDocumentId || !entry.work.decisionPersisted
       )
     ) {
       return finishWithoutWrite("skipped", "document_unavailable");
@@ -157,11 +152,7 @@ export async function applyCategoryAssignments(
         .select({ id: entryCategories.id })
         .from(entryCategories)
         .where(
-          and(
-            eq(entryCategories.ledgerId, ledgerId),
-            inArray(entryCategories.id, categoryIds),
-            isNull(entryCategories.deletedAt)
-          )
+          and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, categoryIds))
         );
       if (available.length !== categoryIds.length) {
         return finishWithoutWrite("conflict", "category_changed");
@@ -185,7 +176,6 @@ export async function applyCategoryAssignments(
               eq(ledgerEntries.ledgerId, ledgerId),
               eq(ledgerEntries.id, entry.work.ledgerEntryId),
               eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-              isNull(ledgerEntries.deletedAt),
               sql`${ledgerEntries.categoryId} IS NOT DISTINCT FROM ${entry.work.originalCategoryId}`
             )
           )

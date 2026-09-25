@@ -210,62 +210,6 @@ describe("queryEnhancedStats", () => {
     expect(result.summary.total).toBe("55");
   });
 
-  it("filters out entries linked to soft-deleted source documents", async () => {
-    const db = getTestDb();
-
-    const insertedDocs = await db
-      .insert(sourceDocuments)
-      .values([
-        {
-          ledgerId,
-          documentDate: "2024-03-05",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-        },
-        {
-          ledgerId,
-          documentDate: "2024-03-05",
-          deletedAt: new Date(),
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-        },
-      ])
-      .returning();
-
-    const activeDoc = requireFirst(insertedDocs, "active document");
-    const deletedDoc = insertedDocs[1];
-    if (deletedDoc == null) {
-      throw new Error("Expected deleted document");
-    }
-
-    await db.insert(ledgerEntries).values([
-      {
-        ledgerId,
-        sourceDocumentId: activeDoc.id,
-        amount: "100",
-        currency: "CNY",
-        itemName: "active item",
-        categoryId,
-      },
-      {
-        ledgerId,
-        sourceDocumentId: deletedDoc.id,
-        amount: "999",
-        currency: "CNY",
-        itemName: "deleted item",
-        categoryId,
-      },
-    ]);
-
-    const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
-      queryRange: { from: "2024-03-01", to: "2024-03-31" },
-      compareRange: { from: "2024-02-01", to: "2024-02-29" },
-    });
-
-    expect(result.summary.total).toBe("100");
-    expect(result.heatmap.days).toHaveLength(1);
-    expect(result.heatmap.days[0]?.totalAmount).toBe("100");
-  });
-
   it("excludes entries when rates are missing", async () => {
     const db = getTestDb();
     await db.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));

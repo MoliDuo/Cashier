@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import "server-only";
 import type {
   RevisionFailureKind,
@@ -33,11 +33,7 @@ export type CreatePendingRevisionInput = {
 } & ({ sourceDocumentId: string; bookId?: string } | { sourceDocumentId?: never; bookId: string });
 
 function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
-  return and(
-    eq(sourceDocuments.ledgerId, ledgerId),
-    eq(sourceDocuments.id, sourceDocumentId),
-    isNull(sourceDocuments.deletedAt)
-  )!;
+  return and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
 }
 
 function mapRevision(
@@ -61,13 +57,10 @@ function mapDocument(
     ledgerId: row.ledgerId,
     version: row.version,
     latestSubmissionRevisionId: row.latestSubmissionRevisionId,
-    supportedActions:
-      row.deletedAt == null
-        ? deriveSourceDocumentCapabilities({
-            latestSubmissionStatus,
-            hasSubmissionInput: row.latestSubmissionRevisionId != null,
-          }).supportedActions
-        : [],
+    supportedActions: deriveSourceDocumentCapabilities({
+      latestSubmissionStatus,
+      hasSubmissionInput: row.latestSubmissionRevisionId != null,
+    }).supportedActions,
   };
 }
 

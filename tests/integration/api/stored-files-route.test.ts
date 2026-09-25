@@ -110,10 +110,7 @@ describe("GET /api/stored-files/[fileId]", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const { document, file } = await createLinkedStoredFile(ledgerId);
-    await db
-      .update(sourceDocuments)
-      .set({ deletedAt: new Date() })
-      .where(eq(sourceDocuments.id, document.id));
+    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, document.id));
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
 
