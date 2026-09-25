@@ -2,7 +2,6 @@ import "server-only";
 import { createHash } from "crypto";
 import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
 import { getBook } from "@/modules/ledger/server/books";
-import { scheduleRequestMaintenance } from "@/server/maintenance/schedule";
 import type { SourceDocumentSubmissionContract } from "@/modules/source-document/server/submissions";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
@@ -64,10 +63,9 @@ export async function createSourceDocumentFromCredentialRequest(input: {
     ...(input.requestId == null ? {} : { requestId: input.requestId }),
   });
 
-  // Also recover older pending intents for the ledger and run bounded
-  // maintenance. The claim CAS makes duplicate scheduling harmless.
+  // Also recover older pending intents for the ledger. The claim CAS makes
+  // duplicate scheduling harmless.
   scheduleProcessingRecoveryAfter(credential.ledgerId, input.requestId);
-  scheduleRequestMaintenance();
 
   return result;
 }

@@ -31,6 +31,8 @@ export const OUTCOME_RESERVE_MS = 10_000;
  */
 export const LEASE_HEARTBEAT_MS = FUNCTION_BUDGET_MS / 8;
 export const LEASE_DURATION_MS = 4 * LEASE_HEARTBEAT_MS;
+/** How long the daily cron keeps starting new maintenance work. */
+export const CRON_BUDGET_MS = FUNCTION_BUDGET_MS - OUTCOME_RESERVE_MS;
 /** Runs one piece of background work gets, the first one included, before it is failed. */
 export const BACKGROUND_MAX_ATTEMPTS = 3;
 

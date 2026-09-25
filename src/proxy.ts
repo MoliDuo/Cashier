@@ -15,7 +15,8 @@ export default auth((req) => {
     const isPublicApi =
       pathname === "/api/auth" ||
       pathname.startsWith("/api/auth/") ||
-      pathname.startsWith("/api/v1/");
+      pathname.startsWith("/api/v1/") ||
+      pathname.startsWith("/api/cron/");
 
     if (!isPublicApi && !req.auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

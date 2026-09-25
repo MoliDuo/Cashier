@@ -91,8 +91,11 @@ finalization and compensation, and authorized reads are separate files of plain 
 Finalization replay is read-only after authorization. Evidence reads fetch bytes and metadata in
 one object-store GET and share a promise only within one processing invocation.
 
-Request-triggered maintenance uses a 60-second cooldown. Object cleanup claims at most 25 jobs,
-executes four deletions concurrently, and uses five-minute leases. Acknowledgement requires the
+Maintenance runs once a day from Vercel Cron at `/api/cron/daily` (`src/server/maintenance/daily.ts`),
+authenticated by `CRON_SECRET`; requests no longer trigger it. Each step runs independently within
+the cron budget: expired records, scheduling every ledger's due processing and category work with
+`after()`, the exchange-rate refresh, stale upload sessions, and the object cleanup queue. Object
+cleanup claims 25 jobs at a time, executes four deletions concurrently, and uses five-minute leases. Acknowledgement requires the
 current unexpired token; successful sibling jobs lock their upload session before deleting the
 job and checking whether the session has any remaining work.
 
@@ -102,8 +105,7 @@ Entries store only their amount and currency. Reads convert with the `convert_am
 at the document's effective date against `exchange_rates`, which holds one row per calendar day
 and currency. An entry whose day has no rate reads as unconverted; it is never converted at another
 day's rate. Writes make one best-effort attempt to cache the rates they need before the
-transaction and save regardless; request-triggered maintenance fills missing days and replaces
-provisional rows. Changing the main currency only updates the setting.
+transaction and save regardless; the daily cron fills missing days and replaces provisional rows. Changing the main currency only updates the setting.
 
 ## Simplified persistence
 

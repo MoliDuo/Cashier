@@ -21,6 +21,8 @@
 - `TRUSTED_PROXY=platform`：让按 IP 的限流拿到真实客户端 IP（见上文）。
 - `AUTH_SECRET`、`API_KEY_PEPPER`、`AUTH_OTP_PEPPER`：三个内部密钥，
   必须是安全随机值，并且在同一部署的重启、预览实例和多次构建之间保持一致。
+- `CRON_SECRET`：每日 cron 的调用密钥，至少 32 个字符，例如用 `openssl rand -hex 32` 生成。
+  Vercel Cron 调用 `/api/cron/daily` 时会带上 `Authorization: Bearer <CRON_SECRET>`。
 
 账号、账本和分账由首次启动的向导创建，不需要环境变量。
 
@@ -50,6 +52,17 @@
 命令里那行 `echo` 会把 `VERCEL_ENV` 和 `VERCEL_GIT_COMMIT_REF` 的实际取值打进构建日志。
 加它是因为排查上面这类问题时，靠改配置试一次要等一次完整部署；有这行，看日志就够了。
 已知的一组取值：main 上的生产构建里 `VERCEL_ENV=production`、`ref=main`。
+
+`vercel.json` 还声明了每日 cron：每天 UTC 18:00（北京时间凌晨 2 点，ECB 已发布当天汇率）
+调用 `/api/cron/daily`。它清理过期记录，给所有账本的待处理任务补一次调度，刷新汇率，
+并清理对象存储。Hobby 计划的 cron 只能按天运行，所以请求路径上的 `after()` 和轮询恢复
+仍是主要触发方式，cron 只做兜底。手动触发一次可以这样验证：
+
+```sh
+curl -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/daily
+```
+
+返回的 JSON 列出每一步是 `done`、`failed` 还是 `skipped`。
 
 JSON 写不了注释，所以这几条的理由都记在这里。
 

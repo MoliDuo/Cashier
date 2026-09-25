@@ -17,6 +17,7 @@ export interface RuntimeEnv {
   readonly s3SecretAccessKey: string;
   readonly s3ForcePathStyle: boolean;
   readonly trustedProxy: string | undefined;
+  readonly cronSecret: string | undefined;
   readonly timeZone: string;
   readonly aiModel: string;
   readonly databasePoolMax: number;
@@ -76,6 +77,9 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get trustedProxy() {
     return getStartupEnvValue("TRUSTED_PROXY");
+  },
+  get cronSecret() {
+    return getStartupEnvValue("CRON_SECRET");
   },
   get timeZone() {
     return getStartupEnvValue("TZ");

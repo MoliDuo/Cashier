@@ -15,6 +15,7 @@ const AI_RUNNING_ROUTES = [
   "src/app/(protected)/page.tsx",
   "src/app/api/ledger-queries/route.ts",
   "src/app/api/v1/source-documents/route.ts",
+  "src/app/api/cron/daily/route.ts",
 ];
 
 const budgetMs = FUNCTION_MAX_DURATION_SECONDS * 1000;

@@ -10,7 +10,6 @@ import { createAndQueueSourceDocument } from "../server/create-and-queue";
 import { resolveRecordBook } from "../server/resolve-record-book";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
-import { scheduleRequestMaintenance } from "@/server/maintenance/schedule";
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
 
 /**
@@ -51,7 +50,6 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
 
     // Also recover any missed processing intents
     scheduleProcessingRecoveryAfter(ledgerId);
-    scheduleRequestMaintenance();
 
     return { sourceDocumentId: result.sourceDocumentId, version: 1, status: "processing" };
   }

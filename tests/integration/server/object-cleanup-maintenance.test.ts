@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger } from "../../helpers/schema-setup";
@@ -9,13 +9,14 @@ vi.mock("@/lib/storage/s3", () => ({
   getS3Storage: () => ({ delete: deleteObject }),
 }));
 
-import { runBoundedMaintenance } from "@/server/maintenance/run";
+import { runDailyMaintenance } from "@/server/maintenance/daily";
 import {
   acknowledgeObjectCleanup,
   claimObjectCleanup,
   enqueueObjectCleanup,
 } from "@/server/maintenance/object-cleanup";
 
+beforeEach(() => deleteObject.mockReset());
 afterEach(() => vi.useRealTimers());
 
 describe("persistent object cleanup maintenance", () => {
@@ -46,7 +47,7 @@ describe("persistent object cleanup maintenance", () => {
     const firstRun = new Date();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(firstRun);
-    await runBoundedMaintenance(firstRun);
+    await runDailyMaintenance({ now: firstRun });
 
     expect(
       await db.query.uploadSessions.findFirst({ where: eq(uploadSessions.id, sessionId) })
@@ -58,7 +59,7 @@ describe("persistent object cleanup maintenance", () => {
 
     deleteObject.mockResolvedValueOnce({ success: true });
     vi.setSystemTime(new Date(firstRun.getTime() + 60 * 60 * 1000));
-    await runBoundedMaintenance();
+    await runDailyMaintenance();
 
     expect(
       await db.query.objectCleanupJobs.findFirst({
@@ -127,7 +128,7 @@ describe("persistent object cleanup maintenance", () => {
     ).toBeUndefined();
   });
 
-  it("honors the global cooldown and deletes at most four objects concurrently", async () => {
+  it("drains the whole queue, deleting at most four objects concurrently", async () => {
     const db = getTestDb();
     await db.insert(objectCleanupJobs).values(
       Array.from({ length: 30 }, (_, index) => ({
@@ -144,13 +145,24 @@ describe("persistent object cleanup maintenance", () => {
       concurrent--;
       return { success: true };
     });
-    const now = new Date();
-    await Promise.all([runBoundedMaintenance(now), runBoundedMaintenance(now)]);
+
+    await expect(runDailyMaintenance()).resolves.toMatchObject({ object_cleanup: "done" });
+
     expect(maximum).toBe(4);
-    expect(await db.select().from(objectCleanupJobs)).toHaveLength(5);
-    await runBoundedMaintenance(new Date(now.getTime() + 59_999));
-    expect(await db.select().from(objectCleanupJobs)).toHaveLength(5);
-    await runBoundedMaintenance(new Date(now.getTime() + 60_000));
     expect(await db.select().from(objectCleanupJobs)).toHaveLength(0);
+  });
+
+  it("stops starting work once the deadline has passed", async () => {
+    const db = getTestDb();
+    await db
+      .insert(objectCleanupJobs)
+      .values({ storageKey: "temporary/late", nextAttemptAt: new Date(0) });
+
+    await expect(runDailyMaintenance({ deadlineAt: Date.now() - 1 })).resolves.toMatchObject({
+      expired_records: "skipped",
+      object_cleanup: "skipped",
+    });
+    expect(deleteObject).not.toHaveBeenCalled();
+    expect(await db.select().from(objectCleanupJobs)).toHaveLength(1);
   });
 });

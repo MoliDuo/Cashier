@@ -99,6 +99,16 @@ describe("Proxy Logic", () => {
       expect(res.status).toBe(200);
     });
 
+    it("leaves the cron route to authenticate its own bearer secret", async () => {
+      const res = await invokeProxy(createRequest("/api/cron/daily"));
+      expect(res.status).toBe(200);
+    });
+
+    it("does not treat a path that merely starts with cron as the cron route", async () => {
+      const res = await invokeProxy(createRequest("/api/cronjobs"));
+      expect(res.status).toBe(401);
+    });
+
     it("does not let a dot bypass API authentication", async () => {
       const res = await invokeProxy(createRequest("/api/private/file.json"));
       expect(res.status).toBe(401);

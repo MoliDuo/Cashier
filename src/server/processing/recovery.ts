@@ -7,17 +7,12 @@ import { scheduleProcessingAfter } from "./schedule";
 import { PROCESSING_RECOVERY_MAX_BATCH } from "@/config/tuning";
 
 /**
- * Schedules recovery of bounded processing intents that were missed by
- * earlier after() execution. Called from authenticated request boundaries:
- * ledger bootstrap, attention/count/detail reads, new submission, and Retry.
- *
- * Does NOT await AI completion. Does NOT start a global drain loop.
- * Does NOT scan other ledgers.
- *
- * This is a server-only utility — not a "use server" action, because it is
- * invoked from within other server contexts, not directly from the client.
+ * Schedules one ledger's due processing attempts that no run holds, each with
+ * its own `after()`. Called from authenticated request boundaries (ledger
+ * bootstrap, attention/count/detail reads, new submission, Retry) and from the
+ * daily cron for every ledger. Does not await AI completion.
  */
-async function scheduleProcessingRecovery(ledgerId: string): Promise<void> {
+export async function scheduleProcessingRecovery(ledgerId: string): Promise<void> {
   // Attempts are counted when a run claims the job, which is also where an
   // exhausted job is failed; scheduling one twice only loses the second claim.
   const recoverable = await recoverProcessingJobs(ledgerId, PROCESSING_RECOVERY_MAX_BATCH);

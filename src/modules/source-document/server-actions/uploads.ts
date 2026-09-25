@@ -9,7 +9,6 @@ import {
   type FinalizeSourceDocumentUploadInput,
 } from "../contract-schemas";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { scheduleRequestMaintenance } from "@/server/maintenance/schedule";
 
 export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAccess(
   async (
@@ -29,7 +28,6 @@ export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAcce
 
 export const finalizeSourceDocumentUploadAction = withSourceDocumentLedgerAccess(
   async ({ ledgerId }, input: FinalizeSourceDocumentUploadInput): Promise<string[]> => {
-    scheduleRequestMaintenance();
     const validated = finalizeSourceDocumentUploadInputSchema.parse(input);
     const files = await finalizeDirectUpload({ ...validated, ledgerId });
     return files.map((file) => file.id);

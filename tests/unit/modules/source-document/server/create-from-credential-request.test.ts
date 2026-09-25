@@ -12,9 +12,6 @@ vi.mock("@/modules/ledger/server/books", () => ({ getBook: getBookMock }));
 vi.mock("@/server/processing/recovery", () => ({
   scheduleProcessingRecoveryAfter: vi.fn(),
 }));
-vi.mock("@/server/maintenance/schedule", () => ({
-  scheduleRequestMaintenance: vi.fn(),
-}));
 
 import { createSourceDocumentFromCredentialRequest } from "@/modules/source-document/server/create-from-credential-request";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";

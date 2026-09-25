@@ -13,8 +13,6 @@ import { logIdentifier } from "@/lib/security/log-identifier";
  * identity (sourceDocumentId, revisionId) plus the optional requestId. The
  * claim CAS on the attempt makes duplicate scheduling harmless: the second
  * execution simply finds the attempt already claimed or finished.
- *
- * This deliberately does not add cron jobs, workers, or external queues.
  */
 export function scheduleProcessingAfter(job: ProcessingJobContract, requestId?: string): void {
   after(() =>

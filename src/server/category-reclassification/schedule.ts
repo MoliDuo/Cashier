@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import {
+  drainDueCategoryReclassifications,
   recoverLedgerCategoryReclassifications,
   runCategoryReclassificationJob,
 } from "@/server/category-reclassification/run";
@@ -32,8 +33,8 @@ export function scheduleCategoryReclassificationAfter(jobId: string, ledgerId: s
 /**
  * Schedules a recovery pass for one ledger. Called from the status query the
  * client is already polling, so a run whose `after()` callback died (a
- * restarted process, a closed tab) is picked up on the next poll; there is no
- * cron to find it otherwise.
+ * restarted process, a closed tab) is picked up on the next poll; the daily
+ * cron drains whatever no poll picked up.
  */
 export function scheduleCategoryReclassificationRecoveryAfter(
   ledgerId: string,
@@ -45,6 +46,15 @@ export function scheduleCategoryReclassificationRecoveryAfter(
         { error, ledgerSubject: logIdentifier("ledger", ledgerId), requestId },
         "after() category reclassification recovery failed"
       );
+    })
+  );
+}
+
+/** Schedules a pass over every ledger's due category work; the daily cron's backstop. */
+export function scheduleCategoryReclassificationDrainAfter(): void {
+  after(() =>
+    drainDueCategoryReclassifications().catch((error: unknown) => {
+      logger.error({ error }, "after() category reclassification drain failed");
     })
   );
 }
