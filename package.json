@@ -17,7 +17,7 @@
     "demo:reset": "node scripts/run-demo.mjs --reset",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 0",
     "tsc": "tsc --noEmit",
     "validate:i18n": "node scripts/validate-i18n-catalogs.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",

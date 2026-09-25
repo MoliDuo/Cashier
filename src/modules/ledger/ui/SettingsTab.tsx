@@ -134,24 +134,24 @@ export function SettingsTab({
     await signOut({ callbackUrl: "/login" });
   };
 
-  const handleRequireReauthentication = async () => {
-    const query = searchParams.toString();
-    const currentPath = query === "" ? pathname : `${pathname}?${query}`;
-    const callbackUrl = `/login?notice=reauth_required&callbackUrl=${encodeURIComponent(currentPath)}`;
+  const signOutTo = async (callbackUrl: string) => {
     try {
       await signOut({ callbackUrl });
     } catch {
+      // A full page load, not a client-side push: the old session's cached
+      // ledger data must not survive into the login page.
       window.location.assign(callbackUrl);
     }
   };
 
+  const handleRequireReauthentication = async () => {
+    const query = searchParams.toString();
+    const currentPath = query === "" ? pathname : `${pathname}?${query}`;
+    await signOutTo(`/login?notice=reauth_required&callbackUrl=${encodeURIComponent(currentPath)}`);
+  };
+
   const handleCredentialsChanged = async () => {
-    const callbackUrl = "/login?notice=credentials_changed";
-    try {
-      await signOut({ callbackUrl });
-    } catch {
-      window.location.assign(callbackUrl);
-    }
+    await signOutTo("/login?notice=credentials_changed");
   };
 
   const handleSaveAppearance = async () => {
