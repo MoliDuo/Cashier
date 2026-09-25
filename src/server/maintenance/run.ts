@@ -108,7 +108,7 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
   if (!acquired) return;
 
   await drainDueExchangeRateRecalculations(now);
-  await drainDueCategoryReclassifications(now);
+  await drainDueCategoryReclassifications();
 
   const jobs = await claimObjectCleanup(new Date());
   if (jobs.length === 0) return;

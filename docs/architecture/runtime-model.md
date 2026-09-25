@@ -24,11 +24,12 @@ same `Idempotency-Key` when retrying a create request.
 
 ## Category assignment jobs
 
-Batch category assignment also uses `after()` with durable PostgreSQL work rows. A normal lifecycle
-keeps claiming document work, waits through short retry delays, and does not depend on the details
-page polling. Closing the page therefore does not cancel a committed job. Polling only displays
-progress and gives a later request an opportunity to recover expired leases after a process restart
-or serverless termination.
+Batch category assignment also uses `after()` with durable PostgreSQL work rows. A run keeps claiming
+document work and waits through short retry delays, but it stops claiming once its run budget
+(`CATEGORY_RUN_BUDGET_MS`) is spent, and it returns at once when every slot is held by another run
+instead of waiting for one. Closing the page does not cancel a committed job. While a job is active,
+the progress poll starts a fresh run every few seconds, which continues where the last one stopped and
+recovers expired leases after a process restart or serverless termination.
 
 The database coordinates deployment-wide document slots with leases and fencing tokens. A document
 is the atomic classification commit unit; groups above 50 selected entries use persisted request

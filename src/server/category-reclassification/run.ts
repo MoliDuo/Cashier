@@ -5,7 +5,11 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
 import { isSuccessfulLoadImageResult, loadStoredFilesForAI } from "@/server/processing/evidence";
 import type { ClaimedCategoryAssignmentDocument } from "@/server/category-reclassification/assignments";
-import { AI_CATEGORY_CONCURRENCY, AI_CATEGORY_MAX_ATTEMPTS } from "@/config/tuning";
+import {
+  AI_CATEGORY_CONCURRENCY,
+  AI_CATEGORY_MAX_ATTEMPTS,
+  CATEGORY_RUN_BUDGET_MS,
+} from "@/config/tuning";
 import {
   claimCategoryAssignmentDocuments,
   failCategoryAssignmentDocument,
@@ -22,7 +26,6 @@ const CLAIM_LEASE_MS = 120_000;
 const CLAIM_HEARTBEAT_MS = 20_000;
 const REQUEST_CHUNK_SIZE = 50;
 const MAX_IDLE_WAIT_MS = 30_000;
-const SLOT_RECHECK_MS = 250;
 
 function stableErrorCode(error: unknown): string {
   if (error instanceof AppError) return error.code;
@@ -204,9 +207,20 @@ async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise
   }
 }
 
+/**
+ * Works through due documents until none are left or the run budget is spent.
+ * A run never waits for a slot another process holds: that process claims the
+ * next document itself when it finishes, and the status poll the client keeps
+ * up while a job is active starts a fresh run every few seconds. Stopping at
+ * the budget leaves the function time to finish the document it already
+ * claimed instead of being killed mid-request.
+ */
 async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<boolean> {
+  const startedAt = Date.now();
   let processed = false;
   for (;;) {
+    const remainingMs = CATEGORY_RUN_BUDGET_MS - (Date.now() - startedAt);
+    if (remainingMs <= 0) return processed;
     const claimed = await claimCategoryAssignmentDocuments({
       now: new Date(),
       leaseMs: CLAIM_LEASE_MS,
@@ -221,14 +235,11 @@ async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<bo
     const nextDue = await nextCategoryAssignmentDue(scope);
     if (nextDue == null) return processed;
     const waitMs = nextDue.getTime() - Date.now();
-    if (waitMs <= 0) {
-      // Due work can remain unclaimed while another process owns every global
-      // slot. Keep this after() lifecycle alive so the job starts as soon as a
-      // lease is released instead of waiting for a future browser request.
-      await new Promise((resolve) => setTimeout(resolve, SLOT_RECHECK_MS));
-      continue;
-    }
-    await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, MAX_IDLE_WAIT_MS)));
+    // Due but unclaimed: every slot is held by another run.
+    if (waitMs <= 0) return processed;
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(waitMs, MAX_IDLE_WAIT_MS, remainingMs))
+    );
   }
 }
 
@@ -240,6 +251,6 @@ export async function recoverLedgerCategoryReclassifications(ledgerId: string): 
   await runLoop({ ledgerId });
 }
 
-export async function drainDueCategoryReclassifications(_now?: Date): Promise<void> {
+export async function drainDueCategoryReclassifications(): Promise<void> {
   await runLoop({});
 }

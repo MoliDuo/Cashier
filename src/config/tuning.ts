@@ -30,6 +30,12 @@ export const AI_REVISION_DEADLINE_MS = 180_000;
 export const AI_CATEGORY_CONCURRENCY = 1;
 export const AI_CATEGORY_REQUEST_TIMEOUT_MS = 60_000;
 export const AI_CATEGORY_MAX_ATTEMPTS = 3;
+/**
+ * How long one run keeps claiming new documents. A document claimed at the
+ * last moment still has one request timeout plus a margin before the function
+ * limit; whatever is left is picked up by the next run.
+ */
+export const CATEGORY_RUN_BUDGET_MS = 50_000;
 
 /** Upload ceilings, per ledger. The daily one is 100 MiB. */
 export const UPLOAD_PLAN_LIMIT_PER_15_MIN = 20;

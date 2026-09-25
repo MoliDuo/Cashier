@@ -16,7 +16,7 @@ const adapters = vi.hoisted(() => ({
     entryIds: [`entry-${input.sourceDocumentId}`],
     completedChunkCount: 0,
   })),
-  nextDue: vi.fn(async () => null),
+  nextDue: vi.fn(async (): Promise<Date | null> => null),
   renewDocumentClaim: vi.fn(async () => true),
   persistDecisions: vi.fn(async (_input: { completedChunkCount: number }) => true),
   markEvidenceIncomplete: vi.fn(async () => undefined),
@@ -70,6 +70,7 @@ vi.mock("@/config/tuning", () => ({
     return state.concurrency;
   },
   AI_CATEGORY_MAX_ATTEMPTS: 3,
+  CATEGORY_RUN_BUDGET_MS: 50_000,
 }));
 vi.mock("@/server/category-reclassification/assignments", () => ({
   claimCategoryAssignmentDocuments: adapters.claimDocuments,
@@ -142,16 +143,31 @@ describe("category reclassification orchestration concurrency", () => {
     expect(Date.now() - startedAt).toBe(20_000);
   });
 
-  it("honors a concurrency of 10 and completes the same work in ten batches", async () => {
+  it("honors a concurrency of 10 and stops claiming once the run budget is spent", async () => {
     state.concurrency = 10;
     const startedAt = Date.now();
-    const running = runCategoryReclassificationJob("job-1");
+    const first = runCategoryReclassificationJob("job-1");
     await vi.runAllTimersAsync();
-    await running;
+    await first;
 
+    // Batches start at 0s, 20s and 40s; at 60s the 50-second budget is spent.
     expect(state.maxActive).toBe(10);
-    expect(state.decideCalls).toBe(100);
-    expect(Date.now() - startedAt).toBe(200_000);
+    expect(state.decideCalls).toBe(30);
+    expect(Date.now() - startedAt).toBe(60_000);
+
+    const second = runCategoryReclassificationJob("job-1");
+    await vi.runAllTimersAsync();
+    await second;
+    expect(state.decideCalls).toBe(60);
+  });
+
+  it("returns instead of waiting when every slot is held by another run", async () => {
+    state.queue = [];
+    adapters.nextDue.mockResolvedValueOnce(new Date(Date.now() - 1_000));
+
+    await expect(runCategoryReclassificationJob("job-1")).resolves.toBe(false);
+    expect(adapters.claimDocuments).toHaveBeenCalledTimes(1);
+    expect(adapters.nextDue).toHaveBeenCalledTimes(1);
   });
 
   it("isolates one failed document without repeating the other 99 requests", async () => {
