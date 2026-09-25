@@ -1,5 +1,4 @@
 import "server-only";
-import { format } from "date-fns";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import {
@@ -43,7 +42,10 @@ const providerRatesSchema = z.object({
  * Rejects malformed dates, unsupported bases, invalid rate codes, and
  * non-finite or non-positive rates without touching the database.
  */
-function parseProviderRates(data: unknown, targetDate: string): ExchangeRates {
+function parseProviderRates(
+  data: unknown,
+  targetDate: string
+): { rates: ExchangeRates; providerDate: string } {
   const result = providerRatesSchema.safeParse(data);
   if (!result.success) {
     throw new AppError(
@@ -53,12 +55,26 @@ function parseProviderRates(data: unknown, targetDate: string): ExchangeRates {
     );
   }
   return {
-    base: result.data.base,
-    date: targetDate,
-    rates: Object.fromEntries(
-      Object.entries(result.data.rates).filter(([currency]) => supportedCurrencySet.has(currency))
-    ),
+    rates: {
+      base: result.data.base,
+      date: targetDate,
+      rates: Object.fromEntries(
+        Object.entries(result.data.rates).filter(([currency]) => supportedCurrencySet.has(currency))
+      ),
+    },
+    providerDate: result.data.date,
   };
+}
+
+/**
+ * The provider answers a date with the latest rates published on or before
+ * it, so an earlier provider date is the applicable rate for a past day
+ * (a Saturday gets Friday's rates). For today or a future day it only means
+ * the day's rates are not out yet, and caching them would pin the previous
+ * day's rates to that date for good.
+ */
+function isFinalForDate(providerDate: string, targetDate: string): boolean {
+  return providerDate >= targetDate || targetDate < formatExchangeRateDate(new Date());
 }
 
 // helpers
@@ -68,7 +84,7 @@ export function formatExchangeRateDate(date: Date | string): string {
     return dateStringSchema.parse(datePart ?? date);
   }
 
-  return dateStringSchema.parse(format(date, "yyyy-MM-dd"));
+  return dateStringSchema.parse(date.toISOString().slice(0, 10));
 }
 
 function isRetryableHttpStatus(status: number): boolean {
@@ -172,7 +188,8 @@ async function fetchAndStoreRates(targetDateStr: string): Promise<ExchangeRates>
         502
       );
     }
-    const data = parseProviderRates(payload, targetDateStr);
+    const { rates: data, providerDate } = parseProviderRates(payload, targetDateStr);
+    if (!isFinalForDate(providerDate, targetDateStr)) return data;
 
     return await db.transaction(async (tx) => {
       const insertedRows = await tx

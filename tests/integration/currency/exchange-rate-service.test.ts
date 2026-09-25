@@ -80,6 +80,32 @@ describe("getExchangeRates", () => {
     expect(cached.date).toBe("2024-01-20");
   });
 
+  it.each([
+    ["today before the day's rates are published", 0],
+    ["a future day", 3],
+  ])("does not cache the previous day's rates for %s", async (_label, daysAhead) => {
+    const requested = new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
+    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        base: "EUR",
+        date: "2024-01-19",
+        rates: { USD: 1.15, CNY: 7.7 },
+      }),
+    } as Response);
+
+    await expect(getExchangeRates(requested)).resolves.toMatchObject({
+      date: requested,
+      rates: { USD: 1.15, CNY: 7.7 },
+    });
+    expect(
+      await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, requested) })
+    ).toBeUndefined();
+
+    await getExchangeRates(requested);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects an invalid provider payload without writing to the database", async () => {
     vi.spyOn(global, "fetch").mockResolvedValue({
       ok: true,
