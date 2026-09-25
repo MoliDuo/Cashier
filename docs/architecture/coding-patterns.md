@@ -44,28 +44,28 @@ with `vi.mock` of the concrete module rather than injected fakes.
 - Scope tenant data by `ledgerId` in SQL and include soft-delete predicates.
 - Prefer set-based statements (`UPDATE FROM`, CTEs, and `unnest`) to per-row queries.
 - Keep keyset ordering and cursor fields identical. A cursor includes a fingerprint of its query.
-- Use the persisted accounting amount for Details, Stats, and Stream summaries. Cross-currency 1:1
-  fallback is forbidden.
+- Convert amounts at read time with the `convert_amount` SQL function (the only conversion
+  implementation) at the document's effective date. A missing rate reads as unconverted;
+  cross-currency 1:1 fallback and falling back to another day's rate are forbidden.
 - Source-document writes live in the registered writers under `src/modules/source-document/server/`
   (the architecture check lists them), not a second write path. External IO — FX conversion, provider calls — runs before the transaction
   starts, never inside it; a write transaction locks the ledger row first, then locks the target
-  document row(s) in ascending ID order, and only then compares the locked row's `version`
-  against the caller's `expectedVersion`. Ledger-wide configuration the write depends on (for example
-  `mainCurrency`) is not covered by a document's `version` and must be re-verified against the
-  locked ledger row inside the same transaction. A failed check aborts before any write; a command
-  that changes nothing observable for the caller (a no-op replay, an unchanged field) must not
-  increment `version` — every aggregate command that does produce a user-observable change
-  increments the target document's `version` by exactly one.
+  document row(s) in ascending ID order. Only the whole save from the detail page
+  (`saveSourceDocumentChanges`) compares the locked row's `version` against the caller's
+  `expectedVersion`, and it writes only the fields it patches; other commands check the narrower
+  precondition they depend on (for example, that the document is not processing, that the selected
+  entries are still on it, or that a suggestion is still current). `version` increments by exactly
+  one when, and only when, the document's title, date, or entries change — what a whole save can
+  write. Background writes that change nothing a whole save could write leave it alone.
 - Document details use one complete detail contract, including entries and evidence file metadata.
   Historical revision numbers remain stored for audit; new revisions use UUID identities and document
   versions for concurrency, without allocating sequential revision numbers.
-- Use the narrowest read that satisfies the caller. Edit-retry evidence reads only the revision
+- Use the narrowest read that satisfies the caller. Edit-retry evidence reads only the document's
   input; it must not load ledger entries or category projections that the caller discards.
 - Loaded ledger settings are complete contracts; only update inputs are partial. Do not repeat
-  defaults at each consumer. Metadata-only edits preserve stored amounts and FX results; amount,
-  currency, and document-date changes recalculate only affected entries before acquiring locks.
-- Projection replacement is an internal helper of the versioned aggregate, not an independent
-  writer. Pass already locked documents and projections into transaction helpers.
+  defaults at each consumer.
+- Entry replacement is an internal helper of the document aggregate, not an independent writer.
+  Pass already locked documents and entries into transaction helpers.
 
 ## Frontend
 
@@ -156,8 +156,8 @@ arbitrary text sizes and the retired `text-muted` alias fail the check while com
 
 Category changes initiated by persistent assignment jobs belong to the source-document aggregate.
 Acquire locks in this order: ledger, source documents ordered by ID, then assignment job/document
-work. The aggregate transaction validates the document version, active revision, editable state,
-target category, claim token, and lease before changing any entry. It increments each document
-version at most once and writes entry outcomes, work status, and parent counters in the same
-transaction. Do not reintroduce a standalone unversioned category writer or record job progress in a
-second transaction.
+work. The aggregate transaction validates the claim token, lease, target category, and that the
+document is live and not processing before changing any entry. Each entry is written only if it
+still has the category it had when it was selected, so an entry changed since then is a conflict on
+its own; the write does not change the document version. Entry outcomes, work status, and parent
+counters are written in the same transaction. Do not record job progress in a second transaction.

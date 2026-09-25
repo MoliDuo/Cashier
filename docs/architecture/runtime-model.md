@@ -6,12 +6,13 @@ for contributors, not as a deployment guarantee.
 ## Source-document processing
 
 - Vercel is the only production target; local development runs the same application path.
-- A submission creates a durable processing job and schedules work with Next.js `after()`.
+- A submission creates a processing attempt (a `source_document_revisions` row) and schedules
+  work with Next.js `after()`. The attempt is its own queue entry; there is no separate job table.
 - There is no global drain loop, cron process, external queue, or continuously running worker.
-- Processing intents use idempotent dispatch, claim leases, and lease renewal.
-- Processor completion reports `atomic` when the aggregate transaction already completed its
-  job, and `residual` when the dispatcher must acknowledge remaining work. Only residual
-  completion invokes the separate acknowledgement; recovery claims batches through one path.
+- A worker claims the attempt while it is still processing and still the document's latest
+  submission, renews the lease while it runs, and closes it in the transaction that records the
+  result or the failure. A claim counts an attempt; a claim past the attempt limit fails the
+  attempt under its lease.
 - Processing remains bounded by the Vercel function `maxDuration`.
 
 `POST /api/v1/source-documents` returns `201` only after image processing, object upload, and
@@ -95,27 +96,27 @@ executes four deletions concurrently, and uses five-minute leases. Acknowledgeme
 current unexpired token; successful sibling jobs lock their upload session before deleting the
 job and checking whether the session has any remaining work.
 
-## Exchange-rate recalculation
+## Exchange rates
 
-The transaction that first persists a daily exchange-rate snapshot is the only normal enqueue point
-for ledger recalculation jobs. Request-triggered maintenance drains due jobs; snapshot persistence
-does not start detached promises. There is no process-global event subscriber registry or
-instrumentation lifecycle token.
-
-Jobs remain durable and use claim leases, fencing tokens, bounded concurrency, exponential retry,
-and a permanent-failure state. Runtime maintenance does not scan history to recreate missing jobs.
+Entries store only their amount and currency. Reads convert with the `convert_amount` SQL function
+at the document's effective date against `exchange_rates`, which holds one row per calendar day
+and currency. An entry whose day has no rate reads as unconverted; it is never converted at another
+day's rate. Writes make one best-effort attempt to cache the rates they need before the
+transaction and save regardless; request-triggered maintenance fills missing days and replaces
+provisional rows. Changing the main currency only updates the setting.
 
 ## Simplified persistence
 
-Processing leases, scheduling state, timestamps, and diagnostic fields live in processing_outbox.
-A processing lease lasts 60 seconds and the worker renews it every 15 seconds, so a job whose
-function was killed can be claimed again within a minute. Each revision has exactly one outbox
-row; there is no second attempts table to synchronize.
+Processing leases, attempt counts, and scheduling state live on the processing attempt itself. A
+lease lasts 60 seconds and the worker renews it every 15 seconds, so an attempt whose function was
+killed can be claimed again within a minute.
 
-Manual edits update the active projection and increment the document version without creating a
-revision or copying entry history. Splits keep the original active revision and create evidence
-revisions only for newly created documents. Existing history stays intact. The latest submission
-revision still identifies original input for retry; it is distinct from the active result.
+Entries belong to their document alone. A completed parse replaces the document's entries; a
+failed or cancelled one leaves them in place. The document's current input (text and files) lives
+on the document: a submission or edit-retry replaces it, and a split or date organization copies
+it to each new document so the new record keeps its evidence. Manual edits change entries in place
+without creating revisions or copying entry history; revisions exist only for parse attempts, and
+the document's latest submission points at the current one.
 
 AI text, image, and JSON repair requests use the single configured model. Category document slots
 are limited to one across database-coordinated workers. The AI client serializes provider requests
