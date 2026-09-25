@@ -8,7 +8,6 @@ import type {
 } from "@/server/processing/types";
 import { db } from "@/lib/db";
 import { processingOutbox } from "@/persistence";
-import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 
 // Renewed every 15 seconds while the worker runs, so the length only decides how
 // soon a job whose function was killed can be claimed again.
@@ -61,7 +60,8 @@ export async function claimProcessingJob(
       )
       UPDATE processing_outbox outbox
       SET status = 'claimed', started_at = COALESCE(outbox.started_at, now()), claim_token = ${claimToken},
-          claim_expires_at = ${expiresAt}
+          claim_expires_at = ${expiresAt},
+          schedule_attempt_count = outbox.schedule_attempt_count + 1
       FROM candidate WHERE outbox.id = candidate.id
       RETURNING outbox.*
     `);
@@ -75,6 +75,7 @@ export async function claimProcessingJob(
             sourceDocumentId: raw.source_document_id,
             revisionId: raw.revision_id,
             requestedAt: new Date(raw.requested_at as string | Date),
+            scheduleAttemptCount: Number(raw.schedule_attempt_count),
           } as typeof processingOutbox.$inferSelect);
     if (row == null) return null;
     const job = mapJob(row);
@@ -82,6 +83,7 @@ export async function claimProcessingJob(
       ledgerId: row.ledgerId,
       job,
       claimToken,
+      attempt: row.scheduleAttemptCount,
       expiresAt: expiresAt.toISOString(),
     };
   });
@@ -95,9 +97,9 @@ export async function recoverProcessingJobs(
   const now = clock.now?.() ?? new Date();
   const nextAvailable = new Date(now.getTime() + config.cooldownSeconds * 1000);
 
+  // Every statement locks only outbox rows, skipping ones another pass holds,
+  // so concurrent passes pick disjoint sets without serializing on the ledger.
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
-
     await tx.execute(sql`
       WITH candidate AS (
         SELECT outbox.id, outbox.revision_id,
@@ -138,47 +140,6 @@ export async function recoverProcessingJobs(
       SELECT count(*) FROM closed
     `);
 
-    await tx.execute(sql`
-      WITH candidate AS (
-        SELECT outbox.id, outbox.revision_id
-        FROM processing_outbox outbox
-        JOIN source_documents document
-          ON document.ledger_id = outbox.ledger_id
-         AND document.id = outbox.source_document_id
-         AND document.latest_submission_revision_id = outbox.revision_id
-         AND document.deleted_at IS NULL
-        JOIN source_document_revisions revision
-          ON revision.ledger_id = outbox.ledger_id
-         AND revision.id = outbox.revision_id
-         AND revision.processing_status = 'processing'
-        WHERE outbox.ledger_id = ${ledgerId}
-          AND outbox.schedule_attempt_count >= ${config.maxAttempts}
-          AND outbox.next_available_at <= ${now}
-          AND (
-            outbox.status = 'pending'
-            OR (outbox.status = 'claimed' AND outbox.claim_expires_at <= ${now})
-          )
-        ORDER BY outbox.next_available_at, outbox.created_at, outbox.id
-        FOR UPDATE OF outbox SKIP LOCKED
-        LIMIT ${config.maxBatch}
-      ), closed AS (
-        UPDATE processing_outbox outbox
-        SET status = 'failed', diagnostic_code = 'request_bound_retry_exhausted', completed_at = ${now}, claim_token = NULL, claim_expires_at = NULL
-        FROM candidate
-        WHERE outbox.id = candidate.id
-        RETURNING candidate.revision_id
-      ), updated_revisions AS (
-        UPDATE source_document_revisions revision
-        SET processing_status = 'failed', failure_kind = 'processing_error',
-            failure_code = 'request_bound_retry_exhausted',
-            failure_message = 'Processing retry limit reached', finished_at = ${now}
-        FROM closed
-        WHERE revision.id = closed.revision_id AND revision.processing_status = 'processing'
-        RETURNING revision.id
-      )
-      SELECT count(*) FROM closed
-    `);
-
     const scheduled = await tx.execute<{
       id: string;
       sourceDocumentId: string;
@@ -200,7 +161,6 @@ export async function recoverProcessingJobs(
          AND revision.id = outbox.revision_id
          AND revision.processing_status = 'processing'
         WHERE outbox.ledger_id = ${ledgerId}
-          AND outbox.schedule_attempt_count < ${config.maxAttempts}
           AND outbox.next_available_at <= ${now}
           AND (
             outbox.status = 'pending'
@@ -211,8 +171,7 @@ export async function recoverProcessingJobs(
         LIMIT ${config.maxBatch}
       )
       UPDATE processing_outbox outbox
-      SET schedule_attempt_count = outbox.schedule_attempt_count + 1,
-          next_available_at = ${nextAvailable}
+      SET next_available_at = ${nextAvailable}
       FROM candidate
       WHERE outbox.id = candidate.id
       RETURNING outbox.id,

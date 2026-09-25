@@ -21,6 +21,8 @@ export interface ProcessingClaimContract {
   ledgerId: string;
   job: ProcessingJobContract;
   claimToken: string;
+  /** Runs this job has been given, this one included. */
+  attempt: number;
   expiresAt: string;
 }
 
@@ -31,7 +33,6 @@ export interface RecoverableProcessingJobContract extends ProcessingJobContract 
 
 export interface ProcessingRecoveryConfig {
   maxBatch: number;
-  maxAttempts: number;
   cooldownSeconds: number;
 }
 

@@ -15,7 +15,12 @@ const { process, recordProcessingFailure } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/processing/jobs", () => ({
-  claimProcessingJob: vi.fn(async () => ({ job, ledgerId: "ledger", claimToken: "token" })),
+  claimProcessingJob: vi.fn(async () => ({
+    job,
+    ledgerId: "ledger",
+    claimToken: "token",
+    attempt: 1,
+  })),
   renewProcessingJobLease: vi.fn(async () => null),
 }));
 vi.mock("@/server/processing/revision-processor", () => ({ processRevision: process }));

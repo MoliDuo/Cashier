@@ -1,5 +1,5 @@
 import { createPendingRevision } from "tests/helpers/processing-revision";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
@@ -7,6 +7,13 @@ import type { ProcessingJobContract } from "@/server/processing/types";
 import { processingOutbox, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { processingJobs } from "tests/helpers/processing-jobs";
+import { PROCESSING_MAX_ATTEMPTS } from "@/config/tuning";
+
+vi.mock("@/lib/tasks/ai-context", () => ({
+  createAIContext: vi.fn(),
+}));
+import { createAIContext } from "@/lib/tasks/ai-context";
+import { executeProcessingJob } from "@/server/processing/execute-job";
 
 /**
  * Creates a pending revision + job for a single source document.
@@ -73,7 +80,7 @@ async function expireClaim(jobId: string) {
 }
 
 describe("Processing Recovery", () => {
-  const config = { maxBatch: 3, maxAttempts: 5, cooldownSeconds: 60 };
+  const config = { maxBatch: 3, cooldownSeconds: 60 };
 
   it("recovers an job that was dispatched but never claimed (missed after())", async () => {
     const { ledgerId, job } = await pendingIntent();
@@ -92,7 +99,7 @@ describe("Processing Recovery", () => {
     const row = await db.query.processingOutbox.findFirst({
       where: eq(processingOutbox.id, job.id),
     });
-    expect(row?.scheduleAttemptCount).toBe(1);
+    expect(row?.scheduleAttemptCount).toBe(0);
     expect(new Date(row!.nextAvailableAt).getTime()).toBeGreaterThan(Date.now());
   });
 
@@ -125,12 +132,13 @@ describe("Processing Recovery", () => {
     const recoveredIds = [...first, ...second].map((candidate) => candidate.id);
     expect(recoveredIds).toEqual([job.id]);
 
-    // The job should have been incrementally scheduled
+    // Scheduling pushes the next run out; only a claim counts an attempt.
     const db = getTestDb();
     const row = await db.query.processingOutbox.findFirst({
       where: eq(processingOutbox.id, job.id),
     });
-    expect(row!.scheduleAttemptCount).toBe(1);
+    expect(row!.scheduleAttemptCount).toBe(0);
+    expect(new Date(row!.nextAvailableAt).getTime()).toBeGreaterThan(Date.now());
   });
 
   it("skips recovery when the source document has been deleted", async () => {
@@ -191,67 +199,54 @@ describe("Processing Recovery", () => {
     expect(recoverable).toHaveLength(0);
   });
 
-  // ── New/updated tests for Task 3 ──
+  it("counts an attempt each time a run claims the job, not when it is scheduled", async () => {
+    let now = new Date("2026-07-15T00:00:00.000Z");
+    const { ledgerId, job } = await pendingIntent(now.toISOString());
+    const adapter = processingJobs({ leaseMs: 1_000, now: () => now });
+    await adapter.dispatch(job);
 
-  it("returns job for execution on last allowed attempt (scheduleAttemptCount reaches maxAttempts)", async () => {
+    await adapter.recoverBatch(ledgerId, config);
+    await expect(adapter.claim(job.id)).resolves.toMatchObject({ attempt: 1 });
+    now = new Date(now.getTime() + 1_001);
+    await expect(adapter.claim(job.id)).resolves.toMatchObject({ attempt: 2 });
+  });
+
+  it("fails an exhausted job under its lease when a run claims it", async () => {
     const { ledgerId, job } = await pendingIntent();
     const adapter = processingJobs();
     await adapter.dispatch(job);
-
-    // Set scheduleAttemptCount to one below maxAttempts — this is the last schedulable attempt
-    await setScheduleAttemptCount(job.id, config.maxAttempts - 1);
-    await expireNextAvailable(job.id);
-
-    const recoverable = await adapter.recoverBatch(ledgerId, config);
-
-    // The job should be returned for execution (this is its last allowed attempt)
-    expect(recoverable).toHaveLength(1);
-    expect(recoverable[0]!.id).toBe(job.id);
-
-    // scheduleAttemptCount should now be maxAttempts
+    await setScheduleAttemptCount(job.id, PROCESSING_MAX_ATTEMPTS);
     const db = getTestDb();
-    const row = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
+    const before = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
-    expect(row?.scheduleAttemptCount).toBe(config.maxAttempts);
-    // Outbox should NOT be exhausted yet — exhaustion only on next request
-    expect(row?.status).toBe("pending");
+
+    // Recovery still schedules it; the claim is where exhaustion is decided.
+    await expect(adapter.recoverBatch(ledgerId, config)).resolves.toHaveLength(1);
+    await expect(executeProcessingJob(job)).resolves.toBe(true);
+
+    expect(createAIContext).not.toHaveBeenCalled();
+    await expect(
+      db.query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.id, job.revisionId),
+      })
+    ).resolves.toMatchObject({
+      processingStatus: "failed",
+      failureCode: "request_bound_retry_exhausted",
+    });
+    await expect(
+      db.query.processingOutbox.findFirst({ where: eq(processingOutbox.id, job.id) })
+    ).resolves.toMatchObject({
+      status: "failed",
+      diagnosticCode: "request_bound_retry_exhausted",
+    });
+    await expect(
+      db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, job.sourceDocumentId) })
+    ).resolves.toMatchObject({ version: before!.version + 1 });
   });
 
-  it("exhausts job on next request after scheduleAttemptCount reaches maxAttempts and cooldown expires", async () => {
-    const { ledgerId, job } = await pendingIntent();
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
-    // Simulate: the job has already been scheduled maxAttempts times
-    await setScheduleAttemptCount(job.id, config.maxAttempts);
-    await expireNextAvailable(job.id);
-
-    // This request should exhaust the job (not schedule it)
-    const recoverable = await adapter.recoverBatch(ledgerId, config);
-    expect(recoverable).toHaveLength(0);
-
-    // Outbox should be marked as failed
-    const db = getTestDb();
-    const outboxRow = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(outboxRow?.status).toBe("failed");
-    expect(outboxRow?.completedAt).not.toBeNull();
-
-    // Revision should be marked as failed
-    const revisionRow = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
-    });
-    expect(revisionRow?.processingStatus).toBe("failed");
-    expect(revisionRow?.failureCode).toBe("request_bound_retry_exhausted");
-
-    // Diagnostics live on the same durable job.
-    expect(outboxRow?.diagnosticCode).toBe("request_bound_retry_exhausted");
-  });
-
-  it("respects maxBatch independent of maxAttempts (returns at most maxBatch intents)", async () => {
-    const smallConfig = { maxBatch: 2, maxAttempts: 5, cooldownSeconds: 60 };
+  it("returns at most maxBatch intents", async () => {
+    const smallConfig = { maxBatch: 2, cooldownSeconds: 60 };
 
     // Create a single ledger and 3 source documents within it
     const { ledgerId, job: intent1 } = await pendingIntent();
@@ -299,7 +294,7 @@ describe("Processing Recovery", () => {
   });
 
   it("maxBatch=1 still allows job to execute", async () => {
-    const singleConfig = { maxBatch: 1, maxAttempts: 3, cooldownSeconds: 60 };
+    const singleConfig = { maxBatch: 1, cooldownSeconds: 60 };
     const { ledgerId, job } = await pendingIntent();
     const adapter = processingJobs();
     await adapter.dispatch(job);
@@ -309,16 +304,12 @@ describe("Processing Recovery", () => {
     expect(recoverable[0]!.id).toBe(job.id);
   });
 
-  it("exhaustion CAS: stale outbox closed but revision untouched when newer pending exists", async () => {
+  it("closes a superseded job without touching its revision", async () => {
     const { ledgerId, job } = await pendingIntent();
     const adapter = processingJobs();
     await adapter.dispatch(job);
 
-    // Set up: scheduleAttemptCount at maxAttempts, but then change the document's
-    // latestSubmissionRevisionId so the outbox's revision is no longer current
-    await setScheduleAttemptCount(job.id, config.maxAttempts);
-
-    // Create a newer pending revision
+    // Point the document at a newer revision so the job's revision is no longer current.
     const db = getTestDb();
     const newRevision = await db
       .insert(sourceDocumentRevisions)
@@ -351,35 +342,7 @@ describe("Processing Recovery", () => {
     expect(oldRevision?.failureCode).toBeNull();
   });
 
-  it("exhaustion CAS: full exhaustion when revision is still current pending", async () => {
-    const { ledgerId, job } = await pendingIntent();
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
-    // The revision IS still the current pending — exhaustion should fully update
-    await setScheduleAttemptCount(job.id, config.maxAttempts);
-    await expireNextAvailable(job.id);
-    await adapter.recoverBatch(ledgerId, config);
-
-    const db = getTestDb();
-
-    // Outbox should be failed
-    const outboxRow = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(outboxRow?.status).toBe("failed");
-
-    // Revision should be marked as failed
-    const revisionRow = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
-    });
-    expect(revisionRow?.processingStatus).toBe("failed");
-    expect(revisionRow?.failureCode).toBe("request_bound_retry_exhausted");
-
-    // Diagnostics live on the same durable job.
-  });
-
-  it("exhaustion CAS: does not modify completed revision's outcome", async () => {
+  it("closes a finished job without changing its revision's outcome", async () => {
     const { ledgerId, job } = await pendingIntent();
     const adapter = processingJobs();
     await adapter.dispatch(job);
@@ -404,65 +367,6 @@ describe("Processing Recovery", () => {
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
     expect(revisionRow?.processingStatus).toBe("completed");
-  });
-
-  it("does not select an job with scheduleAttemptCount >= maxAttempts for recovery", async () => {
-    const { ledgerId, job } = await pendingIntent();
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
-    // Set scheduleAttemptCount to maxAttempts (exceeds threshold for selectRecoverable)
-    await setScheduleAttemptCount(job.id, config.maxAttempts);
-    await expireNextAvailable(job.id);
-
-    // The job should NOT be selected for recovery (scheduleAttemptCount >= maxAttempts)
-    // Instead, it should be exhausted
-    const recoverable = await adapter.recoverBatch(ledgerId, config);
-    expect(recoverable).toHaveLength(0);
-
-    // Outbox should be exhausted
-    const db = getTestDb();
-    const row = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(row?.status).toBe("failed");
-  });
-
-  it("exhaustion only happens after cooldown expires", async () => {
-    const { ledgerId, job } = await pendingIntent();
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
-    // Set scheduleAttemptCount to maxAttempts and force nextAvailableAt to the future
-    const db = getTestDb();
-    await db
-      .update(processingOutbox)
-      .set({
-        scheduleAttemptCount: config.maxAttempts,
-        nextAvailableAt: new Date("2099-01-01T00:00:00.000Z"),
-      })
-      .where(eq(processingOutbox.id, job.id));
-
-    // The job should not be exhausted because cooldown hasn't expired
-    const recoverable = await adapter.recoverBatch(ledgerId, config);
-    expect(recoverable).toHaveLength(0);
-
-    // Outbox should still be pending (not yet exhausted because nextAvailableAt > now)
-    const row = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(row?.status).toBe("pending");
-    expect(row?.scheduleAttemptCount).toBe(config.maxAttempts);
-
-    // Now expire nextAvailableAt and try again — should exhaust
-    await expireNextAvailable(job.id);
-    const recoverable2 = await adapter.recoverBatch(ledgerId, config);
-    expect(recoverable2).toHaveLength(0);
-
-    const row2 = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(row2?.status).toBe("failed");
   });
 });
 

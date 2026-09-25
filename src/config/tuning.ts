@@ -85,5 +85,6 @@ export const SESSION_MAX_AGE_DAYS = 14;
 
 /** Picking up source documents whose processing died mid-flight. */
 export const PROCESSING_RECOVERY_MAX_BATCH = 5;
-export const PROCESSING_RECOVERY_MAX_ATTEMPTS = 5;
 export const PROCESSING_RECOVERY_COOLDOWN_SECONDS = 60;
+/** Runs a submission gets, the first one included, before it is failed. */
+export const PROCESSING_MAX_ATTEMPTS = 5;

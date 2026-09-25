@@ -11,6 +11,7 @@ import {
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 import { claimProcessingJob, renewProcessingJobLease } from "./jobs";
 import { processRevision } from "./revision-processor";
+import { PROCESSING_MAX_ATTEMPTS } from "@/config/tuning";
 
 function toFailureCode(error: unknown): ProcessingFailureCode {
   if (error instanceof ProcessingFailure) return error.code;
@@ -38,6 +39,19 @@ function toFailureCode(error: unknown): ProcessingFailureCode {
 export async function executeProcessingJob(job: ProcessingJobContract): Promise<boolean> {
   const claim = await claimProcessingJob(job.id);
   if (claim == null) return false;
+  const lease = { jobId: claim.job.id, claimToken: claim.claimToken };
+  if (claim.attempt > PROCESSING_MAX_ATTEMPTS) {
+    await recordProcessingFailure({
+      ledgerId: claim.ledgerId,
+      sourceDocumentId: claim.job.sourceDocumentId,
+      revisionId: claim.job.revisionId,
+      failureKind: "processing_error",
+      failureMessage: "Processing retry limit reached",
+      failureCode: "request_bound_retry_exhausted",
+      lease,
+    });
+    return true;
+  }
 
   const controller = new AbortController();
   let stopped = false;
@@ -78,7 +92,7 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
       sourceDocumentId: claim.job.sourceDocumentId,
       revisionId: claim.job.revisionId,
       signal: controller.signal,
-      lease: { jobId: claim.job.id, claimToken: claim.claimToken },
+      lease,
     });
   } catch (error) {
     if (error instanceof ProcessingCancelledError || controller.signal.aborted) return true;
@@ -89,7 +103,7 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
       failureKind: "processing_error",
       failureMessage: error instanceof Error ? error.message : "Processing failed",
       failureCode: toFailureCode(error),
-      lease: { jobId: claim.job.id, claimToken: claim.claimToken },
+      lease,
     });
   } finally {
     stopped = true;

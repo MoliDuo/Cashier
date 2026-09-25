@@ -6,7 +6,6 @@ import { recoverProcessingJobs } from "./jobs";
 import { scheduleProcessingAfter } from "./schedule";
 import {
   PROCESSING_RECOVERY_COOLDOWN_SECONDS,
-  PROCESSING_RECOVERY_MAX_ATTEMPTS,
   PROCESSING_RECOVERY_MAX_BATCH,
 } from "@/config/tuning";
 
@@ -24,14 +23,12 @@ import {
 async function scheduleProcessingRecovery(ledgerId: string): Promise<void> {
   const config = {
     maxBatch: PROCESSING_RECOVERY_MAX_BATCH,
-    maxAttempts: PROCESSING_RECOVERY_MAX_ATTEMPTS,
     cooldownSeconds: PROCESSING_RECOVERY_COOLDOWN_SECONDS,
   };
 
-  // Every returned job had its schedule attempt count advanced under the
-  // ledger lock, so a concurrent request picks a disjoint set. A job that just
-  // reached the attempt limit still runs once; exhaustion is decided on a
-  // later request, after the cooldown.
+  // Every returned job had its next run pushed out by the cooldown, so a
+  // concurrent request picks a disjoint set. Attempts are counted when a run
+  // claims the job, which is also where an exhausted job is failed.
   const recoverable = await recoverProcessingJobs(ledgerId, config);
 
   if (recoverable.length === 0) return;
