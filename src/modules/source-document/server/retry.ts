@@ -27,6 +27,6 @@ export async function retrySourceDocument({
     supersedeProcessing: true,
     ...(input == null ? {} : { input }),
   });
-  if (pending.idempotencyReplay !== true) scheduleProcessingAfter(pending.job);
+  scheduleProcessingAfter(pending.job);
   return { status: "processing" };
 }

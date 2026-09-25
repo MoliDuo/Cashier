@@ -3,7 +3,7 @@
  * `source_document_files` — alongside the revision copies it replaces. Every
  * write that changes which input a document reads keeps the two in step.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import {
   ledgerSyncState,
@@ -13,11 +13,15 @@ import {
   storedFiles,
 } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { getTestDb, getTestPool } from "tests/setup";
+import { getTestDb } from "tests/setup";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
-import { scanUnreferencedFiles } from "../../../../scripts/prune-storage.mjs";
+import { runDailyMaintenance } from "@/server/maintenance/daily";
+import { MemoryObjectStore } from "tests/helpers/memory-object-store";
+
+const objectStore = vi.hoisted(() => ({ current: undefined as MemoryObjectStore | undefined }));
+vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
 
 const entry = {
   categoryId: null,
@@ -144,9 +148,10 @@ describe("source document input", () => {
     });
   });
 
-  it("keeps a file only the document lists out of the unreferenced-file prune", async () => {
+  it("keeps a file only the document lists out of the unused-file sweep", async () => {
     const ledgerId = await newLedger();
-    const [listed, orphan] = await Promise.all([storeFile(ledgerId), storeFile(ledgerId)]);
+    // The second file is on no document, so the sweep takes it.
+    const [listed] = await Promise.all([storeFile(ledgerId), storeFile(ledgerId)]);
     const created = await createManualDocument({
       ledgerId,
       bookId: await testBookId(getTestDb(), ledgerId),
@@ -159,42 +164,27 @@ describe("source document input", () => {
       position: 0,
     });
 
-    const seen: string[] = [];
-    const s3 = {
-      send: async (command: { input: { Key: string } }) => {
-        seen.push(command.input.Key);
-        return { ContentLength: 7 };
-      },
-    };
-    const summary = {
-      unreferencedFiles: {
-        count: 0,
-        bytes: 0,
-        deleted: 0,
-        deletedBytes: 0,
-        failed: 0,
-        missing: 0,
-        missingBytes: 0,
-      },
-      missingObjects: { count: 0, bytes: 0 },
-      errors: [] as string[],
-    };
-    await scanUnreferencedFiles(
-      getTestPool(),
-      s3,
-      "fixture",
-      new Date(Date.now() + 60_000),
-      50,
-      false,
-      summary
-    );
-    const keys = await getTestDb()
-      .select({ id: storedFiles.id, key: storedFiles.storageKey })
-      .from(storedFiles)
-      .where(eq(storedFiles.ledgerId, ledgerId));
-    const keyById = new Map(keys.map((row) => [row.id, row.key]));
-    expect(seen).toContain(keyById.get(orphan));
-    expect(seen).not.toContain(keyById.get(listed));
+    const storage = new MemoryObjectStore();
+    objectStore.current = storage;
+    const files = await getTestDb()
+      .update(storedFiles)
+      .set({ createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) })
+      .where(eq(storedFiles.ledgerId, ledgerId))
+      .returning({ id: storedFiles.id, key: storedFiles.storageKey });
+    for (const file of files) await storage.upload(file.key, Buffer.from("fixture"));
+
+    await expect(runDailyMaintenance()).resolves.toMatchObject({ unused_files: "done" });
+
+    const keyById = new Map(files.map((file) => [file.id, file.key]));
+    expect([...storage.files.keys()]).toEqual([keyById.get(listed)]);
+    expect(
+      (
+        await getTestDb()
+          .select({ id: storedFiles.id })
+          .from(storedFiles)
+          .where(eq(storedFiles.ledgerId, ledgerId))
+      ).map((file) => file.id)
+    ).toEqual([listed]);
   });
 
   it("leaves the ledger sync version alone when only a processing lease moves", async () => {

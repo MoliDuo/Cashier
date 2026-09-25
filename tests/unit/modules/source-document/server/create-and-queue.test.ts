@@ -3,6 +3,7 @@ import { ValidationError } from "@/lib/errors";
 
 const {
   submit,
+  findIdempotent,
   submitIdempotently,
   scheduleProcessing,
   storeProcessedImages,
@@ -10,6 +11,7 @@ const {
   processImage,
 } = vi.hoisted(() => ({
   submit: vi.fn(),
+  findIdempotent: vi.fn(),
   submitIdempotently: vi.fn(),
   scheduleProcessing: vi.fn(),
   storeProcessedImages: vi.fn(),
@@ -19,6 +21,7 @@ const {
 
 vi.mock("@/modules/source-document/server/submissions", () => ({
   submitSourceDocument: submit,
+  findIdempotentSubmission: findIdempotent,
   submitSourceDocumentIdempotently: submitIdempotently,
 }));
 vi.mock("@/server/processing/schedule", () => ({
@@ -89,13 +92,13 @@ describe("createAndQueueSourceDocument", () => {
     });
   });
 
-  it("uses the required idempotent path and skips preparation on replay", async () => {
-    submitIdempotently.mockResolvedValue({
-      document: { id: "doc-1" },
-      revision: { id: "revision-1", processingStatus: "processing" },
-      job,
-      idempotencyReplay: true,
-    });
+  it("replays a known key before processing any image", async () => {
+    const existing = {
+      sourceDocumentId: "doc-1",
+      revisionId: "revision-1",
+      processingStatus: "processing",
+    };
+    findIdempotent.mockResolvedValue(existing);
     const idempotency = {
       principalType: "user" as const,
       principalId: "user-1",
@@ -103,7 +106,7 @@ describe("createAndQueueSourceDocument", () => {
       contentFingerprint: "fingerprint-1",
     };
 
-    await createAndQueueSourceDocument({
+    const result = await createAndQueueSourceDocument({
       ledgerId: "ledger-1",
       bookId: "user-1",
       input: {
@@ -113,10 +116,41 @@ describe("createAndQueueSourceDocument", () => {
       idempotency,
     });
 
-    expect(submitIdempotently).toHaveBeenCalledWith(idempotency, expect.any(Function));
+    expect(result).toBe(existing);
+    expect(findIdempotent).toHaveBeenCalledWith("ledger-1", idempotency);
     expect(processImage).not.toHaveBeenCalled();
     expect(storeProcessedImages).not.toHaveBeenCalled();
-    expect(submit).not.toHaveBeenCalled();
+    expect(submitIdempotently).not.toHaveBeenCalled();
+    expect(scheduleProcessing).not.toHaveBeenCalled();
+  });
+
+  it("discards its images when a concurrent repeat created the document first", async () => {
+    const existing = {
+      sourceDocumentId: "doc-1",
+      revisionId: "revision-1",
+      processingStatus: "processing",
+    };
+    findIdempotent.mockResolvedValue(null);
+    storeProcessedImages.mockResolvedValue(["stored-1"]);
+    submitIdempotently.mockResolvedValue({ replayed: true, existing });
+
+    const result = await createAndQueueSourceDocument({
+      ledgerId: "ledger-1",
+      bookId: "user-1",
+      input: {
+        kind: "inline",
+        images: [{ bytes: Buffer.from("image"), mimeType: "image/jpeg", contentHash: "hash" }],
+      },
+      idempotency: {
+        principalType: "credential",
+        principalId: "credential-1",
+        key: "upload-1",
+        contentFingerprint: "fingerprint-1",
+      },
+    });
+
+    expect(result).toBe(existing);
+    expect(discardUnusedFiles).toHaveBeenCalledWith("ledger-1", ["stored-1"]);
     expect(scheduleProcessing).not.toHaveBeenCalled();
   });
 

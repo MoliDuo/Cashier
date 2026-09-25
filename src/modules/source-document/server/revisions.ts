@@ -28,6 +28,8 @@ export type CreatePendingRevisionInput = {
     documentDate: string | null;
     dateReference?: string | null;
   };
+  /** Recorded on a new document so a repeated create request finds it. */
+  idempotency?: { source: string; key: string; fingerprint: string | null };
 } & ({ sourceDocumentId: string; bookId?: string } | { sourceDocumentId?: never; bookId: string });
 
 function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
@@ -91,6 +93,9 @@ async function insertNewSourceDocument(
       id: sourceDocumentId,
       ledgerId: input.ledgerId,
       bookId: input.bookId!,
+      idempotencySource: input.idempotency?.source ?? null,
+      idempotencyKey: input.idempotency?.key ?? null,
+      idempotencyFingerprint: input.idempotency?.fingerprint ?? null,
     })
     .returning();
   return rows[0]!;

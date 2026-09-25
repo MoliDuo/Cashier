@@ -5,8 +5,10 @@ import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
 import { discardUnusedFiles } from "@/server/stored-files/uploads";
 import { scheduleProcessingAfter } from "@/server/processing/schedule";
 import {
+  findIdempotentSubmission,
   submitSourceDocument,
   submitSourceDocumentIdempotently,
+  type SourceDocumentIdempotencyInput,
   type SourceDocumentSubmissionContract,
 } from "./submissions";
 import type { PreparedInlineImage } from "@/modules/source-document/api-v1-policy";
@@ -21,12 +23,7 @@ export interface CreateAndQueueSourceDocumentInput {
     | { kind: "inline"; images: PreparedInlineImage[] };
   documentDate?: string;
   timezone?: string;
-  idempotency?: {
-    principalType: "credential" | "user";
-    principalId: string;
-    key: string;
-    contentFingerprint: string | null;
-  };
+  idempotency?: SourceDocumentIdempotencyInput;
   /** Correlates the processing `after()` with the request that queued it. */
   requestId?: string;
 }
@@ -39,7 +36,6 @@ function resolveDocumentDate(documentDate?: string, timezone?: string): string {
 export async function createAndQueueSourceDocument(
   input: CreateAndQueueSourceDocumentInput
 ): Promise<SourceDocumentSubmissionContract> {
-  let storedImageIds: string[] = [];
   const storedInput = input.input.kind === "stored" ? input.input : null;
   const inlineImages = input.input.kind === "inline" ? input.input.images : [];
   validateAggregateFileCount(storedInput?.storedFileIds.length ?? inlineImages.length, 0);
@@ -54,39 +50,49 @@ export async function createAndQueueSourceDocument(
     throw new ValidationError("Content (text or images) is required");
   }
 
-  const prepareSubmission = async () => {
-    const resolvedDate = resolveDocumentDate(input.documentDate, input.timezone);
-    const preparedImages =
-      inlineImages.length > 0 ? await prepareInlineImages(inlineImages, input.ledgerId) : null;
-    const processedImageIds = preparedImages?.storedFileIds ?? [];
-    storedImageIds = processedImageIds;
+  // A repeated request finds its document before any image is processed.
+  if (input.idempotency != null) {
+    const existing = await findIdempotentSubmission(input.ledgerId, input.idempotency);
+    if (existing != null) return existing;
+  }
 
-    return {
+  let storedImageIds: string[] = [];
+  try {
+    const resolvedDate = resolveDocumentDate(input.documentDate, input.timezone);
+    if (inlineImages.length > 0) {
+      storedImageIds = (await prepareInlineImages(inlineImages, input.ledgerId)).storedFileIds;
+    }
+    const submission = {
       ledgerId: input.ledgerId,
       bookId: input.bookId,
       input: {
         text: storedInput?.text ?? null,
-        storedFileIds: [...(storedInput?.storedFileIds ?? []), ...processedImageIds],
+        storedFileIds: [...(storedInput?.storedFileIds ?? []), ...storedImageIds],
         documentDate: resolvedDate,
         dateReference: resolvedDate,
       },
     };
-  };
-
-  let pending;
-  try {
-    pending = input.idempotency
-      ? await submitSourceDocumentIdempotently(input.idempotency, prepareSubmission)
-      : await submitSourceDocument(await prepareSubmission());
+    let pending;
+    if (input.idempotency == null) {
+      pending = await submitSourceDocument(submission);
+    } else {
+      const result = await submitSourceDocumentIdempotently(submission, input.idempotency);
+      if (result.replayed) {
+        // A concurrent repeat created the document first; these images are unused.
+        await discardUnusedFiles(input.ledgerId, storedImageIds);
+        return result.existing;
+      }
+      pending = result.submission;
+    }
+    scheduleProcessingAfter(pending.job, input.requestId);
+    return {
+      sourceDocumentId: pending.document.id,
+      revisionId: pending.revision.id,
+      processingStatus: "processing",
+    };
   } catch (error) {
     // Images stored for a submission that did not happen are nobody's.
     await discardUnusedFiles(input.ledgerId, storedImageIds);
     throw error;
   }
-  if (pending.idempotencyReplay !== true) scheduleProcessingAfter(pending.job, input.requestId);
-  return {
-    sourceDocumentId: pending.document.id,
-    revisionId: pending.revision.id,
-    processingStatus: "processing",
-  };
 }

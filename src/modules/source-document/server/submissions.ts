@@ -1,33 +1,20 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
-import {
-  idempotencyRecords,
-  sourceDocumentFiles,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { sourceDocumentFiles, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import {
   createProcessingRevisionInTransaction,
   type SourceDocumentContract,
   type SourceDocumentRevisionContract,
 } from "@/modules/source-document/server/revisions";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import type { PostgresTransaction } from "@/lib/db/transaction-locks";
-
-const IDEMPOTENCY_WAIT_ATTEMPTS = 10;
-const IDEMPOTENCY_LEASE_MS = 30_000;
-const IDEMPOTENCY_RENEW_INTERVAL_MS = 10_000;
-const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { lockLedgerForUpdate, type PostgresTransaction } from "@/lib/db/transaction-locks";
 
 async function submitInTransaction(
   tx: PostgresTransaction,
-  input: SourceDocumentSubmissionInput
+  input: SourceDocumentSubmissionInput,
+  idempotency?: SourceDocumentIdempotencyInput
 ): Promise<SourceDocumentSubmissionResult> {
   let revisionInput = input.input;
 
@@ -114,6 +101,15 @@ async function submitInTransaction(
           ledgerId: input.ledgerId,
           bookId: input.bookId!,
           input: revisionInput,
+          ...(idempotency == null
+            ? {}
+            : {
+                idempotency: {
+                  source: idempotencySource(idempotency),
+                  key: idempotency.key,
+                  fingerprint: idempotency.contentFingerprint,
+                },
+              }),
         }
       : {
           ledgerId: input.ledgerId,
@@ -131,132 +127,49 @@ async function submitInTransaction(
   return { ...pending, job };
 }
 
-async function createIdempotentSubmission(
+function idempotencySource(idempotency: SourceDocumentIdempotencyInput): string {
+  return `${idempotency.principalType}:${idempotency.principalId}`;
+}
+
+/**
+ * The document an earlier create request with this key made in the ledger, or
+ * null. Keys never expire; one reused with other content is refused rather
+ * than replayed.
+ */
+export async function findIdempotentSubmission(
+  ledgerId: string,
   idempotency: SourceDocumentIdempotencyInput,
-  prepare: () => Promise<SourceDocumentSubmissionInput>
-): Promise<SourceDocumentSubmissionResult> {
-  const { principalType, principalId, key, contentFingerprint } = idempotency;
+  executor: PostgresTransaction | typeof db = db
+): Promise<SourceDocumentSubmissionContract | null> {
+  const { key } = idempotency;
   if (key.trim() === "" || key.length > 512) {
     throw new ValidationError("Idempotency key must contain between 1 and 512 characters");
   }
-
-  const now = new Date();
-  const leaseToken = crypto.randomUUID();
-  const claimed = await db
-    .insert(idempotencyRecords)
-    .values({
-      principalType,
-      principalId,
-      key,
-      status: "pending",
-      contentFingerprint,
-      leaseToken,
-      leaseExpiresAt: new Date(now.getTime() + IDEMPOTENCY_LEASE_MS),
-      expiresAt: new Date(now.getTime() + IDEMPOTENCY_TTL_MS),
+  const document = await executor
+    .select({
+      id: sourceDocuments.id,
+      revisionId: sourceDocuments.latestSubmissionRevisionId,
+      fingerprint: sourceDocuments.idempotencyFingerprint,
     })
-    .onConflictDoUpdate({
-      target: [
-        idempotencyRecords.principalType,
-        idempotencyRecords.principalId,
-        idempotencyRecords.key,
-      ],
-      set: {
-        leaseToken,
-        leaseExpiresAt: new Date(now.getTime() + IDEMPOTENCY_LEASE_MS),
-        expiresAt: new Date(now.getTime() + IDEMPOTENCY_TTL_MS),
-      },
-      setWhere: sql`${idempotencyRecords.status} = 'pending'
-        AND ${idempotencyRecords.leaseExpiresAt} < ${now}
-        AND ${idempotencyRecords.contentFingerprint} IS NOT DISTINCT FROM ${contentFingerprint}`,
-    })
-    .returning({ key: idempotencyRecords.key });
-
-  if (claimed.length === 1) {
-    const renewLease = async () => {
-      const renewedAt = new Date();
-      await db
-        .update(idempotencyRecords)
-        .set({ leaseExpiresAt: new Date(renewedAt.getTime() + IDEMPOTENCY_LEASE_MS) })
-        .where(
-          and(
-            eq(idempotencyRecords.principalType, principalType),
-            eq(idempotencyRecords.principalId, principalId),
-            eq(idempotencyRecords.key, key),
-            eq(idempotencyRecords.status, "pending"),
-            eq(idempotencyRecords.leaseToken, leaseToken)
-          )
-        );
-    };
-    const heartbeat = setInterval(() => {
-      void renewLease().catch(() => {
-        // The final fencing-token update remains authoritative if renewal fails.
-      });
-    }, IDEMPOTENCY_RENEW_INTERVAL_MS);
-    try {
-      const input = await prepare();
-      return await db.transaction(async (tx) => {
-        const submission = await submitInTransaction(tx, input);
-        const committed = await tx
-          .update(idempotencyRecords)
-          .set({
-            status: "completed",
-            result: { value: submission },
-            completedAt: new Date(),
-            leaseToken: null,
-            leaseExpiresAt: null,
-          })
-          .where(
-            and(
-              eq(idempotencyRecords.principalType, principalType),
-              eq(idempotencyRecords.principalId, principalId),
-              eq(idempotencyRecords.key, key),
-              eq(idempotencyRecords.leaseToken, leaseToken)
-            )
-          )
-          .returning({ key: idempotencyRecords.key });
-        if (committed.length !== 1) {
-          throw new ConflictError("The idempotency lease expired before submission commit");
-        }
-        return submission;
-      });
-    } catch (error) {
-      await db
-        .delete(idempotencyRecords)
-        .where(
-          and(
-            eq(idempotencyRecords.principalType, principalType),
-            eq(idempotencyRecords.principalId, principalId),
-            eq(idempotencyRecords.key, key),
-            eq(idempotencyRecords.leaseToken, leaseToken)
-          )
-        );
-      throw error;
-    } finally {
-      clearInterval(heartbeat);
-    }
+    .from(sourceDocuments)
+    .where(
+      and(
+        eq(sourceDocuments.ledgerId, ledgerId),
+        eq(sourceDocuments.idempotencySource, idempotencySource(idempotency)),
+        eq(sourceDocuments.idempotencyKey, key)
+      )
+    )
+    .then((rows) => rows[0]);
+  if (document == null) return null;
+  if (document.fingerprint !== idempotency.contentFingerprint) {
+    throw new ConflictError("Idempotency key was already used with different content");
   }
-
-  for (let attempt = 0; attempt < IDEMPOTENCY_WAIT_ATTEMPTS; attempt += 1) {
-    const record = await db.query.idempotencyRecords.findFirst({
-      where: and(
-        eq(idempotencyRecords.principalType, principalType),
-        eq(idempotencyRecords.principalId, principalId),
-        eq(idempotencyRecords.key, key)
-      ),
-    });
-    if (record != null && record.contentFingerprint !== contentFingerprint) {
-      throw new ConflictError("Idempotency key was already used with different content");
-    }
-    if (record?.status === "completed") {
-      const submission = (record.result as { value: SourceDocumentSubmissionResult }).value;
-      return { ...submission, idempotencyReplay: true };
-    }
-    if (record == null || (record.leaseExpiresAt != null && record.leaseExpiresAt <= new Date())) {
-      return createIdempotentSubmission(idempotency, prepare);
-    }
-    await wait(Math.min(25 * 2 ** attempt, 500));
-  }
-  throw new ConflictError("The idempotent request is still in progress");
+  // Creating a document sets its latest submission in the same transaction.
+  return {
+    sourceDocumentId: document.id,
+    revisionId: document.revisionId!,
+    processingStatus: "processing",
+  };
 }
 
 export async function submitSourceDocument(
@@ -265,11 +178,25 @@ export async function submitSourceDocument(
   return db.transaction((tx) => submitInTransaction(tx, input));
 }
 
+/**
+ * Creates a document that carries the request's idempotency key, or replays
+ * the one an earlier request with the key created. Creations in a ledger queue
+ * on its lock, so a concurrent repeat waits for the first to commit and then
+ * finds its document.
+ */
 export async function submitSourceDocumentIdempotently(
-  idempotency: SourceDocumentIdempotencyInput,
-  prepare: () => Promise<SourceDocumentSubmissionInput>
-): Promise<SourceDocumentSubmissionResult> {
-  return createIdempotentSubmission(idempotency, prepare);
+  input: SourceDocumentSubmissionInput & { bookId: string; sourceDocumentId?: never },
+  idempotency: SourceDocumentIdempotencyInput
+): Promise<
+  | { replayed: false; submission: SourceDocumentSubmissionResult }
+  | { replayed: true; existing: SourceDocumentSubmissionContract }
+> {
+  return db.transaction(async (tx) => {
+    await lockLedgerForUpdate(tx, input.ledgerId);
+    const existing = await findIdempotentSubmission(input.ledgerId, idempotency, tx);
+    if (existing != null) return { replayed: true, existing };
+    return { replayed: false, submission: await submitInTransaction(tx, input, idempotency) };
+  });
 }
 
 export interface SourceDocumentSubmissionContract {
@@ -282,8 +209,6 @@ export interface SourceDocumentSubmissionResult {
   document: SourceDocumentContract;
   revision: SourceDocumentRevisionContract;
   job: ProcessingJobContract;
-  /** True when the result was replayed from an already-completed idempotent request. */
-  idempotencyReplay?: boolean;
 }
 
 /** Atomically persists submitted evidence as a processing attempt ready to be claimed. */

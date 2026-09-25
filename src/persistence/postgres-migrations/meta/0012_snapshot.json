@@ -1,6 +1,6 @@
 {
-  "id": "18bcb825-1ea1-455e-808e-63b2e911094d",
-  "prevId": "4228f000-f2ad-4e7d-8df0-bd951edf87fd",
+  "id": "2b350401-3e73-47c2-8d4d-f347115dec28",
+  "prevId": "18bcb825-1ea1-455e-808e-63b2e911094d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1420,6 +1420,24 @@
           "notNull": true,
           "default": 1
         },
+        "idempotency_source": {
+          "name": "idempotency_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "idempotency_fingerprint": {
+          "name": "idempotency_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "date_organization_suggestion": {
           "name": "date_organization_suggestion",
           "type": "jsonb",
@@ -1568,6 +1586,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "uq_source_documents_idempotency": {
+          "name": "uq_source_documents_idempotency",
+          "columns": [
+            {
+              "expression": "ledger_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "idempotency_source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1624,6 +1669,10 @@
         "source_documents_version_check": {
           "name": "source_documents_version_check",
           "value": "\"source_documents\".\"version\" > 0"
+        },
+        "ck_source_documents_idempotency": {
+          "name": "ck_source_documents_idempotency",
+          "value": "(\"source_documents\".\"idempotency_source\" IS NULL) = (\"source_documents\".\"idempotency_key\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -2169,145 +2218,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.idempotency_records": {
-      "name": "idempotency_records",
-      "schema": "",
-      "columns": {
-        "principal_type": {
-          "name": "principal_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "principal_id": {
-          "name": "principal_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "idempotency_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "result": {
-          "name": "result",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "content_fingerprint": {
-          "name": "content_fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lease_token": {
-          "name": "lease_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lease_expires_at": {
-          "name": "lease_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "idx_idempotency_records_status_expiry": {
-          "name": "idx_idempotency_records_status_expiry",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_idempotency_pending_lease": {
-          "name": "idx_idempotency_pending_lease",
-          "columns": [
-            {
-              "expression": "lease_expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"idempotency_records\".\"status\" = 'pending'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "idempotency_records_principal_type_principal_id_key_pk": {
-          "name": "idempotency_records_principal_type_principal_id_key_pk",
-          "columns": [
-            "principal_type",
-            "principal_id",
-            "key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ck_idempotency_records_principal_type": {
-          "name": "ck_idempotency_records_principal_type",
-          "value": "\"idempotency_records\".\"principal_type\" IN ('credential', 'user')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.ledger_sync_state": {
       "name": "ledger_sync_state",
       "schema": "",
@@ -2384,126 +2294,6 @@
           "value": "\"ledger_sync_state\".\"version\" >= 0"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.object_cleanup_jobs": {
-      "name": "object_cleanup_jobs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "storage_key": {
-          "name": "storage_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "upload_session_id": {
-          "name": "upload_session_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "claim_token": {
-          "name": "claim_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_expires_at": {
-          "name": "claim_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "uq_object_cleanup_jobs_storage_key": {
-          "name": "uq_object_cleanup_jobs_storage_key",
-          "columns": [
-            {
-              "expression": "storage_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_object_cleanup_jobs_due": {
-          "name": "idx_object_cleanup_jobs_due",
-          "columns": [
-            {
-              "expression": "next_attempt_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "object_cleanup_jobs_upload_session_id_upload_sessions_id_fk": {
-          "name": "object_cleanup_jobs_upload_session_id_upload_sessions_id_fk",
-          "tableFrom": "object_cleanup_jobs",
-          "tableTo": "upload_sessions",
-          "columnsFrom": [
-            "upload_session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.rate_limit_buckets": {
@@ -3103,342 +2893,6 @@
         }
       },
       "isRLSEnabled": false
-    },
-    "public.upload_session_files": {
-      "name": "upload_session_files",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "upload_session_id": {
-          "name": "upload_session_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stored_file_id": {
-          "name": "stored_file_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "target_id": {
-          "name": "target_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expected_content_type": {
-          "name": "expected_content_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expected_byte_size": {
-          "name": "expected_byte_size",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "original_filename": {
-          "name": "original_filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expected_checksum": {
-          "name": "expected_checksum",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "upload_file_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'planned'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "uq_upload_session_files_session_target": {
-          "name": "uq_upload_session_files_session_target",
-          "columns": [
-            {
-              "expression": "upload_session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "target_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "uq_upload_session_files_session_position": {
-          "name": "uq_upload_session_files_session_position",
-          "columns": [
-            {
-              "expression": "upload_session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_upload_session_files_ledger_file": {
-          "name": "idx_upload_session_files_ledger_file",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stored_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "fk_upload_session_files_session_ledger": {
-          "name": "fk_upload_session_files_session_ledger",
-          "tableFrom": "upload_session_files",
-          "tableTo": "upload_sessions",
-          "columnsFrom": [
-            "ledger_id",
-            "upload_session_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_upload_session_files_stored_file_ledger": {
-          "name": "fk_upload_session_files_stored_file_ledger",
-          "tableFrom": "upload_session_files",
-          "tableTo": "stored_files",
-          "columnsFrom": [
-            "ledger_id",
-            "stored_file_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ck_upload_session_files_position": {
-          "name": "ck_upload_session_files_position",
-          "value": "\"upload_session_files\".\"position\" >= 0"
-        },
-        "ck_upload_session_files_expected_byte_size": {
-          "name": "ck_upload_session_files_expected_byte_size",
-          "value": "\"upload_session_files\".\"expected_byte_size\" IS NULL OR \"upload_session_files\".\"expected_byte_size\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.upload_sessions": {
-      "name": "upload_sessions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "finalization_token_hash": {
-          "name": "finalization_token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "transport": {
-          "name": "transport",
-          "type": "upload_transport",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'proxy'"
-        },
-        "status": {
-          "name": "status",
-          "type": "upload_session_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'open'"
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "finalized_at": {
-          "name": "finalized_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "uq_upload_sessions_ledger_id_id": {
-          "name": "uq_upload_sessions_ledger_id_id",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "uq_upload_sessions_finalization_token_hash": {
-          "name": "uq_upload_sessions_finalization_token_hash",
-          "columns": [
-            {
-              "expression": "finalization_token_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_upload_sessions_ledger_status_expiry": {
-          "name": "idx_upload_sessions_ledger_status_expiry",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "upload_sessions_ledger_id_ledgers_id_fk": {
-          "name": "upload_sessions_ledger_id_ledgers_id_fk",
-          "tableFrom": "upload_sessions",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -3480,14 +2934,6 @@
         "cancelled"
       ]
     },
-    "public.idempotency_status": {
-      "name": "idempotency_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "completed"
-      ]
-    },
     "public.revision_failure_kind": {
       "name": "revision_failure_kind",
       "schema": "public",
@@ -3504,35 +2950,6 @@
         "completed",
         "failed",
         "cancelled"
-      ]
-    },
-    "public.upload_file_status": {
-      "name": "upload_file_status",
-      "schema": "public",
-      "values": [
-        "planned",
-        "uploaded",
-        "finalized",
-        "rejected"
-      ]
-    },
-    "public.upload_session_status": {
-      "name": "upload_session_status",
-      "schema": "public",
-      "values": [
-        "open",
-        "finalizing",
-        "finalized",
-        "expired",
-        "cancelled"
-      ]
-    },
-    "public.upload_transport": {
-      "name": "upload_transport",
-      "schema": "public",
-      "values": [
-        "proxy",
-        "direct"
       ]
     }
   },

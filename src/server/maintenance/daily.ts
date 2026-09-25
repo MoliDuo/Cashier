@@ -1,5 +1,5 @@
 import "server-only";
-import { sql, type SQL } from "drizzle-orm";
+import { inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   categoryReclassificationJobs,
@@ -18,6 +18,8 @@ import { CRON_BUDGET_MS } from "@/config/tuning";
 
 const BATCH = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** How long a ready file may go unused before it is deleted. */
+const UNUSED_FILE_GRACE_DAYS = 7;
 
 export type DailyStep =
   | "expired_records"
@@ -25,7 +27,9 @@ export type DailyStep =
   | "category_recovery"
   | "exchange_rates"
   | "pending_files"
-  | "temporary_objects";
+  | "unused_files"
+  | "temporary_objects"
+  | "orphan_objects";
 
 export type DailyStepOutcome = "done" | "failed" | "skipped";
 
@@ -70,7 +74,9 @@ export async function runDailyMaintenance(
   await step("category_recovery", async () => scheduleCategoryReclassificationDrainAfter());
   await step("exchange_rates", () => refreshExchangeRates(now));
   await step("pending_files", () => deleteStalePendingFiles(now, deadlineAt));
+  await step("unused_files", () => deleteUnusedFiles(now, deadlineAt));
   await step("temporary_objects", () => deleteStaleTemporaryObjects(now, deadlineAt));
+  await step("orphan_objects", () => deleteOrphanObjects(now, deadlineAt));
   return outcomes;
 }
 
@@ -83,17 +89,11 @@ async function deleteInBatches(statement: SQL, deadlineAt: number): Promise<void
 }
 
 async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void> {
-  const dayAgo = new Date(now.getTime() - DAY_MS);
   const twoDaysAgo = new Date(now.getTime() - 2 * DAY_MS);
   const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS);
   const statements = [
     sql`DELETE FROM rate_limit_buckets WHERE bucket_key IN (
       SELECT bucket_key FROM rate_limit_buckets WHERE window_start < ${twoDaysAgo} LIMIT ${BATCH}
-    )`,
-    sql`DELETE FROM idempotency_records WHERE (principal_type, principal_id, key) IN (
-      SELECT principal_type, principal_id, key FROM idempotency_records
-      WHERE expires_at < ${now} OR (status = 'completed' AND completed_at < ${dayAgo})
-      LIMIT ${BATCH}
     )`,
     sql`DELETE FROM otp_tokens WHERE id IN (
       SELECT id FROM otp_tokens WHERE expires < ${now} LIMIT ${BATCH}
@@ -152,6 +152,39 @@ async function deleteStalePendingFiles(now: Date, deadlineAt: number): Promise<v
 }
 
 /**
+ * Deletes ready files that no document has used for a week, with their
+ * objects. Rows go first: a submission attaching one of them meanwhile makes
+ * the delete fail on the file link's foreign key rather than lose the file.
+ */
+async function deleteUnusedFiles(now: Date, deadlineAt: number): Promise<void> {
+  const weekAgo = new Date(now.getTime() - UNUSED_FILE_GRACE_DAYS * DAY_MS);
+  const storage = getS3Storage();
+  while (Date.now() < deadlineAt) {
+    const deleted = await db.execute<{ storageKey: string }>(sql`
+      DELETE FROM ${storedFiles} WHERE id IN (
+        SELECT file.id FROM ${storedFiles} AS file
+        WHERE file.finalized_at IS NOT NULL
+          AND file.created_at < ${weekAgo}
+          AND NOT EXISTS (
+            SELECT 1 FROM ${sourceDocumentFiles} AS link
+            WHERE link.ledger_id = file.ledger_id AND link.stored_file_id = file.id
+          )
+        LIMIT ${BATCH}
+      )
+      RETURNING storage_key AS "storageKey"
+    `);
+    await runWithConcurrency(
+      deleted.rows.map((file) => file.storageKey),
+      4,
+      async (key) => {
+        await storage.delete(key);
+      }
+    );
+    if (deleted.rows.length < BATCH) return;
+  }
+}
+
+/**
  * Deletes objects under `temporary/` last written over a day ago. Finalization
  * removes its own; these are uploads that never finished or whose delete
  * failed. Nothing refers to a temporary object, so age alone decides.
@@ -168,6 +201,45 @@ async function deleteStaleTemporaryObjects(now: Date, deadlineAt: number): Promi
     await runWithConcurrency(stale, 4, async (key) => {
       await storage.delete(key);
     });
+    continuationToken = page.isTruncated ? page.nextContinuationToken : null;
+  } while (continuationToken != null && Date.now() < deadlineAt);
+}
+
+/**
+ * Deletes stored objects no row names, last written over a day ago: the
+ * objects of deleted rows whose own delete failed. A row always exists before
+ * its object is written, so a younger object without one is never a live
+ * upload, and the day's margin covers clocks.
+ */
+async function deleteOrphanObjects(now: Date, deadlineAt: number): Promise<void> {
+  const dayAgo = now.getTime() - DAY_MS;
+  const storage = getS3Storage();
+  let continuationToken: string | null = null;
+  do {
+    const page = await storage.listObjectsPage("", continuationToken);
+    const candidates = page.objects
+      .filter(
+        (object) =>
+          object.key.includes("/stored/") &&
+          !object.key.startsWith("temporary/") &&
+          object.lastModified != null &&
+          object.lastModified.getTime() < dayAgo
+      )
+      .map((object) => object.key);
+    if (candidates.length > 0) {
+      const known = await db
+        .select({ storageKey: storedFiles.storageKey })
+        .from(storedFiles)
+        .where(inArray(storedFiles.storageKey, candidates));
+      const knownKeys = new Set(known.map((file) => file.storageKey));
+      await runWithConcurrency(
+        candidates.filter((key) => !knownKeys.has(key)),
+        4,
+        async (key) => {
+          await storage.delete(key);
+        }
+      );
+    }
     continuationToken = page.isTruncated ? page.nextContinuationToken : null;
   } while (continuationToken != null && Date.now() < deadlineAt);
 }

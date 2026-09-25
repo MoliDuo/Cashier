@@ -37,6 +37,12 @@ export const sourceDocuments = pgTable(
       .generatedAlwaysAs(sql`COALESCE("document_date", ("created_at" AT TIME ZONE 'UTC')::date)`),
     latestSubmissionRevisionId: uuid("latest_submission_revision_id"),
     version: integer("version").notNull().default(1),
+    /** Who sent the create request that made the document: `user:<id>` or `credential:<id>`. */
+    idempotencySource: text("idempotency_source"),
+    /** The request's idempotency key; a repeat within the ledger replays this document. */
+    idempotencyKey: text("idempotency_key"),
+    /** The created content, so a repeat with other content is refused. */
+    idempotencyFingerprint: text("idempotency_fingerprint"),
     dateOrganizationSuggestion: jsonb("date_organization_suggestion").$type<
       import("@/modules/source-document/date-organization-contracts").DateOrganizationSuggestion
     >(),
@@ -70,6 +76,15 @@ export const sourceDocuments = pgTable(
       table.id.desc()
     ),
     check("source_documents_version_check", sql`${table.version} > 0`),
+    check(
+      "ck_source_documents_idempotency",
+      sql`(${table.idempotencySource} IS NULL) = (${table.idempotencyKey} IS NULL)`
+    ),
+    uniqueIndex("uq_source_documents_idempotency").on(
+      table.ledgerId,
+      table.idempotencySource,
+      table.idempotencyKey
+    ),
     foreignKey({
       columns: [table.ledgerId, table.id, table.latestSubmissionRevisionId],
       foreignColumns: [

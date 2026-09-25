@@ -18,10 +18,13 @@ for contributors, not as a deployment guarantee.
 `POST /api/v1/source-documents` returns `201` only after image processing, object upload, and
 database persistence finish. It does not wait for AI parsing. If parsing fails or the request
 lifecycle ends, the job remains recoverable. The next upload, ledger query, or Stream refresh
-for that ledger can claim pending work. With no later request, recovery does not run automatically.
+for that ledger can claim pending work, and the daily cron schedules whatever is still due.
 
 Cancelling a delivered HTTP request does not undo a completed upload. API clients should reuse the
-same `Idempotency-Key` when retrying a create request.
+same `Idempotency-Key` when retrying a create request. The key is stored on the document it
+created, scoped to the ledger and sender, and never expires: a repeat returns that document
+without processing images again, a repeat with other content is refused with `409`, and a
+concurrent repeat waits on the ledger lock for the first to commit.
 
 ## Category assignment jobs
 
@@ -104,8 +107,9 @@ processing invocation.
 Maintenance runs once a day from Vercel Cron at `/api/cron/daily` (`src/server/maintenance/daily.ts`),
 authenticated by `CRON_SECRET`; requests no longer trigger it. Each step runs independently within
 the cron budget: expired records, scheduling every ledger's due processing and category work with
-`after()`, the exchange-rate refresh, pending files older than a day that no document uses (rows
-first, then their objects), and `temporary/` objects older than a day.
+`after()`, the exchange-rate refresh, pending files older than a day, ready files no document has
+used for seven days (rows first, then their objects), `temporary/` objects older than a day, and
+stored objects older than a day that no row names.
 
 ## Exchange rates
 

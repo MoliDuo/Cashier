@@ -43,7 +43,7 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
       idempotency: {
         principalType: "user",
         principalId: userId,
-        key: `source-document:create:${ledgerId}:new:${validatedClientSubmissionId}`,
+        key: validatedClientSubmissionId,
         contentFingerprint: sourceDocumentFingerprint(payload),
       },
     });

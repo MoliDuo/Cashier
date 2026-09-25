@@ -323,5 +323,37 @@ describe("API v1 source-documents route", () => {
       expect([...mockR2.files.keys()]).toEqual([`${ledgerId}/stored/${storedFilesRows[0]!.id}`]);
       expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
     });
+
+    it("replays a repeated key without storing its images again", async () => {
+      const fakeJpegBase64 = await validJpegBase64();
+      const makeRequest = () =>
+        new NextRequest("http://localhost/api/v1/source-documents", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${credentialKey}`,
+            "Idempotency-Key": "repeated-image-ingestion-request",
+          },
+          body: JSON.stringify({
+            images: [{ data: fakeJpegBase64, mimeType: "image/jpeg" }],
+          }),
+        });
+
+      const first = await POST(makeRequest());
+      expect(first.status).toBe(201);
+      // Storing an image now fails, so a 201 means the replay stored none.
+      mockR2.setUploadError(new Error("upload must not run"));
+      try {
+        const replay = await POST(makeRequest());
+        expect(replay.status).toBe(201);
+        expect(await replay.json()).toEqual(await first.json());
+      } finally {
+        mockR2.setUploadError(null);
+      }
+      const storedFilesRows = await getTestDb()
+        .select({ id: storedFiles.id })
+        .from(storedFiles)
+        .where(eq(storedFiles.ledgerId, ledgerId));
+      expect(storedFilesRows).toHaveLength(1);
+    });
   });
 });

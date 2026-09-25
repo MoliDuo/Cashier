@@ -124,7 +124,7 @@ describe("createSourceDocumentAction omission semantics", () => {
         idempotency: {
           principalType: "user",
           principalId: USER_ID,
-          key: `source-document:create:ledger-1:new:${CLIENT_SUBMISSION_ID}`,
+          key: CLIENT_SUBMISSION_ID,
           contentFingerprint: sourceDocumentFingerprint({ text: "Lunch" }),
         },
       })

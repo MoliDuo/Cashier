@@ -56,7 +56,9 @@ describe("GET /api/cron/daily", () => {
         category_recovery: "done",
         exchange_rates: "done",
         pending_files: "done",
+        unused_files: "done",
         temporary_objects: "done",
+        orphan_objects: "done",
       },
     });
     const stale = await db.execute(

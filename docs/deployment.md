@@ -141,23 +141,16 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 
 ## 存储维护
 
-`npm run prune` 清理可以证明已经无引用的运行时数据和对象。命令默认只扫描，不删除：
+对象存储由每日 cron 自动清理，没有需要手动运行的命令：
 
-```bash
-npm run prune
-npm run prune -- --apply
-npm run prune -- --json --batch-size 500 --orphan-grace-days 14 \
-  --temporary-grace-hours 48
-```
+- 规划后超过 1 天仍未完成的上传：先删数据库记录，再删它的对象。
+- 已完成、但没有任何单据使用、创建超过 7 天的图片：先删记录，再删对象。
+  删除单据后，它的图片会在这之后被清理。
+- `temporary/` 下超过 1 天的对象。
+- 名字里带 `/stored/`、没有数据库记录、超过 1 天的对象，即删除记录后删对象失败留下的。
 
-默认规则：
-
-- 清理过期的限流桶、OTP、幂等记录、上传会话和对象清理任务。
-- 清理超过 7 天且没有有效引用的 `stored_files` 和对应对象。
-- 清理超过 24 小时且没有开放上传会话引用的 `temporary/*` 对象。
-- 只报告对象已经缺失的数据库记录，不自动删除这些记录。
-
-`--apply` 会真实删除数据。先审阅 dry-run 输出，并确保使用了正确的数据库和对象存储配置。
+清理总是先删记录。删对象失败只会留下没有记录的对象，下一次 cron 会再删；不会出现
+记录还在、对象却没了的情况。
 
 ## 常用命令
 

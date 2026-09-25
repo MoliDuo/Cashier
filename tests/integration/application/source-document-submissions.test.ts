@@ -10,14 +10,13 @@ import { getTargetSourceDocument } from "@/modules/source-document/server/reads/
 import {
   ledgerEntries,
   ledgers,
-  idempotencyRecords,
   serviceCredentials,
   sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import { ValidationError } from "@/lib/errors";
+import { ConflictError, ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { createTestBooks, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb, getTestSchemaName } from "../../setup";
@@ -68,31 +67,39 @@ describe("target source-document submissions", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const bookId = await testBookId(db, ledgerId);
-    const prepare = vi.fn(async () => ({
+    const submission = {
       ledgerId,
       bookId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
-    }));
+    };
     const idempotency = {
       principalType: "user" as const,
       principalId: crypto.randomUUID(),
-      key: `create:${crypto.randomUUID()}`,
-      contentFingerprint: null,
+      key: crypto.randomUUID(),
+      contentFingerprint: "lunch",
     };
 
-    const [first, replay] = await Promise.all([
-      submitSourceDocumentIdempotently!(idempotency, prepare),
-      submitSourceDocumentIdempotently!(idempotency, prepare),
+    const results = await Promise.all([
+      submitSourceDocumentIdempotently(submission, idempotency),
+      submitSourceDocumentIdempotently(submission, idempotency),
     ]);
 
-    expect(first.document.id).toBe(replay.document.id);
-    expect(prepare).toHaveBeenCalledOnce();
+    const created = results.find((result) => !result.replayed);
+    const replayed = results.find((result) => result.replayed);
+    if (created?.replayed !== false || replayed?.replayed !== true) {
+      throw new Error("Expected one creation and one replay");
+    }
+    expect(replayed.existing).toEqual({
+      sourceDocumentId: created.submission.document.id,
+      revisionId: created.submission.revision.id,
+      processingStatus: "processing",
+    });
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await queuedAttemptIds(db)).toEqual([first.revision.id]);
+    expect(await queuedAttemptIds(db)).toEqual([created.submission.revision.id]);
   });
 
-  it("rolls back a fencing loser after an expired idempotency lease is taken over", async () => {
+  it("refuses a key reused with other content and scopes keys to their sender", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const bookId = await testBookId(db, ledgerId);
@@ -100,50 +107,48 @@ describe("target source-document submissions", () => {
     await db.insert(serviceCredentials).values({
       id: credentialId,
       ledgerId,
-      name: "fencing-test",
+      name: "idempotency-test",
       tokenHash: "f".repeat(64),
       tokenPrefix: "cashier_test",
       tokenSuffix: "test",
       bookId,
     });
-    const idempotency = {
-      principalType: "credential" as const,
-      principalId: credentialId,
-      key: "fencing-takeover",
-      contentFingerprint: "same-content",
-    };
-    let signalStarted!: () => void;
-    let releaseFirst!: () => void;
-    const started = new Promise<void>((resolve) => (signalStarted = resolve));
-    const gate = new Promise<void>((resolve) => (releaseFirst = resolve));
-
-    const first = submitSourceDocumentIdempotently!(idempotency, async () => {
-      signalStarted();
-      await gate;
-      return {
-        ledgerId,
-        bookId,
-        input: { text: "receipt", storedFileIds: [], documentDate: null },
-      };
-    });
-    await started;
-    await db
-      .update(idempotencyRecords)
-      .set({ leaseExpiresAt: new Date(Date.now() - 1) })
-      .where(eq(idempotencyRecords.key, idempotency.key));
-
-    const winner = await submitSourceDocumentIdempotently!(idempotency, async () => ({
+    const submission = {
       ledgerId,
       bookId,
       input: { text: "receipt", storedFileIds: [], documentDate: null },
-    }));
-    releaseFirst();
-    await expect(first).rejects.toThrow("idempotency lease expired");
+    };
+    const idempotency = {
+      principalType: "credential" as const,
+      principalId: credentialId,
+      key: "upload-20260926-001",
+      contentFingerprint: "first",
+    };
 
-    expect(await db.select().from(sourceDocuments)).toHaveLength(1);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await queuedAttemptIds(db)).toEqual([winner.revision.id]);
-    expect(winner.document.id).toBe((await db.select().from(sourceDocuments))[0]?.id);
+    await submitSourceDocumentIdempotently(submission, idempotency);
+    await expect(
+      submitSourceDocumentIdempotently(submission, { ...idempotency, contentFingerprint: "other" })
+    ).rejects.toBeInstanceOf(ConflictError);
+    const fromUser = await submitSourceDocumentIdempotently(submission, {
+      ...idempotency,
+      principalType: "user",
+    });
+
+    expect(fromUser.replayed).toBe(false);
+    expect(
+      await db
+        .select({
+          source: sourceDocuments.idempotencySource,
+          key: sourceDocuments.idempotencyKey,
+          fingerprint: sourceDocuments.idempotencyFingerprint,
+        })
+        .from(sourceDocuments)
+    ).toEqual(
+      expect.arrayContaining([
+        { source: `credential:${credentialId}`, key: idempotency.key, fingerprint: "first" },
+        { source: `user:${credentialId}`, key: idempotency.key, fingerprint: "first" },
+      ])
+    );
   });
 
   it("atomically creates text, image, and mixed pending revisions with durable intents", async () => {
@@ -691,22 +696,22 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     const idempotency = {
       principalType: "user" as const,
       principalId: crypto.randomUUID(),
-      key: `create:${crypto.randomUUID()}`,
+      key: crypto.randomUUID(),
       contentFingerprint: null,
     };
-    const prepare = async () => ({
+    const submission = {
       ledgerId,
       bookId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
-    });
+    };
 
-    const created = await submitSourceDocumentIdempotently!(idempotency, prepare);
-    const replay = await submitSourceDocumentIdempotently!(idempotency, prepare);
+    const created = await submitSourceDocumentIdempotently(submission, idempotency);
+    const replay = await submitSourceDocumentIdempotently(submission, idempotency);
 
-    expect(replay.document.id).toBe(created.document.id);
-    expect(replay.idempotencyReplay).toBe(true);
+    if (created.replayed || !replay.replayed) throw new Error("Expected a creation, then a replay");
+    expect(replay.existing.sourceDocumentId).toBe(created.submission.document.id);
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await queuedAttemptIds(db)).toEqual([created.revision.id]);
+    expect(await queuedAttemptIds(db)).toEqual([created.submission.revision.id]);
   });
 });

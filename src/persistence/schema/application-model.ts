@@ -31,7 +31,6 @@ export const revisionFailureKindEnum = pgEnum("revision_failure_kind", [
   "invalid_input",
   "processing_error",
 ]);
-export const idempotencyStatusEnum = pgEnum("idempotency_status", ["pending", "completed"]);
 
 export const sourceDocumentRevisions = pgTable(
   "source_document_revisions",
@@ -305,34 +304,6 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   windowStart: requiredTimestamp("window_start"),
   createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
 });
-
-export const idempotencyRecords = pgTable(
-  "idempotency_records",
-  {
-    principalType: text("principal_type").$type<"credential" | "user">().notNull(),
-    principalId: uuid("principal_id").notNull(),
-    key: text("key").notNull(),
-    status: idempotencyStatusEnum("status").notNull().default("pending"),
-    result: jsonb("result").$type<unknown>(),
-    contentFingerprint: text("content_fingerprint"),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    leaseToken: uuid("lease_token"),
-    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
-    expiresAt: requiredTimestamp("expires_at"),
-  },
-  (table) => [
-    primaryKey({ columns: [table.principalType, table.principalId, table.key] }),
-    check(
-      "ck_idempotency_records_principal_type",
-      sql`${table.principalType} IN ('credential', 'user')`
-    ),
-    index("idx_idempotency_records_status_expiry").on(table.status, table.expiresAt),
-    index("idx_idempotency_pending_lease")
-      .on(table.leaseExpiresAt, table.createdAt)
-      .where(sql`${table.status} = 'pending'`),
-  ]
-);
 
 export const ledgerSyncState = pgTable(
   "ledger_sync_state",

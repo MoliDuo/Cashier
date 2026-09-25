@@ -230,7 +230,6 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     // whatever the last session left behind. The file links go first: they
     // reference stored files without cascading.
     await client.query("DELETE FROM source_document_files");
-    await client.query("DELETE FROM upload_session_files");
     await client.query("DELETE FROM ledgers");
     await client.query(
       `DELETE FROM users WHERE id IN
