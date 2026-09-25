@@ -85,7 +85,7 @@ Phase 1 规划时又核实了两个正在出错的问题，放在 Phase 1 的预
   - 条目和当前输入只属于票据，文件放在 `source_document_files`。
   - 手动 revision 不再创建，存量的 264 条已经删除。
 
-### E. 后台租约：五套实现，规则各不相同（Phase 2，M，待做）
+### E. 后台租约：五套实现，规则各不相同（Phase 2，M，已做）
 
 - **现状**：processing、分类文档、汇率任务、对象清理、幂等记录各自手写了一套租约。退避规则有 5 种，错误码方案有 4 种，判断过期时有的用 `<=`、有的用 `<`，完成时有的检查过期、有的不检查，有的用数据库时钟、有的用应用时钟。
   - 汇率重算是纯数据库事务，用 `FOR UPDATE SKIP LOCKED` 就够了。
@@ -95,15 +95,23 @@ Phase 1 规划时又核实了两个正在出错的问题，放在 Phase 1 的预
 - **错误分类失效**：`processing/execute-job.ts` 的 `toFailureCode` 匹配大写错误码，而 AI 客户端抛出的是小写的 `ai_rate_limited` 等，`parser.ts` 还会把它包进 `cause`。所以限流和配置错误从来没有被单独识别过。
 - **API v1 放弃上传会话时**，会为从未写入过的 `temporary/` key 排清理任务，真正写入的永久对象反而没人清理。
 - **重写**：只有提取和分类两个流程需要租约，二者共用一个租约帮手；再加一个每日 cron 做兜底清扫。
+- **结果**：
+  - 提取和分类共用 `src/lib/db/lease.ts`，只认数据库时钟。重试策略统一为最多 3 次，暂时性错误按退避重新排队，`toFailureCode` 沿 `cause` 链识别错误码。
+  - 分类任务的租约挪到 job 行，选择一次提交，进度在读取时统计；chunks 表和计数列已删除。
+  - 每日 cron（`/api/cron/daily`）负责过期记录、提取与分类的恢复、汇率、pending 文件、未引用文件、`temporary/` 和孤儿对象的清理。请求触发的维护已删除。
 
-### F. 上传用了四张表（Phase 2，M–L，待做）
+### F. 上传用了四张表（Phase 2，M–L，已做）
 
 - **现状**：`upload_sessions`、`upload_session_files`、`stored_files`、`object_cleanup_jobs`，外加大约 1,000 行代码。
   - API v1 收到的图片已经在服务器内存里，却仍然要走一遍"代理上传会话"（`prepare-inline-images.ts`）。
   - `stored_files.deleted_at` 从来没有被写入过。
 - **重写**：只保留 `stored_files`，状态分 pending 和 ready。服务端路径直接写入 S3；`temporary/` 前缀交给 S3 生命周期规则清理。
+- **结果**：
+  - 只剩 `stored_files`，`finalized_at IS NULL` 表示 pending。会话表和清理队列已删除（迁移 0012）。API v1 直接写入最终对象，不经过 `temporary/`。
+  - `temporary/` 不用存储商的生命周期规则，改由每日 cron 清理超过 1 天的对象；没被引用的文件 7 天后由 cron 删除，`prune-storage.mjs` 已删除。
+  - 幂等 key 存在票据上并永久有效，`idempotency_records` 已删除（迁移 0013）。
 
-### G. 软删除（Phase 2，M，待做）
+### G. 软删除（Phase 2，M，已做）
 
 - **现状**：全仓库有 132 处 `deleted_at IS NULL` 谓词，但没有任何代码会把软删的行读回来。附带的后果：
   - 删掉的票据，图片永远不会被清理（`prune-storage.mjs:13`）。
@@ -111,6 +119,7 @@ Phase 1 规划时又核实了两个正在出错的问题，放在 Phase 1 的预
   - 分类改名时要用 `__cashier_internal_category_rename__` 临时名。
 - **来历**：SQLite 同步时代（`9af391c0`）。
 - **重写**：改为硬删除，外键级联；清理存量墓碑行属于破坏性操作，要单独审查。
+- **结果**：删除票据、条目、分类都直接删行。存量墓碑经审查后清除（迁移 0011），部分索引重建为整表索引，分类名改为可延迟的唯一约束，临时名技巧已删除。四张表的 `deleted_at` 列已删除（迁移 0014）；只有凭证保留它，表示已吊销。
 
 ### H. 前端（Phase 3，M–L，待做）
 

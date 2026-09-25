@@ -205,11 +205,16 @@ describe("PostgreSQL schema contract", () => {
     expect(byName.get("idx_ledger_entries_search")).toContain("gin");
   });
 
-  it("indexes whole tables now that deletes remove rows", async () => {
-    const limited = (await fetchIndexes()).filter((row) =>
-      /\bWHERE\b.*deleted_at/.test(row.indexdef)
+  it("keeps deleted_at only as the credential revocation mark", async () => {
+    const tables = ["source_documents", "ledger_entries", "entry_categories", "stored_files"];
+    for (const table of tables) {
+      const columns = (await fetchColumns(table)).map((column) => column.columnName);
+      expect(columns, table).not.toContain("deleted_at");
+    }
+    const credentialColumns = (await fetchColumns("service_credentials")).map(
+      (column) => column.columnName
     );
-    expect(limited.map((row) => row.indexname)).toEqual([]);
+    expect(credentialColumns).toContain("deleted_at");
   });
 
   it("checks category names per ledger when a statement ends", async () => {
