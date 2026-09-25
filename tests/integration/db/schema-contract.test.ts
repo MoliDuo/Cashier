@@ -115,16 +115,11 @@ describe("PostgreSQL schema contract", () => {
     const byName = new Map((await fetchConstraints()).map((row) => [row.conname, row.definition]));
     const expected = [
       "fk_ledger_entries_document_ledger",
-      "fk_ledger_entries_revision_ledger",
-      "fk_ledger_entries_document_revision",
       "fk_ledger_entries_category_ledger",
-      "fk_revision_files_revision_ledger",
-      "fk_revision_files_stored_file_ledger",
-      "fk_processing_outbox_revision_ledger",
-      "fk_processing_outbox_document_ledger",
       "fk_upload_session_files_session_ledger",
       "fk_upload_session_files_stored_file_ledger",
-      "fk_source_documents_active_revision",
+      "fk_source_document_files_document_ledger",
+      "fk_source_document_files_stored_file_ledger",
       "fk_source_documents_latest_submission_revision",
     ];
     for (const name of expected) {
@@ -243,25 +238,9 @@ describe("PostgreSQL schema contract", () => {
   });
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
-    // Entries and input left the revisions for the document, and attempts left
-    // the outbox; what referenced them stays until the next contract migration.
-    const retiredNames = new Set([
-      "ck_revision_files_position",
-      "fk_ledger_entries_document_revision",
-      "fk_ledger_entries_revision_ledger",
-      "fk_processing_outbox_document_ledger",
-      "fk_processing_outbox_revision_ledger",
-      "fk_revision_files_revision_ledger",
-      "fk_revision_files_stored_file_ledger",
-      "fk_source_documents_active_revision",
-      "idx_source_documents_active_revision",
-      "uq_revision_files_revision_position",
-      "uq_revision_files_revision_file",
-      "idx_revision_files_ledger_file",
-      "uq_processing_outbox_revision",
-      "idx_processing_outbox_claim_expiry",
-      "idx_processing_outbox_recoverable",
-    ]);
+    // Names a later contract migration drops once the model has let go of
+    // them; empty while the model and the database agree.
+    const retiredNames = new Set<string>();
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(

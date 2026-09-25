@@ -277,11 +277,6 @@ export async function scanUnreferencedFiles(
          AND created_at < $1
          AND ($3::uuid IS NULL OR id > $3::uuid)
          AND NOT EXISTS (
-           SELECT 1 FROM revision_files rf
-           WHERE rf.ledger_id = stored_files.ledger_id
-             AND rf.stored_file_id = stored_files.id
-         )
-         AND NOT EXISTS (
            SELECT 1 FROM source_document_files sdf
            WHERE sdf.ledger_id = stored_files.ledger_id
              AND sdf.stored_file_id = stored_files.id
@@ -329,11 +324,6 @@ export async function scanUnreferencedFiles(
           `DELETE FROM stored_files
            WHERE id = $1
              AND storage_key = $2
-             AND NOT EXISTS (
-               SELECT 1 FROM revision_files rf
-               WHERE rf.ledger_id = stored_files.ledger_id
-                 AND rf.stored_file_id = stored_files.id
-             )
              AND NOT EXISTS (
                SELECT 1 FROM source_document_files sdf
                WHERE sdf.ledger_id = stored_files.ledger_id

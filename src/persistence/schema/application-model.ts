@@ -56,7 +56,7 @@ export const sourceDocumentRevisions = pgTable(
     title: text("title"),
     inputDocumentDate: text("input_document_date"),
     inputDateReference: date("input_date_reference", { mode: "string" }),
-    processingStatus: revisionProcessingStatusEnum("processing_status"),
+    processingStatus: revisionProcessingStatusEnum("processing_status").notNull(),
     failureKind: revisionFailureKindEnum("failure_kind"),
     failureCode: text("failure_code"),
     failureMessage: text("failure_message"),

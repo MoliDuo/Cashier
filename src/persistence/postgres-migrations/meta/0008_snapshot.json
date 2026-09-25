@@ -1,6 +1,6 @@
 {
-  "id": "b46b957d-680d-46e2-b024-7b399ea7578b",
-  "prevId": "c246041c-9df7-47f9-9cf5-e3ade9ed0afd",
+  "id": "9a7a2839-7957-495e-9d61-41161c3860fe",
+  "prevId": "b46b957d-680d-46e2-b024-7b399ea7578b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -830,12 +830,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "source_document_revision_id": {
-          "name": "source_document_revision_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "position": {
           "name": "position",
           "type": "integer",
@@ -1115,38 +1109,6 @@
           ],
           "columnsTo": [
             "ledger_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_ledger_entries_revision_ledger": {
-          "name": "fk_ledger_entries_revision_ledger",
-          "tableFrom": "ledger_entries",
-          "tableTo": "source_document_revisions",
-          "columnsFrom": [
-            "ledger_id",
-            "source_document_revision_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_ledger_entries_document_revision": {
-          "name": "fk_ledger_entries_document_revision",
-          "tableFrom": "ledger_entries",
-          "tableTo": "source_document_revisions",
-          "columnsFrom": [
-            "ledger_id",
-            "source_document_id",
-            "source_document_revision_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "source_document_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1464,12 +1426,6 @@
             "type": "stored"
           }
         },
-        "active_revision_id": {
-          "name": "active_revision_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "latest_submission_revision_id": {
           "name": "latest_submission_revision_id",
           "type": "uuid",
@@ -1586,21 +1542,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_source_documents_active_revision": {
-          "name": "idx_source_documents_active_revision",
-          "columns": [
-            {
-              "expression": "active_revision_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_source_documents_latest_submission_revision": {
           "name": "idx_source_documents_latest_submission_revision",
           "columns": [
@@ -1675,23 +1616,6 @@
           ],
           "columnsTo": [
             "ledger_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "fk_source_documents_active_revision": {
-          "name": "fk_source_documents_active_revision",
-          "tableFrom": "source_documents",
-          "tableTo": "source_document_revisions",
-          "columnsFrom": [
-            "ledger_id",
-            "id",
-            "active_revision_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "source_document_id",
             "id"
           ],
           "onDelete": "no action",
@@ -1853,12 +1777,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "revision_id": {
-          "name": "revision_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         },
         "first_selection_order": {
           "name": "first_selection_order",
@@ -2798,197 +2716,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.processing_outbox": {
-      "name": "processing_outbox",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "revision_id": {
-          "name": "revision_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_document_id": {
-          "name": "source_document_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "processing_outbox_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "diagnostic_code": {
-          "name": "diagnostic_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requested_at": {
-          "name": "requested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "claim_token": {
-          "name": "claim_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_expires_at": {
-          "name": "claim_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "schedule_attempt_count": {
-          "name": "schedule_attempt_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_available_at": {
-          "name": "next_available_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "uq_processing_outbox_revision": {
-          "name": "uq_processing_outbox_revision",
-          "columns": [
-            {
-              "expression": "revision_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_processing_outbox_claim_expiry": {
-          "name": "idx_processing_outbox_claim_expiry",
-          "columns": [
-            {
-              "expression": "claim_expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"processing_outbox\".\"status\" = 'claimed'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_processing_outbox_recoverable": {
-          "name": "idx_processing_outbox_recoverable",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_available_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "fk_processing_outbox_revision_ledger": {
-          "name": "fk_processing_outbox_revision_ledger",
-          "tableFrom": "processing_outbox",
-          "tableTo": "source_document_revisions",
-          "columnsFrom": [
-            "ledger_id",
-            "revision_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_processing_outbox_document_ledger": {
-          "name": "fk_processing_outbox_document_ledger",
-          "tableFrom": "processing_outbox",
-          "tableTo": "source_documents",
-          "columnsFrom": [
-            "ledger_id",
-            "source_document_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.rate_limit_buckets": {
       "name": "rate_limit_buckets",
       "schema": "",
@@ -3025,156 +2752,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.revision_files": {
-      "name": "revision_files",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "revision_id": {
-          "name": "revision_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stored_file_id": {
-          "name": "stored_file_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "uq_revision_files_revision_position": {
-          "name": "uq_revision_files_revision_position",
-          "columns": [
-            {
-              "expression": "revision_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "uq_revision_files_revision_file": {
-          "name": "uq_revision_files_revision_file",
-          "columns": [
-            {
-              "expression": "revision_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stored_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_revision_files_ledger_file": {
-          "name": "idx_revision_files_ledger_file",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stored_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "fk_revision_files_revision_ledger": {
-          "name": "fk_revision_files_revision_ledger",
-          "tableFrom": "revision_files",
-          "tableTo": "source_document_revisions",
-          "columnsFrom": [
-            "ledger_id",
-            "revision_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_revision_files_stored_file_ledger": {
-          "name": "fk_revision_files_stored_file_ledger",
-          "tableFrom": "revision_files",
-          "tableTo": "stored_files",
-          "columnsFrom": [
-            "ledger_id",
-            "stored_file_id"
-          ],
-          "columnsTo": [
-            "ledger_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ck_revision_files_position": {
-          "name": "ck_revision_files_position",
-          "value": "\"revision_files\".\"position\" >= 0"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.source_document_files": {
@@ -3356,12 +2933,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "input_text": {
-          "name": "input_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "input_document_date": {
           "name": "input_document_date",
           "type": "text",
@@ -3379,7 +2950,7 @@
           "type": "revision_processing_status",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "failure_kind": {
           "name": "failure_kind",
@@ -4125,17 +3696,6 @@
       "values": [
         "pending",
         "completed"
-      ]
-    },
-    "public.processing_outbox_status": {
-      "name": "processing_outbox_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "claimed",
-        "completed",
-        "failed",
-        "cancelled"
       ]
     },
     "public.revision_failure_kind": {

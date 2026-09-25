@@ -57,6 +57,13 @@
       "when": 1790332824884,
       "tag": "0007_entries_owned_by_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790336986600,
+      "tag": "0008_contract_revision_links",
+      "breakpoints": true
     }
   ]
 }
