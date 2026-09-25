@@ -4,8 +4,7 @@ import {
   entryCategories,
   ledgerEntries,
   ledgers,
-  revisionFiles,
-  sourceDocumentRevisions,
+  sourceDocumentFiles,
   sourceDocuments,
 } from "@/persistence";
 import { getTestDb } from "../../setup";
@@ -13,16 +12,13 @@ import { createCategoryData, createLedgerData } from "../../helpers/factories";
 import { createTestSourceDocument, ensureTestLedgerBooks } from "../../helpers/schema-setup";
 import { loadReclassificationDocumentGroups } from "@/server/category-reclassification/document-groups";
 
-/**
- * A projected entry used to verify evidence grouping. Each entry needs its own
- * `position` inside the revision (`uq_ledger_entries_revision_position`).
- */
+/** A document entry used to verify evidence grouping, at its own `position`. */
 async function seedProjectedEntry(input: {
   ledgerId: string;
   categoryId: string | null;
   documentId: string;
-  revisionId?: string;
   position?: number;
+  deletedAt?: Date;
   itemName?: string;
 }): Promise<string> {
   const db = getTestDb();
@@ -31,7 +27,7 @@ async function seedProjectedEntry(input: {
     id,
     ledgerId: input.ledgerId,
     sourceDocumentId: input.documentId,
-    sourceDocumentRevisionId: input.revisionId ?? null,
+    deletedAt: input.deletedAt ?? null,
     position: input.position ?? 0,
     amount: "10.00",
     currency: "CNY",
@@ -39,22 +35,6 @@ async function seedProjectedEntry(input: {
     categoryId: input.categoryId,
   });
   return id;
-}
-
-/** A second, completed revision the document has since moved past. */
-async function createSupersededRevision(ledgerId: string, documentId: string): Promise<string> {
-  const db = getTestDb();
-  const [revision] = await db
-    .insert(sourceDocumentRevisions)
-    .values({
-      ledgerId,
-      sourceDocumentId: documentId,
-      processingStatus: "completed",
-      finishedAt: new Date(),
-    })
-    .returning();
-  if (revision == null) throw new Error("Expected a superseded revision fixture");
-  return revision.id;
 }
 
 describe("loadDocumentGroups", () => {
@@ -72,7 +52,7 @@ describe("loadDocumentGroups", () => {
     documentDate?: string | null;
     inputText?: string;
     imageUrls?: string[];
-  }): Promise<{ documentId: string; revisionId: string }> {
+  }): Promise<{ documentId: string }> {
     const db = getTestDb();
     const documentId = await createTestSourceDocument(db, input.ledgerId, {
       title: input.title ?? null,
@@ -80,19 +60,13 @@ describe("loadDocumentGroups", () => {
       ...(input.inputText == null ? {} : { text: input.inputText }),
       imageUrls: input.imageUrls ?? [],
     });
-    const document = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, documentId),
-    });
-    if (document?.activeRevisionId == null) {
-      throw new Error("Expected an active revision fixture");
-    }
-    return { documentId, revisionId: document.activeRevisionId };
+    return { documentId };
   }
 
   it("groups one document's entries together and carries the document's own evidence", async () => {
     const db = getTestDb();
     const ledger = await setupEmptyLedger();
-    const { documentId, revisionId } = await setupDocument({
+    const { documentId } = await setupDocument({
       ledgerId: ledger.id,
       title: "全家便利店",
       documentDate: "2026-09-10",
@@ -103,7 +77,6 @@ describe("loadDocumentGroups", () => {
       ledgerId: ledger.id,
       categoryId: null,
       documentId,
-      revisionId,
       position: 1,
       itemName: "面包",
     });
@@ -111,7 +84,6 @@ describe("loadDocumentGroups", () => {
       ledgerId: ledger.id,
       categoryId: null,
       documentId,
-      revisionId,
       position: 0,
       itemName: "可乐",
     });
@@ -133,17 +105,17 @@ describe("loadDocumentGroups", () => {
     expect(group!.subjects.map((subject) => subject.itemName)).toEqual(["可乐", "面包"]);
 
     const files = await db
-      .select({ storedFileId: revisionFiles.storedFileId })
-      .from(revisionFiles)
-      .where(eq(revisionFiles.revisionId, revisionId))
-      .orderBy(revisionFiles.position);
+      .select({ storedFileId: sourceDocumentFiles.storedFileId })
+      .from(sourceDocumentFiles)
+      .where(eq(sourceDocumentFiles.sourceDocumentId, documentId))
+      .orderBy(sourceDocumentFiles.position);
     expect(files).toHaveLength(3);
     expect(group!.storedFileIds).toEqual(files.map((file) => file.storedFileId));
   });
 
   it("keeps a text-only document in the run without any evidence attached", async () => {
     const ledger = await setupEmptyLedger();
-    const { documentId, revisionId } = await setupDocument({
+    const { documentId } = await setupDocument({
       ledgerId: ledger.id,
       inputText: "打车 18 元",
     });
@@ -151,7 +123,6 @@ describe("loadDocumentGroups", () => {
       ledgerId: ledger.id,
       categoryId: null,
       documentId,
-      revisionId,
       itemName: "打车",
     });
 
@@ -179,13 +150,11 @@ describe("loadDocumentGroups", () => {
       ledgerId: ledger.id,
       categoryId: null,
       documentId: receipt.documentId,
-      revisionId: receipt.revisionId,
     });
     const noteEntry = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: null,
       documentId: note.documentId,
-      revisionId: note.revisionId,
     });
 
     const groups = await loadReclassificationDocumentGroups({
@@ -201,30 +170,37 @@ describe("loadDocumentGroups", () => {
     expect(byDocument.get(receipt.documentId)?.subjects[0]?.ledgerEntryId).toBe(receiptEntry);
   });
 
-  it("leaves out entries whose document is not the live one", async () => {
+  it("leaves out deleted entries and the entries of a deleted document", async () => {
+    const db = getTestDb();
     const ledger = await setupEmptyLedger();
-    const { documentId, revisionId } = await setupDocument({ ledgerId: ledger.id });
+    const { documentId } = await setupDocument({ ledgerId: ledger.id });
     const liveEntryId = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: null,
       documentId,
-      revisionId,
     });
-    const supersededEntryId = await seedProjectedEntry({
+    // An entry a later parse replaced is soft-deleted, not moved to a revision.
+    const replacedEntryId = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: null,
       documentId,
-      revisionId: await createSupersededRevision(ledger.id, documentId),
+      position: 1,
+      deletedAt: new Date(),
     });
-    const orphanEntryId = await seedProjectedEntry({
+    const deleted = await setupDocument({ ledgerId: ledger.id });
+    const deletedDocumentEntryId = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: null,
-      documentId,
+      documentId: deleted.documentId,
     });
+    await db
+      .update(sourceDocuments)
+      .set({ deletedAt: new Date() })
+      .where(eq(sourceDocuments.id, deleted.documentId));
 
     const groups = await loadReclassificationDocumentGroups({
       ledgerId: ledger.id,
-      ledgerEntryIds: [liveEntryId, supersededEntryId, orphanEntryId],
+      ledgerEntryIds: [liveEntryId, replacedEntryId, deletedDocumentEntryId],
     });
 
     expect(groups).toHaveLength(1);
@@ -236,12 +212,11 @@ describe("loadDocumentGroups", () => {
     const ledger = await setupEmptyLedger();
     const category = createCategoryData(ledger.id, { name: "吃喝", sortOrder: 0 });
     await db.insert(entryCategories).values(category);
-    const { documentId, revisionId } = await setupDocument({ ledgerId: ledger.id });
+    const { documentId } = await setupDocument({ ledgerId: ledger.id });
     const entryId = await seedProjectedEntry({
       ledgerId: ledger.id,
       categoryId: category.id,
       documentId,
-      revisionId,
     });
 
     const groups = await loadReclassificationDocumentGroups({

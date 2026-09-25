@@ -15,38 +15,23 @@ describe("target application contracts", () => {
   it("exposes actions for stable document lifecycle states", () => {
     const cases = [
       [
-        {
-          activeRevisionId: "revision-1",
-          latestSubmissionStatus: "failed" as const,
-          hasSubmissionInput: true,
-        },
+        { latestSubmissionStatus: "failed" as const, hasSubmissionInput: true },
         ["split_entries", "retry", "edit_retry", "delete"],
       ],
       [
-        {
-          activeRevisionId: null,
-          latestSubmissionStatus: "cancelled" as const,
-          hasSubmissionInput: true,
-        },
-        ["retry", "edit_retry", "delete"],
-      ],
-      [
-        {
-          activeRevisionId: "revision-1",
-          latestSubmissionStatus: "completed" as const,
-          hasSubmissionInput: true,
-        },
+        { latestSubmissionStatus: "cancelled" as const, hasSubmissionInput: true },
         ["split_entries", "retry", "edit_retry", "delete"],
       ],
       [
-        {
-          activeRevisionId: null,
-          latestSubmissionStatus: "failed" as const,
-          hasSubmissionInput: true,
-          deleted: true,
-        },
-        [],
+        { latestSubmissionStatus: "completed" as const, hasSubmissionInput: true },
+        ["split_entries", "retry", "edit_retry", "delete"],
       ],
+      [
+        { latestSubmissionStatus: "processing" as const, hasSubmissionInput: true },
+        ["cancel_processing", "retry", "edit_retry", "delete"],
+      ],
+      [{ latestSubmissionStatus: null, hasSubmissionInput: false }, ["split_entries", "delete"]],
+      [{ latestSubmissionStatus: "failed" as const, hasSubmissionInput: true, deleted: true }, []],
     ] as const;
 
     for (const [input, actions] of cases) {
@@ -54,24 +39,16 @@ describe("target application contracts", () => {
     }
   });
 
-  it("only exposes splitting for a completed active document without pending work", () => {
+  it("only exposes splitting while no processing is pending", () => {
+    expect(
+      supportedSourceDocumentActions({ latestSubmissionStatus: null, hasSubmissionInput: false })
+    ).toContain("split_entries");
     expect(
       supportedSourceDocumentActions({
-        activeRevisionId: "revision-1",
-        latestSubmissionStatus: null,
-        hasSubmissionInput: false,
-      })
-    ).toContain("split_entries");
-    for (const input of [
-      {
-        activeRevisionId: "revision-1",
-        latestSubmissionStatus: "processing" as const,
+        latestSubmissionStatus: "processing",
         hasSubmissionInput: true,
-      },
-      { activeRevisionId: null, latestSubmissionStatus: null, hasSubmissionInput: false },
-    ]) {
-      expect(supportedSourceDocumentActions(input)).not.toContain("split_entries");
-    }
+      })
+    ).not.toContain("split_entries");
   });
 
   it("maps infrastructure failures to stable, non-sensitive application errors", () => {

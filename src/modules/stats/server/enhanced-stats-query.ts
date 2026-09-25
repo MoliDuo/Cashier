@@ -51,7 +51,6 @@ async function fetchAggregatedRows(
     JOIN ledger_entries entries
       ON entries.ledger_id = documents.ledger_id
       AND entries.source_document_id = documents.id
-      AND entries.source_document_revision_id = documents.active_revision_id
       AND entries.deleted_at IS NULL
     JOIN ledgers ON ledgers.id = documents.ledger_id
     CROSS JOIN LATERAL (

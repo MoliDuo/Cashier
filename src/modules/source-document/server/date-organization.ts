@@ -11,8 +11,7 @@ import type {
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
-import { copyRevisionInputToDocument } from "./document-input";
-import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
+import { copyDocumentInput } from "./document-input";
 import { getSourceDocumentInTransaction } from "./reads/list";
 
 function normalizeCurrency(value: string | null) {
@@ -67,16 +66,12 @@ export async function applyDateOrganization(
     }),
   ]);
   if (ledger == null || document == null) throw new NotFoundError("Source document");
-  if (
-    document.activeRevisionId == null ||
-    document.dateOrganizationSuggestion?.id !== input.suggestionId
-  )
+  if (document.dateOrganizationSuggestion?.id !== input.suggestionId)
     throw new ConflictError("Date organization suggestion is no longer current");
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, input.ledgerId),
       eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-      eq(ledgerEntries.sourceDocumentRevisionId, document.activeRevisionId),
       isNull(ledgerEntries.deletedAt)
     ),
     orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
@@ -125,24 +120,25 @@ export async function applyDateOrganization(
       input.ledgerId,
       input.sourceDocumentId
     );
-    if (
-      lockedDocument.activeRevisionId !== document.activeRevisionId ||
-      lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId
-    )
+    if (lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId)
       throw new ConflictError("Source document changed before date organization");
     await assertSourceDocumentNotProcessing(tx, lockedDocument);
-    const activeRevision = await tx.query.sourceDocumentRevisions.findFirst({
-      where: and(
-        eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-        eq(sourceDocumentRevisions.id, lockedDocument.activeRevisionId!)
-      ),
-    });
-    if (activeRevision == null) throw new ConflictError("Active revision is missing");
+    const revisionTitle =
+      lockedDocument.latestSubmissionRevisionId == null
+        ? null
+        : ((
+            await tx.query.sourceDocumentRevisions.findFirst({
+              where: and(
+                eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
+                eq(sourceDocumentRevisions.id, lockedDocument.latestSubmissionRevisionId)
+              ),
+              columns: { title: true },
+            })
+          )?.title ?? null);
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
         eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-        eq(ledgerEntries.sourceDocumentRevisionId, lockedDocument.activeRevisionId!),
         isNull(ledgerEntries.deletedAt)
       ),
       columns: { id: true, position: true },
@@ -157,59 +153,26 @@ export async function applyDateOrganization(
       (assigned.size === entries.length) !== (assigned.size === currentEntries.length)
     )
       throw new ConflictError("Source document entries changed before date organization");
-    const destinationByEntry = new Map<
-      string,
-      { documentId: string; revisionId: string; entryDate: string }
-    >();
+    const destinationByEntry = new Map<string, { documentId: string; entryDate: string }>();
     for (const [index, group] of destinationGroups.entries()) {
       const id = createdIds[index]!;
       await tx.insert(sourceDocuments).values({
         id,
         ledgerId: input.ledgerId,
         bookId: lockedDocument.bookId,
-        title: lockedDocument.title ?? activeRevision.title,
+        title: lockedDocument.title ?? revisionTitle,
         version: 1,
         documentDate: group.entryDate,
       });
-      const revision = await createManualRevision(tx, {
+      // Each new record keeps the evidence its entries were read from.
+      await copyDocumentInput(tx, {
         ledgerId: input.ledgerId,
-        sourceDocumentId: id,
-        inputText: activeRevision.inputText,
-      });
-      await copyRevisionFiles(tx, {
-        ledgerId: input.ledgerId,
-        fromRevisionId: activeRevision.id,
-        toRevisionId: revision.id,
+        fromDocumentId: input.sourceDocumentId,
+        toDocumentId: id,
       });
       for (const entryId of group.ledgerEntryIds)
-        destinationByEntry.set(entryId, {
-          documentId: id,
-          revisionId: revision.id,
-          entryDate: group.entryDate!,
-        });
-      await tx
-        .update(sourceDocuments)
-        .set({ activeRevisionId: revision.id, latestSubmissionRevisionId: null })
-        .where(eq(sourceDocuments.id, id));
-      await copyRevisionInputToDocument(tx, {
-        ledgerId: input.ledgerId,
-        sourceDocumentId: id,
-        revisionId: revision.id,
-      });
+        destinationByEntry.set(entryId, { documentId: id, entryDate: group.entryDate! });
     }
-    // Free the active positions before assigning contiguous positions in the same revision.
-    const positionOffset = Math.max(0, ...currentEntries.map((entry) => entry.position + 1));
-    await tx
-      .update(ledgerEntries)
-      .set({ position: sql`${ledgerEntries.position} + ${positionOffset}` })
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, input.ledgerId),
-          eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-          eq(ledgerEntries.sourceDocumentRevisionId, activeRevision.id),
-          isNull(ledgerEntries.deletedAt)
-        )
-      );
 
     const positions = new Map<string, number>();
     for (const entry of currentEntries) {
@@ -221,7 +184,6 @@ export async function applyDateOrganization(
         .update(ledgerEntries)
         .set({
           sourceDocumentId: docId,
-          sourceDocumentRevisionId: destination?.revisionId ?? activeRevision.id,
           position,
           updatedAt: new Date(),
         })

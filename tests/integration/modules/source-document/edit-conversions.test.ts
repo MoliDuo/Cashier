@@ -29,7 +29,8 @@ async function fixture() {
   const entries = await db
     .select()
     .from(ledgerEntries)
-    .where(eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId));
+    .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId))
+    .orderBy(ledgerEntries.position);
   return { db, ledgerId, ...created, entries };
 }
 

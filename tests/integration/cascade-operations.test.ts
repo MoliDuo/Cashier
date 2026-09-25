@@ -300,8 +300,8 @@ describe("E2: Delete Entry → Related Counts Update", () => {
     const doc = await db.query.sourceDocuments.findFirst({
       where: and(eq(sourceDocuments.id, sourceDoc.id), isNull(sourceDocuments.deletedAt)),
     });
-    expect(doc).not.toBeNull();
-    expect(doc?.activeRevisionId).not.toBeNull();
+    expect(doc).toBeDefined();
+    expect(doc?.deletedAt).toBeNull();
   });
 });
 

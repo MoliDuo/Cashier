@@ -30,11 +30,10 @@ vi.mock("@/lib/ai/openai-client", () => ({
 
 const userId = "00000000-0000-0000-0000-000000000000";
 
-/** Entries the model can be asked about, each on the document's live revision. */
+/** Entries the model can be asked about, each on the live document. */
 async function seedEntries(input: {
   ledgerId: string;
   documentId: string;
-  revisionId: string;
   categoryId: string | null;
   count: number;
 }): Promise<string[]> {
@@ -46,7 +45,6 @@ async function seedEntries(input: {
       ledgerId: input.ledgerId,
       categoryId: input.categoryId,
       sourceDocumentId: input.documentId,
-      sourceDocumentRevisionId: input.revisionId,
       position,
       amount: "10.00",
       currency: "CNY",
@@ -69,8 +67,8 @@ async function setupLedger() {
     ...document,
     bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
   });
-  const revisionId = await activateTestSourceDocumentProjection(db, document.id);
-  return { ledger, food, home, document, revisionId };
+  await activateTestSourceDocumentProjection(db, document.id);
+  return { ledger, food, home, document };
 }
 
 async function submitSelection(
@@ -119,11 +117,10 @@ describe("submitSelection", () => {
 
   it("runs the whole chain and reports what it moved", async () => {
     const db = getTestDb();
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const { ledger, food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: null,
       count: 2,
     });
@@ -159,11 +156,10 @@ describe("submitSelection", () => {
   });
 
   it("fails incomplete model output instead of leaving entries undecided", async () => {
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const { ledger, food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: home.id,
       count: 3,
     });
@@ -193,11 +189,10 @@ describe("submitSelection", () => {
   });
 
   it("counts an entry the model left in place as confirmed", async () => {
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const { ledger, food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: food.id,
       count: 1,
     });
@@ -219,11 +214,10 @@ describe("submitSelection", () => {
   });
 
   it("accepts selections above 100 but rejects a candidate set that is too small", async () => {
-    const { ledger, food, document, revisionId } = await setupLedger();
+    const { ledger, food, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: null,
       count: 3,
     });
@@ -236,11 +230,10 @@ describe("submitSelection", () => {
   });
 
   it("rejects a candidate category that is not in the ledger", async () => {
-    const { ledger, food, document, revisionId } = await setupLedger();
+    const { ledger, food, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: null,
       count: 1,
     });
@@ -256,11 +249,10 @@ describe("submitSelection", () => {
 
   it("rejects a candidate set that is no longer live before registering anything", async () => {
     const db = getTestDb();
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const { ledger, food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: null,
       count: 1,
     });
@@ -279,11 +271,10 @@ describe("submitSelection", () => {
   });
 
   it("reports a provider failure without losing the run", async () => {
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const { ledger, food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: null,
       count: 1,
     });
@@ -302,11 +293,10 @@ describe("submitSelection", () => {
   });
 
   it("refuses a second run while one is active", async () => {
-    const { ledger, food, home, document, revisionId } = await setupLedger();
+    const { ledger, food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
       ledgerId: ledger.id,
       documentId: document.id,
-      revisionId,
       categoryId: null,
       count: 1,
     });

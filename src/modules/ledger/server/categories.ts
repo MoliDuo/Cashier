@@ -120,7 +120,6 @@ export async function listCategoriesWithCount(
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, ledgerId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         isNull(sourceDocuments.deletedAt)
       )
     )
@@ -243,7 +242,6 @@ export async function saveEntryCategories(
           and(
             eq(sourceDocuments.ledgerId, ledgerId),
             eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
             isNull(sourceDocuments.deletedAt)
           )
         )
@@ -479,7 +477,6 @@ export async function applyCategoryPreset(
               and(
                 eq(sourceDocuments.ledgerId, ledgerId),
                 eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-                eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
                 isNull(sourceDocuments.deletedAt)
               )
             )
@@ -568,7 +565,6 @@ export async function applyCategoryPreset(
           AND entry.deleted_at IS NULL
           AND document.ledger_id = ${ledgerId}
           AND document.id = entry.source_document_id
-          AND document.active_revision_id = entry.source_document_revision_id
           AND document.deleted_at IS NULL
           AND entry.category_id IS DISTINCT FROM transfers.to_id
         RETURNING entry.source_document_id
@@ -625,7 +621,6 @@ export async function applyCategoryPreset(
         and(
           eq(sourceDocuments.ledgerId, ledgerId),
           eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-          eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
           isNull(sourceDocuments.deletedAt)
         )
       )
@@ -661,7 +656,6 @@ export async function countUncategorizedEntries(ledgerId: string): Promise<numbe
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, ledgerId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         isNull(sourceDocuments.deletedAt)
       )
     )

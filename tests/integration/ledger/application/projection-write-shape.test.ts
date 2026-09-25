@@ -6,7 +6,7 @@ import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-se
 import {
   ledgerEntries,
   ledgerSyncState,
-  revisionFiles,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
@@ -118,7 +118,7 @@ describe("projection write shape", () => {
     }
   });
 
-  it("edits the active revision without duplicating files or entries", async () => {
+  it("edits a document's entries without duplicating its files or entries", async () => {
     const db = getTestDb();
     const created = await createManualDocument({
       ledgerId,
@@ -139,14 +139,18 @@ describe("projection write shape", () => {
         .returning()
     )[0];
     if (file == null) throw new Error("Expected stored file insert to return a row");
-    await db.insert(revisionFiles).values({
+    await db.insert(sourceDocumentFiles).values({
       ledgerId,
-      revisionId: created.revisionId,
+      sourceDocumentId: created.sourceDocumentId,
       storedFileId: file.id,
       position: 0,
     });
     await installStatementCounters(db, [
-      { table: "revision_files", operation: "INSERT", name: "revision_files_insert" },
+      {
+        table: "source_document_files",
+        operation: "INSERT",
+        name: "source_document_files_insert",
+      },
     ]);
 
     await addLedgerEntry({
@@ -157,59 +161,50 @@ describe("projection write shape", () => {
       itemName: "C",
     });
 
-    expect(await readStatementCounter(db, "revision_files_insert")).toBe(0);
-    const document = (
-      await db
-        .select()
-        .from(sourceDocuments)
-        .where(eq(sourceDocuments.id, created.sourceDocumentId))
-    )[0];
-    const replacedRevisionId = document!.activeRevisionId!;
-    expect(replacedRevisionId).toBe(created.revisionId);
+    expect(await readStatementCounter(db, "source_document_files_insert")).toBe(0);
 
-    // Existing evidence keeps its position.
-    const copiedFiles = await db
-      .select({ position: revisionFiles.position })
-      .from(revisionFiles)
-      .where(
-        and(
-          eq(revisionFiles.revisionId, replacedRevisionId),
-          eq(revisionFiles.storedFileId, file.id)
-        )
-      );
-    expect(copiedFiles).toHaveLength(1);
-    expect(copiedFiles[0]?.position).toBe(0);
+    // Existing evidence keeps its position on the document.
+    const files = await db
+      .select({
+        storedFileId: sourceDocumentFiles.storedFileId,
+        position: sourceDocumentFiles.position,
+      })
+      .from(sourceDocumentFiles)
+      .where(eq(sourceDocumentFiles.sourceDocumentId, created.sourceDocumentId));
+    expect(files).toEqual([{ storedFileId: file.id, position: 0 }]);
 
-    // The same revision retains its evidence and current entries.
-    const oldRevision = (
+    // A hand edit records no parse attempt.
+    expect(
       await db
         .select()
         .from(sourceDocumentRevisions)
-        .where(eq(sourceDocumentRevisions.id, created.revisionId))
-    )[0];
-    expect(oldRevision?.processingStatus).toBeNull();
-    const oldFiles = await db
-      .select({ id: revisionFiles.id })
-      .from(revisionFiles)
-      .where(eq(revisionFiles.revisionId, created.revisionId));
-    expect(oldFiles).toHaveLength(1);
-    const oldEntries = await db
+        .where(eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId))
+    ).toHaveLength(0);
+    const allEntries = await db
       .select({ id: ledgerEntries.id })
       .from(ledgerEntries)
-      .where(eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId));
-    expect(oldEntries).toHaveLength(3);
-    const newEntries = await db
-      .select({ position: ledgerEntries.position, itemName: ledgerEntries.itemName })
+      .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId));
+    expect(allEntries).toHaveLength(3);
+    const liveEntries = await db
+      .select({
+        position: ledgerEntries.position,
+        itemName: ledgerEntries.itemName,
+        sourceDocumentRevisionId: ledgerEntries.sourceDocumentRevisionId,
+      })
       .from(ledgerEntries)
       .where(
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentRevisionId, replacedRevisionId),
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
           isNull(ledgerEntries.deletedAt)
         )
       )
       .orderBy(ledgerEntries.position);
-    expect(newEntries.map((row) => row.itemName)).toEqual(["A", "B", "C"]);
+    expect(liveEntries).toEqual([
+      { position: 0, itemName: "A", sourceDocumentRevisionId: null },
+      { position: 1, itemName: "B", sourceDocumentRevisionId: null },
+      { position: 2, itemName: "C", sourceDocumentRevisionId: null },
+    ]);
   });
 
   it("preserves entry identity and order without history copies, and increments change-log version", async () => {
@@ -235,7 +230,7 @@ describe("projection write shape", () => {
       .where(
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId)
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
         )
       );
     const originalById = new Map(originalRows.map((row) => [row.id, row]));
@@ -260,22 +255,19 @@ describe("projection write shape", () => {
         data: { itemName: `${row.itemName} updated` },
       })),
     });
-    const replacedRevisionId = (await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    }))!.activeRevisionId!;
 
     // No archive INSERT; two set-based UPDATEs, independent of row count.
     expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(0);
     expect(await readStatementCounter(db, "ledger_entries_update")).toBe(2);
 
-    // New active projection: input order, retained ids and created_at intact.
+    // The document's entries: input order, retained ids and created_at intact.
     const activeRows = await db
       .select()
       .from(ledgerEntries)
       .where(
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentRevisionId, replacedRevisionId),
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
           isNull(ledgerEntries.deletedAt)
         )
       )
@@ -298,12 +290,11 @@ describe("projection write shape", () => {
       .where(
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
           isNotNull(ledgerEntries.deletedAt)
         )
       );
     expect(historyRows).toHaveLength(0);
-    expect(replacedRevisionId).toBe(created.revisionId);
 
     // The change-log trigger aggregates by transaction: exactly one version
     // bump for the whole replace.
@@ -316,7 +307,7 @@ describe("projection write shape", () => {
     expect(Number(versionAfterReplace)).toBe(Number(versionAfterCreate) + 1);
   });
 
-  it("reuses positions across repeated removals and additions without new revisions", async () => {
+  it("reuses positions across repeated removals and additions without creating revisions", async () => {
     const db = getTestDb();
     const created = await createManualDocument({
       ledgerId,
@@ -327,7 +318,7 @@ describe("projection write shape", () => {
     for (let iteration = 0; iteration < 3; iteration++) {
       const rows = await db.query.ledgerEntries.findMany({
         where: and(
-          eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
           isNull(ledgerEntries.deletedAt)
         ),
         orderBy: ledgerEntries.position,
@@ -353,15 +344,15 @@ describe("projection write shape", () => {
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
     // Each entry add and delete changes whole-save content and bumps the version once.
-    expect(document).toMatchObject({ activeRevisionId: created.revisionId, version: 7 });
+    expect(document).toMatchObject({ version: 7 });
     expect(
       await db.query.sourceDocumentRevisions.findMany({
         where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
       })
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     const rows = await db.query.ledgerEntries.findMany({
       where: and(
-        eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
+        eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
         isNull(ledgerEntries.deletedAt)
       ),
       orderBy: ledgerEntries.position,

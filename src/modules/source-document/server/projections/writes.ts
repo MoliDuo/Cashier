@@ -52,7 +52,11 @@ export async function activateRevision(input: ActivateRevisionInput): Promise<bo
       return false;
     }
 
-    await replaceProjection(tx, input);
+    await replaceProjection(tx, {
+      ledgerId: input.ledgerId,
+      sourceDocumentId: input.sourceDocumentId,
+      entries: input.entries,
+    });
     const now = new Date();
     await tx
       .update(sourceDocumentRevisions)
@@ -68,7 +72,6 @@ export async function activateRevision(input: ActivateRevisionInput): Promise<bo
     await tx
       .update(sourceDocuments)
       .set({
-        activeRevisionId: input.revisionId,
         version: sql`${sourceDocuments.version} + 1`,
         documentDate: revision.inputDocumentDate,
         ...(input.title == null || input.title === "" ? {} : { title: input.title }),
@@ -82,7 +85,7 @@ export async function activateRevision(input: ActivateRevisionInput): Promise<bo
 
 export async function createManualDocument(
   input: CreateManualDocumentInput
-): Promise<{ sourceDocumentId: string; revisionId: string }> {
+): Promise<{ sourceDocumentId: string }> {
   return db.transaction(async (tx) => {
     // The ledger lock keeps the categories the entries reference from being
     // deleted underneath the new record.
@@ -94,7 +97,7 @@ export async function createManualDocument(
     await lockBookForShare(tx, input.ledgerId, input.bookId);
 
     const sourceDocumentId = input.sourceDocumentId ?? crypto.randomUUID();
-    const revisionId = await createCompletedProjectionInTransaction(tx, {
+    await createCompletedProjectionInTransaction(tx, {
       ledgerId: input.ledgerId,
       bookId: input.bookId,
       sourceDocumentId,
@@ -103,6 +106,6 @@ export async function createManualDocument(
       ...(input.inputText !== undefined ? { inputText: input.inputText } : {}),
       entries: input.entries,
     });
-    return { sourceDocumentId, revisionId };
+    return { sourceDocumentId };
   });
 }

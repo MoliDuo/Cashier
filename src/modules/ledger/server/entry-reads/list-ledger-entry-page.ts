@@ -9,7 +9,7 @@ import {
   encodeLedgerEntryCursor,
   type LedgerEntryFilterParams,
 } from "./build-ledger-entry-filters";
-import { ledgerEntries, revisionFiles } from "@/persistence";
+import { ledgerEntries, sourceDocumentFiles } from "@/persistence";
 import {
   entryConvertedAmountSql,
   entryExchangeRateSql,
@@ -57,8 +57,8 @@ export async function listLedgerEntryPage({
         cursorCondition,
       ].filter((condition): condition is SQL<unknown> => condition != null);
 
-      // Phase 1: a bounded keyset page over one scan of the active projection.
-      // The CTE applies visibility (active revision + soft delete), the
+      // Phase 1: a bounded keyset page over one scan of the live entries.
+      // The CTE applies visibility (soft delete of entry and document), the
       // accounting-date range, entry filters and the cursor predicate in SQL, so
       // no ordering scalar subquery is re-executed per row or per cursor branch.
       const page = await tx.execute<VisibleEntryRow & Record<string, unknown>>(sql`
@@ -67,7 +67,6 @@ export async function listLedgerEntryPage({
         ledger_entries.id,
         ledger_entries.position,
         ledger_entries.source_document_id,
-        ledger_entries.source_document_revision_id,
         documents.effective_date,
         documents.created_at AS document_created_at,
         documents.id AS document_id
@@ -76,7 +75,6 @@ export async function listLedgerEntryPage({
         ON documents.ledger_id = ledger_entries.ledger_id
        AND documents.id = ledger_entries.source_document_id
        AND documents.deleted_at IS NULL
-       AND documents.active_revision_id = ledger_entries.source_document_revision_id
        ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     )
@@ -130,7 +128,6 @@ export async function listLedgerEntryPage({
                 WHERE active_documents.ledger_id = ${ledgerEntries.ledgerId}
                   AND active_documents.id = ${ledgerEntries.sourceDocumentId}
                   AND active_documents.deleted_at IS NULL
-                  AND active_documents.active_revision_id = ${ledgerEntries.sourceDocumentRevisionId}
               )`
                 ),
                 with: {
@@ -153,9 +150,9 @@ export async function listLedgerEntryPage({
                   exchangeRate: entryExchangeRateSql().as("exchange_rate"),
                   hasImages: sql<boolean>`EXISTS (
                     SELECT 1
-                    FROM ${revisionFiles} page_revision_file
-                    WHERE page_revision_file.ledger_id = ${ledgerEntries.ledgerId}
-                      AND page_revision_file.revision_id = ${ledgerEntries.sourceDocumentRevisionId}
+                    FROM ${sourceDocumentFiles} page_document_file
+                    WHERE page_document_file.ledger_id = ${ledgerEntries.ledgerId}
+                      AND page_document_file.source_document_id = ${ledgerEntries.sourceDocumentId}
                   )`.as("has_images"),
                 },
               })

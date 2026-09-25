@@ -11,7 +11,6 @@ export async function hasActiveLedgerEntries(ledgerId: string): Promise<boolean>
       and(
         eq(sourceDocuments.ledgerId, ledgerId),
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         isNull(sourceDocuments.deletedAt)
       )
     )

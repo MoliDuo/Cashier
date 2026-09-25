@@ -5,7 +5,6 @@ describe("source document capabilities", () => {
   it("blocks manual writes while the latest submission is processing", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        activeRevisionId: "active-1",
         latestSubmissionStatus: "processing",
         hasSubmissionInput: true,
       })
@@ -15,7 +14,6 @@ describe("source document capabilities", () => {
   it("allows editing the retained result after processing fails", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        activeRevisionId: "active-1",
         latestSubmissionStatus: "failed",
         hasSubmissionInput: true,
       })
@@ -25,10 +23,21 @@ describe("source document capabilities", () => {
     });
   });
 
+  it("allows editing by hand a document whose first parse failed", () => {
+    expect(
+      deriveSourceDocumentCapabilities({
+        latestSubmissionStatus: "failed",
+        hasSubmissionInput: true,
+      })
+    ).toEqual({
+      canEdit: true,
+      supportedActions: ["split_entries", "retry", "edit_retry", "delete"],
+    });
+  });
+
   it("does not offer retry for a purely manual document without submitted input", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        activeRevisionId: "active-1",
         latestSubmissionStatus: null,
         hasSubmissionInput: false,
       }).supportedActions

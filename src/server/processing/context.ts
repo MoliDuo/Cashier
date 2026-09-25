@@ -7,7 +7,7 @@ import type {
 import { db } from "@/lib/db";
 import {
   entryCategories,
-  revisionFiles,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
@@ -18,11 +18,10 @@ export async function loadRevisionProcessingContext(
   const [identity, files, categories] = await Promise.all([
     db
       .select({
-        inputText: sourceDocumentRevisions.inputText,
+        inputText: sourceDocuments.inputText,
         inputDocumentDate: sourceDocumentRevisions.inputDocumentDate,
         inputDateReference: sourceDocumentRevisions.inputDateReference,
         processingStatus: sourceDocumentRevisions.processingStatus,
-        activeRevisionId: sourceDocuments.activeRevisionId,
         latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
         createdAt: sourceDocuments.createdAt,
       })
@@ -43,16 +42,18 @@ export async function loadRevisionProcessingContext(
         )
       )
       .then((rows) => rows[0] ?? null),
+    // The document's current input is the input of its latest submission,
+    // which the caller only processes while it is that submission.
     db
-      .select({ id: revisionFiles.storedFileId })
-      .from(revisionFiles)
+      .select({ id: sourceDocumentFiles.storedFileId })
+      .from(sourceDocumentFiles)
       .where(
         and(
-          eq(revisionFiles.ledgerId, request.ledgerId),
-          eq(revisionFiles.revisionId, request.revisionId)
+          eq(sourceDocumentFiles.ledgerId, request.ledgerId),
+          eq(sourceDocumentFiles.sourceDocumentId, request.sourceDocumentId)
         )
       )
-      .orderBy(asc(revisionFiles.position)),
+      .orderBy(asc(sourceDocumentFiles.position)),
     db
       .select({
         id: entryCategories.id,
@@ -82,7 +83,6 @@ export async function loadRevisionProcessingContext(
       identity == null
         ? null
         : {
-            activeRevisionId: identity.activeRevisionId,
             latestSubmissionRevisionId: identity.latestSubmissionRevisionId,
             createdAt: identity.createdAt,
           },

@@ -182,7 +182,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.sourceDocumentId, data.sourceDocumentId),
     });
-    expect(revision?.inputText).toBeNull();
+    expect(doc?.inputText).toBeNull();
     expect(revision?.processingStatus).toBe("processing");
   });
 

@@ -49,10 +49,10 @@ describe("source-document retry action", () => {
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    expect(before?.activeRevisionId).not.toBeNull();
+    expect(before?.latestSubmissionRevisionId).not.toBeNull();
     await expect(
       db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, before!.activeRevisionId!),
+        where: eq(sourceDocumentRevisions.id, before!.latestSubmissionRevisionId!),
       })
     ).resolves.toMatchObject({ processingStatus: "completed" });
 
@@ -88,18 +88,17 @@ describe("source-document retry action", () => {
     const activeEntries = await db.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-        eq(ledgerEntries.sourceDocumentRevisionId, after!.activeRevisionId!),
         isNull(ledgerEntries.deletedAt)
       ),
     });
 
-    // The completed retry becomes the active result immediately.
+    // The completed retry replaces the document's entries immediately.
     expect(after).toMatchObject({
       id: created.sourceDocumentId,
       deletedAt: null,
     });
-    expect(after?.latestSubmissionRevisionId).not.toBeNull();
-    expect(after?.activeRevisionId).toBe(after?.latestSubmissionRevisionId);
+    expect(after?.latestSubmissionRevisionId).toBe(revisions[1]?.id);
+    expect(after?.inputText).toBe("晚餐 50元");
     expect(revisions).toHaveLength(2);
     expect(revisions[0]?.processingStatus).toBe("completed");
     expect(revisions[1]?.processingStatus).toBe("completed");
@@ -116,7 +115,7 @@ describe("source-document retry action", () => {
     ).rejects.toThrow(ZodError);
   });
 
-  it("retry succeeds despite a previous failed revision, preserving the original active revision", async () => {
+  it("retry succeeds despite a previous failed revision, which kept the original entries", async () => {
     const db = getTestDb();
 
     // Step 1: Create a document and process it successfully
@@ -126,8 +125,15 @@ describe("source-document retry action", () => {
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    expect(before?.activeRevisionId).not.toBeNull();
-    const originalActiveRevisionId = before!.activeRevisionId;
+    const liveEntries = () =>
+      db.query.ledgerEntries.findMany({
+        where: and(
+          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
+          isNull(ledgerEntries.deletedAt)
+        ),
+      });
+    const originalEntries = await liveEntries();
+    expect(originalEntries.length).toBeGreaterThan(0);
 
     // Step 2: Retry with a broken AI mock that causes processing failure
     vi.mocked(getOpenAIClient).mockReturnValue({
@@ -141,11 +147,13 @@ describe("source-document retry action", () => {
     });
     await processAllPendingTasks();
 
-    // Step 3: Verify the previous active revision is preserved despite the failed retry
+    // Step 3: Verify the previous entries are preserved despite the failed retry
     const afterFail = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    expect(afterFail?.activeRevisionId).toBe(originalActiveRevisionId);
+    expect((await liveEntries()).map((entry) => entry.id).sort()).toEqual(
+      originalEntries.map((entry) => entry.id).sort()
+    );
     // Neither the retry submission nor the recorded failure changes saveable content.
     expect(afterFail?.version).toBe(before!.version);
 
@@ -181,13 +189,10 @@ describe("source-document retry action", () => {
     expect(retried).toEqual({ status: "processing" });
     await processAllPendingTasks();
 
-    // Step 5: Verify final state: the successful retry replaces the active result.
+    // Step 5: Verify final state: the successful retry replaces the entries.
     const afterRetry = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    expect(afterRetry?.latestSubmissionRevisionId).not.toBeNull();
-    expect(afterRetry?.activeRevisionId).toBe(afterRetry?.latestSubmissionRevisionId);
-    expect(afterRetry?.activeRevisionId).not.toBe(originalActiveRevisionId);
 
     const revisions2 = await db.query.sourceDocumentRevisions.findMany({
       where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
@@ -197,14 +202,8 @@ describe("source-document retry action", () => {
     expect(revisions2[0]?.processingStatus).toBe("completed"); // original
     expect(revisions2[1]?.processingStatus).toBe("failed"); // failed retry
     expect(revisions2[2]?.processingStatus).toBe("completed");
+    expect(afterRetry?.latestSubmissionRevisionId).toBe(revisions2[2]?.id);
 
-    const activeEntries = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-        eq(ledgerEntries.sourceDocumentRevisionId, afterRetry!.activeRevisionId!),
-        isNull(ledgerEntries.deletedAt)
-      ),
-    });
-    expect(activeEntries).toMatchObject([{ itemName: "晚餐" }]);
+    expect(await liveEntries()).toMatchObject([{ itemName: "晚餐" }]);
   });
 });

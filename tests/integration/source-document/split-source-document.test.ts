@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
-import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import {
+  ledgerEntries,
+  ledgers,
+  sourceDocumentFiles,
+  sourceDocuments,
+  storedFiles,
+} from "@/persistence";
 import { getTestDb } from "../../setup";
 import {
   activateTestSourceDocumentProjection,
@@ -12,6 +18,8 @@ import {
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
 import { insertExchangeRates } from "../../helpers/exchange-rates";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
+import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
@@ -107,6 +115,59 @@ describe("splitSourceDocumentAction", () => {
     expect(split?.version).toBe(1);
   });
 
+  it("shows the original's input text and images on the split document", async () => {
+    const fixture = await seed();
+    const files = await fixture.db
+      .insert(storedFiles)
+      .values(
+        [0, 1].map((index) => ({
+          ledgerId: fixture.ledger.id,
+          storageKey: `${fixture.ledger.id}/stored/split-evidence-${index}`,
+          contentType: "image/jpeg",
+          byteSize: 1,
+          finalizedAt: new Date(),
+        }))
+      )
+      .returning();
+    await fixture.db.insert(sourceDocumentFiles).values(
+      files.map((file, position) => ({
+        ledgerId: fixture.ledger.id,
+        sourceDocumentId: fixture.document.id,
+        storedFileId: file.id,
+        position,
+      }))
+    );
+    await fixture.db
+      .update(sourceDocuments)
+      .set({ inputText: "Long receipt" })
+      .where(eq(sourceDocuments.id, fixture.document.id));
+
+    const result = await splitSourceDocumentAction({
+      sourceDocumentId: fixture.document.id,
+      ledgerEntryIds: [fixture.ids[1]!],
+      entryDate: "2026-08-16",
+    });
+
+    const fileIds = files.map((file) => file.id);
+    const splitDetail = await getTargetSourceDocument(
+      fixture.ledger.id,
+      result.splitSourceDocumentId
+    );
+    expect(splitDetail).toMatchObject({ text: "Long receipt", hasImages: true });
+    expect(splitDetail?.files.map((file) => file.id)).toEqual(fileIds);
+    expect(splitDetail?.ledgerEntries.map((entry) => entry.id)).toEqual([fixture.ids[1]]);
+    const splitInput = await getSourceDocumentInput(
+      fixture.ledger.id,
+      result.splitSourceDocumentId
+    );
+    expect(splitInput).toMatchObject({ text: "Long receipt" });
+    expect(splitInput?.files.map((file) => file.id)).toEqual(fileIds);
+    // The original keeps its own input as well.
+    const originalDetail = await getTargetSourceDocument(fixture.ledger.id, fixture.document.id);
+    expect(originalDetail).toMatchObject({ text: "Long receipt" });
+    expect(originalDetail?.files.map((file) => file.id)).toEqual(fileIds);
+  });
+
   it("rejects a repeated split once its entry has moved", async () => {
     const fixture = await seed();
     const input = {
@@ -117,7 +178,7 @@ describe("splitSourceDocumentAction", () => {
     await expect(splitSourceDocumentAction(input)).resolves.toMatchObject({
       movedEntryCount: 1,
     });
-    await expect(splitSourceDocumentAction(input)).rejects.toThrow(/not in the active/);
+    await expect(splitSourceDocumentAction(input)).rejects.toThrow(/not in the source document/);
     expect(
       await fixture.db.query.sourceDocuments.findMany({
         where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
@@ -158,7 +219,7 @@ describe("splitSourceDocumentAction", () => {
         ...input,
         ledgerEntryIds: [crypto.randomUUID()],
       })
-    ).rejects.toThrow(/not in the active/);
+    ).rejects.toThrow(/not in the source document/);
     expect(
       await fixture.db.query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, fixture.document.id),

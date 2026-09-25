@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
@@ -7,10 +7,9 @@ import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { getSourceDocumentInTransaction } from "./reads/list";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
-import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
-import { copyRevisionInputToDocument } from "./document-input";
+import { copyDocumentInput } from "./document-input";
 
 function effectiveTitle(documentTitle: string | null, revisionTitle: string | null): string | null {
   return documentTitle?.trim() || revisionTitle?.trim() || null;
@@ -38,14 +37,10 @@ export async function splitSourceDocumentAtomically(input: {
     }),
   ]);
   if (ledger == null || document == null) throw new NotFoundError("Source document");
-  if (document.activeRevisionId == null) {
-    throw new ConflictError("Source document cannot be split in its current state");
-  }
   const initialEntries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, input.ledgerId),
       eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-      eq(ledgerEntries.sourceDocumentRevisionId, document.activeRevisionId),
       isNull(ledgerEntries.deletedAt)
     ),
     orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
@@ -53,7 +48,7 @@ export async function splitSourceDocumentAtomically(input: {
   const selectedIds = new Set(input.ledgerEntryIds);
   const movedEntries = initialEntries.filter((entry) => selectedIds.has(entry.id));
   if (movedEntries.length !== selectedIds.size) {
-    throw new ConflictError("Selected entries are not in the active source document revision");
+    throw new ConflictError("Selected entries are not in the source document");
   }
   if (movedEntries.length >= initialEntries.length) {
     throw new ConflictError("The source document must retain at least one entry");
@@ -73,27 +68,23 @@ export async function splitSourceDocumentAtomically(input: {
       input.ledgerId,
       input.sourceDocumentId
     );
-    if (lockedDocument.activeRevisionId == null) {
-      throw new ConflictError("Source document changed before the split");
-    }
     await assertSourceDocumentNotProcessing(tx, lockedDocument);
-    const activeRevision = await tx.query.sourceDocumentRevisions.findFirst({
-      where: and(
-        eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-        eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-        eq(sourceDocumentRevisions.id, lockedDocument.activeRevisionId),
-        or(
-          eq(sourceDocumentRevisions.processingStatus, "completed"),
-          isNull(sourceDocumentRevisions.processingStatus)
-        )
-      ),
-    });
-    if (activeRevision == null) throw new ConflictError("Active revision is not completed");
+    const revisionTitle =
+      lockedDocument.latestSubmissionRevisionId == null
+        ? null
+        : ((
+            await tx.query.sourceDocumentRevisions.findFirst({
+              where: and(
+                eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
+                eq(sourceDocumentRevisions.id, lockedDocument.latestSubmissionRevisionId)
+              ),
+              columns: { title: true },
+            })
+          )?.title ?? null);
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
         eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-        eq(ledgerEntries.sourceDocumentRevisionId, lockedDocument.activeRevisionId),
         isNull(ledgerEntries.deletedAt)
       ),
       orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
@@ -103,7 +94,7 @@ export async function splitSourceDocumentAtomically(input: {
     // selected entry still here and at least one left behind.
     const currentIds = new Set(currentEntries.map((entry) => entry.id));
     if ([...movedIds].some((id) => !currentIds.has(id))) {
-      throw new ConflictError("Selected entries are not in the active source document revision");
+      throw new ConflictError("Selected entries are not in the source document");
     }
     if (movedIds.size >= currentEntries.length) {
       throw new ConflictError("The source document must retain at least one entry");
@@ -113,35 +104,16 @@ export async function splitSourceDocumentAtomically(input: {
       id: splitSourceDocumentId,
       ledgerId: input.ledgerId,
       bookId: lockedDocument.bookId,
-      title: effectiveTitle(lockedDocument.title, activeRevision.title),
-
+      title: effectiveTitle(lockedDocument.title, revisionTitle),
       version: 1,
       documentDate: input.entryDate,
     });
-    const splitRevision = await createManualRevision(tx, {
+    // The new record keeps the evidence the entries were read from.
+    await copyDocumentInput(tx, {
       ledgerId: input.ledgerId,
-      sourceDocumentId: splitSourceDocumentId,
-      inputText: activeRevision.inputText,
+      fromDocumentId: input.sourceDocumentId,
+      toDocumentId: splitSourceDocumentId,
     });
-    await copyRevisionFiles(tx, {
-      ledgerId: input.ledgerId,
-      fromRevisionId: activeRevision.id,
-      toRevisionId: splitRevision.id,
-    });
-
-    // Free the active positions before assigning contiguous positions in the same revision.
-    const positionOffset = Math.max(0, ...currentEntries.map((entry) => entry.position + 1));
-    await tx
-      .update(ledgerEntries)
-      .set({ position: sql`${ledgerEntries.position} + ${positionOffset}` })
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, input.ledgerId),
-          eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-          eq(ledgerEntries.sourceDocumentRevisionId, activeRevision.id),
-          isNull(ledgerEntries.deletedAt)
-        )
-      );
 
     const now = new Date();
     let splitPosition = 0;
@@ -151,7 +123,6 @@ export async function splitSourceDocumentAtomically(input: {
       return {
         id: entry.id,
         source_document_id: isMoved ? splitSourceDocumentId : input.sourceDocumentId,
-        source_document_revision_id: isMoved ? splitRevision.id : activeRevision.id,
         position: isMoved ? splitPosition++ : sourcePosition++,
       };
     });
@@ -160,13 +131,11 @@ export async function splitSourceDocumentAtomically(input: {
         SELECT * FROM jsonb_to_recordset(${JSON.stringify(entryPatches)}::jsonb) AS value(
           id uuid,
           source_document_id uuid,
-          source_document_revision_id uuid,
           position integer
         )
       )
       UPDATE ledger_entries AS entry
       SET source_document_id = patches.source_document_id,
-          source_document_revision_id = patches.source_document_revision_id,
           position = patches.position,
           updated_at = ${now}
       FROM patches
@@ -191,20 +160,6 @@ export async function splitSourceDocumentAtomically(input: {
           eq(sourceDocuments.id, input.sourceDocumentId)
         )
       );
-    await tx
-      .update(sourceDocuments)
-      .set({ activeRevisionId: splitRevision.id, latestSubmissionRevisionId: null, updatedAt: now })
-      .where(
-        and(
-          eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, splitSourceDocumentId)
-        )
-      );
-    await copyRevisionInputToDocument(tx, {
-      ledgerId: input.ledgerId,
-      sourceDocumentId: splitSourceDocumentId,
-      revisionId: splitRevision.id,
-    });
     const sourceDocument = await getSourceDocumentInTransaction(
       tx,
       input.ledgerId,

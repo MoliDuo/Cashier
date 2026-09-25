@@ -161,10 +161,10 @@ describe("SourceDocument Actions", () => {
     expect(savedDoc).toBeDefined();
     expect(savedDoc).not.toHaveProperty("text");
     expect(savedDoc).not.toHaveProperty("imageUrls");
+    expect(savedDoc?.inputText).toBe("午餐25元");
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.sourceDocumentId, result.sourceDocumentId!),
     });
-    expect(revision?.inputText).toBe("午餐25元");
     expect(revision?.processingStatus).toBe("processing");
 
     // Process tasks to ensure cleanup

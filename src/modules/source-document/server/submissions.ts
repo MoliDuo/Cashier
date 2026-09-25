@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import {
   idempotencyRecords,
-  revisionFiles,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
@@ -34,7 +34,7 @@ async function submitInTransaction(
   if (input.sourceDocumentId != null) {
     const document = await tx
       .select({
-        activeRevisionId: sourceDocuments.activeRevisionId,
+        inputText: sourceDocuments.inputText,
         latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
       })
       .from(sourceDocuments)
@@ -53,9 +53,10 @@ async function submitInTransaction(
     if (input.inheritInput === true) {
       if (inputRevisionId == null)
         throw new ConflictError("Source document has no submission input");
+      // The text and files are the document's current input; the dates the
+      // parse read them with stay on the submission they came with.
       const previousInput = await tx
         .select({
-          text: sourceDocumentRevisions.inputText,
           documentDate: sourceDocumentRevisions.inputDocumentDate,
           dateReference: sourceDocumentRevisions.inputDateReference,
         })
@@ -71,17 +72,17 @@ async function submitInTransaction(
       if (previousInput == null) throw new ConflictError("Source document has no submission input");
       const storedFileIds = (
         await tx
-          .select({ id: revisionFiles.storedFileId })
-          .from(revisionFiles)
+          .select({ id: sourceDocumentFiles.storedFileId })
+          .from(sourceDocumentFiles)
           .where(
             and(
-              eq(revisionFiles.ledgerId, input.ledgerId),
-              eq(revisionFiles.revisionId, inputRevisionId)
+              eq(sourceDocumentFiles.ledgerId, input.ledgerId),
+              eq(sourceDocumentFiles.sourceDocumentId, input.sourceDocumentId)
             )
           )
-          .orderBy(asc(revisionFiles.position))
+          .orderBy(asc(sourceDocumentFiles.position))
       ).map((file) => file.id);
-      revisionInput = { ...previousInput, storedFileIds };
+      revisionInput = { ...previousInput, text: document.inputText, storedFileIds };
     }
 
     if (input.supersedeProcessing === true && document?.latestSubmissionRevisionId != null) {

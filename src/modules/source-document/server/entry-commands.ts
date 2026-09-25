@@ -9,27 +9,24 @@ import { compare as compareDecimal } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { replaceActiveProjectionInTransaction } from "./projections/manual-entries";
+import { replaceDocumentEntriesInTransaction } from "./projections/manual-entries";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   lockSourceDocumentsForUpdate,
 } from "@/lib/db/transaction-locks";
-import { hasEditableActiveProjection } from "./write-guards";
 import { assertCategoryOwnership } from "./projections/shared";
 
 async function listProjectionEntries(
   tx: PostgresTransaction,
   ledgerId: string,
-  sourceDocumentId: string,
-  revisionId: string
+  sourceDocumentId: string
 ) {
   return tx.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
       eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-      eq(ledgerEntries.sourceDocumentRevisionId, revisionId),
       isNull(ledgerEntries.deletedAt)
     ),
     orderBy: (entries, { asc }) => [asc(entries.position), asc(entries.id)],
@@ -128,7 +125,6 @@ async function prepareBatchUpdate(input: {
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         inArray(sourceDocuments.id, input.sourceDocumentIds),
         isNull(sourceDocuments.deletedAt)
       )
@@ -189,24 +185,15 @@ export async function addLedgerEntry(
   return db.transaction(async (tx) => {
     const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
     const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
-    if (!hasEditableActiveProjection(document)) {
-      throw new NotFoundError("Active source document");
-    }
     await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
-    const entries = await listProjectionEntries(
-      tx,
-      input.ledgerId,
-      document.id,
-      document.activeRevisionId
-    );
+    const entries = await listProjectionEntries(tx, input.ledgerId, document.id);
     const ledgerEntryId = crypto.randomUUID();
     const effectiveCurrency = input.currency ?? ledger.mainCurrency;
-    await replaceActiveProjectionInTransaction(tx, {
+    await replaceDocumentEntriesInTransaction(tx, {
       document,
       previousEntries: entries,
       ledgerId: input.ledgerId,
       sourceDocumentId: document.id,
-      expectedActiveRevisionId: document.activeRevisionId,
       entries: [
         ...entries.map(toProjectionEntry),
         {
@@ -231,24 +218,15 @@ export async function deleteLedgerEntry(input: {
   return db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, input.ledgerId);
     const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
-    if (!hasEditableActiveProjection(document)) {
-      throw new NotFoundError("Active source document");
-    }
-    const entries = await listProjectionEntries(
-      tx,
-      input.ledgerId,
-      document.id,
-      document.activeRevisionId
-    );
+    const entries = await listProjectionEntries(tx, input.ledgerId, document.id);
     if (!entries.some((entry) => entry.id === input.ledgerEntryId)) {
       throw new NotFoundError("Active ledger entry projection");
     }
-    await replaceActiveProjectionInTransaction(tx, {
+    await replaceDocumentEntriesInTransaction(tx, {
       document,
       previousEntries: entries,
       ledgerId: input.ledgerId,
       sourceDocumentId: document.id,
-      expectedActiveRevisionId: document.activeRevisionId,
       entries: entries.filter((entry) => entry.id !== input.ledgerEntryId).map(toProjectionEntry),
     });
     return { ledgerEntryId: input.ledgerEntryId, deleted: true };
@@ -266,9 +244,6 @@ export async function batchUpdateLedgerEntries(
       input.ledgerId,
       input.sourceDocumentIds
     );
-    if (documents.some((document) => !hasEditableActiveProjection(document))) {
-      throw new NotFoundError("Active source document");
-    }
     await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
     const requestedIds = [...new Set(input.ledgerEntryIds)].sort();
     const requested = new Set(requestedIds);
@@ -280,7 +255,6 @@ export async function batchUpdateLedgerEntries(
         and(
           eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
           eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
           isNull(sourceDocuments.deletedAt)
         )
       )
@@ -349,12 +323,11 @@ export async function batchUpdateLedgerEntries(
     const changedDocuments = documents.filter((document) => changedDocumentIds.has(document.id));
     for (const document of changedDocuments) {
       const entries = entriesByDocument.get(document.id)!;
-      await replaceActiveProjectionInTransaction(tx, {
+      await replaceDocumentEntriesInTransaction(tx, {
         document,
         previousEntries: entries,
         ledgerId: input.ledgerId,
         sourceDocumentId: document.id,
-        expectedActiveRevisionId: document.activeRevisionId!,
         entries: entries.map((entry) => nextById.get(entry.id) ?? toProjectionEntry(entry)),
       });
     }
@@ -373,7 +346,6 @@ export async function batchDeleteLedgerEntries(input: {
     .select({
       id: ledgerEntries.id,
       sourceDocumentId: ledgerEntries.sourceDocumentId,
-      sourceDocumentRevisionId: ledgerEntries.sourceDocumentRevisionId,
     })
     .from(ledgerEntries)
     .where(
@@ -407,25 +379,16 @@ export async function batchDeleteLedgerEntries(input: {
       await db.transaction(async (tx) => {
         await lockLedgerForUpdate(tx, input.ledgerId);
         const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, sourceDocumentId);
-        if (!hasEditableActiveProjection(document)) {
-          throw new NotFoundError("Active source document");
-        }
-        const entries = await listProjectionEntries(
-          tx,
-          input.ledgerId,
-          sourceDocumentId,
-          document.activeRevisionId
-        );
+        const entries = await listProjectionEntries(tx, input.ledgerId, sourceDocumentId);
         const selected = new Set(entryIds);
         if (entryIds.some((id) => !entries.some((entry) => entry.id === id))) {
           throw new NotFoundError("Active ledger entry projection");
         }
-        await replaceActiveProjectionInTransaction(tx, {
+        await replaceDocumentEntriesInTransaction(tx, {
           document,
           previousEntries: entries,
           ledgerId: input.ledgerId,
           sourceDocumentId,
-          expectedActiveRevisionId: document.activeRevisionId,
           entries: entries.filter((entry) => !selected.has(entry.id)).map(toProjectionEntry),
         });
       });

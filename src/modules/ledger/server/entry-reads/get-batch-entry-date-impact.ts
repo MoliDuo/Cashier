@@ -48,11 +48,7 @@ export async function getBatchEntryDateImpact(input: {
     .from(ledgerEntries)
     .innerJoin(
       sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
-        isNull(sourceDocuments.deletedAt)
-      )
+      and(eq(sourceDocuments.id, ledgerEntries.sourceDocumentId), isNull(sourceDocuments.deletedAt))
     )
     .where(
       and(

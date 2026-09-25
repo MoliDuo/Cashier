@@ -155,12 +155,20 @@ describe("saveEntryCategoriesAction", () => {
         amount: "10",
         currency: "CNY",
       });
-      const revisionId = await activateTestSourceDocumentProjection(db, document.id);
+      await activateTestSourceDocumentProjection(db, document.id);
       if (document === documents[1]) {
+        const [attempt] = await db
+          .insert(sourceDocumentRevisions)
+          .values({
+            ledgerId: ledger.id,
+            sourceDocumentId: document.id,
+            processingStatus: "processing",
+          })
+          .returning();
         await db
-          .update(sourceDocumentRevisions)
-          .set({ processingStatus: "processing" })
-          .where(eq(sourceDocumentRevisions.id, revisionId));
+          .update(sourceDocuments)
+          .set({ latestSubmissionRevisionId: attempt!.id })
+          .where(eq(sourceDocuments.id, document.id));
       }
     }
     const categories = await db.query.entryCategories.findMany({

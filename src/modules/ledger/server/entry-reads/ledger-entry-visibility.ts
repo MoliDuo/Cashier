@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { ledgerEntries } from "@/persistence";
 
-// An entry is visible when it belongs to its document's active revision.
+// An entry is visible while it and its document are live.
 
 interface SourceDocumentDateRange {
   startDate?: string | null;
@@ -18,8 +18,6 @@ export function buildLedgerEntryVisibilityCondition(
     WHERE active_documents.ledger_id = ${ledgerId}
       AND active_documents.id = ${ledgerEntries.sourceDocumentId}
       AND active_documents.deleted_at IS NULL
-      AND active_documents.active_revision_id IS NOT NULL
-      AND active_documents.active_revision_id = ${ledgerEntries.sourceDocumentRevisionId}
       ${
         dateRange?.startDate != null && dateRange.startDate !== ""
           ? sql`AND active_documents.effective_date >= ${dateRange.startDate}::date`

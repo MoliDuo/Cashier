@@ -52,12 +52,11 @@ export async function assertCategoryOwnership(
   }
 }
 
-export async function insertRevisionEntries(
+export async function insertDocumentEntries(
   tx: PostgresTransaction,
   input: {
     ledgerId: string;
     sourceDocumentId: string;
-    revisionId: string;
     entries: readonly LedgerProjectionEntryContract[];
   }
 ): Promise<void> {
@@ -67,7 +66,6 @@ export async function insertRevisionEntries(
       id: entry.id ?? crypto.randomUUID(),
       ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
-      sourceDocumentRevisionId: input.revisionId,
       position,
       categoryId: entry.categoryId,
       amount: entry.amount,
@@ -79,12 +77,12 @@ export async function insertRevisionEntries(
   );
 }
 
+/** Replaces every live entry of the document with the given ones. */
 export async function replaceProjection(
   tx: PostgresTransaction,
   input: {
     ledgerId: string;
     sourceDocumentId: string;
-    revisionId: string;
     entries: readonly LedgerProjectionEntryContract[];
   }
 ): Promise<void> {
@@ -101,5 +99,5 @@ export async function replaceProjection(
         isNull(ledgerEntries.deletedAt)
       )
     );
-  await insertRevisionEntries(tx, input);
+  await insertDocumentEntries(tx, input);
 }

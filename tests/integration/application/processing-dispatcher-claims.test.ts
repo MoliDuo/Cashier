@@ -99,10 +99,7 @@ describe("processing attempt jobs", () => {
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
     await expect(
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, job.sourceDocumentId) })
-    ).resolves.toMatchObject({
-      activeRevisionId: job.revisionId,
-      latestSubmissionRevisionId: job.revisionId,
-    });
+    ).resolves.toMatchObject({ latestSubmissionRevisionId: job.revisionId });
   });
 
   it("processes with custom ledger prompt in AI generation request", async () => {

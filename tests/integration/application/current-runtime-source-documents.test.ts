@@ -12,7 +12,7 @@ import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup
 import {
   entryCategories,
   ledgerEntries,
-  revisionFiles,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
@@ -104,10 +104,13 @@ describe("current-runtime target adapters", () => {
     const preserved = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, first.document.id),
     });
-    expect(preserved).toMatchObject({
-      activeRevisionId: retry.revision.id,
-      latestSubmissionRevisionId: failedRetry.revision.id,
-    });
+    expect(preserved).toMatchObject({ latestSubmissionRevisionId: failedRetry.revision.id });
+    // The failed retry leaves the entries of the completed one in place.
+    expect(
+      await db.query.ledgerEntries.findMany({
+        where: eq(ledgerEntries.sourceDocumentId, first.document.id),
+      })
+    ).toEqual([expect.objectContaining({ amount: "12.500", deletedAt: null })]);
 
     const second = await createPendingRevision({
       ledgerId,
@@ -160,10 +163,7 @@ describe("current-runtime target adapters", () => {
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, pending.revision.id),
     });
-    expect(document).toMatchObject({
-      activeRevisionId: null,
-      latestSubmissionRevisionId: pending.revision.id,
-    });
+    expect(document).toMatchObject({ latestSubmissionRevisionId: pending.revision.id });
     expect(revision?.processingStatus).toBe("processing");
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
@@ -224,7 +224,7 @@ describe("current-runtime target adapters", () => {
     ]);
     const pendingLease = await claimRevisionForTest(pending.revision.id);
     const revisionCount = (await db.select().from(sourceDocumentRevisions)).length;
-    const fileLinkCount = (await db.select().from(revisionFiles)).length;
+    const fileLinkCount = (await db.select().from(sourceDocumentFiles)).length;
 
     await expect(
       deleteSourceDocumentAtomically({
@@ -253,11 +253,11 @@ describe("current-runtime target adapters", () => {
     });
     expect(deleted).toMatchObject({
       deletedAt: expect.any(Date),
-      activeRevisionId: active.revisionId,
       latestSubmissionRevisionId: pending.revision.id,
     });
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(revisionCount);
-    expect(await db.select().from(revisionFiles)).toHaveLength(fileLinkCount);
+    expect(fileLinkCount).toBe(1);
+    expect(await db.select().from(sourceDocumentFiles)).toHaveLength(fileLinkCount);
     expect(await db.select().from(storedFiles)).toHaveLength(1);
     expect(
       await db.query.ledgerEntries.findFirst({

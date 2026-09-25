@@ -109,11 +109,8 @@ export async function applyCategoryAssignments(
       return { status } as const;
     };
 
-    if (document == null || document.deletedAt != null || document.activeRevisionId == null) {
+    if (document == null || document.deletedAt != null) {
       return finishWithoutWrite("skipped", "document_unavailable");
-    }
-    if (document.activeRevisionId !== work.revisionId) {
-      return finishWithoutWrite("conflict", "document_changed");
     }
     try {
       await assertSourceDocumentNotProcessing(tx, document);
@@ -128,7 +125,7 @@ export async function applyCategoryAssignments(
       .select({
         work: categoryReclassificationJobEntries,
         currentCategoryId: ledgerEntries.categoryId,
-        revisionId: ledgerEntries.sourceDocumentRevisionId,
+        sourceDocumentId: ledgerEntries.sourceDocumentId,
         deletedAt: ledgerEntries.deletedAt,
       })
       .from(categoryReclassificationJobEntries)
@@ -147,11 +144,13 @@ export async function applyCategoryAssignments(
         )
       )
       .orderBy(categoryReclassificationJobEntries.selectionOrder);
+    // A reparse replaces the entries and a split moves them to another
+    // document; either way the selection no longer describes this one.
     if (
       selected.some(
         (entry) =>
           entry.deletedAt != null ||
-          entry.revisionId !== document.activeRevisionId ||
+          entry.sourceDocumentId !== input.sourceDocumentId ||
           !entry.work.decisionPersisted
       )
     ) {
@@ -192,7 +191,7 @@ export async function applyCategoryAssignments(
             and(
               eq(ledgerEntries.ledgerId, input.ledgerId),
               eq(ledgerEntries.id, entry.work.ledgerEntryId),
-              eq(ledgerEntries.sourceDocumentRevisionId, document.activeRevisionId),
+              eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
               isNull(ledgerEntries.deletedAt),
               sql`${ledgerEntries.categoryId} IS NOT DISTINCT FROM ${entry.work.originalCategoryId}`
             )

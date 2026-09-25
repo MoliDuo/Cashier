@@ -3,10 +3,9 @@ import type { LedgerProjectionEntryContract } from "@/modules/source-document/se
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
 import type { DateOrganizationSuggestion } from "@/modules/source-document/date-organization-contracts";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
-import { assertSourceDocumentNotProcessing, hasEditableActiveProjection } from "../write-guards";
-import { copyRevisionInputToDocument } from "../document-input";
+import { assertSourceDocumentNotProcessing } from "../write-guards";
 
 import {
   activeDocumentWhere,
@@ -44,7 +43,6 @@ export async function replaceManualProjection(
   input: {
     ledgerId: string;
     sourceDocumentId: string;
-    revisionId: string;
     entries: readonly LedgerProjectionEntryContract[];
     previousEntries: readonly (typeof ledgerEntries.$inferSelect)[];
   }
@@ -53,7 +51,7 @@ export async function replaceManualProjection(
   await assertCategoryOwnership(tx, input.ledgerId, input.entries);
   const requestedIds = input.entries.flatMap((entry) => (entry.id == null ? [] : [entry.id]));
   if (new Set(requestedIds).size !== requestedIds.length) {
-    throw new ValidationError("A ledger entry may only appear once per manual revision");
+    throw new ValidationError("A ledger entry may only appear once per source document");
   }
 
   const previousEntries = input.previousEntries;
@@ -71,11 +69,10 @@ export async function replaceManualProjection(
   const retainedIds = new Set(requestedIds);
   const retainedEntries = previousEntries.filter((previous) => retainedIds.has(previous.id));
   if (retainedEntries.length > 0) {
-    // Free active positions before inserting or reordering entries.
+    // Move the kept entries past every current position before reordering.
     await tx.execute(sql`
       UPDATE ledger_entries entry
-      SET source_document_revision_id = ${input.revisionId},
-          position = positions.position + ${Math.max(input.entries.length, ...previousEntries.map((entry) => entry.position + 1))},
+      SET position = positions.position + ${Math.max(input.entries.length, ...previousEntries.map((entry) => entry.position + 1))},
           updated_at = ${now}
       FROM (VALUES ${sql.join(
         retainedEntries.map((previous, index) => sql`(${previous.id}::uuid, ${index}::integer)`),
@@ -110,7 +107,6 @@ export async function replaceManualProjection(
             id: entry.id ?? crypto.randomUUID(),
             ledgerId: input.ledgerId,
             sourceDocumentId: input.sourceDocumentId,
-            sourceDocumentRevisionId: input.revisionId,
             position,
             categoryId: entry.categoryId,
             amount: entry.amount,
@@ -145,8 +141,7 @@ export async function replaceManualProjection(
   if (updatedEntries.length > 0) {
     await tx.execute(sql`
       UPDATE ledger_entries entry
-      SET source_document_revision_id = ${input.revisionId},
-          position = updates.position,
+      SET position = updates.position,
           category_id = updates.category_id,
           amount = updates.amount,
           currency = updates.currency,
@@ -175,60 +170,31 @@ export async function replaceManualProjection(
   }
 }
 
-export async function createManualRevision(
-  tx: PostgresTransaction,
-  input: {
-    ledgerId: string;
-    sourceDocumentId: string;
-    inputText?: string | null;
-    revisionId?: string;
-  }
-) {
-  const now = new Date();
-  const revision = await tx
-    .insert(sourceDocumentRevisions)
-    .values({
-      ...(input.revisionId === undefined ? {} : { id: input.revisionId }),
-      ledgerId: input.ledgerId,
-      sourceDocumentId: input.sourceDocumentId,
-      inputText: input.inputText ?? null,
-      processingStatus: null,
-      submittedAt: now,
-    })
-    .returning()
-    .then((rows) => rows[0]);
-  if (revision == null) throw new ConflictError("Failed to create completed revision");
-  return revision;
-}
-
-export async function replaceActiveProjectionInTransaction(
+/**
+ * Writes a hand edit of the document's entries, title or date. The caller
+ * holds the document lock and read `previousEntries` under it; a document being
+ * processed is refused, since the parse replaces its entries when it completes.
+ */
+export async function replaceDocumentEntriesInTransaction(
   tx: PostgresTransaction,
   input: {
     ledgerId: string;
     document: typeof sourceDocuments.$inferSelect;
     previousEntries: readonly (typeof ledgerEntries.$inferSelect)[];
     sourceDocumentId: string;
-    expectedActiveRevisionId: string;
     entries: readonly LedgerProjectionEntryContract[];
     title?: string;
     entryDate?: string;
   }
-): Promise<string> {
+): Promise<void> {
   const document = input.document;
   const dateChanged = input.entryDate !== undefined && input.entryDate !== document.documentDate;
-  if (!hasEditableActiveProjection(document)) {
-    throw new ConflictError("Source document is not editable");
-  }
-  if (document.activeRevisionId !== input.expectedActiveRevisionId) {
-    throw new ConflictError("Source document active revision changed");
-  }
   await assertSourceDocumentNotProcessing(tx, document);
 
   await replaceManualProjection(tx, {
     previousEntries: input.previousEntries,
     ledgerId: input.ledgerId,
     sourceDocumentId: input.sourceDocumentId,
-    revisionId: input.expectedActiveRevisionId,
     entries: input.entries,
   });
   const updated = await tx
@@ -253,47 +219,25 @@ export async function replaceActiveProjectionInTransaction(
         : {}),
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        activeDocumentWhere(input.ledgerId, input.sourceDocumentId),
-        eq(sourceDocuments.activeRevisionId, input.expectedActiveRevisionId)
-      )
-    )
+    .where(activeDocumentWhere(input.ledgerId, input.sourceDocumentId))
     .returning({ id: sourceDocuments.id })
     .then((rows) => rows[0]);
   if (updated == null) throw new ConflictError("Source document changed during the edit");
-  return input.expectedActiveRevisionId;
 }
 
-export async function copyRevisionFiles(
-  tx: PostgresTransaction,
-  input: { ledgerId: string; fromRevisionId: string; toRevisionId: string }
-): Promise<void> {
-  // The source rows are already tenant-scoped by the WHERE clause, so the
-  // copy inherits their ownership in a single INSERT ... SELECT.
-  await tx.execute(sql`
-    INSERT INTO revision_files (ledger_id, revision_id, stored_file_id, position, created_at)
-    SELECT ledger_id, ${input.toRevisionId}, stored_file_id, position, now()
-    FROM revision_files
-    WHERE ledger_id = ${input.ledgerId}
-      AND revision_id = ${input.fromRevisionId}
-  `);
-}
-
+/** Creates a record typed in by hand, with its input text and entries. */
 export async function createCompletedProjectionInTransaction(
   tx: PostgresTransaction,
   input: {
     ledgerId: string;
     sourceDocumentId: string;
     bookId: string;
-    revisionId?: string;
     title?: string | null;
     entryDate?: string | null;
     inputText?: string | null;
-    copyFilesFromRevisionId?: string;
     entries: readonly LedgerProjectionEntryContract[];
   }
-): Promise<string> {
+): Promise<void> {
   const existing = await tx
     .select({ id: sourceDocuments.id })
     .from(sourceDocuments)
@@ -307,35 +251,12 @@ export async function createCompletedProjectionInTransaction(
     ledgerId: input.ledgerId,
     bookId: input.bookId,
     title: input.title ?? null,
+    inputText: input.inputText ?? null,
     documentDate: input.entryDate ?? null,
   });
-  const revision = await createManualRevision(tx, {
-    ledgerId: input.ledgerId,
-    sourceDocumentId: input.sourceDocumentId,
-    ...(input.revisionId === undefined ? {} : { revisionId: input.revisionId }),
-    ...(input.inputText !== undefined ? { inputText: input.inputText } : {}),
-  });
-  if (input.copyFilesFromRevisionId !== undefined) {
-    await copyRevisionFiles(tx, {
-      ledgerId: input.ledgerId,
-      fromRevisionId: input.copyFilesFromRevisionId,
-      toRevisionId: revision.id,
-    });
-  }
   await replaceProjection(tx, {
     ledgerId: input.ledgerId,
     sourceDocumentId: input.sourceDocumentId,
-    revisionId: revision.id,
     entries: input.entries,
   });
-  await tx
-    .update(sourceDocuments)
-    .set({ activeRevisionId: revision.id })
-    .where(activeDocumentWhere(input.ledgerId, input.sourceDocumentId));
-  await copyRevisionInputToDocument(tx, {
-    ledgerId: input.ledgerId,
-    sourceDocumentId: input.sourceDocumentId,
-    revisionId: revision.id,
-  });
-  return revision.id;
 }

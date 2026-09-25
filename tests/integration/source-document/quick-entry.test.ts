@@ -89,14 +89,13 @@ describe("createQuickEntryAction", () => {
     });
     expect(sourceDoc).toBeDefined();
     expect(sourceDoc?.title).toBe("Test Item");
+    // A record typed in by hand has no input and no parse attempt.
+    expect(sourceDoc).toMatchObject({ inputText: null, latestSubmissionRevisionId: null });
     await expect(
-      db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, sourceDoc!.activeRevisionId!),
+      db.query.sourceDocumentRevisions.findMany({
+        where: eq(sourceDocumentRevisions.sourceDocumentId, result.sourceDocumentId),
       })
-    ).resolves.toMatchObject({
-      processingStatus: null,
-      inputText: null,
-    });
+    ).resolves.toEqual([]);
 
     // Verify ledger entry was created
     const entry = await db.query.ledgerEntries.findFirst({

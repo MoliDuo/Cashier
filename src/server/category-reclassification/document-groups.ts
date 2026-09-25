@@ -4,8 +4,7 @@ import { db } from "@/lib/db";
 import {
   entryCategories,
   ledgerEntries,
-  revisionFiles,
-  sourceDocumentRevisions,
+  sourceDocumentFiles,
   sourceDocuments,
 } from "@/persistence";
 import type {
@@ -15,7 +14,7 @@ import type {
 
 /**
  * Entries grouped by the source document their evidence hangs off. Entries
- * whose document has no live active revision are absent.
+ * whose document is deleted are absent.
  */
 export async function loadReclassificationDocumentGroups(input: {
   ledgerId: string;
@@ -35,9 +34,9 @@ export async function loadReclassificationDocumentGroups(input: {
       sourceDocumentId: sourceDocuments.id,
       documentTitle: sourceDocuments.title,
       documentDate: sourceDocuments.documentDate,
-      inputText: sourceDocumentRevisions.inputText,
-      storedFileId: revisionFiles.storedFileId,
-      storedFilePosition: revisionFiles.position,
+      inputText: sourceDocuments.inputText,
+      storedFileId: sourceDocumentFiles.storedFileId,
+      storedFilePosition: sourceDocumentFiles.position,
     })
     .from(ledgerEntries)
     .innerJoin(
@@ -45,7 +44,6 @@ export async function loadReclassificationDocumentGroups(input: {
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         isNull(sourceDocuments.deletedAt)
       )
     )
@@ -57,22 +55,15 @@ export async function loadReclassificationDocumentGroups(input: {
         isNull(entryCategories.deletedAt)
       )
     )
-    // Both evidence joins are LEFT joins on purpose: a text-only submission
-    // has no revision_files, and an inner join here would drop its entries
-    // from the run entirely instead of merely leaving them without images.
-    // The liveness join above stays the only thing that excludes an entry.
+    // The file join is a LEFT join on purpose: a text-only record has no
+    // files, and an inner join here would drop its entries from the run
+    // entirely instead of merely leaving them without images. The liveness
+    // join above stays the only thing that excludes an entry.
     .leftJoin(
-      sourceDocumentRevisions,
+      sourceDocumentFiles,
       and(
-        eq(sourceDocumentRevisions.id, sourceDocuments.activeRevisionId),
-        eq(sourceDocumentRevisions.ledgerId, input.ledgerId)
-      )
-    )
-    .leftJoin(
-      revisionFiles,
-      and(
-        eq(revisionFiles.revisionId, sourceDocuments.activeRevisionId),
-        eq(revisionFiles.ledgerId, input.ledgerId)
+        eq(sourceDocumentFiles.sourceDocumentId, sourceDocuments.id),
+        eq(sourceDocumentFiles.ledgerId, input.ledgerId)
       )
     )
     .where(
@@ -82,7 +73,7 @@ export async function loadReclassificationDocumentGroups(input: {
         isNull(ledgerEntries.deletedAt)
       )
     )
-    .orderBy(ledgerEntries.position, ledgerEntries.id, revisionFiles.position);
+    .orderBy(ledgerEntries.position, ledgerEntries.id, sourceDocumentFiles.position);
 
   // The file join repeats each entry once per image, so both the subjects and
   // the file ids are collected into maps keyed by their own id rather than

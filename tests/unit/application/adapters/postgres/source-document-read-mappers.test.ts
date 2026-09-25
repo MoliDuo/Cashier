@@ -13,7 +13,6 @@ const row: SourceDocumentRow = {
   bookId: "book",
   documentDate: null,
   effectiveDate: "2026-09-24",
-  activeRevisionId: "active",
   latestSubmissionRevisionId: "retry",
   version: 3,
   createdAt: new Date("2026-09-24"),
@@ -83,10 +82,7 @@ describe("source document read contracts", () => {
   });
   it("does not invent retained results for first-parse failures", () => {
     expect(
-      mapSourceDocumentDetail(
-        { ...row, activeRevisionId: null },
-        { ...hydration, ledgerEntries: [] }
-      ).activeResultSummary
+      mapSourceDocumentDetail(row, { ...hydration, ledgerEntries: [] }).activeResultSummary
     ).toBeUndefined();
   });
   it.each([

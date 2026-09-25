@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { and, eq, isNull } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { updateLedgerSettings } from "@/modules/ledger/server/settings";
-import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { exchangeRates } from "@/persistence/schema/currency";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
@@ -162,28 +162,15 @@ describe("target Settings currency workflow", () => {
     async function addMainCurrencyOnlyEntry(entryDate: string) {
       const db = getTestDb();
       const sourceDocumentId = crypto.randomUUID();
-      const activeRevisionId = crypto.randomUUID();
       await db.insert(sourceDocuments).values({
         id: sourceDocumentId,
         ledgerId,
         documentDate: entryDate,
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
-      await db.insert(sourceDocumentRevisions).values({
-        id: activeRevisionId,
-        ledgerId,
-        sourceDocumentId,
-        processingStatus: "completed",
-        finishedAt: new Date(),
-      });
-      await db
-        .update(sourceDocuments)
-        .set({ activeRevisionId })
-        .where(eq(sourceDocuments.id, sourceDocumentId));
       await db.insert(ledgerEntries).values({
         ledgerId,
         sourceDocumentId,
-        sourceDocumentRevisionId: activeRevisionId,
         amount: "40.00",
         currency: "CNY",
         itemName: "Main-currency-only entry",

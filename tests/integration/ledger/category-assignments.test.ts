@@ -45,13 +45,12 @@ async function seedSelection() {
     ...document,
     bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
   });
-  const revisionId = await activateTestSourceDocumentProjection(db, document.id);
+  await activateTestSourceDocumentProjection(db, document.id);
   const entryId = crypto.randomUUID();
   await db.insert(ledgerEntries).values({
     id: entryId,
     ledgerId: ledger.id,
     sourceDocumentId: document.id,
-    sourceDocumentRevisionId: revisionId,
     position: 0,
     amount: "12.00",
     currency: "CNY",
@@ -312,15 +311,11 @@ describe("category assignment v2", () => {
       .insert(entryCategories)
       .values(createCategoryData(fixture.ledger.id, { name: "Travel", sortOrder: 1 }))
       .returning();
-    const document = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, fixture.document.id),
-    });
     const secondEntryId = crypto.randomUUID();
     await db.insert(ledgerEntries).values({
       id: secondEntryId,
       ledgerId: fixture.ledger.id,
       sourceDocumentId: fixture.document.id,
-      sourceDocumentRevisionId: document!.activeRevisionId,
       position: 1,
       amount: "8.00",
       currency: "CNY",

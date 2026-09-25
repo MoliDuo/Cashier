@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { ledgerEntries, sourceDocuments } from "@/persistence";
+import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
@@ -29,9 +29,14 @@ describe("current-runtime target adapters", () => {
       bookId: await testBookId(db, ledgerId),
     });
     const originalEntry = await db.query.ledgerEntries.findFirst({
-      where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
+      where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     });
-    expect(originalEntry).toBeDefined();
+    expect(originalEntry).toMatchObject({ sourceDocumentRevisionId: null });
+    expect(
+      await db.query.sourceDocumentRevisions.findMany({
+        where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
+      })
+    ).toEqual([]);
 
     const edited = await saveSourceDocumentChanges({
       ledgerId,
@@ -41,19 +46,17 @@ describe("current-runtime target adapters", () => {
       entries: [{ ledgerEntryId: originalEntry!.id, data: { amount: "18.00" } }],
     });
     expect(edited.ok).toBe(true);
-    const replacementRevisionId = (await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    }))!.activeRevisionId!;
-    const replacementEntry = await db.query.ledgerEntries.findFirst({
-      where: eq(ledgerEntries.sourceDocumentRevisionId, replacementRevisionId),
+    const replacementEntries = await db.query.ledgerEntries.findMany({
+      where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     });
-    expect(replacementEntry?.amount).toBe("18.000");
-    expect(replacementEntry?.id).toBe(originalEntry!.id);
-    expect(
-      await db.query.ledgerEntries.findFirst({
-        where: eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
-      })
-    ).toMatchObject({ amount: "18.000", deletedAt: null });
+    expect(replacementEntries).toHaveLength(1);
+    const replacementEntry = replacementEntries[0];
+    expect(replacementEntry).toMatchObject({
+      id: originalEntry!.id,
+      amount: "18.000",
+      deletedAt: null,
+      sourceDocumentRevisionId: null,
+    });
 
     await expect(
       deleteSourceDocumentAtomically({

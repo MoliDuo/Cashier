@@ -97,7 +97,7 @@ async function createActiveDocument(ledgerId: string, count = 1) {
   });
   const entries = await getTestDb().query.ledgerEntries.findMany({
     where: (row, { eq: eqOp, and, isNull }) =>
-      and(eqOp(row.sourceDocumentRevisionId, created.revisionId), isNull(row.deletedAt)),
+      and(eqOp(row.sourceDocumentId, created.sourceDocumentId), isNull(row.deletedAt)),
     orderBy: (row, { asc }) => [asc(row.position)],
   });
   return { sourceDocumentId: created.sourceDocumentId, entryIds: entries.map((row) => row.id) };

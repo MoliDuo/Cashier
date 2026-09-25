@@ -24,6 +24,7 @@ async function createFixture() {
     bookId: await testBookId(db, ledgerId),
     title: "Long screenshot",
     entryDate: "2026-09-10",
+    inputText: "Long screenshot text",
     entries: ["Today", "Yesterday", "Earlier"].map((itemName, index) => ({
       categoryId: null,
       amount: `${index + 1}.00`,
@@ -38,7 +39,6 @@ async function createFixture() {
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
       eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
-      eq(ledgerEntries.sourceDocumentRevisionId, created.revisionId),
       isNull(ledgerEntries.deletedAt)
     ),
     orderBy: (row, { asc }) => [asc(row.position)],
@@ -78,12 +78,11 @@ async function activeEntryNames(ledgerId: string, sourceDocumentId: string) {
   const document = await db.query.sourceDocuments.findFirst({
     where: and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)),
   });
-  if (document?.activeRevisionId == null) throw new Error("Active document expected");
+  if (document == null || document.deletedAt != null) throw new Error("Live document expected");
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
       eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-      eq(ledgerEntries.sourceDocumentRevisionId, document.activeRevisionId),
       isNull(ledgerEntries.deletedAt)
     ),
     orderBy: (row, { asc }) => [asc(row.position)],
@@ -117,6 +116,15 @@ describe("date organization", () => {
     expect(created.map(({ document, names }) => [document.documentDate, names])).toEqual([
       ["2026-09-09", ["Yesterday"]],
       ["2026-09-08", ["Earlier"]],
+    ]);
+    // Each new bill keeps the input the entries were read from, without a revision.
+    expect(created.map(({ document }) => document.inputText)).toEqual([
+      "Long screenshot text",
+      "Long screenshot text",
+    ]);
+    expect(created.map(({ document }) => document.latestSubmissionRevisionId)).toEqual([
+      null,
+      null,
     ]);
     const stream = await listStreamPage(fixture.ledgerId);
     const createdCards = result.createdSourceDocumentIds.map((id) =>

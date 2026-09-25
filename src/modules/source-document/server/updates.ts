@@ -14,7 +14,7 @@ import type {
   UpdateSourceDocumentInput as UpdateSourceDocumentPayload,
 } from "@/modules/source-document/contract-schemas";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { replaceActiveProjectionInTransaction } from "./projections/manual-entries";
+import { replaceDocumentEntriesInTransaction } from "./projections/manual-entries";
 import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
@@ -22,7 +22,6 @@ import {
 } from "@/lib/db/transaction-locks";
 import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
-import { hasEditableActiveProjection } from "./write-guards";
 
 function whereSourceDocumentNotDeleted(ledgerId: string) {
   return and(eq(sourceDocuments.ledgerId, ledgerId), isNull(sourceDocuments.deletedAt))!;
@@ -145,8 +144,7 @@ async function ensureRatesForDateChange(
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt),
-        eq(ledgerEntries.sourceDocumentRevisionId, sourceDocuments.activeRevisionId)
+        isNull(sourceDocuments.deletedAt)
       )
     )
     .innerJoin(ledgers, eq(ledgers.id, ledgerEntries.ledgerId))
@@ -175,7 +173,6 @@ export async function saveSourceDocumentChanges(
     db.query.sourceDocuments.findFirst({
       where: whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId),
       columns: {
-        activeRevisionId: true,
         latestSubmissionRevisionId: true,
         version: true,
         title: true,
@@ -206,18 +203,11 @@ export async function saveSourceDocumentChanges(
       currentVersion: document.version,
     };
   }
-  if (!hasEditableActiveProjection(document)) {
-    throw new ConflictError("Source document is not editable");
-  }
-  const activeEntries = initialEntries.filter(
-    (entry) => entry.sourceDocumentRevisionId === document.activeRevisionId
-  );
-
   const patches = new Map(input.entries.map((entry) => [entry.ledgerEntryId, entry.data]));
   if (patches.size !== input.entries.length) {
     throw new ConflictError("A ledger entry may only be updated once");
   }
-  const initialEntriesById = new Map(activeEntries.map((entry) => [entry.id, entry]));
+  const initialEntriesById = new Map(initialEntries.map((entry) => [entry.id, entry]));
   for (const entryId of patches.keys()) {
     if (!initialEntriesById.has(entryId)) {
       throw new NotFoundError("Active ledger entry projection");
@@ -250,7 +240,7 @@ export async function saveSourceDocumentChanges(
     };
   }
 
-  const nextEntries = applyEntryPatches(activeEntries, patches, ledger.mainCurrency);
+  const nextEntries = applyEntryPatches(initialEntries, patches, ledger.mainCurrency);
   const dateChanged =
     input.sourceDocument?.documentDate !== undefined &&
     input.sourceDocument.documentDate !== document.documentDate;
@@ -277,21 +267,16 @@ export async function saveSourceDocumentChanges(
     if (lockedDocument.version !== input.expectedVersion) {
       return { ok: false as const, currentVersion: lockedDocument.version };
     }
-    if (!hasEditableActiveProjection(lockedDocument)) {
-      throw new ConflictError("Source document is not editable");
-    }
-
     // Writes only the patched fields onto the entries as they are now, so a
     // category another writer set since the draft was loaded survives.
     const previousEntries = await loadProjectionEntriesForDocuments(tx, input.ledgerId, [
       input.sourceDocumentId,
     ]);
-    await replaceActiveProjectionInTransaction(tx, {
+    await replaceDocumentEntriesInTransaction(tx, {
       document: lockedDocument,
       previousEntries,
       ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
-      expectedActiveRevisionId: lockedDocument.activeRevisionId,
       entries: applyEntryPatches(previousEntries, patches, ledger.mainCurrency),
       ...(input.sourceDocument?.title === undefined ? {} : { title: input.sourceDocument.title }),
       ...(input.sourceDocument?.documentDate === undefined
@@ -329,7 +314,6 @@ export async function updateSourceDocuments({
   const initialDocuments = await db
     .select({
       id: sourceDocuments.id,
-      activeRevisionId: sourceDocuments.activeRevisionId,
       latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
       title: sourceDocuments.title,
       documentDate: sourceDocuments.documentDate,
@@ -343,10 +327,7 @@ export async function updateSourceDocuments({
       )
     )
     .orderBy(asc(sourceDocuments.id));
-  if (
-    initialDocuments.length !== requestedIds.length ||
-    initialDocuments.some((document) => !hasEditableActiveProjection(document))
-  ) {
+  if (initialDocuments.length !== requestedIds.length) {
     throw new ConflictError("Source document is not editable");
   }
   const changedDateIds = new Set(
@@ -373,10 +354,6 @@ export async function updateSourceDocuments({
       }
       throw error;
     }
-    if (documents.some((document) => !hasEditableActiveProjection(document))) {
-      throw new ConflictError("Source document is not editable");
-    }
-
     let impact: BatchEntryDateImpact | undefined;
     if (selectedLedgerEntryIds != null) {
       const selectedIds = [...new Set(selectedLedgerEntryIds)].sort();
@@ -388,7 +365,6 @@ export async function updateSourceDocuments({
           and(
             eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
             eq(sourceDocuments.ledgerId, ledgerId),
-            eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
             isNull(sourceDocuments.deletedAt)
           )
         )
@@ -421,7 +397,6 @@ export async function updateSourceDocuments({
           and(
             eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
             eq(sourceDocuments.ledgerId, ledgerId),
-            eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
             isNull(sourceDocuments.deletedAt)
           )
         )
@@ -448,7 +423,6 @@ export async function updateSourceDocuments({
           return (
             current == null ||
             initial.id !== current.id ||
-            initial.activeRevisionId !== current.activeRevisionId ||
             initial.latestSubmissionRevisionId !== current.latestSubmissionRevisionId
           );
         })
@@ -469,12 +443,11 @@ export async function updateSourceDocuments({
       });
       for (const document of changedDocuments) {
         const entries = projectionEntries.filter((entry) => entry.sourceDocumentId === document.id);
-        await replaceActiveProjectionInTransaction(tx, {
+        await replaceDocumentEntriesInTransaction(tx, {
           document,
           previousEntries: entries,
           ledgerId,
           sourceDocumentId: document.id,
-          expectedActiveRevisionId: document.activeRevisionId!,
           entryDate: data.documentDate!,
           ...(data.title === undefined ? {} : { title: data.title }),
           entries: entries.map((entry) => ({
@@ -543,7 +516,6 @@ export async function updateLedgerEntryDates(input: {
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         isNull(sourceDocuments.deletedAt)
       )
     )
@@ -590,8 +562,7 @@ function loadProjectionEntriesForDocuments(
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, ledgerId),
-        isNull(sourceDocuments.deletedAt),
-        eq(ledgerEntries.sourceDocumentRevisionId, sourceDocuments.activeRevisionId)
+        isNull(sourceDocuments.deletedAt)
       )
     )
     .where(

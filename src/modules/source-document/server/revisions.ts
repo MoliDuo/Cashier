@@ -10,13 +10,7 @@ import { deriveSourceDocumentCapabilities } from "@/modules/source-document/doma
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { MAX_FILES, MAX_NORMALIZED_BYTES_PER_REVISION } from "@/lib/storage/upload-policy";
-import {
-  ledgers,
-  revisionFiles,
-  sourceDocumentRevisions,
-  sourceDocuments,
-  storedFiles,
-} from "@/persistence";
+import { ledgers, sourceDocumentRevisions, sourceDocuments, storedFiles } from "@/persistence";
 import {
   lockBookForShare,
   lockLedgerForUpdate,
@@ -24,7 +18,7 @@ import {
 } from "@/lib/db/transaction-locks";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
-import { copyRevisionInputToDocument } from "./document-input";
+import { replaceDocumentInput } from "./document-input";
 
 export type CreatePendingRevisionInput = {
   ledgerId: string;
@@ -64,12 +58,10 @@ function mapDocument(
     id: row.id,
     ledgerId: row.ledgerId,
     version: row.version,
-    activeRevisionId: row.activeRevisionId,
     latestSubmissionRevisionId: row.latestSubmissionRevisionId,
     supportedActions:
       row.deletedAt == null
         ? deriveSourceDocumentCapabilities({
-            activeRevisionId: row.activeRevisionId,
             latestSubmissionStatus,
             hasSubmissionInput: row.latestSubmissionRevisionId != null,
           }).supportedActions
@@ -157,7 +149,6 @@ export async function createProcessingRevisionInTransaction(
     .values({
       ledgerId: input.ledgerId,
       sourceDocumentId,
-      inputText: input.input.text,
       inputDocumentDate: input.input.documentDate,
       inputDateReference: input.input.dateReference ?? input.input.documentDate,
       processingStatus: "processing",
@@ -203,18 +194,6 @@ export async function createProcessingRevisionInTransaction(
     );
   }
 
-  // Ownership checks completed above; the file rows are inserted in one batch.
-  if (storedFileRows.length > 0) {
-    await tx.insert(revisionFiles).values(
-      storedFileRows.map((file, position) => ({
-        ledgerId: input.ledgerId,
-        revisionId: revision.id,
-        storedFileId: file.id,
-        position,
-      }))
-    );
-  }
-
   const updatedDocument = await tx
     .update(sourceDocuments)
     .set({
@@ -226,10 +205,13 @@ export async function createProcessingRevisionInTransaction(
     .then((rows) => rows[0]);
   if (updatedDocument == null)
     throw new ConflictError("Failed to update source document revision pointer");
-  await copyRevisionInputToDocument(tx, {
+  // The submission's input becomes the document's, even while the entries of
+  // an earlier parse stay until this attempt completes.
+  await replaceDocumentInput(tx, {
     ledgerId: input.ledgerId,
     sourceDocumentId,
-    revisionId: revision.id,
+    text: input.input.text,
+    storedFileIds: fileIds,
   });
   return { document: mapDocument(updatedDocument, "processing"), revision: mapRevision(revision) };
 }
@@ -316,7 +298,6 @@ export interface SourceDocumentContract {
   id: string;
   ledgerId: string;
   version: number;
-  activeRevisionId: string | null;
   latestSubmissionRevisionId: string | null;
   supportedActions: readonly SupportedSourceDocumentAction[];
 }

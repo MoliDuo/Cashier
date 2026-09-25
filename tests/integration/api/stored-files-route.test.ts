@@ -4,12 +4,7 @@ import type { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger } from "../../helpers/schema-setup";
-import {
-  revisionFiles,
-  sourceDocumentRevisions,
-  sourceDocuments,
-  storedFiles,
-} from "@/persistence";
+import { sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
 import * as authModule from "@/auth";
 import { AppError } from "@/lib/errors";
 
@@ -42,15 +37,6 @@ async function createLinkedStoredFile(ledgerId: string) {
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
-  const [revision] = await db
-    .insert(sourceDocumentRevisions)
-    .values({
-      ledgerId,
-      sourceDocumentId: document!.id,
-      processingStatus: "completed",
-      finishedAt: new Date(),
-    })
-    .returning();
   const [file] = await db
     .insert(storedFiles)
     .values({
@@ -61,16 +47,12 @@ async function createLinkedStoredFile(ledgerId: string) {
       finalizedAt: new Date(),
     })
     .returning();
-  await db.insert(revisionFiles).values({
+  await db.insert(sourceDocumentFiles).values({
     ledgerId,
-    revisionId: revision!.id,
+    sourceDocumentId: document!.id,
     storedFileId: file!.id,
     position: 0,
   });
-  await db
-    .update(sourceDocuments)
-    .set({ activeRevisionId: revision!.id })
-    .where(eq(sourceDocuments.id, document!.id));
   return { document: document!, file: file! };
 }
 

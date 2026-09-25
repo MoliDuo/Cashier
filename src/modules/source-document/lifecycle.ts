@@ -7,7 +7,6 @@ export type SupportedSourceDocumentAction =
   "retry" | "edit_retry" | "delete" | "cancel_processing" | "split_entries";
 
 export function supportedSourceDocumentActions(input: {
-  activeRevisionId: string | null;
   latestSubmissionStatus: RevisionProcessingStatus | null;
   hasSubmissionInput: boolean;
   deleted?: boolean;
@@ -23,10 +22,7 @@ export function supportedSourceDocumentActions(input: {
   const retryActions: SupportedSourceDocumentAction[] = input.hasSubmissionInput
     ? ["retry", "edit_retry"]
     : [];
-  if (input.activeRevisionId != null) {
-    return ["split_entries", ...retryActions, "delete"];
-  }
-  return [...retryActions, "delete"];
+  return ["split_entries", ...retryActions, "delete"];
 }
 
 /**

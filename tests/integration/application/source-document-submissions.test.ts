@@ -13,8 +13,8 @@ import {
   ledgerEntries,
   ledgers,
   idempotencyRecords,
-  revisionFiles,
   serviceCredentials,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
@@ -188,7 +188,7 @@ describe("target source-document submissions", () => {
     expect(new Set([text.document.id, imageOnly.document.id, mixed.document.id]).size).toBe(3);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(3);
     expect(await queuedAttemptIds(db)).toHaveLength(3);
-    expect(await db.select().from(revisionFiles)).toHaveLength(2);
+    expect(await db.select().from(sourceDocumentFiles)).toHaveLength(2);
     expect(mixed.job).toMatchObject({
       sourceDocumentId: mixed.document.id,
       revisionId: mixed.revision.id,
@@ -223,7 +223,7 @@ describe("target source-document submissions", () => {
     ["processing_error", "PROCESSING_UNAVAILABLE"],
     ["invalid_input", null],
   ] as const)(
-    "keeps a first %s failure without an active revision or ledger projection",
+    "keeps a first %s failure without ledger entries, open to retry or editing by hand",
     async (failureKind, failureCode) => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
@@ -249,12 +249,12 @@ describe("target source-document submissions", () => {
         where: eq(sourceDocuments.id, pending.document.id),
       });
       expect(document).toMatchObject({
-        activeRevisionId: null,
+        inputText: "first parse evidence",
         latestSubmissionRevisionId: pending.revision.id,
       });
       expect(
         (await getTargetSourceDocument(ledgerId, pending.document.id))?.supportedActions
-      ).toEqual(["retry", "edit_retry", "delete"]);
+      ).toEqual(["split_entries", "retry", "edit_retry", "delete"]);
       expect(await db.select().from(ledgerEntries)).toHaveLength(0);
     }
   );
@@ -268,7 +268,7 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     const activeEntry = await db.query.ledgerEntries.findFirst({
-      where: eq(ledgerEntries.sourceDocumentRevisionId, active.revisionId),
+      where: eq(ledgerEntries.sourceDocumentId, active.sourceDocumentId),
     });
 
     const failed = await submitSourceDocument({
@@ -326,7 +326,7 @@ describe("target source-document submissions", () => {
       where: eq(sourceDocuments.id, active.sourceDocumentId),
     });
     expect(document).toMatchObject({
-      activeRevisionId: active.revisionId,
+      inputText: "anomalous edit retry",
       latestSubmissionRevisionId: anomalous.revision.id,
     });
     expect(
@@ -362,16 +362,23 @@ describe("target source-document submissions", () => {
     const retryRevision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, retry.revision.id),
     });
-    const retryFiles = await db.query.revisionFiles.findMany({
-      where: eq(revisionFiles.revisionId, retry.revision.id),
+    const retryDocument = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, retry.document.id),
+    });
+    const retryFiles = await db.query.sourceDocumentFiles.findMany({
+      where: eq(sourceDocumentFiles.sourceDocumentId, retry.document.id),
     });
     expect(retry.document.id).toBe(initial.document.id);
-    expect(retryRevision?.inputText).toBe("original");
+    expect(retryDocument).toMatchObject({
+      inputText: "original",
+      latestSubmissionRevisionId: retry.revision.id,
+    });
+    expect(retryRevision?.processingStatus).toBe("processing");
     expect(retryFiles.map((file) => file.storedFileId)).toEqual([image.id]);
     expect(await queuedAttemptIds(db)).toEqual([retry.revision.id]);
   });
 
-  it("rejects inherited evidence retry when previous revision exceeds MAX_FILES", async () => {
+  it("rejects inherited evidence retry when the document input exceeds MAX_FILES", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
@@ -401,12 +408,12 @@ describe("target source-document submissions", () => {
       failureMessage: "processing failed",
     });
 
-    // Directly insert an extra revisionFile record to simulate a pre-existing
+    // Directly insert an extra document file to simulate a pre-existing
     // overflow that predates the aggregate file-count check.
     const overflowFileId = files[MAX_FILES]!.id;
-    await db.insert(revisionFiles).values({
+    await db.insert(sourceDocumentFiles).values({
       ledgerId,
-      revisionId: initial.revision.id,
+      sourceDocumentId: initial.document.id,
       storedFileId: overflowFileId,
       position: MAX_FILES,
     });

@@ -5,7 +5,7 @@ import {
   entryCategories,
   ledgerEntries,
   ledgers,
-  revisionFiles,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
@@ -38,10 +38,7 @@ async function loadSourceDocumentDetailSnapshot(
     .select({
       ...getTableColumns(sourceDocuments),
       mainCurrency: ledgers.mainCurrency,
-      selectedRevisionId: sourceDocumentRevisions.id,
-      activeRevisionId: sourceDocuments.activeRevisionId,
       revisionTitle: sourceDocumentRevisions.title,
-      inputText: sourceDocumentRevisions.inputText,
       latestSubmissionStatus: sourceDocumentRevisions.processingStatus,
       failureKind: sourceDocumentRevisions.failureKind,
       failureMessage: sourceDocumentRevisions.failureMessage,
@@ -67,71 +64,64 @@ async function loadSourceDocumentDetailSnapshot(
     .then((rows) => rows[0]);
   if (baseRow == null) return null;
 
-  const fileRows: SourceDocumentStoredFileAggregateRow[] =
-    baseRow.selectedRevisionId == null
-      ? []
-      : await tx
-          .select({
-            id: storedFiles.id,
-            contentType: storedFiles.contentType,
-            byteSize: storedFiles.byteSize,
-            originalFilename: storedFiles.originalFilename,
-          })
-          .from(revisionFiles)
-          .innerJoin(
-            storedFiles,
-            and(
-              eq(storedFiles.ledgerId, revisionFiles.ledgerId),
-              eq(storedFiles.id, revisionFiles.storedFileId),
-              isNull(storedFiles.deletedAt)
-            )
-          )
-          .where(
-            and(
-              eq(revisionFiles.ledgerId, ledgerId),
-              eq(revisionFiles.revisionId, baseRow.selectedRevisionId)
-            )
-          )
-          .orderBy(asc(revisionFiles.position));
+  const fileRows: SourceDocumentStoredFileAggregateRow[] = await tx
+    .select({
+      id: storedFiles.id,
+      contentType: storedFiles.contentType,
+      byteSize: storedFiles.byteSize,
+      originalFilename: storedFiles.originalFilename,
+    })
+    .from(sourceDocumentFiles)
+    .innerJoin(
+      storedFiles,
+      and(
+        eq(storedFiles.ledgerId, sourceDocumentFiles.ledgerId),
+        eq(storedFiles.id, sourceDocumentFiles.storedFileId),
+        isNull(storedFiles.deletedAt)
+      )
+    )
+    .where(
+      and(
+        eq(sourceDocumentFiles.ledgerId, ledgerId),
+        eq(sourceDocumentFiles.sourceDocumentId, sourceDocumentId)
+      )
+    )
+    .orderBy(asc(sourceDocumentFiles.position));
 
-  const entryRows =
-    baseRow.activeRevisionId == null
-      ? []
-      : await tx
-          .select({
-            id: ledgerEntries.id,
-            ledgerId: ledgerEntries.ledgerId,
-            categoryId: ledgerEntries.categoryId,
-            sourceDocumentId: ledgerEntries.sourceDocumentId,
-            amount: ledgerEntries.amount,
-            currency: ledgerEntries.currency,
-            itemName: ledgerEntries.itemName,
-            description: ledgerEntries.description,
-            convertedAmount: entryConvertedAmountSql(),
-            exchangeRate: entryExchangeRateSql(),
-            createdAt: ledgerEntries.createdAt,
-            updatedAt: ledgerEntries.updatedAt,
-            deletedAt: ledgerEntries.deletedAt,
-            category: entryCategories,
-          })
-          .from(ledgerEntries)
-          .leftJoin(
-            entryCategories,
-            and(
-              eq(entryCategories.ledgerId, ledgerEntries.ledgerId),
-              eq(entryCategories.id, ledgerEntries.categoryId),
-              isNull(entryCategories.deletedAt)
-            )
-          )
-          .where(
-            and(
-              eq(ledgerEntries.ledgerId, ledgerId),
-              eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-              eq(ledgerEntries.sourceDocumentRevisionId, baseRow.activeRevisionId),
-              isNull(ledgerEntries.deletedAt)
-            )
-          )
-          .orderBy(asc(ledgerEntries.position), asc(ledgerEntries.id));
+  const entryRows = await tx
+    .select({
+      id: ledgerEntries.id,
+      ledgerId: ledgerEntries.ledgerId,
+      categoryId: ledgerEntries.categoryId,
+      sourceDocumentId: ledgerEntries.sourceDocumentId,
+      amount: ledgerEntries.amount,
+      currency: ledgerEntries.currency,
+      itemName: ledgerEntries.itemName,
+      description: ledgerEntries.description,
+      convertedAmount: entryConvertedAmountSql(),
+      exchangeRate: entryExchangeRateSql(),
+      createdAt: ledgerEntries.createdAt,
+      updatedAt: ledgerEntries.updatedAt,
+      deletedAt: ledgerEntries.deletedAt,
+      category: entryCategories,
+    })
+    .from(ledgerEntries)
+    .leftJoin(
+      entryCategories,
+      and(
+        eq(entryCategories.ledgerId, ledgerEntries.ledgerId),
+        eq(entryCategories.id, ledgerEntries.categoryId),
+        isNull(entryCategories.deletedAt)
+      )
+    )
+    .where(
+      and(
+        eq(ledgerEntries.ledgerId, ledgerId),
+        eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
+        isNull(ledgerEntries.deletedAt)
+      )
+    )
+    .orderBy(asc(ledgerEntries.position), asc(ledgerEntries.id));
   const activeEntries: SourceDocumentLedgerEntryAggregateRow[] = entryRows.map((entry) => ({
     id: entry.id,
     ledgerId: entry.ledgerId,
@@ -185,13 +175,13 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
       failureCode: sourceDocumentRevisions.failureCode,
       hasImages: sql<boolean>`EXISTS (
             SELECT 1
-            FROM ${revisionFiles} list_revision_file
+            FROM ${sourceDocumentFiles} list_document_file
             INNER JOIN ${storedFiles} list_stored_file
-              ON list_stored_file.ledger_id = list_revision_file.ledger_id
-             AND list_stored_file.id = list_revision_file.stored_file_id
+              ON list_stored_file.ledger_id = list_document_file.ledger_id
+             AND list_stored_file.id = list_document_file.stored_file_id
              AND list_stored_file.deleted_at IS NULL
-            WHERE list_revision_file.ledger_id = ${input.ledgerId}
-              AND list_revision_file.revision_id = ${sourceDocumentRevisions.id}
+            WHERE list_document_file.ledger_id = ${input.ledgerId}
+              AND list_document_file.source_document_id = ${sourceDocuments.id}
           )`,
     })
     .from(sourceDocuments)

@@ -131,7 +131,8 @@ export interface GetStreamTotalInput {
 
 export interface CredentialSourceDocumentStatusResult {
   sourceDocumentId: string;
-  revisionId: string;
+  /** The latest parse attempt; null for a record entered or split off by hand. */
+  revisionId: string | null;
   status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
   submittedAt: string;
   finalizedAt: string | null;

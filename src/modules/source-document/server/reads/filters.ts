@@ -67,7 +67,6 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
       FROM ledger_entries AS matched_entries
       WHERE matched_entries.ledger_id = ${input.ledgerId}
         AND matched_entries.source_document_id = ${sourceDocuments.id}
-        AND matched_entries.source_document_revision_id = ${sourceDocuments.activeRevisionId}
         AND matched_entries.deleted_at IS NULL
         ${input.minAmount !== undefined ? sql`AND ${matchedConverted} >= ${input.minAmount}` : sql``}
         ${input.maxAmount !== undefined ? sql`AND ${matchedConverted} <= ${input.maxAmount}` : sql``}
@@ -117,7 +116,6 @@ export async function calculateCompletedSourceDocumentTotal(
       and(
         eq(ledgerEntries.ledgerId, sourceDocuments.ledgerId),
         eq(ledgerEntries.sourceDocumentId, sourceDocuments.id),
-        eq(ledgerEntries.sourceDocumentRevisionId, sourceDocuments.activeRevisionId),
         isNull(ledgerEntries.deletedAt),
         ...matchedEntryConditions
       )

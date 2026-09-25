@@ -74,7 +74,6 @@ export interface ClaimedCategoryAssignmentDocument {
   jobId: string;
   ledgerId: string;
   sourceDocumentId: string;
-  revisionId: string;
   claimToken: string;
   attempts: number;
   mode: CategoryAssignmentMode;
@@ -352,7 +351,6 @@ export async function resolveLatestConflictSelection(input: { ledgerId: string; 
       and(
         eq(sourceDocuments.ledgerId, input.ledgerId),
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
         isNull(sourceDocuments.deletedAt)
       )
     )
@@ -432,8 +430,6 @@ export async function appendCategoryAssignmentEntries(input: {
         id: ledgerEntries.id,
         categoryId: ledgerEntries.categoryId,
         sourceDocumentId: ledgerEntries.sourceDocumentId,
-        revisionId: ledgerEntries.sourceDocumentRevisionId,
-        activeRevisionId: sourceDocuments.activeRevisionId,
       })
       .from(ledgerEntries)
       .innerJoin(
@@ -455,23 +451,16 @@ export async function appendCategoryAssignmentEntries(input: {
     if (byId.size !== uniqueEntryIds.length)
       throw new ValidationError("Selection contains unavailable entries");
 
-    const documents = new Map<string, { revisionId: string; firstSelectionOrder: number }>();
+    const documents = new Map<string, { firstSelectionOrder: number }>();
     input.entries.forEach((entry, index) => {
       const row = byId.get(entry.ledgerEntryId)!;
-      if (
-        row.sourceDocumentId !== entry.sourceDocumentId ||
-        row.revisionId == null ||
-        row.revisionId !== row.activeRevisionId
-      ) {
+      if (row.sourceDocumentId !== entry.sourceDocumentId) {
         throw new ConflictError("Selected entry or document changed during upload");
       }
       const selectionOrder = input.chunkIndex * 1000 + index;
       const existing = documents.get(entry.sourceDocumentId);
       if (existing == null || selectionOrder < existing.firstSelectionOrder) {
-        documents.set(entry.sourceDocumentId, {
-          revisionId: row.revisionId,
-          firstSelectionOrder: selectionOrder,
-        });
+        documents.set(entry.sourceDocumentId, { firstSelectionOrder: selectionOrder });
       }
     });
 
@@ -498,12 +487,8 @@ export async function appendCategoryAssignmentEntries(input: {
           )
         )
         .then((result) => result[0]);
-      if (
-        stored == null ||
-        stored.ledgerId !== input.ledgerId ||
-        stored.revisionId !== document.revisionId
-      ) {
-        throw new ConflictError("A document selection was uploaded with inconsistent revisions");
+      if (stored == null || stored.ledgerId !== input.ledgerId) {
+        throw new ConflictError("A document selection was uploaded to another ledger");
       }
     }
 
@@ -597,7 +582,6 @@ export async function commitCategoryAssignment(input: {
     const documents = await tx
       .select({
         work: categoryReclassificationJobDocuments,
-        activeRevisionId: sourceDocuments.activeRevisionId,
         deletedAt: sourceDocuments.deletedAt,
       })
       .from(categoryReclassificationJobDocuments)
@@ -616,12 +600,7 @@ export async function commitCategoryAssignment(input: {
       )
       .orderBy(asc(categoryReclassificationJobDocuments.sourceDocumentId))
       .for("update");
-    if (
-      documents.some(
-        ({ work, activeRevisionId, deletedAt }) =>
-          deletedAt != null || activeRevisionId !== work.revisionId
-      )
-    ) {
+    if (documents.some(({ deletedAt }) => deletedAt != null)) {
       throw new ConflictError("A selected document changed before the assignment was committed");
     }
 
@@ -696,7 +675,6 @@ export async function claimCategoryAssignmentDocuments(input: {
       job_id: string;
       ledger_id: string;
       source_document_id: string;
-      revision_id: string;
       claim_token: string;
       attempts: number;
       mode: "ai" | "assign" | "clear";
@@ -736,7 +714,7 @@ export async function claimCategoryAssignmentDocuments(input: {
         RETURNING work.*
       )
       SELECT claimed.job_id, claimed.ledger_id, claimed.source_document_id,
-        claimed.revision_id, claimed.claim_token,
+        claimed.claim_token,
         claimed.attempts, job.mode, job.direct_category_id,
         job.candidate_category_ids, job.candidate_snapshot, job.custom_prompt_snapshot
       FROM claimed
@@ -753,7 +731,6 @@ export async function claimCategoryAssignmentDocuments(input: {
       jobId: row.job_id,
       ledgerId: row.ledger_id,
       sourceDocumentId: row.source_document_id,
-      revisionId: row.revision_id,
       claimToken: row.claim_token,
       attempts: row.attempts,
       mode: rowMode({
@@ -1171,16 +1148,12 @@ export async function retryCategoryAssignmentFailures(input: {
     if (created == null) throw new ConflictError("Retry assignment could not be created");
     const changedDocuments = new Set<string>();
     for (const { work, current } of failedDocuments) {
-      const changed =
-        current == null ||
-        current.deletedAt != null ||
-        current.activeRevisionId !== work.revisionId;
+      const changed = current == null || current.deletedAt != null;
       if (changed) changedDocuments.add(work.sourceDocumentId);
       await tx.insert(categoryReclassificationJobDocuments).values({
         jobId: created.id,
         ledgerId: input.ledgerId,
         sourceDocumentId: work.sourceDocumentId,
-        revisionId: work.revisionId,
         firstSelectionOrder: work.firstSelectionOrder,
         status: changed ? "conflict" : "pending",
         completedChunkCount: changed ? 0 : work.completedChunkCount,

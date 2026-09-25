@@ -10,11 +10,10 @@ export async function getCredentialSourceDocumentStatus(
   ledgerId: string,
   sourceDocumentId: string
 ): Promise<CredentialSourceDocumentStatusResult | null> {
-  // Load the document, its selected revision (pending ?? active), and the
-  // ledger's main currency in a single query so status polling does not fan
-  // out into three sequential reads. The revision must belong to both the
-  // document and the same ledger.
-  const selectedRevisionId = sql<string>`COALESCE(${sourceDocuments.latestSubmissionRevisionId}, ${sourceDocuments.activeRevisionId})`;
+  // Load the document, its latest attempt, its entries and the ledger's main
+  // currency in a single query so status polling does not fan out into
+  // sequential reads. The attempt must belong to both the document and the
+  // same ledger; a record entered by hand has none.
   const rows = await db
     .select({
       document: sourceDocuments,
@@ -41,16 +40,16 @@ export async function getCredentialSourceDocumentStatus(
           ) ORDER BY entry.position, entry.created_at, entry.id)
           FROM ledger_entries entry
           LEFT JOIN entry_categories category ON category.id = entry.category_id
-          WHERE entry.source_document_revision_id = ${selectedRevisionId}
+          WHERE entry.source_document_id = ${sourceDocuments.id}
             AND entry.ledger_id = ${ledgerId}
             AND entry.deleted_at IS NULL
         ), '[]'::jsonb)`,
     })
     .from(sourceDocuments)
-    .innerJoin(
+    .leftJoin(
       sourceDocumentRevisions,
       and(
-        eq(sourceDocumentRevisions.id, selectedRevisionId),
+        eq(sourceDocumentRevisions.id, sourceDocuments.latestSubmissionRevisionId),
         eq(sourceDocumentRevisions.sourceDocumentId, sourceDocuments.id),
         eq(sourceDocumentRevisions.ledgerId, ledgerId)
       )
@@ -68,11 +67,13 @@ export async function getCredentialSourceDocumentStatus(
   if (row == null) return null;
   const { document, revision } = row;
   const status =
-    revision.failureKind === "invalid_input"
-      ? "invalid"
-      : (revision.processingStatus as CredentialSourceDocumentStatusResult["status"]);
+    revision == null
+      ? "completed"
+      : revision.failureKind === "invalid_input"
+        ? "invalid"
+        : (revision.processingStatus as CredentialSourceDocumentStatusResult["status"]);
   let result: CredentialSourceDocumentStatusResult["result"] = null;
-  if (status === "completed" && document.activeRevisionId != null) {
+  if (status === "completed") {
     result = {
       title: document.title,
       total: accountingTotal(row.entries, row.mainCurrency),
@@ -91,16 +92,19 @@ export async function getCredentialSourceDocumentStatus(
   // the ledger owner reads, which may be absent.
   const error =
     status === "failed"
-      ? { code: toStableFailureCode(revision.failureCode) }
+      ? { code: toStableFailureCode(revision?.failureCode ?? null) }
       : status === "invalid"
-        ? { code: "VALIDATION_FAILED", message: revision.failureMessage }
+        ? { code: "VALIDATION_FAILED", message: revision?.failureMessage ?? null }
         : null;
   return {
     sourceDocumentId: document.id,
-    revisionId: revision.id,
+    revisionId: revision?.id ?? null,
     status,
-    submittedAt: revision.submittedAt.toISOString(),
-    finalizedAt: revision.finishedAt?.toISOString() ?? null,
+    submittedAt: (revision?.submittedAt ?? document.createdAt).toISOString(),
+    finalizedAt:
+      revision == null
+        ? document.createdAt.toISOString()
+        : (revision.finishedAt?.toISOString() ?? null),
     entryDate: document.documentDate,
     result,
     error,

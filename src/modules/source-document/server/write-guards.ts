@@ -3,12 +3,6 @@ import { ConflictError } from "@/lib/errors";
 import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
-export function hasEditableActiveProjection<T extends { activeRevisionId: string | null }>(
-  document: T
-): document is T & { activeRevisionId: string } {
-  return document.activeRevisionId !== null;
-}
-
 export async function assertSourceDocumentNotProcessing(
   tx: PostgresTransaction,
   document: Pick<

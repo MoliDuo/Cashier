@@ -57,7 +57,6 @@ export interface RevisionProcessingContextContract {
     processingStatus: RevisionProcessingStatus | null;
   } | null;
   document: {
-    activeRevisionId: string | null;
     latestSubmissionRevisionId: string | null;
     createdAt: Date;
   } | null;

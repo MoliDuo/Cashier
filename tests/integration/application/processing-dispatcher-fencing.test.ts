@@ -104,7 +104,6 @@ describe("leased processor fencing", () => {
       where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
     expect(revision?.processingStatus).toBe("processing");
-    expect(document?.activeRevisionId).toBeNull();
     expect(document?.latestSubmissionRevisionId).toBe(job.revisionId);
     expect(document?.version).toBe(1);
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);

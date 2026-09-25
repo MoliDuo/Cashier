@@ -20,7 +20,6 @@ export interface SourceDocumentRow {
   bookId?: string | null;
   documentDate: string | null;
   effectiveDate: string;
-  activeRevisionId: string | null;
   latestSubmissionRevisionId: string | null;
   version: number;
   createdAt: Date;
@@ -137,7 +136,6 @@ export function mapListItem(
   hydration: SourceDocumentListHydrationRow
 ): SourceDocumentListItemDto {
   const capabilities = deriveSourceDocumentCapabilities({
-    activeRevisionId: row.activeRevisionId,
     latestSubmissionStatus: hydration.processingStatus,
     hasSubmissionInput: row.latestSubmissionRevisionId != null,
   });
@@ -170,15 +168,15 @@ export function mapSourceDocumentDetail(
   row: SourceDocumentRow,
   hydration: SourceDocumentHydrationRow
 ): SourceDocumentDetailDto {
+  // The entries a failed retry left in place are reported alongside it.
   const activeResultSummary =
-    row.activeRevisionId == null
+    hydration.ledgerEntries.length === 0
       ? null
       : {
           entryCount: hydration.ledgerEntries.length,
           total: accountingTotal(hydration.ledgerEntries, hydration.mainCurrency),
         };
   const capabilities = deriveSourceDocumentCapabilities({
-    activeRevisionId: row.activeRevisionId,
     latestSubmissionStatus: hydration.processingStatus,
     hasSubmissionInput: row.latestSubmissionRevisionId != null,
   });

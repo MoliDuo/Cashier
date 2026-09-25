@@ -2,14 +2,14 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { SourceDocumentInputDto } from "@/modules/source-document/contracts";
 import {
-  revisionFiles,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
 import { mapStoredFileDto } from "./mappers";
 
-/** Read only the latest submitted input required to seed an edit-and-retry draft. */
+/** Read only the document's current input required to seed an edit-and-retry draft. */
 export async function getSourceDocumentInput(
   ledgerId: string,
   sourceDocumentId: string
@@ -22,8 +22,7 @@ export async function getSourceDocumentInput(
           processingStatus: sourceDocumentRevisions.processingStatus,
           documentDate: sourceDocumentRevisions.inputDocumentDate,
           createdAt: sourceDocuments.createdAt,
-          revisionId: sourceDocuments.latestSubmissionRevisionId,
-          text: sourceDocumentRevisions.inputText,
+          text: sourceDocuments.inputText,
         })
         .from(sourceDocuments)
         .leftJoin(
@@ -45,32 +44,29 @@ export async function getSourceDocumentInput(
         .then((rows) => rows[0]);
       if (document == null) return null;
 
-      const files =
-        document.revisionId == null
-          ? []
-          : await tx
-              .select({
-                id: storedFiles.id,
-                contentType: storedFiles.contentType,
-                byteSize: storedFiles.byteSize,
-                originalFilename: storedFiles.originalFilename,
-              })
-              .from(revisionFiles)
-              .innerJoin(
-                storedFiles,
-                and(
-                  eq(storedFiles.ledgerId, revisionFiles.ledgerId),
-                  eq(storedFiles.id, revisionFiles.storedFileId),
-                  isNull(storedFiles.deletedAt)
-                )
-              )
-              .where(
-                and(
-                  eq(revisionFiles.ledgerId, ledgerId),
-                  eq(revisionFiles.revisionId, document.revisionId)
-                )
-              )
-              .orderBy(asc(revisionFiles.position));
+      const files = await tx
+        .select({
+          id: storedFiles.id,
+          contentType: storedFiles.contentType,
+          byteSize: storedFiles.byteSize,
+          originalFilename: storedFiles.originalFilename,
+        })
+        .from(sourceDocumentFiles)
+        .innerJoin(
+          storedFiles,
+          and(
+            eq(storedFiles.ledgerId, sourceDocumentFiles.ledgerId),
+            eq(storedFiles.id, sourceDocumentFiles.storedFileId),
+            isNull(storedFiles.deletedAt)
+          )
+        )
+        .where(
+          and(
+            eq(sourceDocumentFiles.ledgerId, ledgerId),
+            eq(sourceDocumentFiles.sourceDocumentId, sourceDocumentId)
+          )
+        )
+        .orderBy(asc(sourceDocumentFiles.position));
 
       return {
         id: document.id,

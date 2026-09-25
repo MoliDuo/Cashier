@@ -52,7 +52,6 @@ describe("local contract release", () => {
       where: eq(sourceDocuments.id, pending.document.id),
     });
     expect(completed).toMatchObject({
-      activeRevisionId: pending.revision.id,
       latestSubmissionRevisionId: pending.revision.id,
       title: "Target title",
     });

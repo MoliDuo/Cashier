@@ -147,7 +147,6 @@ describe("API v1 source-documents route", () => {
     await db.insert(ledgerEntries).values({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
-      sourceDocumentRevisionId: created.revisionId,
       itemName: "Lunch",
       description: "Noodles",
       amount: "12.50",
@@ -160,11 +159,7 @@ describe("API v1 source-documents route", () => {
       .where(eq(sourceDocumentRevisions.id, created.revisionId));
     await db
       .update(sourceDocuments)
-      .set({
-        title: "Lunch receipt",
-        activeRevisionId: created.revisionId,
-        latestSubmissionRevisionId: null,
-      })
+      .set({ title: "Lunch receipt" })
       .where(eq(sourceDocuments.id, created.sourceDocumentId));
 
     const response = await GET(
@@ -285,7 +280,6 @@ describe("API v1 source-documents route", () => {
       {
         ledgerId,
         sourceDocumentId: created.sourceDocumentId,
-        sourceDocumentRevisionId: created.revisionId,
         itemName: "USD purchase",
         description: null,
         amount: "10.000",
@@ -295,7 +289,6 @@ describe("API v1 source-documents route", () => {
       {
         ledgerId,
         sourceDocumentId: created.sourceDocumentId,
-        sourceDocumentRevisionId: created.revisionId,
         itemName: "Local coffee",
         description: null,
         amount: "5.000",
@@ -309,11 +302,7 @@ describe("API v1 source-documents route", () => {
       .where(eq(sourceDocumentRevisions.id, created.revisionId));
     await db
       .update(sourceDocuments)
-      .set({
-        title: "Mixed receipt",
-        activeRevisionId: created.revisionId,
-        latestSubmissionRevisionId: null,
-      })
+      .set({ title: "Mixed receipt" })
       .where(eq(sourceDocuments.id, created.sourceDocumentId));
 
     const response = await GET(
@@ -361,7 +350,6 @@ describe("API v1 source-documents route", () => {
     await db.insert(ledgerEntries).values({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
-      sourceDocumentRevisionId: created.revisionId,
       itemName: "Dinar purchase",
       amount: "12.500",
       currency: "BHD",
@@ -371,13 +359,6 @@ describe("API v1 source-documents route", () => {
       .update(sourceDocumentRevisions)
       .set({ processingStatus: "completed", finishedAt: new Date() })
       .where(eq(sourceDocumentRevisions.id, created.revisionId));
-    await db
-      .update(sourceDocuments)
-      .set({
-        activeRevisionId: created.revisionId,
-        latestSubmissionRevisionId: null,
-      })
-      .where(eq(sourceDocuments.id, created.sourceDocumentId));
 
     const response = await GET(
       new NextRequest(`http://localhost/api/v1/source-documents/${created.sourceDocumentId}`, {

@@ -60,7 +60,6 @@ function createProcessor(entryCount: number) {
       processingStatus: "processing",
     },
     document: {
-      activeRevisionId: null,
       latestSubmissionRevisionId: "revision-1",
       createdAt: new Date("2026-09-01T00:00:00Z"),
     },
@@ -113,7 +112,6 @@ describe("processRevision", () => {
     loadContext.mockResolvedValue({
       revision: { inputText: "receipt", inputDocumentDate: null, processingStatus: "processing" },
       document: {
-        activeRevisionId: null,
         latestSubmissionRevisionId: "revision-1",
         createdAt: new Date("2026-08-30T23:30:00Z"),
       },

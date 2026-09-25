@@ -243,8 +243,7 @@ describe("source-document-queries", () => {
     const completedInRange = docs.find((d) => d.title === "completed-in-range")!;
     const completedOutOfRange = docs.find((d) => d.title === "completed-outside-range")!;
 
-    // Insert ledger entries BEFORE activation so the activation function
-    // links them to the revision via sourceDocumentRevisionId
+    // Insert ledger entries BEFORE activation so the fixture numbers their positions
     await db.insert(ledgerEntries).values([
       {
         ledgerId,
@@ -264,9 +263,11 @@ describe("source-document-queries", () => {
       },
     ]);
 
-    // Activate projections once per doc
+    // Activate projections once per doc; only the "completed" ones record a completed parse
     for (const doc of docs) {
-      await activateTestSourceDocumentProjection(db, doc.id);
+      await activateTestSourceDocumentProjection(db, doc.id, {
+        parsed: doc.title?.startsWith("completed-") === true,
+      });
     }
 
     // Filter by status = completed, date range, and amount

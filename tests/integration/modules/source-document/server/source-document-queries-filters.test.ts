@@ -147,7 +147,7 @@ describe("source-document-queries", () => {
     ]);
 
     for (const doc of docs) {
-      await activateTestSourceDocumentProjection(db, doc.id);
+      await activateTestSourceDocumentProjection(db, doc.id, { parsed: doc.id !== failed.id });
     }
 
     const failedRevision = requireDefined(

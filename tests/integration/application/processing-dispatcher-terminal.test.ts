@@ -117,7 +117,6 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
-    expect(document?.activeRevisionId).toBeNull();
     expect(document?.latestSubmissionRevisionId).toBe(job.revisionId);
     expect(revision?.processingStatus).toBe("processing");
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
@@ -156,7 +155,6 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const doc = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
-    expect(doc?.activeRevisionId).toBe(job.revisionId);
     expect(doc?.latestSubmissionRevisionId).toBe(job.revisionId);
     expect(doc?.version).toBe(2);
 

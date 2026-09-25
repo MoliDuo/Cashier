@@ -83,21 +83,14 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .where(eq(sourceDocumentRevisions.sourceDocumentId, doc.id));
     expect(afterRevisionCount).toHaveLength(beforeRevisionCount.length);
 
-    const document = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, doc.id),
-    });
     const activeEntries = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, doc.id),
-        eq(ledgerEntries.sourceDocumentRevisionId, document!.activeRevisionId!),
-        isNull(ledgerEntries.deletedAt)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, doc.id), isNull(ledgerEntries.deletedAt)),
     });
     expect(activeEntries).toHaveLength(1);
     expect(activeEntries[0]?.itemName).toBe("Item 2");
   });
 
-  it("reports entries of a document without an active projection as not found", async () => {
+  it("deletes entries of a document that never had a parse attempt", async () => {
     const db = getTestDb();
     const [doc] = await db
       .insert(sourceDocuments)
@@ -116,7 +109,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
           id: randomUUID(),
           ledgerId,
           sourceDocumentId: doc!.id,
-          itemName: `Orphan ${index}`,
+          itemName: `Typed ${index}`,
           amount: String(amount),
           currency: "CNY",
         }))
@@ -128,13 +121,15 @@ describe("batchDeleteLedgerEntriesAction", () => {
       entries.map((entry) => entry.id)
     );
 
-    // The document has no active projection, so the entries cannot be deleted.
-    // The per-entry delete path reports this as a failure instead of a silent skip.
-    expect(result.succeeded).toEqual([]);
-    expect(result.failed.map((failure) => failure.id).sort()).toEqual(
+    // Entries belong to their document, whether or not a parse wrote them.
+    expect(result.failed).toEqual([]);
+    expect(result.succeeded.map((item) => item.id).sort()).toEqual(
       entries.map((entry) => entry.id).sort()
     );
-    expect(result.failed[0]?.code).toBe("NOT_FOUND");
+    const remaining = await db.query.ledgerEntries.findMany({
+      where: and(eq(ledgerEntries.sourceDocumentId, doc!.id), isNull(ledgerEntries.deletedAt)),
+    });
+    expect(remaining).toEqual([]);
   });
 
   it("commits one document's deletion independently of another document's failure in the same batch", async () => {
@@ -177,7 +172,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     expect(badDocument?.version).toBe(1);
   });
 
-  it("rolls back every entry in one document's group when part of that group fails", async () => {
+  it("fails every entry of a document's group together, without writes, while it is processing", async () => {
     const db = getTestDb();
     const doc = await seedDoc(db, ledgerId);
     const entries = await db
@@ -194,52 +189,34 @@ describe("batchDeleteLedgerEntriesAction", () => {
       )
       .returning();
     await activateTestSourceDocumentProjection(db, doc.id);
-    // A second, non-active revision plus a real, non-deleted ledger entry
-    // linked to it: the entry groups with the document's other entries (same
-    // `sourceDocumentId`, not deleted, so it passes the ownership check) but
-    // is absent from the *active* projection the group's transaction reads —
-    // so the whole group's transaction fails, not just this one id.
-    const [otherRevision] = await db
+    // A retry is being parsed: it will replace the entries when it completes,
+    // so the group's transaction refuses the write as a whole.
+    const [attempt] = await db
       .insert(sourceDocumentRevisions)
-      .values({
-        ledgerId,
-        sourceDocumentId: doc.id,
-        processingStatus: "cancelled",
-      })
+      .values({ ledgerId, sourceDocumentId: doc.id, processingStatus: "processing" })
       .returning();
-    const [inactiveEntry] = await db
-      .insert(ledgerEntries)
-      .values({
-        id: randomUUID(),
-        ledgerId,
-        sourceDocumentId: doc.id,
-        sourceDocumentRevisionId: otherRevision!.id,
-        itemName: "Not on the active revision",
-        amount: "5",
-        currency: "CNY",
-      })
-      .returning();
+    await db
+      .update(sourceDocuments)
+      .set({ latestSubmissionRevisionId: attempt!.id })
+      .where(eq(sourceDocuments.id, doc.id));
 
     const result = await batchDeleteLedgerEntriesAction(
       [doc.id],
-      [...entries.map((entry) => entry.id), inactiveEntry!.id]
+      entries.map((entry) => entry.id)
     );
 
     expect(result.succeeded).toEqual([]);
     expect(result.failed.map((failure) => failure.id).sort()).toEqual(
-      [...entries.map((entry) => entry.id), inactiveEntry!.id].sort()
+      entries.map((entry) => entry.id).sort()
     );
 
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, doc.id),
     });
-    // Zero writes: the document's version and active entries are untouched.
+    // Zero writes: the document's version and entries are untouched.
     expect(document?.version).toBe(1);
     const activeEntries = await db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.sourceDocumentId, doc.id),
-        eq(ledgerEntries.sourceDocumentRevisionId, document!.activeRevisionId!)
-      ),
+      where: and(eq(ledgerEntries.sourceDocumentId, doc.id), isNull(ledgerEntries.deletedAt)),
     });
     expect(activeEntries.map((entry) => entry.id).sort()).toEqual(
       entries.map((entry) => entry.id).sort()

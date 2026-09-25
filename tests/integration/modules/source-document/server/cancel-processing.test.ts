@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
-import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
@@ -35,16 +35,16 @@ describe("cancel source-document processing", () => {
     ]);
     expect(document?.latestSubmissionRevisionId).toBe(submission.revision.id);
     expect(document?.version).toBe(submission.document.version);
+    expect(document?.inputText).toBe("Lunch 12 CNY");
     expect(revision).toMatchObject({
       processingStatus: "cancelled",
-      inputText: "Lunch 12 CNY",
       inputDocumentDate: "2026-09-10",
     });
     await expect(processing.renew(submission.revision.id, claim!.claimToken)).resolves.toBeNull();
     await expect(processing.claim(submission.revision.id)).resolves.toBeNull();
   });
 
-  it("keeps the previous active result when a retry is cancelled", async () => {
+  it("keeps the previous entries when a retry is cancelled", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const active = await createManualDocument({
@@ -72,7 +72,11 @@ describe("cancel source-document processing", () => {
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, active.sourceDocumentId),
     });
-    expect(after?.activeRevisionId).toBe(active.revisionId);
     expect(after?.latestSubmissionRevisionId).toBe(retry.revision.id);
+    expect(
+      await db.query.ledgerEntries.findMany({
+        where: eq(ledgerEntries.sourceDocumentId, active.sourceDocumentId),
+      })
+    ).toEqual([expect.objectContaining({ itemName: "Original", deletedAt: null })]);
   });
 });

@@ -95,8 +95,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
       where: eq(sourceDocuments.id, doc.id),
     });
 
-    // Manual edits update the active projection in place and bump the version.
-    expect(after?.activeRevisionId).toBe(before?.activeRevisionId);
+    // Manual edits update the entries in place and bump the version.
     expect(after?.version).toBe(before!.version + 1);
 
     for (const id of ids) {
@@ -271,7 +270,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
         ])
         .returning({ id: ledgerEntries.id })
     ).map((entry) => entry.id);
-    const activeRevisionId = await activateTestSourceDocumentProjection(db, doc.id);
+    await activateTestSourceDocumentProjection(db, doc.id);
     const preview = await previewBatchLedgerEntryDateAction([ids[0]!]);
 
     const committed = await batchUpdateLedgerEntryDatesAction([doc.id], [ids[0]!], "2026-01-02");
@@ -287,7 +286,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
       where: eq(sourceDocuments.id, doc.id),
     });
     expect(updatedDocument?.documentDate).toBe("2026-01-02");
-    expect(updatedDocument?.activeRevisionId).toBe(activeRevisionId);
     expect(updatedDocument?.version).toBe(2);
   });
 });

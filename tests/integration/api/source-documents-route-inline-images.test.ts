@@ -7,8 +7,8 @@ import { getTestDb } from "../../setup";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   ledgers,
-  revisionFiles,
   serviceCredentials,
+  sourceDocumentFiles,
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
@@ -120,27 +120,23 @@ describe("API v1 source-documents route", () => {
       const data = await response.json();
       expect(data.revisionState).toBe("processing");
 
-      // Verify the revision has a linked stored file
+      // Verify the document lists a stored file as its input
       const db = getTestDb();
-      const revisionFilesRows = await db
+      const documentFilesRows = await db
         .select({
-          storedFileId: revisionFiles.storedFileId,
-          position: revisionFiles.position,
+          storedFileId: sourceDocumentFiles.storedFileId,
+          position: sourceDocumentFiles.position,
         })
-        .from(revisionFiles)
-        .innerJoin(
-          sourceDocumentRevisions,
-          eq(sourceDocumentRevisions.id, revisionFiles.revisionId)
-        )
-        .where(eq(sourceDocumentRevisions.sourceDocumentId, data.sourceDocumentId));
-      expect(revisionFilesRows).toHaveLength(1);
-      expect(revisionFilesRows[0]!.position).toBe(0);
+        .from(sourceDocumentFiles)
+        .where(eq(sourceDocumentFiles.sourceDocumentId, data.sourceDocumentId));
+      expect(documentFilesRows).toHaveLength(1);
+      expect(documentFilesRows[0]!.position).toBe(0);
 
       // Verify the stored file is finalized with provider r2
       const storedFile = await db
         .select()
         .from(storedFiles)
-        .where(eq(storedFiles.id, revisionFilesRows[0]!.storedFileId))
+        .where(eq(storedFiles.id, documentFilesRows[0]!.storedFileId))
         .then((rows) => rows[0]);
       expect(storedFile).not.toBeUndefined();
       expect(storedFile!.finalizedAt).not.toBeNull();
@@ -178,16 +174,12 @@ describe("API v1 source-documents route", () => {
       expect(data.revisionState).toBe("processing");
 
       const db = getTestDb();
-      const revisionFilesRows = await db
+      const documentFilesRows = await db
         .select()
-        .from(revisionFiles)
-        .innerJoin(
-          sourceDocumentRevisions,
-          eq(sourceDocumentRevisions.id, revisionFiles.revisionId)
-        )
-        .where(eq(sourceDocumentRevisions.sourceDocumentId, data.sourceDocumentId));
+        .from(sourceDocumentFiles)
+        .where(eq(sourceDocumentFiles.sourceDocumentId, data.sourceDocumentId));
       // Should have at least one file linked
-      expect(revisionFilesRows.length).toBeGreaterThanOrEqual(1);
+      expect(documentFilesRows.length).toBeGreaterThanOrEqual(1);
     });
 
     it("rejects invalid base64 with 400", async () => {
@@ -315,14 +307,10 @@ describe("API v1 source-documents route", () => {
         .select({ id: storedFiles.id })
         .from(storedFiles)
         .where(eq(storedFiles.ledgerId, ledgerId));
-      const revisionFilesRows = await db
-        .select({ id: revisionFiles.id })
-        .from(revisionFiles)
-        .innerJoin(
-          sourceDocumentRevisions,
-          eq(sourceDocumentRevisions.id, revisionFiles.revisionId)
-        )
-        .where(eq(sourceDocumentRevisions.sourceDocumentId, firstBody.sourceDocumentId));
+      const documentFilesRows = await db
+        .select({ id: sourceDocumentFiles.id })
+        .from(sourceDocumentFiles)
+        .where(eq(sourceDocumentFiles.sourceDocumentId, firstBody.sourceDocumentId));
       const sessions = await db
         .select({ id: uploadSessions.id })
         .from(uploadSessions)
@@ -334,7 +322,7 @@ describe("API v1 source-documents route", () => {
       expect(documents).toHaveLength(1);
       expect(revisions).toHaveLength(1);
       expect(storedFilesRows).toHaveLength(1);
-      expect(revisionFilesRows).toHaveLength(1);
+      expect(documentFilesRows).toHaveLength(1);
       expect(sessions).toHaveLength(1);
       expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
     });

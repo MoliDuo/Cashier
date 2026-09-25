@@ -77,13 +77,12 @@ describe("applyCategoryPresetAction", () => {
       ...document,
       bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
     });
-    const revisionId = await activateTestSourceDocumentProjection(db, document.id);
+    await activateTestSourceDocumentProjection(db, document.id);
     await db.insert(ledgerEntries).values([
       {
         id: foodEntryId,
         ledgerId: ledger.id,
         sourceDocumentId: document.id,
-        sourceDocumentRevisionId: revisionId,
         position: 0,
         itemName: "Lunch",
         amount: "30.00",
@@ -94,7 +93,6 @@ describe("applyCategoryPresetAction", () => {
         id: travelEntryId,
         ledgerId: ledger.id,
         sourceDocumentId: document.id,
-        sourceDocumentRevisionId: revisionId,
         position: 1,
         itemName: "Metro",
         amount: "6.00",

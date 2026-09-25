@@ -366,15 +366,14 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     if (document.retainedResult != null) {
       await client.query(
         `INSERT INTO source_document_revisions
-          (id, ledger_id, source_document_id, title, input_text, input_document_date,
+          (id, ledger_id, source_document_id, title, input_document_date,
            input_date_reference, processing_status, submitted_at, finished_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6::text, $6::date, 'completed', $7, $7, $7)`,
+         VALUES ($1, $2, $3, $4, $5::text, $5::date, 'completed', $6, $6, $6)`,
         [
           document.retainedResult.revisionId,
           ledgerId,
           document.id,
           document.retainedResult.title,
-          document.retainedResult.inputText,
           documentDate,
           createdAt,
         ]
@@ -382,16 +381,15 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     }
     await client.query(
       `INSERT INTO source_document_revisions
-        (id, ledger_id, source_document_id, title, input_text, input_document_date,
+        (id, ledger_id, source_document_id, title, input_document_date,
          input_date_reference, processing_status, failure_kind, failure_code, failure_message,
          submitted_at, finished_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6::text, $6::date, $7, $8, $9, $10, $11, $11, $11)`,
+       VALUES ($1, $2, $3, $4, $5::text, $5::date, $6, $7, $8, $9, $10, $10, $10)`,
       [
         document.revisionId,
         ledgerId,
         document.id,
         document.title,
-        document.inputText,
         documentDate,
         document.status,
         document.failureKind ?? null,
@@ -418,18 +416,12 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
         ]
       );
       await client.query(
-        `INSERT INTO revision_files (ledger_id, revision_id, stored_file_id, position, created_at)
-         VALUES ($1, $2, $3, 0, $4)`,
-        [ledgerId, document.revisionId, image.fileId, createdAt]
-      );
-      await client.query(
         `INSERT INTO source_document_files
           (ledger_id, source_document_id, stored_file_id, position, created_at)
          VALUES ($1, $2, $3, 0, $4)`,
         [ledgerId, document.id, image.fileId, createdAt]
       );
     }
-    const entryRevisionId = document.retainedResult?.revisionId ?? document.revisionId;
     for (const [position, entry] of activeEntries(document).entries()) {
       const categoryId = entry.category == null ? null : (categoryIds.get(entry.category) ?? null);
       if (entry.category != null && categoryId == null) {
@@ -437,15 +429,14 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       }
       await client.query(
         `INSERT INTO ledger_entries
-          (id, ledger_id, category_id, source_document_id, source_document_revision_id,
+          (id, ledger_id, category_id, source_document_id,
            position, amount, currency, item_name, description, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
         [
           entry.id,
           ledgerId,
           categoryId,
           document.id,
-          entryRevisionId,
           position,
           entry.amount,
           entry.currency,
@@ -457,26 +448,9 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     }
     await seedExchangeRates(client, fixture, documentDate, activeEntries(document), now);
     await client.query(
-      `UPDATE source_documents
-          SET active_revision_id = $1, latest_submission_revision_id = $2
-        WHERE id = $3`,
-      [
-        document.status === "completed"
-          ? document.revisionId
-          : (document.retainedResult?.revisionId ?? null),
-        document.revisionId,
-        document.id,
-      ]
+      `UPDATE source_documents SET latest_submission_revision_id = $1 WHERE id = $2`,
+      [document.revisionId, document.id]
     );
-    if (document.status === "failed") {
-      await client.query(
-        `INSERT INTO processing_outbox
-          (ledger_id, revision_id, status, diagnostic_code, completed_at, created_at,
-           source_document_id, requested_at, next_available_at)
-         VALUES ($1, $2, $3, $4, $5, $5, $6, $5, $5)`,
-        [ledgerId, document.revisionId, "failed", document.failureCode, createdAt, document.id]
-      );
-    }
   }
 }
 
