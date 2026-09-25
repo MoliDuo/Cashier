@@ -14,6 +14,13 @@
  * than degree.
  */
 
+/**
+ * The `maxDuration` every AI-running route exports. Route segment config has
+ * to be a literal, so the routes repeat the number and a unit test holds them
+ * to this one. Every deadline and run budget below must fit inside it.
+ */
+export const FUNCTION_MAX_DURATION_SECONDS = 120;
+
 /** OpenAI calls: how long to wait, how often to try again. */
 export const AI_REQUEST_TIMEOUT_MS = 60_000;
 export const AI_MAX_ATTEMPTS = 3;
@@ -23,8 +30,13 @@ export const AI_MAX_ATTEMPTS = 3;
  * budget an integration test waits on.
  */
 export const AI_RETRY_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1_000;
-/** The whole parse of one source document, across however many model calls. */
-export const AI_REVISION_DEADLINE_MS = 180_000;
+/**
+ * The whole parse of one source document, across however many model calls.
+ * Leaves room inside the function limit for the request that scheduled the
+ * parse and for recording the outcome, so a slow parse fails as
+ * `processing_timeout` instead of being killed and retried from scratch.
+ */
+export const AI_REVISION_DEADLINE_MS = 90_000;
 
 /** Bulk re-categorisation shares one database-coordinated provider slot. */
 export const AI_CATEGORY_CONCURRENCY = 1;
