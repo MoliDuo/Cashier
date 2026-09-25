@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import { processingOutbox, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
+import { sourceDocuments, sourceDocumentRevisions } from "@/persistence";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { processingJobs } from "tests/helpers/processing-jobs";
 import { PROCESSING_MAX_ATTEMPTS } from "@/config/tuning";
@@ -66,7 +66,6 @@ async function supersede(ledgerId: string, job: ProcessingJobContract) {
     .values({
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
-      inputText: "Updated text",
       processingStatus: "processing",
     })
     .returning()
@@ -191,32 +190,6 @@ describe("Processing Recovery", () => {
     await expect(adapter.claim(job.revisionId)).resolves.toMatchObject({ attempt: 1 });
     now = new Date(now.getTime() + 1_001);
     await expect(adapter.claim(job.revisionId)).resolves.toMatchObject({ attempt: 2 });
-  });
-
-  it("does not claim an attempt a previous release's worker still holds", async () => {
-    const { ledgerId, job } = await pendingIntent();
-    const adapter = processingJobs();
-    const db = getTestDb();
-    const outbox = {
-      id: crypto.randomUUID(),
-      ledgerId,
-      sourceDocumentId: job.sourceDocumentId,
-      revisionId: job.revisionId,
-      requestedAt: new Date(),
-      claimToken: "previous-release",
-    };
-    await db.insert(processingOutbox).values({
-      ...outbox,
-      status: "claimed",
-      claimExpiresAt: new Date(Date.now() + 60_000),
-    });
-    await expect(adapter.claim(job.revisionId)).resolves.toBeNull();
-
-    await db
-      .update(processingOutbox)
-      .set({ claimExpiresAt: new Date(Date.now() - 1_000) })
-      .where(eq(processingOutbox.id, outbox.id));
-    await expect(adapter.claim(job.revisionId)).resolves.not.toBeNull();
   });
 
   it("fails an exhausted job under its lease when a run claims it", async () => {

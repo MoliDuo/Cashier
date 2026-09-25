@@ -189,7 +189,6 @@ describe("projection write shape", () => {
       .select({
         position: ledgerEntries.position,
         itemName: ledgerEntries.itemName,
-        sourceDocumentRevisionId: ledgerEntries.sourceDocumentRevisionId,
       })
       .from(ledgerEntries)
       .where(
@@ -201,9 +200,9 @@ describe("projection write shape", () => {
       )
       .orderBy(ledgerEntries.position);
     expect(liveEntries).toEqual([
-      { position: 0, itemName: "A", sourceDocumentRevisionId: null },
-      { position: 1, itemName: "B", sourceDocumentRevisionId: null },
-      { position: 2, itemName: "C", sourceDocumentRevisionId: null },
+      { position: 0, itemName: "A" },
+      { position: 1, itemName: "B" },
+      { position: 2, itemName: "C" },
     ]);
   });
 

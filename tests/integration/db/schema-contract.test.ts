@@ -243,11 +243,24 @@ describe("PostgreSQL schema contract", () => {
   });
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
-    // The recalculation queue left the model with read-time conversion; its
-    // table stays until the next contract migration drops it.
+    // Entries and input left the revisions for the document, and attempts left
+    // the outbox; what referenced them stays until the next contract migration.
     const retiredNames = new Set([
-      "exchange_rate_recalculation_jobs_ledger_id_ledgers_id_fk",
-      "idx_exchange_rate_recalculation_jobs_due",
+      "ck_revision_files_position",
+      "fk_ledger_entries_document_revision",
+      "fk_ledger_entries_revision_ledger",
+      "fk_processing_outbox_document_ledger",
+      "fk_processing_outbox_revision_ledger",
+      "fk_revision_files_revision_ledger",
+      "fk_revision_files_stored_file_ledger",
+      "fk_source_documents_active_revision",
+      "idx_source_documents_active_revision",
+      "uq_revision_files_revision_position",
+      "uq_revision_files_revision_file",
+      "idx_revision_files_ledger_file",
+      "uq_processing_outbox_revision",
+      "idx_processing_outbox_claim_expiry",
+      "idx_processing_outbox_recoverable",
     ]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();

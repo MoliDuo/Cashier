@@ -31,7 +31,7 @@ describe("current-runtime target adapters", () => {
     const originalEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     });
-    expect(originalEntry).toMatchObject({ sourceDocumentRevisionId: null });
+    expect(originalEntry).toBeDefined();
     expect(
       await db.query.sourceDocumentRevisions.findMany({
         where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
@@ -55,7 +55,6 @@ describe("current-runtime target adapters", () => {
       id: originalEntry!.id,
       amount: "18.000",
       deletedAt: null,
-      sourceDocumentRevisionId: null,
     });
 
     await expect(

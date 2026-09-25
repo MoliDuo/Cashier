@@ -1,44 +1,13 @@
 import "server-only";
-import { and, eq, exists, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, exists, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
-import {
-  ledgers,
-  revisionFiles,
-  sourceDocumentFiles,
-  sourceDocumentRevisions,
-  sourceDocuments,
-  storedFiles,
-} from "@/persistence";
+import { ledgers, sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
 import { mapStoredFile } from "./shared";
 import type { AuthorizedFileReadContract, StoredFileContract } from "./types";
 
 /** A live source document of the file's ledger lists the file among its inputs. */
 function referencedByLiveDocument() {
-  const byRevision = db
-    .select({ id: revisionFiles.id })
-    .from(revisionFiles)
-    .innerJoin(
-      sourceDocumentRevisions,
-      and(
-        eq(sourceDocumentRevisions.ledgerId, revisionFiles.ledgerId),
-        eq(sourceDocumentRevisions.id, revisionFiles.revisionId)
-      )
-    )
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.ledgerId, sourceDocumentRevisions.ledgerId),
-        eq(sourceDocuments.id, sourceDocumentRevisions.sourceDocumentId)
-      )
-    )
-    .where(
-      and(
-        eq(revisionFiles.ledgerId, storedFiles.ledgerId),
-        eq(revisionFiles.storedFileId, storedFiles.id),
-        isNull(sourceDocuments.deletedAt)
-      )
-    );
   const byDocument = db
     .select({ id: sourceDocumentFiles.id })
     .from(sourceDocumentFiles)
@@ -56,7 +25,7 @@ function referencedByLiveDocument() {
         isNull(sourceDocuments.deletedAt)
       )
     );
-  return or(exists(byRevision), exists(byDocument));
+  return exists(byDocument);
 }
 
 /** A finalized file the ledger still references from a live source document. */

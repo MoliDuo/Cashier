@@ -31,13 +31,6 @@ export const revisionFailureKindEnum = pgEnum("revision_failure_kind", [
   "invalid_input",
   "processing_error",
 ]);
-export const processingOutboxStatusEnum = pgEnum("processing_outbox_status", [
-  "pending",
-  "claimed",
-  "completed",
-  "failed",
-  "cancelled",
-]);
 export const uploadSessionStatusEnum = pgEnum("upload_session_status", [
   "open",
   "finalizing",
@@ -61,7 +54,6 @@ export const sourceDocumentRevisions = pgTable(
     ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
     title: text("title"),
-    inputText: text("input_text"),
     inputDocumentDate: text("input_document_date"),
     inputDateReference: date("input_date_reference", { mode: "string" }),
     processingStatus: revisionProcessingStatusEnum("processing_status"),
@@ -71,8 +63,7 @@ export const sourceDocumentRevisions = pgTable(
     submittedAt: requiredTimestamp("submitted_at").$defaultFn(() => new Date()),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-    // The processing lease. A processing attempt is its own queue entry: these
-    // replace the outbox row once the worker claims attempts directly.
+    // The processing lease: a processing attempt is its own queue entry.
     claimToken: text("claim_token"),
     claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
     attemptCount: integer("attempt_count").notNull().default(0),
@@ -131,34 +122,6 @@ export const storedFiles = pgTable(
   ]
 );
 
-export const revisionFiles = pgTable(
-  "revision_files",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
-    revisionId: uuid("revision_id").notNull(),
-    storedFileId: uuid("stored_file_id").notNull(),
-    position: integer("position").notNull(),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.ledgerId, table.revisionId],
-      foreignColumns: [sourceDocumentRevisions.ledgerId, sourceDocumentRevisions.id],
-      name: "fk_revision_files_revision_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId, table.storedFileId],
-      foreignColumns: [storedFiles.ledgerId, storedFiles.id],
-      name: "fk_revision_files_stored_file_ledger",
-    }),
-    uniqueIndex("uq_revision_files_revision_position").on(table.revisionId, table.position),
-    uniqueIndex("uq_revision_files_revision_file").on(table.revisionId, table.storedFileId),
-    index("idx_revision_files_ledger_file").on(table.ledgerId, table.storedFileId),
-    check("ck_revision_files_position", sql`${table.position} >= 0`),
-  ]
-);
-
 /** The files of a source document's current input, in upload order. */
 export const sourceDocumentFiles = pgTable(
   "source_document_files",
@@ -191,47 +154,6 @@ export const sourceDocumentFiles = pgTable(
     ),
     index("idx_source_document_files_ledger_file").on(table.ledgerId, table.storedFileId),
     check("ck_source_document_files_position", sql`${table.position} >= 0`),
-  ]
-);
-
-export const processingOutbox = pgTable(
-  "processing_outbox",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
-    revisionId: uuid("revision_id").notNull(),
-    sourceDocumentId: uuid("source_document_id").notNull(),
-    status: processingOutboxStatusEnum("status").notNull().default("pending"),
-    diagnosticCode: text("diagnostic_code"),
-    startedAt: timestamp("started_at", { withTimezone: true }),
-    requestedAt: requiredTimestamp("requested_at").$defaultFn(() => new Date()),
-    claimToken: text("claim_token"),
-    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-    scheduleAttemptCount: integer("schedule_attempt_count").notNull().default(0),
-    nextAvailableAt: requiredTimestamp("next_available_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.ledgerId, table.revisionId],
-      foreignColumns: [sourceDocumentRevisions.ledgerId, sourceDocumentRevisions.id],
-      name: "fk_processing_outbox_revision_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId, table.sourceDocumentId],
-      foreignColumns: [sourceDocuments.ledgerId, sourceDocuments.id],
-      name: "fk_processing_outbox_document_ledger",
-    }).onDelete("cascade"),
-    uniqueIndex("uq_processing_outbox_revision").on(table.revisionId),
-    index("idx_processing_outbox_claim_expiry")
-      .on(table.claimExpiresAt)
-      .where(sql`${table.status} = 'claimed'`),
-    index("idx_processing_outbox_recoverable").on(
-      table.ledgerId,
-      table.status,
-      table.nextAvailableAt
-    ),
   ]
 );
 
@@ -437,7 +359,6 @@ export const categoryReclassificationJobDocuments = pgTable(
     jobId: uuid("job_id").notNull(),
     ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
-    revisionId: uuid("revision_id"),
     firstSelectionOrder: integer("first_selection_order").notNull(),
     status: categoryAssignmentDocumentStatusEnum("status").notNull().default("pending"),
     claimToken: uuid("claim_token"),

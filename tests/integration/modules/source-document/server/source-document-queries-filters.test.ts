@@ -157,7 +157,6 @@ describe("source-document-queries", () => {
           .values({
             ledgerId,
             sourceDocumentId: failed.id,
-            inputText: "retry",
             processingStatus: "failed",
             finishedAt: new Date(),
           })

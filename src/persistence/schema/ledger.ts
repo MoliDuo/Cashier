@@ -20,11 +20,6 @@ const sourceDocumentsReference = pgTable("source_documents", {
   id: uuid("id").notNull(),
   ledgerId: uuid("ledger_id").notNull(),
 });
-const sourceDocumentRevisionsReference = pgTable("source_document_revisions", {
-  id: uuid("id").notNull(),
-  ledgerId: uuid("ledger_id").notNull(),
-  sourceDocumentId: uuid("source_document_id").notNull(),
-});
 
 export const ledgers = pgTable(
   "ledgers",
@@ -145,7 +140,6 @@ export const ledgerEntries = pgTable(
       .references(() => ledgers.id, { onDelete: "cascade" }),
     categoryId: uuid("category_id"),
     sourceDocumentId: uuid("source_document_id"),
-    sourceDocumentRevisionId: uuid("source_document_revision_id"),
     position: integer("position").notNull().default(0),
     amount: numeric("amount", { precision: 21, scale: 3, mode: "string" }).notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
@@ -196,23 +190,6 @@ export const ledgerEntries = pgTable(
       columns: [table.ledgerId, table.sourceDocumentId],
       foreignColumns: [sourceDocumentsReference.ledgerId, sourceDocumentsReference.id],
       name: "fk_ledger_entries_document_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId, table.sourceDocumentRevisionId],
-      foreignColumns: [
-        sourceDocumentRevisionsReference.ledgerId,
-        sourceDocumentRevisionsReference.id,
-      ],
-      name: "fk_ledger_entries_revision_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId, table.sourceDocumentId, table.sourceDocumentRevisionId],
-      foreignColumns: [
-        sourceDocumentRevisionsReference.ledgerId,
-        sourceDocumentRevisionsReference.sourceDocumentId,
-        sourceDocumentRevisionsReference.id,
-      ],
-      name: "fk_ledger_entries_document_revision",
     }).onDelete("cascade"),
   ]
 );

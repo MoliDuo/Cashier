@@ -33,8 +33,6 @@ export async function claimProcessingJob(
   const now = clock.now?.() ?? new Date();
   const claimToken = crypto.randomUUID();
   const expiresAt = new Date(now.getTime() + (clock.leaseMs ?? DEFAULT_LEASE_MS));
-  // The outbox check covers the deploy window only: a worker of the previous
-  // release still holding the attempt through its outbox row keeps it.
   const claimed = await db.execute<{
     ledger_id: string;
     source_document_id: string;
@@ -52,13 +50,6 @@ export async function claimProcessingJob(
       WHERE revision.id = ${revisionId}
         AND revision.processing_status = 'processing'
         AND (revision.claim_expires_at IS NULL OR revision.claim_expires_at <= ${now})
-        AND NOT EXISTS (
-          SELECT 1 FROM processing_outbox outbox
-          WHERE outbox.ledger_id = revision.ledger_id
-            AND outbox.revision_id = revision.id
-            AND outbox.status = 'claimed'
-            AND outbox.claim_expires_at > ${now}
-        )
       FOR UPDATE OF revision SKIP LOCKED
     )
     UPDATE source_document_revisions revision

@@ -35,7 +35,6 @@ export const sourceDocuments = pgTable(
     effectiveDate: date("effective_date", { mode: "string" })
       .notNull()
       .generatedAlwaysAs(sql`COALESCE("document_date", ("created_at" AT TIME ZONE 'UTC')::date)`),
-    activeRevisionId: uuid("active_revision_id"),
     latestSubmissionRevisionId: uuid("latest_submission_revision_id"),
     version: integer("version").notNull().default(1),
     dateOrganizationSuggestion: jsonb("date_organization_suggestion").$type<
@@ -62,23 +61,11 @@ export const sourceDocuments = pgTable(
     index("idx_source_documents_active_feed")
       .on(table.ledgerId, table.effectiveDate.desc(), table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} IS NULL`),
-    index("idx_source_documents_active_revision").on(table.activeRevisionId),
     index("idx_source_documents_latest_submission_revision").on(table.latestSubmissionRevisionId),
     index("idx_source_documents_ledger_document_date")
       .on(table.ledgerId, table.documentDate, table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} IS NULL`),
     check("source_documents_version_check", sql`${table.version} > 0`),
-    // PostgreSQL uses column-list SET NULL here so ledger_id remains intact.
-    // Drizzle cannot express that syntax; migrations own the delete action.
-    foreignKey({
-      columns: [table.ledgerId, table.id, table.activeRevisionId],
-      foreignColumns: [
-        sourceDocumentRevisionsReference.ledgerId,
-        sourceDocumentRevisionsReference.sourceDocumentId,
-        sourceDocumentRevisionsReference.id,
-      ],
-      name: "fk_source_documents_active_revision",
-    }),
     foreignKey({
       columns: [table.ledgerId, table.id, table.latestSubmissionRevisionId],
       foreignColumns: [
