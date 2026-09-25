@@ -283,6 +283,67 @@ describe("OTP Repository", () => {
     });
   });
 
+  describe("issuing a new code", () => {
+    const sixteenMinutesAgo = () => new Date(Date.now() - 16 * 60 * 1000);
+
+    it("keeps an active lockout", async () => {
+      await createOTPToken(testEmail, generateOTP());
+      for (let i = 0; i < 5; i++) {
+        await verifyOTPToken(testEmail, "000000");
+      }
+
+      const otp = generateOTP();
+      await createOTPToken(testEmail, otp);
+
+      const result = await verifyOTPToken(testEmail, otp);
+      expect(result).toMatchObject({ success: false, reason: "locked" });
+    });
+
+    it("carries recent failed attempts over to the new code", async () => {
+      await createOTPToken(testEmail, generateOTP());
+      for (let i = 0; i < 3; i++) {
+        await verifyOTPToken(testEmail, "000000");
+      }
+
+      await createOTPToken(testEmail, generateOTP());
+
+      const result = await verifyOTPToken(testEmail, "000000");
+      expect(result.attemptsRemaining).toBe(1);
+    });
+
+    it("starts a fresh budget once a lockout window passes without a failure", async () => {
+      await createOTPToken(testEmail, generateOTP());
+      for (let i = 0; i < 3; i++) {
+        await verifyOTPToken(testEmail, "000000");
+      }
+      await db
+        .update(otpTokens)
+        .set({ lastAttemptAt: sixteenMinutesAgo() })
+        .where(eq(otpTokens.email, testEmail));
+
+      await createOTPToken(testEmail, generateOTP());
+
+      const result = await verifyOTPToken(testEmail, "000000");
+      expect(result.attemptsRemaining).toBe(4);
+    });
+
+    it("clears a lockout that has ended", async () => {
+      await createOTPToken(testEmail, generateOTP());
+      for (let i = 0; i < 5; i++) {
+        await verifyOTPToken(testEmail, "000000");
+      }
+      await db
+        .update(otpTokens)
+        .set({ lockedUntil: new Date(Date.now() - 60 * 1000), lastAttemptAt: sixteenMinutesAgo() })
+        .where(eq(otpTokens.email, testEmail));
+
+      const otp = generateOTP();
+      await createOTPToken(testEmail, otp);
+
+      expect((await verifyOTPToken(testEmail, otp)).success).toBe(true);
+    });
+  });
+
   describe("deleteOTPToken", () => {
     it("should delete OTP token", async () => {
       const otp = generateOTP();

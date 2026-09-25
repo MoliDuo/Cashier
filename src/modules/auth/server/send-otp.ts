@@ -7,7 +7,7 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { normalizeEmail, DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
 import type { SendOTPEmail } from "@/modules/auth/contract-schemas";
 import { sendEmail } from "@/lib/email-delivery";
-import { createOtpToken, discardOtpToken } from "./otp-tokens";
+import { createOtpToken, discardOtpToken, findOtpToken } from "./otp-tokens";
 import { findUserByEmail } from "./users";
 import {
   acquireResendCooldown,
@@ -80,13 +80,25 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
   }
   const canResendAt = Math.floor(cooldown.acquiredAt.getTime() / 1000) + getResendCooldown();
 
-  if ((await findUserByEmail(normalizedEmail)) == null) {
+  // Unknown and locked-out addresses get the same answer as a real send, so
+  // the response says nothing about which addresses exist. A locked-out one
+  // gets no email either: a new code could not be used before the lock ends.
+  const unsentResult = () => {
     const expiresAt = new Date(cooldown.acquiredAt.getTime() + OTP_EXPIRES_SECONDS * 1000);
     return {
       expiresIn: OTP_EXPIRES_SECONDS,
       expiresAt: Math.floor(expiresAt.getTime() / 1000),
       canResendAt,
     };
+  };
+  if ((await findUserByEmail(normalizedEmail)) == null) return unsentResult();
+  const lockedUntil = (await findOtpToken(normalizedEmail))?.lockedUntil;
+  if (lockedUntil != null && lockedUntil > cooldown.acquiredAt) {
+    logger.info(
+      { subject: logIdentifier("email", normalizedEmail) },
+      "OTP email skipped while the address is locked out"
+    );
+    return unsentResult();
   }
 
   const otp = generateOTP();

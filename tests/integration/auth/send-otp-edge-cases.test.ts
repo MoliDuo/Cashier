@@ -83,4 +83,26 @@ describe("sendOTPAction edge cases", () => {
       code: "email_send_failed",
     });
   });
+
+  it("sends nothing to a locked-out address but answers as if it had", async () => {
+    process.env.AUTH_RESEND_KEY = "test-resend-key";
+    const lockedUntil = new Date(Date.now() + 10 * 60 * 1000);
+    await getTestDb()
+      .insert(otpTokens)
+      .values({
+        email: testEmail,
+        tokenHash: "locked-token-hash",
+        expires: new Date(Date.now() + 60 * 1000),
+        attempts: 5,
+        lockedUntil,
+      });
+
+    await expect(sendOTPAction(testEmail)).resolves.toMatchObject({ ok: true });
+
+    expect(resendSendMock).not.toHaveBeenCalled();
+    const token = await getTestDb().query.otpTokens.findFirst({
+      where: eq(otpTokens.email, testEmail),
+    });
+    expect(token).toMatchObject({ tokenHash: "locked-token-hash", attempts: 5, lockedUntil });
+  });
 });

@@ -35,6 +35,7 @@ const {
 vi.mock("@/modules/auth/server/otp-tokens", () => ({
   createOtpToken: createOTPTokenMock,
   discardOtpToken: discardOTPTokenMock,
+  findOtpToken: vi.fn(async () => null),
 }));
 
 vi.mock("@/modules/auth/server/users", () => ({
