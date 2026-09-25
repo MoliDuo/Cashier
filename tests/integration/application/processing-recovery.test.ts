@@ -164,6 +164,11 @@ describe("Processing Recovery", () => {
 
     // Create a newer pending revision and point the document to it
     const db = getTestDb();
+    // A retry cancels the attempt it replaces; one document processes one attempt at a time.
+    await db
+      .update(sourceDocumentRevisions)
+      .set({ processingStatus: "cancelled", finishedAt: new Date() })
+      .where(eq(sourceDocumentRevisions.id, job.revisionId));
     const newRevision = await db
       .insert(sourceDocumentRevisions)
       .values({
@@ -312,6 +317,11 @@ describe("Processing Recovery", () => {
 
     // Point the document at a newer revision so the job's revision is no longer current.
     const db = getTestDb();
+    // A retry cancels the attempt it replaces; one document processes one attempt at a time.
+    await db
+      .update(sourceDocumentRevisions)
+      .set({ processingStatus: "cancelled", finishedAt: new Date() })
+      .where(eq(sourceDocumentRevisions.id, job.revisionId));
     const newRevision = await db
       .insert(sourceDocumentRevisions)
       .values({
@@ -339,7 +349,7 @@ describe("Processing Recovery", () => {
     const oldRevision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
-    expect(oldRevision?.processingStatus).not.toBe("failed");
+    expect(oldRevision?.processingStatus).toBe("cancelled");
     expect(oldRevision?.failureCode).toBeNull();
   });
 

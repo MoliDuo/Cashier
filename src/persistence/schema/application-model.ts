@@ -71,6 +71,12 @@ export const sourceDocumentRevisions = pgTable(
     submittedAt: requiredTimestamp("submitted_at").$defaultFn(() => new Date()),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
+    // The processing lease. A processing attempt is its own queue entry: these
+    // replace the outbox row once the worker claims attempts directly.
+    claimToken: text("claim_token"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    nextAvailableAt: timestamp("next_available_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     foreignKey({
@@ -78,6 +84,12 @@ export const sourceDocumentRevisions = pgTable(
       foreignColumns: [sourceDocuments.ledgerId, sourceDocuments.id],
       name: "fk_revisions_source_document_ledger",
     }).onDelete("cascade"),
+    uniqueIndex("uq_source_document_revisions_one_processing")
+      .on(table.sourceDocumentId)
+      .where(sql`${table.processingStatus} = 'processing'`),
+    index("idx_source_document_revisions_recoverable")
+      .on(table.nextAvailableAt)
+      .where(sql`${table.processingStatus} = 'processing'`),
     uniqueIndex("uq_source_document_revisions_ledger_id_id").on(table.ledgerId, table.id),
     uniqueIndex("uq_source_document_revisions_ledger_document_id").on(
       table.ledgerId,
@@ -144,6 +156,41 @@ export const revisionFiles = pgTable(
     uniqueIndex("uq_revision_files_revision_file").on(table.revisionId, table.storedFileId),
     index("idx_revision_files_ledger_file").on(table.ledgerId, table.storedFileId),
     check("ck_revision_files_position", sql`${table.position} >= 0`),
+  ]
+);
+
+/** The files of a source document's current input, in upload order. */
+export const sourceDocumentFiles = pgTable(
+  "source_document_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ledgerId: uuid("ledger_id").notNull(),
+    sourceDocumentId: uuid("source_document_id").notNull(),
+    storedFileId: uuid("stored_file_id").notNull(),
+    position: integer("position").notNull(),
+    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.ledgerId, table.sourceDocumentId],
+      foreignColumns: [sourceDocuments.ledgerId, sourceDocuments.id],
+      name: "fk_source_document_files_document_ledger",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.ledgerId, table.storedFileId],
+      foreignColumns: [storedFiles.ledgerId, storedFiles.id],
+      name: "fk_source_document_files_stored_file_ledger",
+    }),
+    uniqueIndex("uq_source_document_files_document_position").on(
+      table.sourceDocumentId,
+      table.position
+    ),
+    uniqueIndex("uq_source_document_files_document_file").on(
+      table.sourceDocumentId,
+      table.storedFileId
+    ),
+    index("idx_source_document_files_ledger_file").on(table.ledgerId, table.storedFileId),
+    check("ck_source_document_files_position", sql`${table.position} >= 0`),
   ]
 );
 
@@ -390,8 +437,7 @@ export const categoryReclassificationJobDocuments = pgTable(
     jobId: uuid("job_id").notNull(),
     ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
-    expectedVersion: integer("expected_version"),
-    revisionId: uuid("revision_id").notNull(),
+    revisionId: uuid("revision_id"),
     firstSelectionOrder: integer("first_selection_order").notNull(),
     status: categoryAssignmentDocumentStatusEnum("status").notNull().default("pending"),
     claimToken: uuid("claim_token"),
@@ -436,7 +482,6 @@ export const categoryReclassificationJobEntries = pgTable(
     ledgerEntryId: uuid("ledger_entry_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
     selectionOrder: integer("selection_order").notNull(),
-    expectedVersion: integer("expected_version"),
     originalCategoryId: uuid("original_category_id"),
     targetCategoryId: uuid("target_category_id"),
     decisionPersisted: boolean("decision_persisted").notNull().default(false),

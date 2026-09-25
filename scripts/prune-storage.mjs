@@ -282,6 +282,11 @@ export async function scanUnreferencedFiles(
              AND rf.stored_file_id = stored_files.id
          )
          AND NOT EXISTS (
+           SELECT 1 FROM source_document_files sdf
+           WHERE sdf.ledger_id = stored_files.ledger_id
+             AND sdf.stored_file_id = stored_files.id
+         )
+         AND NOT EXISTS (
            SELECT 1 FROM upload_session_files usf
            JOIN upload_sessions us
              ON us.ledger_id = usf.ledger_id AND us.id = usf.upload_session_id
@@ -328,6 +333,11 @@ export async function scanUnreferencedFiles(
                SELECT 1 FROM revision_files rf
                WHERE rf.ledger_id = stored_files.ledger_id
                  AND rf.stored_file_id = stored_files.id
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM source_document_files sdf
+               WHERE sdf.ledger_id = stored_files.ledger_id
+                 AND sdf.stored_file_id = stored_files.id
              )
              AND NOT EXISTS (
                SELECT 1 FROM upload_session_files usf

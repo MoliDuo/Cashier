@@ -1,6 +1,6 @@
 {
-  "id": "e8c95e51-541a-4436-a5ad-3a65ae10cd63",
-  "prevId": "caec73ad-d35b-4a62-8504-07b88aabb5a7",
+  "id": "c246041c-9df7-47f9-9cf5-e3ade9ed0afd",
+  "prevId": "e8c95e51-541a-4436-a5ad-3a65ae10cd63",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1087,6 +1087,40 @@
           "method": "btree",
           "with": {}
         },
+        "idx_ledger_entries_document_position": {
+          "name": "idx_ledger_entries_document_position",
+          "columns": [
+            {
+              "expression": "ledger_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"ledger_entries\".\"deleted_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_ledger_entries_search": {
           "name": "idx_ledger_entries_search",
           "columns": [
@@ -1466,6 +1500,12 @@
         },
         "title": {
           "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "input_text": {
+          "name": "input_text",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1876,17 +1916,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "expected_version": {
-          "name": "expected_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "revision_id": {
           "name": "revision_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "first_selection_order": {
           "name": "first_selection_order",
@@ -2104,12 +2138,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "expected_version": {
-          "name": "expected_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         },
         "original_category_id": {
           "name": "original_category_id",
@@ -3211,6 +3239,156 @@
       },
       "isRLSEnabled": false
     },
+    "public.source_document_files": {
+      "name": "source_document_files",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ledger_id": {
+          "name": "ledger_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_document_id": {
+          "name": "source_document_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stored_file_id": {
+          "name": "stored_file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "uq_source_document_files_document_position": {
+          "name": "uq_source_document_files_document_position",
+          "columns": [
+            {
+              "expression": "source_document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_source_document_files_document_file": {
+          "name": "uq_source_document_files_document_file",
+          "columns": [
+            {
+              "expression": "source_document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stored_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_source_document_files_ledger_file": {
+          "name": "idx_source_document_files_ledger_file",
+          "columns": [
+            {
+              "expression": "ledger_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stored_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_source_document_files_document_ledger": {
+          "name": "fk_source_document_files_document_ledger",
+          "tableFrom": "source_document_files",
+          "tableTo": "source_documents",
+          "columnsFrom": [
+            "ledger_id",
+            "source_document_id"
+          ],
+          "columnsTo": [
+            "ledger_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_source_document_files_stored_file_ledger": {
+          "name": "fk_source_document_files_stored_file_ledger",
+          "tableFrom": "source_document_files",
+          "tableTo": "stored_files",
+          "columnsFrom": [
+            "ledger_id",
+            "stored_file_id"
+          ],
+          "columnsTo": [
+            "ledger_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_source_document_files_position": {
+          "name": "ck_source_document_files_position",
+          "value": "\"source_document_files\".\"position\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.source_document_revisions": {
       "name": "source_document_revisions",
       "schema": "",
@@ -3301,9 +3479,67 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "claim_token": {
+          "name": "claim_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claim_expires_at": {
+          "name": "claim_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_available_at": {
+          "name": "next_available_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
+        "uq_source_document_revisions_one_processing": {
+          "name": "uq_source_document_revisions_one_processing",
+          "columns": [
+            {
+              "expression": "source_document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"source_document_revisions\".\"processing_status\" = 'processing'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_source_document_revisions_recoverable": {
+          "name": "idx_source_document_revisions_recoverable",
+          "columns": [
+            {
+              "expression": "next_available_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"source_document_revisions\".\"processing_status\" = 'processing'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "uq_source_document_revisions_ledger_id_id": {
           "name": "uq_source_document_revisions_ledger_id_id",
           "columns": [

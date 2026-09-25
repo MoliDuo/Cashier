@@ -11,6 +11,7 @@ import type {
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
+import { copyRevisionInputToDocument } from "./document-input";
 import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
 import { getSourceDocumentInTransaction } from "./reads/list";
 
@@ -190,6 +191,11 @@ export async function applyDateOrganization(
         .update(sourceDocuments)
         .set({ activeRevisionId: revision.id, latestSubmissionRevisionId: null })
         .where(eq(sourceDocuments.id, id));
+      await copyRevisionInputToDocument(tx, {
+        ledgerId: input.ledgerId,
+        sourceDocumentId: id,
+        revisionId: revision.id,
+      });
     }
     // Free the active positions before assigning contiguous positions in the same revision.
     const positionOffset = Math.max(0, ...currentEntries.map((entry) => entry.position + 1));

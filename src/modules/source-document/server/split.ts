@@ -10,6 +10,7 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
+import { copyRevisionInputToDocument } from "./document-input";
 
 function effectiveTitle(documentTitle: string | null, revisionTitle: string | null): string | null {
   return documentTitle?.trim() || revisionTitle?.trim() || null;
@@ -199,6 +200,11 @@ export async function splitSourceDocumentAtomically(input: {
           eq(sourceDocuments.id, splitSourceDocumentId)
         )
       );
+    await copyRevisionInputToDocument(tx, {
+      ledgerId: input.ledgerId,
+      sourceDocumentId: splitSourceDocumentId,
+      revisionId: splitRevision.id,
+    });
     const sourceDocument = await getSourceDocumentInTransaction(
       tx,
       input.ledgerId,

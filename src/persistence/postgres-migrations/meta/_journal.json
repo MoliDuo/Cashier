@@ -43,6 +43,13 @@
       "when": 1790325609563,
       "tag": "0005_contract_stored_conversions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790331708516,
+      "tag": "0006_source_document_files_and_revision_queue",
+      "breakpoints": true
     }
   ]
 }

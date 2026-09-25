@@ -349,13 +349,15 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     }
     await client.query(
       `INSERT INTO source_documents
-        (id, ledger_id, book_id, title, document_date, version, date_organization_suggestion, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $7)`,
+        (id, ledger_id, book_id, title, input_text, document_date, version,
+         date_organization_suggestion, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $8)`,
       [
         document.id,
         ledgerId,
         bookIds.get(document.book),
         document.title,
+        document.inputText,
         documentDate,
         suggestion,
         createdAt,
@@ -419,6 +421,12 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
         `INSERT INTO revision_files (ledger_id, revision_id, stored_file_id, position, created_at)
          VALUES ($1, $2, $3, 0, $4)`,
         [ledgerId, document.revisionId, image.fileId, createdAt]
+      );
+      await client.query(
+        `INSERT INTO source_document_files
+          (ledger_id, source_document_id, stored_file_id, position, created_at)
+         VALUES ($1, $2, $3, 0, $4)`,
+        [ledgerId, document.id, image.fileId, createdAt]
       );
     }
     const entryRevisionId = document.retainedResult?.revisionId ?? document.revisionId;

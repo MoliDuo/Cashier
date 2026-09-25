@@ -24,6 +24,7 @@ import {
 } from "@/lib/db/transaction-locks";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
+import { copyRevisionInputToDocument } from "./document-input";
 
 export type CreatePendingRevisionInput = {
   ledgerId: string;
@@ -225,6 +226,11 @@ export async function createProcessingRevisionInTransaction(
     .then((rows) => rows[0]);
   if (updatedDocument == null)
     throw new ConflictError("Failed to update source document revision pointer");
+  await copyRevisionInputToDocument(tx, {
+    ledgerId: input.ledgerId,
+    sourceDocumentId,
+    revisionId: revision.id,
+  });
   return { document: mapDocument(updatedDocument, "processing"), revision: mapRevision(revision) };
 }
 

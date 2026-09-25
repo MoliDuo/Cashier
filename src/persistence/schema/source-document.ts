@@ -29,6 +29,8 @@ export const sourceDocuments = pgTable(
       .references(() => ledgers.id, { onDelete: "cascade" }),
     bookId: uuid("book_id").notNull(),
     title: text("title"),
+    /** The text of the current attempt's input; its files are in `source_document_files`. */
+    inputText: text("input_text"),
     documentDate: date("document_date", { mode: "string" }),
     effectiveDate: date("effective_date", { mode: "string" })
       .notNull()

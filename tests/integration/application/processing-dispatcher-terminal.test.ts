@@ -196,17 +196,22 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const adapter = processingJobs();
     await adapter.dispatch(job);
 
-    // Simulate stale revision: change latestSubmissionRevisionId so recordProcessingFailure guard fails
-    const staleRevisionId = crypto.randomUUID();
+    // Simulate a retry: it cancels the attempt it replaces and points the
+    // document at the new one.
+    await db
+      .update(sourceDocumentRevisions)
+      .set({ processingStatus: "cancelled", finishedAt: new Date() })
+      .where(eq(sourceDocumentRevisions.id, job.revisionId));
+    const newRevisionId = crypto.randomUUID();
     await db.insert(sourceDocumentRevisions).values({
-      id: staleRevisionId,
+      id: newRevisionId,
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       processingStatus: "processing",
     });
     await db
       .update(sourceDocuments)
-      .set({ latestSubmissionRevisionId: staleRevisionId })
+      .set({ latestSubmissionRevisionId: newRevisionId })
       .where(eq(sourceDocuments.id, job.sourceDocumentId));
 
     const result = await executeProcessingJob(job);
@@ -222,7 +227,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
-    expect(revision?.processingStatus).toBe("processing");
+    expect(revision?.processingStatus).toBe("cancelled");
 
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });

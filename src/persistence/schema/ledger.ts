@@ -183,6 +183,9 @@ export const ledgerEntries = pgTable(
         table.id
       )
       .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_ledger_entries_document_position")
+      .on(table.ledgerId, table.sourceDocumentId, table.position, table.id)
+      .where(sql`${table.deletedAt} IS NULL`),
     index("idx_ledger_entries_search")
       .using(
         "gin",

@@ -6,6 +6,7 @@ import type { DateOrganizationSuggestion } from "@/modules/source-document/date-
 import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing, hasEditableActiveProjection } from "../write-guards";
+import { copyRevisionInputToDocument } from "../document-input";
 
 import {
   activeDocumentWhere,
@@ -331,5 +332,10 @@ export async function createCompletedProjectionInTransaction(
     .update(sourceDocuments)
     .set({ activeRevisionId: revision.id })
     .where(activeDocumentWhere(input.ledgerId, input.sourceDocumentId));
+  await copyRevisionInputToDocument(tx, {
+    ledgerId: input.ledgerId,
+    sourceDocumentId: input.sourceDocumentId,
+    revisionId: revision.id,
+  });
   return revision.id;
 }
