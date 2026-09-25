@@ -196,6 +196,41 @@ describe("useSourceDocumentStream", () => {
     });
   });
 
+  it("starts polling when a newer page shows work an idle baseline never saw", async () => {
+    // Another device uploaded while this one sat idle; a mutation here then
+    // refetched the list, which now shows that upload still processing.
+    listStreamPageActionMock.mockResolvedValueOnce({
+      items: [makeItem("doc-1", { status: "processing" })],
+      nextCursor: null,
+      generation: "10",
+      hasTransitionalWork: true,
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    const refreshKey = queryKeys.sourceDocumentRefresh();
+    const invalidations = { categories: true, settings: false, stats: true };
+    queryClient.setQueryData(refreshKey, {
+      version: "9",
+      changed: true,
+      hasTransitionalWork: false,
+      invalidations,
+    });
+
+    const { result } = renderHook(() => useTestSourceDocumentStream("ledger-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // The version stays the refresh consumer's to advance.
+    expect(queryClient.getQueryData(refreshKey)).toEqual({
+      version: "9",
+      changed: true,
+      hasTransitionalWork: true,
+      invalidations,
+    });
+  });
+
   it("fetches the first page on mount and returns stream groups", async () => {
     const { result } = renderHook(() => useTestSourceDocumentStream("ledger-1"), {
       wrapper: createWrapper(),

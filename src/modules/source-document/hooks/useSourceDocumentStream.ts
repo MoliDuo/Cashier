@@ -46,8 +46,18 @@ function seedRefreshBaseline(
   const queryKey = queryKeys.sourceDocumentRefresh();
   queryClient.setQueryData<LedgerRefreshResult>(queryKey, (current) => {
     // A page refreshes only its own projection, not every ledger cache.
-    // Only the refresh consumer may advance an existing baseline.
-    if (current != null) return current;
+    // Only the refresh consumer may advance an existing baseline. A newer page
+    // that shows work still processing does start its polling, though: a list
+    // refetched after a mutation can show another device's upload that the
+    // idle baseline never heard of, and without the poll it would stay
+    // "processing" on screen until the window next regains focus.
+    if (current != null) {
+      return page.hasTransitionalWork &&
+        !current.hasTransitionalWork &&
+        BigInt(page.generation) > BigInt(current.version)
+        ? { ...current, hasTransitionalWork: true }
+        : current;
+    }
     return {
       version: page.generation,
       changed: false,
