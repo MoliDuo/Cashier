@@ -278,16 +278,17 @@ describe("processing attempt jobs", () => {
   });
 
   it("reclaims an expired lease and fences out the previous holder", async () => {
-    let now = new Date("2026-07-15T00:00:00.000Z");
-    const { job } = await pendingIntent(now.toISOString(), crypto.randomUUID());
-    const adapter = processingJobs({ leaseMs: 1_000, now: () => now });
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const adapter = processingJobs();
 
     const first = await adapter.claim(job.revisionId);
     expect(first).not.toBeNull();
-    now = new Date(now.getTime() + 500);
     const renewedUntil = await adapter.renew(job.revisionId, first!.claimToken);
-    expect(renewedUntil).toBe(new Date(now.getTime() + 1_000).toISOString());
-    now = new Date(now.getTime() + 1_001);
+    expect(new Date(renewedUntil!).getTime()).toBeGreaterThanOrEqual(
+      new Date(first!.expiresAt).getTime()
+    );
+    await adapter.expireLease(job.revisionId);
+    await expect(adapter.renew(job.revisionId, first!.claimToken)).resolves.toBeNull();
     const second = await adapter.claim(job.revisionId);
     expect(second).not.toBeNull();
     expect(second!.claimToken).not.toBe(first!.claimToken);

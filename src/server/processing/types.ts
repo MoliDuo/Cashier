@@ -31,11 +31,6 @@ export interface RecoverableProcessingJobContract extends ProcessingJobContract 
   nextAvailableAt: string;
 }
 
-export interface ProcessingRecoveryConfig {
-  maxBatch: number;
-  cooldownSeconds: number;
-}
-
 export interface RevisionProcessingRequestContract {
   ledgerId: string;
   sourceDocumentId: string;

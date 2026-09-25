@@ -2,9 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   AI_CATEGORY_REQUEST_TIMEOUT_MS,
+  AI_REQUEST_TIMEOUT_MS,
   AI_REVISION_DEADLINE_MS,
   CATEGORY_RUN_BUDGET_MS,
   FUNCTION_MAX_DURATION_SECONDS,
+  LEASE_DURATION_MS,
+  LEASE_HEARTBEAT_MS,
+  OUTCOME_RESERVE_MS,
 } from "@/config/tuning";
 
 const AI_RUNNING_ROUTES = [
@@ -29,5 +33,15 @@ describe("function time budget", () => {
 
   it("lets the last document a category run claims finish its request", () => {
     expect(CATEGORY_RUN_BUDGET_MS + AI_CATEGORY_REQUEST_TIMEOUT_MS).toBeLessThan(budgetMs);
+  });
+
+  it("lets one model request finish inside the parse deadline", () => {
+    expect(AI_REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(AI_REVISION_DEADLINE_MS);
+    expect(AI_REVISION_DEADLINE_MS + OUTCOME_RESERVE_MS).toBeLessThanOrEqual(budgetMs);
+  });
+
+  it("keeps a lease through a late heartbeat but frees a killed worker's within the budget", () => {
+    expect(LEASE_DURATION_MS).toBeGreaterThanOrEqual(3 * LEASE_HEARTBEAT_MS);
+    expect(LEASE_DURATION_MS).toBeLessThanOrEqual(budgetMs);
   });
 });

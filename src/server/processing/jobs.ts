@@ -2,20 +2,14 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import type {
   ProcessingClaimContract,
-  ProcessingRecoveryConfig,
+  ProcessingLeaseContract,
   RecoverableProcessingJobContract,
 } from "@/server/processing/types";
 import { db } from "@/lib/db";
+import { databaseClockPlus, leaseExpiry, leaseFree, leaseHeldBy } from "@/lib/db/lease";
 
-// Renewed every 15 seconds while the worker runs, so the length only decides how
-// soon an attempt whose function was killed can be claimed again.
-const DEFAULT_LEASE_MS = 60 * 1000;
-
-/** Overrides for the lease length and the clock; tests use them to walk expiry. */
-export interface ProcessingJobClock {
-  leaseMs?: number;
-  now?: () => Date;
-}
+const claimToken = sql`revision.claim_token`;
+const claimExpiresAt = sql`revision.claim_expires_at`;
 
 function toIso(value: Date | string): string {
   return typeof value === "string" ? new Date(value).toISOString() : value.toISOString();
@@ -23,22 +17,20 @@ function toIso(value: Date | string): string {
 
 /**
  * Leases one processing attempt. Only the document's current submission, still
- * processing and not held by an unexpired lease, is claimable; the claim counts
- * the run so an attempt that keeps dying is failed once it runs out.
+ * processing, due, and not held by an unexpired lease, is claimable; the claim
+ * counts the run so an attempt that keeps dying is failed once it runs out.
  */
 export async function claimProcessingJob(
-  revisionId: string,
-  clock: ProcessingJobClock = {}
+  revisionId: string
 ): Promise<ProcessingClaimContract | null> {
-  const now = clock.now?.() ?? new Date();
-  const claimToken = crypto.randomUUID();
-  const expiresAt = new Date(now.getTime() + (clock.leaseMs ?? DEFAULT_LEASE_MS));
+  const token = crypto.randomUUID();
   const claimed = await db.execute<{
     ledger_id: string;
     source_document_id: string;
     id: string;
     submitted_at: Date | string;
     attempt_count: number;
+    claim_expires_at: Date | string;
   }>(sql`
     WITH candidate AS (
       SELECT revision.id FROM source_document_revisions revision
@@ -49,15 +41,16 @@ export async function claimProcessingJob(
        AND document.deleted_at IS NULL
       WHERE revision.id = ${revisionId}
         AND revision.processing_status = 'processing'
-        AND (revision.claim_expires_at IS NULL OR revision.claim_expires_at <= ${now})
+        AND revision.next_available_at <= clock_timestamp()
+        AND ${leaseFree(claimToken, claimExpiresAt)}
       FOR UPDATE OF revision SKIP LOCKED
     )
     UPDATE source_document_revisions revision
-    SET claim_token = ${claimToken}, claim_expires_at = ${expiresAt},
+    SET claim_token = ${token}, claim_expires_at = ${leaseExpiry()},
         attempt_count = revision.attempt_count + 1
     FROM candidate WHERE revision.id = candidate.id
     RETURNING revision.ledger_id, revision.source_document_id, revision.id,
-      revision.submitted_at, revision.attempt_count
+      revision.submitted_at, revision.attempt_count, revision.claim_expires_at
   `);
   const row = claimed.rows[0];
   if (row == null) return null;
@@ -68,59 +61,47 @@ export async function claimProcessingJob(
       revisionId: row.id,
       requestedAt: toIso(row.submitted_at),
     },
-    claimToken,
+    claimToken: token,
     attempt: Number(row.attempt_count),
-    expiresAt: expiresAt.toISOString(),
+    expiresAt: toIso(row.claim_expires_at),
   };
 }
 
 /**
- * Picks the ledger's processing attempts whose run was missed and pushes each
- * one's next run out by the cooldown. Only attempt rows are locked, skipping
- * ones another pass holds, so concurrent passes pick disjoint sets without
- * serializing on the ledger.
+ * The ledger's processing attempts that are due but that no run holds: their
+ * `after()` was lost, their function was killed, or their retry came due.
+ * Nothing is written; a duplicate schedule just finds the attempt claimed.
  */
 export async function recoverProcessingJobs(
   ledgerId: string,
-  config: ProcessingRecoveryConfig,
-  clock: ProcessingJobClock = {}
+  maxBatch: number
 ): Promise<readonly RecoverableProcessingJobContract[]> {
-  const now = clock.now?.() ?? new Date();
-  const nextAvailable = new Date(now.getTime() + config.cooldownSeconds * 1000);
-  const scheduled = await db.execute<{
+  const due = await db.execute<{
     sourceDocumentId: string;
     revisionId: string;
     requestedAt: Date | string;
     attemptCount: number;
     nextAvailableAt: Date | string;
   }>(sql`
-    WITH candidate AS (
-      SELECT revision.id
-      FROM source_document_revisions revision
-      JOIN source_documents document
-        ON document.ledger_id = revision.ledger_id
-       AND document.id = revision.source_document_id
-       AND document.latest_submission_revision_id = revision.id
-       AND document.deleted_at IS NULL
-      WHERE revision.ledger_id = ${ledgerId}
-        AND revision.processing_status = 'processing'
-        AND revision.next_available_at <= ${now}
-        AND (revision.claim_expires_at IS NULL OR revision.claim_expires_at <= ${now})
-      ORDER BY revision.next_available_at, revision.submitted_at, revision.id
-      FOR UPDATE OF revision SKIP LOCKED
-      LIMIT ${config.maxBatch}
-    )
-    UPDATE source_document_revisions revision
-    SET next_available_at = ${nextAvailable}
-    FROM candidate
-    WHERE revision.id = candidate.id
-    RETURNING revision.source_document_id AS "sourceDocumentId",
+    SELECT revision.source_document_id AS "sourceDocumentId",
       revision.id AS "revisionId",
       revision.submitted_at AS "requestedAt",
       revision.attempt_count AS "attemptCount",
       revision.next_available_at AS "nextAvailableAt"
+    FROM source_document_revisions revision
+    JOIN source_documents document
+      ON document.ledger_id = revision.ledger_id
+     AND document.id = revision.source_document_id
+     AND document.latest_submission_revision_id = revision.id
+     AND document.deleted_at IS NULL
+    WHERE revision.ledger_id = ${ledgerId}
+      AND revision.processing_status = 'processing'
+      AND revision.next_available_at <= clock_timestamp()
+      AND ${leaseFree(claimToken, claimExpiresAt)}
+    ORDER BY revision.next_available_at, revision.submitted_at, revision.id
+    LIMIT ${maxBatch}
   `);
-  return scheduled.rows.map((row) => ({
+  return due.rows.map((row) => ({
     ...row,
     attemptCount: Number(row.attemptCount),
     requestedAt: toIso(row.requestedAt),
@@ -128,21 +109,39 @@ export async function recoverProcessingJobs(
   }));
 }
 
+/** Extends a held lease; null once it was lost, reclaimed or the attempt ended. */
 export async function renewProcessingJobLease(
   revisionId: string,
-  claimToken: string,
-  clock: ProcessingJobClock = {}
+  token: string
 ): Promise<string | null> {
-  const expiresAt = new Date(
-    (clock.now?.() ?? new Date()).getTime() + (clock.leaseMs ?? DEFAULT_LEASE_MS)
-  );
-  const renewed = await db.execute(sql`
-    UPDATE source_document_revisions
-    SET claim_expires_at = ${expiresAt}
-    WHERE id = ${revisionId}
-      AND claim_token = ${claimToken}
-      AND processing_status = 'processing'
-    RETURNING id
+  const renewed = await db.execute<{ claim_expires_at: Date | string }>(sql`
+    UPDATE source_document_revisions revision
+    SET claim_expires_at = ${leaseExpiry()}
+    WHERE revision.id = ${revisionId}
+      AND ${leaseHeldBy(claimToken, claimExpiresAt, token)}
+      AND revision.processing_status = 'processing'
+    RETURNING revision.claim_expires_at
   `);
-  return renewed.rows.length === 1 ? expiresAt.toISOString() : null;
+  const row = renewed.rows[0];
+  return row == null ? null : toIso(row.claim_expires_at);
+}
+
+/**
+ * Gives a held attempt back to the queue after a transient failure, due again
+ * once the delay has passed. False when the lease was already lost.
+ */
+export async function rescheduleProcessingJob(
+  lease: ProcessingLeaseContract,
+  delayMs: number
+): Promise<boolean> {
+  const released = await db.execute(sql`
+    UPDATE source_document_revisions revision
+    SET claim_token = NULL, claim_expires_at = NULL,
+        next_available_at = ${databaseClockPlus(delayMs)}
+    WHERE revision.id = ${lease.revisionId}
+      AND ${leaseHeldBy(claimToken, claimExpiresAt, lease.claimToken)}
+      AND revision.processing_status = 'processing'
+    RETURNING revision.id
+  `);
+  return released.rows.length === 1;
 }

@@ -1,113 +1,103 @@
 import "server-only";
 import type { ProcessingFailureCode } from "@/modules/source-document/lifecycle";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
+import { classifyFailure, findAppErrorCode, retryDelayMs } from "@/lib/background/retry";
+import { holdLease } from "@/lib/db/lease";
 import {
   ProcessingCancelledError,
   ProcessingFailure,
 } from "@/modules/source-document/domain/parse/contracts";
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
-import { claimProcessingJob, renewProcessingJobLease } from "./jobs";
+import { claimProcessingJob, renewProcessingJobLease, rescheduleProcessingJob } from "./jobs";
 import { processRevision } from "./revision-processor";
-import { PROCESSING_MAX_ATTEMPTS } from "@/config/tuning";
+import { BACKGROUND_MAX_ATTEMPTS } from "@/config/tuning";
 
 function toFailureCode(error: unknown): ProcessingFailureCode {
   if (error instanceof ProcessingFailure) return error.code;
-  if (error instanceof AppError) {
-    switch (error.code) {
-      case "RATE_LIMIT":
-      case "AI_PROVIDER_RATE_LIMITED":
-      case "AI_PROVIDER_UNAVAILABLE":
-        return "ai_provider_unavailable";
-      case "EXCHANGE_RATES_UNAVAILABLE":
-      case "EXCHANGE_RATES_FETCH_FAILED":
-      case "CURRENCY_NOT_FOUND":
-        return "exchange_rate_failure";
-      case "FILE_NOT_FOUND":
-        return "storage_failure";
-    }
+  switch (findAppErrorCode(error)) {
+    case "ai_rate_limited":
+    case "ai_provider_unavailable":
+    case "ai_timeout":
+    case "ai_configuration_invalid":
+      return "ai_provider_unavailable";
+    case "FILE_NOT_FOUND":
+      return "storage_failure";
+    default:
+      return "processing_unavailable";
   }
-  return "processing_unavailable";
 }
 
 /**
  * Claims one processing attempt, keeps its lease alive while it is parsed, and
- * records the outcome. Returns false when another execution holds it.
+ * records the outcome. A transient failure gives the attempt back to the queue
+ * until it runs out of attempts. Returns false when another execution holds it.
  */
 export async function executeProcessingJob(job: ProcessingJobContract): Promise<boolean> {
   const claim = await claimProcessingJob(job.revisionId);
   if (claim == null) return false;
   const lease = { revisionId: claim.job.revisionId, claimToken: claim.claimToken };
-  if (claim.attempt > PROCESSING_MAX_ATTEMPTS) {
+  const failure = {
+    ledgerId: claim.ledgerId,
+    sourceDocumentId: claim.job.sourceDocumentId,
+    revisionId: claim.job.revisionId,
+    failureKind: "processing_error" as const,
+    lease,
+  };
+  const revisionSubject = logIdentifier("revision", claim.job.revisionId);
+  if (claim.attempt > BACKGROUND_MAX_ATTEMPTS) {
     await recordProcessingFailure({
-      ledgerId: claim.ledgerId,
-      sourceDocumentId: claim.job.sourceDocumentId,
-      revisionId: claim.job.revisionId,
-      failureKind: "processing_error",
+      ...failure,
       failureMessage: "Processing retry limit reached",
       failureCode: "request_bound_retry_exhausted",
-      lease,
     });
     return true;
   }
 
-  const controller = new AbortController();
-  let stopped = false;
-  let renewalTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const renewLease = async (): Promise<void> => {
-    if (stopped || controller.signal.aborted) return;
-    try {
-      const renewedUntil = await renewProcessingJobLease(claim.job.revisionId, claim.claimToken);
-      if (renewedUntil == null) {
-        logger.warn(
-          { revisionSubject: logIdentifier("revision", claim.job.revisionId) },
-          "Processing lease was lost or cancelled; aborting worker"
-        );
-        controller.abort();
-        return;
-      }
-    } catch (error) {
+  const held = holdLease(
+    async () => (await renewProcessingJobLease(lease.revisionId, lease.claimToken)) != null,
+    (reason, error) => {
       logger.warn(
-        {
-          revisionSubject: logIdentifier("revision", claim.job.revisionId),
-          errorCode: error instanceof AppError ? error.code : "UNKNOWN",
-        },
-        "Processing lease renewal failed; aborting worker"
+        { revisionSubject, reason, errorCode: findAppErrorCode(error) ?? "UNKNOWN" },
+        "Processing lease was lost; aborting worker"
       );
-      controller.abort();
-      return;
     }
-    if (!stopped && !controller.signal.aborted) {
-      renewalTimer = setTimeout(() => void renewLease(), 15_000);
-    }
-  };
-  renewalTimer = setTimeout(() => void renewLease(), 15_000);
+  );
 
   try {
     await processRevision({
       ledgerId: claim.ledgerId,
       sourceDocumentId: claim.job.sourceDocumentId,
       revisionId: claim.job.revisionId,
-      signal: controller.signal,
+      signal: held.signal,
       lease,
     });
   } catch (error) {
-    if (error instanceof ProcessingCancelledError || controller.signal.aborted) return true;
+    if (error instanceof ProcessingCancelledError || held.signal.aborted) return true;
+    const classified = classifyFailure(error);
+    if (classified.kind === "transient" && claim.attempt < BACKGROUND_MAX_ATTEMPTS) {
+      const delayMs = retryDelayMs(claim.attempt, classified.retryAfterMs);
+      logger.warn(
+        { revisionSubject, errorCode: classified.code, attempt: claim.attempt, delayMs },
+        "Processing failed transiently; retrying later"
+      );
+      await rescheduleProcessingJob(lease, delayMs);
+      return true;
+    }
+    if (classified.kind === "configuration") {
+      logger.error(
+        { revisionSubject, errorCode: classified.code },
+        "Processing failed on provider configuration"
+      );
+    }
     await recordProcessingFailure({
-      ledgerId: claim.ledgerId,
-      sourceDocumentId: claim.job.sourceDocumentId,
-      revisionId: claim.job.revisionId,
-      failureKind: "processing_error",
+      ...failure,
       failureMessage: error instanceof Error ? error.message : "Processing failed",
       failureCode: toFailureCode(error),
-      lease,
     });
   } finally {
-    stopped = true;
-    if (renewalTimer != null) clearTimeout(renewalTimer);
+    held.stop();
   }
 
   return true;

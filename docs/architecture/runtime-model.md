@@ -107,9 +107,16 @@ provisional rows. Changing the main currency only updates the setting.
 
 ## Simplified persistence
 
-Processing leases, attempt counts, and scheduling state live on the processing attempt itself. A
-lease lasts 60 seconds and the worker renews it every 15 seconds, so an attempt whose function was
-killed can be claimed again within a minute.
+Processing leases, attempt counts, and scheduling state live on the processing attempt itself.
+Leases use the shared helper in `src/lib/db/lease.ts`, timed by the database clock only: a lease is
+held while its expiry is later than `clock_timestamp()`. A lease lasts 60 seconds and the worker
+renews it every 15 seconds, both derived from `FUNCTION_MAX_DURATION_SECONDS`, so an attempt whose
+function was killed can be claimed again within a minute.
+
+A claim counts the attempt. Failures are classified once, by `src/lib/background/retry.ts`:
+transient provider failures (rate limits, outages, timeouts) give the attempt back to the queue with
+a backoff until its third attempt, while permanent and configuration failures fail it at once.
+Recovery only reads which attempts are due and unheld; a duplicate schedule loses the claim.
 
 Entries belong to their document alone. A completed parse replaces the document's entries; a
 failed or cancelled one leaves them in place. The document's current input (text and files) lives

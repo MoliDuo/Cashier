@@ -1,24 +1,28 @@
-import type {
-  ProcessingRecoveryConfig,
-  RevisionProcessingRequestContract,
-} from "@/server/processing/types";
+import { eq } from "drizzle-orm";
+import type { RevisionProcessingRequestContract } from "@/server/processing/types";
 import type { AIContext } from "@/lib/tasks/types";
 import { processRevision } from "@/server/processing/revision-processor";
 import {
   claimProcessingJob,
   recoverProcessingJobs,
   renewProcessingJobLease,
-  type ProcessingJobClock,
 } from "@/server/processing/jobs";
+import { sourceDocumentRevisions } from "@/persistence";
+import { getTestDb } from "../setup";
 
-/** The queue functions bound to one clock, for tests that walk lease expiry. */
-export function processingJobs(clock: ProcessingJobClock = {}) {
+/** The processing queue functions under test. */
+export function processingJobs() {
   return {
-    claim: (revisionId: string) => claimProcessingJob(revisionId, clock),
+    claim: (revisionId: string) => claimProcessingJob(revisionId),
     renew: (revisionId: string, claimToken: string) =>
-      renewProcessingJobLease(revisionId, claimToken, clock),
-    recoverBatch: (ledgerId: string, config: ProcessingRecoveryConfig) =>
-      recoverProcessingJobs(ledgerId, config, clock),
+      renewProcessingJobLease(revisionId, claimToken),
+    recoverBatch: (ledgerId: string, maxBatch: number) => recoverProcessingJobs(ledgerId, maxBatch),
+    /** Leases run on the database clock, so a test expires one by moving it into the past. */
+    expireLease: (revisionId: string) =>
+      getTestDb()
+        .update(sourceDocumentRevisions)
+        .set({ claimExpiresAt: new Date(Date.now() - 60_000) })
+        .where(eq(sourceDocumentRevisions.id, revisionId)),
   };
 }
 

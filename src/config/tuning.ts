@@ -20,6 +20,19 @@
  * to this one. Every deadline and run budget below must fit inside it.
  */
 export const FUNCTION_MAX_DURATION_SECONDS = 120;
+const FUNCTION_BUDGET_MS = FUNCTION_MAX_DURATION_SECONDS * 1000;
+/** Kept free at the end of a run for writing down how it ended. */
+export const OUTCOME_RESERVE_MS = 10_000;
+
+/**
+ * Background leases. A worker renews its lease on every heartbeat; a lease
+ * lasts several heartbeats so one slow renewal does not lose it, and only
+ * decides how soon work whose function was killed can be claimed again.
+ */
+export const LEASE_HEARTBEAT_MS = FUNCTION_BUDGET_MS / 8;
+export const LEASE_DURATION_MS = 4 * LEASE_HEARTBEAT_MS;
+/** Runs one piece of background work gets, the first one included, before it is failed. */
+export const BACKGROUND_MAX_ATTEMPTS = 3;
 
 /** OpenAI calls: how long to wait, how often to try again. */
 export const AI_REQUEST_TIMEOUT_MS = 60_000;
@@ -36,7 +49,7 @@ export const AI_RETRY_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1_000;
  * parse and for recording the outcome, so a slow parse fails as
  * `processing_timeout` instead of being killed and retried from scratch.
  */
-export const AI_REVISION_DEADLINE_MS = 90_000;
+export const AI_REVISION_DEADLINE_MS = FUNCTION_BUDGET_MS - 3 * OUTCOME_RESERVE_MS;
 
 /** Bulk re-categorisation shares one database-coordinated provider slot. */
 export const AI_CATEGORY_CONCURRENCY = 1;
@@ -47,7 +60,8 @@ export const AI_CATEGORY_MAX_ATTEMPTS = 3;
  * last moment still has one request timeout plus a margin before the function
  * limit; whatever is left is picked up by the next run.
  */
-export const CATEGORY_RUN_BUDGET_MS = 50_000;
+export const CATEGORY_RUN_BUDGET_MS =
+  FUNCTION_BUDGET_MS - AI_CATEGORY_REQUEST_TIMEOUT_MS - OUTCOME_RESERVE_MS;
 
 /** Upload ceilings, per ledger. The daily one is 100 MiB. */
 export const UPLOAD_PLAN_LIMIT_PER_15_MIN = 20;
@@ -85,6 +99,3 @@ export const SESSION_MAX_AGE_DAYS = 14;
 
 /** Picking up source documents whose processing died mid-flight. */
 export const PROCESSING_RECOVERY_MAX_BATCH = 5;
-export const PROCESSING_RECOVERY_COOLDOWN_SECONDS = 60;
-/** Runs a submission gets, the first one included, before it is failed. */
-export const PROCESSING_MAX_ATTEMPTS = 5;
