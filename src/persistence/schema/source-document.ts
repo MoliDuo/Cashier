@@ -50,21 +50,25 @@ export const sourceDocuments = pgTable(
   },
   (table) => [
     uniqueIndex("uq_source_documents_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_source_documents_ledger_book")
-      .on(table.ledgerId, table.bookId)
-      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_source_documents_ledger_book").on(table.ledgerId, table.bookId),
     foreignKey({
       columns: [table.ledgerId, table.bookId],
       foreignColumns: [books.ledgerId, books.id],
       name: "fk_source_documents_book_ledger",
     }),
-    index("idx_source_documents_active_feed")
-      .on(table.ledgerId, table.effectiveDate.desc(), table.createdAt.desc(), table.id.desc())
-      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_source_documents_active_feed").on(
+      table.ledgerId,
+      table.effectiveDate.desc(),
+      table.createdAt.desc(),
+      table.id.desc()
+    ),
     index("idx_source_documents_latest_submission_revision").on(table.latestSubmissionRevisionId),
-    index("idx_source_documents_ledger_document_date")
-      .on(table.ledgerId, table.documentDate, table.createdAt.desc(), table.id.desc())
-      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_source_documents_ledger_document_date").on(
+      table.ledgerId,
+      table.documentDate,
+      table.createdAt.desc(),
+      table.id.desc()
+    ),
     check("source_documents_version_check", sql`${table.version} > 0`),
     foreignKey({
       columns: [table.ledgerId, table.id, table.latestSubmissionRevisionId],

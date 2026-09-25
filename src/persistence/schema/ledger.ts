@@ -3,6 +3,7 @@ import {
   text,
   integer,
   index,
+  unique,
   uniqueIndex,
   timestamp,
   boolean,
@@ -120,12 +121,16 @@ export const entryCategories = pgTable(
   },
   (table) => [
     uniqueIndex("uq_entry_categories_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_entry_categories_active_sort")
-      .on(table.ledgerId, table.sortOrder, table.createdAt, table.id)
-      .where(sql`${table.deletedAt} IS NULL`),
-    uniqueIndex("uniq_category_name_per_ledger")
-      .on(table.ledgerId, table.name)
-      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_entry_categories_active_sort").on(
+      table.ledgerId,
+      table.sortOrder,
+      table.createdAt,
+      table.id
+    ),
+    // The database declares this DEFERRABLE INITIALLY IMMEDIATE, which Drizzle
+    // cannot express: it is checked when a statement ends, so one UPDATE can
+    // swap names.
+    unique("uq_entry_categories_ledger_name").on(table.ledgerId, table.name),
   ]
 );
 
@@ -155,25 +160,34 @@ export const ledgerEntries = pgTable(
   },
   (table) => [
     uniqueIndex("uq_ledger_entries_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_ledger_entries_active_feed")
-      .on(table.ledgerId, table.createdAt.desc(), table.id.desc())
-      .where(sql`${table.deletedAt} IS NULL`),
-    index("idx_ledger_entries_active_category")
-      .on(table.ledgerId, table.categoryId, table.createdAt.desc(), table.id.desc())
-      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_ledger_entries_active_feed").on(
+      table.ledgerId,
+      table.createdAt.desc(),
+      table.id.desc()
+    ),
+    index("idx_ledger_entries_active_category").on(
+      table.ledgerId,
+      table.categoryId,
+      table.createdAt.desc(),
+      table.id.desc()
+    ),
     index("idx_ledger_entries_category_all").on(table.ledgerId, table.categoryId),
-    index("idx_ledger_entries_active_currency")
-      .on(table.ledgerId, table.currency, table.createdAt.desc(), table.id.desc())
-      .where(sql`${table.deletedAt} IS NULL`),
-    index("idx_ledger_entries_document_position")
-      .on(table.ledgerId, table.sourceDocumentId, table.position, table.id)
-      .where(sql`${table.deletedAt} IS NULL`),
-    index("idx_ledger_entries_search")
-      .using(
-        "gin",
-        sql`lower(${table.itemName} || ' ' || COALESCE(${table.description}, '')) public.gin_trgm_ops`
-      )
-      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_ledger_entries_active_currency").on(
+      table.ledgerId,
+      table.currency,
+      table.createdAt.desc(),
+      table.id.desc()
+    ),
+    index("idx_ledger_entries_document_position").on(
+      table.ledgerId,
+      table.sourceDocumentId,
+      table.position,
+      table.id
+    ),
+    index("idx_ledger_entries_search").using(
+      "gin",
+      sql`lower(${table.itemName} || ' ' || COALESCE(${table.description}, '')) public.gin_trgm_ops`
+    ),
     check("ck_ledger_entries_currency", sql`${table.currency} ~ '^[A-Z]{3}$'`),
     check("ck_ledger_entries_position", sql`${table.position} >= 0`),
     // The live database (migration 0022) declares this FK as

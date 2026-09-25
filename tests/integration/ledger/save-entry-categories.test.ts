@@ -310,6 +310,46 @@ describe("saveEntryCategoriesAction", () => {
     ).resolves.toMatchObject({ name: "Changed elsewhere" });
   });
 
+  it("swaps two names and reuses a deleted category's name in one save", async () => {
+    const db = getTestDb();
+    const ledger = createLedgerData();
+    const [aId, bId, goneId] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
+    await db.insert(entryCategories).values([
+      { id: aId, ledgerId: ledger.id, name: "A", sortOrder: 0 },
+      { id: bId, ledgerId: ledger.id, name: "B", sortOrder: 1 },
+      { id: goneId, ledgerId: ledger.id, name: "Gone", sortOrder: 2 },
+    ]);
+    const expectedRevision = await computeCategoryCollectionRevision(
+      await db.query.entryCategories.findMany({
+        where: eq(entryCategories.ledgerId, ledger.id),
+        orderBy: entryCategories.sortOrder,
+      })
+    );
+
+    await saveEntryCategoriesAction({
+      expectedRevision,
+      categories: [
+        { id: aId, name: "B", description: null, icon: null },
+        { id: bId, name: "Gone", description: null, icon: null },
+        { clientId: crypto.randomUUID(), name: "A", description: null, icon: null },
+      ],
+    });
+
+    const rows = await db.query.entryCategories.findMany({
+      where: eq(entryCategories.ledgerId, ledger.id),
+      orderBy: entryCategories.sortOrder,
+    });
+    expect(
+      rows.map((row) => [row.id === aId ? "a" : row.id === bId ? "b" : "new", row.name])
+    ).toEqual([
+      ["a", "B"],
+      ["b", "Gone"],
+      ["new", "A"],
+    ]);
+  });
+
   it("saves the maximum category batch while swapping every unique name", async () => {
     const db = getTestDb();
     const ledger = createLedgerData();

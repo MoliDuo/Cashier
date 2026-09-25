@@ -190,7 +190,7 @@ describe("PostgreSQL schema contract", () => {
     expect(effective?.generationExpression ?? "").toContain("UTC");
   });
 
-  it("keeps the key partial indexes and tenant unique keys", async () => {
+  it("keeps the key indexes and tenant unique keys", async () => {
     const byName = new Map((await fetchIndexes()).map((row) => [row.indexname, row.indexdef]));
     for (const name of [
       "uq_entry_categories_ledger_id_id",
@@ -205,6 +205,28 @@ describe("PostgreSQL schema contract", () => {
     }
     expect(byName.get("idx_source_documents_active_feed")).toContain("effective_date");
     expect(byName.get("idx_ledger_entries_search")).toContain("gin");
+  });
+
+  it("indexes whole tables now that deletes remove rows", async () => {
+    const limited = (await fetchIndexes()).filter((row) =>
+      /\bWHERE\b.*deleted_at/.test(row.indexdef)
+    );
+    expect(limited.map((row) => row.indexname)).toEqual([]);
+  });
+
+  it("checks category names per ledger when a statement ends", async () => {
+    const result = await getTestDb().execute<{ definition: string; deferrable: boolean }>(sql`
+      SELECT pg_get_constraintdef(oid) AS definition, condeferrable AS deferrable
+      FROM pg_constraint
+      WHERE conname = 'uq_entry_categories_ledger_name'
+        AND connamespace = current_schema()::regnamespace
+    `);
+    expect(result.rows).toEqual([
+      {
+        definition: "UNIQUE (ledger_id, name) DEFERRABLE",
+        deferrable: true,
+      },
+    ]);
   });
 
   it("rejects cross-ledger category assignment with an FK violation", async () => {

@@ -276,41 +276,12 @@ export async function saveEntryCategories(
         );
     }
 
-    const renamedExisting = targets.filter((target) => {
-      const existing = currentById.get(target.id ?? target.clientId!);
-      return existing != null && existing.name !== target.name;
-    });
-    if (renamedExisting.length > 0) {
-      const temporaryNames = JSON.stringify(
-        renamedExisting.map((target) => ({
-          id: target.id ?? target.clientId!,
-          name: `__cashier_internal_category_rename__:${crypto.randomUUID()}:${"x".repeat(80)}`,
-        }))
-      );
-      const renamed = await tx.execute(sql`
-        WITH renames AS (
-          SELECT * FROM jsonb_to_recordset(${temporaryNames}::jsonb) AS value(
-            id uuid,
-            name text
-          )
-        )
-        UPDATE entry_categories AS category
-        SET name = renames.name,
-            updated_at = ${now}
-        FROM renames
-        WHERE category.id = renames.id
-          AND category.ledger_id = ${ledgerId}
-          AND category.deleted_at IS NULL
-        RETURNING category.id
-      `);
-      if (renamed.rows.length !== renamedExisting.length) {
-        throw new ConflictError("Category collection changed during rename");
-      }
-    }
-
     const existingTargets = targets.filter((target) =>
       currentById.has(target.id ?? target.clientId!)
     );
+    // One statement renames them all. Names are unique per ledger through a
+    // deferrable constraint, checked when the statement ends rather than row by
+    // row, so a save may swap or rotate names among its categories.
     if (existingTargets.length > 0) {
       const updates = JSON.stringify(
         existingTargets.map((target) => ({
@@ -525,9 +496,9 @@ export async function applyCategoryPreset(
     }
 
     // Materialize the preset. A preset name that matches a kept category
-    // reuses that row rather than inserting a duplicate: the partial unique
-    // index is `WHERE deleted_at IS NULL`, and the user's own description and
-    // icon for that name should survive.
+    // reuses that row rather than inserting a duplicate: names are unique per
+    // ledger, and the user's own description and icon for that name should
+    // survive.
     const keptByName = new Map(
       current
         .filter((category) => !migratedIds.includes(category.id))
