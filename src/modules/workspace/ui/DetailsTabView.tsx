@@ -131,7 +131,6 @@ export function DetailsTabView(props: DetailsTabViewProps) {
               categorySelectionChanged={batch.categorySelectionChanged}
               onConfirmCategory={batch.confirmCategory}
               isConfirmingCategory={batch.isConfirmingCategory}
-              selectionUploadProgress={batch.selectionUploadProgress}
               isReclassifying={false}
               isProcessing={batch.isPending}
             />

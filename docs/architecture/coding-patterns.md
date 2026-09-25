@@ -155,9 +155,13 @@ arbitrary text sizes and the retired `text-muted` alias fail the check while com
 ### Category assignment writes
 
 Category changes initiated by persistent assignment jobs belong to the source-document aggregate.
-Acquire locks in this order: ledger, source documents ordered by ID, then assignment job/document
-work. The aggregate transaction validates the claim token, lease, target category, and that the
-document is live and not processing before changing any entry. Each entry is written only if it
-still has the category it had when it was selected, so an entry changed since then is a conflict on
-its own; the write does not change the document version. Entry outcomes, work status, and parent
-counters are written in the same transaction. Do not record job progress in a second transaction.
+Acquire locks in this order: ledger, source document, then the job row. The lease lives on the job
+row, and every worker write — decisions, retries, failures, and the apply itself — checks it with
+`leaseHeldBy` in the same statement or transaction, so a worker whose lease expired writes nothing.
+The aggregate transaction also validates the target category, and that the document is live and not
+processing, before changing any entry. Each entry is written only if it still has the category it
+had when it was selected, so an entry changed since then is a conflict on its own; the write does
+not change the document version. Entry outcomes and the document's status are written in the same
+transaction. Jobs store no progress counters: counts are aggregated from the entry and document
+rows when the job is read, and the final status is derived from entry outcomes when the last
+document settles.

@@ -4,37 +4,30 @@ import { useCallback, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
-import {
-  appendCategoryAssignmentSelectionAction,
-  beginCategoryAssignmentAction,
-  commitCategoryAssignmentSelectionAction,
-} from "@/modules/ledger/server-actions/reclassification";
+import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/reclassification";
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
+import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
 import type {
   CategoryAssignmentMode,
-  CategoryAssignmentSelectionEntry,
   CategoryReclassificationJob,
   EntryCategory,
-  LedgerEntry,
 } from "@/modules/ledger/contracts";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 import { selectionMatches } from "./selection-snapshot";
 
-/** One pick is written through as-is; a longer selection is uploaded in chunks. */
+/** One pick is written through as-is up to this many entries; more start a run. */
 const DIRECT_ASSIGNMENT_LIMIT = 100;
-const SELECTION_CHUNK_SIZE = 1000;
 
 /** The selection the open dialog is asking about, fixed at the moment it opened. */
 interface CategorySnapshot {
   queryFingerprint: string;
   categorySignature: string;
-  entries: CategoryAssignmentSelectionEntry[];
+  ledgerEntryIds: string[];
 }
 
 interface UseDetailsCategoryAssignmentOptions {
   queryFingerprint: string;
   categories: readonly EntryCategory[];
-  entryById: ReadonlyMap<string, LedgerEntry>;
   selectedIds: readonly string[];
   clearSelection: () => void;
   /** The plain entry update this dialog writes through for a single answer. */
@@ -52,7 +45,6 @@ interface UseDetailsCategoryAssignmentOptions {
 export function useDetailsCategoryAssignment({
   queryFingerprint,
   categories,
-  entryById,
   selectedIds,
   clearSelection,
   assignCategory,
@@ -66,10 +58,6 @@ export function useDetailsCategoryAssignment({
   // the task row's ledger entry ids are the authority from the moment it is
   // written; the snapshot only has to survive the trip from open to confirm.
   const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshot | null>(null);
-  const [selectionUploadProgress, setSelectionUploadProgress] = useState<{
-    received: number;
-    total: number;
-  } | null>(null);
   const categoryRequestKeyRef = useRef<string | null>(null);
   // The run outlives this tab, so the page follows it and this dialog only hands
   // it over: nothing here polls, and nothing here announces what the page began.
@@ -78,10 +66,7 @@ export function useDetailsCategoryAssignment({
     categorySnapshot != null &&
     (categorySnapshot.queryFingerprint !== queryFingerprint ||
       categorySnapshot.categorySignature !== categories.map((category) => category.id).join(":") ||
-      !selectionMatches(
-        categorySnapshot.entries.map((entry) => entry.ledgerEntryId),
-        selectedIds
-      ));
+      !selectionMatches(categorySnapshot.ledgerEntryIds, selectedIds));
 
   // Opening captures the selection and drops the picks of the previous visit;
   // closing drops both. A snapshot that no longer matches the selection can
@@ -95,18 +80,14 @@ export function useDetailsCategoryAssignment({
           ? {
               queryFingerprint,
               categorySignature: categories.map((category) => category.id).join(":"),
-              entries: selectedIds.map((id) => {
-                const entry = entryById.get(id);
-                if (entry?.sourceDocument == null) throw new Error("Entry has no source document");
-                return { ledgerEntryId: id, sourceDocumentId: entry.sourceDocument.id };
-              }),
+              ledgerEntryIds: [...selectedIds],
             }
           : null
       );
       setPickedCategoryIds([]);
       setClearCategoryPicked(false);
     },
-    [categories, entryById, queryFingerprint, selectedIds]
+    [categories, queryFingerprint, selectedIds]
   );
 
   // Clearing is exclusive: "no category" is not one more candidate to weigh
@@ -132,36 +113,12 @@ export function useDetailsCategoryAssignment({
     {
       requestKey: string;
       mode: CategoryAssignmentMode;
-      entries: CategoryAssignmentSelectionEntry[];
+      ledgerEntryIds: string[];
     }
   >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    mutationFn: async (input) => {
-      const started = await beginCategoryAssignmentAction({
-        requestKey: input.requestKey,
-        mode: input.mode,
-        expectedEntryCount: input.entries.length,
-      });
-      setSelectionUploadProgress({ received: started.receivedCount, total: input.entries.length });
-      for (
-        let offset = started.receivedCount,
-          chunkIndex = Math.floor(started.receivedCount / SELECTION_CHUNK_SIZE);
-        offset < input.entries.length;
-        offset += SELECTION_CHUNK_SIZE, chunkIndex += 1
-      ) {
-        const progress = await appendCategoryAssignmentSelectionAction({
-          jobId: started.id,
-          chunkIndex,
-          entries: input.entries.slice(offset, offset + SELECTION_CHUNK_SIZE),
-        });
-        setSelectionUploadProgress({ received: progress.received, total: input.entries.length });
-      }
-      return commitCategoryAssignmentSelectionAction({
-        jobId: started.id,
-        expectedEntryCount: input.entries.length,
-      });
-    },
+    mutationFn: (input) => startCategoryAssignmentAction(input),
     errorMessage: tBatch("aiCategoryFailed"),
     onSuccess: (job) => {
       // Hand the run to the page before it can finish: a run whose first answer
@@ -169,7 +126,6 @@ export function useDetailsCategoryAssignment({
       registerSubmittedJob(job);
       toast.success(tBatch("aiCategoryRunning"));
       clearSelection();
-      setSelectionUploadProgress(null);
       categoryRequestKeyRef.current = null;
       setCategoryDialogVisibility(false);
     },
@@ -192,7 +148,7 @@ export function useDetailsCategoryAssignment({
    */
   const confirmCategory = useCallback(() => {
     const snapshot = categorySnapshot;
-    if (snapshot == null || snapshot.entries.length === 0) return;
+    if (snapshot == null || snapshot.ledgerEntryIds.length === 0) return;
     if (categorySelectionChanged) {
       toast.error(tBatch("selectionMoved"));
       return;
@@ -204,7 +160,7 @@ export function useDetailsCategoryAssignment({
     });
     if (
       (pick.kind === "clear" || pick.kind === "assign") &&
-      snapshot.entries.length <= DIRECT_ASSIGNMENT_LIMIT
+      snapshot.ledgerEntryIds.length <= DIRECT_ASSIGNMENT_LIMIT
     ) {
       void assignCategory(pick.kind === "clear" ? null : pick.categoryId).then(
         () => setCategoryDialogVisibility(false),
@@ -213,9 +169,13 @@ export function useDetailsCategoryAssignment({
       return;
     }
     if (pick.kind === "ai" || pick.kind === "assign" || pick.kind === "clear") {
+      if (snapshot.ledgerEntryIds.length > CATEGORY_ASSIGNMENT_MAX_ENTRIES) {
+        toast.error(tBatch("categorySelectionTooLarge", { max: CATEGORY_ASSIGNMENT_MAX_ENTRIES }));
+        return;
+      }
       startAiCategory.mutate({
         requestKey: (categoryRequestKeyRef.current ??= crypto.randomUUID()),
-        entries: snapshot.entries,
+        ledgerEntryIds: snapshot.ledgerEntryIds,
         mode:
           pick.kind === "ai"
             ? { kind: "ai", candidateCategoryIds: [...pick.categoryIds] }
@@ -245,6 +205,5 @@ export function useDetailsCategoryAssignment({
     confirmCategory,
     isConfirmingCategory: isAssigningCategory || startAiCategory.isPending,
     isStartingCategory: startAiCategory.isPending,
-    selectionUploadProgress,
   };
 }

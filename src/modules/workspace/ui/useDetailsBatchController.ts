@@ -100,7 +100,6 @@ export function useDetailsBatchController(
   const categoryAssignment = useDetailsCategoryAssignment({
     queryFingerprint,
     categories,
-    entryById,
     selectedIds: selection.selectedIds,
     clearSelection: selection.clearSelection,
     assignCategory: (categoryId) => update.mutateAsync({ categoryId }),
@@ -244,7 +243,6 @@ export function useDetailsBatchController(
     toggleCategoryPick: categoryAssignment.toggleCategoryPick,
     categorySelectionChanged: categoryAssignment.categorySelectionChanged,
     confirmCategory: categoryAssignment.confirmCategory,
-    selectionUploadProgress: categoryAssignment.selectionUploadProgress,
     isConfirmingCategory: categoryAssignment.isConfirmingCategory,
     isPending:
       update.isPending ||

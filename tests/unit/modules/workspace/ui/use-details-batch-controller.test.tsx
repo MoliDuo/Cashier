@@ -10,9 +10,7 @@ const {
   batchUpdateLedgerEntriesActionMock,
   batchUpdateLedgerEntryDatesActionMock,
   previewBatchLedgerEntryDateActionMock,
-  beginCategoryAssignmentActionMock,
-  appendCategoryAssignmentSelectionActionMock,
-  commitCategoryAssignmentSelectionActionMock,
+  startCategoryAssignmentActionMock,
   reclassificationJobMock,
   toastErrorMock,
   toastSuccessMock,
@@ -21,9 +19,7 @@ const {
   batchUpdateLedgerEntriesActionMock: vi.fn(),
   batchUpdateLedgerEntryDatesActionMock: vi.fn(),
   previewBatchLedgerEntryDateActionMock: vi.fn(),
-  beginCategoryAssignmentActionMock: vi.fn(),
-  appendCategoryAssignmentSelectionActionMock: vi.fn(),
-  commitCategoryAssignmentSelectionActionMock: vi.fn(),
+  startCategoryAssignmentActionMock: vi.fn(),
   reclassificationJobMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
@@ -51,9 +47,7 @@ vi.mock("@/modules/ledger/server-actions/entries", () => ({
 }));
 
 vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
-  beginCategoryAssignmentAction: beginCategoryAssignmentActionMock,
-  appendCategoryAssignmentSelectionAction: appendCategoryAssignmentSelectionActionMock,
-  commitCategoryAssignmentSelectionAction: commitCategoryAssignmentSelectionActionMock,
+  startCategoryAssignmentAction: startCategoryAssignmentActionMock,
 }));
 
 vi.mock("@/lib/queries/ledger-query-client", () => ({
@@ -128,7 +122,6 @@ function assignmentJob(status: "pending" | "running" | "succeeded" = "pending") 
     retryingDocumentCount: 0,
     nextRetryAt: null,
     candidateCategories: [],
-    receivedCount: status === "pending" ? 1 : 0,
     errorCode: null,
     createdAt: "2026-09-04T00:00:00.000Z",
     updatedAt: "2026-09-04T00:00:00.000Z",
@@ -166,17 +159,7 @@ describe("useDetailsBatchController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     reclassificationJobMock.mockResolvedValue(null);
-    beginCategoryAssignmentActionMock.mockResolvedValue({
-      ...assignmentJob("pending"),
-      status: "preparing",
-      receivedCount: 0,
-    });
-    appendCategoryAssignmentSelectionActionMock.mockResolvedValue({
-      jobId: "job-1",
-      received: 1,
-      total: 1,
-    });
-    commitCategoryAssignmentSelectionActionMock.mockResolvedValue(assignmentJob());
+    startCategoryAssignmentActionMock.mockResolvedValue(assignmentJob());
   });
 
   it("closes delete confirmation and finishes before refresh settles", async () => {
@@ -417,19 +400,10 @@ describe("useDetailsBatchController", () => {
     await act(async () => result.current.confirmCategory());
     await act(async () => Promise.resolve());
 
-    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith({
+    expect(startCategoryAssignmentActionMock).toHaveBeenCalledWith({
       requestKey: expect.any(String),
       mode: { kind: "ai", candidateCategoryIds: ["category-1", "category-2"] },
-      expectedEntryCount: 1,
-    });
-    expect(appendCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
-      jobId: "job-1",
-      chunkIndex: 0,
-      entries: [{ ledgerEntryId: "entry-1", sourceDocumentId: "document-1" }],
-    });
-    expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
-      jobId: "job-1",
-      expectedEntryCount: 1,
+      ledgerEntryIds: ["entry-1"],
     });
     expect(result.current.selectedIds).toEqual([]);
     expect(result.current.categoryDialogOpen).toBe(false);
@@ -458,7 +432,7 @@ describe("useDetailsBatchController", () => {
       ["entry-1"],
       { categoryId: "category-1" }
     );
-    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
     expect(result.current.categoryDialogOpen).toBe(false);
   });
 
@@ -490,7 +464,7 @@ describe("useDetailsBatchController", () => {
       ["entry-1"],
       { categoryId: null }
     );
-    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
   });
 
   it("refuses to start when the selection moved under the dialog", async () => {
@@ -508,7 +482,7 @@ describe("useDetailsBatchController", () => {
     await act(async () => result.current.confirmCategory());
 
     expect(result.current.categorySelectionChanged).toBe(true);
-    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
     expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
   });
@@ -582,7 +556,7 @@ describe("useDetailsBatchController", () => {
       await Promise.resolve();
     });
 
-    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
     expect(batchUpdateLedgerEntriesActionMock).toHaveBeenCalledTimes(1);
     expect(result.current.categoryDialogOpen).toBe(false);
   });
@@ -608,28 +582,16 @@ describe("useDetailsBatchController", () => {
     });
 
     expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
-    expect(beginCategoryAssignmentActionMock).toHaveBeenCalledWith({
+    expect(startCategoryAssignmentActionMock).toHaveBeenCalledWith({
       requestKey: expect.any(String),
       mode: { kind: "assign", categoryId: "category-1" },
-      expectedEntryCount: 101,
+      ledgerEntryIds: ids,
     });
   });
 
-  it("uploads a long selection in 1000-entry chunks, resuming from what the server already has", async () => {
+  it("refuses a selection above the run limit without starting anything", async () => {
     const { wrapper } = setup();
-    const ids = Array.from({ length: 2500 }, (_, index) => `entry-${index}`);
-    beginCategoryAssignmentActionMock.mockResolvedValueOnce({
-      ...assignmentJob("pending"),
-      status: "preparing",
-      receivedCount: 1000,
-    });
-    appendCategoryAssignmentSelectionActionMock.mockImplementation(
-      async (input: { chunkIndex: number }) => ({
-        jobId: "job-1",
-        received: Math.min(2500, 1000 + input.chunkIndex * 1000),
-        total: 2500,
-      })
-    );
+    const ids = Array.from({ length: 5001 }, (_, index) => `entry-${index}`);
     const { result } = renderHook(
       () =>
         useDetailsBatchController(
@@ -646,21 +608,10 @@ describe("useDetailsBatchController", () => {
       result.current.confirmCategory();
       await Promise.resolve();
     });
-    await waitFor(() =>
-      expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
-        jobId: "job-1",
-        expectedEntryCount: 2500,
-      })
-    );
 
-    const chunks = appendCategoryAssignmentSelectionActionMock.mock.calls.map((call) => ({
-      chunkIndex: (call[0] as { chunkIndex: number }).chunkIndex,
-      size: (call[0] as { entries: unknown[] }).entries.length,
-    }));
-    expect(chunks).toEqual([
-      { chunkIndex: 1, size: 1000 },
-      { chunkIndex: 2, size: 500 },
-    ]);
+    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith("categorySelectionTooLarge");
+    expect(result.current.categoryDialogOpen).toBe(true);
   });
 
   it("keeps the picks when the direct write fails", async () => {
@@ -681,7 +632,7 @@ describe("useDetailsBatchController", () => {
 
     expect(result.current.categoryDialogOpen).toBe(true);
     expect(result.current.pickedCategoryIds).toEqual(["category-1"]);
-    expect(beginCategoryAssignmentActionMock).not.toHaveBeenCalled();
+    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
   });
 
   it("keeps following a run after its dialog is closed", async () => {

@@ -11,72 +11,69 @@ import {
 } from "@/persistence";
 import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
-import { refreshCategoryAssignmentParentJob } from "@/server/category-reclassification/assignments";
+import { leaseHeldBy } from "@/lib/db/lease";
+import type { CategoryAssignmentLease } from "@/server/category-reclassification/assignments";
 import { ConflictError } from "@/lib/errors";
 
 export interface ApplyCategoryAssignmentsInput {
-  ledgerId: string;
-  jobId: string;
+  lease: CategoryAssignmentLease;
   sourceDocumentId: string;
-  claimToken: string;
   now?: Date;
 }
 
 export type ApplyCategoryAssignmentsResult =
   | { status: "applied"; appliedCount: number; confirmedCount: number; conflictCount: number }
-  | { status: "conflict" | "skipped" | "cancelled" | "claim_lost" };
+  | { status: "conflict" | "skipped" | "claim_lost" };
 
+/**
+ * Writes one document's decided categories and every entry's outcome. Locks
+ * the ledger, then the document, then the job row, whose lease must still be
+ * the caller's: a cancel or a newer worker makes this a no-op.
+ */
 export async function applyCategoryAssignments(
   input: ApplyCategoryAssignmentsInput
 ): Promise<ApplyCategoryAssignmentsResult> {
   const now = input.now ?? new Date();
+  const { ledgerId, jobId, claimToken } = input.lease;
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
+    await lockLedgerForUpdate(tx, ledgerId);
     const document = await tx
       .select()
       .from(sourceDocuments)
       .where(
-        and(
-          eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, input.sourceDocumentId)
-        )
+        and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, input.sourceDocumentId))
       )
       .for("update")
       .then((rows) => rows[0]);
     const job = await tx
-      .select({ status: categoryReclassificationJobs.status })
+      .select({ id: categoryReclassificationJobs.id })
       .from(categoryReclassificationJobs)
       .where(
         and(
-          eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
-          eq(categoryReclassificationJobs.id, input.jobId)
+          eq(categoryReclassificationJobs.ledgerId, ledgerId),
+          eq(categoryReclassificationJobs.id, jobId),
+          leaseHeldBy(
+            categoryReclassificationJobs.claimToken,
+            categoryReclassificationJobs.claimExpiresAt,
+            claimToken
+          )
         )
       )
       .for("update")
       .then((rows) => rows[0]);
+    if (job == null) return { status: "claim_lost" };
     const work = await tx
-      .select()
+      .select({ status: categoryReclassificationJobDocuments.status })
       .from(categoryReclassificationJobDocuments)
       .where(
         and(
-          eq(categoryReclassificationJobDocuments.ledgerId, input.ledgerId),
-          eq(categoryReclassificationJobDocuments.jobId, input.jobId),
+          eq(categoryReclassificationJobDocuments.ledgerId, ledgerId),
+          eq(categoryReclassificationJobDocuments.jobId, jobId),
           eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId)
         )
       )
-      .for("update")
       .then((rows) => rows[0]);
-    if (
-      work == null ||
-      work.status !== "running" ||
-      work.claimToken !== input.claimToken ||
-      work.claimExpiresAt == null ||
-      work.claimExpiresAt < now
-    )
-      return { status: "claim_lost" };
-    if (job == null || job.status === "cancelled") {
-      return { status: "cancelled" };
-    }
+    if (work?.status !== "pending") return { status: "claim_lost" };
 
     const finishWithoutWrite = async (status: "conflict" | "skipped", errorCode: string) => {
       await tx
@@ -84,28 +81,21 @@ export async function applyCategoryAssignments(
         .set({ outcome: status, errorCode, updatedAt: now })
         .where(
           and(
-            eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-            eq(categoryReclassificationJobEntries.jobId, input.jobId),
+            eq(categoryReclassificationJobEntries.ledgerId, ledgerId),
+            eq(categoryReclassificationJobEntries.jobId, jobId),
             eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId),
             isNull(categoryReclassificationJobEntries.outcome)
           )
         );
       await tx
         .update(categoryReclassificationJobDocuments)
-        .set({
-          status,
-          errorCode,
-          claimToken: null,
-          claimExpiresAt: null,
-          updatedAt: now,
-        })
+        .set({ status, errorCode, updatedAt: now })
         .where(
           and(
-            eq(categoryReclassificationJobDocuments.jobId, input.jobId),
+            eq(categoryReclassificationJobDocuments.jobId, jobId),
             eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId)
           )
         );
-      await refreshCategoryAssignmentParentJob(tx, input.jobId, input.ledgerId, now);
       return { status } as const;
     };
 
@@ -132,14 +122,14 @@ export async function applyCategoryAssignments(
       .leftJoin(
         ledgerEntries,
         and(
-          eq(ledgerEntries.ledgerId, input.ledgerId),
+          eq(ledgerEntries.ledgerId, ledgerId),
           eq(ledgerEntries.id, categoryReclassificationJobEntries.ledgerEntryId)
         )
       )
       .where(
         and(
-          eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-          eq(categoryReclassificationJobEntries.jobId, input.jobId),
+          eq(categoryReclassificationJobEntries.ledgerId, ledgerId),
+          eq(categoryReclassificationJobEntries.jobId, jobId),
           eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId)
         )
       )
@@ -165,7 +155,7 @@ export async function applyCategoryAssignments(
         .from(entryCategories)
         .where(
           and(
-            eq(entryCategories.ledgerId, input.ledgerId),
+            eq(entryCategories.ledgerId, ledgerId),
             inArray(entryCategories.id, categoryIds),
             isNull(entryCategories.deletedAt)
           )
@@ -189,7 +179,7 @@ export async function applyCategoryAssignments(
           .set({ categoryId: entry.work.targetCategoryId, updatedAt: now })
           .where(
             and(
-              eq(ledgerEntries.ledgerId, input.ledgerId),
+              eq(ledgerEntries.ledgerId, ledgerId),
               eq(ledgerEntries.id, entry.work.ledgerEntryId),
               eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
               isNull(ledgerEntries.deletedAt),
@@ -211,28 +201,20 @@ export async function applyCategoryAssignments(
         })
         .where(
           and(
-            eq(categoryReclassificationJobEntries.jobId, input.jobId),
+            eq(categoryReclassificationJobEntries.jobId, jobId),
             eq(categoryReclassificationJobEntries.ledgerEntryId, entry.work.ledgerEntryId)
           )
         );
     }
     await tx
       .update(categoryReclassificationJobDocuments)
-      .set({
-        status: "succeeded",
-        errorCode: null,
-        claimToken: null,
-        claimExpiresAt: null,
-        updatedAt: now,
-      })
+      .set({ status: "succeeded", errorCode: null, updatedAt: now })
       .where(
         and(
-          eq(categoryReclassificationJobDocuments.jobId, input.jobId),
-          eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId),
-          eq(categoryReclassificationJobDocuments.claimToken, input.claimToken)
+          eq(categoryReclassificationJobDocuments.jobId, jobId),
+          eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId)
         )
       );
-    await refreshCategoryAssignmentParentJob(tx, input.jobId, input.ledgerId, now);
     return { status: "applied", appliedCount, confirmedCount, conflictCount };
   });
 }

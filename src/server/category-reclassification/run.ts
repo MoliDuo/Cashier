@@ -1,259 +1,230 @@
 import "server-only";
-import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
+import { classifyFailure, retryDelayMs } from "@/lib/background/retry";
+import { holdLease } from "@/lib/db/lease";
 import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
 import { isSuccessfulLoadImageResult, loadStoredFilesForAI } from "@/server/processing/evidence";
-import type { ClaimedCategoryAssignmentDocument } from "@/server/category-reclassification/assignments";
+import { BACKGROUND_MAX_ATTEMPTS, CATEGORY_RUN_BUDGET_MS } from "@/config/tuning";
+import type {
+  CategoryAssignmentDocumentWork,
+  ClaimedCategoryAssignmentJob,
+} from "@/server/category-reclassification/assignments";
 import {
-  AI_CATEGORY_CONCURRENCY,
-  AI_CATEGORY_MAX_ATTEMPTS,
-  CATEGORY_RUN_BUDGET_MS,
-} from "@/config/tuning";
-import {
-  claimCategoryAssignmentDocuments,
+  claimCategoryAssignmentJob,
   failCategoryAssignmentDocument,
   loadCategoryAssignmentSelection,
   markCategoryAssignmentEvidenceIncomplete,
-  nextCategoryAssignmentDue,
+  nextCategoryAssignmentDocument,
   persistCategoryAssignmentDecisions,
-  renewCategoryAssignmentClaim,
+  releaseCategoryAssignmentJob,
+  renewCategoryAssignmentLease,
+  rescheduleCategoryAssignmentDocument,
+  yieldCategoryAssignmentDocument,
 } from "@/server/category-reclassification/assignments";
 import { loadReclassificationDocumentGroups } from "@/server/category-reclassification/document-groups";
 import { decideEntryCategories } from "@/server/category-reclassification/reclassifier";
 
-const CLAIM_LEASE_MS = 120_000;
-const CLAIM_HEARTBEAT_MS = 20_000;
 const REQUEST_CHUNK_SIZE = 50;
-const MAX_IDLE_WAIT_MS = 30_000;
 
-function stableErrorCode(error: unknown): string {
-  if (error instanceof AppError) return error.code;
-  return "ai_provider_unavailable";
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function done() {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    }
+    signal.addEventListener("abort", done, { once: true });
+  });
 }
 
-async function processDocument(work: ClaimedCategoryAssignmentDocument): Promise<void> {
+/**
+ * Asks the model about one document's entries, a request block at a time, then
+ * writes the decisions. Returns false when the run has to stop: its lease is
+ * gone or its budget ended between blocks.
+ */
+async function processDocument(
+  job: ClaimedCategoryAssignmentJob,
+  document: CategoryAssignmentDocumentWork,
+  signal: AbortSignal,
+  deadlineAt: number
+): Promise<boolean> {
+  const { sourceDocumentId } = document;
   const startedAt = Date.now();
-  const selection = await loadCategoryAssignmentSelection({
-    ledgerId: work.ledgerId,
-    jobId: work.jobId,
-    sourceDocumentId: work.sourceDocumentId,
-  });
+  const subject = {
+    jobSubject: logIdentifier("processing-job", job.jobId),
+    documentSubject: logIdentifier("source-document", sourceDocumentId),
+    attempt: document.attempt,
+  };
+  if (document.attempt > BACKGROUND_MAX_ATTEMPTS) {
+    // Every earlier attempt died without recording an outcome.
+    await failCategoryAssignmentDocument({
+      lease: job,
+      sourceDocumentId,
+      errorCode: document.lastErrorCode ?? "ai_timeout",
+    });
+    logger.warn(subject, "Category assignment document ran out of attempts");
+    return true;
+  }
   try {
-    if (work.mode.kind === "ai") {
-      const groups = await loadReclassificationDocumentGroups({
-        ledgerId: work.ledgerId,
-        ledgerEntryIds: selection.entryIds,
+    if (job.mode.kind === "ai") {
+      const entryIds = await loadCategoryAssignmentSelection({
+        ledgerId: job.ledgerId,
+        jobId: job.jobId,
+        sourceDocumentId,
       });
-      const group = groups.find(
-        (candidate) => candidate.sourceDocumentId === work.sourceDocumentId
-      );
-      if (group == null) {
-        await applyCategoryAssignments({
-          ledgerId: work.ledgerId,
-          jobId: work.jobId,
-          sourceDocumentId: work.sourceDocumentId,
-          claimToken: work.claimToken,
-        });
-        return;
-      }
-      const imageStartedAt = Date.now();
-      const loaded = await loadStoredFilesForAI(work.ledgerId, [...group.storedFileIds]);
-      const images = loaded
-        .filter(isSuccessfulLoadImageResult)
-        .map((image) => ({ dataUrl: image.dataUrl }));
-      if (loaded.some((image) => !image.success)) {
-        await markCategoryAssignmentEvidenceIncomplete({
-          ledgerId: work.ledgerId,
-          jobId: work.jobId,
-          sourceDocumentId: work.sourceDocumentId,
-          claimToken: work.claimToken,
-        });
-      }
-      for (
-        let chunkIndex = selection.completedChunkCount;
-        chunkIndex * REQUEST_CHUNK_SIZE < group.subjects.length;
-        chunkIndex += 1
-      ) {
-        const now = new Date();
-        const owned = await renewCategoryAssignmentClaim({
-          ledgerId: work.ledgerId,
-          jobId: work.jobId,
-          sourceDocumentId: work.sourceDocumentId,
-          claimToken: work.claimToken,
-          leaseMs: CLAIM_LEASE_MS,
-          now,
-        });
-        if (!owned) return;
-        const controller = new AbortController();
-        const chunk = {
-          ...group,
-          subjects: group.subjects.slice(
-            chunkIndex * REQUEST_CHUNK_SIZE,
-            (chunkIndex + 1) * REQUEST_CHUNK_SIZE
-          ),
-        };
-        const aiStartedAt = Date.now();
-        let heartbeatInFlight: Promise<void> | null = null;
-        const heartbeat = setInterval(() => {
-          if (heartbeatInFlight != null) return;
-          heartbeatInFlight = renewCategoryAssignmentClaim({
-            ledgerId: work.ledgerId,
-            jobId: work.jobId,
-            sourceDocumentId: work.sourceDocumentId,
-            claimToken: work.claimToken,
-            leaseMs: CLAIM_LEASE_MS,
-            now: new Date(),
-          })
-            .then((renewed) => {
-              if (!renewed) controller.abort();
-            })
-            .catch(() => controller.abort())
-            .finally(() => {
-              heartbeatInFlight = null;
-            });
-        }, CLAIM_HEARTBEAT_MS);
-        let result;
-        try {
-          result = await decideEntryCategories({
-            candidates: work.candidates,
+      const groups = await loadReclassificationDocumentGroups({
+        ledgerId: job.ledgerId,
+        ledgerEntryIds: entryIds,
+      });
+      // A document that no longer holds these entries is settled by the apply.
+      const group = groups.find((candidate) => candidate.sourceDocumentId === sourceDocumentId);
+      if (group != null) {
+        const loaded = await loadStoredFilesForAI(job.ledgerId, [...group.storedFileIds]);
+        const images = loaded
+          .filter(isSuccessfulLoadImageResult)
+          .map((image) => ({ dataUrl: image.dataUrl }));
+        if (loaded.some((image) => !image.success)) {
+          await markCategoryAssignmentEvidenceIncomplete(job, sourceDocumentId);
+        }
+        for (
+          let chunkIndex = document.completedChunkCount;
+          chunkIndex * REQUEST_CHUNK_SIZE < group.subjects.length;
+          chunkIndex += 1
+        ) {
+          if (signal.aborted) return false;
+          if (Date.now() >= deadlineAt) {
+            await yieldCategoryAssignmentDocument(job, sourceDocumentId);
+            return false;
+          }
+          const chunk = {
+            ...group,
+            subjects: group.subjects.slice(
+              chunkIndex * REQUEST_CHUNK_SIZE,
+              (chunkIndex + 1) * REQUEST_CHUNK_SIZE
+            ),
+          };
+          const aiStartedAt = Date.now();
+          const result = await decideEntryCategories({
+            candidates: job.candidates,
             group: chunk,
             images,
-            signal: controller.signal,
-            ...(work.customPrompt == null || work.customPrompt === ""
+            signal,
+            ...(job.customPrompt == null || job.customPrompt === ""
               ? {}
-              : { customPrompt: work.customPrompt }),
+              : { customPrompt: job.customPrompt }),
           });
-        } finally {
-          clearInterval(heartbeat);
-          if (heartbeatInFlight != null) await heartbeatInFlight;
+          const persisted = await persistCategoryAssignmentDecisions({
+            lease: job,
+            sourceDocumentId,
+            decisions: result.decisions,
+            completedChunkCount: chunkIndex + 1,
+          });
+          logger.info(
+            {
+              ...subject,
+              entryCount: chunk.subjects.length,
+              imageCount: images.length,
+              aiDurationMs: Date.now() - aiStartedAt,
+              errorCode: persisted ? null : "claim_lost",
+            },
+            "Category assignment request block finished"
+          );
+          if (!persisted) return false;
         }
-        const persisted = await persistCategoryAssignmentDecisions({
-          ledgerId: work.ledgerId,
-          jobId: work.jobId,
-          sourceDocumentId: work.sourceDocumentId,
-          claimToken: work.claimToken,
-          decisions: result.decisions,
-          completedChunkCount: chunkIndex + 1,
-          now: new Date(),
-        });
-        logger.info(
-          {
-            jobSubject: logIdentifier("processing-job", work.jobId),
-            documentSubject: logIdentifier("source-document", work.sourceDocumentId),
-            attempt: work.attempts,
-            entryCount: chunk.subjects.length,
-            imageCount: images.length,
-            imageLoadDurationMs: Date.now() - imageStartedAt,
-            aiDurationMs: Date.now() - aiStartedAt,
-            errorCode: persisted ? null : "claim_lost",
-          },
-          "Category assignment request block finished"
-        );
-        if (!persisted) return;
       }
     }
     const commitStartedAt = Date.now();
-    const result = await applyCategoryAssignments({
-      ledgerId: work.ledgerId,
-      jobId: work.jobId,
-      sourceDocumentId: work.sourceDocumentId,
-      claimToken: work.claimToken,
-      now: new Date(),
-    });
+    const result = await applyCategoryAssignments({ lease: job, sourceDocumentId });
     logger.info(
       {
-        jobSubject: logIdentifier("processing-job", work.jobId),
-        documentSubject: logIdentifier("source-document", work.sourceDocumentId),
-        attempt: work.attempts,
-        entryCount: selection.entryIds.length,
+        ...subject,
         databaseCommitDurationMs: Date.now() - commitStartedAt,
         totalDurationMs: Date.now() - startedAt,
         outcome: result.status,
       },
       "Category assignment document finished"
     );
+    return result.status !== "claim_lost";
   } catch (error) {
-    const errorCode = stableErrorCode(error);
-    const outcome = await failCategoryAssignmentDocument({
-      ledgerId: work.ledgerId,
-      jobId: work.jobId,
-      sourceDocumentId: work.sourceDocumentId,
-      claimToken: work.claimToken,
-      errorCode,
-      maxAttempts: AI_CATEGORY_MAX_ATTEMPTS,
-      ...(errorCode === "ai_rate_limited"
-        ? {
-            retryAfterMs:
-              error instanceof AppError && typeof error.details?.retryAfterMs === "number"
-                ? error.details.retryAfterMs
-                : 10_000,
-          }
-        : {}),
-      now: new Date(),
-    });
-    logger.warn(
-      {
-        jobSubject: logIdentifier("processing-job", work.jobId),
-        documentSubject: logIdentifier("source-document", work.sourceDocumentId),
-        attempt: work.attempts,
-        entryCount: selection.entryIds.length,
-        totalDurationMs: Date.now() - startedAt,
-        errorCode,
-        retrying: outcome === "retry_scheduled",
-      },
-      "Category assignment document failed"
-    );
+    // A lost lease aborts the request; there is nothing left to record.
+    if (signal.aborted) return false;
+    const failure = classifyFailure(error);
+    const errorCode = failure.code ?? "ai_provider_unavailable";
+    const retrying = failure.kind === "transient" && document.attempt < BACKGROUND_MAX_ATTEMPTS;
+    const recorded = retrying
+      ? await rescheduleCategoryAssignmentDocument({
+          lease: job,
+          sourceDocumentId,
+          errorCode,
+          delayMs: retryDelayMs(document.attempt, failure.retryAfterMs),
+        })
+      : await failCategoryAssignmentDocument({ lease: job, sourceDocumentId, errorCode });
+    const details = { ...subject, totalDurationMs: Date.now() - startedAt, errorCode, retrying };
+    // A configuration failure fails every document the same way until fixed.
+    if (failure.kind === "configuration") {
+      logger.error(details, "Category assignment document failed");
+    } else {
+      logger.warn(details, "Category assignment document failed");
+    }
+    return recorded;
   }
 }
 
 /**
- * Works through due documents until none are left or the run budget is spent.
- * A run never waits for a slot another process holds: that process claims the
- * next document itself when it finishes, and the status poll the client keeps
- * up while a job is active starts a fresh run every few seconds. Stopping at
- * the budget leaves the function time to finish the document it already
- * claimed instead of being killed mid-request.
+ * Works through a claimed job's documents one at a time until none is left,
+ * the budget is spent, or the lease is lost. A document waiting out a retry
+ * that comes due within the budget is waited for; one due later is left to the
+ * next run, which the status poll starts.
  */
-async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<boolean> {
-  const startedAt = Date.now();
-  let processed = false;
-  for (;;) {
-    const remainingMs = CATEGORY_RUN_BUDGET_MS - (Date.now() - startedAt);
-    if (remainingMs <= 0) return processed;
-    const claimedAt = new Date();
-    const claimed = await claimCategoryAssignmentDocuments({
-      now: claimedAt,
-      leaseMs: CLAIM_LEASE_MS,
-      concurrency: AI_CATEGORY_CONCURRENCY,
-      ...scope,
-    });
-    if (claimed.length > 0) {
-      processed = true;
-      await Promise.all(claimed.map(processDocument));
-      continue;
+async function runJob(job: ClaimedCategoryAssignmentJob, deadlineAt: number): Promise<void> {
+  const lease = holdLease(
+    () => renewCategoryAssignmentLease(job),
+    (reason, error) =>
+      logger.warn(
+        { error, reason, jobSubject: logIdentifier("processing-job", job.jobId) },
+        "Category assignment lease lost"
+      )
+  );
+  try {
+    while (!lease.signal.aborted && Date.now() < deadlineAt) {
+      const next = await nextCategoryAssignmentDocument(job);
+      if (next.kind === "lost") return;
+      if (next.kind === "done") break;
+      if (next.kind === "wait") {
+        if (Date.now() + next.delayMs >= deadlineAt) break;
+        await sleep(next.delayMs, lease.signal);
+        continue;
+      }
+      if (!(await processDocument(job, next.document, lease.signal, deadlineAt))) break;
     }
-    const nextDue = await nextCategoryAssignmentDue(scope);
-    if (nextDue == null) return processed;
-    // Due when the claim ran but unclaimed: every slot is held by another run.
-    // Judged against the claim's clock, not a fresh one, so work that came due
-    // during the claim (or a timer that fired a millisecond early) is retried.
-    if (nextDue.getTime() <= claimedAt.getTime()) return processed;
-    const waitMs = Math.max(0, nextDue.getTime() - Date.now());
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.min(waitMs, MAX_IDLE_WAIT_MS, remainingMs))
-    );
+  } finally {
+    lease.stop();
   }
+  await releaseCategoryAssignmentJob(job);
+}
+
+async function runClaimed(scope: { jobId?: string; ledgerId?: string }): Promise<boolean> {
+  const deadlineAt = Date.now() + CATEGORY_RUN_BUDGET_MS;
+  let ran = false;
+  while (Date.now() < deadlineAt) {
+    const job = await claimCategoryAssignmentJob(scope);
+    if (job == null) return ran;
+    ran = true;
+    await runJob(job, deadlineAt);
+  }
+  return ran;
 }
 
 export async function runCategoryReclassificationJob(jobId: string): Promise<boolean> {
-  return runLoop({ jobId });
+  return runClaimed({ jobId });
 }
 
 export async function recoverLedgerCategoryReclassifications(ledgerId: string): Promise<void> {
-  await runLoop({ ledgerId });
+  await runClaimed({ ledgerId });
 }
 
 export async function drainDueCategoryReclassifications(): Promise<void> {
-  await runLoop({});
+  await runClaimed({});
 }

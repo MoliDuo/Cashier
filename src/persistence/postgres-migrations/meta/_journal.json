@@ -64,6 +64,13 @@
       "when": 1790336986600,
       "tag": "0008_contract_revision_links",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790341355296,
+      "tag": "0009_category_job_lease",
+      "breakpoints": true
     }
   ]
 }

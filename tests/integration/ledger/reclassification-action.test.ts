@@ -1,12 +1,8 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, isNull, inArray } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
-import {
-  beginCategoryAssignmentAction,
-  appendCategoryAssignmentSelectionAction,
-  commitCategoryAssignmentSelectionAction,
-} from "@/modules/ledger/server-actions/reclassification";
+import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/reclassification";
 import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
@@ -72,32 +68,13 @@ async function setupLedger() {
 }
 
 async function submitSelection(
-  ledgerId: string,
+  _ledgerId: string,
   input: { ledgerEntryIds: string[]; candidateCategoryIds: string[] }
 ) {
-  const job = await beginCategoryAssignmentAction({
+  return startCategoryAssignmentAction({
     requestKey: crypto.randomUUID(),
     mode: { kind: "ai", candidateCategoryIds: input.candidateCategoryIds },
-    expectedEntryCount: input.ledgerEntryIds.length,
-  });
-  const entries = await getTestDb()
-    .select({
-      ledgerEntryId: ledgerEntries.id,
-      sourceDocumentId: sourceDocuments.id,
-    })
-    .from(ledgerEntries)
-    .innerJoin(sourceDocuments, eq(ledgerEntries.sourceDocumentId, sourceDocuments.id))
-    .where(
-      and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.id, input.ledgerEntryIds))
-    );
-  await appendCategoryAssignmentSelectionAction({
-    jobId: job.id,
-    chunkIndex: 0,
-    entries,
-  });
-  return commitCategoryAssignmentSelectionAction({
-    jobId: job.id,
-    expectedEntryCount: entries.length,
+    ledgerEntryIds: input.ledgerEntryIds,
   });
 }
 
@@ -300,12 +277,11 @@ describe("submitSelection", () => {
       categoryId: null,
       count: 1,
     });
-    // A run already in flight, registered without going through the action so
-    // no model call is left pending.
-    await beginCategoryAssignmentAction({
-      requestKey: crypto.randomUUID(),
-      mode: { kind: "ai", candidateCategoryIds: [food.id, home.id] },
-      expectedEntryCount: entryIds.length,
+    // A run already in flight: its after() callback is never flushed, so no
+    // model call is left pending.
+    await submitSelection(ledger.id, {
+      ledgerEntryIds: entryIds,
+      candidateCategoryIds: [food.id, home.id],
     });
 
     await expect(
@@ -314,5 +290,36 @@ describe("submitSelection", () => {
         candidateCategoryIds: [food.id, home.id],
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("returns the started run when the same request is sent again", async () => {
+    const { ledger, food, home, document } = await setupLedger();
+    const entryIds = await seedEntries({
+      ledgerId: ledger.id,
+      documentId: document.id,
+      categoryId: null,
+      count: 2,
+    });
+    const input = {
+      requestKey: crypto.randomUUID(),
+      mode: { kind: "ai" as const, candidateCategoryIds: [food.id, home.id] },
+      ledgerEntryIds: entryIds,
+    };
+
+    const first = await startCategoryAssignmentAction(input);
+    const replay = await startCategoryAssignmentAction(input);
+    expect(replay.id).toBe(first.id);
+    expect(replay.total).toBe(2);
+  });
+
+  it("refuses a selection above the entry limit before reading it", async () => {
+    await setupLedger();
+    await expect(
+      startCategoryAssignmentAction({
+        requestKey: crypto.randomUUID(),
+        mode: { kind: "clear" },
+        ledgerEntryIds: Array.from({ length: 5001 }, () => crypto.randomUUID()),
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });

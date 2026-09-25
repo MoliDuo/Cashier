@@ -25,21 +25,24 @@ same `Idempotency-Key` when retrying a create request.
 
 ## Category assignment jobs
 
-Batch category assignment also uses `after()` with durable PostgreSQL work rows. A run keeps claiming
-document work and waits through short retry delays, but it stops claiming once its run budget
-(`CATEGORY_RUN_BUDGET_MS`) is spent, and it returns at once when every slot is held by another run
-instead of waiting for one. Closing the page does not cancel a committed job. While a job is active,
-the progress poll starts a fresh run every few seconds, which continues where the last one stopped and
-recovers expired leases after a process restart or serverless termination.
+Batch category assignment also uses `after()` with durable PostgreSQL work rows. The selection is
+submitted once, up to `CATEGORY_ASSIGNMENT_MAX_ENTRIES` entries, and the server registers the job,
+its documents, and its entries in one transaction. A ledger has at most one active job, and a run
+leases the job row, so each ledger has one worker and no global slot is shared between ledgers.
 
-The database coordinates deployment-wide document slots with leases and fencing tokens. A document
-is the atomic classification commit unit; groups above 50 selected entries use persisted request
-blocks. An external AI request is not exactly-once: a process can die after receiving an answer but
-before persisting it, so recovery may repeat that block. Category writes, source-document versions,
-entry outcomes, and job counters are idempotent and commit together.
+The run works through the job's due documents one at a time and waits through short retry delays,
+but it stops once its run budget (`CATEGORY_RUN_BUDGET_MS`) is spent and hands the document it was
+on back without charging an attempt. When no pending document remains, the run settles the job's
+status from the entry outcomes in the same transaction. Closing the page does not cancel a started
+job. While a job is active, the progress poll starts a fresh run every few seconds, which continues
+where the last one stopped once the previous lease expires; the daily cron drains any job left
+behind.
 
-Serverless `maxDuration` can still terminate a long run. With no later ledger request and no separate
-worker or scheduler, Cashier does not promise automatic recovery after that termination.
+A document is the atomic classification commit unit; groups above 50 selected entries use persisted
+request blocks. An external AI request is not exactly-once: a process can die after receiving an
+answer but before persisting it, so recovery may repeat that block. Category writes,
+source-document versions, and entry outcomes are fenced by the job lease and commit together.
+Progress is counted from the entry and document rows when it is read.
 
 ## Unified Stream
 
@@ -127,7 +130,7 @@ it to each new document so the new record keeps its evidence. Manual edits chang
 without creating revisions or copying entry history; revisions exist only for parse attempts, and
 the document's latest submission points at the current one.
 
-AI text, image, and JSON repair requests use the single configured model. Category document slots
-are limited to one across database-coordinated workers. The AI client serializes provider requests
+AI text, image, and JSON repair requests use the single configured model. Category assignment runs
+one worker per ledger. The AI client serializes provider requests
 within each process and honors Retry-After cooldowns; this is not a provider-wide quota across
 multiple application instances.

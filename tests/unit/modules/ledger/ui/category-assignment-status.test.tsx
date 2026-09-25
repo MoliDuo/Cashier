@@ -42,7 +42,6 @@ function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryRecl
     retryingDocumentCount: 1,
     nextRetryAt: "2026-09-14T00:00:05.000Z",
     candidateCategories: [],
-    receivedCount: 10,
     errorCode: null,
     createdAt: "2026-09-14T00:00:00.000Z",
     updatedAt: "2026-09-14T00:00:00.000Z",

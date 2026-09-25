@@ -2,10 +2,7 @@ import { withLedgerAccess } from "../access";
 import type { CategoryReclassificationJobDto } from "@/modules/ledger/contracts";
 import { toCategoryReclassificationJobDto } from "@/modules/ledger/server/category-reclassification-job-dto";
 import type { CategoryAssignmentResultPageDto } from "@/modules/ledger/contracts";
-import {
-  getCategoryAssignmentProgress,
-  listCategoryAssignmentResults,
-} from "@/server/category-reclassification/assignments";
+import { listCategoryAssignmentResults } from "@/server/category-reclassification/assignments";
 import { getLatestCategoryReclassificationJob } from "@/server/category-reclassification/jobs";
 
 /**
@@ -16,12 +13,7 @@ import { getLatestCategoryReclassificationJob } from "@/server/category-reclassi
 export const getCategoryReclassificationJobAction = withLedgerAccess(
   async (ledgerId: string): Promise<CategoryReclassificationJobDto | null> => {
     const job = await getLatestCategoryReclassificationJob({ ledgerId });
-    if (job == null) return null;
-    const metrics = await getCategoryAssignmentProgress({
-      ledgerId,
-      jobId: job.id,
-    });
-    return toCategoryReclassificationJobDto(job, metrics);
+    return job == null ? null : toCategoryReclassificationJobDto(job);
   }
 );
 

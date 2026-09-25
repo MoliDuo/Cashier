@@ -48,7 +48,6 @@ export interface LedgerEntriesBatchActionToolbarProps {
   /** The captured selection no longer matches the live one. */
   categorySelectionChanged?: boolean;
   isConfirmingCategory?: boolean;
-  selectionUploadProgress?: { received: number; total: number } | null;
   isProcessing?: boolean;
   className?: string;
 }
@@ -99,7 +98,6 @@ export function LedgerEntriesBatchActionToolbar({
   onToggleCategoryPick,
   categorySelectionChanged = false,
   isConfirmingCategory = false,
-  selectionUploadProgress = null,
   isProcessing: externallyProcessing = false,
   className,
 }: LedgerEntriesBatchActionToolbarProps) {
@@ -249,7 +247,6 @@ export function LedgerEntriesBatchActionToolbar({
           onTogglePick={onToggleCategoryPick}
           selectionChanged={categorySelectionChanged}
           isConfirming={isConfirmingCategory}
-          uploadProgress={selectionUploadProgress}
           onConfirm={onConfirmCategory}
         />
       ) : null}

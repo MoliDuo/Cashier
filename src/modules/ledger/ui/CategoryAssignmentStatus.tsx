@@ -87,26 +87,24 @@ export function CategoryAssignmentStatus({
     ? t("categoryJobReadFailed")
     : job == null
       ? t("categoryJobReadFailed")
-      : job.status === "preparing"
-        ? t("categorySelectionUploading", { received: job.receivedCount, total: job.total })
-        : job.status === "pending"
-          ? t("categoryJobPending")
-          : job.status === "running"
-            ? t("categoryJobProgress", {
-                processed: job.processedCount,
-                total: job.total,
-                active: job.activeDocumentCount,
+      : job.status === "pending" || job.status === "preparing"
+        ? t("categoryJobPending")
+        : job.status === "running"
+          ? t("categoryJobProgress", {
+              processed: job.processedCount,
+              total: job.total,
+              active: job.activeDocumentCount,
+            })
+          : job.status === "succeeded"
+            ? t("categoryJobSucceeded", {
+                applied: job.appliedCount,
+                confirmed: job.confirmedCount,
               })
-            : job.status === "succeeded"
-              ? t("categoryJobSucceeded", {
-                  applied: job.appliedCount,
-                  confirmed: job.confirmedCount,
-                })
-              : job.status === "partial"
-                ? t("categoryJobPartial")
-                : job.status === "cancelled"
-                  ? t("categoryJobCancelled")
-                  : t("categoryJobFailed");
+            : job.status === "partial"
+              ? t("categoryJobPartial")
+              : job.status === "cancelled"
+                ? t("categoryJobCancelled")
+                : t("categoryJobFailed");
   return (
     <>
       <div

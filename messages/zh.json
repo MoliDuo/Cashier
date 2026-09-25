@@ -97,7 +97,7 @@
     "categoryClearCandidates": "清除候选选择",
     "categoryClearChoice": "清空分类",
     "categoryAiStrictDescription": "结合明细信息和原账单图片判断；成功部分会先保存，失败部分可单独重试。",
-    "categorySelectionUploading": "正在提交选择：{received}/{total}",
+    "categorySelectionTooLarge": "一次最多归类 {max} 条，请缩小选择范围。",
     "categoryJobPending": "已创建，等待处理",
     "categoryJobProgress": "已处理 {processed}/{total}；正在处理 {active} 张账单",
     "categoryJobRetrying": "{count} 张账单将在 {seconds} 秒后重试",

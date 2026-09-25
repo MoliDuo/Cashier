@@ -293,20 +293,14 @@ export const categoryReclassificationJobs = pgTable(
     customPromptSnapshot: text("custom_prompt_snapshot"),
     requestKey: uuid("request_key"),
     parentJobId: uuid("parent_job_id"),
-    declaredEntryCount: integer("declared_entry_count").notNull().default(0),
-    receivedEntryCount: integer("received_entry_count").notNull().default(0),
     candidateCategoryIds: uuid("candidate_category_ids")
       .array()
       .notNull()
       .default(sql`ARRAY[]::uuid[]`),
-    appliedCount: integer("applied_count").notNull().default(0),
-    confirmedCount: integer("confirmed_count").notNull().default(0),
-    failedCount: integer("failed_count").notNull().default(0),
-    conflictCount: integer("conflict_count").notNull().default(0),
-    skippedCount: integer("skipped_count").notNull().default(0),
-    cancelledCount: integer("cancelled_count").notNull().default(0),
-    documentTotal: integer("document_total").notNull().default(0),
-    documentCompleted: integer("document_completed").notNull().default(0),
+    // One worker runs a job at a time; its lease fences every write the run
+    // makes, from a document's decisions to the job's final status.
+    claimToken: uuid("claim_token"),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
     lastError: text("last_error"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
@@ -327,32 +321,6 @@ export const categoryReclassificationJobs = pgTable(
   ]
 );
 
-export const categoryAssignmentSelectionChunks = pgTable(
-  "category_assignment_selection_chunks",
-  {
-    jobId: uuid("job_id").notNull(),
-    ledgerId: uuid("ledger_id").notNull(),
-    chunkIndex: integer("chunk_index").notNull(),
-    contentHash: text("content_hash").notNull(),
-    entryCount: integer("entry_count").notNull(),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    primaryKey({ columns: [table.jobId, table.chunkIndex] }),
-    foreignKey({
-      columns: [table.jobId],
-      foreignColumns: [categoryReclassificationJobs.id],
-      name: "category_assignment_selection_chunks_job_id_fkey",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "category_assignment_selection_chunks_ledger_id_fkey",
-    }).onDelete("cascade"),
-    index("idx_category_assignment_chunks_ledger_job").on(table.ledgerId, table.jobId),
-  ]
-);
-
 export const categoryReclassificationJobDocuments = pgTable(
   "category_reclassification_job_documents",
   {
@@ -361,10 +329,6 @@ export const categoryReclassificationJobDocuments = pgTable(
     sourceDocumentId: uuid("source_document_id").notNull(),
     firstSelectionOrder: integer("first_selection_order").notNull(),
     status: categoryAssignmentDocumentStatusEnum("status").notNull().default("pending"),
-    claimToken: uuid("claim_token"),
-    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
-    claimStartedAt: timestamp("claim_started_at", { withTimezone: true }),
-    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
     completedChunkCount: integer("completed_chunk_count").notNull().default(0),
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),

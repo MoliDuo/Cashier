@@ -37,10 +37,10 @@ import { submitSourceDocument } from "@/modules/source-document/server/submissio
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
 import {
-  appendCategoryAssignmentEntries,
-  beginCategoryAssignment,
-  claimCategoryAssignmentDocuments,
-  commitCategoryAssignment,
+  claimCategoryAssignmentJob,
+  nextCategoryAssignmentDocument,
+  releaseCategoryAssignmentJob,
+  startCategoryAssignment,
 } from "@/server/category-reclassification/assignments";
 import { saveEntryCategories } from "@/modules/ledger/server/categories";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
@@ -147,42 +147,23 @@ async function runCategoryAssignment(input: {
   ledgerEntryId: string;
   categoryId: string;
 }) {
-  const now = new Date();
-  const begun = await beginCategoryAssignment({
+  const started = await startCategoryAssignment({
     ledgerId: input.ledgerId,
     requestKey: crypto.randomUUID(),
     mode: { kind: "assign", categoryId: input.categoryId },
-    expectedEntryCount: 1,
+    ledgerEntryIds: [input.ledgerEntryId],
     candidates: [],
     customPrompt: null,
-    now,
   });
-  await appendCategoryAssignmentEntries({
-    ledgerId: input.ledgerId,
-    jobId: begun.id,
-    chunkIndex: 0,
-    entries: [{ ledgerEntryId: input.ledgerEntryId, sourceDocumentId: input.sourceDocumentId }],
-    now,
-  });
-  await commitCategoryAssignment({
-    ledgerId: input.ledgerId,
-    jobId: begun.id,
-    expectedEntryCount: 1,
-    now,
-  });
-  const [claim] = await claimCategoryAssignmentDocuments({
-    jobId: begun.id,
-    now,
-    leaseMs: 60_000,
-    concurrency: 1,
-  });
-  return applyCategoryAssignments({
-    ledgerId: input.ledgerId,
-    jobId: begun.id,
+  const job = await claimCategoryAssignmentJob({ jobId: started.id });
+  const next = await nextCategoryAssignmentDocument(job!);
+  expect(next).toMatchObject({ kind: "document" });
+  const result = await applyCategoryAssignments({
+    lease: job!,
     sourceDocumentId: input.sourceDocumentId,
-    claimToken: claim!.claimToken,
-    now,
   });
+  await releaseCategoryAssignmentJob(job!);
+  return result;
 }
 
 describe("source document version — content writes advance it by one", () => {

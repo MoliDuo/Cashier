@@ -30,7 +30,6 @@ interface BatchSetCategoryDialogProps {
    * a different set of entries than the one on screen. */
   selectionChanged: boolean;
   isConfirming: boolean;
-  uploadProgress?: { received: number; total: number } | null;
   onConfirm: () => void;
 }
 
@@ -58,7 +57,6 @@ export function BatchSetCategoryDialog({
   onTogglePick,
   selectionChanged,
   isConfirming,
-  uploadProgress = null,
   onConfirm,
 }: BatchSetCategoryDialogProps) {
   const t = useTranslations("BatchActions");
@@ -199,12 +197,8 @@ export function BatchSetCategoryDialog({
 
         <DialogFooter className="shrink-0 gap-2 border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:items-center sm:justify-between sm:space-x-0 sm:px-6 sm:py-4">
           <p className={textRoleClassName("meta")} aria-live="polite">
-            {uploadProgress == null
-              ? summary || t("categorySelectionRequired")
-              : t("categorySelectionUploading", uploadProgress)}
-            {selectionChanged && uploadProgress == null
-              ? `${summary === "" ? "" : " "}${t("selectionMoved")}`
-              : ""}
+            {summary || t("categorySelectionRequired")}
+            {selectionChanged ? `${summary === "" ? "" : " "}${t("selectionMoved")}` : ""}
           </p>
           <Button
             type="button"

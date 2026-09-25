@@ -53,14 +53,13 @@ export const AI_RETRY_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1_000;
  */
 export const AI_REVISION_DEADLINE_MS = FUNCTION_BUDGET_MS - 3 * OUTCOME_RESERVE_MS;
 
-/** Bulk re-categorisation shares one database-coordinated provider slot. */
-export const AI_CATEGORY_CONCURRENCY = 1;
 export const AI_CATEGORY_REQUEST_TIMEOUT_MS = 60_000;
-export const AI_CATEGORY_MAX_ATTEMPTS = 3;
+/** The most entries one category assignment can be started over. */
+export const CATEGORY_ASSIGNMENT_MAX_ENTRIES = 5000;
 /**
- * How long one run keeps claiming new documents. A document claimed at the
- * last moment still has one request timeout plus a margin before the function
- * limit; whatever is left is picked up by the next run.
+ * How long one run keeps starting model requests. A request started at the
+ * last moment still has its timeout plus a margin before the function limit;
+ * whatever is left is picked up by the next run.
  */
 export const CATEGORY_RUN_BUDGET_MS =
   FUNCTION_BUDGET_MS - AI_CATEGORY_REQUEST_TIMEOUT_MS - OUTCOME_RESERVE_MS;

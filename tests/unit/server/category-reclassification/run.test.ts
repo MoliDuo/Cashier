@@ -1,91 +1,118 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "@/lib/errors";
+
+type Next =
+  | {
+      kind: "document";
+      document: {
+        sourceDocumentId: string;
+        attempt: number;
+        completedChunkCount: number;
+        lastErrorCode: string | null;
+      };
+    }
+  | { kind: "wait"; delayMs: number }
+  | { kind: "done" }
+  | { kind: "lost" };
 
 const state = vi.hoisted(() => ({
-  concurrency: 100,
-  queue: [] as Array<Record<string, unknown>>,
-  active: 0,
-  maxActive: 0,
-  decideCalls: 0,
+  queue: [] as Next[],
+  claims: 0,
+  lease: new AbortController(),
 }));
 
+function subjects(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    ledgerEntryId: `entry-${index}`,
+    itemName: "Item",
+    description: null,
+    amount: "1.00",
+    currency: "CNY",
+    currentCategoryId: null,
+    currentCategoryName: null,
+  }));
+}
+
 const adapters = vi.hoisted(() => ({
-  claimDocuments: vi.fn(async (input: { concurrency: number }) =>
-    state.queue.splice(0, input.concurrency)
-  ),
-  loadDocumentSelection: vi.fn(async (input: { sourceDocumentId: string }) => ({
-    entryIds: [`entry-${input.sourceDocumentId}`],
-    completedChunkCount: 0,
-  })),
-  nextDue: vi.fn(async (): Promise<Date | null> => null),
-  renewDocumentClaim: vi.fn(async () => true),
-  persistDecisions: vi.fn(async (_input: { completedChunkCount: number }) => true),
-  markEvidenceIncomplete: vi.fn(async () => undefined),
-  failDocument: vi.fn(async () => "failed"),
-  loadDocumentGroups: vi.fn(async (input: { ledgerEntryIds: string[] }) => {
-    const sourceDocumentId = input.ledgerEntryIds[0]!.replace("entry-", "");
-    return [
-      {
-        sourceDocumentId,
-        title: null,
-        documentDate: null,
-        inputText: null,
-        storedFileIds: [],
-        subjects: [
-          {
-            ledgerEntryId: input.ledgerEntryIds[0]!,
-            itemName: "Item",
-            description: null,
-            amount: "1.00",
-            currency: "CNY",
-            currentCategoryId: null,
-            currentCategoryName: null,
-          },
-        ],
-      },
-    ];
+  claimJob: vi.fn(async () => {
+    state.claims += 1;
+    return state.claims === 1
+      ? {
+          jobId: "job-1",
+          ledgerId: "ledger-1",
+          claimToken: "token-1",
+          mode: { kind: "ai" as const, candidateCategoryIds: ["category-1", "category-2"] },
+          candidates: [
+            { id: "category-1", name: "One", description: null },
+            { id: "category-2", name: "Two", description: null },
+          ],
+          customPrompt: null,
+        }
+      : null;
   }),
+  next: vi.fn(async (): Promise<Next> => state.queue.shift() ?? { kind: "done" }),
+  loadSelection: vi.fn(async (input: { sourceDocumentId: string }) => [
+    `entry-${input.sourceDocumentId}`,
+  ]),
+  loadDocumentGroups: vi.fn(async (input: { ledgerEntryIds: string[] }) => [
+    {
+      sourceDocumentId: input.ledgerEntryIds[0]!.replace("entry-", ""),
+      title: null,
+      documentDate: null,
+      inputText: null,
+      storedFileIds: [],
+      subjects: subjects(1),
+    },
+  ]),
   decide: vi.fn(async (input: { group: { subjects: Array<{ ledgerEntryId: string }> } }) => {
-    state.active += 1;
-    state.maxActive = Math.max(state.maxActive, state.active);
-    state.decideCalls += 1;
     await new Promise((resolve) => setTimeout(resolve, 20_000));
-    state.active -= 1;
     return {
-      decisions: [
-        { ledgerEntryId: input.group.subjects[0]!.ledgerEntryId, categoryId: "category-1" },
-      ],
+      decisions: input.group.subjects.map((subject) => ({
+        ledgerEntryId: subject.ledgerEntryId,
+        categoryId: "category-1",
+      })),
       confirmedCount: 0,
     };
   }),
-  applyCategoryAssignments: vi.fn(async () => ({
+  persistDecisions: vi.fn(async (_input: { completedChunkCount: number }) => true),
+  markEvidenceIncomplete: vi.fn(async () => undefined),
+  yieldDocument: vi.fn(async () => undefined),
+  reschedule: vi.fn(async (_input: { errorCode: string; delayMs: number }) => true),
+  fail: vi.fn(async (_input: { errorCode: string }) => true),
+  release: vi.fn(async () => undefined),
+  renew: vi.fn(async () => true),
+  apply: vi.fn(async (_input: { sourceDocumentId: string }) => ({
     status: "applied",
     appliedCount: 1,
     confirmedCount: 0,
-    version: 2,
+    conflictCount: 0,
   })),
 }));
 
 vi.mock("@/config/tuning", () => ({
-  get AI_CATEGORY_CONCURRENCY() {
-    return state.concurrency;
-  },
-  AI_CATEGORY_MAX_ATTEMPTS: 3,
+  BACKGROUND_MAX_ATTEMPTS: 3,
   CATEGORY_RUN_BUDGET_MS: 50_000,
 }));
+vi.mock("@/lib/db/lease", () => ({
+  holdLease: () => ({ signal: state.lease.signal, stop: () => undefined }),
+}));
 vi.mock("@/server/category-reclassification/assignments", () => ({
-  claimCategoryAssignmentDocuments: adapters.claimDocuments,
-  loadCategoryAssignmentSelection: adapters.loadDocumentSelection,
-  nextCategoryAssignmentDue: adapters.nextDue,
-  renewCategoryAssignmentClaim: adapters.renewDocumentClaim,
+  claimCategoryAssignmentJob: adapters.claimJob,
+  nextCategoryAssignmentDocument: adapters.next,
+  loadCategoryAssignmentSelection: adapters.loadSelection,
   persistCategoryAssignmentDecisions: adapters.persistDecisions,
   markCategoryAssignmentEvidenceIncomplete: adapters.markEvidenceIncomplete,
-  failCategoryAssignmentDocument: adapters.failDocument,
+  yieldCategoryAssignmentDocument: adapters.yieldDocument,
+  rescheduleCategoryAssignmentDocument: adapters.reschedule,
+  failCategoryAssignmentDocument: adapters.fail,
+  releaseCategoryAssignmentJob: adapters.release,
+  renewCategoryAssignmentLease: adapters.renew,
 }));
 vi.mock("@/server/category-reclassification/document-groups", () => ({
   loadReclassificationDocumentGroups: adapters.loadDocumentGroups,
 }));
 vi.mock("@/modules/source-document/server/category-assignments", () => ({
-  applyCategoryAssignments: adapters.applyCategoryAssignments,
+  applyCategoryAssignments: adapters.apply,
 }));
 vi.mock("@/server/category-reclassification/reclassifier", () => ({
   decideEntryCategories: adapters.decide,
@@ -95,120 +122,76 @@ vi.mock("@/server/processing/evidence", () => ({
   isSuccessfulLoadImageResult: () => false,
 }));
 vi.mock("@/lib/logger", () => ({
-  logger: { info: vi.fn(), warn: vi.fn() },
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@/lib/security/log-identifier", () => ({ logIdentifier: () => "hashed" }));
 
 import { runCategoryReclassificationJob } from "@/server/category-reclassification/run";
 
-function work(index: number) {
+function document(
+  index: number,
+  overrides: Partial<{ attempt: number; completedChunkCount: number; lastErrorCode: string }> = {}
+): Next {
   return {
-    jobId: "job-1",
-    ledgerId: "ledger-1",
-    sourceDocumentId: `document-${index}`,
-    revisionId: `revision-${index}`,
-    claimToken: `claim-${index}`,
-    attempts: 1,
-    mode: { kind: "ai" as const, candidateCategoryIds: ["category-1", "category-2"] },
-    candidates: [
-      { id: "category-1", name: "One", description: null },
-      { id: "category-2", name: "Two", description: null },
-    ],
-    customPrompt: null,
+    kind: "document",
+    document: {
+      sourceDocumentId: `document-${index}`,
+      attempt: 1,
+      completedChunkCount: 0,
+      lastErrorCode: null,
+      ...overrides,
+    },
   };
 }
 
-describe("category reclassification orchestration concurrency", () => {
+async function run() {
+  const running = runCategoryReclassificationJob("job-1");
+  await vi.runAllTimersAsync();
+  return running;
+}
+
+describe("category reclassification run", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));
-    state.queue = Array.from({ length: 100 }, (_, index) => work(index));
-    state.active = 0;
-    state.maxActive = 0;
-    state.decideCalls = 0;
     vi.clearAllMocks();
+    state.queue = [];
+    state.claims = 0;
+    state.lease = new AbortController();
   });
   afterEach(() => vi.useRealTimers());
 
-  it("starts 100 independent document requests in one 20-second batch by default", async () => {
-    state.concurrency = 100;
-    const startedAt = Date.now();
-    const running = runCategoryReclassificationJob("job-1");
-    await vi.runAllTimersAsync();
-    await running;
+  it("works through the job's documents one at a time and then releases it", async () => {
+    state.queue = [document(1), document(2)];
 
-    expect(state.maxActive).toBe(100);
-    expect(state.decideCalls).toBe(100);
-    expect(Date.now() - startedAt).toBe(20_000);
+    await expect(run()).resolves.toBe(true);
+    expect(adapters.decide).toHaveBeenCalledTimes(2);
+    expect(adapters.apply.mock.calls.map(([input]) => input)).toEqual([
+      expect.objectContaining({ sourceDocumentId: "document-1" }),
+      expect.objectContaining({ sourceDocumentId: "document-2" }),
+    ]);
+    expect(adapters.release).toHaveBeenCalledTimes(1);
   });
 
-  it("honors a concurrency of 10 and stops claiming once the run budget is spent", async () => {
-    state.concurrency = 10;
-    const startedAt = Date.now();
-    const first = runCategoryReclassificationJob("job-1");
-    await vi.runAllTimersAsync();
-    await first;
+  it("returns without work when no job can be claimed", async () => {
+    state.claims = 1;
+    await expect(run()).resolves.toBe(false);
+    expect(adapters.next).not.toHaveBeenCalled();
+  });
 
-    // Batches start at 0s, 20s and 40s; at 60s the 50-second budget is spent.
-    expect(state.maxActive).toBe(10);
-    expect(state.decideCalls).toBe(30);
+  it("stops starting documents once the run budget is spent", async () => {
+    state.queue = [document(1), document(2), document(3), document(4)];
+    const startedAt = Date.now();
+
+    await run();
+    // Requests start at 0s, 20s and 40s; at 60s the 50-second budget is spent.
+    expect(adapters.decide).toHaveBeenCalledTimes(3);
     expect(Date.now() - startedAt).toBe(60_000);
-
-    const second = runCategoryReclassificationJob("job-1");
-    await vi.runAllTimersAsync();
-    await second;
-    expect(state.decideCalls).toBe(60);
+    expect(adapters.release).toHaveBeenCalledTimes(1);
   });
 
-  it("returns instead of waiting when every slot is held by another run", async () => {
-    state.queue = [];
-    adapters.nextDue.mockResolvedValueOnce(new Date(Date.now() - 1_000));
-
-    await expect(runCategoryReclassificationJob("job-1")).resolves.toBe(false);
-    expect(adapters.claimDocuments).toHaveBeenCalledTimes(1);
-    expect(adapters.nextDue).toHaveBeenCalledTimes(1);
-  });
-
-  it("claims again when the work came due while the empty claim ran", async () => {
-    const pending = work(0);
-    state.queue = [];
-    const claimStartedAt = Date.now();
-    adapters.claimDocuments.mockImplementationOnce(async () => {
-      vi.setSystemTime(claimStartedAt + 5);
-      return [];
-    });
-    adapters.nextDue.mockImplementationOnce(async () => {
-      state.queue = [pending];
-      return new Date(claimStartedAt + 2);
-    });
-
-    const running = runCategoryReclassificationJob("job-1");
-    await vi.runAllTimersAsync();
-
-    await expect(running).resolves.toBe(true);
-    expect(state.decideCalls).toBe(1);
-  });
-
-  it("isolates one failed document without repeating the other 99 requests", async () => {
-    state.concurrency = 100;
-    adapters.decide.mockRejectedValueOnce(new Error("timeout"));
-    const running = runCategoryReclassificationJob("job-1");
-    await vi.runAllTimersAsync();
-    await running;
-
-    expect(adapters.decide).toHaveBeenCalledTimes(100);
-    expect(adapters.failDocument).toHaveBeenCalledTimes(1);
-    expect(adapters.applyCategoryAssignments).toHaveBeenCalledTimes(99);
-  });
-
-  it("splits 120 entries from one document into three persisted request blocks", async () => {
-    state.concurrency = 100;
-    state.queue = [work(1)];
-    const entryIds = Array.from({ length: 120 }, (_, index) => `entry-${index}`);
-    adapters.loadDocumentSelection.mockResolvedValueOnce({
-      entryIds,
-      completedChunkCount: 0,
-    });
+  it("splits a document into request blocks and resumes after the stored checkpoint", async () => {
+    state.queue = [document(1, { completedChunkCount: 1 })];
     adapters.loadDocumentGroups.mockResolvedValueOnce([
       {
         sourceDocumentId: "document-1",
@@ -216,39 +199,117 @@ describe("category reclassification orchestration concurrency", () => {
         documentDate: null,
         inputText: null,
         storedFileIds: [],
-        subjects: entryIds.map((ledgerEntryId) => ({
-          ledgerEntryId,
-          itemName: ledgerEntryId,
-          description: null,
-          amount: "1.00",
-          currency: "CNY",
-          currentCategoryId: null,
-          currentCategoryName: null,
-        })),
+        subjects: subjects(120),
       },
     ]);
-    adapters.decide.mockImplementation(
-      async (input: { group: { subjects: Array<{ ledgerEntryId: string }> } }) => {
-        await new Promise((resolve) => setTimeout(resolve, 20_000));
-        return {
-          decisions: input.group.subjects.map((subject) => ({
-            ledgerEntryId: subject.ledgerEntryId,
-            categoryId: "category-1",
-          })),
-          confirmedCount: 0,
-        };
-      }
-    );
 
-    const running = runCategoryReclassificationJob("job-1");
-    await vi.runAllTimersAsync();
-    await running;
-
+    await run();
     expect(adapters.decide.mock.calls.map(([input]) => input.group.subjects.length)).toEqual([
-      50, 50, 20,
+      50, 20,
     ]);
     expect(
       adapters.persistDecisions.mock.calls.map(([input]) => input.completedChunkCount)
-    ).toEqual([1, 2, 3]);
+    ).toEqual([2, 3]);
+    expect(adapters.apply).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands a document back when the budget ends between its request blocks", async () => {
+    state.queue = [document(1)];
+    adapters.loadDocumentGroups.mockResolvedValueOnce([
+      {
+        sourceDocumentId: "document-1",
+        title: null,
+        documentDate: null,
+        inputText: null,
+        storedFileIds: [],
+        subjects: subjects(200),
+      },
+    ]);
+
+    await run();
+    expect(adapters.decide).toHaveBeenCalledTimes(3);
+    expect(adapters.yieldDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "job-1" }),
+      "document-1"
+    );
+    expect(adapters.apply).not.toHaveBeenCalled();
+    expect(adapters.fail).not.toHaveBeenCalled();
+  });
+
+  it("puts a document back to wait out a transient failure", async () => {
+    state.queue = [document(1)];
+    adapters.decide.mockRejectedValueOnce(
+      new Error("parse failed", {
+        cause: new AppError("rate limited", "ai_rate_limited", 503, { retryAfterMs: 5_000 }),
+      })
+    );
+
+    await run();
+    expect(adapters.reschedule).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCode: "ai_rate_limited", delayMs: 5_000 })
+    );
+    expect(adapters.fail).not.toHaveBeenCalled();
+  });
+
+  it("fails a document on a transient failure in its last attempt", async () => {
+    state.queue = [document(1, { attempt: 3 })];
+    adapters.decide.mockRejectedValueOnce(new AppError("timeout", "ai_timeout", 504));
+
+    await run();
+    expect(adapters.fail).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCode: "ai_timeout" })
+    );
+    expect(adapters.reschedule).not.toHaveBeenCalled();
+  });
+
+  it("fails a document at once on a permanent failure", async () => {
+    state.queue = [document(1), document(2)];
+    adapters.decide.mockRejectedValueOnce(new AppError("bad output", "ai_schema_invalid", 502));
+
+    await run();
+    expect(adapters.fail).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceDocumentId: "document-1", errorCode: "ai_schema_invalid" })
+    );
+    expect(adapters.apply).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails a document whose earlier attempts all died, without asking the model", async () => {
+    state.queue = [document(1, { attempt: 4, lastErrorCode: "ai_rate_limited" })];
+
+    await run();
+    expect(adapters.decide).not.toHaveBeenCalled();
+    expect(adapters.fail).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCode: "ai_rate_limited" })
+    );
+  });
+
+  it("records nothing when the lease is lost mid-request", async () => {
+    state.queue = [document(1), document(2)];
+    adapters.decide.mockImplementationOnce(async () => {
+      state.lease.abort();
+      throw new Error("aborted");
+    });
+
+    await run();
+    expect(adapters.fail).not.toHaveBeenCalled();
+    expect(adapters.reschedule).not.toHaveBeenCalled();
+    expect(adapters.decide).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a retry that comes due within the budget", async () => {
+    state.queue = [{ kind: "wait", delayMs: 8_000 }, document(1)];
+    const startedAt = Date.now();
+
+    await run();
+    expect(adapters.decide).toHaveBeenCalledTimes(1);
+    expect(Date.now() - startedAt).toBe(28_000);
+  });
+
+  it("leaves a retry due after the budget to the next run", async () => {
+    state.queue = [{ kind: "wait", delayMs: 60_000 }];
+
+    await run();
+    expect(adapters.decide).not.toHaveBeenCalled();
+    expect(adapters.release).toHaveBeenCalledTimes(1);
   });
 });

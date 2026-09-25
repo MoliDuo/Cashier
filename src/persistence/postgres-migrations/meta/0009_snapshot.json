@@ -1,6 +1,6 @@
 {
-  "id": "9a7a2839-7957-495e-9d61-41161c3860fe",
-  "prevId": "b46b957d-680d-46e2-b024-7b399ea7578b",
+  "id": "8b545376-c4fb-420b-9fb7-e28322992903",
+  "prevId": "9a7a2839-7957-495e-9d61-41161c3860fe",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1650,112 +1650,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.category_assignment_selection_chunks": {
-      "name": "category_assignment_selection_chunks",
-      "schema": "",
-      "columns": {
-        "job_id": {
-          "name": "job_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "chunk_index": {
-          "name": "chunk_index",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entry_count": {
-          "name": "entry_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "idx_category_assignment_chunks_ledger_job": {
-          "name": "idx_category_assignment_chunks_ledger_job",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "category_assignment_selection_chunks_job_id_fkey": {
-          "name": "category_assignment_selection_chunks_job_id_fkey",
-          "tableFrom": "category_assignment_selection_chunks",
-          "tableTo": "category_reclassification_jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "category_assignment_selection_chunks_ledger_id_fkey": {
-          "name": "category_assignment_selection_chunks_ledger_id_fkey",
-          "tableFrom": "category_assignment_selection_chunks",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "category_assignment_selection_chunks_job_id_chunk_index_pk": {
-          "name": "category_assignment_selection_chunks_job_id_chunk_index_pk",
-          "columns": [
-            "job_id",
-            "chunk_index"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.category_reclassification_job_documents": {
       "name": "category_reclassification_job_documents",
       "schema": "",
@@ -1791,30 +1685,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'pending'"
-        },
-        "claim_token": {
-          "name": "claim_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_expires_at": {
-          "name": "claim_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_started_at": {
-          "name": "claim_started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "heartbeat_at": {
-          "name": "heartbeat_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "completed_chunk_count": {
           "name": "completed_chunk_count",
@@ -2204,20 +2074,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "declared_entry_count": {
-          "name": "declared_entry_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "received_entry_count": {
-          "name": "received_entry_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "candidate_category_ids": {
           "name": "candidate_category_ids",
           "type": "uuid[]",
@@ -2225,61 +2081,17 @@
           "notNull": true,
           "default": "ARRAY[]::uuid[]"
         },
-        "applied_count": {
-          "name": "applied_count",
-          "type": "integer",
+        "claim_token": {
+          "name": "claim_token",
+          "type": "uuid",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": false
         },
-        "confirmed_count": {
-          "name": "confirmed_count",
-          "type": "integer",
+        "claim_expires_at": {
+          "name": "claim_expires_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "failed_count": {
-          "name": "failed_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "conflict_count": {
-          "name": "conflict_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "skipped_count": {
-          "name": "skipped_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "cancelled_count": {
-          "name": "cancelled_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "document_total": {
-          "name": "document_total",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "document_completed": {
-          "name": "document_completed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": false
         },
         "last_error": {
           "name": "last_error",

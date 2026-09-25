@@ -107,23 +107,10 @@ export type CategoryAssignmentMode =
   | { kind: "ai"; candidateCategoryIds: string[] }
   | { kind: "assign"; categoryId: string }
   | { kind: "clear" };
-export interface CategoryAssignmentSelectionEntry {
-  ledgerEntryId: string;
-  sourceDocumentId: string;
-}
-export interface BeginCategoryAssignmentInput {
+export interface StartCategoryAssignmentInput {
   requestKey: string;
   mode: CategoryAssignmentMode;
-  expectedEntryCount: number;
-}
-export interface AppendCategoryAssignmentSelectionInput {
-  jobId: string;
-  chunkIndex: number;
-  entries: CategoryAssignmentSelectionEntry[];
-}
-export interface CommitCategoryAssignmentSelectionInput {
-  jobId: string;
-  expectedEntryCount: number;
+  ledgerEntryIds: string[];
 }
 export type CategoryAssignmentJobStatus =
   "preparing" | "pending" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
@@ -160,7 +147,6 @@ export interface CategoryReclassificationJobDto {
   retryingDocumentCount: number;
   nextRetryAt: string | null;
   candidateCategories: CategoryAssignmentCandidateSnapshot[];
-  receivedCount: number;
   errorCode: string | null;
   createdAt: string;
   updatedAt: string;

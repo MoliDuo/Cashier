@@ -2,32 +2,25 @@
 import { ValidationError } from "@/lib/errors";
 import { scheduleCategoryReclassificationAfter } from "@/server/category-reclassification/schedule";
 import type {
-  AppendCategoryAssignmentSelectionInput,
-  BeginCategoryAssignmentInput,
   CategoryAssignmentCandidateSnapshot,
   CategoryAssignmentMode,
   CategoryReclassificationJobDto,
-  CommitCategoryAssignmentSelectionInput,
+  StartCategoryAssignmentInput,
 } from "@/modules/ledger/contracts";
 import {
-  parseAppendCategoryAssignmentSelectionInput,
-  parseBeginCategoryAssignmentInput,
   parseCancelCategoryAssignmentInput,
-  parseCommitCategoryAssignmentSelectionInput,
   parseRetryCategoryAssignmentInput,
+  parseStartCategoryAssignmentInput,
 } from "../contract-schemas";
 import { toCategoryReclassificationJobDto } from "@/modules/ledger/server/category-reclassification-job-dto";
 import { withLedgerAccess } from "../access";
 import { listCategories } from "../server/categories";
 import { getLedgerSettings } from "../server/settings";
 import {
-  appendCategoryAssignmentEntries,
-  beginCategoryAssignment,
   cancelCategoryAssignment,
-  commitCategoryAssignment,
-  getCategoryAssignmentProgress,
   resolveLatestConflictSelection,
   retryCategoryAssignmentFailures,
+  startCategoryAssignment,
 } from "@/server/category-reclassification/assignments";
 import { getCategoryReclassificationJob } from "@/server/category-reclassification/jobs";
 
@@ -57,55 +50,36 @@ async function validateMode(
 async function loadJob(ledgerId: string, jobId: string): Promise<CategoryReclassificationJobDto> {
   const job = await getCategoryReclassificationJob({ ledgerId, jobId });
   if (job == null) throw new ValidationError("Category assignment job was not found");
-  const metrics = await getCategoryAssignmentProgress({
-    ledgerId,
-    jobId,
-  });
-  return toCategoryReclassificationJobDto(job, metrics);
+  return toCategoryReclassificationJobDto(job);
 }
 
-async function begin(
+async function start(
   ledgerId: string,
-  input: BeginCategoryAssignmentInput,
+  input: StartCategoryAssignmentInput,
   parentJobId?: string
 ): Promise<CategoryReclassificationJobDto> {
   const candidates = await validateMode(ledgerId, input.mode);
   const settings = await getLedgerSettings(ledgerId);
-  const job = await beginCategoryAssignment({
+  const job = await startCategoryAssignment({
     ledgerId,
     requestKey: input.requestKey,
     mode: input.mode,
-    expectedEntryCount: input.expectedEntryCount,
+    ledgerEntryIds: input.ledgerEntryIds,
     candidates,
     customPrompt: settings?.aiCustomPrompt || null,
     ...(parentJobId == null ? {} : { parentJobId }),
   });
+  scheduleCategoryReclassificationAfter(job.id, ledgerId);
   return loadJob(ledgerId, job.id);
 }
 
-export const beginCategoryAssignmentAction = withLedgerAccess(
-  async (ledgerId: string, input: BeginCategoryAssignmentInput) =>
-    begin(ledgerId, parseBeginCategoryAssignmentInput(input))
-);
-
-export const appendCategoryAssignmentSelectionAction = withLedgerAccess(
-  async (ledgerId: string, input: AppendCategoryAssignmentSelectionInput) => {
-    const validated = parseAppendCategoryAssignmentSelectionInput(input);
-    const progress = await appendCategoryAssignmentEntries({ ledgerId, ...validated });
-    return { jobId: validated.jobId, received: progress.receivedEntryCount };
-  }
-);
-
-export const commitCategoryAssignmentSelectionAction = withLedgerAccess(
-  async (ledgerId: string, input: CommitCategoryAssignmentSelectionInput) => {
-    const validated = parseCommitCategoryAssignmentSelectionInput(input);
-    const committed = await commitCategoryAssignment({
-      ledgerId,
-      ...validated,
-    });
-    scheduleCategoryReclassificationAfter(committed.id, ledgerId);
-    return loadJob(ledgerId, committed.id);
-  }
+/**
+ * Starts a run over the selected entries in one call; replaying the same
+ * request key returns the run it started.
+ */
+export const startCategoryAssignmentAction = withLedgerAccess(
+  async (ledgerId: string, input: StartCategoryAssignmentInput) =>
+    start(ledgerId, parseStartCategoryAssignmentInput(input))
 );
 
 export const cancelCategoryAssignmentAction = withLedgerAccess(
@@ -135,30 +109,14 @@ export const retryCategoryAssignmentLatestAction = withLedgerAccess(
       ledgerId,
       jobId: validated.jobId,
     });
-    const started = await begin(
+    return start(
       ledgerId,
       {
         requestKey: validated.requestKey,
         mode: latest.mode,
-        expectedEntryCount: latest.entries.length,
+        ledgerEntryIds: latest.ledgerEntryIds,
       },
       latest.parentJobId
     );
-    for (let offset = 0, chunkIndex = 0; offset < latest.entries.length; offset += 1000) {
-      await appendCategoryAssignmentEntries({
-        ledgerId,
-        jobId: started.id,
-        chunkIndex,
-        entries: latest.entries.slice(offset, offset + 1000),
-      });
-      chunkIndex += 1;
-    }
-    const committed = await commitCategoryAssignment({
-      ledgerId,
-      jobId: started.id,
-      expectedEntryCount: latest.entries.length,
-    });
-    scheduleCategoryReclassificationAfter(committed.id, ledgerId);
-    return loadJob(ledgerId, committed.id);
   }
 );
