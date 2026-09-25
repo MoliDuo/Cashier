@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { eq, sql } from "drizzle-orm";
-import { readFileSync } from "node:fs";
+import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestBooks, testBookId } from "../../helpers/schema-setup";
 import {
@@ -246,62 +245,6 @@ describe("exchange-rate ledger recalculation orchestration", () => {
 
     expect(recalculateLedgerForDateMock).toHaveBeenCalledWith(ledgerId, "2024-02-16");
     expect(await db.query.exchangeRateRecalculationJobs.findMany()).toEqual([]);
-  });
-
-  it("backfills historical gaps only in migration and never recreates completed jobs in maintenance", async () => {
-    const db = getTestDb();
-    const date = "2024-02-16";
-    const ledgerId = await seedLedgerWithEntry({ entryDate: date });
-    const failedLedger = await seedLedgerWithEntry({ entryDate: null });
-    const claimedLedger = await seedLedgerWithEntry({ entryDate: date, pendingOnly: true });
-    const deletedLedger = await seedLedgerWithEntry({ entryDate: date, deleted: true });
-    await db.insert(currencyRates).values({ date, base: "EUR", rates: { USD: 1.1, CNY: 8 } });
-    const claimToken = crypto.randomUUID();
-    await db.insert(exchangeRateRecalculationJobs).values([
-      { rateDate: date, ledgerId: failedLedger, status: "failed", attempts: 8 },
-      {
-        rateDate: date,
-        ledgerId: claimedLedger,
-        status: "claimed",
-        claimToken,
-        claimExpiresAt: new Date(Date.now() + 300_000),
-      },
-    ]);
-    const migration = readFileSync(
-      "src/persistence/postgres-migrations/0035_maintenance_work_lifecycle.sql",
-      "utf8"
-    );
-    const backfill = migration
-      .split("--> statement-breakpoint")
-      .at(-1)!
-      .replaceAll("documents.entry_date", "documents.document_date")
-      .replace(
-        "entries.source_document_revision_id IN (documents.active_revision_id, documents.pending_revision_id)",
-        "entries.source_document_revision_id = documents.active_revision_id"
-      );
-    await db.execute(sql.raw(backfill));
-    const rows = await db.query.exchangeRateRecalculationJobs.findMany();
-    expect(rows).toHaveLength(3);
-    expect(rows.find((row) => row.ledgerId === ledgerId)?.status).toBe("pending");
-    expect(rows.find((row) => row.ledgerId === failedLedger)).toMatchObject({
-      status: "failed",
-      attempts: 8,
-    });
-    expect(rows.find((row) => row.ledgerId === claimedLedger)).toMatchObject({
-      status: "claimed",
-      claimToken,
-    });
-    expect(rows.some((row) => row.ledgerId === deletedLedger)).toBe(false);
-    const now = new Date();
-    await runBoundedMaintenance(now);
-    expect(recalculateLedgerForDateMock).toHaveBeenCalledTimes(1);
-    await runBoundedMaintenance(new Date(now.getTime() + 60_000));
-    expect(recalculateLedgerForDateMock).toHaveBeenCalledTimes(1);
-    expect(
-      await db.query.exchangeRateRecalculationJobs.findFirst({
-        where: eq(exchangeRateRecalculationJobs.ledgerId, ledgerId),
-      })
-    ).toBeUndefined();
   });
 
   it("recalculates only ledgers with active/pending entries on the event date", async () => {

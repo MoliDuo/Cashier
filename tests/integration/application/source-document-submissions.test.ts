@@ -490,9 +490,7 @@ function racePool(): Pool {
  */
 async function lockLedgerRow(client: PoolClient, ledgerId: string): Promise<string> {
   await client.query("BEGIN");
-  await client.query("SELECT id FROM ledgers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [
-    ledgerId,
-  ]);
+  await client.query("SELECT id FROM ledgers WHERE id = $1 FOR UPDATE", [ledgerId]);
   const held = await client.query<{ xid: string }>(
     `SELECT transactionid::text AS xid
        FROM pg_locks

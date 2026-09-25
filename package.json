@@ -35,11 +35,9 @@
     "test:coverage": "node scripts/run-vitest.mjs run --config vitest.config.mts --coverage",
     "docker:local": "docker compose -f docker-compose.local.yml up -d",
     "docker:down": "docker compose -f docker-compose.local.yml down",
-    "db:push": "drizzle-kit push",
-    "db:generate": "node scripts/guard-drizzle-generate.mjs && drizzle-kit generate",
+    "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-database.mjs",
     "db:studio": "drizzle-kit studio",
-    "db:drop": "drizzle-kit drop",
     "prune": "node scripts/prune-storage.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

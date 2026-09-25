@@ -102,16 +102,14 @@ does not start detached promises. There is no process-global event subscriber re
 instrumentation lifecycle token.
 
 Jobs remain durable and use claim leases, fencing tokens, bounded concurrency, exponential retry,
-and a permanent-failure state. Migration `0035_maintenance_work_lifecycle.sql` backfills historical
-snapshots once. Runtime maintenance does not repeatedly scan history to recreate missing jobs.
+and a permanent-failure state. Runtime maintenance does not scan history to recreate missing jobs.
 
 ## Simplified persistence
 
 Processing leases, scheduling state, timestamps, and diagnostic fields live in processing_outbox.
 A processing lease lasts 60 seconds and the worker renews it every 15 seconds, so a job whose
-function was killed can be claimed again within a minute. There is no second attempts table to
-synchronize. Historical terminal diagnostics are migrated into
-these rows; existing claim tokens and expiry times are preserved.
+function was killed can be claimed again within a minute. Each revision has exactly one outbox
+row; there is no second attempts table to synchronize.
 
 Manual edits update the active projection and increment the document version without creating a
 revision or copying entry history. Splits keep the original active revision and create evidence
@@ -122,20 +120,3 @@ AI text, image, and JSON repair requests use the single configured model. Catego
 are limited to one across database-coordinated workers. The AI client serializes provider requests
 within each process and honors Retry-After cooldowns; this is not a provider-wide quota across
 multiple application instances.
-
-Migration 0052 refuses to retire V1 category results still within their seven-day retention window,
-or active processing attempts lacking durable jobs. It transfers diagnostics before dropping the
-old attempts table. Run migrations with old application workers stopped before starting new code.
-
-## Retiring upload compatibility
-
-Migration 0054 retires only sessions with legacy null upload expectations. It refuses sessions that
-are unexpired or less than one day old; drain old application instances and let that window elapse
-before applying it. It queues temporary objects for cleanup independently of the deleted sessions,
-preserves durable stored files, and makes content type and byte size mandatory. Browser finalization
-accepts direct sessions only; API inline images continue to use the proxy workflow.
-
-Migration 0053 replaces the historical refresh table. Deploy the matching application with the
-migration; old application instances that query the retired table must be drained. Existing ledger
-versions survive and each resource watermark starts at that version, conservatively refreshing older
-clients once.
