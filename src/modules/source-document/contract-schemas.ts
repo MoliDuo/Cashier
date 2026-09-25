@@ -232,9 +232,7 @@ export const createSourceDocumentUploadPlanInputSchema = z
   .max(MAX_FILES);
 
 export const finalizeSourceDocumentUploadInputSchema = strictObjectSchema({
-  uploadSessionId: uuidSchema,
-  finalizationToken: z.string().min(1).max(256),
-  targetIds: z.array(uuidSchema).min(1).max(MAX_FILES),
+  storedFileIds: z.array(uuidSchema).min(1).max(MAX_FILES),
 });
 
 const validateFilterRange = (

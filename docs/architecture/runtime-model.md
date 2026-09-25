@@ -79,28 +79,33 @@ no-store`. Reopening an image therefore performs a new authorized read.
 
 ## Storage boundaries
 
-Web images upload directly to private S3-compatible storage with short-lived signed PUT URLs. The
-server verifies MIME type, size, and SHA-256 metadata before copying an upload to its durable key.
-Authenticated reads stream through `/api/stored-files/{fileId}`.
+Web images upload directly to private S3-compatible storage with short-lived signed PUT URLs.
+Planning records one pending `stored_files` row per image (`finalized_at` is null) under the ledger
+lock, once the ledger has room: at most 20 pending files and 100 MiB stored since UTC midnight. The
+signed URL targets `temporary/{ledgerId}/{storedFileId}`. Finalization, within 15 minutes, checks
+each temporary object against the declared MIME type, size, and SHA-256, normalizes it, writes the
+durable key, and marks the row ready; finalizing ready files again returns them unchanged. Only
+ready files can be attached to a revision. Authenticated reads stream through
+`/api/stored-files/{fileId}`.
 
-API v1 inline images use the server-side upload path. The public v1 response contract is independent
-of internal server-action reconciliation DTOs.
+API v1 inline images skip `temporary/`: the server normalizes them, reserves pending rows the same
+way, writes the durable objects, and marks the rows ready. A submission that fails afterwards
+discards the files it stored. The public v1 response contract is independent of internal
+server-action reconciliation DTOs.
 
 The stored-file implementation lives in `src/server/stored-files/`. Its `ObjectStore` contract
-requires streaming reads, signed uploads, and reads with metadata. Upload planning, proxy upload,
-finalization and compensation, and authorized reads are separate files of plain functions over
-`getS3Storage()`; tests replace the object store by mocking `@/lib/storage/s3`.
+requires streaming reads, signed uploads, reads with metadata, and paged listing. Uploads and
+authorized reads are plain functions over `getS3Storage()`; tests replace the object store by
+mocking `@/lib/storage/s3`.
 
-Finalization replay is read-only after authorization. Evidence reads fetch bytes and metadata in
-one object-store GET and share a promise only within one processing invocation.
+Evidence reads fetch bytes and metadata in one object-store GET and share a promise only within one
+processing invocation.
 
 Maintenance runs once a day from Vercel Cron at `/api/cron/daily` (`src/server/maintenance/daily.ts`),
 authenticated by `CRON_SECRET`; requests no longer trigger it. Each step runs independently within
 the cron budget: expired records, scheduling every ledger's due processing and category work with
-`after()`, the exchange-rate refresh, stale upload sessions, and the object cleanup queue. Object
-cleanup claims 25 jobs at a time, executes four deletions concurrently, and uses five-minute leases. Acknowledgement requires the
-current unexpired token; successful sibling jobs lock their upload session before deleting the
-job and checking whether the session has any remaining work.
+`after()`, the exchange-rate refresh, pending files older than a day that no document uses (rows
+first, then their objects), and `temporary/` objects older than a day.
 
 ## Exchange rates
 

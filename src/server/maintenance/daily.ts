@@ -1,13 +1,12 @@
 import "server-only";
-import { and, inArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   categoryReclassificationJobs,
   emailChangeChallenges,
   ledgers,
-  objectCleanupJobs,
-  uploadSessionFiles,
-  uploadSessions,
+  sourceDocumentFiles,
+  storedFiles,
 } from "@/persistence";
 import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
@@ -15,7 +14,6 @@ import { runWithConcurrency } from "@/lib/concurrency";
 import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { scheduleCategoryReclassificationDrainAfter } from "@/server/category-reclassification/schedule";
 import { scheduleProcessingRecovery } from "@/server/processing/recovery";
-import { acknowledgeObjectCleanup, claimObjectCleanup } from "./object-cleanup";
 import { CRON_BUDGET_MS } from "@/config/tuning";
 
 const BATCH = 1000;
@@ -26,8 +24,8 @@ export type DailyStep =
   | "processing_recovery"
   | "category_recovery"
   | "exchange_rates"
-  | "upload_sessions"
-  | "object_cleanup";
+  | "pending_files"
+  | "temporary_objects";
 
 export type DailyStepOutcome = "done" | "failed" | "skipped";
 
@@ -71,8 +69,8 @@ export async function runDailyMaintenance(
   await step("processing_recovery", scheduleDueProcessing);
   await step("category_recovery", async () => scheduleCategoryReclassificationDrainAfter());
   await step("exchange_rates", () => refreshExchangeRates(now));
-  await step("upload_sessions", () => sweepStaleUploadSessions(now));
-  await step("object_cleanup", () => drainObjectCleanup(deadlineAt));
+  await step("pending_files", () => deleteStalePendingFiles(now, deadlineAt));
+  await step("temporary_objects", () => deleteStaleTemporaryObjects(now, deadlineAt));
   return outcomes;
 }
 
@@ -120,75 +118,56 @@ async function scheduleDueProcessing(): Promise<void> {
   for (const ledger of rows) await scheduleProcessingRecovery(ledger.id);
 }
 
-/** Queues the temporary objects of upload sessions that ended over a day ago. */
-async function sweepStaleUploadSessions(now: Date): Promise<void> {
+/**
+ * Deletes files planned over a day ago and never finalized, rows first and
+ * then their objects. A document never takes a pending file, so none is in
+ * use; an object whose delete fails is left for the orphan sweep.
+ */
+async function deleteStalePendingFiles(now: Date, deadlineAt: number): Promise<void> {
   const dayAgo = new Date(now.getTime() - DAY_MS);
-  await db.transaction(async (tx) => {
-    const staleSessions = await tx
-      .select({ id: uploadSessions.id, ledgerId: uploadSessions.ledgerId })
-      .from(uploadSessions)
-      .where(
-        and(
-          or(
-            inArray(uploadSessions.status, ["expired", "cancelled", "finalized"]),
-            lt(uploadSessions.expiresAt, dayAgo)
-          ),
-          lt(uploadSessions.createdAt, dayAgo)
-        )
-      )
-      .limit(BATCH);
-    const sessionIds = staleSessions.map((session) => session.id);
-    if (sessionIds.length === 0) return;
-    const targets = await tx
-      .select({
-        uploadSessionId: uploadSessionFiles.uploadSessionId,
-        targetId: uploadSessionFiles.targetId,
-      })
-      .from(uploadSessionFiles)
-      .where(inArray(uploadSessionFiles.uploadSessionId, sessionIds));
-    const ledgerBySession = new Map(staleSessions.map((session) => [session.id, session.ledgerId]));
-    if (targets.length > 0) {
-      await tx
-        .insert(objectCleanupJobs)
-        .values(
-          targets.map((target) => ({
-            storageKey: `temporary/${ledgerBySession.get(target.uploadSessionId)!}/${target.uploadSessionId}/${target.targetId}`,
-            uploadSessionId: target.uploadSessionId,
-            nextAttemptAt: now,
-          }))
-        )
-        .onConflictDoNothing({ target: objectCleanupJobs.storageKey });
-    }
-    const sessionsWithoutTargets = sessionIds.filter(
-      (id) => !targets.some((target) => target.uploadSessionId === id)
-    );
-    if (sessionsWithoutTargets.length > 0) {
-      await tx.delete(uploadSessions).where(inArray(uploadSessions.id, sessionsWithoutTargets));
-    }
-  });
-}
-
-/** Deletes queued objects, four at a time, until the queue is empty or time runs out. */
-async function drainObjectCleanup(deadlineAt: number): Promise<void> {
   const storage = getS3Storage();
   while (Date.now() < deadlineAt) {
-    const jobs = await claimObjectCleanup(new Date());
-    if (jobs.length === 0) return;
-    await runWithConcurrency(jobs, 4, async (job) => {
-      let errorCode: string | null = null;
-      try {
-        const result = await storage.delete(job.storageKey);
-        if (!result.success) errorCode = result.error?.name ?? "ObjectDeleteFailed";
-      } catch (error) {
-        errorCode = error instanceof Error ? error.name : "ObjectDeleteFailed";
-      }
-      const acknowledged = await acknowledgeObjectCleanup(job, errorCode);
-      if (acknowledged && errorCode != null) {
-        logger.warn(
-          { cleanupJobId: job.id, attempts: job.attempts + 1 },
-          "Object cleanup will be retried"
-        );
-      }
+    const deleted = await db.execute<{ id: string; ledgerId: string; storageKey: string }>(sql`
+      DELETE FROM ${storedFiles} WHERE id IN (
+        SELECT file.id FROM ${storedFiles} AS file
+        WHERE file.finalized_at IS NULL
+          AND file.created_at < ${dayAgo}
+          AND NOT EXISTS (
+            SELECT 1 FROM ${sourceDocumentFiles} AS link
+            WHERE link.ledger_id = file.ledger_id AND link.stored_file_id = file.id
+          )
+        LIMIT ${BATCH}
+      )
+      RETURNING id, ledger_id AS "ledgerId", storage_key AS "storageKey"
+    `);
+    const keys = deleted.rows.flatMap((file) => [
+      file.storageKey,
+      `temporary/${file.ledgerId}/${file.id}`,
+    ]);
+    await runWithConcurrency(keys, 4, async (key) => {
+      await storage.delete(key);
     });
+    if (deleted.rows.length < BATCH) return;
   }
+}
+
+/**
+ * Deletes objects under `temporary/` last written over a day ago. Finalization
+ * removes its own; these are uploads that never finished or whose delete
+ * failed. Nothing refers to a temporary object, so age alone decides.
+ */
+async function deleteStaleTemporaryObjects(now: Date, deadlineAt: number): Promise<void> {
+  const dayAgo = now.getTime() - DAY_MS;
+  const storage = getS3Storage();
+  let continuationToken: string | null = null;
+  do {
+    const page = await storage.listObjectsPage("temporary/", continuationToken);
+    const stale = page.objects
+      .filter((object) => object.lastModified != null && object.lastModified.getTime() < dayAgo)
+      .map((object) => object.key);
+    await runWithConcurrency(stale, 4, async (key) => {
+      await storage.delete(key);
+    });
+    continuationToken = page.isTruncated ? page.nextContinuationToken : null;
+  } while (continuationToken != null && Date.now() < deadlineAt);
 }

@@ -2,7 +2,7 @@ import "server-only";
 import { ValidationError } from "@/lib/errors";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
-import { abandonUploadSession } from "@/server/stored-files/upload-plans";
+import { discardUnusedFiles } from "@/server/stored-files/uploads";
 import { scheduleProcessingAfter } from "@/server/processing/schedule";
 import {
   submitSourceDocument,
@@ -39,7 +39,7 @@ function resolveDocumentDate(documentDate?: string, timezone?: string): string {
 export async function createAndQueueSourceDocument(
   input: CreateAndQueueSourceDocumentInput
 ): Promise<SourceDocumentSubmissionContract> {
-  let createdUploadSessionId: string | null = null;
+  let storedImageIds: string[] = [];
   const storedInput = input.input.kind === "stored" ? input.input : null;
   const inlineImages = input.input.kind === "inline" ? input.input.images : [];
   validateAggregateFileCount(storedInput?.storedFileIds.length ?? inlineImages.length, 0);
@@ -58,8 +58,8 @@ export async function createAndQueueSourceDocument(
     const resolvedDate = resolveDocumentDate(input.documentDate, input.timezone);
     const preparedImages =
       inlineImages.length > 0 ? await prepareInlineImages(inlineImages, input.ledgerId) : null;
-    createdUploadSessionId = preparedImages?.uploadSessionId ?? null;
     const processedImageIds = preparedImages?.storedFileIds ?? [];
+    storedImageIds = processedImageIds;
 
     return {
       ledgerId: input.ledgerId,
@@ -79,13 +79,8 @@ export async function createAndQueueSourceDocument(
       ? await submitSourceDocumentIdempotently(input.idempotency, prepareSubmission)
       : await submitSourceDocument(await prepareSubmission());
   } catch (error) {
-    if (createdUploadSessionId != null) {
-      try {
-        await abandonUploadSession(input.ledgerId, createdUploadSessionId);
-      } catch {
-        // prepareInlineImages already records cleanup diagnostics; preserve the submission error.
-      }
-    }
+    // Images stored for a submission that did not happen are nobody's.
+    await discardUnusedFiles(input.ledgerId, storedImageIds);
     throw error;
   }
   if (pending.idempotencyReplay !== true) scheduleProcessingAfter(pending.job, input.requestId);

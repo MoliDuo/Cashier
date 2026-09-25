@@ -11,20 +11,6 @@ export interface StoredFileContract {
   createdAt: string;
 }
 
-/**
- * A slot in an upload session. A server-side upload writes to it through the
- * server, so the id is all it needs; only a plan the browser has to execute
- * itself carries somewhere to send the bytes.
- */
-interface UploadTargetContract {
-  id: string;
-}
-
-interface DirectUploadTargetContract extends UploadTargetContract {
-  url: string;
-  requiredHeaders: Readonly<Record<string, string>>;
-}
-
 export interface UploadFileRequestContract {
   contentType: string;
   byteSize: number;
@@ -32,25 +18,19 @@ export interface UploadFileRequestContract {
   checksum?: string | null;
 }
 
-export interface UploadPlanContract {
-  id: string;
+/**
+ * Where the browser sends each file. A target's id is the pending stored
+ * file's, which finalization then takes.
+ */
+export interface DirectUploadPlanContract {
   expiresAt: string;
-  targets: readonly UploadTargetContract[];
-  finalizationToken: string;
+  targets: readonly {
+    id: string;
+    url: string;
+    requiredHeaders: Readonly<Record<string, string>>;
+  }[];
   maxFiles: number;
   maxBytesPerFile: number;
-}
-
-/** An upload plan whose targets the caller reaches over the network itself. */
-export interface DirectUploadPlanContract extends Omit<UploadPlanContract, "targets"> {
-  targets: readonly DirectUploadTargetContract[];
-}
-
-export interface UploadFinalizationContract {
-  uploadSessionId: string;
-  finalizationToken: string;
-  targetIds: readonly string[];
-  ledgerId: string;
 }
 
 export interface AuthorizedFileReadContract {

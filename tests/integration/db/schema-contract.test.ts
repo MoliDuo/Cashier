@@ -262,7 +262,22 @@ describe("PostgreSQL schema contract", () => {
   it("has no named constraint or index drift from the Drizzle model", async () => {
     // Names a later contract migration drops once the model has let go of
     // them; empty while the model and the database agree.
-    const retiredNames = new Set<string>([]);
+    const retiredNames = new Set<string>([
+      "ck_upload_session_files_expected_byte_size",
+      "ck_upload_session_files_position",
+      "fk_upload_session_files_session_ledger",
+      "fk_upload_session_files_stored_file_ledger",
+      "idx_object_cleanup_jobs_due",
+      "idx_upload_session_files_ledger_file",
+      "idx_upload_sessions_ledger_status_expiry",
+      "object_cleanup_jobs_upload_session_id_upload_sessions_id_fk",
+      "upload_sessions_ledger_id_ledgers_id_fk",
+      "uq_object_cleanup_jobs_storage_key",
+      "uq_upload_session_files_session_position",
+      "uq_upload_session_files_session_target",
+      "uq_upload_sessions_finalization_token_hash",
+      "uq_upload_sessions_ledger_id_id",
+    ]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(

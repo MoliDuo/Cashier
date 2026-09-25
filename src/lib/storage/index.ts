@@ -1,3 +1,15 @@
+export interface ListedObject {
+  key: string;
+  byteSize: number;
+  lastModified: Date | null;
+}
+
+export interface ListObjectsPage {
+  objects: ListedObject[];
+  isTruncated: boolean;
+  nextContinuationToken: string | null;
+}
+
 export interface ObjectStore {
   upload(key: string, data: Buffer, contentType: string): Promise<unknown>;
   download(key: string): Promise<Buffer>;
@@ -9,6 +21,11 @@ export interface ObjectStore {
     sha256: string,
     expiresInSeconds: number
   ): Promise<{ url: string; requiredHeaders: Readonly<Record<string, string>> }>;
+  listObjectsPage(
+    prefix: string,
+    continuationToken?: string | null,
+    maxKeys?: number
+  ): Promise<ListObjectsPage>;
   readObject(key: string): Promise<{
     bytes: Buffer;
     metadata: {

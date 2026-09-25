@@ -5,7 +5,10 @@ import { getTestDb } from "../../setup";
 import { flushAfterCallbacks } from "../../setup.common";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { createPendingRevision } from "../../helpers/processing-revision";
+import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { GET } from "@/app/api/cron/daily/route";
+
+vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => new MemoryObjectStore() }));
 
 const SECRET = "a-cron-secret-that-is-long-enough-000";
 
@@ -52,8 +55,8 @@ describe("GET /api/cron/daily", () => {
         processing_recovery: "done",
         category_recovery: "done",
         exchange_rates: "done",
-        upload_sessions: "done",
-        object_cleanup: "done",
+        pending_files: "done",
+        temporary_objects: "done",
       },
     });
     const stale = await db.execute(

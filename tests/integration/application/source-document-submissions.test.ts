@@ -4,9 +4,7 @@ import type { ObjectStore } from "@/lib/storage";
 import { and, eq, isNull } from "drizzle-orm";
 import { Pool, type PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
-import { uploadTarget } from "@/server/stored-files/proxy-uploads";
-import { finalizeUpload } from "@/server/stored-files/upload-finalization";
-import { createUploadPlan } from "@/server/stored-files/upload-plans";
+import { storeProcessedImages } from "@/server/stored-files/uploads";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import {
@@ -37,23 +35,8 @@ const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | unde
 vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
 
 async function finalizedFile(ledgerId: string, body: Buffer) {
-  const plan = await createUploadPlan(ledgerId, [
-    { contentType: "image/jpeg", byteSize: body.length, originalFilename: "receipt.jpg" },
-  ]);
-  await uploadTarget({
-    ledgerId,
-    uploadSessionId: plan.id,
-    targetId: plan.targets[0]!.id,
-    contentType: "image/jpeg",
-    body,
-  });
-  const [file] = await finalizeUpload({
-    ledgerId,
-    uploadSessionId: plan.id,
-    finalizationToken: plan.finalizationToken,
-    targetIds: [plan.targets[0]!.id],
-  });
-  return file!;
+  const [id] = await storeProcessedImages(ledgerId, [{ bytes: body, contentType: "image/jpeg" }]);
+  return { id: id! };
 }
 
 /** Attempts waiting in the queue: still processing and not held by a worker. */

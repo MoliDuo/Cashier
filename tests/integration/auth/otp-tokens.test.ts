@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
   createOtpToken as createOTPToken,
@@ -10,6 +10,10 @@ import { generateOTP, verifyOTP } from "@/modules/auth/domain/otp";
 import { otpTokens } from "@/persistence/schema/auth";
 import { eq } from "drizzle-orm";
 import { runDailyMaintenance } from "@/server/maintenance/daily";
+import { MemoryObjectStore } from "tests/helpers/memory-object-store";
+
+// The daily run also sweeps temporary uploads from object storage.
+vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => new MemoryObjectStore() }));
 
 const deleteOTPToken = async (email: string) => {
   const token = await findOTPRecord(email);

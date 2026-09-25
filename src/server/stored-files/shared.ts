@@ -9,18 +9,8 @@ import {
 } from "@/lib/storage/upload-policy";
 import { storedFiles } from "@/persistence";
 
-export function tokenHash(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
-
 export function checksum(bytes: Buffer): string {
   return crypto.createHash("sha256").update(bytes).digest("hex");
-}
-
-export function safeTokenMatches(token: string, expectedHash: string): boolean {
-  const actual = Buffer.from(tokenHash(token), "hex");
-  const expected = Buffer.from(expectedHash, "hex");
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
 export function mapStoredFile(row: typeof storedFiles.$inferSelect): StoredFileContract {
@@ -60,8 +50,9 @@ export function validateRequests(files: readonly UploadFileRequestContract[]): v
   }
 }
 
-export function temporaryKey(ledgerId: string, sessionId: string, targetId: string): string {
-  return `temporary/${ledgerId}/${sessionId}/${targetId}`;
+/** Where the browser puts a pending file's bytes before finalization reads them. */
+export function temporaryKey(ledgerId: string, storedFileId: string): string {
+  return `temporary/${ledgerId}/${storedFileId}`;
 }
 
 export function durableKey(ledgerId: string, storedFileId: string): string {

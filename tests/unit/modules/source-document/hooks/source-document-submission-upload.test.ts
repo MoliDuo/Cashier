@@ -24,8 +24,6 @@ describe("source-document inline submission preparation", () => {
   it("uploads compliant JPEG images without compressing them again", async () => {
     const compress = vi.fn().mockResolvedValue(uploadImage());
     const createPlan = vi.fn().mockResolvedValue({
-      id: "session-1",
-      finalizationToken: "token",
       targets: [{ id: "target-1", url: "https://upload.test", requiredHeaders: {} }],
     });
     const put = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
@@ -50,6 +48,7 @@ describe("source-document inline submission preparation", () => {
       "https://upload.test",
       expect.objectContaining({ method: "PUT", body: expect.any(File) })
     );
+    expect(finalize).toHaveBeenCalledWith({ storedFileIds: ["target-1"] });
   });
 
   it("rejects compression failures instead of returning original bytes", async () => {
@@ -91,8 +90,6 @@ describe("source-document inline submission preparation", () => {
         })
     );
     const createPlan = vi.fn().mockResolvedValue({
-      id: "session-1",
-      finalizationToken: "token",
       targets: Array.from({ length: 3 }, (_, index) => ({
         id: `target-${index}`,
         url: `https://upload.test/${index}`,
@@ -125,9 +122,7 @@ describe("source-document inline submission preparation", () => {
     const controller = new AbortController();
     const compress = vi.fn().mockResolvedValue(uploadImage());
     let resolvePlan!: (plan: {
-      id: string;
       expiresAt: string;
-      finalizationToken: string;
       maxFiles: number;
       maxBytesPerFile: number;
       targets: {
@@ -140,9 +135,7 @@ describe("source-document inline submission preparation", () => {
     const createPlan = vi.fn(
       () =>
         new Promise<{
-          id: string;
           expiresAt: string;
-          finalizationToken: string;
           maxFiles: number;
           maxBytesPerFile: number;
           targets: {
@@ -170,9 +163,7 @@ describe("source-document inline submission preparation", () => {
     await vi.waitFor(() => expect(createPlan).toHaveBeenCalledTimes(1));
     controller.abort();
     resolvePlan({
-      id: "session-1",
       expiresAt: "2026-07-15T01:00:00.000Z",
-      finalizationToken: "token",
       maxFiles: 3,
       maxBytesPerFile: 10_000_000,
       targets: [
@@ -194,9 +185,7 @@ describe("source-document inline submission preparation", () => {
     const controller = new AbortController();
     const compress = vi.fn().mockResolvedValue(uploadImage());
     const createPlan = vi.fn().mockResolvedValue({
-      id: "session-1",
       expiresAt: "2026-07-15T01:00:00.000Z",
-      finalizationToken: "token",
       maxFiles: 3,
       maxBytesPerFile: 10_000_000,
       targets: [

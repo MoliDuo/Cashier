@@ -67,7 +67,6 @@ const forbiddenLogIdentifierProperties = [
   "revisionId",
   "fileId",
   "storedFileId",
-  "uploadSessionId",
 ];
 
 function parseSourceFile(relativePath, source) {

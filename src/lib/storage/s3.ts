@@ -12,7 +12,12 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AppError } from "@/lib/errors";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
-import { assertSafeStorageKey, type ObjectStore } from "./index";
+import {
+  assertSafeStorageKey,
+  type ListedObject,
+  type ListObjectsPage,
+  type ObjectStore,
+} from "./index";
 
 type ObjectClient = Pick<S3Client, "send">;
 type Presign = typeof getSignedUrl;
@@ -21,18 +26,6 @@ export interface S3ObjectMetadata {
   byteSize: number;
   contentType: string;
   metadata: Readonly<Record<string, string>>;
-}
-
-interface S3ListedObject {
-  key: string;
-  byteSize: number;
-  lastModified: Date | null;
-}
-
-export interface S3ListObjectsPage {
-  objects: S3ListedObject[];
-  isTruncated: boolean;
-  nextContinuationToken: string | null;
 }
 
 function isNotFound(error: unknown): boolean {
@@ -229,7 +222,7 @@ export class S3StorageProvider implements ObjectStore {
     prefix: string,
     continuationToken?: string | null,
     maxKeys = 1000
-  ): Promise<S3ListObjectsPage> {
+  ): Promise<ListObjectsPage> {
     try {
       const response = await this.getClient().send(
         new ListObjectsV2Command({
@@ -241,7 +234,7 @@ export class S3StorageProvider implements ObjectStore {
             : { ContinuationToken: continuationToken }),
         })
       );
-      const objects: S3ListedObject[] = (response.Contents ?? []).flatMap((object) => {
+      const objects: ListedObject[] = (response.Contents ?? []).flatMap((object) => {
         if (object.Key == null || object.Key === "") return [];
         return [
           {

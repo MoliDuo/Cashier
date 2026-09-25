@@ -207,9 +207,7 @@ export async function uploadSourceDocumentSubmissionImages(
     throwIfAborted(dependencies.signal);
     onProgress?.({ phase: "finalizing", percent: 88, fileCount: files.length });
     const storedFileIds = await (dependencies.finalize ?? finalizeSourceDocumentUploadAction)({
-      uploadSessionId: plan.id,
-      finalizationToken: plan.finalizationToken,
-      targetIds: plan.targets.map((target) => target.id),
+      storedFileIds: plan.targets.map((target) => target.id),
     });
     return {
       ...base,

@@ -20,8 +20,7 @@ export type LogIdentifierKind =
   | "source-document"
   | "revision"
   | "stored-file"
-  | "processing-job"
-  | "upload-session";
+  | "processing-job";
 
 export function logIdentifier(kind: LogIdentifierKind, value: string): string {
   if (!(PERSONAL_KINDS as readonly string[]).includes(kind)) return `${kind}:${value}`;

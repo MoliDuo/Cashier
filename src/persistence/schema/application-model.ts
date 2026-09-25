@@ -31,20 +31,6 @@ export const revisionFailureKindEnum = pgEnum("revision_failure_kind", [
   "invalid_input",
   "processing_error",
 ]);
-export const uploadSessionStatusEnum = pgEnum("upload_session_status", [
-  "open",
-  "finalizing",
-  "finalized",
-  "expired",
-  "cancelled",
-]);
-export const uploadTransportEnum = pgEnum("upload_transport", ["proxy", "direct"]);
-export const uploadFileStatusEnum = pgEnum("upload_file_status", [
-  "planned",
-  "uploaded",
-  "finalized",
-  "rejected",
-]);
 export const idempotencyStatusEnum = pgEnum("idempotency_status", ["pending", "completed"]);
 
 export const sourceDocumentRevisions = pgTable(
@@ -154,93 +140,6 @@ export const sourceDocumentFiles = pgTable(
     ),
     index("idx_source_document_files_ledger_file").on(table.ledgerId, table.storedFileId),
     check("ck_source_document_files_position", sql`${table.position} >= 0`),
-  ]
-);
-
-export const uploadSessions = pgTable(
-  "upload_sessions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
-    finalizationTokenHash: text("finalization_token_hash").notNull(),
-    transport: uploadTransportEnum("transport").notNull().default("proxy"),
-    status: uploadSessionStatusEnum("status").notNull().default("open"),
-    expiresAt: requiredTimestamp("expires_at"),
-    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    uniqueIndex("uq_upload_sessions_ledger_id_id").on(table.ledgerId, table.id),
-    uniqueIndex("uq_upload_sessions_finalization_token_hash").on(table.finalizationTokenHash),
-    index("idx_upload_sessions_ledger_status_expiry").on(
-      table.ledgerId,
-      table.status,
-      table.expiresAt
-    ),
-  ]
-);
-
-export const uploadSessionFiles = pgTable(
-  "upload_session_files",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
-    uploadSessionId: uuid("upload_session_id").notNull(),
-    storedFileId: uuid("stored_file_id"),
-    targetId: uuid("target_id").notNull(),
-    position: integer("position").notNull(),
-    expectedContentType: text("expected_content_type").notNull(),
-    expectedByteSize: bigint("expected_byte_size", { mode: "number" }).notNull(),
-    originalFilename: text("original_filename"),
-    expectedChecksum: text("expected_checksum"),
-    status: uploadFileStatusEnum("status").notNull().default("planned"),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.ledgerId, table.uploadSessionId],
-      foreignColumns: [uploadSessions.ledgerId, uploadSessions.id],
-      name: "fk_upload_session_files_session_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId, table.storedFileId],
-      foreignColumns: [storedFiles.ledgerId, storedFiles.id],
-      name: "fk_upload_session_files_stored_file_ledger",
-    }),
-    uniqueIndex("uq_upload_session_files_session_target").on(table.uploadSessionId, table.targetId),
-    uniqueIndex("uq_upload_session_files_session_position").on(
-      table.uploadSessionId,
-      table.position
-    ),
-    index("idx_upload_session_files_ledger_file").on(table.ledgerId, table.storedFileId),
-    check("ck_upload_session_files_position", sql`${table.position} >= 0`),
-    check(
-      "ck_upload_session_files_expected_byte_size",
-      sql`${table.expectedByteSize} IS NULL OR ${table.expectedByteSize} >= 0`
-    ),
-  ]
-);
-
-export const objectCleanupJobs = pgTable(
-  "object_cleanup_jobs",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    storageKey: text("storage_key").notNull(),
-    uploadSessionId: uuid("upload_session_id").references(() => uploadSessions.id, {
-      onDelete: "cascade",
-    }),
-    attempts: integer("attempts").notNull().default(0),
-    claimToken: uuid("claim_token"),
-    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
-    nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),
-    lastError: text("last_error"),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    uniqueIndex("uq_object_cleanup_jobs_storage_key").on(table.storageKey),
-    index("idx_object_cleanup_jobs_due").on(table.nextAttemptAt, table.createdAt),
   ]
 );
 

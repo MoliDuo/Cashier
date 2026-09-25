@@ -12,7 +12,6 @@ import {
   sourceDocumentRevisions,
   sourceDocuments,
   storedFiles,
-  uploadSessions,
 } from "@/persistence";
 import { computeHash, prefixSuffix } from "@/lib/security/service-credential-token";
 
@@ -140,6 +139,8 @@ describe("API v1 source-documents route", () => {
         .then((rows) => rows[0]);
       expect(storedFile).not.toBeUndefined();
       expect(storedFile!.finalizedAt).not.toBeNull();
+      // The server writes the stored object directly; nothing goes through temporary/.
+      expect([...mockR2.files.keys()]).toEqual([storedFile!.storageKey]);
 
       // Verify the revision is the document's queued processing attempt
       const queued = await db
@@ -311,10 +312,6 @@ describe("API v1 source-documents route", () => {
         .select({ id: sourceDocumentFiles.id })
         .from(sourceDocumentFiles)
         .where(eq(sourceDocumentFiles.sourceDocumentId, firstBody.sourceDocumentId));
-      const sessions = await db
-        .select({ id: uploadSessions.id })
-        .from(uploadSessions)
-        .where(eq(uploadSessions.ledgerId, ledgerId));
       const queued = await db
         .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
         .from(sourceDocuments)
@@ -323,7 +320,7 @@ describe("API v1 source-documents route", () => {
       expect(revisions).toHaveLength(1);
       expect(storedFilesRows).toHaveLength(1);
       expect(documentFilesRows).toHaveLength(1);
-      expect(sessions).toHaveLength(1);
+      expect([...mockR2.files.keys()]).toEqual([`${ledgerId}/stored/${storedFilesRows[0]!.id}`]);
       expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
     });
   });

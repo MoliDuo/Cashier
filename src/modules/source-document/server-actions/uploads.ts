@@ -1,7 +1,6 @@
 "use server";
 import type { DirectUploadPlanContract } from "@/server/stored-files/types";
-import { createDirectUploadPlan } from "@/server/stored-files/upload-plans";
-import { finalizeDirectUpload } from "@/server/stored-files/upload-finalization";
+import { finalizeDirectUpload, planDirectUpload } from "@/server/stored-files/uploads";
 import {
   createSourceDocumentUploadPlanInputSchema,
   finalizeSourceDocumentUploadInputSchema,
@@ -15,7 +14,7 @@ export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAcce
     { ledgerId },
     input: CreateSourceDocumentUploadPlanInput
   ): Promise<DirectUploadPlanContract> =>
-    createDirectUploadPlan(
+    planDirectUpload(
       ledgerId,
       createSourceDocumentUploadPlanInputSchema.parse(input).map((file) => ({
         contentType: file.contentType,

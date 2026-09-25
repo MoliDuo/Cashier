@@ -8,56 +8,38 @@ import type { ObjectStore } from "@/lib/storage";
  * is created and that internal keys are never leaked.
  */
 
+import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
-import { uploadTarget } from "@/server/stored-files/proxy-uploads";
-import { finalizeUpload } from "@/server/stored-files/upload-finalization";
-import { createUploadPlan } from "@/server/stored-files/upload-plans";
-import { MemoryObjectStore } from "tests/helpers/memory-object-store";
+import {
+  finalizeDirectUpload,
+  planDirectUpload,
+  storeProcessedImages,
+} from "@/server/stored-files/uploads";
+import { DirectMemoryObjectStore, MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
-import type { StoredFileContract } from "@/server/stored-files/types";
-import { ValidationError } from "@/lib/errors";
+import { ConflictError, ValidationError } from "@/lib/errors";
 import {
   MAX_NORMALIZED_BYTES_PER_REVISION,
   MAX_ORIGINAL_BYTES_PER_FILE,
   MAX_FILES,
 } from "@/lib/storage/upload-policy";
-import { sourceDocumentRevisions, storedFiles, uploadSessions } from "@/persistence";
+import { sourceDocumentRevisions, storedFiles } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "../../../helpers/schema-setup";
 import { getTestDb } from "../../../setup";
 
 const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
 vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
 
-/** Create a finalized stored file via the full upload-plan -> upload -> finalize flow. */
-async function finalizedFile(
-  ledgerId: string,
-  body: Buffer,
-  overrides?: { contentType?: string; checksum?: string | null }
-): Promise<StoredFileContract> {
-  const contentType = overrides?.contentType ?? "image/jpeg";
-  const plan = await createUploadPlan(ledgerId, [
-    {
-      contentType,
-      byteSize: body.length,
-      originalFilename: null,
-      ...(overrides?.checksum ? { checksum: overrides.checksum } : {}),
-    },
-  ]);
-  await uploadTarget({
-    ledgerId,
-    uploadSessionId: plan.id,
-    targetId: plan.targets[0]!.id,
-    contentType,
-    body,
-  });
-  const files = await finalizeUpload({
-    ledgerId,
-    uploadSessionId: plan.id,
-    finalizationToken: plan.finalizationToken,
-    targetIds: [plan.targets[0]!.id],
-  });
-  return files[0]!;
+/** A ready stored file holding `body`, as the server stores an image it already holds. */
+async function finalizedFile(ledgerId: string, body: Buffer): Promise<{ id: string }> {
+  const [id] = await storeProcessedImages(ledgerId, [{ bytes: body, contentType: "image/jpeg" }]);
+  return { id: id! };
+}
+
+function sha256(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 describe("upload policy integration", () => {
@@ -67,15 +49,17 @@ describe("upload policy integration", () => {
       objectStore.current = new MemoryObjectStore();
 
       await expect(
-        createUploadPlan(ledgerId, [
-          { contentType: "image/bmp", byteSize: 1024, originalFilename: null },
+        planDirectUpload(ledgerId, [
+          {
+            contentType: "image/bmp",
+            byteSize: 1024,
+            originalFilename: null,
+            checksum: "a".repeat(64),
+          },
         ])
       ).rejects.toThrow(ValidationError);
 
-      // No upload session was created
-      const db = getTestDb();
-      const sessions = await db.select().from(uploadSessions);
-      expect(sessions).toHaveLength(0);
+      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
     });
 
     it("rejects upload plan with oversized file before any durable state", async () => {
@@ -83,18 +67,17 @@ describe("upload policy integration", () => {
       objectStore.current = new MemoryObjectStore();
 
       await expect(
-        createUploadPlan(ledgerId, [
+        planDirectUpload(ledgerId, [
           {
             contentType: "image/jpeg",
             byteSize: MAX_ORIGINAL_BYTES_PER_FILE + 1,
             originalFilename: null,
+            checksum: "a".repeat(64),
           },
         ])
       ).rejects.toThrow(ValidationError);
 
-      const db = getTestDb();
-      const sessions = await db.select().from(uploadSessions);
-      expect(sessions).toHaveLength(0);
+      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
     });
 
     it("rejects upload plan with too many files before any durable state", async () => {
@@ -104,25 +87,25 @@ describe("upload policy integration", () => {
         contentType: "image/jpeg" as const,
         byteSize: 1024,
         originalFilename: null as string | null,
+        checksum: "a".repeat(64),
       }));
 
-      await expect(createUploadPlan(ledgerId, files)).rejects.toThrow(ValidationError);
+      await expect(planDirectUpload(ledgerId, files)).rejects.toThrow(ValidationError);
 
-      const db = getTestDb();
-      const sessions = await db.select().from(uploadSessions);
-      expect(sessions).toHaveLength(0);
+      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
     });
   });
 
   describe("checksum mismatch at finalization", () => {
-    it("rejects upload target when actual bytes do not match expected checksum", async () => {
+    it("rejects uploaded bytes that do not match the planned checksum", async () => {
       const { ledgerId } = await createTestUserWithLedger(getTestDb());
-      objectStore.current = new MemoryObjectStore();
+      const storage = new DirectMemoryObjectStore();
+      objectStore.current = storage;
 
       const body = Buffer.from("receipt-image-data");
-      // Provide a checksum that does NOT match the actual body
+      // Plan a checksum that does NOT match the bytes the browser sends.
       const wrongChecksum = "a".repeat(64);
-      const plan = await createUploadPlan(ledgerId, [
+      const plan = await planDirectUpload(ledgerId, [
         {
           contentType: "image/jpeg",
           byteSize: body.length,
@@ -130,45 +113,41 @@ describe("upload policy integration", () => {
           checksum: wrongChecksum,
         },
       ]);
+      const id = plan.targets[0]!.id;
+      storage.put(`temporary/${ledgerId}/${id}`, body, "image/jpeg", wrongChecksum);
 
-      await expect(
-        uploadTarget({
-          ledgerId,
-          uploadSessionId: plan.id,
-          targetId: plan.targets[0]!.id,
-          contentType: "image/jpeg",
-          body,
-        })
-      ).rejects.toThrow(ValidationError);
+      await expect(finalizeDirectUpload({ ledgerId, storedFileIds: [id] })).rejects.toThrow(
+        ConflictError
+      );
 
-      // No stored file was created in the database
-      const db = getTestDb();
-      const allFiles = await db.select().from(storedFiles);
-      expect(allFiles).toHaveLength(0);
+      // The planned file is discarded rather than left usable.
+      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
     });
 
-    it("accepts upload when checksum matches", async () => {
+    it("accepts uploaded bytes when the checksum matches", async () => {
       const { ledgerId } = await createTestUserWithLedger(getTestDb());
-      objectStore.current = new MemoryObjectStore();
+      const storage = new DirectMemoryObjectStore();
+      objectStore.current = storage;
 
-      const body = Buffer.from("valid-image-data");
-      const plan = await createUploadPlan(ledgerId, [
+      const body = await sharp({
+        create: { width: 1, height: 1, channels: 3, background: "white" },
+      })
+        .jpeg()
+        .toBuffer();
+      const plan = await planDirectUpload(ledgerId, [
         {
           contentType: "image/jpeg",
           byteSize: body.length,
           originalFilename: null,
+          checksum: sha256(body),
         },
       ]);
+      const id = plan.targets[0]!.id;
+      storage.put(`temporary/${ledgerId}/${id}`, body, "image/jpeg", sha256(body));
 
-      await expect(
-        uploadTarget({
-          ledgerId,
-          uploadSessionId: plan.id,
-          targetId: plan.targets[0]!.id,
-          contentType: "image/jpeg",
-          body,
-        })
-      ).resolves.toBeDefined();
+      await expect(finalizeDirectUpload({ ledgerId, storedFileIds: [id] })).resolves.toEqual([
+        expect.objectContaining({ id }),
+      ]);
     });
   });
 
@@ -329,7 +308,27 @@ describe("upload policy integration", () => {
       const { ledgerId } = await createTestUserWithLedger(db);
       objectStore.current = new MemoryObjectStore();
 
-      const file = await finalizedFile(ledgerId, Buffer.from("no-keys"));
+      const storage = new DirectMemoryObjectStore();
+      objectStore.current = storage;
+      const body = await sharp({
+        create: { width: 1, height: 1, channels: 3, background: "white" },
+      })
+        .jpeg()
+        .toBuffer();
+      const plan = await planDirectUpload(ledgerId, [
+        {
+          contentType: "image/jpeg",
+          byteSize: body.length,
+          originalFilename: null,
+          checksum: sha256(body),
+        },
+      ]);
+      storage.put(`temporary/${ledgerId}/${plan.targets[0]!.id}`, body, "image/jpeg", sha256(body));
+      const [file] = await finalizeDirectUpload({
+        ledgerId,
+        storedFileIds: [plan.targets[0]!.id],
+      });
+      if (file == null) throw new Error("Expected a finalized file");
 
       // The StoredFileContract returned by the adapter should not contain storageKey
       expect(file).not.toHaveProperty("storageKey");
