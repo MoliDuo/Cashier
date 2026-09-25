@@ -95,7 +95,8 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
   selectionToolbar,
 }: SourceDocumentViewDetailsProps): ReactNode {
   const t = useTranslations("SourceDocumentDetail");
-  const displayEntryDate = pendingChanges.sourceDoc.entryDate ?? sourceDocument.documentDate ?? "";
+  const displayEntryDate =
+    pendingChanges.sourceDoc.documentDate ?? sourceDocument.documentDate ?? "";
   // Entry/date fields are editable only while in edit mode (and never during a mutation).
   const fieldsDisabled = interactionDisabled || !isEditMode;
 

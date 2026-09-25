@@ -2,7 +2,10 @@ import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { useState, useMemo, useCallback } from "react";
 import { type EntryEditData } from "@/modules/source-document/types";
 import type { SourceDocument } from "@/modules/source-document/contracts";
-import type { PendingChanges } from "@/modules/source-document/detail-types";
+import type {
+  PendingChanges,
+  SourceDocPendingChanges,
+} from "@/modules/source-document/detail-types";
 
 interface UsePendingChangesOptions {
   sourceDocument: SourceDocument | null;
@@ -30,7 +33,7 @@ export function usePendingChanges({ sourceDocument, ledgerEntries }: UsePendingC
   }, [pendingChanges]);
 
   const handleSourceDocChange = useCallback(
-    (changes: { title?: string; entryDate?: string }) => {
+    (changes: SourceDocPendingChanges) => {
       if (!sourceDocument) return;
 
       setPendingChanges((prev) => {
@@ -41,7 +44,7 @@ export function usePendingChanges({ sourceDocument, ledgerEntries }: UsePendingC
 
           if (field === "title") {
             originalValue = sourceDocument.title ?? "";
-          } else if (field === "entryDate") {
+          } else if (field === "documentDate") {
             originalValue = sourceDocument.documentDate?.split("T")[0] ?? "";
           }
 

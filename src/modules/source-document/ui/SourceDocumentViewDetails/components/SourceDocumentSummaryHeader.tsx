@@ -95,7 +95,7 @@ export function SourceDocumentSummaryHeader({
               value={displayEntryDate}
               onChange={(date) => {
                 if (date) {
-                  onSourceDocChange({ entryDate: formatDateTimeForApi(date) });
+                  onSourceDocChange({ documentDate: formatDateTimeForApi(date) });
                 }
               }}
               size="sm"

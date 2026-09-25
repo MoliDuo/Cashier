@@ -27,6 +27,7 @@ import {
   unwrapVersionedCommandResult,
 } from "@/modules/source-document/command-results";
 import type { PendingChanges } from "@/modules/source-document/detail-types";
+import { toSaveSourceDocumentChangesInput } from "@/modules/source-document/detail-save-input";
 import { useSourceDocumentEntryMutations } from "./useSourceDocumentEntryMutations";
 import { useSourceDocumentRecordMutations } from "./useSourceDocumentRecordMutations";
 import type { BatchEntryUpdateData } from "./source-document-detail-cache";
@@ -96,19 +97,9 @@ export function useSourceDocumentDetailMutations({
   >({
     invalidates: ["documents", "stats"],
     mutationFn: async ({ expectedVersion, changes }: SaveDetailChanges) => {
-      const result = await saveSourceDocumentChangesAction({
-        sourceDocumentId: id,
-        expectedVersion,
-        ...(Object.keys(changes.sourceDoc).length === 0
-          ? {}
-          : { sourceDocument: changes.sourceDoc }),
-        entries: Object.entries(changes.entries)
-          .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))
-          .map(([ledgerEntryId, data]) => ({
-            ledgerEntryId,
-            data,
-          })),
-      });
+      const result = await saveSourceDocumentChangesAction(
+        toSaveSourceDocumentChangesInput(id, expectedVersion, changes)
+      );
       return unwrapVersionedCommandResult(result);
     },
     successMessage: null,

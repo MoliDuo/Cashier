@@ -2,7 +2,7 @@ import type { EntryEditData } from "@/modules/source-document/types";
 
 export interface SourceDocPendingChanges {
   title?: string;
-  entryDate?: string;
+  documentDate?: string;
 }
 
 export type EntriesPendingChanges = Record<string, Partial<EntryEditData>>;
