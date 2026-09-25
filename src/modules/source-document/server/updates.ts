@@ -106,6 +106,37 @@ function normalizeCurrency(currency: string | null, fallback = "CNY"): string {
   return currency != null && currency !== "" ? currency : fallback;
 }
 
+/** The entries with each patch's fields applied and amounts rounded to their currency. */
+function applyEntryPatches(
+  entries: readonly (typeof ledgerEntries.$inferSelect)[],
+  patches: ReadonlyMap<string, UpdateLedgerEntryInput>,
+  mainCurrency: string
+) {
+  return entries.map((entry) => {
+    const patch = patches.get(entry.id);
+    const currency = patch?.currency !== undefined ? patch.currency : entry.currency;
+    const effectiveCurrency = normalizeCurrency(currency, mainCurrency);
+    if (patch?.amount !== undefined || patch?.currency !== undefined) {
+      assertExpenseAmountDirection(entry.amount, patch.amount ?? entry.amount, effectiveCurrency);
+    }
+    return {
+      id: entry.id,
+      categoryId: patch?.categoryId !== undefined ? patch.categoryId : entry.categoryId,
+      amount:
+        patch?.amount !== undefined || patch?.currency !== undefined
+          ? roundToCurrency(
+              patch.amount !== undefined ? String(patch.amount) : entry.amount,
+              effectiveCurrency
+            )
+          : entry.amount,
+      currency,
+      itemName: patch?.itemName !== undefined ? patch.itemName : entry.itemName,
+      description: patch?.description !== undefined ? patch.description : entry.description,
+      createdAt: entry.createdAt.toISOString(),
+    };
+  });
+}
+
 /**
  * Caches the rates the documents' foreign-currency entries are read at once
  * they move to `entryDate`. Best effort: the edit commits either way.
@@ -228,37 +259,7 @@ export async function saveSourceDocumentChanges(
     };
   }
 
-  const nextEntries = activeEntries.map((entry) => {
-    const patch = patches.get(entry.id);
-    if (patch?.amount !== undefined || patch?.currency !== undefined) {
-      assertExpenseAmountDirection(
-        entry.amount,
-        patch?.amount ?? entry.amount,
-        normalizeCurrency(
-          patch?.currency !== undefined ? patch.currency : entry.currency,
-          ledger.mainCurrency
-        )
-      );
-    }
-    return {
-      id: entry.id,
-      categoryId: patch?.categoryId !== undefined ? patch.categoryId : entry.categoryId,
-      amount:
-        patch?.amount !== undefined || patch?.currency !== undefined
-          ? roundToCurrency(
-              patch?.amount !== undefined ? String(patch.amount) : entry.amount,
-              normalizeCurrency(
-                patch?.currency !== undefined ? patch.currency : entry.currency,
-                ledger.mainCurrency
-              )
-            )
-          : entry.amount,
-      currency: patch?.currency !== undefined ? patch.currency : entry.currency,
-      itemName: patch?.itemName !== undefined ? patch.itemName : entry.itemName,
-      description: patch?.description !== undefined ? patch.description : entry.description,
-      createdAt: entry.createdAt.toISOString(),
-    };
-  });
+  const nextEntries = applyEntryPatches(activeEntries, patches, ledger.mainCurrency);
   const dateChanged =
     input.sourceDocument?.documentDate !== undefined &&
     input.sourceDocument.documentDate !== document.documentDate;
@@ -289,16 +290,19 @@ export async function saveSourceDocumentChanges(
       throw new ConflictError("Source document is not editable");
     }
 
+    // Writes only the patched fields onto the entries as they are now, so a
+    // category another writer set since the draft was loaded survives.
+    const previousEntries = await loadProjectionEntriesForDocuments(tx, input.ledgerId, [
+      input.sourceDocumentId,
+    ]);
     await replaceActiveProjectionInTransaction(tx, {
       document: lockedDocument,
-      previousEntries: await loadProjectionEntriesForDocuments(tx, input.ledgerId, [
-        input.sourceDocumentId,
-      ]),
+      previousEntries,
       ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
       expectedActiveRevisionId: lockedDocument.activeRevisionId,
       expectedStateVersion: input.expectedVersion,
-      entries: nextEntries,
+      entries: applyEntryPatches(previousEntries, patches, ledger.mainCurrency),
       ...(input.sourceDocument?.title === undefined ? {} : { title: input.sourceDocument.title }),
       ...(input.sourceDocument?.documentDate === undefined
         ? {}

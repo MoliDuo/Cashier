@@ -146,7 +146,6 @@ const categoryAssignmentModeSchema = z.union([
 const categoryAssignmentSelectionEntrySchema = strictObjectSchema({
   ledgerEntryId: uuidSchema,
   sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
 });
 const beginCategoryAssignmentInputSchema = strictObjectSchema({
   requestKey: uuidSchema,

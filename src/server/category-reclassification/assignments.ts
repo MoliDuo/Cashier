@@ -74,7 +74,6 @@ export interface ClaimedCategoryAssignmentDocument {
   jobId: string;
   ledgerId: string;
   sourceDocumentId: string;
-  expectedVersion: number;
   revisionId: string;
   claimToken: string;
   attempts: number;
@@ -338,7 +337,6 @@ export async function resolveLatestConflictSelection(input: { ledgerId: string; 
     .select({
       ledgerEntryId: ledgerEntries.id,
       sourceDocumentId: sourceDocuments.id,
-      expectedVersion: sourceDocuments.version,
     })
     .from(categoryReclassificationJobEntries)
     .innerJoin(
@@ -435,7 +433,6 @@ export async function appendCategoryAssignmentEntries(input: {
         categoryId: ledgerEntries.categoryId,
         sourceDocumentId: ledgerEntries.sourceDocumentId,
         revisionId: ledgerEntries.sourceDocumentRevisionId,
-        documentVersion: sourceDocuments.version,
         activeRevisionId: sourceDocuments.activeRevisionId,
       })
       .from(ledgerEntries)
@@ -458,15 +455,11 @@ export async function appendCategoryAssignmentEntries(input: {
     if (byId.size !== uniqueEntryIds.length)
       throw new ValidationError("Selection contains unavailable entries");
 
-    const documents = new Map<
-      string,
-      { expectedVersion: number; revisionId: string; firstSelectionOrder: number }
-    >();
+    const documents = new Map<string, { revisionId: string; firstSelectionOrder: number }>();
     input.entries.forEach((entry, index) => {
       const row = byId.get(entry.ledgerEntryId)!;
       if (
         row.sourceDocumentId !== entry.sourceDocumentId ||
-        row.documentVersion !== entry.expectedVersion ||
         row.revisionId == null ||
         row.revisionId !== row.activeRevisionId
       ) {
@@ -476,7 +469,6 @@ export async function appendCategoryAssignmentEntries(input: {
       const existing = documents.get(entry.sourceDocumentId);
       if (existing == null || selectionOrder < existing.firstSelectionOrder) {
         documents.set(entry.sourceDocumentId, {
-          expectedVersion: entry.expectedVersion,
           revisionId: row.revisionId,
           firstSelectionOrder: selectionOrder,
         });
@@ -509,10 +501,9 @@ export async function appendCategoryAssignmentEntries(input: {
       if (
         stored == null ||
         stored.ledgerId !== input.ledgerId ||
-        stored.expectedVersion !== document.expectedVersion ||
         stored.revisionId !== document.revisionId
       ) {
-        throw new ConflictError("A document selection was uploaded with inconsistent versions");
+        throw new ConflictError("A document selection was uploaded with inconsistent revisions");
       }
     }
 
@@ -526,7 +517,6 @@ export async function appendCategoryAssignmentEntries(input: {
           ledgerId: input.ledgerId,
           ledgerEntryId: entry.ledgerEntryId,
           sourceDocumentId: entry.sourceDocumentId,
-          expectedVersion: entry.expectedVersion,
           selectionOrder: input.chunkIndex * 1000 + index,
           originalCategoryId: row.categoryId,
           createdAt: now,
@@ -607,7 +597,6 @@ export async function commitCategoryAssignment(input: {
     const documents = await tx
       .select({
         work: categoryReclassificationJobDocuments,
-        version: sourceDocuments.version,
         activeRevisionId: sourceDocuments.activeRevisionId,
         deletedAt: sourceDocuments.deletedAt,
       })
@@ -629,10 +618,8 @@ export async function commitCategoryAssignment(input: {
       .for("update");
     if (
       documents.some(
-        ({ work, version, activeRevisionId, deletedAt }) =>
-          deletedAt != null ||
-          version !== work.expectedVersion ||
-          activeRevisionId !== work.revisionId
+        ({ work, activeRevisionId, deletedAt }) =>
+          deletedAt != null || activeRevisionId !== work.revisionId
       )
     ) {
       throw new ConflictError("A selected document changed before the assignment was committed");
@@ -709,7 +696,6 @@ export async function claimCategoryAssignmentDocuments(input: {
       job_id: string;
       ledger_id: string;
       source_document_id: string;
-      expected_version: number;
       revision_id: string;
       claim_token: string;
       attempts: number;
@@ -750,7 +736,7 @@ export async function claimCategoryAssignmentDocuments(input: {
         RETURNING work.*
       )
       SELECT claimed.job_id, claimed.ledger_id, claimed.source_document_id,
-        claimed.expected_version, claimed.revision_id, claimed.claim_token,
+        claimed.revision_id, claimed.claim_token,
         claimed.attempts, job.mode, job.direct_category_id,
         job.candidate_category_ids, job.candidate_snapshot, job.custom_prompt_snapshot
       FROM claimed
@@ -767,7 +753,6 @@ export async function claimCategoryAssignmentDocuments(input: {
       jobId: row.job_id,
       ledgerId: row.ledger_id,
       sourceDocumentId: row.source_document_id,
-      expectedVersion: row.expected_version,
       revisionId: row.revision_id,
       claimToken: row.claim_token,
       attempts: row.attempts,
@@ -1189,14 +1174,12 @@ export async function retryCategoryAssignmentFailures(input: {
       const changed =
         current == null ||
         current.deletedAt != null ||
-        current.version !== work.expectedVersion ||
         current.activeRevisionId !== work.revisionId;
       if (changed) changedDocuments.add(work.sourceDocumentId);
       await tx.insert(categoryReclassificationJobDocuments).values({
         jobId: created.id,
         ledgerId: input.ledgerId,
         sourceDocumentId: work.sourceDocumentId,
-        expectedVersion: work.expectedVersion,
         revisionId: work.revisionId,
         firstSelectionOrder: work.firstSelectionOrder,
         status: changed ? "conflict" : "pending",
@@ -1215,7 +1198,6 @@ export async function retryCategoryAssignmentFailures(input: {
         ledgerEntryId: entry.ledgerEntryId,
         sourceDocumentId: entry.sourceDocumentId,
         selectionOrder: entry.selectionOrder,
-        expectedVersion: entry.expectedVersion,
         originalCategoryId: entry.originalCategoryId,
         targetCategoryId: changed ? null : entry.targetCategoryId,
         decisionPersisted: !changed && entry.decisionPersisted,

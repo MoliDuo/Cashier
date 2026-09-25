@@ -110,7 +110,6 @@ export type CategoryAssignmentMode =
 export interface CategoryAssignmentSelectionEntry {
   ledgerEntryId: string;
   sourceDocumentId: string;
-  expectedVersion: number;
 }
 export interface BeginCategoryAssignmentInput {
   requestKey: string;

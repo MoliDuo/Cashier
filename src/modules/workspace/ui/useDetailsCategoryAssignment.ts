@@ -97,13 +97,8 @@ export function useDetailsCategoryAssignment({
               categorySignature: categories.map((category) => category.id).join(":"),
               entries: selectedIds.map((id) => {
                 const entry = entryById.get(id);
-                if (entry?.sourceDocument == null)
-                  throw new Error("Entry has no source document version");
-                return {
-                  ledgerEntryId: id,
-                  sourceDocumentId: entry.sourceDocument.id,
-                  expectedVersion: entry.sourceDocument.version,
-                };
+                if (entry?.sourceDocument == null) throw new Error("Entry has no source document");
+                return { ledgerEntryId: id, sourceDocumentId: entry.sourceDocument.id };
               }),
             }
           : null

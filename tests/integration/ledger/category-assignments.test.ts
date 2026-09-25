@@ -64,7 +64,6 @@ async function seedSelection() {
     selection: {
       ledgerEntryId: entryId,
       sourceDocumentId: document.id,
-      expectedVersion: 1,
     },
   };
 }
@@ -85,7 +84,7 @@ async function prepareAssignment() {
 }
 
 describe("category assignment v2", () => {
-  it("resolves conflicted entries against their current document version without widening scope", async () => {
+  it("resolves conflicted entries that are still current without widening scope", async () => {
     const fixture = await prepareAssignment();
     await appendCategoryAssignmentEntries({
       ledgerId: fixture.ledger.id,
@@ -101,10 +100,6 @@ describe("category assignment v2", () => {
       now: START,
     });
     const db = getTestDb();
-    await db
-      .update(sourceDocuments)
-      .set({ version: 2 })
-      .where(eq(sourceDocuments.id, fixture.document.id));
     await db
       .update(categoryReclassificationJobDocuments)
       .set({ status: "conflict", errorCode: "document_changed" })
@@ -126,7 +121,7 @@ describe("category assignment v2", () => {
     ).resolves.toEqual({
       mode: { kind: "assign", categoryId: fixture.category.id },
       parentJobId: fixture.begun.id,
-      entries: [{ ...fixture.selection, expectedVersion: 2 }],
+      entries: [fixture.selection],
     });
   });
 
@@ -202,7 +197,7 @@ describe("category assignment v2", () => {
     await expect(
       appendCategoryAssignmentEntries({
         ...chunk,
-        entries: [{ ...fixture.selection, expectedVersion: 2 }],
+        entries: [{ ...fixture.selection, sourceDocumentId: crypto.randomUUID() }],
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
 
@@ -230,7 +225,7 @@ describe("category assignment v2", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("fences an expired claim and commits category, version, and outcome together", async () => {
+  it("fences an expired claim and commits category and outcome together without a version bump", async () => {
     const fixture = await prepareAssignment();
     await appendCategoryAssignmentEntries({
       ledgerId: fixture.ledger.id,
@@ -292,7 +287,7 @@ describe("category assignment v2", () => {
         claimToken: second!.claimToken,
         now: AFTER_EXPIRY,
       })
-    ).resolves.toMatchObject({ status: "applied", appliedCount: 1, version: 2 });
+    ).resolves.toEqual({ status: "applied", appliedCount: 1, confirmedCount: 0, conflictCount: 0 });
 
     const [entryRow] = await getTestDb()
       .select({ categoryId: ledgerEntries.categoryId })
@@ -304,5 +299,107 @@ describe("category assignment v2", () => {
       .where(eq(categoryReclassificationJobEntries.jobId, fixture.begun.id));
     expect(entryRow?.categoryId).toBe(fixture.category.id);
     expect(resultRow?.outcome).toBe("applied");
+    const document = await getTestDb().query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, fixture.document.id),
+    });
+    expect(document?.version).toBe(1);
+  });
+
+  it("marks only an entry recategorized after selection as a conflict", async () => {
+    const fixture = await seedSelection();
+    const db = getTestDb();
+    const [other] = await db
+      .insert(entryCategories)
+      .values(createCategoryData(fixture.ledger.id, { name: "Travel", sortOrder: 1 }))
+      .returning();
+    const document = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, fixture.document.id),
+    });
+    const secondEntryId = crypto.randomUUID();
+    await db.insert(ledgerEntries).values({
+      id: secondEntryId,
+      ledgerId: fixture.ledger.id,
+      sourceDocumentId: fixture.document.id,
+      sourceDocumentRevisionId: document!.activeRevisionId,
+      position: 1,
+      amount: "8.00",
+      currency: "CNY",
+      itemName: "Coffee",
+    });
+    const begun = await beginCategoryAssignment({
+      ledgerId: fixture.ledger.id,
+      requestKey: crypto.randomUUID(),
+      mode: { kind: "assign", categoryId: fixture.category.id },
+      expectedEntryCount: 2,
+      candidates: [],
+      customPrompt: null,
+      now: START,
+    });
+    await appendCategoryAssignmentEntries({
+      ledgerId: fixture.ledger.id,
+      jobId: begun.id,
+      chunkIndex: 0,
+      entries: [
+        fixture.selection,
+        { ledgerEntryId: secondEntryId, sourceDocumentId: fixture.document.id },
+      ],
+      now: START,
+    });
+    await commitCategoryAssignment({
+      ledgerId: fixture.ledger.id,
+      jobId: begun.id,
+      expectedEntryCount: 2,
+      now: START,
+    });
+    await db
+      .update(ledgerEntries)
+      .set({ categoryId: other!.id })
+      .where(eq(ledgerEntries.id, secondEntryId));
+    const [claimed] = await claimCategoryAssignmentDocuments({
+      jobId: begun.id,
+      now: START,
+      leaseMs: 60_000,
+      concurrency: 1,
+    });
+
+    await expect(
+      applyCategoryAssignments({
+        ledgerId: fixture.ledger.id,
+        jobId: begun.id,
+        sourceDocumentId: fixture.document.id,
+        claimToken: claimed!.claimToken,
+        now: START,
+      })
+    ).resolves.toEqual({ status: "applied", appliedCount: 1, confirmedCount: 0, conflictCount: 1 });
+
+    const entries = await db
+      .select({ id: ledgerEntries.id, categoryId: ledgerEntries.categoryId })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.sourceDocumentId, fixture.document.id));
+    expect(new Map(entries.map((entry) => [entry.id, entry.categoryId]))).toEqual(
+      new Map([
+        [fixture.selection.ledgerEntryId, fixture.category.id],
+        [secondEntryId, other!.id],
+      ])
+    );
+    const outcomes = await db
+      .select({
+        id: categoryReclassificationJobEntries.ledgerEntryId,
+        outcome: categoryReclassificationJobEntries.outcome,
+        errorCode: categoryReclassificationJobEntries.errorCode,
+      })
+      .from(categoryReclassificationJobEntries)
+      .where(eq(categoryReclassificationJobEntries.jobId, begun.id));
+    expect(outcomes).toEqual(
+      expect.arrayContaining([
+        { id: fixture.selection.ledgerEntryId, outcome: "applied", errorCode: null },
+        { id: secondEntryId, outcome: "conflict", errorCode: "entry_changed" },
+      ])
+    );
+    expect(
+      await db.query.categoryReclassificationJobs.findFirst({
+        where: eq(categoryReclassificationJobs.id, begun.id),
+      })
+    ).toMatchObject({ status: "partial", appliedCount: 1, conflictCount: 1 });
   });
 });

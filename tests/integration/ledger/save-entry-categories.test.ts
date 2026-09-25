@@ -113,17 +113,18 @@ describe("saveEntryCategoriesAction", () => {
     });
     expect(removed?.deletedAt).not.toBeNull();
     expect(entry?.categoryId).toBeNull();
+    // Clearing a deleted category does not make an open draft stale.
     expect(
       await db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, document.id) })
-    ).toMatchObject({ version: 2 });
+    ).toMatchObject({ version: 1 });
     expect(
       await saveSourceDocumentChangesAction({
         sourceDocumentId: document.id,
         expectedVersion: 1,
-        sourceDocument: { title: "Stale edit" },
+        sourceDocument: { title: "Draft edit" },
         entries: [],
       })
-    ).toMatchObject({ ok: false, reason: "stale", currentVersion: 2 });
+    ).toMatchObject({ ok: true, version: 2 });
     await saveEntryCategoriesAction({
       expectedRevision: await computeCategoryCollectionRevision(saved),
       categories: saved.map(({ id, name, description, icon }) => ({ id, name, description, icon })),

@@ -106,7 +106,6 @@ function work(index: number) {
     jobId: "job-1",
     ledgerId: "ledger-1",
     sourceDocumentId: `document-${index}`,
-    expectedVersion: 1,
     revisionId: `revision-${index}`,
     claimToken: `claim-${index}`,
     attempts: 1,

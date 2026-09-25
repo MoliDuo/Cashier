@@ -1,6 +1,6 @@
 {
-  "id": "caec73ad-d35b-4a62-8504-07b88aabb5a7",
-  "prevId": "679ce85b-4310-49cb-ae34-f563d3cccb2d",
+  "id": "e8c95e51-541a-4436-a5ad-3a65ae10cd63",
+  "prevId": "caec73ad-d35b-4a62-8504-07b88aabb5a7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -417,44 +417,6 @@
           "value": "\"users\".\"auth_version\" > 0"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.currency_rates": {
-      "name": "currency_rates",
-      "schema": "",
-      "columns": {
-        "date": {
-          "name": "date",
-          "type": "date",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "base": {
-          "name": "base",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'EUR'"
-        },
-        "rates": {
-          "name": "rates",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.exchange_rates": {
@@ -902,18 +864,6 @@
         "description": {
           "name": "description",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "converted_amount": {
-          "name": "converted_amount",
-          "type": "numeric(21, 3)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "exchange_rate": {
-          "name": "exchange_rate",
-          "type": "numeric(30, 12)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1930,7 +1880,7 @@
           "name": "expected_version",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "revision_id": {
           "name": "revision_id",
@@ -2159,7 +2109,7 @@
           "name": "expected_version",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "original_category_id": {
           "name": "original_category_id",
@@ -2540,126 +2490,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.exchange_rate_recalculation_jobs": {
-      "name": "exchange_rate_recalculation_jobs",
-      "schema": "",
-      "columns": {
-        "rate_date": {
-          "name": "rate_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "exchange_rate_recalculation_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "claim_token": {
-          "name": "claim_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_expires_at": {
-          "name": "claim_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "idx_exchange_rate_recalculation_jobs_due": {
-          "name": "idx_exchange_rate_recalculation_jobs_due",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_attempt_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "exchange_rate_recalculation_jobs_ledger_id_ledgers_id_fk": {
-          "name": "exchange_rate_recalculation_jobs_ledger_id_ledgers_id_fk",
-          "tableFrom": "exchange_rate_recalculation_jobs",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "exchange_rate_recalculation_jobs_rate_date_ledger_id_pk": {
-          "name": "exchange_rate_recalculation_jobs_rate_date_ledger_id_pk",
-          "columns": [
-            "rate_date",
-            "ledger_id"
-          ]
-        }
-      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -4113,15 +3943,6 @@
         "partial",
         "failed",
         "cancelled"
-      ]
-    },
-    "public.exchange_rate_recalculation_status": {
-      "name": "exchange_rate_recalculation_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "claimed",
-        "failed"
       ]
     },
     "public.idempotency_status": {

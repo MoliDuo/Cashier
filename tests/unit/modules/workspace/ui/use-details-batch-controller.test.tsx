@@ -437,7 +437,7 @@ describe("useDetailsBatchController", () => {
     expect(appendCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
       jobId: "job-1",
       chunkIndex: 0,
-      entries: [{ ledgerEntryId: "entry-1", sourceDocumentId: "document-1", expectedVersion: 1 }],
+      entries: [{ ledgerEntryId: "entry-1", sourceDocumentId: "document-1" }],
     });
     expect(commitCategoryAssignmentSelectionActionMock).toHaveBeenCalledWith({
       jobId: "job-1",

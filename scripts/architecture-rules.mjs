@@ -58,7 +58,6 @@ const registeredSourceDocumentWriters = new Set([
   "src/modules/source-document/server/projections/manual-entries.ts",
   "src/modules/source-document/server/projections/writes.ts",
   "src/modules/source-document/server/revisions.ts",
-  "src/modules/source-document/server/category-assignments.ts",
 ]);
 const forbiddenLogIdentifierProperties = [
   "userId",

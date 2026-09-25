@@ -23,7 +23,6 @@ import {
 } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
-import { incrementCategoryChangedDocumentVersions } from "@/modules/source-document/server/category-assignments";
 
 function mapCategory(row: typeof entryCategories.$inferSelect): EntryCategoryDto {
   return {
@@ -258,7 +257,6 @@ export async function saveEntryCategories(
         .then((rows) => rows.map((row) => row.id).sort());
       const documents = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
       for (const document of documents) await assertSourceDocumentNotProcessing(tx, document);
-      await incrementCategoryChangedDocumentVersions(tx, ledgerId, affectedDocumentIds, now);
       await tx
         .update(ledgerEntries)
         .set({ categoryId: null, updatedAt: now })
@@ -576,8 +574,6 @@ export async function applyCategoryPreset(
         RETURNING entry.source_document_id
       `);
       movedEntryCount = moved.rows.length;
-      const changedDocumentIds = [...new Set(moved.rows.map((row) => row.source_document_id))];
-      await incrementCategoryChangedDocumentVersions(tx, ledgerId, changedDocumentIds, now);
     }
 
     // Preset categories take the leading slots; kept extras follow. A reused

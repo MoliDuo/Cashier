@@ -86,7 +86,6 @@ async function submitSelection(
     .select({
       ledgerEntryId: ledgerEntries.id,
       sourceDocumentId: sourceDocuments.id,
-      expectedVersion: sourceDocuments.version,
     })
     .from(ledgerEntries)
     .innerJoin(sourceDocuments, eq(ledgerEntries.sourceDocumentId, sourceDocuments.id))

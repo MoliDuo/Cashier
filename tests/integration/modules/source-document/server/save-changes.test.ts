@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
-import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 import { getTestDb } from "../../../../setup";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "../../../../helpers/schema-setup";
-import { createLedgerData, createSourceDocumentData } from "../../../../helpers/factories";
+import {
+  createCategoryData,
+  createLedgerData,
+  createSourceDocumentData,
+} from "../../../../helpers/factories";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
@@ -67,6 +72,35 @@ describe("saveSourceDocumentChangesAction", () => {
     });
     expect(entry?.itemName).toBe("Updated entry");
     expect(entry?.deletedAt).toBeNull();
+  });
+
+  it("keeps a category another writer set while the save was in flight", async () => {
+    const fixture = await seed();
+    const category = createCategoryData(fixture.ledger.id, { name: "Meals", sortOrder: 0 });
+    await fixture.db.insert(entryCategories).values(category);
+    // A category assignment commits between the save's reads and its write,
+    // without advancing the document version.
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates").mockImplementation(async () => {
+      await fixture.db
+        .update(ledgerEntries)
+        .set({ categoryId: category.id })
+        .where(eq(ledgerEntries.id, fixture.entryId));
+    });
+
+    const result = await saveSourceDocumentChangesAction({
+      sourceDocumentId: fixture.document.id,
+      expectedVersion: 1,
+      entries: [{ ledgerEntryId: fixture.entryId, data: { currency: "EUR" } }],
+    });
+
+    expect(ensure).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ ok: true, version: 2 });
+    expect(
+      await fixture.db.query.ledgerEntries.findFirst({
+        where: eq(ledgerEntries.id, fixture.entryId),
+      })
+    ).toMatchObject({ currency: "EUR", categoryId: category.id });
+    ensure.mockRestore();
   });
 
   it("returns stale on replay and performs no additional write", async () => {

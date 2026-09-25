@@ -13,7 +13,6 @@ import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { refreshCategoryAssignmentParentJob } from "@/server/category-reclassification/assignments";
 import { ConflictError } from "@/lib/errors";
-import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
 export interface ApplyCategoryAssignmentsInput {
   ledgerId: string;
@@ -24,26 +23,8 @@ export interface ApplyCategoryAssignmentsInput {
 }
 
 export type ApplyCategoryAssignmentsResult =
-  | { status: "applied"; appliedCount: number; confirmedCount: number; version: number }
+  | { status: "applied"; appliedCount: number; confirmedCount: number; conflictCount: number }
   | { status: "conflict" | "skipped" | "cancelled" | "claim_lost" };
-
-export async function incrementCategoryChangedDocumentVersions(
-  tx: PostgresTransaction,
-  ledgerId: string,
-  sourceDocumentIds: readonly string[],
-  now: Date
-): Promise<void> {
-  if (sourceDocumentIds.length === 0) return;
-  await tx
-    .update(sourceDocuments)
-    .set({ version: sql`${sourceDocuments.version} + 1`, updatedAt: now })
-    .where(
-      and(
-        eq(sourceDocuments.ledgerId, ledgerId),
-        inArray(sourceDocuments.id, [...sourceDocumentIds])
-      )
-    );
-}
 
 export async function applyCategoryAssignments(
   input: ApplyCategoryAssignmentsInput
@@ -131,10 +112,7 @@ export async function applyCategoryAssignments(
     if (document == null || document.deletedAt != null || document.activeRevisionId == null) {
       return finishWithoutWrite("skipped", "document_unavailable");
     }
-    if (
-      document.version !== work.expectedVersion ||
-      document.activeRevisionId !== work.revisionId
-    ) {
+    if (document.activeRevisionId !== work.revisionId) {
       return finishWithoutWrite("conflict", "document_changed");
     }
     try {
@@ -198,44 +176,44 @@ export async function applyCategoryAssignments(
       }
     }
 
+    // Each entry is written only if it still has the category it had when it
+    // was selected; one changed since then is a conflict on its own, and the
+    // document's other entries still apply.
     let appliedCount = 0;
     let confirmedCount = 0;
+    let conflictCount = 0;
     for (const entry of selected) {
-      const outcome =
-        entry.currentCategoryId === entry.work.targetCategoryId ? "confirmed" : "applied";
-      if (outcome === "applied") {
-        await tx
+      let outcome: "applied" | "confirmed" | "conflict" = "confirmed";
+      if (entry.currentCategoryId !== entry.work.targetCategoryId) {
+        const written = await tx
           .update(ledgerEntries)
           .set({ categoryId: entry.work.targetCategoryId, updatedAt: now })
           .where(
             and(
               eq(ledgerEntries.ledgerId, input.ledgerId),
               eq(ledgerEntries.id, entry.work.ledgerEntryId),
-              eq(ledgerEntries.sourceDocumentRevisionId, document.activeRevisionId)
+              eq(ledgerEntries.sourceDocumentRevisionId, document.activeRevisionId),
+              isNull(ledgerEntries.deletedAt),
+              sql`${ledgerEntries.categoryId} IS NOT DISTINCT FROM ${entry.work.originalCategoryId}`
             )
-          );
-        appliedCount += 1;
-      } else confirmedCount += 1;
+          )
+          .returning({ id: ledgerEntries.id });
+        outcome = written.length > 0 ? "applied" : "conflict";
+      }
+      if (outcome === "applied") appliedCount += 1;
+      else if (outcome === "confirmed") confirmedCount += 1;
+      else conflictCount += 1;
       await tx
         .update(categoryReclassificationJobEntries)
-        .set({ outcome, errorCode: null, updatedAt: now })
+        .set({
+          outcome,
+          errorCode: outcome === "conflict" ? "entry_changed" : null,
+          updatedAt: now,
+        })
         .where(
           and(
             eq(categoryReclassificationJobEntries.jobId, input.jobId),
             eq(categoryReclassificationJobEntries.ledgerEntryId, entry.work.ledgerEntryId)
-          )
-        );
-    }
-    const version = document.version + (appliedCount > 0 ? 1 : 0);
-    if (appliedCount > 0) {
-      await tx
-        .update(sourceDocuments)
-        .set({ version, updatedAt: now })
-        .where(
-          and(
-            eq(sourceDocuments.ledgerId, input.ledgerId),
-            eq(sourceDocuments.id, input.sourceDocumentId),
-            eq(sourceDocuments.version, document.version)
           )
         );
     }
@@ -256,6 +234,6 @@ export async function applyCategoryAssignments(
         )
       );
     await refreshCategoryAssignmentParentJob(tx, input.jobId, input.ledgerId, now);
-    return { status: "applied", appliedCount, confirmedCount, version };
+    return { status: "applied", appliedCount, confirmedCount, conflictCount };
   });
 }
