@@ -7,12 +7,10 @@ import { authenticateWithPassword } from "@/modules/auth/server/authenticate-wit
 import { authenticateDevUser } from "@/modules/auth/server/authenticate-dev-user";
 import { getSessionUser } from "@/modules/auth/server/session-user";
 import { isDevAuthBypassEnabled } from "@/modules/auth/dev-auth";
-import { TIME_SECONDS } from "@/lib/constants";
 import { completeInteractiveSignIn } from "@/modules/auth/server/complete-interactive-sign-in";
 import { AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { UnauthorizedError } from "@/lib/errors";
-import { SESSION_MAX_AGE_DAYS } from "@/config/tuning";
 
 class AuthCredentialsSigninError extends CredentialsSignin {
   constructor(code: string) {
@@ -109,11 +107,6 @@ if (isDevAuthBypassEnabled()) {
 export const authOptions = {
   ...authConfig,
   providers,
-  session: {
-    strategy: "jwt",
-    maxAge: SESSION_MAX_AGE_DAYS * TIME_SECONDS.DAY,
-    updateAge: TIME_SECONDS.DAY,
-  },
   pages: authConfig.pages,
   callbacks: {
     ...authConfig.callbacks,
@@ -136,11 +129,13 @@ export const authOptions = {
         if (tokenAuthVersion !== dbUser.authVersion) {
           throw new UnauthorizedError("Session has been revoked");
         }
+        // Not `token.iat`: every re-signed cookie gets a fresh one, which would
+        // make any session look like a recent sign-in.
         const authenticatedAt =
           typeof token.authenticatedAt === "number" && Number.isFinite(token.authenticatedAt)
             ? token.authenticatedAt
-            : token.iat;
-        if (authenticatedAt == null || !Number.isFinite(authenticatedAt)) {
+            : null;
+        if (authenticatedAt == null) {
           throw new UnauthorizedError("Session authentication time is missing");
         }
         const authenticatedAtDate = new Date(authenticatedAt * 1000);

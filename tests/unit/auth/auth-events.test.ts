@@ -222,15 +222,21 @@ describe("auth.ts adapter wiring", () => {
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("accepts legacy version-one tokens and falls back to iat", async () => {
+  it("accepts legacy version-one tokens but not their re-signed iat as a sign-in time", async () => {
     const { authOptions } = await loadAuthOptions();
     const sessionCallback = authOptions?.callbacks?.session;
     const result = await sessionCallback?.({
       session: { user: { id: "db-user" } },
-      token: { sub: "db-user", iat: 1_800_000_000 },
+      token: { sub: "db-user", authenticatedAt: 1_800_000_000 },
     });
-
     expect(result?.user?.authenticatedAt).toBe("2027-01-15T08:00:00.000Z");
+
+    await expect(
+      sessionCallback?.({
+        session: { user: { id: "db-user" } },
+        token: { sub: "db-user", iat: 1_800_000_000 },
+      })
+    ).rejects.toThrow("Session authentication time is missing");
   });
 
   it("rethrows missing-user session errors from the auth session query", async () => {

@@ -29,11 +29,18 @@ vi.mock("@/modules/auth/server/authenticate-with-password", () => ({
   authenticateWithPassword: vi.fn(),
 }));
 
-vi.mock("@/modules/auth/server/session-user", () => ({
-  getSessionUser: vi.fn(async (id: string) => ({
+const { getSessionUserMock } = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn(async (id: string) => ({
     id,
     email: "test@example.com",
+    authVersion: 1,
+    passwordHash: null,
+    passwordUpdatedAt: null,
   })),
+}));
+
+vi.mock("@/modules/auth/server/session-user", () => ({
+  getSessionUser: getSessionUserMock,
 }));
 
 describe("auth runtime config", () => {
@@ -93,5 +100,20 @@ describe("auth runtime config", () => {
       | undefined;
 
     expect(config?.providers?.map((provider) => provider.id)).toEqual(["otp", "password", "dev"]);
+  });
+
+  it("gives the proxy instance the same 14-day session as the full one", async () => {
+    vi.doUnmock("@/auth");
+    const { authConfig } = await import("@/auth.config");
+    const { authOptions } = await import("@/auth");
+
+    // src/proxy.ts builds its instance from authConfig alone and re-signs the
+    // cookie on every request, so the lifetime must not live only in auth.ts.
+    expect(authConfig.session).toEqual({
+      strategy: "jwt",
+      maxAge: 14 * 86_400,
+      updateAge: 86_400,
+    });
+    expect(authOptions.session).toEqual(authConfig.session);
   });
 });
