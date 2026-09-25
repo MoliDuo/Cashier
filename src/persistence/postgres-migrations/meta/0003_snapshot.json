@@ -1,6 +1,6 @@
 {
-  "id": "de3f6a26-721e-4631-b9cb-c90a25d3d163",
-  "prevId": "10718c9a-82c7-494b-b1af-06ffc6577a69",
+  "id": "679ce85b-4310-49cb-ae34-f563d3cccb2d",
+  "prevId": "de3f6a26-721e-4631-b9cb-c90a25d3d163",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -455,6 +455,63 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.exchange_rates": {
+      "name": "exchange_rates",
+      "schema": "",
+      "columns": {
+        "rate_date": {
+          "name": "rate_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "per_eur": {
+          "name": "per_eur",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_date": {
+          "name": "source_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "exchange_rates_rate_date_currency_pk": {
+          "name": "exchange_rates_rate_date_currency_pk",
+          "columns": [
+            "rate_date",
+            "currency"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_exchange_rates_per_eur_positive": {
+          "name": "ck_exchange_rates_per_eur_positive",
+          "value": "\"exchange_rates\".\"per_eur\" > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.books": {

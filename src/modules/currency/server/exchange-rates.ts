@@ -4,6 +4,7 @@ import { AppError } from "@/lib/errors";
 import {
   currencyRates,
   exchangeRateRecalculationJobs,
+  exchangeRates,
   ledgerEntries,
   ledgers,
   sourceDocuments,
@@ -16,6 +17,7 @@ import { convertWithRates, type ExchangeRates } from "../domain/rate-calculation
 import { roundToCurrency } from "@/lib/money/currency-precision";
 
 // Exchange-rate cache backed by the currency_rates table and the Frankfurter API.
+// Final snapshots are also written to exchange_rates, which reads switch to next.
 
 const supportedCurrencySet = new Set<string>(SUPPORTED_CURRENCIES);
 
@@ -192,6 +194,19 @@ async function fetchAndStoreRates(targetDateStr: string): Promise<ExchangeRates>
     if (!isFinalForDate(providerDate, targetDateStr)) return data;
 
     return await db.transaction(async (tx) => {
+      if (data.base === "EUR") {
+        await tx
+          .insert(exchangeRates)
+          .values(
+            Object.entries({ ...data.rates, EUR: 1 }).map(([currency, perEur]) => ({
+              rateDate: targetDateStr,
+              currency,
+              perEur: String(perEur),
+              sourceDate: providerDate,
+            }))
+          )
+          .onConflictDoNothing();
+      }
       const insertedRows = await tx
         .insert(currencyRates)
         .values({ date: targetDateStr, base: data.base, rates: data.rates })

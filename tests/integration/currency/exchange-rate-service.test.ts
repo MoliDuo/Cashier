@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { db } from "@/lib/db";
-import { currencyRates } from "@/persistence/schema/currency";
+import { currencyRates, exchangeRates } from "@/persistence/schema/currency";
 import { eq } from "drizzle-orm";
 
 describe("getExchangeRates", () => {
   beforeEach(async () => {
     // Clear cache and database
     await db.delete(currencyRates);
+    await db.delete(exchangeRates);
   });
 
   afterEach(() => {
@@ -80,6 +81,31 @@ describe("getExchangeRates", () => {
     expect(cached.date).toBe("2024-01-20");
   });
 
+  it("also stores a final snapshot as one per-euro row per currency", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        base: "EUR",
+        date: "2024-01-19",
+        rates: { USD: 1.15, CNY: 7.7 },
+      }),
+    } as Response);
+
+    await getExchangeRates("2024-01-20");
+    const rows = await db.query.exchangeRates.findMany({
+      where: eq(exchangeRates.rateDate, "2024-01-20"),
+    });
+    expect(
+      rows
+        .map(({ currency, perEur, sourceDate }) => ({ currency, perEur, sourceDate }))
+        .sort((a, b) => a.currency.localeCompare(b.currency))
+    ).toEqual([
+      { currency: "CNY", perEur: "7.7", sourceDate: "2024-01-19" },
+      { currency: "EUR", perEur: "1", sourceDate: "2024-01-19" },
+      { currency: "USD", perEur: "1.15", sourceDate: "2024-01-19" },
+    ]);
+  });
+
   it.each([
     ["today before the day's rates are published", 0],
     ["a future day", 3],
@@ -100,6 +126,9 @@ describe("getExchangeRates", () => {
     });
     expect(
       await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, requested) })
+    ).toBeUndefined();
+    expect(
+      await db.query.exchangeRates.findFirst({ where: eq(exchangeRates.rateDate, requested) })
     ).toBeUndefined();
 
     await getExchangeRates(requested);
