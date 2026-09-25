@@ -50,6 +50,13 @@
       "when": 1790331708516,
       "tag": "0006_source_document_files_and_revision_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790332824884,
+      "tag": "0007_entries_owned_by_documents",
+      "breakpoints": true
     }
   ]
 }

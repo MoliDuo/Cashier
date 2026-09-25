@@ -1,7 +1,7 @@
 import type { RevisionProcessingStatus } from "@/modules/source-document/lifecycle";
 
+/** A processing attempt waiting to run; the attempt is its own queue entry. */
 export interface ProcessingJobContract {
-  id: string;
   sourceDocumentId: string;
   revisionId: string;
   requestedAt: string;
@@ -13,7 +13,7 @@ export interface ProcessingJobContract {
  * worker whose lease was lost or reclaimed cannot commit stale results.
  */
 export interface ProcessingLeaseContract {
-  jobId: string;
+  revisionId: string;
   claimToken: string;
 }
 
@@ -21,13 +21,13 @@ export interface ProcessingClaimContract {
   ledgerId: string;
   job: ProcessingJobContract;
   claimToken: string;
-  /** Runs this job has been given, this one included. */
+  /** Runs this attempt has been given, this one included. */
   attempt: number;
   expiresAt: string;
 }
 
 export interface RecoverableProcessingJobContract extends ProcessingJobContract {
-  scheduleAttemptCount: number;
+  attemptCount: number;
   nextAvailableAt: string;
 }
 

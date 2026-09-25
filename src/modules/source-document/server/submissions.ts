@@ -1,10 +1,9 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import {
   idempotencyRecords,
-  processingOutbox,
   revisionFiles,
   sourceDocumentRevisions,
   sourceDocuments,
@@ -30,8 +29,6 @@ async function submitInTransaction(
   tx: PostgresTransaction,
   input: SourceDocumentSubmissionInput
 ): Promise<SourceDocumentSubmissionResult> {
-  const jobId = crypto.randomUUID();
-  const requestedAt = new Date();
   let revisionInput = input.input;
 
   if (input.sourceDocumentId != null) {
@@ -88,40 +85,16 @@ async function submitInTransaction(
     }
 
     if (input.supersedeProcessing === true && document?.latestSubmissionRevisionId != null) {
-      const now = new Date();
-      const supersededRevision = await tx
+      await tx
         .update(sourceDocumentRevisions)
-        .set({
-          processingStatus: "cancelled",
-          finishedAt: now,
-        })
+        .set({ processingStatus: "cancelled", finishedAt: new Date() })
         .where(
           and(
             eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
             eq(sourceDocumentRevisions.id, document.latestSubmissionRevisionId),
             eq(sourceDocumentRevisions.processingStatus, "processing")
           )
-        )
-        .returning({ id: sourceDocumentRevisions.id })
-        .then((rows) => rows[0]);
-
-      if (supersededRevision != null) {
-        await tx
-          .update(processingOutbox)
-          .set({
-            status: "cancelled",
-            diagnosticCode: "superseded_by_retry",
-            completedAt: now,
-            claimToken: null,
-            claimExpiresAt: null,
-          })
-          .where(
-            and(
-              eq(processingOutbox.revisionId, supersededRevision.id),
-              inArray(processingOutbox.status, ["pending", "claimed"])
-            )
-          );
-      }
+        );
     }
   }
 
@@ -147,22 +120,13 @@ async function submitInTransaction(
           input: revisionInput,
         }
   );
+  // The processing attempt is its own queue entry; recovery picks it up if the
+  // request that scheduled its run dies first.
   const job = {
-    id: jobId,
     sourceDocumentId: pending.document.id,
     revisionId: pending.revision.id,
-    requestedAt: requestedAt.toISOString(),
+    requestedAt: pending.revision.submittedAt,
   };
-
-  await tx.insert(processingOutbox).values({
-    id: job.id,
-    ledgerId: input.ledgerId,
-    sourceDocumentId: job.sourceDocumentId,
-    revisionId: pending.revision.id,
-    status: "pending",
-    requestedAt,
-  });
-
   return { ...pending, job };
 }
 
@@ -321,7 +285,7 @@ export interface SourceDocumentSubmissionResult {
   idempotencyReplay?: boolean;
 }
 
-/** Atomically persists submitted evidence and the durable work needed to process it. */
+/** Atomically persists submitted evidence as a processing attempt ready to be claimed. */
 export type SourceDocumentSubmissionInput = {
   ledgerId: string;
   input?: SourceDocumentInputContract;

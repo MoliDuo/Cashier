@@ -33,13 +33,13 @@ function toFailureCode(error: unknown): ProcessingFailureCode {
 }
 
 /**
- * Claims one outbox job, keeps its lease alive while the revision is parsed,
- * and records the outcome. Returns false when another execution holds it.
+ * Claims one processing attempt, keeps its lease alive while it is parsed, and
+ * records the outcome. Returns false when another execution holds it.
  */
 export async function executeProcessingJob(job: ProcessingJobContract): Promise<boolean> {
-  const claim = await claimProcessingJob(job.id);
+  const claim = await claimProcessingJob(job.revisionId);
   if (claim == null) return false;
-  const lease = { jobId: claim.job.id, claimToken: claim.claimToken };
+  const lease = { revisionId: claim.job.revisionId, claimToken: claim.claimToken };
   if (claim.attempt > PROCESSING_MAX_ATTEMPTS) {
     await recordProcessingFailure({
       ledgerId: claim.ledgerId,
@@ -60,10 +60,10 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
   const renewLease = async (): Promise<void> => {
     if (stopped || controller.signal.aborted) return;
     try {
-      const renewedUntil = await renewProcessingJobLease(claim.job.id, claim.claimToken);
+      const renewedUntil = await renewProcessingJobLease(claim.job.revisionId, claim.claimToken);
       if (renewedUntil == null) {
         logger.warn(
-          { processingJobSubject: logIdentifier("processing-job", claim.job.id) },
+          { revisionSubject: logIdentifier("revision", claim.job.revisionId) },
           "Processing lease was lost or cancelled; aborting worker"
         );
         controller.abort();
@@ -72,7 +72,7 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
     } catch (error) {
       logger.warn(
         {
-          processingJobSubject: logIdentifier("processing-job", claim.job.id),
+          revisionSubject: logIdentifier("revision", claim.job.revisionId),
           errorCode: error instanceof AppError ? error.code : "UNKNOWN",
         },
         "Processing lease renewal failed; aborting worker"

@@ -87,7 +87,7 @@ const request = {
   sourceDocumentId: "document-1",
   revisionId: "revision-1",
   signal: new AbortController().signal,
-  lease: { jobId: "job-1", claimToken: "token-1" },
+  lease: { revisionId: "revision-1", claimToken: "token-1" },
 };
 
 describe("processRevision", () => {

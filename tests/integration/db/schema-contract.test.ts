@@ -199,7 +199,7 @@ describe("PostgreSQL schema contract", () => {
     const byName = new Map((await fetchIndexes()).map((row) => [row.indexname, row.indexdef]));
     for (const name of [
       "uq_entry_categories_ledger_id_id",
-      "uq_ledger_entries_revision_position",
+      "idx_ledger_entries_document_position",
       "idx_source_documents_active_feed",
       "idx_ledger_entries_active_feed",
       "idx_ledger_entries_active_category",

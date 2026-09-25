@@ -8,7 +8,6 @@ import { getTestDb } from "../../setup";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   ledgers,
-  processingOutbox,
   serviceCredentials,
   sourceDocumentRevisions,
   sourceDocuments,
@@ -181,13 +180,14 @@ describe("API v1 source-documents route", () => {
       .select({ id: sourceDocumentRevisions.id })
       .from(sourceDocumentRevisions)
       .where(eq(sourceDocumentRevisions.sourceDocumentId, firstBody.sourceDocumentId));
-    const intents = await db
-      .select({ id: processingOutbox.id })
-      .from(processingOutbox)
-      .where(eq(processingOutbox.revisionId, firstBody.revisionId));
+    // The submitted revision is the document's queued processing attempt.
+    const queued = await db
+      .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
+      .from(sourceDocuments)
+      .where(eq(sourceDocuments.id, firstBody.sourceDocumentId));
     expect(documents).toHaveLength(1);
     expect(revisions).toHaveLength(1);
-    expect(intents).toHaveLength(1);
+    expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
   });
 
   it("returns X-Request-Id on error responses too", async () => {

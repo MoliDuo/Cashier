@@ -4,12 +4,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import {
-  ledgerEntries,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { processingJobs, revisionProcessor } from "tests/helpers/processing-jobs";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
@@ -41,7 +36,6 @@ async function pendingIntent(
   return {
     ledgerId,
     job: {
-      id: crypto.randomUUID(),
       sourceDocumentId: pending.document.id,
       revisionId: pending.revision.id,
       requestedAt,
@@ -53,15 +47,14 @@ describe("leased processor fencing", () => {
   async function reclaimedLease(job: ProcessingJobContract) {
     const db = getTestDb();
     const adapter = processingJobs();
-    await adapter.dispatch(job);
-    const first = await adapter.claim(job.id);
+    const first = await adapter.claim(job.revisionId);
     expect(first).not.toBeNull();
-    // Expire the first claim and let a second worker reclaim the outbox row.
+    // Expire the first claim and let a second worker reclaim the attempt.
     await db
-      .update(processingOutbox)
+      .update(sourceDocumentRevisions)
       .set({ claimExpiresAt: new Date(Date.now() - 60_000) })
-      .where(eq(processingOutbox.id, job.id));
-    const second = await adapter.claim(job.id);
+      .where(eq(sourceDocumentRevisions.id, job.revisionId));
+    const second = await adapter.claim(job.revisionId);
     expect(second).not.toBeNull();
     return { adapter, firstToken: first!.claimToken, secondToken: second!.claimToken };
   }
@@ -100,7 +93,7 @@ describe("leased processor fencing", () => {
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,
-        lease: { jobId: job.id, claimToken: firstToken },
+        lease: { revisionId: job.revisionId, claimToken: firstToken },
       })
     ).rejects.toThrow("Processing cancelled");
 
@@ -151,7 +144,7 @@ describe("leased processor fencing", () => {
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         revisionId: job.revisionId,
-        lease: { jobId: job.id, claimToken: firstToken },
+        lease: { revisionId: job.revisionId, claimToken: firstToken },
       })
     ).rejects.toThrow("Processing cancelled");
 

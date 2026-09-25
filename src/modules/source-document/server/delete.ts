@@ -1,10 +1,5 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
-import {
-  ledgerEntries,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { and, eq, isNull } from "drizzle-orm";
+import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { NotFoundError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import type { DeleteSourceDocumentResultDto } from "@/modules/source-document/contracts";
@@ -30,22 +25,6 @@ async function softDeleteLockedSourceDocument(
         )
       );
   }
-  await tx
-    .update(processingOutbox)
-    .set({
-      status: "cancelled",
-      completedAt: now,
-      claimToken: null,
-      claimExpiresAt: null,
-      diagnosticCode: "source_document_deleted",
-    })
-    .where(
-      and(
-        eq(processingOutbox.ledgerId, ledgerId),
-        eq(processingOutbox.sourceDocumentId, sourceDocumentId),
-        inArray(processingOutbox.status, ["pending", "claimed"])
-      )
-    );
   const deleted = await tx
     .update(sourceDocuments)
     .set({ deletedAt: now, updatedAt: now })

@@ -12,7 +12,7 @@ import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
 } from "@/lib/db/transaction-locks";
-import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
+import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
 import { activeDocumentWhere, replaceProjection } from "./shared";
 import { createCompletedProjectionInTransaction } from "./manual-entries";
@@ -48,7 +48,7 @@ export async function activateRevision(input: ActivateRevisionInput): Promise<bo
     if (revision == null || revision.processingStatus !== "processing") {
       return false;
     }
-    if (!(await completeProcessingLeaseInTransaction(tx, input.lease, "completed"))) {
+    if (!(await closeProcessingLeaseInTransaction(tx, input.lease))) {
       return false;
     }
 

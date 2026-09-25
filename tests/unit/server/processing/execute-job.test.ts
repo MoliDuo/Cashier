@@ -3,7 +3,6 @@ import type { RevisionProcessingResultContract } from "@/server/processing/types
 import { ProcessingCancelledError } from "@/modules/source-document/domain/parse/contracts";
 
 const job = {
-  id: "job",
   sourceDocumentId: "document",
   revisionId: "revision",
   requestedAt: "2026-09-01T00:00:00Z",
@@ -26,6 +25,7 @@ vi.mock("@/server/processing/jobs", () => ({
 vi.mock("@/server/processing/revision-processor", () => ({ processRevision: process }));
 vi.mock("@/modules/source-document/server/revisions", () => ({ recordProcessingFailure }));
 
+import { claimProcessingJob } from "@/server/processing/jobs";
 import { executeProcessingJob } from "@/server/processing/execute-job";
 
 describe("single processing job completion", () => {
@@ -43,13 +43,14 @@ describe("single processing job completion", () => {
     }
   );
 
-  it("records an error under the job's lease", async () => {
+  it("records an error under the attempt's lease", async () => {
     process.mockRejectedValue(new Error("failed"));
     await executeProcessingJob(job);
+    expect(claimProcessingJob).toHaveBeenCalledExactlyOnceWith("revision");
     expect(recordProcessingFailure).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         failureKind: "processing_error",
-        lease: { jobId: "job", claimToken: "token" },
+        lease: { revisionId: "revision", claimToken: "token" },
       })
     );
   });

@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
-import { ledgerEntries, processingOutbox, sourceDocuments } from "@/persistence";
+import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 import {
@@ -56,7 +56,11 @@ describe("local contract release", () => {
       latestSubmissionRevisionId: pending.revision.id,
       title: "Target title",
     });
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+    await expect(
+      db.query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.id, pending.revision.id),
+      })
+    ).resolves.toMatchObject({ processingStatus: "completed", claimToken: null });
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
   });
 

@@ -1,7 +1,7 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { ledgerScopedRevisionWhere } from "./projections/revision-guards";
 import { activeDocumentWhere } from "./projections/shared";
@@ -33,16 +33,6 @@ export async function cancelSourceDocumentProcessing(
       .returning({ id: sourceDocumentRevisions.id })
       .then((rows) => rows[0]);
     if (revision == null) throw new ConflictError("Source document is no longer processing");
-
-    await tx
-      .update(processingOutbox)
-      .set({ status: "cancelled", completedAt: now, claimToken: null, claimExpiresAt: null })
-      .where(
-        and(
-          eq(processingOutbox.revisionId, revisionId),
-          inArray(processingOutbox.status, ["pending", "claimed"])
-        )
-      );
 
     const updated = await tx
       .update(sourceDocuments)

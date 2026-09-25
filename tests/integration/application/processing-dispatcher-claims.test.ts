@@ -5,13 +5,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import {
-  ledgerEntries,
-  ledgers,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { ProcessingCancelledError } from "@/modules/source-document/domain/parse/contracts";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
@@ -47,7 +41,6 @@ async function pendingIntent(
   return {
     ledgerId,
     job: {
-      id: crypto.randomUUID(),
       sourceDocumentId: pending.document.id,
       revisionId: pending.revision.id,
       requestedAt,
@@ -55,7 +48,7 @@ async function pendingIntent(
   };
 }
 
-describe("processing outbox jobs", () => {
+describe("processing attempt jobs", () => {
   it("processes parser, reconciliation, exchange-rate facts, and result writes by revision identity", async () => {
     const db = getTestDb();
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
@@ -267,64 +260,67 @@ describe("processing outbox jobs", () => {
     expect(callArgs).toContain(customPrompt);
   });
 
-  it("deduplicates dispatch and permits only one concurrent claim", async () => {
+  it("permits only one concurrent claim", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
 
-    await Promise.all([adapter.dispatch(job), adapter.dispatch(job)]);
-    const claims = await Promise.all([adapter.claim(job.id), adapter.claim(job.id)]);
+    const claims = await Promise.all([
+      adapter.claim(job.revisionId),
+      adapter.claim(job.revisionId),
+    ]);
 
-    expect(claims.filter((claim) => claim != null)).toHaveLength(1);
-    expect(claims.find((claim) => claim != null)?.ledgerId).toBeDefined();
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+    const won = claims.filter((claim) => claim != null);
+    expect(won).toHaveLength(1);
+    expect(won[0]?.ledgerId).toBeDefined();
+    await expect(
+      db.query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.id, job.revisionId),
+      })
+    ).resolves.toMatchObject({ attemptCount: 1, claimToken: won[0]!.claimToken });
   });
 
   it("reclaims an expired lease and fences out the previous holder", async () => {
     let now = new Date("2026-07-15T00:00:00.000Z");
     const { job } = await pendingIntent(now.toISOString(), crypto.randomUUID());
     const adapter = processingJobs({ leaseMs: 1_000, now: () => now });
-    await adapter.dispatch(job);
 
-    const first = await adapter.claim(job.id);
+    const first = await adapter.claim(job.revisionId);
     expect(first).not.toBeNull();
     now = new Date(now.getTime() + 500);
-    const renewedUntil = await adapter.renew(job.id, first!.claimToken);
+    const renewedUntil = await adapter.renew(job.revisionId, first!.claimToken);
     expect(renewedUntil).toBe(new Date(now.getTime() + 1_000).toISOString());
     now = new Date(now.getTime() + 1_001);
-    const second = await adapter.claim(job.id);
+    const second = await adapter.claim(job.revisionId);
     expect(second).not.toBeNull();
     expect(second!.claimToken).not.toBe(first!.claimToken);
 
-    await expect(adapter.renew(job.id, first!.claimToken)).resolves.toBeNull();
-    await expect(adapter.renew(job.id, second!.claimToken)).resolves.not.toBeNull();
+    await expect(adapter.renew(job.revisionId, first!.claimToken)).resolves.toBeNull();
+    await expect(adapter.renew(job.revisionId, second!.claimToken)).resolves.not.toBeNull();
   });
 
   it("does not hand out a job whose revision already finished", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
-    await adapter.dispatch(job);
     await db
       .update(sourceDocumentRevisions)
       .set({ processingStatus: "completed" })
       .where(eq(sourceDocumentRevisions.id, job.revisionId));
 
-    await expect(adapter.claim(job.id)).resolves.toBeNull();
+    await expect(adapter.claim(job.revisionId)).resolves.toBeNull();
   });
 
   it("returns false on duplicate claim", async () => {
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
-    await adapter.dispatch(job);
 
     // First claim succeeds
-    const first = await adapter.claim(job.id);
+    const first = await adapter.claim(job.revisionId);
     expect(first).not.toBeNull();
 
     // Second claim (same adapter, same DB) returns null since job is claimed
-    const second = await adapter.claim(job.id);
+    const second = await adapter.claim(job.revisionId);
     expect(second).toBeNull();
   });
 
@@ -335,15 +331,12 @@ describe("processing outbox jobs", () => {
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });
 
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
     const result = await executeProcessingJob(job);
     expect(result).toBe(true);
 
-    const row = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
+    const row = await db.query.sourceDocumentRevisions.findFirst({
+      where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
-    expect(row?.status).toBe("failed");
+    expect(row).toMatchObject({ processingStatus: "failed", attemptCount: 1, claimToken: null });
   });
 });

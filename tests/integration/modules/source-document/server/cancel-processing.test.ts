@@ -1,14 +1,15 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
-import { processingOutbox, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
+import { processingJobs } from "tests/helpers/processing-jobs";
 
 describe("cancel source-document processing", () => {
-  it("retains the latest submission input and terminates its task records", async () => {
+  it("retains the latest submission input and fences out the running worker", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const submission = await submitSourceDocument({
@@ -16,20 +17,20 @@ describe("cancel source-document processing", () => {
       input: { text: "Lunch 12 CNY", storedFileIds: [], documentDate: "2026-09-10" },
       bookId: await testBookId(db, ledgerId),
     });
+    const processing = processingJobs();
+    const claim = await processing.claim(submission.revision.id);
+    expect(claim).not.toBeNull();
 
     await expect(cancelSourceDocumentProcessing(ledgerId, submission.document.id)).resolves.toEqual(
       { processingStatus: "cancelled" }
     );
 
-    const [document, revision, outbox] = await Promise.all([
+    const [document, revision] = await Promise.all([
       db.query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, submission.document.id),
       }),
       db.query.sourceDocumentRevisions.findFirst({
         where: eq(sourceDocumentRevisions.id, submission.revision.id),
-      }),
-      db.query.processingOutbox.findFirst({
-        where: eq(processingOutbox.revisionId, submission.revision.id),
       }),
     ]);
     expect(document?.latestSubmissionRevisionId).toBe(submission.revision.id);
@@ -39,7 +40,8 @@ describe("cancel source-document processing", () => {
       inputText: "Lunch 12 CNY",
       inputDocumentDate: "2026-09-10",
     });
-    expect(outbox?.status).toBe("cancelled");
+    await expect(processing.renew(submission.revision.id, claim!.claimToken)).resolves.toBeNull();
+    await expect(processing.claim(submission.revision.id)).resolves.toBeNull();
   });
 
   it("keeps the previous active result when a retry is cancelled", async () => {

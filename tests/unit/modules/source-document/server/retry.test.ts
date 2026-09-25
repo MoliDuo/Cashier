@@ -15,6 +15,12 @@ vi.mock("@/server/processing/schedule", () => ({
 
 import { retrySourceDocument } from "@/modules/source-document/server/retry";
 
+const job = {
+  sourceDocumentId: "doc-1",
+  revisionId: "revision-2",
+  requestedAt: "2026-07-15T00:00:00.000Z",
+};
+
 const ledger = {
   id: "ledger-1",
   userId: "user-1",
@@ -30,11 +36,11 @@ describe("retrySourceDocument", () => {
     submit.mockResolvedValue({
       document: { id: "doc-1", version: 2 },
       revision: { id: "revision-2" },
-      job: { id: "job-2" },
+      job,
     });
   });
 
-  it("propagates missing-document failures without dispatch", async () => {
+  it("propagates missing-document failures without scheduling", async () => {
     submit.mockRejectedValueOnce(new NotFoundError("Source document"));
     await expect(
       retrySourceDocument({ ledgerId: ledger.id, sourceDocumentId: "missing" })
@@ -53,7 +59,7 @@ describe("retrySourceDocument", () => {
       inheritInput: true,
       supersedeProcessing: true,
     });
-    expect(scheduleProcessing).toHaveBeenCalledWith({ id: "job-2" });
+    expect(scheduleProcessing).toHaveBeenCalledWith(job);
     // ordering: scheduleProcessing must be called AFTER submit completes
     expect(submit.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleProcessing.mock.invocationCallOrder[0]!

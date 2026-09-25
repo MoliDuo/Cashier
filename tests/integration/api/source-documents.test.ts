@@ -7,7 +7,6 @@ import {
   ledgerEntries,
   sourceDocumentRevisions,
   sourceDocuments,
-  processingOutbox,
   ledgers,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
@@ -186,16 +185,14 @@ describe("SourceDocument Actions", () => {
         where: eq(sourceDocuments.id, first.sourceDocumentId),
       })
     ).toHaveLength(1);
-    expect(
-      await db.query.sourceDocumentRevisions.findMany({
-        where: eq(sourceDocumentRevisions.sourceDocumentId, first.sourceDocumentId),
-      })
-    ).toHaveLength(1);
-    expect(
-      await db.query.processingOutbox.findMany({
-        where: eq(processingOutbox.sourceDocumentId, first.sourceDocumentId),
-      })
-    ).toHaveLength(1);
+    const revisions = await db.query.sourceDocumentRevisions.findMany({
+      where: eq(sourceDocumentRevisions.sourceDocumentId, first.sourceDocumentId),
+    });
+    expect(revisions).toHaveLength(1);
+    // The one revision is the document's single queued processing attempt.
+    await expect(
+      db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, first.sourceDocumentId) })
+    ).resolves.toMatchObject({ latestSubmissionRevisionId: revisions[0]!.id });
   });
 
   it("should return error when no input provided", async () => {

@@ -5,14 +5,8 @@ import { getTestDb } from "../../setup";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import { executeProcessingJob } from "@/server/processing/execute-job";
 import { renewProcessingJobLease } from "@/server/processing/jobs";
-import { processingJobs } from "tests/helpers/processing-jobs";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import {
-  ledgerEntries,
-  processingOutbox,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -49,7 +43,6 @@ async function pendingIntent(
   return {
     ledgerId,
     job: {
-      id: crypto.randomUUID(),
       sourceDocumentId: pending.document.id,
       revisionId: pending.revision.id,
       requestedAt,
@@ -88,9 +81,6 @@ describe("executeProcessingJob — standalone function with real adapter/process
       if (mode === "null") return null;
       throw new Error("lease backend unavailable");
     });
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
     const execution = executeProcessingJob(job);
     await generationStarted;
     await vi.advanceTimersByTimeAsync(15_000);
@@ -133,7 +123,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
 
-  it("processes successfully, setting outbox and revision outcomes to completed", async () => {
+  it("processes successfully, completing the revision and releasing its claim", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
@@ -160,16 +150,8 @@ describe("executeProcessingJob — standalone function with real adapter/process
     }));
     vi.mocked(createAIContext).mockReturnValue({ generate });
 
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
-
     const result = await executeProcessingJob(job);
     expect(result).toBe(true);
-
-    const row = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(row?.status).toBe("completed");
 
     const doc = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, job.sourceDocumentId),
@@ -181,7 +163,12 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
-    expect(revision?.processingStatus).toBe("completed");
+    expect(revision).toMatchObject({
+      processingStatus: "completed",
+      attemptCount: 1,
+      claimToken: null,
+      claimExpiresAt: null,
+    });
 
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
   });
@@ -192,9 +179,6 @@ describe("executeProcessingJob — standalone function with real adapter/process
 
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });
-
-    const adapter = processingJobs();
-    await adapter.dispatch(job);
 
     // Simulate a retry: it cancels the attempt it replaces and points the
     // document at the new one.
@@ -218,16 +202,15 @@ describe("executeProcessingJob — standalone function with real adapter/process
     expect(result).toBe(false);
     expect(generate).not.toHaveBeenCalled();
 
-    const row = await db.query.processingOutbox.findFirst({
-      where: eq(processingOutbox.id, job.id),
-    });
-    expect(row?.status).toBe("pending");
-
-    // The claim refuses the superseded revision; the recovery pass closes its row.
+    // The claim refuses the superseded revision without counting a run.
     const revision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, job.revisionId),
     });
-    expect(revision?.processingStatus).toBe("cancelled");
+    expect(revision).toMatchObject({
+      processingStatus: "cancelled",
+      attemptCount: 0,
+      claimToken: null,
+    });
 
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });

@@ -7,7 +7,6 @@ import { getTestDb } from "../../setup";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
   ledgers,
-  processingOutbox,
   revisionFiles,
   serviceCredentials,
   sourceDocumentRevisions,
@@ -146,12 +145,12 @@ describe("API v1 source-documents route", () => {
       expect(storedFile).not.toBeUndefined();
       expect(storedFile!.finalizedAt).not.toBeNull();
 
-      // Verify one processing outbox record exists
-      const intents = await db
-        .select({ id: processingOutbox.id })
-        .from(processingOutbox)
-        .where(eq(processingOutbox.revisionId, data.revisionId));
-      expect(intents).toHaveLength(1);
+      // Verify the revision is the document's queued processing attempt
+      const queued = await db
+        .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
+        .from(sourceDocuments)
+        .where(eq(sourceDocuments.id, data.sourceDocumentId));
+      expect(queued).toEqual([{ revisionId: data.revisionId }]);
     });
 
     it("returns 201 with a valid data URL image", async () => {
@@ -328,16 +327,16 @@ describe("API v1 source-documents route", () => {
         .select({ id: uploadSessions.id })
         .from(uploadSessions)
         .where(eq(uploadSessions.ledgerId, ledgerId));
-      const intents = await db
-        .select({ id: processingOutbox.id })
-        .from(processingOutbox)
-        .where(eq(processingOutbox.revisionId, firstBody.revisionId));
+      const queued = await db
+        .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
+        .from(sourceDocuments)
+        .where(eq(sourceDocuments.id, firstBody.sourceDocumentId));
       expect(documents).toHaveLength(1);
       expect(revisions).toHaveLength(1);
       expect(storedFilesRows).toHaveLength(1);
       expect(revisionFilesRows).toHaveLength(1);
       expect(sessions).toHaveLength(1);
-      expect(intents).toHaveLength(1);
+      expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
     });
   });
 });

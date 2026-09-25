@@ -161,9 +161,6 @@ export const ledgerEntries = pgTable(
   },
   (table) => [
     uniqueIndex("uq_ledger_entries_ledger_id_id").on(table.ledgerId, table.id),
-    uniqueIndex("uq_ledger_entries_revision_position")
-      .on(table.sourceDocumentRevisionId, table.position)
-      .where(sql`${table.deletedAt} IS NULL`),
     index("idx_ledger_entries_active_feed")
       .on(table.ledgerId, table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} IS NULL`),
@@ -173,15 +170,6 @@ export const ledgerEntries = pgTable(
     index("idx_ledger_entries_category_all").on(table.ledgerId, table.categoryId),
     index("idx_ledger_entries_active_currency")
       .on(table.ledgerId, table.currency, table.createdAt.desc(), table.id.desc())
-      .where(sql`${table.deletedAt} IS NULL`),
-    index("idx_ledger_entries_active_source")
-      .on(
-        table.ledgerId,
-        table.sourceDocumentId,
-        table.sourceDocumentRevisionId,
-        table.position,
-        table.id
-      )
       .where(sql`${table.deletedAt} IS NULL`),
     index("idx_ledger_entries_document_position")
       .on(table.ledgerId, table.sourceDocumentId, table.position, table.id)

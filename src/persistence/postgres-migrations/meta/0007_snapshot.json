@@ -1,6 +1,6 @@
 {
-  "id": "c246041c-9df7-47f9-9cf5-e3ade9ed0afd",
-  "prevId": "e8c95e51-541a-4436-a5ad-3a65ae10cd63",
+  "id": "b46b957d-680d-46e2-b024-7b399ea7578b",
+  "prevId": "c246041c-9df7-47f9-9cf5-e3ade9ed0afd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -908,28 +908,6 @@
           "method": "btree",
           "with": {}
         },
-        "uq_ledger_entries_revision_position": {
-          "name": "uq_ledger_entries_revision_position",
-          "columns": [
-            {
-              "expression": "source_document_revision_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"ledger_entries\".\"deleted_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_ledger_entries_active_feed": {
           "name": "idx_ledger_entries_active_feed",
           "columns": [
@@ -1038,46 +1016,6 @@
               "expression": "id",
               "isExpression": false,
               "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"ledger_entries\".\"deleted_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_ledger_entries_active_source": {
-          "name": "idx_ledger_entries_active_source",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source_document_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source_document_revision_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
               "nulls": "last"
             }
           ],

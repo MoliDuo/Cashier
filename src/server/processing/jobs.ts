@@ -1,16 +1,14 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type {
   ProcessingClaimContract,
-  ProcessingJobContract,
   ProcessingRecoveryConfig,
   RecoverableProcessingJobContract,
 } from "@/server/processing/types";
 import { db } from "@/lib/db";
-import { processingOutbox } from "@/persistence";
 
 // Renewed every 15 seconds while the worker runs, so the length only decides how
-// soon a job whose function was killed can be claimed again.
+// soon an attempt whose function was killed can be claimed again.
 const DEFAULT_LEASE_MS = 60 * 1000;
 
 /** Overrides for the lease length and the clock; tests use them to walk expiry. */
@@ -19,76 +17,78 @@ export interface ProcessingJobClock {
   now?: () => Date;
 }
 
-function mapJob(row: typeof processingOutbox.$inferSelect): ProcessingJobContract {
-  return {
-    id: row.id,
-    sourceDocumentId: row.sourceDocumentId,
-    revisionId: row.revisionId,
-    requestedAt: row.requestedAt.toISOString(),
-  };
+function toIso(value: Date | string): string {
+  return typeof value === "string" ? new Date(value).toISOString() : value.toISOString();
 }
 
+/**
+ * Leases one processing attempt. Only the document's current submission, still
+ * processing and not held by an unexpired lease, is claimable; the claim counts
+ * the run so an attempt that keeps dying is failed once it runs out.
+ */
 export async function claimProcessingJob(
-  jobId: string,
+  revisionId: string,
   clock: ProcessingJobClock = {}
 ): Promise<ProcessingClaimContract | null> {
   const now = clock.now?.() ?? new Date();
   const claimToken = crypto.randomUUID();
   const expiresAt = new Date(now.getTime() + (clock.leaseMs ?? DEFAULT_LEASE_MS));
-  return db.transaction(async (tx) => {
-    // Only the document's current submission, still processing, is claimable.
-    // A row whose revision already finished or was superseded is left for the
-    // recovery pass to close instead of being parsed again.
-    const claimed = await tx.execute<typeof processingOutbox.$inferSelect>(sql`
-      WITH candidate AS (
-        SELECT outbox.id FROM processing_outbox outbox
-        JOIN source_documents document
-          ON document.ledger_id = outbox.ledger_id
-         AND document.id = outbox.source_document_id
-         AND document.latest_submission_revision_id = outbox.revision_id
-         AND document.deleted_at IS NULL
-        JOIN source_document_revisions revision
-          ON revision.ledger_id = outbox.ledger_id
-         AND revision.id = outbox.revision_id
-         AND revision.processing_status = 'processing'
-        WHERE outbox.id = ${jobId}
-          AND (
-            outbox.status = 'pending'
-            OR (outbox.status = 'claimed' AND outbox.claim_expires_at <= ${now})
-          )
-        FOR UPDATE OF outbox SKIP LOCKED
-      )
-      UPDATE processing_outbox outbox
-      SET status = 'claimed', started_at = COALESCE(outbox.started_at, now()), claim_token = ${claimToken},
-          claim_expires_at = ${expiresAt},
-          schedule_attempt_count = outbox.schedule_attempt_count + 1
-      FROM candidate WHERE outbox.id = candidate.id
-      RETURNING outbox.*
-    `);
-    const raw = claimed.rows?.[0] as Record<string, unknown> | undefined;
-    const row =
-      raw == null
-        ? undefined
-        : ({
-            ...raw,
-            ledgerId: raw.ledger_id,
-            sourceDocumentId: raw.source_document_id,
-            revisionId: raw.revision_id,
-            requestedAt: new Date(raw.requested_at as string | Date),
-            scheduleAttemptCount: Number(raw.schedule_attempt_count),
-          } as typeof processingOutbox.$inferSelect);
-    if (row == null) return null;
-    const job = mapJob(row);
-    return {
-      ledgerId: row.ledgerId,
-      job,
-      claimToken,
-      attempt: row.scheduleAttemptCount,
-      expiresAt: expiresAt.toISOString(),
-    };
-  });
+  // The outbox check covers the deploy window only: a worker of the previous
+  // release still holding the attempt through its outbox row keeps it.
+  const claimed = await db.execute<{
+    ledger_id: string;
+    source_document_id: string;
+    id: string;
+    submitted_at: Date | string;
+    attempt_count: number;
+  }>(sql`
+    WITH candidate AS (
+      SELECT revision.id FROM source_document_revisions revision
+      JOIN source_documents document
+        ON document.ledger_id = revision.ledger_id
+       AND document.id = revision.source_document_id
+       AND document.latest_submission_revision_id = revision.id
+       AND document.deleted_at IS NULL
+      WHERE revision.id = ${revisionId}
+        AND revision.processing_status = 'processing'
+        AND (revision.claim_expires_at IS NULL OR revision.claim_expires_at <= ${now})
+        AND NOT EXISTS (
+          SELECT 1 FROM processing_outbox outbox
+          WHERE outbox.ledger_id = revision.ledger_id
+            AND outbox.revision_id = revision.id
+            AND outbox.status = 'claimed'
+            AND outbox.claim_expires_at > ${now}
+        )
+      FOR UPDATE OF revision SKIP LOCKED
+    )
+    UPDATE source_document_revisions revision
+    SET claim_token = ${claimToken}, claim_expires_at = ${expiresAt},
+        attempt_count = revision.attempt_count + 1
+    FROM candidate WHERE revision.id = candidate.id
+    RETURNING revision.ledger_id, revision.source_document_id, revision.id,
+      revision.submitted_at, revision.attempt_count
+  `);
+  const row = claimed.rows[0];
+  if (row == null) return null;
+  return {
+    ledgerId: row.ledger_id,
+    job: {
+      sourceDocumentId: row.source_document_id,
+      revisionId: row.id,
+      requestedAt: toIso(row.submitted_at),
+    },
+    claimToken,
+    attempt: Number(row.attempt_count),
+    expiresAt: expiresAt.toISOString(),
+  };
 }
 
+/**
+ * Picks the ledger's processing attempts whose run was missed and pushes each
+ * one's next run out by the cooldown. Only attempt rows are locked, skipping
+ * ones another pass holds, so concurrent passes pick disjoint sets without
+ * serializing on the ledger.
+ */
 export async function recoverProcessingJobs(
   ledgerId: string,
   config: ProcessingRecoveryConfig,
@@ -96,122 +96,62 @@ export async function recoverProcessingJobs(
 ): Promise<readonly RecoverableProcessingJobContract[]> {
   const now = clock.now?.() ?? new Date();
   const nextAvailable = new Date(now.getTime() + config.cooldownSeconds * 1000);
-
-  // Every statement locks only outbox rows, skipping ones another pass holds,
-  // so concurrent passes pick disjoint sets without serializing on the ledger.
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`
-      WITH candidate AS (
-        SELECT outbox.id, outbox.revision_id,
-          CASE
-            WHEN document.deleted_at IS NOT NULL
-              OR document.latest_submission_revision_id IS DISTINCT FROM outbox.revision_id
-              OR revision.processing_status = 'cancelled'
-            THEN 'cancelled'
-            WHEN revision.processing_status = 'failed' THEN 'failed'
-            ELSE 'completed'
-          END AS outbox_status
-        FROM processing_outbox outbox
-        JOIN source_documents document
-          ON document.ledger_id = outbox.ledger_id
-         AND document.id = outbox.source_document_id
-        JOIN source_document_revisions revision
-          ON revision.ledger_id = outbox.ledger_id
-         AND revision.id = outbox.revision_id
-        WHERE outbox.ledger_id = ${ledgerId}
-          AND outbox.status IN ('pending', 'claimed')
-          AND (
-            document.deleted_at IS NOT NULL
-            OR document.latest_submission_revision_id IS DISTINCT FROM outbox.revision_id
-            OR revision.processing_status <> 'processing'
-          )
-        ORDER BY outbox.created_at, outbox.id
-        FOR UPDATE OF outbox SKIP LOCKED
-        LIMIT ${config.maxBatch}
-      ), closed AS (
-        UPDATE processing_outbox outbox
-        SET status = candidate.outbox_status::processing_outbox_status,
-            completed_at = ${now}, claim_token = NULL, claim_expires_at = NULL
-        FROM candidate
-        WHERE outbox.id = candidate.id
-          AND outbox.status IN ('pending', 'claimed')
-        RETURNING candidate.revision_id
-      )
-      SELECT count(*) FROM closed
-    `);
-
-    const scheduled = await tx.execute<{
-      id: string;
-      sourceDocumentId: string;
-      revisionId: string;
-      requestedAt: Date | string;
-      scheduleAttemptCount: number;
-      nextAvailableAt: Date | string;
-    }>(sql`
-      WITH candidate AS (
-        SELECT outbox.id
-        FROM processing_outbox outbox
-        JOIN source_documents document
-          ON document.ledger_id = outbox.ledger_id
-         AND document.id = outbox.source_document_id
-         AND document.latest_submission_revision_id = outbox.revision_id
-         AND document.deleted_at IS NULL
-        JOIN source_document_revisions revision
-          ON revision.ledger_id = outbox.ledger_id
-         AND revision.id = outbox.revision_id
-         AND revision.processing_status = 'processing'
-        WHERE outbox.ledger_id = ${ledgerId}
-          AND outbox.next_available_at <= ${now}
-          AND (
-            outbox.status = 'pending'
-            OR (outbox.status = 'claimed' AND outbox.claim_expires_at <= ${now})
-          )
-        ORDER BY outbox.next_available_at, outbox.created_at, outbox.id
-        FOR UPDATE OF outbox SKIP LOCKED
-        LIMIT ${config.maxBatch}
-      )
-      UPDATE processing_outbox outbox
-      SET next_available_at = ${nextAvailable}
-      FROM candidate
-      WHERE outbox.id = candidate.id
-      RETURNING outbox.id,
-        outbox.source_document_id AS "sourceDocumentId",
-        outbox.revision_id AS "revisionId",
-        outbox.requested_at AS "requestedAt",
-        outbox.schedule_attempt_count AS "scheduleAttemptCount",
-        outbox.next_available_at AS "nextAvailableAt"
-    `);
-
-    return scheduled.rows.map((row) => ({
-      ...row,
-      requestedAt:
-        typeof row.requestedAt === "string" ? row.requestedAt : row.requestedAt.toISOString(),
-      nextAvailableAt:
-        typeof row.nextAvailableAt === "string"
-          ? row.nextAvailableAt
-          : row.nextAvailableAt.toISOString(),
-    }));
-  });
+  const scheduled = await db.execute<{
+    sourceDocumentId: string;
+    revisionId: string;
+    requestedAt: Date | string;
+    attemptCount: number;
+    nextAvailableAt: Date | string;
+  }>(sql`
+    WITH candidate AS (
+      SELECT revision.id
+      FROM source_document_revisions revision
+      JOIN source_documents document
+        ON document.ledger_id = revision.ledger_id
+       AND document.id = revision.source_document_id
+       AND document.latest_submission_revision_id = revision.id
+       AND document.deleted_at IS NULL
+      WHERE revision.ledger_id = ${ledgerId}
+        AND revision.processing_status = 'processing'
+        AND revision.next_available_at <= ${now}
+        AND (revision.claim_expires_at IS NULL OR revision.claim_expires_at <= ${now})
+      ORDER BY revision.next_available_at, revision.submitted_at, revision.id
+      FOR UPDATE OF revision SKIP LOCKED
+      LIMIT ${config.maxBatch}
+    )
+    UPDATE source_document_revisions revision
+    SET next_available_at = ${nextAvailable}
+    FROM candidate
+    WHERE revision.id = candidate.id
+    RETURNING revision.source_document_id AS "sourceDocumentId",
+      revision.id AS "revisionId",
+      revision.submitted_at AS "requestedAt",
+      revision.attempt_count AS "attemptCount",
+      revision.next_available_at AS "nextAvailableAt"
+  `);
+  return scheduled.rows.map((row) => ({
+    ...row,
+    attemptCount: Number(row.attemptCount),
+    requestedAt: toIso(row.requestedAt),
+    nextAvailableAt: toIso(row.nextAvailableAt),
+  }));
 }
 
 export async function renewProcessingJobLease(
-  jobId: string,
+  revisionId: string,
   claimToken: string,
   clock: ProcessingJobClock = {}
 ): Promise<string | null> {
   const expiresAt = new Date(
     (clock.now?.() ?? new Date()).getTime() + (clock.leaseMs ?? DEFAULT_LEASE_MS)
   );
-  const renewed = await db
-    .update(processingOutbox)
-    .set({ claimExpiresAt: expiresAt })
-    .where(
-      and(
-        eq(processingOutbox.id, jobId),
-        eq(processingOutbox.status, "claimed"),
-        eq(processingOutbox.claimToken, claimToken)
-      )
-    )
-    .returning({ id: processingOutbox.id });
-  return renewed.length === 1 ? expiresAt.toISOString() : null;
+  const renewed = await db.execute(sql`
+    UPDATE source_document_revisions
+    SET claim_expires_at = ${expiresAt}
+    WHERE id = ${revisionId}
+      AND claim_token = ${claimToken}
+      AND processing_status = 'processing'
+    RETURNING id
+  `);
+  return renewed.rows.length === 1 ? expiresAt.toISOString() : null;
 }

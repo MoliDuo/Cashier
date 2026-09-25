@@ -1,31 +1,26 @@
 import { db } from "@/lib/db";
-import { processingOutbox } from "@/persistence";
-import { eq, or } from "drizzle-orm";
+import { sourceDocumentRevisions } from "@/persistence";
+import { eq } from "drizzle-orm";
 
 /**
- * Polls for all pending task runs to complete.
+ * Polls for all processing attempts to finish.
  * Tasks run asynchronously in-process.
- * We wait for the processing outbox to have no pending/claimed rows.
+ * We wait for no revision to be left processing.
  */
 export async function processAllPendingTasks(timeoutMs: number = 10000) {
   const start = Date.now();
-
-  while (Date.now() - start < timeoutMs) {
-    const pendingJobs = await db.query.processingOutbox.findMany({
-      where: or(eq(processingOutbox.status, "pending"), eq(processingOutbox.status, "claimed")),
+  const pending = () =>
+    db.query.sourceDocumentRevisions.findMany({
+      where: eq(sourceDocumentRevisions.processingStatus, "processing"),
+      columns: { id: true },
     });
 
-    if (pendingJobs.length === 0) {
-      return;
-    }
-
+  while (Date.now() - start < timeoutMs) {
+    if ((await pending()).length === 0) return;
     await new Promise((r) => setTimeout(r, 200));
   }
 
-  const pendingJobs = await db.query.processingOutbox.findMany({
-    where: or(eq(processingOutbox.status, "pending"), eq(processingOutbox.status, "claimed")),
-  });
-  const pendingSummary = pendingJobs.map((job) => `${job.id}:${job.status}`).join(", ");
+  const pendingSummary = (await pending()).map((revision) => revision.id).join(", ");
   throw new Error(
     `Timed out after ${timeoutMs}ms waiting for processing tasks: ${pendingSummary || "unknown"}`
   );

@@ -23,7 +23,7 @@ import {
   lockSourceDocumentForUpdate,
 } from "@/lib/db/transaction-locks";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
-import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
+import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 import { copyRevisionInputToDocument } from "./document-input";
 
 export type CreatePendingRevisionInput = {
@@ -249,7 +249,7 @@ export interface RecordProcessingFailureInput {
 }
 
 /**
- * Marks the latest submission as failed and closes its outbox lease. Returns
+ * Marks the latest submission as failed and releases its lease. Returns
  * false when the lease was lost or the revision was superseded, so a late
  * worker never overwrites newer state.
  */
@@ -279,13 +279,7 @@ export async function recordProcessingFailure(
       .for("update")
       .then((rows) => rows[0]);
     if (revision?.processingStatus !== "processing") return false;
-    if (
-      !(await completeProcessingLeaseInTransaction(tx, input.lease, "failed", {
-        code: input.failureCode ?? null,
-      }))
-    ) {
-      return false;
-    }
+    if (!(await closeProcessingLeaseInTransaction(tx, input.lease))) return false;
     const updated = await tx
       .update(sourceDocumentRevisions)
       .set({

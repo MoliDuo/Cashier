@@ -1,35 +1,25 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { ProcessingLeaseContract } from "@/server/processing/types";
-import { processingOutbox } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
-export type ProcessingTerminalStatus = "completed" | "failed";
-
-export async function completeProcessingLeaseInTransaction(
+/**
+ * Releases the worker's lease on a processing attempt the caller is about to
+ * finish. Returns false when the lease was lost, reclaimed or the attempt is no
+ * longer processing, so a late worker cannot commit stale results.
+ */
+export async function closeProcessingLeaseInTransaction(
   tx: PostgresTransaction,
-  lease: ProcessingLeaseContract,
-  processingStatus: ProcessingTerminalStatus,
-  diagnostic?: { code?: string | null }
+  lease: ProcessingLeaseContract
 ): Promise<boolean> {
-  const now = new Date();
-  const closed = await tx
-    .update(processingOutbox)
-    .set({
-      status: processingStatus,
-      diagnosticCode: diagnostic?.code ?? null,
-      completedAt: now,
-      claimToken: null,
-      claimExpiresAt: null,
-    })
-    .where(
-      and(
-        eq(processingOutbox.id, lease.jobId),
-        eq(processingOutbox.status, "claimed"),
-        eq(processingOutbox.claimToken, lease.claimToken),
-        sql`${processingOutbox.claimExpiresAt} > now()`
-      )
-    )
-    .returning({ id: processingOutbox.id });
-  return closed.length === 1;
+  const closed = await tx.execute(sql`
+    UPDATE source_document_revisions
+    SET claim_token = NULL, claim_expires_at = NULL
+    WHERE id = ${lease.revisionId}
+      AND claim_token = ${lease.claimToken}
+      AND claim_expires_at > now()
+      AND processing_status = 'processing'
+    RETURNING id
+  `);
+  return closed.rows.length === 1;
 }

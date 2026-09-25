@@ -35,13 +35,19 @@ vi.mock("@/lib/storage/image-processing", () => ({ processImage }));
 
 import { createAndQueueSourceDocument } from "@/modules/source-document/server/create-and-queue";
 
+const job = {
+  sourceDocumentId: "doc-1",
+  revisionId: "revision-1",
+  requestedAt: "2026-07-15T00:00:00.000Z",
+};
+
 describe("createAndQueueSourceDocument", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     submit.mockResolvedValue({
       document: { id: "doc-1" },
       revision: { id: "revision-1", processingStatus: "processing" },
-      job: { id: "job-1" },
+      job,
     });
     processImage.mockImplementation(async (buffer: Buffer, mimeType: string) => ({
       buffer,
@@ -60,7 +66,7 @@ describe("createAndQueueSourceDocument", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("creates stored evidence and dispatches after durable job creation", async () => {
+  it("creates stored evidence and schedules the attempt after it is durable", async () => {
     const result = await createAndQueueSourceDocument({
       ledgerId: "ledger-1",
       bookId: "user-1",
@@ -78,7 +84,7 @@ describe("createAndQueueSourceDocument", () => {
         dateReference: "2026-07-15",
       },
     });
-    expect(scheduleProcessing.mock.calls[0]?.[0]).toEqual({ id: "job-1" });
+    expect(scheduleProcessing.mock.calls[0]?.[0]).toEqual(job);
     expect(submit.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleProcessing.mock.invocationCallOrder[0]!
     );
@@ -93,7 +99,7 @@ describe("createAndQueueSourceDocument", () => {
     submitIdempotently.mockResolvedValue({
       document: { id: "doc-1" },
       revision: { id: "revision-1", processingStatus: "processing" },
-      job: { id: "job-1" },
+      job,
       idempotencyReplay: true,
     });
     const idempotency = {

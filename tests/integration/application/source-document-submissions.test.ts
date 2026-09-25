@@ -1,7 +1,7 @@
 import { archiveBook } from "@/modules/ledger/server/books";
 import { claimRevisionForTest } from "tests/helpers/processing-revision";
 import type { ObjectStore } from "@/lib/storage";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Pool, type PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { uploadTarget } from "@/server/stored-files/proxy-uploads";
@@ -13,7 +13,6 @@ import {
   ledgerEntries,
   ledgers,
   idempotencyRecords,
-  processingOutbox,
   revisionFiles,
   serviceCredentials,
   sourceDocumentRevisions,
@@ -32,7 +31,6 @@ import {
   submitSourceDocument,
   submitSourceDocumentIdempotently,
 } from "@/modules/source-document/server/submissions";
-import { processingJobs } from "tests/helpers/processing-jobs";
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 
 const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
@@ -56,6 +54,20 @@ async function finalizedFile(ledgerId: string, body: Buffer) {
     targetIds: [plan.targets[0]!.id],
   });
   return file!;
+}
+
+/** Attempts waiting in the queue: still processing and not held by a worker. */
+async function queuedAttemptIds(db: ReturnType<typeof getTestDb>): Promise<string[]> {
+  const rows = await db
+    .select({ id: sourceDocumentRevisions.id })
+    .from(sourceDocumentRevisions)
+    .where(
+      and(
+        eq(sourceDocumentRevisions.processingStatus, "processing"),
+        isNull(sourceDocumentRevisions.claimToken)
+      )
+    );
+  return rows.map((row) => row.id);
 }
 
 const entry = {
@@ -94,7 +106,7 @@ describe("target source-document submissions", () => {
     expect(prepare).toHaveBeenCalledOnce();
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([first.revision.id]);
   });
 
   it("rolls back a fencing loser after an expired idempotency lease is taken over", async () => {
@@ -147,7 +159,7 @@ describe("target source-document submissions", () => {
 
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([winner.revision.id]);
     expect(winner.document.id).toBe((await db.select().from(sourceDocuments))[0]?.id);
   });
 
@@ -175,8 +187,7 @@ describe("target source-document submissions", () => {
 
     expect(new Set([text.document.id, imageOnly.document.id, mixed.document.id]).size).toBe(3);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(3);
-    expect(await db.select().from(processingOutbox)).toHaveLength(3);
-    expect(await db.select().from(processingOutbox)).toHaveLength(3);
+    expect(await queuedAttemptIds(db)).toHaveLength(3);
     expect(await db.select().from(revisionFiles)).toHaveLength(2);
     expect(mixed.job).toMatchObject({
       sourceDocumentId: mixed.document.id,
@@ -206,7 +217,6 @@ describe("target source-document submissions", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocuments)).toHaveLength(0);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
-    expect(await db.select().from(processingOutbox)).toHaveLength(0);
   });
 
   it.each([
@@ -324,7 +334,7 @@ describe("target source-document submissions", () => {
     ).toMatchObject({ amount: "12.500", deletedAt: null });
   });
 
-  it("inherits immutable evidence on retry and deduplicates post-commit dispatch", async () => {
+  it("inherits immutable evidence on retry and queues only the retry attempt", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
@@ -349,7 +359,6 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
 
-    await Promise.all([processingJobs().dispatch(retry.job), processingJobs().dispatch(retry.job)]);
     const retryRevision = await db.query.sourceDocumentRevisions.findFirst({
       where: eq(sourceDocumentRevisions.id, retry.revision.id),
     });
@@ -359,8 +368,7 @@ describe("target source-document submissions", () => {
     expect(retry.document.id).toBe(initial.document.id);
     expect(retryRevision?.inputText).toBe("original");
     expect(retryFiles.map((file) => file.storedFileId)).toEqual([image.id]);
-    expect(await db.select().from(processingOutbox)).toHaveLength(2);
-    expect(await db.select().from(processingOutbox)).toHaveLength(2);
+    expect(await queuedAttemptIds(db)).toEqual([retry.revision.id]);
   });
 
   it("rejects inherited evidence retry when previous revision exceeds MAX_FILES", async () => {
@@ -522,7 +530,6 @@ async function waitUntilBlockedOn(pool: Pool, holderXid: string): Promise<void> 
 async function expectNoRecordRows(db: ReturnType<typeof getTestDb>): Promise<void> {
   expect(await db.select().from(sourceDocuments)).toHaveLength(0);
   expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
-  expect(await db.select().from(processingOutbox)).toHaveLength(0);
 }
 
 /**
@@ -684,7 +691,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     expect(retry.document.id).toBe(documentId);
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([retry.revision.id]);
   });
 
   it("replays a completed idempotent submission without a second document", async () => {
@@ -710,6 +717,6 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     expect(replay.idempotencyReplay).toBe(true);
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
     expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await db.select().from(processingOutbox)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([created.revision.id]);
   });
 });
