@@ -221,8 +221,9 @@ async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<bo
   for (;;) {
     const remainingMs = CATEGORY_RUN_BUDGET_MS - (Date.now() - startedAt);
     if (remainingMs <= 0) return processed;
+    const claimedAt = new Date();
     const claimed = await claimCategoryAssignmentDocuments({
-      now: new Date(),
+      now: claimedAt,
       leaseMs: CLAIM_LEASE_MS,
       concurrency: AI_CATEGORY_CONCURRENCY,
       ...scope,
@@ -234,9 +235,11 @@ async function runLoop(scope: { jobId?: string; ledgerId?: string }): Promise<bo
     }
     const nextDue = await nextCategoryAssignmentDue(scope);
     if (nextDue == null) return processed;
-    const waitMs = nextDue.getTime() - Date.now();
-    // Due but unclaimed: every slot is held by another run.
-    if (waitMs <= 0) return processed;
+    // Due when the claim ran but unclaimed: every slot is held by another run.
+    // Judged against the claim's clock, not a fresh one, so work that came due
+    // during the claim (or a timer that fired a millisecond early) is retried.
+    if (nextDue.getTime() <= claimedAt.getTime()) return processed;
+    const waitMs = Math.max(0, nextDue.getTime() - Date.now());
     await new Promise((resolve) =>
       setTimeout(resolve, Math.min(waitMs, MAX_IDLE_WAIT_MS, remainingMs))
     );

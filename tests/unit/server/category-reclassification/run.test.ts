@@ -170,6 +170,26 @@ describe("category reclassification orchestration concurrency", () => {
     expect(adapters.nextDue).toHaveBeenCalledTimes(1);
   });
 
+  it("claims again when the work came due while the empty claim ran", async () => {
+    const pending = work(0);
+    state.queue = [];
+    const claimStartedAt = Date.now();
+    adapters.claimDocuments.mockImplementationOnce(async () => {
+      vi.setSystemTime(claimStartedAt + 5);
+      return [];
+    });
+    adapters.nextDue.mockImplementationOnce(async () => {
+      state.queue = [pending];
+      return new Date(claimStartedAt + 2);
+    });
+
+    const running = runCategoryReclassificationJob("job-1");
+    await vi.runAllTimersAsync();
+
+    await expect(running).resolves.toBe(true);
+    expect(state.decideCalls).toBe(1);
+  });
+
   it("isolates one failed document without repeating the other 99 requests", async () => {
     state.concurrency = 100;
     adapters.decide.mockRejectedValueOnce(new Error("timeout"));
