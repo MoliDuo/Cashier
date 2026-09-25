@@ -1,82 +1,41 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
-import {
-  currencyRates,
-  exchangeRateRecalculationJobs,
-  exchangeRates,
-  ledgerEntries,
-  ledgers,
-  sourceDocuments,
-} from "@/persistence";
-import { eq, sql } from "drizzle-orm";
+import { logger } from "@/lib/logger";
+import { exchangeRates } from "@/persistence";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { dateStringSchema } from "@/lib/validation";
-import { convertWithRates, type ExchangeRates } from "../domain/rate-calculation";
-import { roundToCurrency } from "@/lib/money/currency-precision";
 
-// Exchange-rate cache backed by the currency_rates table and the Frankfurter API.
-// Final snapshots are also written to exchange_rates, which reads switch to next.
+// Per-day exchange rates in the exchange_rates table, fetched from Frankfurter.
+// Conversions happen in SQL through convert_amount, which answers null for a
+// day without rates; nothing here converts amounts itself.
 
 const supportedCurrencySet = new Set<string>(SUPPORTED_CURRENCIES);
 
-function assertSupportedCurrency(currency: string): void {
-  if (!supportedCurrencySet.has(currency)) {
-    throw new AppError(`Currency not found: ${currency}`, "CURRENCY_NOT_FOUND", 400);
-  }
-}
-
 const providerCurrencyCodeSchema = z.string().regex(/^[A-Z]{3}$/, "Invalid currency code");
-const providerBaseCurrencySchema = providerCurrencyCodeSchema.refine(
-  (code) => supportedCurrencySet.has(code),
-  "Unsupported base currency"
-);
 
-const providerRatesSchema = z.object({
-  base: providerBaseCurrencySchema,
-  date: dateStringSchema,
-  rates: z.record(providerCurrencyCodeSchema, z.number().finite().positive()),
+const providerTimeSeriesSchema = z.object({
+  base: z.literal("EUR"),
+  rates: z.record(
+    dateStringSchema,
+    z.record(providerCurrencyCodeSchema, z.number().finite().positive())
+  ),
 });
 
-/**
- * Validate a Frankfurter-style provider payload before anything is written.
- * Rejects malformed dates, unsupported bases, invalid rate codes, and
- * non-finite or non-positive rates without touching the database.
- */
-function parseProviderRates(
-  data: unknown,
-  targetDate: string
-): { rates: ExchangeRates; providerDate: string } {
-  const result = providerRatesSchema.safeParse(data);
-  if (!result.success) {
-    throw new AppError(
-      "Invalid exchange-rate provider response",
-      "EXCHANGE_RATES_INVALID_RESPONSE",
-      502
-    );
-  }
-  return {
-    rates: {
-      base: result.data.base,
-      date: targetDate,
-      rates: Object.fromEntries(
-        Object.entries(result.data.rates).filter(([currency]) => supportedCurrencySet.has(currency))
-      ),
-    },
-    providerDate: result.data.date,
-  };
-}
+/** Days before the first wanted one that are also requested, so a wanted day
+ * that falls on a weekend or holiday has a publication to carry forward. */
+const LOOKBACK_DAYS = 7;
+const ENSURE_TIMEOUT_MS = 3_000;
+const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+const INSERT_CHUNK_ROWS = 1_000;
+const API_BASE_URL = "https://api.frankfurter.app";
 
-/**
- * The provider answers a date with the latest rates published on or before
- * it, so an earlier provider date is the applicable rate for a past day
- * (a Saturday gets Friday's rates). For today or a future day it only means
- * the day's rates are not out yet, and caching them would pin the previous
- * day's rates to that date for good.
- */
-function isFinalForDate(providerDate: string, targetDate: string): boolean {
-  return providerDate >= targetDate || targetDate < formatExchangeRateDate(new Date());
+interface DayRates {
+  rateDate: string;
+  sourceDate: string;
+  perEur: Record<string, number>;
 }
 
 // helpers
@@ -87,6 +46,12 @@ export function formatExchangeRateDate(date: Date | string): string {
   }
 
   return dateStringSchema.parse(date.toISOString().slice(0, 10));
+}
+
+function addDays(date: string, days: number): string {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
 }
 
 function isRetryableHttpStatus(status: number): boolean {
@@ -126,204 +91,195 @@ export async function fetchWithRetry(url: string, retries = 3, delay = 1000): Pr
   throw lastError;
 }
 
-const API_BASE_URL = "https://api.frankfurter.app";
+/**
+ * Turns the provider's publications into one entry per wanted calendar day,
+ * each carrying the latest publication on or before it. A day earlier than
+ * every publication is left out.
+ */
+export function spreadToCalendarDays(
+  published: Record<string, Record<string, number>>,
+  wantedDays: readonly string[]
+): DayRates[] {
+  const publicationDays = Object.keys(published).sort();
+  return [...wantedDays].sort().flatMap((rateDate) => {
+    let sourceDate: string | undefined;
+    for (const day of publicationDays) {
+      if (day > rateDate) break;
+      sourceDate = day;
+    }
+    if (sourceDate == null) return [];
+    const perEur = Object.fromEntries(
+      Object.entries(published[sourceDate]!).filter(([currency]) =>
+        supportedCurrencySet.has(currency)
+      )
+    );
+    return [{ rateDate, sourceDate, perEur: { ...perEur, EUR: 1 } }];
+  });
+}
 
-const pendingRequests = new Map<string, Promise<ExchangeRates>>();
+async function fetchPublications(
+  from: string,
+  to: string,
+  load: (url: string) => Promise<Response>
+): Promise<Record<string, Record<string, number>>> {
+  const response = await load(`${API_BASE_URL}/${from}..${to}?base=EUR`);
+  if (!response.ok) {
+    throw new AppError(
+      `Failed to fetch exchange rates: HTTP ${response.status}`,
+      "EXCHANGE_RATES_FETCH_FAILED"
+    );
+  }
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  const result = providerTimeSeriesSchema.safeParse(payload);
+  if (!result.success) {
+    throw new AppError(
+      "Invalid exchange-rate provider response",
+      "EXCHANGE_RATES_INVALID_RESPONSE",
+      502
+    );
+  }
+  return result.data.rates;
+}
 
 /**
- * Get rates for a specific date (defaults to today).
- * Uses "Daily Snapshot" strategy:
- * 1. Check DB for date.
- * 2. If missing, fetch from Frankfurter (base=EUR) and cache.
- * 3. Return rates.
+ * Stores the days' rates. A day already stored is replaced only while it is
+ * provisional, and only when the new rates differ or have become final, so a
+ * repeated fetch of an unchanged day does not tell every ledger to refresh.
+ * A day is final once it has its own publication or two days have passed.
  */
-export async function getExchangeRates(date?: Date | string): Promise<ExchangeRates> {
-  const targetDateStr = formatExchangeRateDate(date ?? new Date());
-
-  const cached = await db.query.currencyRates.findFirst({
-    where: eq(currencyRates.date, targetDateStr),
-  });
-
-  if (cached) {
-    return {
-      base: cached.base,
-      date: cached.date,
-      rates: cached.rates as Record<string, number>,
-    };
-  }
-
-  // Request collapsing: register the pending fetch before any await so
-  // concurrent callers for the same date share one provider request.
-  let fetchPromise = pendingRequests.get(targetDateStr);
-  if (fetchPromise === undefined) {
-    fetchPromise = fetchAndStoreRates(targetDateStr);
-    pendingRequests.set(targetDateStr, fetchPromise);
-  }
-
-  return fetchPromise;
-}
-
-async function fetchAndStoreRates(targetDateStr: string): Promise<ExchangeRates> {
-  try {
-    const response = await fetchWithRetry(`${API_BASE_URL}/${targetDateStr}?base=EUR`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new AppError(
-          `Exchange rates unavailable for date: ${targetDateStr}`,
-          "EXCHANGE_RATES_UNAVAILABLE"
-        );
-      }
-      throw new AppError(
-        `Failed to fetch exchange rates: ${response.statusText}`,
-        "EXCHANGE_RATES_FETCH_FAILED"
-      );
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new AppError(
-        "Invalid exchange-rate provider response",
-        "EXCHANGE_RATES_INVALID_RESPONSE",
-        502
-      );
-    }
-    const { rates: data, providerDate } = parseProviderRates(payload, targetDateStr);
-    if (!isFinalForDate(providerDate, targetDateStr)) return data;
-
-    return await db.transaction(async (tx) => {
-      if (data.base === "EUR") {
-        await tx
-          .insert(exchangeRates)
-          .values(
-            Object.entries({ ...data.rates, EUR: 1 }).map(([currency, perEur]) => ({
-              rateDate: targetDateStr,
-              currency,
-              perEur: String(perEur),
-              sourceDate: providerDate,
-            }))
+async function storeDays(days: readonly DayRates[], fetchedAt: Date): Promise<void> {
+  const rows = days.flatMap((day) =>
+    Object.entries(day.perEur).map(([currency, perEur]) => ({
+      rateDate: day.rateDate,
+      currency,
+      perEur: String(perEur),
+      sourceDate: day.sourceDate,
+      fetchedAt,
+    }))
+  );
+  for (let start = 0; start < rows.length; start += INSERT_CHUNK_ROWS) {
+    await db
+      .insert(exchangeRates)
+      .values(rows.slice(start, start + INSERT_CHUNK_ROWS))
+      .onConflictDoUpdate({
+        target: [exchangeRates.rateDate, exchangeRates.currency],
+        set: {
+          perEur: sql`excluded.per_eur`,
+          sourceDate: sql`excluded.source_date`,
+          fetchedAt: sql`excluded.fetched_at`,
+        },
+        setWhere: sql`NOT (
+            ${exchangeRates.sourceDate} IS NOT DISTINCT FROM ${exchangeRates.rateDate}
+            OR ${exchangeRates.fetchedAt} >= (${exchangeRates.rateDate} + 2)::timestamp AT TIME ZONE 'UTC'
           )
-          .onConflictDoNothing();
-      }
-      const insertedRows = await tx
-        .insert(currencyRates)
-        .values({ date: targetDateStr, base: data.base, rates: data.rates })
-        .onConflictDoNothing()
-        .returning();
-
-      if (insertedRows.length === 0) {
-        const persisted = await tx.query.currencyRates.findFirst({
-          where: eq(currencyRates.date, targetDateStr),
-        });
-        if (persisted == null) {
-          throw new AppError("Stored exchange rates disappeared", "EXCHANGE_RATES_UNAVAILABLE");
-        }
-        return {
-          base: persisted.base,
-          date: persisted.date,
-          rates: persisted.rates,
-        };
-      }
-
-      await tx.execute(sql`
-        INSERT INTO ${exchangeRateRecalculationJobs} (rate_date, ledger_id)
-        SELECT ${targetDateStr}, ${ledgers.id}
-        FROM ${ledgers}
-        INNER JOIN ${sourceDocuments}
-          ON ${sourceDocuments.ledgerId} = ${ledgers.id}
-          AND (${sourceDocuments.documentDate} = ${targetDateStr} OR ${sourceDocuments.documentDate} IS NULL)
-          AND ${sourceDocuments.deletedAt} IS NULL
-        INNER JOIN ${ledgerEntries}
-          ON ${ledgerEntries.ledgerId} = ${ledgers.id}
-          AND ${ledgerEntries.sourceDocumentId} = ${sourceDocuments.id}
-          AND ${ledgerEntries.deletedAt} IS NULL
           AND (
-            ${sourceDocuments.activeRevisionId} = ${ledgerEntries.sourceDocumentRevisionId}
-            OR ${sourceDocuments.latestSubmissionRevisionId} = ${ledgerEntries.sourceDocumentRevisionId}
-          )
-        ON CONFLICT (rate_date, ledger_id) DO NOTHING
-      `);
-      return data;
-    });
-  } finally {
-    // Remove from pending map once finished (success or failure)
-    pendingRequests.delete(targetDateStr);
+            (${exchangeRates.perEur}, ${exchangeRates.sourceDate})
+              IS DISTINCT FROM (excluded.per_eur, excluded.source_date)
+            OR excluded.source_date = excluded.rate_date
+            OR excluded.fetched_at >= (excluded.rate_date + 2)::timestamp AT TIME ZONE 'UTC'
+          )`,
+      });
   }
 }
 
-export interface ConvertAmountInput {
+async function fetchAndStoreDays(
+  wantedDays: readonly string[],
+  load: (url: string) => Promise<Response>
+): Promise<void> {
+  const sorted = [...wantedDays].sort();
+  const first = sorted[0];
+  const last = sorted.at(-1);
+  if (first == null || last == null) return;
+  const fetchedAt = new Date();
+  const published = await fetchPublications(addDays(first, -LOOKBACK_DAYS), last, load);
+  await storeDays(spreadToCalendarDays(published, sorted), fetchedAt);
+}
+
+/**
+ * Makes a best effort to have rates for the given days before an entry is
+ * written on them: one provider request, about three seconds, never throwing.
+ * A day that still has no rates converts to null until maintenance fills it.
+ * Days after today are skipped; they have no rates yet.
+ */
+export async function ensureExchangeRates(dates: readonly (string | null)[]): Promise<void> {
+  const today = formatExchangeRateDate(new Date());
+  const candidates = [
+    ...new Set(dates.filter((date): date is string => date != null && date <= today)),
+  ];
+  if (candidates.length === 0) return;
+  try {
+    const stored = await db.execute<{ rate_date: string }>(sql`
+      SELECT rate_date::text FROM exchange_rates
+      WHERE currency = 'EUR' AND rate_date = ANY(${`{${candidates.join(",")}}`}::date[])
+    `);
+    const storedDays = new Set(stored.rows.map((row) => row.rate_date));
+    const missing = candidates.filter((date) => !storedDays.has(date));
+    await fetchAndStoreDays(missing, (url) =>
+      fetch(url, { signal: AbortSignal.timeout(ENSURE_TIMEOUT_MS) })
+    );
+  } catch (error) {
+    logger.warn(
+      { errorCode: error instanceof AppError ? error.code : "EXCHANGE_RATES_ENSURE_FAILED" },
+      "Exchange rates could not be ensured before a write"
+    );
+  }
+}
+
+/**
+ * Fills the days documents need that have no rates and replaces provisional
+ * days, at most once per cooldown across all instances. Runs from maintenance.
+ */
+export async function refreshExchangeRates(now = new Date()): Promise<void> {
+  const claimed = await db.execute(sql`
+    INSERT INTO rate_limit_buckets (bucket_key, count, window_start, created_at)
+    VALUES ('exchange-rates:refresh', 1, ${now}, ${now})
+    ON CONFLICT (bucket_key) DO UPDATE SET window_start = EXCLUDED.window_start
+    WHERE rate_limit_buckets.window_start <= ${new Date(now.getTime() - REFRESH_COOLDOWN_MS)}
+    RETURNING bucket_key
+  `);
+  if (claimed.rows.length === 0) return;
+
+  const today = formatExchangeRateDate(now);
+  const wanted = await db.execute<{ rate_date: string }>(sql`
+    SELECT DISTINCT documents.effective_date::text AS rate_date
+    FROM source_documents documents
+    WHERE documents.deleted_at IS NULL
+      AND documents.effective_date <= ${today}::date
+      AND NOT EXISTS (
+        SELECT 1 FROM exchange_rates rates
+        WHERE rates.rate_date = documents.effective_date AND rates.currency = 'EUR'
+      )
+    UNION
+    SELECT rates.rate_date::text
+    FROM exchange_rates rates
+    WHERE rates.currency = 'EUR'
+      AND rates.source_date IS DISTINCT FROM rates.rate_date
+      AND rates.fetched_at < (rates.rate_date + 2)::timestamp AT TIME ZONE 'UTC'
+  `);
+  await fetchAndStoreDays(
+    wanted.rows.map((row) => row.rate_date),
+    (url) => fetchWithRetry(url)
+  );
+}
+
+/** Converts one amount at the day's stored rate, fetching the day's rates first
+ * if they are missing; null when no rate is available for that day. */
+export async function convertAmount(input: {
   amount: string;
   fromCurrency: string;
   toCurrency: string;
-  date?: Date | string;
-}
-
-export interface ConvertedAmount {
-  convertedAmount: string;
-  exchangeRate: string;
-}
-
-/** Convert one amount using the rates for its date (defaults to today). */
-export async function convertAmount({
-  amount,
-  fromCurrency,
-  toCurrency,
-  date,
-}: ConvertAmountInput): Promise<ConvertedAmount> {
-  assertSupportedCurrency(fromCurrency);
-  assertSupportedCurrency(toCurrency);
-  if (fromCurrency === toCurrency) {
-    return { convertedAmount: roundToCurrency(amount, toCurrency), exchangeRate: "1" };
-  }
-
-  const rates = await getExchangeRates(date === "" ? undefined : date);
-  return convertWithRates(amount, rates, fromCurrency, toCurrency);
-}
-
-/**
- * Batch convert multiple amounts, loading one rates snapshot per distinct
- * date. For N items with M unique dates, this performs M DB queries instead of N.
- */
-export async function convertAmounts(
-  items: Array<{ amount: string; from: string; date?: Date | string }>,
-  targetCurrency: string
-): Promise<ConvertedAmount[]> {
-  if (items.length === 0) return [];
-  assertSupportedCurrency(targetCurrency);
-  for (const item of items) assertSupportedCurrency(item.from);
-
-  // 1. Same-currency items never touch the database or provider.
-  const crossCurrencyItems = items.filter((item) => item.from !== targetCurrency);
-
-  // 2. Collect all unique dates for cross-currency items only.
-  const uniqueDates = [
-    ...new Set(crossCurrencyItems.map((item) => formatExchangeRateDate(item.date ?? new Date()))),
-  ];
-
-  // 3. Pre-load one rates snapshot per date (M DB queries for M dates).
-  const ratesByDate = new Map<string, ExchangeRates>();
-  await Promise.all(
-    uniqueDates.map(async (date) => {
-      ratesByDate.set(date, await getExchangeRates(date));
-    })
-  );
-
-  // 4. Map results synchronously using the pre-loaded snapshots.
-  return items.map((item) => {
-    if (item.from === targetCurrency) {
-      return { convertedAmount: roundToCurrency(item.amount, targetCurrency), exchangeRate: "1" };
-    }
-
-    const dateKey = formatExchangeRateDate(item.date ?? new Date());
-    const ratesData = ratesByDate.get(dateKey);
-    if (ratesData == null) {
-      throw new AppError(
-        `Missing exchange rates for grouped date: ${dateKey}`,
-        "MISSING_EXCHANGE_RATES"
-      );
-    }
-    return convertWithRates(item.amount, ratesData, item.from, targetCurrency);
-  });
+  date?: string;
+}): Promise<string | null> {
+  const date = formatExchangeRateDate(input.date ?? new Date());
+  if (input.fromCurrency !== input.toCurrency) await ensureExchangeRates([date]);
+  const result = await db.execute<{ converted: string | null }>(sql`
+    SELECT convert_amount(${input.amount}::numeric, ${input.fromCurrency}, ${input.toCurrency},
+      ${date}::date)::text AS converted
+  `);
+  return result.rows[0]?.converted ?? null;
 }

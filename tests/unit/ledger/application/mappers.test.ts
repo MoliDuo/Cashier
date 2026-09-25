@@ -4,7 +4,8 @@ import type { LedgerEntry } from "@/persistence";
 
 describe("mapLedgerEntryDto", () => {
   it("requires the source document relation and keeps categories optional", () => {
-    const entry: LedgerEntry = {
+    // Reads select the converted amount and rate beside the stored columns.
+    const entry: LedgerEntry & { convertedAmount: string | null; exchangeRate: string | null } = {
       id: "entry-1",
       ledgerId: "ledger-1",
       categoryId: null,

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ZodError } from "zod";
 import { getTestDb } from "../../setup";
 import {
-  currencyRates,
   entryCategories,
   ledgerEntries,
   ledgers,
@@ -14,6 +13,8 @@ import {
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
 // Mock auth
 vi.mock("@/auth", () => ({
@@ -46,7 +47,6 @@ describe("createQuickEntryAction", () => {
     await db.delete(sourceDocuments);
     await db.delete(entryCategories);
     await db.delete(ledgers);
-    await db.delete(currencyRates);
 
     // Create test ledger
     ledgerId = randomUUID();
@@ -65,14 +65,7 @@ describe("createQuickEntryAction", () => {
       sortOrder: 0,
     });
 
-    await db.insert(currencyRates).values({
-      date: TEST_RATE_DATE,
-      base: "EUR",
-      rates: {
-        CNY: 7.5,
-        USD: 1.1,
-      },
-    });
+    await insertExchangeRates(TEST_RATE_DATE, { CNY: 7.5, USD: 1.1 });
   });
 
   it("should create quick entry with valid data", async () => {
@@ -144,7 +137,7 @@ describe("createQuickEntryAction", () => {
     expect(entry?.currency).toBe("CNY");
   });
 
-  it("should use provided currency", async () => {
+  it("should use provided currency and read it converted at the stored day's rate", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockRejectedValue(new Error("network disabled in test"));
@@ -162,12 +155,54 @@ describe("createQuickEntryAction", () => {
         where: eq(ledgerEntries.id, result.ledgerEntryId),
       });
       expect(entry?.currency).toBe("USD");
-      expect(entry?.convertedAmount).toBe("681.820");
-      expect(entry?.exchangeRate).toBe("6.818181818182");
+      const page = await listStreamPage(ledgerId, { limit: 10 });
+      expect(page.items[0]?.ledgerEntries?.[0]).toMatchObject({
+        amount: "100.000",
+        currency: "USD",
+        convertedAmount: "681.82",
+        exchangeRate: "6.818181818182",
+      });
       expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+
+  it("saves the entry when the rate provider is down and reads it unconverted", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("provider down"));
+
+    try {
+      const result = await createQuickEntryAction({
+        categoryId,
+        amount: "100",
+        currency: "USD",
+        entryDate: "2026-02-10",
+      });
+
+      expect(result.status).toBe("completed");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const page = await listStreamPage(ledgerId, { limit: 10 });
+      expect(page.items[0]?.ledgerEntries?.[0]).toMatchObject({
+        currency: "USD",
+        convertedAmount: null,
+      });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("saves a currency the provider never publishes and reads it unconverted", async () => {
+    const result = await createQuickEntryAction({
+      categoryId,
+      amount: "12.345",
+      currency: "BHD",
+      entryDate: TEST_RATE_DATE,
+    });
+
+    const page = await listStreamPage(ledgerId, { limit: 10 });
+    expect(page.items.find((item) => item.id === result.sourceDocumentId)).toMatchObject({
+      ledgerEntries: [{ amount: "12.345", currency: "BHD", convertedAmount: null }],
+    });
   });
 
   it("should use current date when entryDate not provided", async () => {

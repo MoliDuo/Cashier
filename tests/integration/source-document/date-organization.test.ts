@@ -18,7 +18,6 @@ async function createFixture() {
   const created = await createManualDocument({
     ledgerId,
     bookId: await testBookId(db, ledgerId),
-    expectedMainCurrency: "CNY",
     title: "Long screenshot",
     entryDate: "2026-09-10",
     entries: ["Today", "Yesterday", "Earlier"].map((itemName, index) => ({
@@ -122,8 +121,8 @@ describe("date organization", () => {
       stream.items.find((item) => item.id === id)
     );
     expect(createdCards.map((item) => item?.ledgerEntries)).toMatchObject([
-      [{ itemName: "Yesterday", amount: "2.000", convertedAmount: "2.000" }],
-      [{ itemName: "Earlier", amount: "3.000", convertedAmount: "3.000" }],
+      [{ itemName: "Yesterday", amount: "2.000", convertedAmount: "2.00" }],
+      [{ itemName: "Earlier", amount: "3.000", convertedAmount: "3.00" }],
     ]);
   });
 

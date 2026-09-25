@@ -275,34 +275,6 @@ export const objectCleanupJobs = pgTable(
   ]
 );
 
-export const exchangeRateRecalculationStatusEnum = pgEnum("exchange_rate_recalculation_status", [
-  "pending",
-  "claimed",
-  "failed",
-]);
-
-export const exchangeRateRecalculationJobs = pgTable(
-  "exchange_rate_recalculation_jobs",
-  {
-    rateDate: text("rate_date").notNull(),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
-    status: exchangeRateRecalculationStatusEnum("status").notNull().default("pending"),
-    attempts: integer("attempts").notNull().default(0),
-    claimToken: uuid("claim_token"),
-    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
-    nextAttemptAt: requiredTimestamp("next_attempt_at").$defaultFn(() => new Date()),
-    lastError: text("last_error"),
-    createdAt: requiredTimestamp("created_at").$defaultFn(() => new Date()),
-    updatedAt: requiredTimestamp("updated_at").$defaultFn(() => new Date()),
-  },
-  (table) => [
-    primaryKey({ columns: [table.rateDate, table.ledgerId] }),
-    index("idx_exchange_rate_recalculation_jobs_due").on(table.status, table.nextAttemptAt),
-  ]
-);
-
 /**
  * One category assignment run. Selection, document work, persisted decisions,
  * and final outcomes live

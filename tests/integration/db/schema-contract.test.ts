@@ -204,14 +204,11 @@ describe("PostgreSQL schema contract", () => {
       "idx_ledger_entries_active_feed",
       "idx_ledger_entries_active_category",
       "idx_ledger_entries_active_currency",
-      "idx_ledger_entries_active_amount",
       "idx_ledger_entries_search",
     ]) {
       expect(byName.has(name), `missing index ${name}`).toBe(true);
     }
     expect(byName.get("idx_source_documents_active_feed")).toContain("effective_date");
-    expect(byName.get("idx_ledger_entries_active_amount")).toContain("converted_amount");
-    expect(byName.get("idx_ledger_entries_active_amount")).toContain("WHERE");
     expect(byName.get("idx_ledger_entries_search")).toContain("gin");
   });
 
@@ -246,10 +243,19 @@ describe("PostgreSQL schema contract", () => {
   });
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
+    // The recalculation queue left the model with read-time conversion; its
+    // table stays until the next contract migration drops it.
+    const retiredNames = new Set([
+      "exchange_rate_recalculation_jobs_ledger_id_ledgers_id_fk",
+      "idx_exchange_rate_recalculation_jobs_due",
+    ]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(
-      constraintRows.filter((row) => row.type !== "p").map((row) => row.conname)
+      constraintRows
+        .filter((row) => row.type !== "p")
+        .map((row) => row.conname)
+        .filter((name) => !retiredNames.has(name))
     );
     const constraintBackedIndexes = new Set(
       constraintRows.filter((row) => row.type === "p" || row.type === "u").map((row) => row.conname)
@@ -261,6 +267,7 @@ describe("PostgreSQL schema contract", () => {
         .filter((name) => !name.endsWith("_pkey"))
         // PostgreSQL exposes UNIQUE constraints as both constraints and backing indexes.
         .filter((name) => !constraintBackedIndexes.has(name))
+        .filter((name) => !retiredNames.has(name))
     );
 
     expect({

@@ -17,11 +17,10 @@ export type LedgerDto = {
 export type Ledger = LedgerDto;
 
 export type UpdateLedgerActionErrorCode =
-  "rates_unavailable" | "unsupported_currency" | "validation_failed" | "conflict" | "unexpected";
+  "unsupported_currency" | "validation_failed" | "conflict" | "unexpected";
 
 export type UpdateLedgerActionResult =
-  | { ok: true; ledger: LedgerDto }
-  | { ok: false; code: UpdateLedgerActionErrorCode; dates?: string[] };
+  { ok: true; ledger: LedgerDto } | { ok: false; code: UpdateLedgerActionErrorCode };
 
 export type BookDto = {
   id: string;

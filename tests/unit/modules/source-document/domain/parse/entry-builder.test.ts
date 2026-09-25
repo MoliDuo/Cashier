@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { convertAmountMock, formatDateTimeForApiMock } = vi.hoisted(() => ({
-  convertAmountMock: vi.fn(),
+const { formatDateTimeForApiMock } = vi.hoisted(() => ({
   formatDateTimeForApiMock: vi.fn(),
 }));
 
@@ -21,38 +20,36 @@ describe("entry-builder", () => {
     formatDateTimeForApiMock.mockReturnValue("2026-03-23");
   });
 
-  it("fails the write when a required accounting conversion fails", async () => {
-    convertAmountMock.mockRejectedValueOnce(new Error("rate unavailable"));
-
-    await expect(
-      buildEntriesForInsert({
-        validEntries: [
-          {
-            amount: "10",
-            currency: "USD",
-            categoryIndex: 1,
-            entryDate: null,
-            itemName: "",
-            notes: null,
-          },
-        ],
-        categories: [{ id: "cat-1", name: "Food", description: null }],
-        sourceDocumentId: "doc-1",
-        ledgerId: "ledger-1",
-        mainCurrency: "CNY",
-        fallbackDate: "2026-03-20",
-        convertAmount: convertAmountMock,
-      })
-    ).rejects.toThrow("rate unavailable");
-  });
-
-  it("category_index 0 means no category — categoryId is null", async () => {
-    convertAmountMock.mockResolvedValueOnce({
-      convertedAmount: "10.00",
-      exchangeRate: "10.00",
+  it("keeps each amount in its own currency, rounded to that currency", () => {
+    const [entry] = buildEntriesForInsert({
+      validEntries: [
+        {
+          amount: "12.345",
+          currency: "USD",
+          categoryIndex: 1,
+          entryDate: null,
+          itemName: "",
+          notes: null,
+        },
+      ],
+      categories: [{ id: "cat-1", name: "Food", description: null }],
+      sourceDocumentId: "doc-1",
+      ledgerId: "ledger-1",
+      fallbackDate: "2026-03-20",
     });
 
-    const result = await buildEntriesForInsert({
+    expect(entry).toMatchObject({
+      amount: "12.35",
+      currency: "USD",
+      itemName: "Uncategorized",
+      categoryId: "cat-1",
+      entryDate: "2026-03-20",
+    });
+    expect(entry).not.toHaveProperty("convertedAmount");
+  });
+
+  it("category_index 0 means no category — categoryId is null", () => {
+    const result = buildEntriesForInsert({
       validEntries: [
         {
           amount: "10",
@@ -69,9 +66,7 @@ describe("entry-builder", () => {
       ],
       sourceDocumentId: "doc-1",
       ledgerId: "ledger-1",
-      mainCurrency: "CNY",
       fallbackDate: "2026-03-20",
-      convertAmount: convertAmountMock,
     });
 
     const firstEntry = result[0];
@@ -83,12 +78,8 @@ describe("entry-builder", () => {
     expect(firstEntry.categoryId).toBeNull();
   });
 
-  it("category_index 1 maps to first category, category_index 2 maps to second (1-based)", async () => {
-    convertAmountMock
-      .mockResolvedValueOnce({ convertedAmount: "10.00", exchangeRate: "1" })
-      .mockResolvedValueOnce({ convertedAmount: "20.00", exchangeRate: "1" });
-
-    const result = await buildEntriesForInsert({
+  it("category_index 1 maps to first category, category_index 2 maps to second (1-based)", () => {
+    const result = buildEntriesForInsert({
       validEntries: [
         {
           amount: "10",
@@ -113,9 +104,7 @@ describe("entry-builder", () => {
       ],
       sourceDocumentId: "doc-1",
       ledgerId: "ledger-1",
-      mainCurrency: "CNY",
       fallbackDate: "2026-03-20",
-      convertAmount: convertAmountMock,
     });
 
     const firstEntry = result[0];

@@ -6,8 +6,10 @@ import { POST } from "@/app/api/v1/source-documents/route";
 import { GET } from "@/app/api/v1/source-documents/[sourceDocumentId]/route";
 import { getTestDb } from "../../setup";
 import { flushAfterCallbacks } from "../../setup.common";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 import {
+  exchangeRates,
   ledgers,
   ledgerEntries,
   serviceCredentials,
@@ -150,7 +152,6 @@ describe("API v1 source-documents route", () => {
       description: "Noodles",
       amount: "12.50",
       currency: "CNY",
-      convertedAmount: "12.50",
       position: 0,
     });
     await db
@@ -269,6 +270,7 @@ describe("API v1 source-documents route", () => {
   });
 
   it("totals converted amounts in the ledger main currency instead of raw amounts", async () => {
+    await insertExchangeRates(new Date().toISOString().slice(0, 10), { USD: 1, CNY: 5 });
     const image = await validJpegBase64();
     const created = await POST(
       new NextRequest("http://localhost/api/v1/source-documents", {
@@ -288,7 +290,6 @@ describe("API v1 source-documents route", () => {
         description: null,
         amount: "10.000",
         currency: "USD",
-        convertedAmount: "10.00",
         position: 0,
       },
       {
@@ -299,7 +300,6 @@ describe("API v1 source-documents route", () => {
         description: null,
         amount: "5.000",
         currency: "CNY",
-        convertedAmount: "0.70",
         position: 1,
       },
     ]);
@@ -324,7 +324,7 @@ describe("API v1 source-documents route", () => {
     );
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body.result.total).toBe("10.70");
+    expect(body.result.total).toBe("11.00");
     expect(body.result.total).not.toBe("15.00");
     expect(body.result.totalCurrency).toBe("USD");
     expect(body.result.entries).toEqual([
@@ -345,7 +345,7 @@ describe("API v1 source-documents route", () => {
     ]);
   });
 
-  it("returns a sanitized 500 when a completed entry lacks an accounting amount", async () => {
+  it("reports a null total while an entry has no exchange rate for its day", async () => {
     const image = await validJpegBase64();
     const created = await POST(
       new NextRequest("http://localhost/api/v1/source-documents", {
@@ -354,14 +354,17 @@ describe("API v1 source-documents route", () => {
         body: JSON.stringify({ images: [{ data: image, mimeType: "image/jpeg" }] }),
       })
     ).then((response) => response.json());
+    await flushAfterCallbacks();
     const db = getTestDb();
+    // The provider does not publish BHD; drop whatever the request cached.
+    await db.delete(exchangeRates);
     await db.insert(ledgerEntries).values({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       sourceDocumentRevisionId: created.revisionId,
-      itemName: "Broken entry",
-      amount: "12.50",
-      currency: "CNY",
+      itemName: "Dinar purchase",
+      amount: "12.500",
+      currency: "BHD",
       position: 0,
     });
     await db
@@ -382,11 +385,12 @@ describe("API v1 source-documents route", () => {
       }),
       { params: Promise.resolve({ sourceDocumentId: created.sourceDocumentId }) }
     );
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error.code).toBe("INTERNAL");
-    expect(body.error.message).toBe("The request could not be completed.");
-    expect(JSON.stringify(body)).not.toMatch(/converted|accounting|stack|sourceDocumentId/i);
-    expect(response.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
+    expect(body.result.total).toBeNull();
+    expect(body.result.totalCurrency).toBe("CNY");
+    expect(body.result.entries).toEqual([
+      expect.objectContaining({ name: "Dinar purchase", amount: "12.500", currency: "BHD" }),
+    ]);
   });
 });

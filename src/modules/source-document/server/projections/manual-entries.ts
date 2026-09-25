@@ -116,8 +116,6 @@ export async function replaceManualProjection(
             currency: requireCurrency(entry.currency),
             itemName: entry.itemName,
             description: entry.description,
-            convertedAmount: entry.convertedAmount,
-            exchangeRate: entry.exchangeRate,
             ...(entry.createdAt == null ? {} : { createdAt: new Date(entry.createdAt) }),
           },
         ]
@@ -140,8 +138,6 @@ export async function replaceManualProjection(
             currency: entry.currency,
             itemName: entry.itemName,
             description: entry.description,
-            convertedAmount: entry.convertedAmount,
-            exchangeRate: entry.exchangeRate,
           },
         ];
   });
@@ -155,8 +151,6 @@ export async function replaceManualProjection(
           currency = updates.currency,
           item_name = updates.item_name,
           description = updates.description,
-          converted_amount = updates.converted_amount,
-          exchange_rate = updates.exchange_rate,
           deleted_at = NULL,
           updated_at = ${now}
       FROM (VALUES ${sql.join(
@@ -169,14 +163,11 @@ export async function replaceManualProjection(
               ${row.amount}::numeric,
               ${row.currency}::varchar(3),
               ${row.itemName}::text,
-              ${row.description}::text,
-              ${row.convertedAmount}::numeric,
-              ${row.exchangeRate}::numeric
+              ${row.description}::text
             )`
         ),
         sql`, `
-      )}) AS updates(id, position, category_id, amount, currency, item_name,
-        description, converted_amount, exchange_rate)
+      )}) AS updates(id, position, category_id, amount, currency, item_name, description)
       WHERE entry.id = updates.id
         AND entry.ledger_id = ${input.ledgerId}
     `);

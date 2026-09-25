@@ -5,7 +5,7 @@ import type {
   CreateManualDocumentInput,
 } from "@/modules/source-document/server/projections/types";
 import { db } from "@/lib/db";
-import { ConflictError, NotFoundError } from "@/lib/errors";
+import { NotFoundError } from "@/lib/errors";
 import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import {
   lockBookForShare,
@@ -14,17 +14,14 @@ import {
 } from "@/lib/db/transaction-locks";
 import { completeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
-import { LedgerMainCurrencyChangedError, activeDocumentWhere, replaceProjection } from "./shared";
+import { activeDocumentWhere, replaceProjection } from "./shared";
 import { createCompletedProjectionInTransaction } from "./manual-entries";
 
 export async function activateRevision(input: ActivateRevisionInput): Promise<boolean> {
   return db.transaction(async (tx) => {
-    // Lock the ledger row to serialise with concurrent main-currency changes.
-    // The lock prevents a main-currency change from interleaving with result activation.
-    const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
-    if (ledger.mainCurrency !== input.expectedMainCurrency) {
-      throw new LedgerMainCurrencyChangedError();
-    }
+    // The ledger lock keeps the categories the entries reference from being
+    // deleted underneath the activation.
+    await lockLedgerForUpdate(tx, input.ledgerId);
 
     // Also lock the source document row to serialise with concurrent soft-delete.
     // Lock order: ledger → source document (prevents deadlocks).
@@ -87,13 +84,9 @@ export async function createManualDocument(
   input: CreateManualDocumentInput
 ): Promise<{ sourceDocumentId: string; revisionId: string }> {
   return db.transaction(async (tx) => {
-    // Lock the ledger row to serialise with concurrent main-currency changes.
-    // This is the first-active-projection path; the lock prevents a settings
-    // main-currency change from interleaving with entry creation.
-    const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
-    if (ledger.mainCurrency !== input.expectedMainCurrency) {
-      throw new ConflictError("Ledger currency changed before quick entry commit");
-    }
+    // The ledger lock keeps the categories the entries reference from being
+    // deleted underneath the new record.
+    await lockLedgerForUpdate(tx, input.ledgerId);
 
     // The book was resolved outside this transaction; the ledger lock makes
     // the re-read authoritative, so a book archived while the form was open

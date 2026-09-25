@@ -59,7 +59,8 @@ export async function calculateLedgerEntryStats({
       SELECT
         COALESCE(ledger_entries.currency, settings.main_currency) AS currency,
         ledger_entries.amount,
-        ledger_entries.converted_amount,
+        convert_amount(ledger_entries.amount, ledger_entries.currency,
+          settings.main_currency, documents.effective_date) AS converted_amount,
         documents.effective_date,
         ledger_entries.category_id,
         categories.name AS category_name,

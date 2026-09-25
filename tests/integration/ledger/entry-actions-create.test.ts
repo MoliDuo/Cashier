@@ -9,15 +9,6 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
-const { getRatesMock } = vi.hoisted(() => ({
-  getRatesMock: vi.fn(async () => ({ base: "CNY", date: "2026-01-01", rates: {} })),
-}));
-
-vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
-  getExchangeRates: getRatesMock,
-}));
-
 describe("createLedgerEntryAction version CAS", () => {
   let ledgerId: string;
   let sourceDocumentId: string;

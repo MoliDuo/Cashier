@@ -10,6 +10,10 @@ import {
   type LedgerEntryFilterParams,
 } from "./build-ledger-entry-filters";
 import { ledgerEntries, revisionFiles } from "@/persistence";
+import {
+  entryConvertedAmountSql,
+  entryExchangeRateSql,
+} from "@/modules/currency/server/conversion-sql";
 
 interface ListLedgerEntryPageInput {
   ledgerId: string;
@@ -145,6 +149,8 @@ export async function listLedgerEntryPage({
                   },
                 },
                 extras: {
+                  convertedAmount: entryConvertedAmountSql().as("converted_amount"),
+                  exchangeRate: entryExchangeRateSql().as("exchange_rate"),
                   hasImages: sql<boolean>`EXISTS (
                     SELECT 1
                     FROM ${revisionFiles} page_revision_file

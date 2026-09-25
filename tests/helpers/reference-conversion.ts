@@ -1,3 +1,7 @@
+/**
+ * The JavaScript conversion the stored amounts were computed with before
+ * reads converted in SQL; kept as the parity reference for convert_amount.
+ */
 import { multiply, divide, round } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { AppError } from "@/lib/errors";

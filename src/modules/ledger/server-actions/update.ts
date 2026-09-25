@@ -4,7 +4,7 @@ import { logError } from "@/lib/error-handlers";
 import type { UpdateLedgerActionResult } from "@/modules/ledger/contracts";
 import { parseUpdateLedgerInput, type UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
 import { updateLedgerSettings } from "../server/settings";
-import { extractUpdateLedgerActionDates, toUpdateLedgerActionErrorCode } from "./update-error";
+import { toUpdateLedgerActionErrorCode } from "./update-error";
 
 export const updateLedgerSettingsAction = withLedgerAccess(
   async (ledgerId: string, data: UpdateLedgerInput): Promise<UpdateLedgerActionResult> => {
@@ -20,9 +20,7 @@ export const updateLedgerSettingsAction = withLedgerAccess(
       // callers can keep drafts on known conflicts. Other simple commands
       // continue to throw their typed application errors at the boundary.
       if (code === "unexpected") logError("updateLedgerSettingsAction", error);
-      const dates =
-        code === "rates_unavailable" ? extractUpdateLedgerActionDates(error) : undefined;
-      return { ok: false, code, ...(dates !== undefined ? { dates } : {}) };
+      return { ok: false, code };
     }
   }
 );

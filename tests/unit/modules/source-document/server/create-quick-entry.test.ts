@@ -5,13 +5,13 @@ const {
   getDateInTimezoneMock,
   getEntryCategoryNameMock,
   createManualMock,
-  convertAmountMock,
+  ensureRatesMock,
 } = vi.hoisted(() => ({
   formatDateTimeForApiMock: vi.fn(),
   getDateInTimezoneMock: vi.fn<() => string | undefined>(() => undefined),
   getEntryCategoryNameMock: vi.fn(),
   createManualMock: vi.fn(),
-  convertAmountMock: vi.fn(),
+  ensureRatesMock: vi.fn(),
 }));
 
 vi.mock("@/lib/date-utils", () => ({
@@ -24,7 +24,7 @@ vi.mock("@/modules/source-document/server/projections/writes", () => ({
 }));
 
 vi.mock("@/modules/currency/server/exchange-rates", () => ({
-  convertAmount: convertAmountMock,
+  ensureExchangeRates: ensureRatesMock,
 }));
 
 vi.mock("@/modules/ledger/server/categories", () => ({
@@ -40,10 +40,7 @@ describe("createQuickEntry", () => {
     vi.clearAllMocks();
     formatDateTimeForApiMock.mockReturnValue("2026-03-20");
     getEntryCategoryNameMock.mockResolvedValue("Food");
-    convertAmountMock.mockImplementation(async (input) => ({
-      convertedAmount: input.fromCurrency === input.toCurrency ? "100.00" : "3.67",
-      exchangeRate: input.fromCurrency === input.toCurrency ? "1" : "0.146666666667",
-    }));
+    ensureRatesMock.mockResolvedValue(undefined);
     createManualMock.mockResolvedValue({ sourceDocumentId: "doc-1", revisionId: "revision-1" });
     randomUuidSpy = vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValueOnce("entry-1");
   });
@@ -63,16 +60,10 @@ describe("createQuickEntry", () => {
       }
     );
 
-    expect(convertAmountMock).toHaveBeenCalledWith({
-      amount: "100",
-      fromCurrency: "USD",
-      toCurrency: "USD",
-      date: "2026-03-20",
-    });
+    expect(ensureRatesMock).not.toHaveBeenCalled();
     expect(createManualMock).toHaveBeenCalledWith({
       ledgerId: "ledger-1",
       bookId: "user-1",
-      expectedMainCurrency: "USD",
       title: "Food",
       entryDate: "2026-03-20",
       entries: [
@@ -80,7 +71,7 @@ describe("createQuickEntry", () => {
           id: "entry-1",
           currency: "USD",
           itemName: "Food",
-          convertedAmount: "100.00",
+          amount: "100.00",
         }),
       ],
     });
@@ -126,12 +117,7 @@ describe("createQuickEntry", () => {
       }
     );
 
-    expect(convertAmountMock).toHaveBeenCalledWith({
-      amount: "25",
-      fromCurrency: "CNY",
-      toCurrency: "USD",
-      date: "2026-01-31",
-    });
+    expect(ensureRatesMock).toHaveBeenCalledWith(["2026-01-31"]);
     expect(createManualMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Tea",

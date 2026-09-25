@@ -10,6 +10,7 @@ import {
   sourceDocuments,
 } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 import { getTestDb } from "../../setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
@@ -51,8 +52,6 @@ const entry = {
   currency: "CNY",
   itemName: "Lunch",
   description: null,
-  convertedAmount: "12.50",
-  exchangeRate: "1.000000",
 } as const;
 
 describe("target upper workflows", () => {
@@ -60,7 +59,6 @@ describe("target upper workflows", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const completed = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
@@ -113,7 +111,6 @@ describe("target upper workflows", () => {
       .values({ ledgerId, name: "Food" })
       .returning();
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
       entries: [{ ...entry, categoryId: category!.id }],
@@ -186,10 +183,10 @@ describe("target upper workflows", () => {
       .insert(entryCategories)
       .values({ ledgerId, name: "Food" })
       .returning();
+    await insertExchangeRates("2026-07-14", { USD: 1, CNY: 8 });
     const transactionAt = "2026-07-14T12:30:00.000Z";
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const;
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Receipt with adjustments",
       entryDate: "2026-07-14",
@@ -201,8 +198,6 @@ describe("target upper workflows", () => {
           currency: "USD",
           itemName: "Meal",
           description: null,
-          convertedAmount: "98.720",
-          exchangeRate: "8.000000000000",
           createdAt: transactionAt,
         },
         {
@@ -212,8 +207,6 @@ describe("target upper workflows", () => {
           currency: "USD",
           itemName: "Order discount",
           description: "bill-level discount",
-          convertedAmount: "-8.88",
-          exchangeRate: "8.000000",
           createdAt: transactionAt,
         },
         {
@@ -223,8 +216,6 @@ describe("target upper workflows", () => {
           currency: "USD",
           itemName: "Service fee",
           description: "bill-level fee",
-          convertedAmount: "4.00",
-          exchangeRate: "8.000000",
           createdAt: transactionAt,
         },
       ],
@@ -244,7 +235,7 @@ describe("target upper workflows", () => {
           categoryId: category!.id,
           amount: "12.340",
           currency: "USD",
-          convertedAmount: "98.720",
+          convertedAmount: "98.72",
           exchangeRate: "8.000000000000",
           sourceDocument: expect.objectContaining({ documentDate: "2026-07-14" }),
         }),
@@ -257,7 +248,7 @@ describe("target upper workflows", () => {
       category: { id: category!.id, name: "Food" },
       amount: "12.340",
       currency: "USD",
-      convertedAmount: "98.720",
+      convertedAmount: "98.72",
       exchangeRate: "8.000000000000",
       sourceDocument: { id: created.sourceDocumentId, documentDate: "2026-07-14" },
     });
@@ -288,8 +279,7 @@ describe("target upper workflows", () => {
       orderBy: (entries, { asc }) => [asc(entries.position)],
     });
     expect(afterRollback).toMatchObject({
-      convertedAmount: "98.720",
-      exchangeRate: "8.000000000000",
+      itemName: "Meal",
       sourceDocumentRevisionId: created.revisionId,
     });
     expect(activeDocument?.activeRevisionId).toBe(created.revisionId);
@@ -311,7 +301,6 @@ describe("target upper workflows", () => {
       .returning();
     await expect(
       createManualDocument({
-        expectedMainCurrency: "CNY",
         ledgerId,
         entries: [{ ...entry, categoryId: otherCategory!.id }],
         bookId: await testBookId(db, ledgerId),
@@ -322,7 +311,6 @@ describe("target upper workflows", () => {
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
 
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
@@ -364,7 +352,6 @@ describe("target upper workflows", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
@@ -430,7 +417,6 @@ describe("target upper workflows", () => {
     await activateRevision({
       lease: await claimRevisionForTest(pending.revision.id),
       ledgerId,
-      expectedMainCurrency: "CNY",
       sourceDocumentId: pending.document.id,
       revisionId: pending.revision.id,
       entries: [entry],

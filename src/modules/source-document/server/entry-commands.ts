@@ -9,11 +9,11 @@ import type {
 } from "@/modules/source-document/contracts";
 import "server-only";
 import { db } from "@/lib/db";
-import { ConflictError, NotFoundError } from "@/lib/errors";
+import { NotFoundError } from "@/lib/errors";
 import { compare as compareDecimal } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
-import { convertAmount, convertAmounts } from "@/modules/currency/server/exchange-rates";
+import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { replaceActiveProjectionInTransaction } from "./projections/manual-entries";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import {
@@ -64,8 +64,6 @@ function toProjectionEntry(
     currency: entry.currency,
     itemName: entry.itemName,
     description: entry.description,
-    convertedAmount: entry.convertedAmount,
-    exchangeRate: entry.exchangeRate,
     createdAt: entry.createdAt.toISOString(),
   };
 }
@@ -89,16 +87,19 @@ function changed(
   );
 }
 
-async function prepareCreateConversion(input: {
+/**
+ * Caches the rates an entry in a foreign currency is read at before it is
+ * written. Best effort: the entry saves either way.
+ */
+async function prepareCreate(input: {
   ledgerId: string;
   sourceDocumentId: string;
-  amount: string;
   currency?: string;
-}) {
+}): Promise<void> {
   const context = await db
     .select({
       mainCurrency: ledgers.mainCurrency,
-      entryDate: sourceDocuments.documentDate,
+      effectiveDate: sourceDocuments.effectiveDate,
     })
     .from(sourceDocuments)
     .innerJoin(
@@ -114,32 +115,29 @@ async function prepareCreateConversion(input: {
     )
     .then((rows) => rows[0]);
   if (context == null) throw new NotFoundError("Source document");
-  const effectiveCurrency = input.currency ?? context.mainCurrency;
-  const conversion = await convertAmount({
-    amount: input.amount,
-    fromCurrency: effectiveCurrency,
-    toCurrency: context.mainCurrency,
-    ...(context.entryDate == null ? {} : { date: context.entryDate }),
-  });
-  return { ...context, effectiveCurrency, conversion };
+  if (input.currency != null && input.currency !== context.mainCurrency) {
+    await ensureExchangeRates([context.effectiveDate]);
+  }
 }
 
-async function prepareBatchConversions(input: {
+/**
+ * Checks the new amounts keep each entry's direction and, when the currency
+ * changes, caches the rates the entries are read at.
+ */
+async function prepareBatchUpdate(input: {
   ledgerId: string;
   targets: VersionedTarget[];
   ledgerEntryIds: string[];
   amount?: string;
   currency?: string | null;
-}) {
-  if (input.amount === undefined && input.currency === undefined) return null;
+}): Promise<void> {
+  if (input.amount === undefined && input.currency === undefined) return;
   const requestedIds = [...new Set(input.ledgerEntryIds)].sort();
   const targetIds = input.targets.map((target) => target.sourceDocumentId);
   const rows = await db
     .select({
-      id: ledgerEntries.id,
-      sourceDocumentId: ledgerEntries.sourceDocumentId,
       mainCurrency: ledgers.mainCurrency,
-      entryDate: sourceDocuments.documentDate,
+      effectiveDate: sourceDocuments.effectiveDate,
       amount: ledgerEntries.amount,
       currency: ledgerEntries.currency,
     })
@@ -168,30 +166,14 @@ async function prepareBatchConversions(input: {
   if (rows.length !== requestedIds.length) {
     throw new NotFoundError("Active ledger entry projection");
   }
-  const preparedRows = rows.map((entry) => {
+  for (const entry of rows) {
     const nextCurrency = input.currency !== undefined ? input.currency : entry.currency;
     const effectiveCurrency = nextCurrency ?? entry.mainCurrency;
     assertExpenseAmountDirection(entry.amount, input.amount ?? entry.amount, effectiveCurrency);
-    return {
-      entry,
-      effectiveCurrency,
-      nextAmount: input.amount ?? entry.amount,
-    };
-  });
-  const conversions = await convertAmounts(
-    preparedRows.map(({ entry, effectiveCurrency, nextAmount }) => ({
-      amount: nextAmount,
-      from: effectiveCurrency,
-      ...(entry.entryDate == null ? {} : { date: entry.entryDate }),
-    })),
-    rows[0]!.mainCurrency
-  );
-  return new Map(
-    preparedRows.map(({ entry, effectiveCurrency, nextAmount }, index) => [
-      entry.id,
-      { ...entry, effectiveCurrency, nextAmount, conversion: conversions[index]! },
-    ])
-  );
+  }
+  if (input.currency != null && input.currency !== rows[0]?.mainCurrency) {
+    await ensureExchangeRates(rows.map((entry) => entry.effectiveDate));
+  }
 }
 
 function targetMap(targets: readonly VersionedTarget[]) {
@@ -220,10 +202,9 @@ export interface BatchUpdateLedgerEntriesInput {
 }
 
 export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryResult> {
-  const prepared = await prepareCreateConversion({
+  await prepareCreate({
     ledgerId: input.ledgerId,
     sourceDocumentId: input.target.sourceDocumentId,
-    amount: input.amount,
     ...(input.currency === undefined ? {} : { currency: input.currency }),
   });
   return db.transaction(async (tx): Promise<EntryResult> => {
@@ -239,9 +220,6 @@ export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryR
     if (!hasEditableActiveProjection(document)) {
       throw new NotFoundError("Active source document");
     }
-    if (ledger.mainCurrency !== prepared.mainCurrency) {
-      throw new ConflictError("Ledger currency changed before the entry was committed");
-    }
     await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
     const entries = await listProjectionEntries(
       tx,
@@ -250,6 +228,7 @@ export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryR
       document.activeRevisionId
     );
     const ledgerEntryId = crypto.randomUUID();
+    const effectiveCurrency = input.currency ?? ledger.mainCurrency;
     await replaceActiveProjectionInTransaction(tx, {
       document,
       previousEntries: entries,
@@ -263,12 +242,10 @@ export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryR
         {
           id: ledgerEntryId,
           categoryId: input.categoryId ?? null,
-          amount: roundToCurrency(input.amount, prepared.effectiveCurrency),
-          currency: prepared.effectiveCurrency,
+          amount: roundToCurrency(input.amount, effectiveCurrency),
+          currency: effectiveCurrency,
           itemName: input.itemName,
           description: input.description ?? null,
-          convertedAmount: prepared.conversion.convertedAmount,
-          exchangeRate: prepared.conversion.exchangeRate,
         },
       ],
     });
@@ -330,7 +307,7 @@ export async function deleteLedgerEntry(input: {
 export async function batchUpdateLedgerEntries(
   input: BatchUpdateLedgerEntriesInput
 ): Promise<AtomicBatchCommandResult<{ ledgerEntryIds: string[]; affectedCount: number }>> {
-  const prepared = await prepareBatchConversions(input);
+  await prepareBatchUpdate(input);
   return db.transaction(async (tx) => {
     const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
     const targets = input.targets;
@@ -348,12 +325,6 @@ export async function batchUpdateLedgerEntries(
     });
     if (staleTargets.length > 0) {
       return { ok: false as const, reason: "stale" as const, staleTargets };
-    }
-    if (
-      prepared != null &&
-      [...prepared.values()].some((entry) => entry.mainCurrency !== ledger.mainCurrency)
-    ) {
-      throw new ConflictError("Ledger currency changed before the entries were committed");
     }
     if (documents.some((document) => !hasEditableActiveProjection(document))) {
       throw new NotFoundError("Active source document");
@@ -428,19 +399,14 @@ export async function batchUpdateLedgerEntries(
       const nextCurrency = input.currency !== undefined ? input.currency : entry.currency;
       const effectiveCurrency = nextCurrency ?? ledger.mainCurrency;
       const nextAmount = input.amount ?? entry.amount;
-      const needsConversion = input.amount !== undefined || input.currency !== undefined;
-      const conversion = needsConversion ? prepared!.get(entry.id)!.conversion : null;
+      const amountChanged = input.amount !== undefined || input.currency !== undefined;
       nextById.set(entry.id, {
         ...toProjectionEntry(entry),
         categoryId: input.categoryId !== undefined ? input.categoryId : entry.categoryId,
-        amount: needsConversion ? roundToCurrency(nextAmount, effectiveCurrency) : entry.amount,
+        amount: amountChanged ? roundToCurrency(nextAmount, effectiveCurrency) : entry.amount,
         currency: input.currency !== undefined ? effectiveCurrency : entry.currency,
         itemName: input.itemName !== undefined ? input.itemName : entry.itemName,
         description: input.description !== undefined ? input.description : entry.description,
-        convertedAmount: needsConversion
-          ? (conversion?.convertedAmount ?? null)
-          : entry.convertedAmount,
-        exchangeRate: needsConversion ? (conversion?.exchangeRate ?? null) : entry.exchangeRate,
       });
     }
 

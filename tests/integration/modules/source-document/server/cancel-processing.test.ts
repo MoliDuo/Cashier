@@ -49,7 +49,6 @@ describe("cancel source-document processing", () => {
     const { ledgerId } = await createTestUserWithLedger(db);
     const active = await createManualDocument({
       ledgerId,
-      expectedMainCurrency: "CNY",
       entries: [
         {
           categoryId: null,
@@ -57,8 +56,6 @@ describe("cancel source-document processing", () => {
           currency: "CNY",
           itemName: "Original",
           description: null,
-          convertedAmount: "12.00",
-          exchangeRate: "1",
         },
       ],
       bookId: await testBookId(db, ledgerId),

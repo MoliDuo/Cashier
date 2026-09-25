@@ -27,8 +27,6 @@ function entry(
     currency: "CNY",
     itemName,
     description: null,
-    convertedAmount: "10.00",
-    exchangeRate: "1.000000",
     ...overrides,
   };
 }
@@ -94,7 +92,6 @@ describe("projection write shape", () => {
 
     for (const count of [1, 50, 500]) {
       const created = await createManualDocument({
-        expectedMainCurrency: "CNY",
         ledgerId,
         title: `Doc ${count}`,
         entries: Array.from({ length: count }, (_, index) =>
@@ -124,7 +121,6 @@ describe("projection write shape", () => {
   it("edits the active revision without duplicating files or entries", async () => {
     const db = getTestDb();
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "With file",
       entries: [entry("A"), entry("B")],
@@ -220,7 +216,6 @@ describe("projection write shape", () => {
     const db = getTestDb();
     const pinnedCreatedAt = new Date("2026-01-02T03:04:05.000Z");
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Manual",
       entryDate: "2026-05-01",
@@ -324,7 +319,6 @@ describe("projection write shape", () => {
   it("reuses positions across repeated removals and additions without new revisions", async () => {
     const db = getTestDb();
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Repeated edits",
       entries: [entry("Keep"), entry("Replace")],

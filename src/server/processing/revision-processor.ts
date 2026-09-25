@@ -1,5 +1,4 @@
 import "server-only";
-import { LedgerMainCurrencyChangedError } from "@/modules/source-document/server/projections/shared";
 import type {
   RevisionProcessingRequestContract,
   RevisionProcessingResultContract,
@@ -9,7 +8,6 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import type { AIContext } from "@/lib/tasks/types";
 import { compare } from "@/lib/money/decimal";
-import { convertWithRates, type ExchangeRates } from "@/modules/currency/domain/rate-calculation";
 import {
   buildEntriesForInsert,
   getEntryFallbackDate,
@@ -31,7 +29,10 @@ import {
 } from "./evidence";
 import { loadRevisionProcessingContext } from "./context";
 import { getLedgerSettings } from "@/modules/ledger/server/settings";
-import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
+import {
+  ensureExchangeRates,
+  formatExchangeRateDate,
+} from "@/modules/currency/server/exchange-rates";
 import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
 import { activateRevision } from "@/modules/source-document/server/projections/writes";
 import { createAIContext } from "@/lib/tasks/ai-context";
@@ -165,74 +166,45 @@ export async function processRevision(
   const validEntries = output.ledgerEntries.filter(
     (entry) => compare(entry.amount, "0") > 0 || entry.isAdjustment === true
   );
-  const ratesByDate = new Map<string, Promise<ExchangeRates>>();
-  let currentSettings = ledgerSettings;
+  const entries = buildEntriesForInsert({
+    validEntries,
+    categories,
+    sourceDocumentId: request.sourceDocumentId,
+    ledgerId: request.ledgerId,
+    fallbackDate,
+  });
+  const entryInputs = entries.map((entry) => ({
+    id: entry.id,
+    categoryId: entry.categoryId,
+    amount: entry.amount,
+    currency: entry.currency,
+    itemName: entry.itemName,
+    description: entry.description,
+    createdAt: entry.entryDate,
+    ...(entry.dateHint == null ? {} : { dateHint: entry.dateHint }),
+  }));
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    throwIfProcessingCancelled(signal);
-    if (attempt > 0) {
-      currentSettings = await getLedgerSettings(request.ledgerId);
-      throwIfProcessingCancelled(signal);
-    }
-    const mainCurrency = currentSettings?.mainCurrency ?? "CNY";
+  const dateOrganizationSuggestion = createDateOrganizationSuggestion({
+    referenceDate: revision.inputDateReference,
+    sourceDocumentDate: fallbackDate,
+    entries,
+  });
 
-    try {
-      const entries = await buildEntriesForInsert({
-        validEntries,
-        categories,
-        sourceDocumentId: request.sourceDocumentId,
-        ledgerId: request.ledgerId,
-        mainCurrency,
-        fallbackDate,
-        convertAmount: async ({ amount, fromCurrency, toCurrency, date }) => {
-          const rateDate = date ?? "latest";
-          let ratesPromise = ratesByDate.get(rateDate);
-          if (ratesPromise == null) {
-            ratesPromise = getExchangeRates(date);
-            ratesByDate.set(rateDate, ratesPromise);
-          }
-          return convertWithRates(amount, await ratesPromise, fromCurrency, toCurrency);
-        },
-      });
-      throwIfProcessingCancelled(signal);
-      const entryInputs = entries.map((entry) => ({
-        id: entry.id,
-        categoryId: entry.categoryId,
-        amount: entry.amount,
-        currency: entry.currency,
-        itemName: entry.itemName,
-        description: entry.description,
-        convertedAmount: entry.convertedAmount,
-        exchangeRate: entry.exchangeRate,
-        createdAt: entry.entryDate,
-        ...(entry.dateHint == null ? {} : { dateHint: entry.dateHint }),
-      }));
-
-      const dateOrganizationSuggestion = createDateOrganizationSuggestion({
-        referenceDate: revision.inputDateReference,
-        sourceDocumentDate: fallbackDate,
-        entries,
-      });
-
-      throwIfProcessingCancelled(signal);
-      const activated = await activateRevision({
-        ...request,
-        expectedMainCurrency: mainCurrency,
-        ...(output.title == null ? {} : { title: output.title }),
-        entries: entryInputs,
-        dateOrganizationSuggestion,
-      });
-      if (!activated) {
-        throw new ProcessingCancelledError();
-      }
-      return { processingStatus: "completed" };
-    } catch (error) {
-      if (!(error instanceof LedgerMainCurrencyChangedError)) throw error;
-    }
+  // Cache the rates for the day the entries will be read on, so they show
+  // converted as soon as they appear. Without them the entries still save and
+  // show unconverted until maintenance fills the day.
+  await ensureExchangeRates([
+    revision.inputDocumentDate ?? formatExchangeRateDate(document.createdAt),
+  ]);
+  throwIfProcessingCancelled(signal);
+  const activated = await activateRevision({
+    ...request,
+    ...(output.title == null ? {} : { title: output.title }),
+    entries: entryInputs,
+    dateOrganizationSuggestion,
+  });
+  if (!activated) {
+    throw new ProcessingCancelledError();
   }
-
-  throw new ProcessingFailure(
-    "exchange_rate_failure",
-    "Ledger currency kept changing while the revision was being committed"
-  );
+  return { processingStatus: "completed" };
 }

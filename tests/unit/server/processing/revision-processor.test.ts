@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LedgerMainCurrencyChangedError } from "@/modules/source-document/server/projections/shared";
 import type { AIContext } from "@/lib/tasks/types";
-import { ProcessingFailure } from "@/modules/source-document/domain/parse/contracts";
 
 const {
   runParsePipelineMock,
@@ -9,7 +7,7 @@ const {
   loadContext,
   getSettings,
   loadStoredFiles,
-  getRates,
+  ensureRates,
   activateRevision,
   recordProcessingFailure,
 } = vi.hoisted(() => ({
@@ -18,7 +16,7 @@ const {
   loadContext: vi.fn(),
   getSettings: vi.fn(),
   loadStoredFiles: vi.fn(),
-  getRates: vi.fn(),
+  ensureRates: vi.fn(),
   activateRevision: vi.fn(),
   recordProcessingFailure: vi.fn(),
 }));
@@ -35,7 +33,10 @@ vi.mock("@/server/processing/evidence", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/processing/evidence")>()),
   loadStoredFilesForAI: loadStoredFiles,
 }));
-vi.mock("@/modules/currency/server/exchange-rates", () => ({ getExchangeRates: getRates }));
+vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
+  ensureExchangeRates: ensureRates,
+}));
 vi.mock("@/modules/source-document/server/projections/writes", () => ({ activateRevision }));
 vi.mock("@/modules/source-document/server/revisions", () => ({ recordProcessingFailure }));
 
@@ -48,11 +49,7 @@ const processor = {
 
 function createProcessor(entryCount: number) {
   getSettings.mockResolvedValue({ mainCurrency: "CNY" });
-  getRates.mockResolvedValue({
-    base: "EUR",
-    date: "2026-09-01",
-    rates: { EUR: 1, CNY: 8, USD: 1.2 },
-  });
+  ensureRates.mockResolvedValue(undefined);
   activateRevision.mockResolvedValue(true);
   recordProcessingFailure.mockResolvedValue(true);
   loadStoredFiles.mockResolvedValue([]);
@@ -82,7 +79,7 @@ function createProcessor(entryCount: number) {
     })),
   });
   runParsePipelineMock.mockResolvedValue({});
-  return { processor, getSettings, getRates, activateRevision, recordProcessingFailure };
+  return { processor, getSettings, ensureRates, activateRevision, recordProcessingFailure };
 }
 
 const request = {
@@ -96,50 +93,38 @@ const request = {
 describe("processRevision", () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it("deduplicates concurrent exchange-rate reads within one processing request", async () => {
-    const { processor, getRates, activateRevision } = createProcessor(100);
+  it("caches the document day's rates once and stores amounts unconverted", async () => {
+    const { processor, ensureRates, activateRevision } = createProcessor(100);
 
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "completed",
     });
 
-    expect(getRates).toHaveBeenCalledTimes(1);
-    expect(activateRevision.mock.calls[0]?.[0].entries).toHaveLength(100);
+    expect(ensureRates).toHaveBeenCalledTimes(1);
+    expect(ensureRates).toHaveBeenCalledWith(["2026-09-01"]);
+    const entries = activateRevision.mock.calls[0]?.[0].entries;
+    expect(entries).toHaveLength(100);
+    expect(entries[0]).toMatchObject({ amount: "10.00", currency: "EUR" });
+    expect(entries[0]).not.toHaveProperty("convertedAmount");
   });
 
-  it("rebuilds currency-dependent work after a commit conflict without reparsing", async () => {
-    createProcessor(1);
-    getSettings
-      .mockResolvedValueOnce({ mainCurrency: "CNY" })
-      .mockResolvedValueOnce({ mainCurrency: "USD" });
-    activateRevision.mockRejectedValueOnce(new LedgerMainCurrencyChangedError());
+  it("asks for the creation day's rates when the document has no date", async () => {
+    const { processor, ensureRates } = createProcessor(1);
+    loadContext.mockResolvedValue({
+      revision: { inputText: "receipt", inputDocumentDate: null, processingStatus: "processing" },
+      document: {
+        activeRevisionId: null,
+        latestSubmissionRevisionId: "revision-1",
+        createdAt: new Date("2026-08-30T23:30:00Z"),
+      },
+      storedFileIds: [],
+      categories: [],
+    });
 
     await expect(processor.process(request)).resolves.toEqual({
       processingStatus: "completed",
     });
-
-    expect(runParsePipelineMock).toHaveBeenCalledTimes(1);
-    expect(activateRevision).toHaveBeenCalledTimes(2);
-    expect(activateRevision.mock.calls[0]?.[0]).toMatchObject({
-      expectedMainCurrency: "CNY",
-      entries: [expect.objectContaining({ convertedAmount: "80.00" })],
-    });
-    expect(activateRevision.mock.calls[1]?.[0]).toMatchObject({
-      expectedMainCurrency: "USD",
-      entries: [expect.objectContaining({ convertedAmount: "12.00" })],
-    });
-  });
-
-  it("stops after three currency conflicts with the stable exchange-rate failure", async () => {
-    createProcessor(1);
-    activateRevision.mockRejectedValue(new LedgerMainCurrencyChangedError());
-
-    const processing = processor.process(request);
-    await expect(processing).rejects.toBeInstanceOf(ProcessingFailure);
-    await expect(processing).rejects.toMatchObject({ code: "exchange_rate_failure" });
-    expect(activateRevision).toHaveBeenCalledTimes(3);
-    expect(getSettings).toHaveBeenCalledTimes(3);
-    expect(runParsePipelineMock).toHaveBeenCalledTimes(1);
+    expect(ensureRates).toHaveBeenCalledWith(["2026-08-30"]);
   });
 
   it("records the AI reason and the AI-declared diagnostic when the AI rejects the document", async () => {

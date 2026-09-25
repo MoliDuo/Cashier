@@ -4,6 +4,12 @@ import { escapedLikeContains } from "@/lib/db/like-pattern";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/contracts";
 import { normalize as decimalNormalize } from "@/lib/money/decimal";
 import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { convertedAmountSql } from "@/modules/currency/server/conversion-sql";
+
+// Amount filters and totals convert in the document's ledger currency on the
+// document's day; an entry without a rate matches no amount bound.
+const documentMainCurrency = sql`(SELECT document_ledger.main_currency FROM ledgers document_ledger
+  WHERE document_ledger.id = ${sourceDocuments.ledgerId})`;
 
 export interface TargetSourceDocumentFilterInput {
   ledgerId: string;
@@ -50,6 +56,12 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
     input.maxAmount !== undefined ||
     (input.search != null && input.search !== "")
   ) {
+    const matchedConverted = convertedAmountSql({
+      amount: sql`matched_entries.amount`,
+      currency: sql`matched_entries.currency`,
+      mainCurrency: documentMainCurrency,
+      date: sourceDocuments.effectiveDate,
+    });
     conditions.push(sql`EXISTS (
       SELECT 1
       FROM ledger_entries AS matched_entries
@@ -57,8 +69,8 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
         AND matched_entries.source_document_id = ${sourceDocuments.id}
         AND matched_entries.source_document_revision_id = ${sourceDocuments.activeRevisionId}
         AND matched_entries.deleted_at IS NULL
-        ${input.minAmount !== undefined ? sql`AND matched_entries.converted_amount IS NOT NULL AND matched_entries.converted_amount >= ${input.minAmount}` : sql``}
-        ${input.maxAmount !== undefined ? sql`AND matched_entries.converted_amount IS NOT NULL AND matched_entries.converted_amount <= ${input.maxAmount}` : sql``}
+        ${input.minAmount !== undefined ? sql`AND ${matchedConverted} >= ${input.minAmount}` : sql``}
+        ${input.maxAmount !== undefined ? sql`AND ${matchedConverted} <= ${input.maxAmount}` : sql``}
         ${
           searchPattern != null
             ? sql`AND lower(matched_entries.item_name || ' ' || COALESCE(matched_entries.description, ''))
@@ -74,18 +86,18 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
 export async function calculateCompletedSourceDocumentTotal(
   input: TargetSourceDocumentFilterInput
 ): Promise<{ total: string; unconvertedCount: number }> {
+  const converted = convertedAmountSql({
+    amount: ledgerEntries.amount,
+    currency: ledgerEntries.currency,
+    mainCurrency: documentMainCurrency,
+    date: sourceDocuments.effectiveDate,
+  });
   const matchedEntryConditions: SQL<unknown>[] = [];
   if (input.minAmount !== undefined) {
-    matchedEntryConditions.push(
-      sql`${ledgerEntries.convertedAmount} IS NOT NULL
-        AND ${ledgerEntries.convertedAmount} >= ${input.minAmount}`
-    );
+    matchedEntryConditions.push(sql`${converted} >= ${input.minAmount}`);
   }
   if (input.maxAmount !== undefined) {
-    matchedEntryConditions.push(
-      sql`${ledgerEntries.convertedAmount} IS NOT NULL
-        AND ${ledgerEntries.convertedAmount} <= ${input.maxAmount}`
-    );
+    matchedEntryConditions.push(sql`${converted} <= ${input.maxAmount}`);
   }
   if (input.search != null && input.search !== "") {
     const searchPattern = escapedLikeContains(input.search);
@@ -96,10 +108,8 @@ export async function calculateCompletedSourceDocumentTotal(
   }
   const result = await db
     .select({
-      total: sql<string>`SUM(${ledgerEntries.convertedAmount})`,
-      unconvertedCount: sql<number>`COUNT(*) FILTER (
-        WHERE ${ledgerEntries.convertedAmount} IS NULL
-      )`,
+      total: sql<string>`SUM(${converted})`,
+      unconvertedCount: sql<number>`COUNT(*) FILTER (WHERE ${converted} IS NULL)`,
     })
     .from(sourceDocuments)
     .innerJoin(

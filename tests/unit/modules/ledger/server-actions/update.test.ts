@@ -4,7 +4,7 @@ import { toUpdateLedgerActionErrorCode } from "@/modules/ledger/server-actions/u
 
 describe("toUpdateLedgerActionErrorCode", () => {
   it.each([
-    [new AppError("missing", "EXCHANGE_RATES_UNAVAILABLE"), "rates_unavailable"],
+    [new AppError("missing", "EXCHANGE_RATES_UNAVAILABLE"), "unexpected"],
     [new AppError("unsupported", "CURRENCY_NOT_FOUND"), "unsupported_currency"],
     [new ValidationError("invalid"), "validation_failed"],
     [new ConflictError("conflict"), "conflict"],

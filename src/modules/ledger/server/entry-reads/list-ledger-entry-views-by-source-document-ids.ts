@@ -1,6 +1,10 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ledgerEntries } from "@/persistence";
+import {
+  entryConvertedAmountSql,
+  entryExchangeRateSql,
+} from "@/modules/currency/server/conversion-sql";
 import { mapLedgerEntryEmbeddedViewDto } from "./mappers";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
 import { buildLedgerEntryVisibilityCondition } from "./ledger-entry-visibility";
@@ -30,6 +34,10 @@ export async function listLedgerEntryViewsBySourceDocumentIds({
       buildLedgerEntryVisibilityCondition(ledgerId)
     ),
     with: { category: true },
+    extras: {
+      convertedAmount: entryConvertedAmountSql().as("converted_amount"),
+      exchangeRate: entryExchangeRateSql().as("exchange_rate"),
+    },
     orderBy: [
       asc(ledgerEntries.sourceDocumentId),
       asc(ledgerEntries.position),

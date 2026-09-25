@@ -9,7 +9,7 @@ import {
   convertWithRates,
   resolveRateRatio,
   type ExchangeRates,
-} from "@/modules/currency/domain/rate-calculation";
+} from "../../helpers/reference-conversion";
 
 const DATE = "2026-03-02";
 const rates: ExchangeRates = {

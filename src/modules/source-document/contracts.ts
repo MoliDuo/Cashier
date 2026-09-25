@@ -164,8 +164,11 @@ export interface CredentialSourceDocumentStatusResult {
   entryDate: string | null;
   result: null | {
     title: string | null;
-    /** Accounting total in the ledger's main currency (convertedAmount sum). */
-    total: string;
+    /**
+     * Accounting total in the ledger's main currency (convertedAmount sum);
+     * null while an entry has no exchange rate for its day.
+     */
+    total: string | null;
     /** Three-letter ISO currency code of `total`, from the ledger's main currency. */
     totalCurrency: string;
     entries: Array<{

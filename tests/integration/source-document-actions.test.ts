@@ -112,7 +112,6 @@ describe("getSourceDocumentDetailAction", () => {
       sourceDocumentId: docData.id,
       categoryId: categoryData.id,
       itemName: "Test Entry",
-      convertedAmount: "25.50",
     });
     await db.insert(ledgerEntries).values(entryData);
     await activateTestSourceDocumentProjection(db, docData.id);

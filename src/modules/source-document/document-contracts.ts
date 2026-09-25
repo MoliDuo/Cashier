@@ -48,7 +48,8 @@ export interface SourceDocumentDetailDto
 
 export interface SourceDocumentActiveResultSummary {
   entryCount: number;
-  total: string;
+  /** Null while an entry has no exchange rate for its day. */
+  total: string | null;
 }
 
 export interface SourceDocumentListItemDto extends SourceDocumentSummaryDto {

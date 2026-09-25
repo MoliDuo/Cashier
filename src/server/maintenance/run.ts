@@ -11,7 +11,7 @@ import {
 import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
-import { drainDueExchangeRateRecalculations } from "@/server/exchange-rate-recalculation/run";
+import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { drainDueCategoryReclassifications } from "@/server/category-reclassification/run";
 import { acknowledgeObjectCleanup, claimObjectCleanup } from "./object-cleanup";
 
@@ -107,7 +107,14 @@ export async function runBoundedMaintenance(now = new Date()): Promise<void> {
   });
   if (!acquired) return;
 
-  await drainDueExchangeRateRecalculations(now);
+  try {
+    await refreshExchangeRates(now);
+  } catch (error) {
+    logger.warn(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Exchange rate refresh failed"
+    );
+  }
   await drainDueCategoryReclassifications();
 
   const jobs = await claimObjectCleanup(new Date());

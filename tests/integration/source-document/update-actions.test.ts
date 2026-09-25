@@ -3,14 +3,24 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ZodError } from "zod";
 import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import { getTestDb } from "../../setup";
-import { currencyRates, ledgerEntries, sourceDocuments, ledgers } from "@/persistence";
+import { ledgerEntries, sourceDocuments, ledgers } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
 import { eq } from "drizzle-orm";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
-import * as exchangeRates from "@/modules/currency/server/exchange-rates";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
+
+async function convertedAmountsById(ledgerId: string) {
+  const page = await listStreamPage(ledgerId, { limit: 20 });
+  return new Map(
+    page.items.flatMap((item) =>
+      (item.ledgerEntries ?? []).map((entry) => [entry.id, entry.convertedAmount] as const)
+    )
+  );
+}
 
 // Mock auth module
 vi.mock("@/auth", () => ({
@@ -35,11 +45,13 @@ describe("Source Document Update Actions", () => {
   });
 
   describe("batchUpdateSourceDocumentsAction", () => {
-    it("converts only changed dates in a mixed batch and preserves metadata-only FX", async () => {
+    it("reads every re-dated entry at its document's new day's rate", async () => {
       const db = getTestDb();
       const ledger = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
       await ensureTestLedgerBooks(db, ledger.id);
+      await insertExchangeRates("2024-03-14", { USD: "1.15", MYR: "5" });
+      await insertExchangeRates("2024-03-15", { USD: "1.2", MYR: "5" });
       const documents = ["2024-03-14", "2024-03-15"].map((documentDate) =>
         createSourceDocumentData(ledger.id, { status: "completed", documentDate })
       );
@@ -58,37 +70,32 @@ describe("Source Document Update Actions", () => {
           amount: "100",
           currency: "MYR",
           itemName: "Fictional item",
-          convertedAmount: "23",
-          exchangeRate: "0.23",
         });
         await activateTestSourceDocumentProjection(db, document.id);
       }
-      const convert = vi
-        .spyOn(exchangeRates, "convertAmounts")
-        .mockResolvedValue([{ convertedAmount: "24", exchangeRate: "0.24" }]);
-      try {
-        await batchUpdateSourceDocumentsAction({
-          targets: documents.map((document) => ({
-            sourceDocumentId: document.id,
-            expectedVersion: 1,
-          })),
-          data: { documentDate: "2024-03-15", title: "Updated title" },
-        });
-        expect(convert).toHaveBeenCalledExactlyOnceWith(
-          [{ amount: "100.000", from: "MYR", date: "2024-03-15" }],
-          "USD"
-        );
-        expect(
-          await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, ids[0]!) })
-        ).toMatchObject({ convertedAmount: "24.000" });
-        expect(
-          await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, ids[1]!) })
-        ).toMatchObject({ convertedAmount: "23.000", exchangeRate: "0.230000000000" });
-      } finally {
-        convert.mockRestore();
-      }
+      expect(await convertedAmountsById(ledger.id)).toEqual(
+        new Map([
+          [ids[0]!, "23.00"],
+          [ids[1]!, "24.00"],
+        ])
+      );
+
+      await batchUpdateSourceDocumentsAction({
+        targets: documents.map((document) => ({
+          sourceDocumentId: document.id,
+          expectedVersion: 1,
+        })),
+        data: { documentDate: "2024-03-15", title: "Updated title" },
+      });
+
+      expect(await convertedAmountsById(ledger.id)).toEqual(
+        new Map([
+          [ids[0]!, "24.00"],
+          [ids[1]!, "24.00"],
+        ])
+      );
     });
-    it("does not prepare FX or advance the version when the date is unchanged", async () => {
+    it("does not ask for rates or advance the version when the date is unchanged", async () => {
       const db = getTestDb();
       const ledger = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
@@ -102,18 +109,18 @@ describe("Source Document Update Actions", () => {
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
       });
       await activateTestSourceDocumentProjection(db, document.id);
-      const convert = vi.spyOn(exchangeRates, "convertAmounts");
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
       try {
         await batchUpdateSourceDocumentsAction({
           targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],
           data: { documentDate: "2024-03-14" },
         });
-        expect(convert).not.toHaveBeenCalled();
+        expect(fetchSpy).not.toHaveBeenCalled();
         expect(
           await db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, document.id) })
         ).toMatchObject({ version: 1 });
       } finally {
-        convert.mockRestore();
+        fetchSpy.mockRestore();
       }
     });
     it("should batch update multiple source documents", async () => {
@@ -159,7 +166,7 @@ describe("Source Document Update Actions", () => {
       expect(updated2?.title).toBe("Updated documents");
     });
 
-    it("recalculates active entry conversions using the new historical date", async () => {
+    it("reads active entries converted at the new historical date", async () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledgerData);
@@ -180,31 +187,20 @@ describe("Source Document Update Actions", () => {
         amount: "100",
         currency: "CNY",
         itemName: "Historical item",
-        convertedAmount: "20",
-        exchangeRate: "0.2",
       });
       await activateTestSourceDocumentProjection(db, document.id);
-      await db
-        .insert(currencyRates)
-        .values({
-          date: "2024-03-15",
-          base: "EUR",
-          rates: { EUR: 1, USD: 1, CNY: 10 },
-        })
-        .onConflictDoNothing();
+      await insertExchangeRates("2024-03-15", { USD: 1, CNY: 10 });
 
       await batchUpdateSourceDocumentsAction({
         targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],
         data: { documentDate: "2024-03-15" },
       });
 
-      const [updatedDocument, updatedEntry] = await Promise.all([
-        db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, document.id) }),
-        db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, entryId) }),
-      ]);
+      const updatedDocument = await db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, document.id),
+      });
       expect(updatedDocument?.documentDate).toBe("2024-03-15");
-      expect(updatedEntry?.convertedAmount).toBe("10.000");
-      expect(updatedEntry?.exchangeRate).toBe("0.100000000000");
+      expect((await convertedAmountsById(ledgerData.id)).get(entryId)).toBe("10.00");
     });
 
     it("rejects an empty batch", async () => {

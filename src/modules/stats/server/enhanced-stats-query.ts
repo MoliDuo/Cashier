@@ -38,10 +38,10 @@ async function fetchAggregatedRows(
     SELECT ranges.period, documents.effective_date AS "effectiveDate",
       entries.currency, entries.category_id AS "categoryId",
       categories.name AS "categoryName", categories.icon AS "categoryIcon",
-      sum(entries.converted_amount)::text AS "totalAmount",
-      count(*) FILTER (WHERE entries.converted_amount IS NOT NULL)::int AS "entryCount",
+      sum(converted.amount)::text AS "totalAmount",
+      count(*) FILTER (WHERE converted.amount IS NOT NULL)::int AS "entryCount",
       ledgers.main_currency AS "mainCurrency",
-      count(*) FILTER (WHERE entries.converted_amount IS NULL)::int AS "unconvertedCount"
+      count(*) FILTER (WHERE converted.amount IS NULL)::int AS "unconvertedCount"
     FROM ranges
     JOIN source_documents documents
       ON documents.ledger_id = ${ledgerId}
@@ -54,6 +54,10 @@ async function fetchAggregatedRows(
       AND entries.source_document_revision_id = documents.active_revision_id
       AND entries.deleted_at IS NULL
     JOIN ledgers ON ledgers.id = documents.ledger_id
+    CROSS JOIN LATERAL (
+      SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
+        documents.effective_date) AS amount
+    ) converted
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
       AND categories.ledger_id = entries.ledger_id

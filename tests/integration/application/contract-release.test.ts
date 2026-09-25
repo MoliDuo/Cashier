@@ -41,7 +41,6 @@ describe("local contract release", () => {
       activateRevision({
         lease: await claimRevisionForTest(pending.revision.id),
         ledgerId,
-        expectedMainCurrency: "CNY",
         sourceDocumentId: pending.document.id,
         revisionId: pending.revision.id,
         title: "Target title",
@@ -76,7 +75,6 @@ describe("local contract release", () => {
     });
 
     await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Target-only entry",
       entries: [projectionEntry],
@@ -92,7 +90,6 @@ describe("local contract release", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       inputText: "target revision text",
       entries: [projectionEntry],

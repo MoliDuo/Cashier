@@ -3,7 +3,7 @@ import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { getCategoryName } from "@/modules/ledger/server/categories";
 import type { QuickEntryResponseDto } from "@/modules/source-document/contracts";
-import { convertAmount } from "@/modules/currency/server/exchange-rates";
+import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { createManualDocument } from "./projections/writes";
 import type { LedgerSettings } from "@/modules/ledger/contracts";
 
@@ -20,11 +20,6 @@ export interface CreateQuickEntryPayload {
   entryDate?: string;
 }
 
-interface ConversionResult {
-  convertedAmount: string;
-  exchangeRate: string;
-}
-
 interface QuickEntryInsertData {
   bookId: string;
   categoryId: string;
@@ -36,10 +31,8 @@ interface QuickEntryInsertData {
 
 async function createQuickEntryAtomically(
   ledgerId: string,
-  expectedMainCurrency: string,
   categoryName: string,
   currency: string,
-  conversion: ConversionResult,
   data: QuickEntryInsertData
 ): Promise<{ sourceDocumentId: string; ledgerEntryId: string }> {
   const ledgerEntryId = crypto.randomUUID();
@@ -47,7 +40,6 @@ async function createQuickEntryAtomically(
   const created = await createManualDocument({
     ledgerId,
     bookId: data.bookId,
-    expectedMainCurrency,
     title: itemName,
     entryDate: data.entryDate,
     entries: [
@@ -58,8 +50,6 @@ async function createQuickEntryAtomically(
         currency,
         itemName,
         description: data.description,
-        convertedAmount: conversion.convertedAmount,
-        exchangeRate: conversion.exchangeRate,
       },
     ],
   });
@@ -81,31 +71,19 @@ export async function createQuickEntry(
     getDateInTimezone(payload.timeZone ?? undefined) ??
     formatDateTimeForApi(new Date());
 
-  const [categoryName, conversion] = await Promise.all([
+  const [categoryName] = await Promise.all([
     getCategoryName(ledgerId, payload.categoryId),
-    convertAmount({
-      amount: payload.amount,
-      fromCurrency: entryCurrency,
-      toCurrency: mainCurrency,
-      date: entryDate,
-    }),
+    entryCurrency === mainCurrency ? undefined : ensureExchangeRates([entryDate]),
   ]);
 
-  const result = await createQuickEntryAtomically(
-    ledgerId,
-    mainCurrency,
-    categoryName,
-    entryCurrency,
-    conversion,
-    {
-      bookId: payload.bookId,
-      categoryId: payload.categoryId,
-      itemName: payload.itemName ?? null,
-      description: payload.description ?? null,
-      amount: payload.amount,
-      entryDate,
-    }
-  );
+  const result = await createQuickEntryAtomically(ledgerId, categoryName, entryCurrency, {
+    bookId: payload.bookId,
+    categoryId: payload.categoryId,
+    itemName: payload.itemName ?? null,
+    description: payload.description ?? null,
+    amount: payload.amount,
+    entryDate,
+  });
 
   return {
     sourceDocumentId: result.sourceDocumentId,

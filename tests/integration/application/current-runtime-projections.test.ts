@@ -22,7 +22,6 @@ describe("current-runtime target adapters", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Manual",
       entryDate: "2026-07-15",

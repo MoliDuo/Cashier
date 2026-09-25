@@ -1,17 +1,13 @@
 import "server-only";
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
-import { currencyRates, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { ledgers, sourceDocuments } from "@/persistence";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { omitUndefinedProperties } from "@/lib/validation";
-import { runWithConcurrency } from "@/lib/concurrency";
-import { recalculateCurrentEntries } from "@/modules/source-document/server/projections/recalculate-current-entries";
-import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
+import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import type { UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
 import type { LedgerDto, LedgerSettings } from "@/modules/ledger/contracts";
-
-const RATE_PREFETCH_CONCURRENCY = 4;
 
 export function mapLedgerSettings(
   row: Pick<
@@ -58,52 +54,12 @@ export async function getLedgerSettings(ledgerId: string): Promise<LedgerSetting
   return ledger == null ? null : mapLedgerSettings(ledger);
 }
 
-/**
- * Read-only lookup of the ledger's current main currency and the distinct
- * entry dates its live entries need an exchange rate for.
- */
-async function getRequiredExchangeRateDates(
-  ledgerId: string
-): Promise<{ currentMainCurrency: string; dates: string[] } | null> {
-  const ledger = await db.query.ledgers.findFirst({
-    where: eq(ledgers.id, ledgerId),
-    columns: { mainCurrency: true },
-  });
-  if (ledger == null) return null;
-
-  // Mirrors the entries join in recalculateCurrentEntries (below) with no
-  // entryDate filter, matching the full-ledger recalculation a
-  // main-currency change triggers.
-  const rows = await db
-    .selectDistinct({ entryDate: sourceDocuments.documentDate })
-    .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.ledgerId, ledgerId),
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        or(
-          eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
-          eq(sourceDocuments.latestSubmissionRevisionId, ledgerEntries.sourceDocumentRevisionId)
-        ),
-        isNull(sourceDocuments.deletedAt)
-      )
-    )
-    .where(and(eq(ledgerEntries.ledgerId, ledgerId), isNull(ledgerEntries.deletedAt)));
-
-  const dates = rows.map((row) => row.entryDate).filter((date): date is string => date != null);
-
-  return { currentMainCurrency: ledger.mainCurrency, dates };
-}
-
-async function updateWithCurrencyRecalculation(input: {
+async function updateSettingsRow(input: {
   ledgerId: string;
   expectedUpdatedAt: string;
   settings: Partial<LedgerSettings>;
-}): Promise<LedgerDto | null> {
+}): Promise<{ ledger: LedgerDto; mainCurrencyChanged: boolean } | null> {
   return db.transaction(async (tx) => {
-    // Lock the ledger row to serialise with concurrent first-entry creation.
-    // This prevents a main-currency change from interleaving with activateRevision / createManual.
     const ledger = await tx
       .select()
       .from(ledgers)
@@ -136,26 +92,6 @@ async function updateWithCurrencyRecalculation(input: {
     ) {
       throw new ValidationError("Main currency must be included in preferred currencies");
     }
-    if (previousMainCurrency !== nextMainCurrency) {
-      const latestRate = await tx
-        .select({ base: currencyRates.base, rates: currencyRates.rates })
-        .from(currencyRates)
-        .orderBy(desc(currencyRates.date))
-        .limit(1)
-        .then((rows) => rows[0] ?? null);
-      if (latestRate == null) {
-        throw new AppError(
-          "No stored currency rates are available",
-          "EXCHANGE_RATES_UNAVAILABLE",
-          409
-        );
-      }
-      const availableRates = { ...latestRate.rates, [latestRate.base]: 1 };
-      if (availableRates[nextMainCurrency] == null) {
-        throw new AppError(`Currency not found: ${nextMainCurrency}`, "CURRENCY_NOT_FOUND", 400);
-      }
-      await recalculateCurrentEntries(tx, input.ledgerId, nextMainCurrency);
-    }
     const updatedAt = new Date(Math.max(Date.now(), ledger.updatedAt.getTime() + 1));
     const updated = await tx
       .update(ledgers)
@@ -172,68 +108,41 @@ async function updateWithCurrencyRecalculation(input: {
       .then((rows) => rows[0]);
     if (updated == null) throw new ConflictError("Failed to update ledger settings");
     return {
-      id: updated.id,
-      settings: mapLedgerSettings(updated),
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      ledger: {
+        id: updated.id,
+        settings: mapLedgerSettings(updated),
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+      mainCurrencyChanged: previousMainCurrency !== nextMainCurrency,
     };
   });
 }
 
 /**
- * Exchange rates only ever get cached as a side effect of a cross-currency
- * conversion, so a ledger whose bills were always recorded in its current
- * main currency can have zero stored rates for those dates. Changing the
- * main currency turns every one of those entries into a cross-currency
- * conversion, and the transactional recalculation
- * (recalculateCurrentEntries) only reads currency_rates — it never fetches.
- * Pre-fetch (and cache) any missing rate here, outside any transaction or
- * ledger lock, so a historically single-currency ledger isn't rejected for
- * dates that are, in fact, fetchable.
+ * A ledger that only ever recorded its old main currency may have no rates
+ * for its days; once the main currency changes every entry converts, so the
+ * rates for all its document days are fetched. Best effort: a day still
+ * missing reads as unconverted until maintenance fills it.
  */
-async function ensureExchangeRatesForCurrencyChange(
-  ledgerId: string,
-  nextMainCurrency: string
-): Promise<void> {
-  const plan = await getRequiredExchangeRateDates(ledgerId);
-  if (plan == null) return; // Ledger not found; updateWithCurrencyRecalculation reports that.
-  if (plan.currentMainCurrency.trim().toUpperCase() === nextMainCurrency.trim().toUpperCase()) {
-    return; // No actual currency change, no new conversions to cover.
-  }
-
-  const failedDates: string[] = [];
-  await runWithConcurrency(plan.dates, RATE_PREFETCH_CONCURRENCY, async (date) => {
-    try {
-      await getExchangeRates(date);
-    } catch {
-      failedDates.push(date);
-    }
-  });
-
-  if (failedDates.length > 0) {
-    throw new AppError(
-      `No stored currency rates are available for ${failedDates.length} date(s)`,
-      "EXCHANGE_RATES_UNAVAILABLE",
-      409,
-      { dates: failedDates.sort().slice(0, 5) }
-    );
-  }
+async function ensureExchangeRatesForLedger(ledgerId: string): Promise<void> {
+  const rows = await db
+    .selectDistinct({ effectiveDate: sourceDocuments.effectiveDate })
+    .from(sourceDocuments)
+    .where(and(eq(sourceDocuments.ledgerId, ledgerId), isNull(sourceDocuments.deletedAt)));
+  await ensureExchangeRates(rows.map((row) => row.effectiveDate));
 }
 
 export async function updateLedgerSettings(
   ledgerId: string,
   data: UpdateLedgerInput
 ): Promise<LedgerDto> {
-  const nextMainCurrency = data.settings?.mainCurrency;
-  if (nextMainCurrency !== undefined) {
-    await ensureExchangeRatesForCurrencyChange(ledgerId, nextMainCurrency);
-  }
-
-  const updated = await updateWithCurrencyRecalculation({
+  const updated = await updateSettingsRow({
     ledgerId,
     expectedUpdatedAt: data.expectedUpdatedAt,
     settings: omitUndefinedProperties(data.settings ?? {}),
   });
   if (updated == null) throw new NotFoundError("Ledger");
-  return updated;
+  if (updated.mainCurrencyChanged) await ensureExchangeRatesForLedger(ledgerId);
+  return updated.ledger;
 }

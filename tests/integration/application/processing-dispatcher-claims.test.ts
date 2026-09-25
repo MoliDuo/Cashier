@@ -9,7 +9,6 @@ import {
   ledgerEntries,
   ledgers,
   processingOutbox,
-  currencyRates,
   sourceDocumentRevisions,
   sourceDocuments,
 } from "@/persistence";
@@ -21,6 +20,7 @@ vi.mock("@/lib/tasks/ai-context", () => ({
 import { createAIContext } from "@/lib/tasks/ai-context";
 import { processingJobs, revisionProcessor } from "tests/helpers/processing-jobs";
 import { executeProcessingJob } from "@/server/processing/execute-job";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -171,11 +171,7 @@ describe("processing outbox jobs", () => {
 
   it("retried revision uses current ledger settings", async () => {
     const db = getTestDb();
-    await db.insert(currencyRates).values({
-      date: new Date().toISOString().slice(0, 10),
-      base: "EUR",
-      rates: { EUR: 1, CNY: 8, USD: 1.2 },
-    });
+    await insertExchangeRates(new Date().toISOString().slice(0, 10), { CNY: 8, USD: 1.2 });
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
     // Process once without custom prompt (successful first parse)

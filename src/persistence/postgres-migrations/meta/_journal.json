@@ -29,6 +29,13 @@
       "when": 1790321523819,
       "tag": "0003_exchange_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790322249992,
+      "tag": "0004_read_time_conversion",
+      "breakpoints": true
     }
   ]
 }

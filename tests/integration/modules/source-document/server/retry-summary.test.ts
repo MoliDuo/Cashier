@@ -13,8 +13,6 @@ const activeEntry = {
   currency: "CNY",
   itemName: "Lunch",
   description: null,
-  convertedAmount: "12.50",
-  exchangeRate: "1.000000",
 } as const;
 
 /**
@@ -28,7 +26,6 @@ async function setupDocumentWithFailedRetry(
   // Step 1: Create a document with an active revision and entries
   const bookId = await testBookId(db, ledgerId);
   const created = await createManualDocument({
-    expectedMainCurrency: "CNY",
     ledgerId,
     title: "Original",
     entryDate: "2026-07-15",
@@ -139,7 +136,6 @@ describe("retry active result summary", () => {
 
     // Create a manual document with multiple entries
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Multi-entry",
       entryDate: "2026-07-15",
@@ -151,8 +147,6 @@ describe("retry active result summary", () => {
           currency: "CNY",
           itemName: "Item 1",
           description: null,
-          convertedAmount: "9007199254740992.01",
-          exchangeRate: "1.000000",
         },
         {
           categoryId: null,
@@ -160,8 +154,6 @@ describe("retry active result summary", () => {
           currency: "CNY",
           itemName: "Item 2",
           description: null,
-          convertedAmount: "0.01",
-          exchangeRate: "1.000000",
         },
         {
           categoryId: null,
@@ -169,8 +161,6 @@ describe("retry active result summary", () => {
           currency: "CNY",
           itemName: "Item 3",
           description: null,
-          convertedAmount: "0.01",
-          exchangeRate: "1.000000",
         },
       ],
       bookId: await testBookId(db, ledgerId),

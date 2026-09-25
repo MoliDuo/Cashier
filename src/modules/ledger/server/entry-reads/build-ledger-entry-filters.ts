@@ -3,6 +3,7 @@ import { eq, isNull, sql, type SQL } from "drizzle-orm";
 import { ValidationError } from "@/lib/errors";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import { ledgerEntries } from "@/persistence";
+import { entryConvertedAmountSql } from "@/modules/currency/server/conversion-sql";
 import {
   buildLedgerEntrySourceDocumentDateCondition,
   buildLedgerEntryVisibilityCondition,
@@ -37,18 +38,14 @@ export function buildLedgerEntryValueConditions(filters: LedgerEntryFilterParams
     conditions.push(eq(ledgerEntries.currency, filters.currency));
   }
 
+  // An entry without a rate for its day has no converted amount and never
+  // matches an amount bound.
   if (filters.minAmount !== undefined && filters.minAmount !== null) {
-    conditions.push(
-      sql`${ledgerEntries.convertedAmount} IS NOT NULL
-        AND ${ledgerEntries.convertedAmount} >= ${filters.minAmount}`
-    );
+    conditions.push(sql`${entryConvertedAmountSql()} >= ${filters.minAmount}`);
   }
 
   if (filters.maxAmount !== undefined && filters.maxAmount !== null) {
-    conditions.push(
-      sql`${ledgerEntries.convertedAmount} IS NOT NULL
-        AND ${ledgerEntries.convertedAmount} <= ${filters.maxAmount}`
-    );
+    conditions.push(sql`${entryConvertedAmountSql()} <= ${filters.maxAmount}`);
   }
 
   if (filters.search != null && filters.search !== "") {

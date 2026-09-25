@@ -11,6 +11,10 @@ import {
   storedFiles,
 } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
+import {
+  entryConvertedAmountSql,
+  entryExchangeRateSql,
+} from "@/modules/currency/server/conversion-sql";
 
 import type { TargetSourceDocumentListInput } from "./filters";
 import { baseConditions } from "./filters";
@@ -103,8 +107,8 @@ async function loadSourceDocumentDetailSnapshot(
             currency: ledgerEntries.currency,
             itemName: ledgerEntries.itemName,
             description: ledgerEntries.description,
-            convertedAmount: ledgerEntries.convertedAmount,
-            exchangeRate: ledgerEntries.exchangeRate,
+            convertedAmount: entryConvertedAmountSql(),
+            exchangeRate: entryExchangeRateSql(),
             createdAt: ledgerEntries.createdAt,
             updatedAt: ledgerEntries.updatedAt,
             deletedAt: ledgerEntries.deletedAt,

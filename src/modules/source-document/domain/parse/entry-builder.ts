@@ -13,8 +13,6 @@ export interface EntryToInsert {
   itemName: string;
   description: string | null;
   entryDate: string;
-  convertedAmount: string | null;
-  exchangeRate: string | null;
   dateHint?: import("@/modules/source-document/date-organization-contracts").DateHint;
 }
 
@@ -23,72 +21,42 @@ export interface BuildEntriesParams {
   categories: CategoryInfo[];
   sourceDocumentId: string;
   ledgerId: string;
-  mainCurrency: string;
   fallbackDate: string;
-  convertAmount: (input: {
-    amount: string;
-    fromCurrency: string;
-    toCurrency: string;
-    date: string;
-  }) => Promise<{ convertedAmount: string; exchangeRate: string }>;
 }
 
 /**
- * Build entries for database insertion with currency conversion
+ * Build entries for database insertion. Amounts stay in their own currency;
+ * reads convert them at the document's day's rate.
  */
-export async function buildEntriesForInsert({
+export function buildEntriesForInsert({
   validEntries,
   categories,
   sourceDocumentId,
   ledgerId,
-  mainCurrency,
   fallbackDate,
-  convertAmount,
-}: BuildEntriesParams): Promise<EntryToInsert[]> {
-  return Promise.all(
-    validEntries.map(async (entry) => {
-      // categoryIndex is 1-based: 0 = no category, 1 = categories[0], 2 = categories[1], ...
-      const categoryId =
-        entry.categoryIndex > 0 && entry.categoryIndex <= categories.length
-          ? (categories[entry.categoryIndex - 1]?.id ?? null)
-          : null;
+}: BuildEntriesParams): EntryToInsert[] {
+  return validEntries.map((entry) => {
+    // categoryIndex is 1-based: 0 = no category, 1 = categories[0], 2 = categories[1], ...
+    const categoryId =
+      entry.categoryIndex > 0 && entry.categoryIndex <= categories.length
+        ? (categories[entry.categoryIndex - 1]?.id ?? null)
+        : null;
 
-      const entryCurrency = entry.currency ?? "CNY";
+    const entryCurrency = entry.currency ?? "CNY";
 
-      // Calculate converted amount
-      let convertedAmount: string;
-      let exchangeRate: string;
-
-      if (entryCurrency === mainCurrency) {
-        convertedAmount = roundToCurrency(String(entry.amount), mainCurrency);
-        exchangeRate = "1";
-      } else {
-        const conversion = await convertAmount({
-          amount: String(entry.amount),
-          fromCurrency: entryCurrency,
-          toCurrency: mainCurrency,
-          date: fallbackDate,
-        });
-        convertedAmount = conversion.convertedAmount;
-        exchangeRate = conversion.exchangeRate;
-      }
-
-      return {
-        id: crypto.randomUUID(),
-        ledgerId,
-        categoryId,
-        sourceDocumentId,
-        amount: roundToCurrency(String(entry.amount), entryCurrency),
-        currency: entryCurrency,
-        itemName: entry.itemName !== "" ? entry.itemName : "Uncategorized",
-        description: entry.notes ?? null,
-        entryDate: fallbackDate,
-        convertedAmount,
-        exchangeRate,
-        ...(entry.dateHint == null ? {} : { dateHint: entry.dateHint }),
-      };
-    })
-  );
+    return {
+      id: crypto.randomUUID(),
+      ledgerId,
+      categoryId,
+      sourceDocumentId,
+      amount: roundToCurrency(String(entry.amount), entryCurrency),
+      currency: entryCurrency,
+      itemName: entry.itemName !== "" ? entry.itemName : "Uncategorized",
+      description: entry.notes ?? null,
+      entryDate: fallbackDate,
+      ...(entry.dateHint == null ? {} : { dateHint: entry.dateHint }),
+    };
+  });
 }
 
 export interface ValidationResult {

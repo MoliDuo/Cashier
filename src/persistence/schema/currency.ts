@@ -1,25 +1,5 @@
-import {
-  pgTable,
-  varchar,
-  timestamp,
-  jsonb,
-  date,
-  numeric,
-  primaryKey,
-  check,
-} from "drizzle-orm/pg-core";
-import { sql, type InferSelectModel } from "drizzle-orm";
-
-export const currencyRates = pgTable("currency_rates", {
-  date: date("date", { mode: "string" }).primaryKey(),
-  base: varchar("base", { length: 3 }).notNull().default("EUR"),
-  rates: jsonb("rates").$type<Record<string, number>>().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
-export type CurrencyRate = InferSelectModel<typeof currencyRates>;
+import { pgTable, varchar, timestamp, date, numeric, primaryKey, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * One row per calendar day and currency: units of the currency one euro buys

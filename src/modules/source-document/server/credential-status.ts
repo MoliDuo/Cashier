@@ -35,7 +35,8 @@ export async function getCredentialSourceDocumentStatus(
             'description', entry.description,
             'amount', entry.amount::text,
             'currency', entry.currency,
-            'convertedAmount', entry.converted_amount::text,
+            'convertedAmount', convert_amount(entry.amount, entry.currency,
+              ${ledgers.mainCurrency}, ${sourceDocuments.effectiveDate})::text,
             'category', category.name
           ) ORDER BY entry.position, entry.created_at, entry.id)
           FROM ledger_entries entry

@@ -134,7 +134,7 @@ export function SourceDocumentDetailStatusPanels({
                     </span>
                     <AmountText variant="caption">
                       {sourceDocument.activeResultSummary.entryCount} ·{" "}
-                      {sourceDocument.activeResultSummary.total}
+                      {sourceDocument.activeResultSummary.total ?? "—"}
                     </AmountText>
                   </div>
                 </div>

@@ -103,7 +103,6 @@ async function currentTitle(sourceDocumentId: string): Promise<string | null> {
 /** An active, completed document with `count` entries — version 1. */
 async function createActiveDocument(ledgerId: string, count = 1) {
   const created = await createManualDocument({
-    expectedMainCurrency: "CNY",
     ledgerId,
     bookId: await testBookId(getTestDb(), ledgerId),
     title: "Original",

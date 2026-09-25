@@ -1,213 +1,192 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { db } from "@/lib/db";
-import { currencyRates, exchangeRates } from "@/persistence/schema/currency";
-import { eq } from "drizzle-orm";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { and, eq, sql } from "drizzle-orm";
+import {
+  ensureExchangeRates,
+  refreshExchangeRates,
+  spreadToCalendarDays,
+} from "@/modules/currency/server/exchange-rates";
+import { ledgerSyncState, sourceDocuments } from "@/persistence";
+import { exchangeRates } from "@/persistence/schema/currency";
+import { getTestDb } from "../../setup";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
+import { createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
 
-describe("getExchangeRates", () => {
-  beforeEach(async () => {
-    // Clear cache and database
-    await db.delete(currencyRates);
-    await db.delete(exchangeRates);
+function providerResponse(rates: Record<string, Record<string, number>>, base = "EUR") {
+  return { ok: true, json: async () => ({ base, rates }) } as Response;
+}
+
+async function storedDay(rateDate: string) {
+  const rows = await getTestDb().query.exchangeRates.findMany({
+    where: eq(exchangeRates.rateDate, rateDate),
   });
+  return rows
+    .map(({ currency, perEur, sourceDate }) => ({ currency, perEur, sourceDate }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+}
 
+describe("spreadToCalendarDays", () => {
+  it("carries the latest earlier publication onto days without one", () => {
+    expect(
+      spreadToCalendarDays({ "2024-01-19": { USD: 1.15 }, "2024-01-22": { USD: 1.2 } }, [
+        "2024-01-22",
+        "2024-01-20",
+        "2024-01-18",
+      ])
+    ).toEqual([
+      { rateDate: "2024-01-20", sourceDate: "2024-01-19", perEur: { USD: 1.15, EUR: 1 } },
+      { rateDate: "2024-01-22", sourceDate: "2024-01-22", perEur: { USD: 1.2, EUR: 1 } },
+    ]);
+  });
+});
+
+describe("ensureExchangeRates", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("collapses concurrent requests when the cache is empty", async () => {
-    let callCount = 0;
-    let resolveFetch!: (response: Response) => void;
-    const fetchGate = new Promise<Response>((resolve) => {
-      resolveFetch = resolve;
-    });
-    vi.spyOn(global, "fetch").mockImplementation(async () => {
-      callCount++;
-      return fetchGate;
-    });
+  it("stores a weekend day as one per-euro row per supported currency", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      providerResponse({ "2024-01-19": { USD: 1.15, CNY: 7.7, BGN: 1.9558 } })
+    );
 
-    const date = new Date("2024-01-20");
+    await ensureExchangeRates(["2024-01-20"]);
 
-    const promises = Array(10)
-      .fill(null)
-      .map(() => getExchangeRates(date));
-
-    const allResults = Promise.all(promises);
-    await vi.waitFor(() => expect(callCount).toBe(1));
-    resolveFetch({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "2024-01-20",
-        rates: { USD: 1.2 },
-      }),
-    } as Response);
-    const results = await allResults;
-
-    expect(new Set(results.map((r) => r.rates.USD)).size).toBe(1);
-    expect(callCount).toBe(1);
-  });
-
-  it("filters valid provider currencies that are not enabled by the application", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "2024-01-18",
-        rates: { USD: 1.15, CNY: 7.7, BGN: 1.9558 },
-      }),
-    } as Response);
-
-    const result = await getExchangeRates("2024-01-18");
-    expect(result.rates).toEqual({ USD: 1.15, CNY: 7.7 });
-    expect(
-      await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, "2024-01-18") })
-    ).toMatchObject({ rates: { USD: 1.15, CNY: 7.7 } });
-  });
-
-  it("uses the requested date for weekend responses and cache hits", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "2024-01-19",
-        rates: { USD: 1.15, CNY: 7.7 },
-      }),
-    } as Response);
-
-    const first = await getExchangeRates("2024-01-20");
-    const cached = await getExchangeRates("2024-01-20");
-    expect(first.date).toBe("2024-01-20");
-    expect(cached.date).toBe("2024-01-20");
-  });
-
-  it("also stores a final snapshot as one per-euro row per currency", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "2024-01-19",
-        rates: { USD: 1.15, CNY: 7.7 },
-      }),
-    } as Response);
-
-    await getExchangeRates("2024-01-20");
-    const rows = await db.query.exchangeRates.findMany({
-      where: eq(exchangeRates.rateDate, "2024-01-20"),
-    });
-    expect(
-      rows
-        .map(({ currency, perEur, sourceDate }) => ({ currency, perEur, sourceDate }))
-        .sort((a, b) => a.currency.localeCompare(b.currency))
-    ).toEqual([
+    expect(await storedDay("2024-01-20")).toEqual([
       { currency: "CNY", perEur: "7.7", sourceDate: "2024-01-19" },
       { currency: "EUR", perEur: "1", sourceDate: "2024-01-19" },
       { currency: "USD", perEur: "1.15", sourceDate: "2024-01-19" },
     ]);
   });
 
+  it("asks the provider only for stored-less days up to today", async () => {
+    await insertExchangeRates("2024-01-18", { USD: 1.1 });
+    const fetchSpy = vi.spyOn(global, "fetch");
+    const future = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+
+    await ensureExchangeRates(["2024-01-18", future, null]);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it.each([
-    ["today before the day's rates are published", 0],
-    ["a future day", 3],
-  ])("does not cache the previous day's rates for %s", async (_label, daysAhead) => {
-    const requested = new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
-    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "2024-01-19",
-        rates: { USD: 1.15, CNY: 7.7 },
-      }),
-    } as Response);
+    ["an unavailable provider", () => Promise.reject(new TypeError("fetch failed"))],
+    [
+      "an error status",
+      () => Promise.resolve({ ok: false, status: 503, statusText: "Unavailable" } as Response),
+    ],
+    [
+      "a base other than EUR",
+      () => Promise.resolve(providerResponse({ "2024-01-22": { USD: 1.1 } }, "BGN")),
+    ],
+    ["a malformed day", () => Promise.resolve(providerResponse({ "not-a-date": { USD: 1.1 } }))],
+    ["a negative rate", () => Promise.resolve(providerResponse({ "2024-01-22": { USD: -1.1 } }))],
+    ["an invalid code", () => Promise.resolve(providerResponse({ "2024-01-22": { US: 1.1 } }))],
+  ])("stores nothing and does not throw on %s", async (_label, respond) => {
+    vi.spyOn(global, "fetch").mockImplementation(respond);
 
-    await expect(getExchangeRates(requested)).resolves.toMatchObject({
-      date: requested,
-      rates: { USD: 1.15, CNY: 7.7 },
+    await expect(ensureExchangeRates(["2024-01-22"])).resolves.toBeUndefined();
+    expect(await storedDay("2024-01-22")).toEqual([]);
+  });
+
+  it("tells every ledger to refresh when a day's rates arrive", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const before = await db.query.ledgerSyncState.findFirst({
+      where: eq(ledgerSyncState.ledgerId, ledgerId),
     });
-    expect(
-      await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, requested) })
-    ).toBeUndefined();
-    expect(
-      await db.query.exchangeRates.findFirst({ where: eq(exchangeRates.rateDate, requested) })
-    ).toBeUndefined();
 
-    await getExchangeRates(requested);
+    await insertExchangeRates("2024-01-22", { USD: 1.1 });
+
+    const after = await db.query.ledgerSyncState.findFirst({
+      where: eq(ledgerSyncState.ledgerId, ledgerId),
+    });
+    expect(after!.version).toBeGreaterThan(before?.version ?? BigInt(0));
+    expect(after!.statsVersion).toBeGreaterThan(before?.statsVersion ?? BigInt(0));
+  });
+});
+
+describe("refreshExchangeRates", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fills document days, replaces provisional days, keeps final ones, and waits out its cooldown", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    await db.insert(sourceDocuments).values({
+      ledgerId,
+      documentDate: "2024-03-05",
+      bookId: await testBookId(db, ledgerId),
+    });
+    await insertExchangeRates(
+      "2024-03-02",
+      { USD: 1.05 },
+      { sourceDate: "2024-03-01", fetchedAt: new Date("2024-03-02T12:00:00.000Z") }
+    );
+    await insertExchangeRates("2024-03-01", { USD: 1.01 });
+    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
+      providerResponse({
+        "2024-03-01": { USD: 1.09 },
+        "2024-03-04": { USD: 1.08 },
+        "2024-03-05": { USD: 1.07 },
+      })
+    );
+    const now = new Date("2024-03-10T00:00:00.000Z");
+
+    await refreshExchangeRates(now);
+
+    expect(await storedDay("2024-03-05")).toContainEqual({
+      currency: "USD",
+      perEur: "1.07",
+      sourceDate: "2024-03-05",
+    });
+    expect(await storedDay("2024-03-02")).toContainEqual({
+      currency: "USD",
+      perEur: "1.09",
+      sourceDate: "2024-03-01",
+    });
+    expect(await storedDay("2024-03-01")).toContainEqual({
+      currency: "USD",
+      perEur: "1.01",
+      sourceDate: "2024-03-01",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await db.insert(sourceDocuments).values({
+      ledgerId,
+      documentDate: "2024-03-06",
+      bookId: await testBookId(db, ledgerId),
+    });
+    await refreshExchangeRates(new Date(now.getTime() + 5 * 60_000));
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await refreshExchangeRates(new Date(now.getTime() + 16 * 60_000));
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects an invalid provider payload without writing to the database", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "not-a-date",
-        rates: { USD: 1.1 },
-      }),
-    } as Response);
-
-    await expect(getExchangeRates("2024-01-22")).rejects.toThrow(
-      "Invalid exchange-rate provider response"
+  it("converts entries of a day once refresh fills its rates", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const [document] = await db
+      .insert(sourceDocuments)
+      .values({ ledgerId, documentDate: "2024-03-05", bookId: await testBookId(db, ledgerId) })
+      .returning();
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      providerResponse({ "2024-03-05": { USD: 1.25, CNY: 7.5 } })
     );
+    const convert = () =>
+      db.execute<{ converted: string | null }>(sql`
+        SELECT convert_amount(10, 'USD', 'CNY', effective_date)::text AS converted
+        FROM source_documents WHERE id = ${document!.id}
+      `);
 
-    const persisted = await db.query.currencyRates.findFirst({
-      where: eq(currencyRates.date, "2024-01-22"),
-    });
-    expect(persisted).toBeUndefined();
-  });
-
-  it("rejects a provider base currency that is not enabled", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "BGN",
-        date: "2024-01-22",
-        rates: { USD: 1.1, EUR: 0.51 },
-      }),
-    } as Response);
-
-    await expect(getExchangeRates("2024-01-22")).rejects.toThrow(
-      "Invalid exchange-rate provider response"
-    );
+    expect((await convert()).rows[0]?.converted).toBeNull();
+    await refreshExchangeRates(new Date("2024-03-10T00:00:00.000Z"));
+    expect((await convert()).rows[0]?.converted).toBe("60.00");
     expect(
-      await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, "2024-01-22") })
-    ).toBeUndefined();
-  });
-
-  it("rejects non-positive provider rates without writing", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        base: "EUR",
-        date: "2024-01-23",
-        rates: { USD: -1.1, CNY: 7.8 },
-      }),
-    } as Response);
-
-    await expect(getExchangeRates("2024-01-23")).rejects.toThrow(
-      "Invalid exchange-rate provider response"
-    );
-
-    const persisted = await db.query.currencyRates.findFirst({
-      where: eq(currencyRates.date, "2024-01-23"),
-    });
-    expect(persisted).toBeUndefined();
-  });
-
-  it.each([
-    ["invalid code", { US: 1.1 }],
-    ["NaN", { USD: Number.NaN }],
-    ["Infinity", { USD: Number.POSITIVE_INFINITY }],
-  ])("rejects %s provider rates without writing", async (_label, rates) => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({ base: "EUR", date: "2024-01-24", rates }),
-    } as Response);
-
-    await expect(getExchangeRates("2024-01-24")).rejects.toThrow(
-      "Invalid exchange-rate provider response"
-    );
-    expect(
-      await db.query.currencyRates.findFirst({ where: eq(currencyRates.date, "2024-01-24") })
-    ).toBeUndefined();
+      await db.query.exchangeRates.findFirst({
+        where: and(eq(exchangeRates.rateDate, "2024-03-05"), eq(exchangeRates.currency, "EUR")),
+      })
+    ).toBeDefined();
   });
 });

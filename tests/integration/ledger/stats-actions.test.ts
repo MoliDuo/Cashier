@@ -9,6 +9,7 @@ import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 
 const OTHER_USER_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -18,7 +19,6 @@ async function seedEntry(
   opts: {
     amount: string;
     currency?: string;
-    convertedAmount?: string | null;
     categoryId?: string;
     entryDate?: string;
   }
@@ -44,7 +44,6 @@ async function seedEntry(
     itemName: "Test Item",
     amount: opts.amount,
     currency: opts.currency === undefined ? "CNY" : opts.currency,
-    convertedAmount: opts.convertedAmount === undefined ? opts.amount : opts.convertedAmount,
     categoryId: opts.categoryId ?? null,
   });
   await activateTestSourceDocumentProjection(db, doc.id);
@@ -101,7 +100,6 @@ describe("getLedgerStatsAction", () => {
     await seedEntry(db, ledgerId, {
       amount: "12.50",
       currency: "USD",
-      convertedAmount: "12.50",
     });
 
     const result = await getLedgerStatsAction({ currency: " usd " });
@@ -124,13 +122,11 @@ describe("getLedgerStatsAction", () => {
       amount: "8.25",
       currency: "CNY",
       categoryId,
-      convertedAmount: "8.25",
     });
     await seedEntry(db, ledgerId, {
       amount: "3.75",
       currency: "CNY",
       categoryId,
-      convertedAmount: "3.75",
     });
 
     const result = await getLedgerStatsAction({});
@@ -225,8 +221,8 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by minAmount using convertedAmount", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY", convertedAmount: "50.00" });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY", convertedAmount: "200.00" });
+    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY" });
+    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY" });
 
     const result = await getLedgerStatsAction({
       minAmount: "100",
@@ -238,8 +234,8 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by maxAmount using convertedAmount", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY", convertedAmount: "50.00" });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY", convertedAmount: "200.00" });
+    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY" });
+    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY" });
 
     const result = await getLedgerStatsAction({
       maxAmount: "100",
@@ -249,15 +245,13 @@ describe("getLedgerStatsAction", () => {
     expect(cny!.total).toBe("50");
   });
 
-  it("uses stored convertedAmount for convertedTotal", async () => {
+  it("converts foreign entries at their document day's rate for convertedTotal", async () => {
     const db = getTestDb();
-
-    // Entry with pre-calculated convertedAmount (e.g., from AI processing)
-    // 110 USD converted to 720 CNY
+    await insertExchangeRates("2024-01-15", { USD: "1.1", CNY: "7.2" });
+    // 110 USD at 7.2 / 1.1 CNY per USD is 720 CNY.
     await seedEntry(db, ledgerId, {
       amount: "110.00",
       currency: "USD",
-      convertedAmount: "720.00", // Pre-converted amount
       entryDate: "2024-01-15",
     });
 
@@ -267,18 +261,16 @@ describe("getLedgerStatsAction", () => {
     expect(result.convertedTotal?.total).toBe("720");
   });
 
-  it("excludes unconverted entries from the main total but keeps original currency totals", async () => {
+  it("excludes entries without a rate for their day from the main total but keeps original currency totals", async () => {
     const db = getTestDb();
     await seedEntry(db, ledgerId, {
       amount: "100.00",
       currency: "USD",
-      convertedAmount: null,
       entryDate: "2024-01-15",
     });
     await seedEntry(db, ledgerId, {
       amount: "50.00",
       currency: "CNY",
-      convertedAmount: "50.00",
       entryDate: "2024-01-15",
     });
 

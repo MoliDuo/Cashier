@@ -1,25 +1,11 @@
 import { sql } from "drizzle-orm";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries, entryCategories } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
-const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
-  getRatesMock: vi.fn(async () => ({
-    base: "USD",
-    date: "2026-01-01",
-    rates: { CNY: 1 } as Record<string, number>,
-  })),
-  convertBatchMock: vi.fn(),
-}));
-
-vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
-  getExchangeRates: getRatesMock,
-  convertAmounts: convertBatchMock,
-}));
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
 import {
@@ -450,7 +436,6 @@ describe("getLedgerEntriesAction", () => {
         itemName: "Cheap",
         amount: "10.00",
         currency: "CNY",
-        convertedAmount: "10.00",
       },
       {
         id: randomUUID(),
@@ -459,7 +444,6 @@ describe("getLedgerEntriesAction", () => {
         itemName: "Mid",
         amount: "50.00",
         currency: "CNY",
-        convertedAmount: "50.00",
       },
       {
         id: randomUUID(),
@@ -468,7 +452,6 @@ describe("getLedgerEntriesAction", () => {
         itemName: "Expensive",
         amount: "200.00",
         currency: "CNY",
-        convertedAmount: "200.00",
       },
     ]);
 

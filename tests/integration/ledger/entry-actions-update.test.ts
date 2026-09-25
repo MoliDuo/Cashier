@@ -43,8 +43,6 @@ describe("single-entry update version CAS", () => {
       itemName: "Lunch",
       amount: "50.000",
       currency: "CNY",
-      convertedAmount: "50.000",
-      exchangeRate: "1",
     });
     await activateTestSourceDocumentProjection(db, sourceDocumentId);
   });
@@ -79,7 +77,7 @@ describe("single-entry update version CAS", () => {
   it("edits a deduction while preserving its negative direction", async () => {
     await getTestDb()
       .update(ledgerEntries)
-      .set({ amount: "-8.000", convertedAmount: "-8.000" })
+      .set({ amount: "-8.000" })
       .where(eq(ledgerEntries.id, entryId));
 
     await expect(
@@ -91,7 +89,7 @@ describe("single-entry update version CAS", () => {
     const entry = await getTestDb().query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
     });
-    expect(entry).toMatchObject({ amount: "-6.000", convertedAmount: "-6.000" });
+    expect(entry).toMatchObject({ amount: "-6.000" });
 
     await expect(
       updateEntry({ sourceDocumentId, expectedVersion: 2 }, entryId, {

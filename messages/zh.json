@@ -497,8 +497,6 @@
     "addCategory": "添加",
     "updateSuccess": "设置更新成功",
     "updateFailed": "更新失败，请稍后重试",
-    "ratesUnavailable": "缺少部分交易日的历史汇率，主货币未更改",
-    "ratesUnavailableDates": "以下日期缺少历史汇率，主货币未更改：{dates}",
     "unsupportedCurrency": "所选币种暂不受汇率数据支持",
     "validationFailed": "设置内容无效，请检查后重试",
     "updateConflict": "未保存，设置已发生变化，请取消编辑后重新修改。",

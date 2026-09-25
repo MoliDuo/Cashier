@@ -9,6 +9,7 @@ import {
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { eq } from "drizzle-orm";
+import { insertExchangeRates } from "../helpers/exchange-rates";
 
 describe("Stats Currency Conversion", () => {
   let ledgerId: string;
@@ -29,8 +30,9 @@ describe("Stats Currency Conversion", () => {
     await db.delete(ledgerEntries).where(eq(ledgerEntries.ledgerId, ledgerId));
   });
 
-  it("aggregates persisted converted amounts across currencies", async () => {
+  it("converts every currency by the document day's rates", async () => {
     const db = getTestDb();
+    await insertExchangeRates("2024-01-01", { CNY: 7.8, MYR: 5, USD: 1.08 });
 
     const [sourceDoc] = await db
       .insert(sourceDocuments)
@@ -50,7 +52,6 @@ describe("Stats Currency Conversion", () => {
       sourceDocumentId: sourceDoc.id,
       amount: "100.00",
       currency: "MYR",
-      convertedAmount: "156.00",
       itemName: "MYR Item",
     });
 
@@ -59,7 +60,6 @@ describe("Stats Currency Conversion", () => {
       sourceDocumentId: sourceDoc.id,
       amount: "50.00",
       currency: "USD",
-      convertedAmount: "361.11",
       itemName: "USD Item",
     });
 
@@ -68,7 +68,6 @@ describe("Stats Currency Conversion", () => {
       sourceDocumentId: sourceDoc.id,
       amount: "100.00",
       currency: "CNY",
-      convertedAmount: "100.00",
       itemName: "CNY Item",
     });
     await activateTestSourceDocumentProjection(db, sourceDoc.id);
@@ -77,5 +76,32 @@ describe("Stats Currency Conversion", () => {
 
     expect(stats.convertedTotal?.currency).toBe("CNY");
     expect(stats.convertedTotal?.total).toBeCloseTo(617.11, 1);
+  });
+
+  it("converts an undated document by its UTC creation day's rates", async () => {
+    const db = getTestDb();
+    await insertExchangeRates("2024-02-10", { CNY: 8, USD: 1 });
+    await insertExchangeRates("2024-02-11", { CNY: 9, USD: 1 });
+    const [sourceDoc] = await db
+      .insert(sourceDocuments)
+      .values({
+        ledgerId,
+        documentDate: null,
+        createdAt: new Date("2024-02-10T23:30:00Z"),
+        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      })
+      .returning();
+    await db.insert(ledgerEntries).values({
+      ledgerId,
+      sourceDocumentId: sourceDoc!.id,
+      amount: "10.00",
+      currency: "USD",
+      itemName: "Undated USD Item",
+    });
+    await activateTestSourceDocumentProjection(db, sourceDoc!.id);
+
+    const stats = await getLedgerStatsAction({});
+
+    expect(stats.convertedTotal).toEqual({ total: "80", currency: "CNY" });
   });
 });

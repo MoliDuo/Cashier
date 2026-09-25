@@ -16,7 +16,6 @@ async function fixture() {
   const created = await createManualDocument({
     ledgerId,
     bookId: bookId,
-    expectedMainCurrency: "CNY",
     title: "Original",
     entryDate: "2026-01-01",
     entries: ["One", "Two"].map((itemName) => ({
@@ -25,8 +24,6 @@ async function fixture() {
       currency: "USD",
       itemName,
       description: null,
-      convertedAmount: "70",
-      exchangeRate: "7",
     })),
   });
   const entries = await db
@@ -36,16 +33,10 @@ async function fixture() {
   return { db, ledgerId, ...created, entries };
 }
 
-describe("document edit conversion scope", () => {
-  it("preserves stored conversions for title and entry metadata changes", async () => {
+describe("document edit rate caching", () => {
+  it("asks for no rates when only titles and entry metadata change", async () => {
     const { db, ledgerId, sourceDocumentId, entries } = await fixture();
-    await db
-      .update(ledgerEntries)
-      .set({ amount: "10.001" })
-      .where(eq(ledgerEntries.id, entries[0]!.id));
-    const convert = vi
-      .spyOn(exchangeRates, "convertAmounts")
-      .mockRejectedValue(new Error("FX must not be called"));
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates");
     const result = await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
@@ -54,23 +45,15 @@ describe("document edit conversion scope", () => {
       entries: [{ ledgerEntryId: entries[0]!.id, data: { description: "Note" } }],
     });
     expect(result).toMatchObject({ ok: true, version: 2 });
-    expect(convert).not.toHaveBeenCalled();
-    const entry = await db.query.ledgerEntries.findFirst({
-      where: eq(ledgerEntries.id, entries[0]!.id),
-    });
-    expect(entry).toMatchObject({
-      amount: "10.001",
-      description: "Note",
-      convertedAmount: entries[0]!.convertedAmount,
-      exchangeRate: entries[0]!.exchangeRate,
-    });
+    expect(ensure).not.toHaveBeenCalled();
+    expect(
+      await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, entries[0]!.id) })
+    ).toMatchObject({ amount: "10.000", description: "Note" });
   });
 
-  it("converts only the entry with changed financial values", async () => {
-    const { db, ledgerId, sourceDocumentId, entries } = await fixture();
-    const convert = vi
-      .spyOn(exchangeRates, "convertAmounts")
-      .mockResolvedValue([{ convertedAmount: "140", exchangeRate: "7" }]);
+  it("asks once for the document day when a foreign amount changes", async () => {
+    const { ledgerId, sourceDocumentId, entries } = await fixture();
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates");
     await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
@@ -80,21 +63,12 @@ describe("document edit conversion scope", () => {
         { ledgerEntryId: entries[1]!.id, data: { itemName: "Renamed" } },
       ],
     });
-    expect(convert).toHaveBeenCalledExactlyOnceWith(
-      [{ amount: "20.00", from: "USD", date: "2026-01-01" }],
-      "CNY"
-    );
-    expect(
-      await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, entries[1]!.id) })
-    ).toMatchObject({ convertedAmount: entries[1]!.convertedAmount });
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(["2026-01-01"]);
   });
 
-  it("converts every active entry when the document date changes", async () => {
+  it("asks for the new day when the document date changes", async () => {
     const { ledgerId, sourceDocumentId } = await fixture();
-    const convert = vi.spyOn(exchangeRates, "convertAmounts").mockResolvedValue([
-      { convertedAmount: "80", exchangeRate: "8" },
-      { convertedAmount: "80", exchangeRate: "8" },
-    ]);
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates");
     await saveSourceDocumentChanges({
       ledgerId,
       sourceDocumentId,
@@ -102,23 +76,16 @@ describe("document edit conversion scope", () => {
       sourceDocument: { documentDate: "2026-01-02" },
       entries: [],
     });
-    expect(convert).toHaveBeenCalledExactlyOnceWith(
-      [
-        { amount: "10.000", from: "USD", date: "2026-01-02" },
-        { amount: "10.000", from: "USD", date: "2026-01-02" },
-      ],
-      "CNY"
-    );
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(["2026-01-02"]);
   });
 
-  it("rejects a version changed while FX I/O is running", async () => {
+  it("rejects a version changed while rates are being fetched", async () => {
     const { db, ledgerId, sourceDocumentId, entries } = await fixture();
-    vi.spyOn(exchangeRates, "convertAmounts").mockImplementation(async () => {
+    vi.spyOn(exchangeRates, "ensureExchangeRates").mockImplementation(async () => {
       await db
         .update(sourceDocuments)
         .set({ version: 2 })
         .where(eq(sourceDocuments.id, sourceDocumentId));
-      return [{ convertedAmount: "140", exchangeRate: "7" }];
     });
     expect(
       await saveSourceDocumentChanges({

@@ -253,7 +253,6 @@ describe("target source-document submissions", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const active = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
@@ -298,7 +297,6 @@ describe("target source-document submissions", () => {
       await activateRevision({
         lease: failedLease,
         ledgerId,
-        expectedMainCurrency: "CNY",
         sourceDocumentId: active.sourceDocumentId,
         revisionId: failed.revision.id,
         entries: [{ ...entry, amount: "99.00" }],

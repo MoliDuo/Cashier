@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "../../setup";
-import { currencyRates } from "@/persistence/schema/currency";
 import { ledgers } from "@/persistence";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 import { convertCurrencyAction } from "@/modules/currency/server-actions/convert-currency";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 
 const LEDGER_ID = "10000000-0000-4000-8000-000000000001";
 
@@ -12,7 +12,7 @@ vi.mock("@/auth", () => ({
 }));
 
 async function insertRates(date: string, rates: Record<string, number>) {
-  await getTestDb().insert(currencyRates).values({ date, base: "EUR", rates });
+  await insertExchangeRates(date, rates);
 }
 
 describe("currency action composition", () => {

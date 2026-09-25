@@ -151,8 +151,6 @@ export const ledgerEntries = pgTable(
     currency: varchar("currency", { length: 3 }).notNull(),
     itemName: text("item_name").notNull(),
     description: text("description"),
-    convertedAmount: numeric("converted_amount", { precision: 21, scale: 3, mode: "string" }),
-    exchangeRate: numeric("exchange_rate", { precision: 30, scale: 12, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -185,9 +183,6 @@ export const ledgerEntries = pgTable(
         table.id
       )
       .where(sql`${table.deletedAt} IS NULL`),
-    index("idx_ledger_entries_active_amount")
-      .on(table.ledgerId, table.convertedAmount)
-      .where(sql`${table.deletedAt} IS NULL AND ${table.convertedAmount} IS NOT NULL`),
     index("idx_ledger_entries_search")
       .using(
         "gin",

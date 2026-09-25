@@ -26,12 +26,8 @@ export function useLedgerSettingsMutation({
 }: UseLedgerSettingsMutationParams) {
   const t = useTranslations("Settings");
   const queryClient = useQueryClient();
-  const translateError = (code: UpdateLedgerActionErrorCode, dates?: string[]) => {
+  const translateError = (code: UpdateLedgerActionErrorCode) => {
     switch (code) {
-      case "rates_unavailable":
-        return dates != null && dates.length > 0
-          ? t("ratesUnavailableDates", { dates: dates.join(", ") })
-          : t("ratesUnavailable");
       case "unsupported_currency":
         return t("unsupportedCurrency");
       case "validation_failed":
@@ -51,7 +47,7 @@ export function useLedgerSettingsMutation({
         expectedUpdatedAt,
         settings: omitUndefinedProperties(data),
       });
-      if (!result.ok) throw new Error(translateError(result.code, result.dates));
+      if (!result.ok) throw new Error(translateError(result.code));
       return result.ledger;
     },
     successMessage,

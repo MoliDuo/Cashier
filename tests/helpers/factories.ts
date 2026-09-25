@@ -61,8 +61,6 @@ export function createLedgerEntryData(
     itemName: string;
     description: string | null;
     entryDate: string | null; // yyyy-MM-dd format
-    convertedAmount: string | null;
-    exchangeRate: string | null;
     createdAt: Date;
   }> = {}
 ) {
@@ -79,8 +77,6 @@ export function createLedgerEntryData(
     itemName: "午餐",
     description: null,
     entryDate: null,
-    convertedAmount: null,
-    exchangeRate: null,
     createdAt: new Date(),
     ...overrides,
   };

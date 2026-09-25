@@ -43,8 +43,6 @@ describe("saveSourceDocumentChangesAction", () => {
       amount: "10.000",
       currency: "USD",
       itemName: "First",
-      convertedAmount: "10.000",
-      exchangeRate: "1",
     });
     await activateTestSourceDocumentProjection(db, document.id);
     return { db, ledger, document, entryId };

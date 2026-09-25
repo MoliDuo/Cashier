@@ -10,47 +10,41 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 import { createLedgerData, createSourceDocumentData } from "../../helpers/factories";
-import * as exchangeRates from "@/modules/currency/server/exchange-rates";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
+import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
 describe("splitSourceDocumentAction", () => {
-  it("reuses persisted FX on an unchanged date and returns the next split baseline", async () => {
+  it("converts moved entries at the split document's day and returns the next split baseline", async () => {
     const fixture = await seed();
-    await fixture.db
-      .update(sourceDocuments)
-      .set({ documentDate: "2026-08-16" })
-      .where(eq(sourceDocuments.id, fixture.document.id));
+    await insertExchangeRates("2026-08-16", { USD: "1.25", MYR: "5" });
     await fixture.db
       .update(ledgerEntries)
-      .set({ currency: "MYR", convertedAmount: "2.35", exchangeRate: "0.235" })
+      .set({ currency: "MYR", amount: "10.00" })
       .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
-    const convert = vi.spyOn(exchangeRates, "convertAmounts");
-    try {
-      for (const [index, id] of fixture.ids.slice(0, 2).entries()) {
-        const result = await splitSourceDocumentAction({
-          sourceDocumentId: fixture.document.id,
-          expectedVersion: index + 1,
-          ledgerEntryIds: [id],
-          entryDate: "2026-08-16",
-        });
-        expect(result).toMatchObject({
-          ok: true,
-          data: { sourceDocument: { version: index + 2 } },
-        });
-        if (!result.ok) throw new Error("Expected success");
-        expect(result.data.sourceDocument.ledgerEntries).toHaveLength(2 - index);
-        expect(
-          result.data.sourceDocument.ledgerEntries?.every(
-            (entry) => Number(entry.convertedAmount) === 2.35
-          )
-        ).toBe(true);
-      }
-      expect(convert).not.toHaveBeenCalled();
-    } finally {
-      convert.mockRestore();
+    for (const [index, id] of fixture.ids.slice(0, 2).entries()) {
+      const result = await splitSourceDocumentAction({
+        sourceDocumentId: fixture.document.id,
+        expectedVersion: index + 1,
+        ledgerEntryIds: [id],
+        entryDate: "2026-08-16",
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        data: { sourceDocument: { version: index + 2 } },
+      });
+      if (!result.ok) throw new Error("Expected success");
+      expect(result.data.sourceDocument.ledgerEntries).toHaveLength(2 - index);
     }
+    const split = await listStreamPage(fixture.ledger.id, { limit: 20 });
+    const movedEntries = split.items
+      .filter((item) => item.documentDate === "2026-08-16")
+      .flatMap((item) => item.ledgerEntries ?? []);
+    // 10 MYR at 1.25 / 5 USD per MYR.
+    expect(movedEntries.map((entry) => entry.convertedAmount)).toEqual(["2.50", "2.50"]);
   });
+
   const userId = "00000000-0000-0000-0000-000000000000";
   beforeEach(() => {
     vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
@@ -79,8 +73,6 @@ describe("splitSourceDocumentAction", () => {
         amount: `${position + 1}0.00`,
         currency: "USD",
         itemName: `Item ${position + 1}`,
-        convertedAmount: `${position + 1}0.00`,
-        exchangeRate: "1",
       }))
     );
     await activateTestSourceDocumentProjection(db, document.id);
@@ -140,7 +132,7 @@ describe("splitSourceDocumentAction", () => {
     });
   });
 
-  it("rejects invalid selections and conversion failures without changing the document", async () => {
+  it("rejects invalid selections without changing the document", async () => {
     const fixture = await seed();
     const input = {
       sourceDocumentId: fixture.document.id,
@@ -155,29 +147,16 @@ describe("splitSourceDocumentAction", () => {
         ledgerEntryIds: [crypto.randomUUID()],
       })
     ).rejects.toThrow(/not in the active/);
-    const convert = vi
-      .spyOn(exchangeRates, "convertAmounts")
-      .mockRejectedValueOnce(new Error("FX unavailable"));
-    try {
-      await expect(
-        splitSourceDocumentAction({
-          ...input,
-          ledgerEntryIds: [fixture.ids[0]!],
-        })
-      ).rejects.toThrow("FX unavailable");
-      expect(
-        await fixture.db.query.sourceDocuments.findFirst({
-          where: eq(sourceDocuments.id, fixture.document.id),
-        })
-      ).toMatchObject({ version: 1 });
-      expect(
-        await fixture.db.query.sourceDocuments.findMany({
-          where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
-        })
-      ).toHaveLength(1);
-    } finally {
-      convert.mockRestore();
-    }
+    expect(
+      await fixture.db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, fixture.document.id),
+      })
+    ).toMatchObject({ version: 1 });
+    expect(
+      await fixture.db.query.sourceDocuments.findMany({
+        where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
+      })
+    ).toHaveLength(1);
   });
 
   it("allows only one of two concurrent splits at the same version to commit", async () => {

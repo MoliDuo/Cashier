@@ -10,6 +10,13 @@
     "preferredCurrencies": ["CNY", "USD", "MYR"],
     "aiLanguage": "en"
   },
+  "exchangeRates": {
+    "USD": "7.18",
+    "MYR": "1.62",
+    "SGD": "5.32",
+    "JPY": "0.048",
+    "KWD": "23.40"
+  },
   "books": [
     {
       "id": "90000000-0000-4000-8000-000000000003",
@@ -101,18 +108,14 @@
           "category": "Dining",
           "itemName": "Flat White",
           "amount": "16.00",
-          "currency": "CNY",
-          "convertedAmount": "16.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000002",
           "category": "Dining",
           "itemName": "Chicken Sandwich",
           "amount": "28.00",
-          "currency": "CNY",
-          "convertedAmount": "28.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000003",
@@ -120,9 +123,7 @@
           "itemName": "Member Discount",
           "description": "Receipt-level adjustment",
           "amount": "-4.00",
-          "currency": "CNY",
-          "convertedAmount": "-4.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "哞哞"
@@ -141,9 +142,7 @@
           "category": "Transport",
           "itemName": "Airport transfer",
           "amount": "32.50",
-          "currency": "CNY",
-          "convertedAmount": "32.50",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "梁梁"
@@ -169,9 +168,7 @@
           "category": "Household",
           "itemName": "Jasmine Rice",
           "amount": "36.90",
-          "currency": "CNY",
-          "convertedAmount": "36.90",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000006",
@@ -179,18 +176,14 @@
           "itemName": "Seasonal Fruit",
           "description": "Deliver tomorrow",
           "amount": "28.40",
-          "currency": "CNY",
-          "convertedAmount": "28.40",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000007",
           "category": "Household",
           "itemName": "Laundry Detergent",
           "amount": "22.90",
-          "currency": "CNY",
-          "convertedAmount": "22.90",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "梁梁"
@@ -209,9 +202,7 @@
           "category": "Memberships",
           "itemName": "Cloud storage plan",
           "amount": "9.99",
-          "currency": "USD",
-          "convertedAmount": "71.73",
-          "exchangeRate": "7.18"
+          "currency": "USD"
         }
       ],
       "book": "哞哞"
@@ -230,18 +221,14 @@
           "category": "Healthcare",
           "itemName": "Cold medicine",
           "amount": "36.80",
-          "currency": "CNY",
-          "convertedAmount": "36.80",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000010",
           "category": "Healthcare",
           "itemName": "Vitamin tablets",
           "amount": "20.00",
-          "currency": "CNY",
-          "convertedAmount": "20.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "梁梁"
@@ -260,18 +247,14 @@
           "category": "Education",
           "itemName": "Distributed Systems",
           "amount": "79.00",
-          "currency": "CNY",
-          "convertedAmount": "79.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000012",
           "category": "Education",
           "itemName": "Interface Design",
           "amount": "49.00",
-          "currency": "CNY",
-          "convertedAmount": "49.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "梁梁"
@@ -290,9 +273,7 @@
           "category": "Housing",
           "itemName": "Hotel room",
           "amount": "420.00",
-          "currency": "MYR",
-          "convertedAmount": "680.40",
-          "exchangeRate": "1.62"
+          "currency": "MYR"
         }
       ],
       "book": "哞哞"
@@ -311,18 +292,14 @@
           "category": "Housing",
           "itemName": "Electricity usage",
           "amount": "286.35",
-          "currency": "CNY",
-          "convertedAmount": "286.35",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000015",
           "category": "Housing",
           "itemName": "Service fee",
           "amount": "8.00",
-          "currency": "CNY",
-          "convertedAmount": "8.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "梁梁"
@@ -355,18 +332,14 @@
           "category": "Transport",
           "itemName": "Airport rail ticket",
           "amount": "18.40",
-          "currency": "SGD",
-          "convertedAmount": "97.888",
-          "exchangeRate": "5.32"
+          "currency": "SGD"
         },
         {
           "id": "70000000-0000-4000-8000-000000000017",
           "category": "Dining",
           "itemName": "Station cafe lunch",
           "amount": "42.00",
-          "currency": "MYR",
-          "convertedAmount": "68.04",
-          "exchangeRate": "1.62"
+          "currency": "MYR"
         }
       ],
       "book": "哞哞"
@@ -385,9 +358,7 @@
           "category": "Transport",
           "itemName": "24-hour metro pass",
           "amount": "1280",
-          "currency": "JPY",
-          "convertedAmount": "61.44",
-          "exchangeRate": "0.048"
+          "currency": "JPY"
         }
       ],
       "book": "共同支出"
@@ -407,9 +378,7 @@
           "itemName": "Returned desk lamp",
           "description": "Full refund to the original payment method",
           "amount": "-259.00",
-          "currency": "CNY",
-          "convertedAmount": "-259.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "梁梁"
@@ -428,9 +397,7 @@
           "category": null,
           "itemName": "Uncategorized cash purchase",
           "amount": "18.60",
-          "currency": "CNY",
-          "convertedAmount": "18.60",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "哞哞"
@@ -450,9 +417,7 @@
           "itemName": "Advanced distributed systems architecture and operational reliability workshop",
           "description": "A full-day technical workshop covering consistency models, failure recovery, observability, capacity planning, and practical incident analysis for production services.",
           "amount": "1880.00",
-          "currency": "CNY",
-          "convertedAmount": "1880.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         },
         {
           "id": "70000000-0000-4000-8000-000000000022",
@@ -460,9 +425,7 @@
           "itemName": "Digital conference reference package",
           "description": "Slides, recordings, transcripts, and supplementary reading material",
           "amount": "320.00",
-          "currency": "CNY",
-          "convertedAmount": "320.00",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "共同支出"
@@ -481,9 +444,7 @@
           "category": "Healthcare",
           "itemName": "Annual family premium",
           "amount": "123456.78",
-          "currency": "CNY",
-          "convertedAmount": "123456.78",
-          "exchangeRate": "1"
+          "currency": "CNY"
         }
       ],
       "book": "共同支出"
@@ -502,9 +463,7 @@
           "category": "Education",
           "itemName": "Exhibition catalog",
           "amount": "12.345",
-          "currency": "KWD",
-          "convertedAmount": "288.873",
-          "exchangeRate": "23.40"
+          "currency": "KWD"
         }
       ],
       "book": "哞哞"
@@ -681,18 +640,14 @@
             "category": "Household",
             "itemName": "Fresh vegetables",
             "amount": "46.80",
-            "currency": "CNY",
-            "convertedAmount": "46.80",
-            "exchangeRate": "1"
+            "currency": "CNY"
           },
           {
             "id": "70000000-0000-4000-8000-000000000026",
             "category": "Household",
             "itemName": "Kitchen supplies",
             "amount": "32.20",
-            "currency": "CNY",
-            "convertedAmount": "32.20",
-            "exchangeRate": "1"
+            "currency": "CNY"
           }
         ]
       },

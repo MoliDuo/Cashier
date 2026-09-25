@@ -1,6 +1,6 @@
 {
-  "id": "679ce85b-4310-49cb-ae34-f563d3cccb2d",
-  "prevId": "de3f6a26-721e-4631-b9cb-c90a25d3d163",
+  "id": "caec73ad-d35b-4a62-8504-07b88aabb5a7",
+  "prevId": "679ce85b-4310-49cb-ae34-f563d3cccb2d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1133,28 +1133,6 @@
           ],
           "isUnique": false,
           "where": "\"ledger_entries\".\"deleted_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_ledger_entries_active_amount": {
-          "name": "idx_ledger_entries_active_amount",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "converted_amount",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"ledger_entries\".\"deleted_at\" IS NULL AND \"ledger_entries\".\"converted_amount\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

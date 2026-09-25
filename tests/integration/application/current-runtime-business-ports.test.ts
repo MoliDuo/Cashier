@@ -6,8 +6,9 @@ import { listCategories } from "@/modules/ledger/server/categories";
 import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
 import { authenticateServiceCredential } from "@/modules/ledger/server/service-credentials";
 import { getLedgerSettings } from "@/modules/ledger/server/settings";
-import { currencyRates, entryCategories, ledgers, serviceCredentials } from "@/persistence";
+import { entryCategories, ledgers, serviceCredentials } from "@/persistence";
 import { computeHash } from "@/lib/security/service-credential-token";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 
 describe("current-runtime target adapters", () => {
   it("implements ledger, category, currency, settings, auth, and credential ports", async () => {
@@ -16,11 +17,7 @@ describe("current-runtime target adapters", () => {
     const bookId = await testBookId(db, ledgerId);
     await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
     await db.insert(entryCategories).values({ ledgerId, name: "Food" });
-    await db.insert(currencyRates).values({
-      date: "2026-07-15",
-      base: "EUR",
-      rates: { CNY: 8, USD: 2 },
-    });
+    await insertExchangeRates("2026-07-15", { CNY: 8, USD: 2 });
     const credentialId = crypto.randomUUID();
     await db.insert(serviceCredentials).values({
       id: credentialId,

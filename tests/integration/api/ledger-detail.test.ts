@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
 import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
 import { getTestDb } from "../../setup";
-import { currencyRates, ledgers } from "@/persistence";
+import { ledgers } from "@/persistence";
 import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
 import { eq } from "drizzle-orm";
 import { NotFoundError } from "@/lib/errors";
+import { insertExchangeRates } from "../../helpers/exchange-rates";
 
 // Helper to clean up and create test ledger for current user
 async function setupTestLedger(db: ReturnType<typeof getTestDb>) {
@@ -23,11 +24,7 @@ describe("Ledger Actions", () => {
     const db = getTestDb();
     const ledgerId = await setupTestLedger(db);
     const initial = await db.query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
-    await db.insert(currencyRates).values({
-      date: "2026-08-22",
-      base: "EUR",
-      rates: { USD: 1, CNY: 8 },
-    });
+    await insertExchangeRates("2026-08-22", { USD: 1, CNY: 8 });
 
     const result = await updateLedgerSettingsAction({
       expectedUpdatedAt: initial!.updatedAt.toISOString(),

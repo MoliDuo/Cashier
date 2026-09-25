@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { batchUpdateLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import { getTestDb } from "../../setup";
 import { ledgerEntries, entryCategories, ledgers } from "@/persistence";
@@ -9,13 +9,6 @@ import {
   activateTestSourceDocumentProjection,
   TEST_USER_ID,
 } from "../../helpers/schema-setup";
-
-vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
-  convertAmounts: vi.fn(async (items: Array<{ amount: string }>) =>
-    items.map((item) => ({ convertedAmount: item.amount, exchangeRate: "1" }))
-  ),
-}));
 
 describe("Batch Update Ledger Entries Action", () => {
   let testLedgerId: string;

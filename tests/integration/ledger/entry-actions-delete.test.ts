@@ -1,25 +1,11 @@
 import { sql } from "drizzle-orm";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb } from "../../setup";
 import { ledgers, ledgerEntries } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
-const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
-  getRatesMock: vi.fn(async () => ({
-    base: "USD",
-    date: "2026-01-01",
-    rates: { CNY: 1 } as Record<string, number>,
-  })),
-  convertBatchMock: vi.fn(),
-}));
-
-vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
-  getExchangeRates: getRatesMock,
-  convertAmounts: convertBatchMock,
-}));
 import { deleteLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
 import {
   activateTestSourceDocumentProjection,

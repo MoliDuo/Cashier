@@ -7,7 +7,6 @@ import {
   createTestUserWithLedger,
 } from "tests/helpers/schema-setup";
 import {
-  currencyRates,
   entryCategories,
   ledgerEntries,
   ledgers,
@@ -15,6 +14,7 @@ import {
   sourceDocuments,
 } from "@/persistence";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
+import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
 async function getTargetEnhancedStatsQuery({
   ledgerId,
@@ -65,18 +65,8 @@ describe("queryEnhancedStats", () => {
     const db = getTestDb();
     await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
 
-    await db.insert(currencyRates).values([
-      {
-        date: "2024-03-01",
-        base: "EUR",
-        rates: { USD: 2, CNY: 4 },
-      },
-      {
-        date: "2024-03-02",
-        base: "EUR",
-        rates: { USD: 2, CNY: 4 },
-      },
-    ]);
+    await insertExchangeRates("2024-03-01", { USD: 2, CNY: 4 });
+    await insertExchangeRates("2024-03-02", { USD: 2, CNY: 4 });
 
     const insertedDocs = await db
       .insert(sourceDocuments)
@@ -105,8 +95,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: firstDoc.id,
         amount: "20",
-        convertedAmount: "40",
-        exchangeRate: "2",
         currency: "USD",
         itemName: "USD item",
         categoryId,
@@ -115,8 +103,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: secondDoc.id,
         amount: "30",
-        convertedAmount: "30",
-        exchangeRate: "1",
         currency: "CNY",
         itemName: "CNY item",
         categoryId,
@@ -163,7 +149,6 @@ describe("queryEnhancedStats", () => {
       ledgerId,
       sourceDocumentId: doc.id,
       amount: "40",
-      convertedAmount: "40",
       currency: "CNY",
       itemName: "null entry date item",
       categoryId,
@@ -196,7 +181,6 @@ describe("queryEnhancedStats", () => {
       ledgerId,
       sourceDocumentId: doc.id,
       amount: "55",
-      convertedAmount: "55",
       currency: "CNY",
       itemName: "pending reprocess item",
       categoryId,
@@ -257,7 +241,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: activeDoc.id,
         amount: "100",
-        convertedAmount: "100",
         currency: "CNY",
         itemName: "active item",
         categoryId,
@@ -266,7 +249,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: deletedDoc.id,
         amount: "999",
-        convertedAmount: "999",
         currency: "CNY",
         itemName: "deleted item",
         categoryId,
@@ -288,11 +270,7 @@ describe("queryEnhancedStats", () => {
     const db = getTestDb();
     await db.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
 
-    await db.insert(currencyRates).values({
-      date: "2024-04-01",
-      base: "EUR",
-      rates: { CNY: 7.8 },
-    });
+    await insertExchangeRates("2024-04-01", { CNY: 7.8 });
 
     const insertedDoc = await db
       .insert(sourceDocuments)
@@ -318,8 +296,6 @@ describe("queryEnhancedStats", () => {
         sourceDocumentId: doc.id,
         amount: "25",
         currency: "USD",
-        convertedAmount: "25",
-        exchangeRate: "1",
         itemName: "main currency",
         categoryId,
       },
@@ -353,7 +329,6 @@ describe("queryEnhancedStats", () => {
       ledgerId,
       sourceDocumentId: doc.id,
       amount: "10",
-      convertedAmount: "10",
       currency: "CNY",
       itemName: "default currency item",
       categoryId,
@@ -388,7 +363,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc!.id,
         amount: String(amount),
-        convertedAmount: String(amount),
         currency: "CNY",
         itemName: `item-${day}`,
         categoryId,
@@ -433,7 +407,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc!.id,
         amount: "100",
-        convertedAmount: "100",
         currency: "CNY",
         itemName: "item 1",
         categoryId,
@@ -442,7 +415,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc!.id,
         amount: "200",
-        convertedAmount: "200",
         currency: "CNY",
         itemName: "item 2",
         categoryId,
@@ -451,7 +423,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc!.id,
         amount: "300",
-        convertedAmount: "300",
         currency: "CNY",
         itemName: "item 3",
         categoryId,
@@ -461,7 +432,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc!.id,
         amount: "50",
-        convertedAmount: "50",
         currency: "CNY",
         itemName: "item 4",
         categoryId: secondCategoryId,
@@ -470,7 +440,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc!.id,
         amount: "150",
-        convertedAmount: "150",
         currency: "CNY",
         itemName: "item 5",
         categoryId: secondCategoryId,
@@ -547,7 +516,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc.id,
         amount: hugeA,
-        convertedAmount: hugeA,
         currency: "CNY",
         itemName: "huge A",
         categoryId,
@@ -556,7 +524,6 @@ describe("queryEnhancedStats", () => {
         ledgerId,
         sourceDocumentId: doc.id,
         amount: hugeB,
-        convertedAmount: hugeB,
         currency: "CNY",
         itemName: "huge B",
         categoryId: secondCategoryId,

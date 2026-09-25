@@ -1,8 +1,7 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { compare, round } from "@/lib/money/decimal";
-import { roundToCurrency } from "@/lib/money/currency-precision";
+import { compare } from "@/lib/money/decimal";
 import { ledgerEntries, ledgers, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
 import type {
   ApplyDateOrganizationInput,
@@ -10,7 +9,7 @@ import type {
   DismissDateOrganizationInput,
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
-import { convertAmounts } from "@/modules/currency/server/exchange-rates";
+import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
 import { copyRevisionFiles, createManualRevision } from "./projections/manual-entries";
@@ -129,25 +128,17 @@ export async function applyDateOrganization(
   const destinationGroups = appliedGroups.filter(
     (group) => group.entryDate != null && group !== originalGroup
   );
-  const conversionByEntry = new Map<string, { convertedAmount: string; exchangeRate: string }>();
-  for (const group of appliedGroups) {
-    if (group.entryDate == null || group.entryDate === document.documentDate) continue;
-    const conversions = await convertAmounts(
-      group.ledgerEntryIds.map((id) => {
-        const entry = entriesById.get(id)!;
-        return {
-          amount: entry.amount,
-          from: normalizeCurrency(entry.currency),
-          date: group.entryDate!,
-        };
-      }),
-      ledger.mainCurrency
-    );
-    group.ledgerEntryIds.forEach((id, index) => conversionByEntry.set(id, conversions[index]!));
-  }
+  const redatedForeignDates = appliedGroups.flatMap((group) =>
+    group.entryDate != null &&
+    group.entryDate !== document.documentDate &&
+    group.ledgerEntryIds.some((id) => entriesById.get(id)!.currency !== ledger.mainCurrency)
+      ? [group.entryDate]
+      : []
+  );
+  if (redatedForeignDates.length > 0) await ensureExchangeRates(redatedForeignDates);
   const createdIds = destinationGroups.map(() => crypto.randomUUID());
   const outcome = await db.transaction(async (tx) => {
-    const lockedLedger = await lockLedgerForUpdate(tx, input.ledgerId);
+    await lockLedgerForUpdate(tx, input.ledgerId);
     const lockedDocument = await lockSourceDocumentForUpdate(
       tx,
       input.ledgerId,
@@ -156,7 +147,6 @@ export async function applyDateOrganization(
     if (lockedDocument.version !== input.expectedVersion)
       return { staleVersion: lockedDocument.version } as const;
     if (
-      lockedLedger.mainCurrency !== ledger.mainCurrency ||
       lockedDocument.activeRevisionId !== document.activeRevisionId ||
       lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId
     )
@@ -238,19 +228,12 @@ export async function applyDateOrganization(
       const docId = destination?.documentId ?? input.sourceDocumentId;
       const position = positions.get(docId) ?? 0;
       positions.set(docId, position + 1);
-      const conversion = conversionByEntry.get(entry.id);
       await tx
         .update(ledgerEntries)
         .set({
           sourceDocumentId: docId,
           sourceDocumentRevisionId: destination?.revisionId ?? activeRevision.id,
           position,
-          convertedAmount:
-            conversion == null
-              ? entry.convertedAmount
-              : roundToCurrency(conversion.convertedAmount, lockedLedger.mainCurrency),
-          exchangeRate:
-            conversion == null ? entry.exchangeRate : round(conversion.exchangeRate, 12),
           updatedAt: new Date(),
         })
         .where(and(eq(ledgerEntries.id, entry.id), eq(ledgerEntries.ledgerId, input.ledgerId)));

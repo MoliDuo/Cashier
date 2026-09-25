@@ -61,13 +61,13 @@ describe("source document read contracts", () => {
       mapSourceDocumentDetail(row, { ...hydration, mainCurrency }).activeResultSummary
     ).toEqual({ entryCount: 1, total });
   });
-  it("never substitutes a foreign original amount for missing accounting data", () => {
-    expect(() =>
+  it("reports no total rather than substituting a foreign original amount for a missing rate", () => {
+    expect(
       mapSourceDocumentDetail(row, {
         ...hydration,
         ledgerEntries: [{ ...hydration.ledgerEntries[0]!, convertedAmount: null }],
-      })
-    ).toThrow("without accounting amounts");
+      }).activeResultSummary
+    ).toEqual({ entryCount: 1, total: null });
   });
   it("preserves exact totals above the safe integer limit", () => {
     expect(

@@ -1,14 +1,12 @@
 import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { round } from "@/lib/money/decimal";
-import { roundToCurrency } from "@/lib/money/currency-precision";
 import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
 import type {
   SplitSourceDocumentResultDto,
   VersionedCommandResult,
 } from "@/modules/source-document/contracts";
-import { convertAmounts } from "@/modules/currency/server/exchange-rates";
+import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { getSourceDocumentInTransaction } from "./reads/list";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
@@ -17,10 +15,6 @@ import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/trans
 import { assertSourceDocumentNotProcessing } from "./write-guards";
 
 type EntrySnapshot = typeof ledgerEntries.$inferSelect;
-
-function normalizeCurrency(currency: string | null): string {
-  return currency != null && currency !== "" ? currency : "CNY";
-}
 
 function effectiveTitle(documentTitle: string | null, revisionTitle: string | null): string | null {
   return documentTitle?.trim() || revisionTitle?.trim() || null;
@@ -38,9 +32,7 @@ function sameEntries(expected: readonly EntrySnapshot[], actual: readonly EntryS
       entry.amount === current.amount &&
       entry.currency === current.currency &&
       entry.itemName === current.itemName &&
-      entry.description === current.description &&
-      entry.convertedAmount === current.convertedAmount &&
-      entry.exchangeRate === current.exchangeRate
+      entry.description === current.description
     );
   });
 }
@@ -98,23 +90,15 @@ export async function splitSourceDocumentAtomically(input: {
     throw new ConflictError("The source document must retain at least one entry");
   }
   const preparedAt = performance.now();
-  const conversions =
-    document.documentDate === input.entryDate
-      ? null
-      : await convertAmounts(
-          movedEntries.map((entry) => ({
-            amount: entry.amount,
-            from: normalizeCurrency(entry.currency),
-            date: input.entryDate,
-          })),
-          ledger.mainCurrency
-        );
-  const movedIndexById = new Map(movedEntries.map((entry, index) => [entry.id, index]));
+  if (movedEntries.some((entry) => entry.currency !== ledger.mainCurrency)) {
+    await ensureExchangeRates([input.entryDate]);
+  }
+  const movedIds = new Set(movedEntries.map((entry) => entry.id));
   const convertedAt = performance.now();
 
   const splitSourceDocumentId = crypto.randomUUID();
   const outcome = await db.transaction(async (tx) => {
-    const lockedLedger = await lockLedgerForUpdate(tx, input.ledgerId);
+    await lockLedgerForUpdate(tx, input.ledgerId);
     const lockedDocument = await lockSourceDocumentForUpdate(
       tx,
       input.ledgerId,
@@ -123,10 +107,7 @@ export async function splitSourceDocumentAtomically(input: {
     if (lockedDocument.version !== input.expectedVersion) {
       return { staleVersion: lockedDocument.version } as const;
     }
-    if (
-      lockedLedger.mainCurrency !== ledger.mainCurrency ||
-      lockedDocument.activeRevisionId == null
-    ) {
+    if (lockedDocument.activeRevisionId == null) {
       throw new ConflictError("Source document changed before the split");
     }
     await assertSourceDocumentNotProcessing(tx, lockedDocument);
@@ -193,21 +174,12 @@ export async function splitSourceDocumentAtomically(input: {
     let splitPosition = 0;
     let sourcePosition = 0;
     const entryPatches = currentEntries.map((entry) => {
-      const movedIndex = movedIndexById.get(entry.id);
-      const isMoved = movedIndex != null;
+      const isMoved = movedIds.has(entry.id);
       return {
         id: entry.id,
         source_document_id: isMoved ? splitSourceDocumentId : input.sourceDocumentId,
         source_document_revision_id: isMoved ? splitRevision.id : activeRevision.id,
         position: isMoved ? splitPosition++ : sourcePosition++,
-        converted_amount:
-          isMoved && conversions != null
-            ? roundToCurrency(conversions[movedIndex]!.convertedAmount, lockedLedger.mainCurrency)
-            : entry.convertedAmount,
-        exchange_rate:
-          isMoved && conversions != null
-            ? round(conversions[movedIndex]!.exchangeRate, 12)
-            : entry.exchangeRate,
       };
     });
     const updatedEntries = await tx.execute(sql`
@@ -216,17 +188,13 @@ export async function splitSourceDocumentAtomically(input: {
           id uuid,
           source_document_id uuid,
           source_document_revision_id uuid,
-          position integer,
-          converted_amount numeric,
-          exchange_rate numeric
+          position integer
         )
       )
       UPDATE ledger_entries AS entry
       SET source_document_id = patches.source_document_id,
           source_document_revision_id = patches.source_document_revision_id,
           position = patches.position,
-          converted_amount = patches.converted_amount,
-          exchange_rate = patches.exchange_rate,
           updated_at = ${now}
       FROM patches
       WHERE entry.id = patches.id

@@ -11,7 +11,6 @@ describe("ledger search", () => {
   it("normalizes search and keeps Stream and Details contracts independent", async () => {
     const { ledgerId } = await createTestUserWithLedger(getTestDb());
     await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Coffee Receipt",
       entryDate: "2026-07-15",
@@ -22,14 +21,11 @@ describe("ledger search", () => {
           currency: "CNY",
           itemName: "Latte",
           description: "Morning special",
-          convertedAmount: "12.50",
-          exchangeRate: "1.000000",
         },
       ],
       bookId: await testBookId(getTestDb(), ledgerId),
     });
     await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Literal % Store",
       entryDate: "2026-07-16",
@@ -40,8 +36,6 @@ describe("ledger search", () => {
           currency: "CNY",
           itemName: "Tea_100%",
           description: null,
-          convertedAmount: "20.00",
-          exchangeRate: "1.000000",
         },
       ],
       bookId: await testBookId(getTestDb(), ledgerId),

@@ -95,6 +95,9 @@ export function validateDemoEnvironment(environment = process.env) {
   return { databaseUrl: databaseUrl.toString(), storageUrl: storageUrl.toString() };
 }
 
+/** Any positive value works: demo conversions only depend on the fixture's rates. */
+const DEMO_MAIN_CURRENCY_PER_EUR = "7.8";
+
 function isoDateWithOffset(anchorDate, dayOffset) {
   const date = new Date(`${anchorDate}T12:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + dayOffset);
@@ -427,9 +430,8 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
       await client.query(
         `INSERT INTO ledger_entries
           (id, ledger_id, category_id, source_document_id, source_document_revision_id,
-           position, amount, currency, item_name, description, converted_amount, exchange_rate,
-           created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)`,
+           position, amount, currency, item_name, description, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)`,
         [
           entry.id,
           ledgerId,
@@ -441,12 +443,11 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
           entry.currency,
           entry.itemName,
           entry.description ?? null,
-          entry.convertedAmount,
-          entry.exchangeRate,
           createdAt,
         ]
       );
     }
+    await seedExchangeRates(client, fixture, documentDate, activeEntries(document), now);
     await client.query(
       `UPDATE source_documents
           SET active_revision_id = $1, latest_submission_revision_id = $2
@@ -468,6 +469,39 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
         [ledgerId, document.revisionId, "failed", document.failureCode, createdAt, document.id]
       );
     }
+  }
+}
+
+/**
+ * Stores the day's rates the fixture's foreign entries convert at, so the demo
+ * shows converted totals without reaching the rate provider. The rows are
+ * final, so maintenance never replaces them.
+ */
+async function seedExchangeRates(client, fixture, rateDate, entries, now) {
+  const mainCurrency = fixture.ledger.mainCurrency;
+  const foreign = [...new Set(entries.map((entry) => entry.currency))].filter(
+    (currency) => currency !== mainCurrency
+  );
+  if (foreign.length === 0) return;
+  const mainPerEur = mainCurrency === "EUR" ? "1" : DEMO_MAIN_CURRENCY_PER_EUR;
+  // Each row is [currency, dividend, divisor]: a foreign currency's rate is
+  // how many main-currency units one unit buys, so it buys main/rate per euro.
+  const rows = [
+    ["EUR", "1", "1"],
+    [mainCurrency, mainPerEur, "1"],
+    ...foreign.map((currency) => {
+      const rate = fixture.exchangeRates?.[currency];
+      if (rate == null) throw new Error(`Demo fixture has no exchange rate for ${currency}`);
+      return [currency, mainPerEur, rate];
+    }),
+  ];
+  for (const [currency, dividend, divisor] of rows) {
+    await client.query(
+      `INSERT INTO exchange_rates (rate_date, currency, per_eur, source_date, fetched_at)
+       VALUES ($1, $2, $3::numeric / $4::numeric, $1, $5)
+       ON CONFLICT (rate_date, currency) DO NOTHING`,
+      [rateDate, currency, dividend, divisor, now]
+    );
   }
 }
 

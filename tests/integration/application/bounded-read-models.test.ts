@@ -157,8 +157,6 @@ describe("bounded target read models", () => {
       sourceDocumentId: document!.id,
       amount: "12.00",
       currency: "CNY",
-      convertedAmount: "12.00",
-      exchangeRate: "1.000000",
       itemName: "Bounded item",
     });
     await activateTestSourceDocumentProjection(db, document!.id, {
@@ -325,7 +323,6 @@ describe("bounded target read models", () => {
     const storageKey = "private/ledger-receipt.jpg";
     const createdAt = "2026-07-15T08:00:00.000Z";
     const created = await createManualDocument({
-      expectedMainCurrency: "CNY",
       ledgerId,
       title: "Large receipt",
       inputText: sensitiveText,
@@ -337,8 +334,6 @@ describe("bounded target read models", () => {
         currency: "CNY",
         itemName: `Item ${index}`,
         description: null,
-        convertedAmount: `${index + 1}.25`,
-        exchangeRate: "1.000000",
         createdAt,
       })),
       bookId: await testBookId(db, ledgerId),

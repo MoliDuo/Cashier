@@ -6,19 +6,13 @@ import { sourceDocuments } from "@/persistence/schema/source-document";
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
-const { getRatesMock, convertBatchMock } = vi.hoisted(() => ({
-  getRatesMock: vi.fn(async () => ({
-    base: "USD",
-    date: "2026-01-01",
-    rates: { CNY: 1 } as Record<string, number>,
-  })),
-  convertBatchMock: vi.fn(),
+const { ensureRatesMock } = vi.hoisted(() => ({
+  ensureRatesMock: vi.fn(async (_dates: readonly (string | null)[]) => undefined),
 }));
 
 vi.mock("@/modules/currency/server/exchange-rates", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/currency/server/exchange-rates")>()),
-  getExchangeRates: getRatesMock,
-  convertAmounts: convertBatchMock,
+  ensureExchangeRates: ensureRatesMock,
 }));
 import {
   batchUpdateLedgerEntriesAction,
@@ -163,7 +157,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
     }
   });
 
-  it("uses one batch conversion for many amount updates", async () => {
+  it("asks once for the rates of a batch moved to a foreign currency", async () => {
     const db = getTestDb();
     const doc = await seedDoc(db, ledgerId, "2026-09-01");
     const ids = (
@@ -176,23 +170,20 @@ describe("batchUpdateLedgerEntriesAction", () => {
             sourceDocumentId: doc.id,
             itemName: `Converted ${index}`,
             amount: "10.00",
-            currency: "USD",
+            currency: "CNY",
           }))
         )
         .returning({ id: ledgerEntries.id })
     ).map((entry) => entry.id);
     await activateTestSourceDocumentProjection(db, doc.id);
-    convertBatchMock.mockImplementation(async (items: Array<{ amount: string }>) =>
-      items.map((item) => ({ convertedAmount: item.amount, exchangeRate: "1" }))
-    );
+    ensureRatesMock.mockClear();
 
     await batchUpdateLedgerEntriesAction([{ sourceDocumentId: doc.id, expectedVersion: 1 }], ids, {
-      amount: "12.00",
+      currency: "USD",
     });
 
-    expect(convertBatchMock).toHaveBeenCalledTimes(1);
-    expect(convertBatchMock.mock.calls[0]?.[0]).toHaveLength(20);
-    expect(getRatesMock).not.toHaveBeenCalled();
+    expect(ensureRatesMock).toHaveBeenCalledTimes(1);
+    expect(new Set(ensureRatesMock.mock.calls[0]?.[0])).toEqual(new Set(["2026-09-01"]));
   });
 
   it("rolls back the entire atomic batch when one target is stale", async () => {
@@ -282,10 +273,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   it("commits the date change and returns the locked impact", async () => {
     const db = getTestDb();
-    convertBatchMock.mockResolvedValue([
-      { convertedAmount: "10", exchangeRate: "1" },
-      { convertedAmount: "20", exchangeRate: "1" },
-    ]);
     const doc = await seedDoc(db, ledgerId, "2026-01-01");
     const ids = (
       await db
