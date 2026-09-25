@@ -1,6 +1,6 @@
 {
-  "id": "10718c9a-82c7-494b-b1af-06ffc6577a69",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "de3f6a26-721e-4631-b9cb-c90a25d3d163",
+  "prevId": "10718c9a-82c7-494b-b1af-06ffc6577a69",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -264,12 +264,6 @@
         "last_attempt_at": {
           "name": "last_attempt_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ip_address": {
-          "name": "ip_address",
-          "type": "inet",
           "primaryKey": false,
           "notNull": false
         }

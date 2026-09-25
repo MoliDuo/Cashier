@@ -1,0 +1,1 @@
+ALTER TABLE "otp_tokens" DROP COLUMN "ip_address";
