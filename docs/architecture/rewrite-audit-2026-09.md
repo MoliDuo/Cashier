@@ -92,6 +92,8 @@ Phase 1 规划时又核实了两个正在出错的问题，放在 Phase 1 的预
   - 对象清理本身是幂等的。
   - 这两处的租约其实什么也没保护。
 - **没有 cron**：维护只有在上传时顺带执行（`scheduleRequestMaintenance`）。
+- **错误分类失效**：`processing/execute-job.ts` 的 `toFailureCode` 匹配大写错误码，而 AI 客户端抛出的是小写的 `ai_rate_limited` 等，`parser.ts` 还会把它包进 `cause`。所以限流和配置错误从来没有被单独识别过。
+- **API v1 放弃上传会话时**，会为从未写入过的 `temporary/` key 排清理任务，真正写入的永久对象反而没人清理。
 - **重写**：只有提取和分类两个流程需要租约，二者共用一个租约帮手；再加一个每日 cron 做兜底清扫。
 
 ### F. 上传用了四张表（Phase 2，M–L，待做）

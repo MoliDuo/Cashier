@@ -30,7 +30,8 @@
      而 Postgres 存的是微秒，比较相等并不可靠。
    - 其余写入一律用字段级 PATCH，最后写入者胜出。后台分类任务对单个条目做比较并交换
      （`category_id` 仍是开始时的值才写入），不依赖票据的版本号。
-4. **默认硬删除。** 只有明确需要审计的地方才保留痕迹，例如凭证的 `revoked_at`。
+4. **默认硬删除。** 只有明确需要审计的地方才保留痕迹。凭证是唯一的例外：它的 `deleted_at` 表示"已吊销"，
+   吊销后的行留作审计，不改名。
 5. **离开页面是安全的。** 草稿会保留下来，而不是拦住用户不让离开。只有上传还在进行时才拦截关闭页面。
 6. **所有时间预算都从同一个数字推导。** 截止时间、租约长度、单次请求超时都由
    `FUNCTION_MAX_DURATION_SECONDS` 算出来，不允许出现比函数寿命更长的截止时间。
@@ -48,19 +49,19 @@
 表名沿用现状。改表名在迁移和旧版本并存的部署窗口里没法安全进行，收益又只是名字好看，所以下表的
 "概念"一列只用来说明职责。
 
-| 概念与表名                                              | 职责                                                                                       | 相对现状                                                                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `ledgers`（单行）、`books`、`categories`                | 账本设置、分账、分类                                                                       | 分类改为硬删除；名称唯一约束设为 `DEFERRABLE`，去掉改名用的临时名技巧                                            |
-| 票据：`source_documents`                                | 所属分账、标题、日期、当前输入（文本）、`version`、指向当前提取尝试的指针                  | 去掉 `active_revision_id`，只保留 `latest_submission_revision_id` 作为"当前尝试"的引用                           |
-| 票据文件：`source_document_files`                       | 票据当前输入的文件                                                                         | 新表，取代 `revision_files`                                                                                      |
-| 提取尝试：`source_document_revisions`                   | 每一次提取：请求的日期、状态、租约、尝试次数、失败码                                       | 并入 `processing_outbox` 的租约与计数，它本身就是任务队列；不再有 manual revision                                |
-| 条目：`ledger_entries`                                  | 金额、币种、分类、所属票据                                                                 | 去掉 `converted_amount`、`exchange_rate` 和 revision 外键                                                        |
-| 汇率：`exchange_rates(rate_date, currency, per_eur, …)` | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间    | 取代每个日期一行的 jsonb `currency_rates`；折算由 SQL 函数在读取时完成                                           |
-| `stored_files`（`pending` / `ready`）                   | 对象存储里文件的登记                                                                       | 删除 `upload_sessions`、`upload_session_files`、`object_cleanup_jobs`；`temporary/` 前缀交给 S3 生命周期规则清理 |
-| `category_jobs`、`category_job_documents`               | 批量分类任务，租约放在 job 行上                                                            | 删除 chunks 表和父表上缓存的计数列                                                                               |
-| 认证                                                    | `users`、`login_emails`、`verification_codes`、`rate_limit_buckets`、`service_credentials` | OTP 和改邮箱验证合成一张验证码表，尝试次数和锁定逻辑只实现一次                                                   |
-| `ledger_sync_state`                                     | 客户端刷新用的水位线，由语句级触发器维护                                                   | 由行级触发器改来                                                                                                 |
-| 幂等                                                    | 在票据上加 `UNIQUE(来源, idempotency_key)`                                                 | 删除 `idempotency_records`，不再需要它的租约和心跳                                                               |
+| 概念与表名                                              | 职责                                                                                       | 相对现状                                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `ledgers`（单行）、`books`、`categories`                | 账本设置、分账、分类                                                                       | 分类改为硬删除；名称唯一约束设为 `DEFERRABLE`，去掉改名用的临时名技巧                           |
+| 票据：`source_documents`                                | 所属分账、标题、日期、当前输入（文本）、`version`、指向当前提取尝试的指针                  | 去掉 `active_revision_id`，只保留 `latest_submission_revision_id` 作为"当前尝试"的引用          |
+| 票据文件：`source_document_files`                       | 票据当前输入的文件                                                                         | 新表，取代 `revision_files`                                                                     |
+| 提取尝试：`source_document_revisions`                   | 每一次提取：请求的日期、状态、租约、尝试次数、失败码                                       | 并入 `processing_outbox` 的租约与计数，它本身就是任务队列；不再有 manual revision               |
+| 条目：`ledger_entries`                                  | 金额、币种、分类、所属票据                                                                 | 去掉 `converted_amount`、`exchange_rate` 和 revision 外键                                       |
+| 汇率：`exchange_rates(rate_date, currency, per_eur, …)` | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间    | 取代每个日期一行的 jsonb `currency_rates`；折算由 SQL 函数在读取时完成                          |
+| `stored_files`（`finalized_at` 为空即 pending）         | 对象存储里文件的登记                                                                       | 删除 `upload_sessions`、`upload_session_files`、`object_cleanup_jobs`；清理见第 4 节的每日 cron |
+| `category_jobs`、`category_job_documents`               | 批量分类任务，租约放在 job 行上                                                            | 删除 chunks 表和父表上缓存的计数列；选择一次提交，进度在读取时统计                              |
+| 认证                                                    | `users`、`login_emails`、`verification_codes`、`rate_limit_buckets`、`service_credentials` | OTP 和改邮箱验证合成一张验证码表，尝试次数和锁定逻辑只实现一次                                  |
+| `ledger_sync_state`                                     | 客户端刷新用的水位线，由语句级触发器维护                                                   | 由行级触发器改来                                                                                |
+| 幂等                                                    | 票据上的 `UNIQUE(ledger_id, idempotency_source, idempotency_key)` 加内容指纹，key 永久有效 | 删除 `idempotency_records`，不再需要它的租约和心跳                                              |
 
 语义约定：
 
@@ -106,9 +107,13 @@ src/persistence/      schema（按领域拆文件）和迁移
 - **三种触发方式。**
   - `after()`：请求结束后立即执行。
   - 轮询顺带恢复：客户端本来就会轮询，借这个时机捡起中断的任务。
-  - 每日 cron：兜底清扫。
-- **只有两个流程需要租约：提取和分类。** 它们共用一个租约帮手，统一以数据库时钟为准，
-  重试策略和错误分类（暂时性 / 永久性 / 配置问题）也各只有一套。
+  - 每日 cron：兜底清扫。它清理过期记录，对所有账本做一次恢复扫描，刷新汇率，删除 `temporary/` 下
+    超过 1 天的对象和超过 1 天仍未完成的 pending 文件，并删除没有被任何票据引用、创建超过 7 天的文件。
+    请求不再顺带触发维护。
+- **只有两个流程需要租约：提取和分类。** 它们共用一个租约帮手，统一以数据库时钟为准：
+  `expires_at > clock_timestamp()` 即持有，否则即空闲。重试策略和错误分类
+  （暂时性 / 永久性 / 配置问题）也各只有一套：暂时性失败按退避重新排队，永久性和配置问题立即失败，
+  所有后台任务最多尝试 3 次。
 - **runner 没活就退出。** 认领不到工作时立刻返回，不空转等待；快用完预算时主动停下，
   剩下的工作交给下一次触发。
 - **汇率在写入前尽力缓存。** 拿不到也照常保存，读取时显示未折算，由维护流程补齐。
