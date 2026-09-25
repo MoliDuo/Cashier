@@ -18,7 +18,7 @@ vi.mock("@/modules/source-document/server/updates", () => ({
 }));
 
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
-import { ConflictError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 
 const LEDGER_ID = "11111111-1111-4111-8111-111111111111";
 const SOURCE_DOCUMENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -26,14 +26,13 @@ const BOOK_ID = "33333333-3333-4333-8333-333333333333";
 
 const input = {
   sourceDocumentId: SOURCE_DOCUMENT_ID,
-  expectedVersion: 3,
   bookId: BOOK_ID,
 };
 
 /**
- * The three ways moving a record between books can fail are told apart, because
- * the reader's next action differs: reload for a conflict, pick another book for
- * a retired one, and nothing at all for a record that is gone.
+ * The ways moving a record between books can fail are told apart, because the
+ * reader's next action differs: pick another book for a retired one, and
+ * nothing at all for a record that is gone.
  */
 describe("assignSourceDocumentBookAction failures", () => {
   beforeEach(() => {
@@ -44,12 +43,10 @@ describe("assignSourceDocumentBookAction failures", () => {
     });
   });
 
-  it("reports a version conflict as a conflict, not a missing record", async () => {
-    assignBookMock.mockResolvedValue({ ok: false, reason: "stale", currentVersion: 4 });
+  it("propagates a missing record as not found", async () => {
+    assignBookMock.mockRejectedValue(new NotFoundError("Source document"));
 
-    // A record that was edited elsewhere exists; the caller is looking at an
-    // older copy of it, so "not found" would send them hunting for a lost record.
-    await expect(assignSourceDocumentBookAction(input)).rejects.toThrow(ConflictError);
+    await expect(assignSourceDocumentBookAction(input)).rejects.toThrow(NotFoundError);
   });
 
   it("reports a book that was archived under the reader as a validation failure", async () => {
@@ -58,12 +55,21 @@ describe("assignSourceDocumentBookAction failures", () => {
     await expect(assignSourceDocumentBookAction(input)).rejects.toThrow(ValidationError);
   });
 
-  it("returns the new version on success", async () => {
-    assignBookMock.mockResolvedValue({ ok: true, version: 4 });
+  it("returns the assigned book on success", async () => {
+    assignBookMock.mockResolvedValue({ ok: true });
 
-    await expect(assignSourceDocumentBookAction(input)).resolves.toEqual({
+    await expect(assignSourceDocumentBookAction(input)).resolves.toEqual({ bookId: BOOK_ID });
+    expect(assignBookMock).toHaveBeenCalledWith({
+      ledgerId: LEDGER_ID,
+      sourceDocumentId: SOURCE_DOCUMENT_ID,
       bookId: BOOK_ID,
-      version: 4,
     });
+  });
+
+  it("rejects the removed expectedVersion field", async () => {
+    await expect(assignSourceDocumentBookAction({ ...input, expectedVersion: 3 })).rejects.toThrow(
+      ValidationError
+    );
+    expect(assignBookMock).not.toHaveBeenCalled();
   });
 });

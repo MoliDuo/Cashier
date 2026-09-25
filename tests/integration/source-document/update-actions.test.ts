@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ZodError } from "zod";
+import { ConflictError } from "@/lib/errors";
 import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import { getTestDb } from "../../setup";
 import { ledgerEntries, sourceDocuments, ledgers } from "@/persistence";
@@ -81,10 +82,7 @@ describe("Source Document Update Actions", () => {
       );
 
       await batchUpdateSourceDocumentsAction({
-        targets: documents.map((document) => ({
-          sourceDocumentId: document.id,
-          expectedVersion: 1,
-        })),
+        sourceDocumentIds: documents.map((document) => document.id),
         data: { documentDate: "2024-03-15", title: "Updated title" },
       });
 
@@ -112,7 +110,7 @@ describe("Source Document Update Actions", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       try {
         await batchUpdateSourceDocumentsAction({
-          targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],
+          sourceDocumentIds: [document.id],
           data: { documentDate: "2024-03-14" },
         });
         expect(fetchSpy).not.toHaveBeenCalled();
@@ -147,10 +145,7 @@ describe("Source Document Update Actions", () => {
 
       // Batch update
       await batchUpdateSourceDocumentsAction({
-        targets: [docData1, docData2].map((document) => ({
-          sourceDocumentId: document.id,
-          expectedVersion: 1,
-        })),
+        sourceDocumentIds: [docData1.id, docData2.id],
         data: { title: "Updated documents" },
       });
 
@@ -192,7 +187,7 @@ describe("Source Document Update Actions", () => {
       await insertExchangeRates("2024-03-15", { USD: 1, CNY: 10 });
 
       await batchUpdateSourceDocumentsAction({
-        targets: [{ sourceDocumentId: document.id, expectedVersion: 1 }],
+        sourceDocumentIds: [document.id],
         data: { documentDate: "2024-03-15" },
       });
 
@@ -211,7 +206,7 @@ describe("Source Document Update Actions", () => {
 
       await expect(
         batchUpdateSourceDocumentsAction({
-          targets: [],
+          sourceDocumentIds: [],
           data: { title: "Ignored" },
         })
       ).rejects.toThrow(ZodError);
@@ -230,58 +225,47 @@ describe("Source Document Update Actions", () => {
       await activateTestSourceDocumentProjection(db, docData.id);
 
       const result = await batchUpdateSourceDocumentsAction({
-        targets: [{ sourceDocumentId: docData.id, expectedVersion: 1 }],
+        sourceDocumentIds: [docData.id],
         data: { title: "Same title" },
       });
 
-      expect(result).toMatchObject({
-        ok: true,
-        versions: [{ sourceDocumentId: docData.id, version: 1 }],
-        data: { updatedCount: 0 },
-      });
+      expect(result).toEqual({ sourceDocumentIds: [docData.id], updatedCount: 0 });
       const document = await db.query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, docData.id),
       });
       expect(document?.version).toBe(1);
     });
 
-    it("rolls back the whole batch — including the non-stale document — when one target is stale", async () => {
+    it("rejects the whole batch, leaving every document untouched, when one is deleted", async () => {
       const db = getTestDb();
       const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
       await ensureTestLedgerBooks(db, ledgerData.id);
       const okDoc = createSourceDocumentData(ledgerData.id, { title: "Original A" });
-      const staleDoc = createSourceDocumentData(ledgerData.id, { title: "Original B" });
+      const deletedDoc = createSourceDocumentData(ledgerData.id, { title: "Original B" });
       await db.insert(sourceDocuments).values([
         {
           ...okDoc,
           bookId: sql`(SELECT id FROM books WHERE ledger_id = ${okDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ...staleDoc,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${staleDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          ...deletedDoc,
+          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${deletedDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
         },
       ]);
-      // Advance staleDoc's version out from under the caller's expectation.
+      await activateTestSourceDocumentProjection(db, okDoc.id);
+      await activateTestSourceDocumentProjection(db, deletedDoc.id);
       await db
         .update(sourceDocuments)
-        .set({ version: 2 })
-        .where(eq(sourceDocuments.id, staleDoc.id));
+        .set({ deletedAt: new Date() })
+        .where(eq(sourceDocuments.id, deletedDoc.id));
 
-      const result = await batchUpdateSourceDocumentsAction({
-        targets: [
-          { sourceDocumentId: okDoc.id, expectedVersion: 1 },
-          { sourceDocumentId: staleDoc.id, expectedVersion: 1 },
-        ],
-        data: { title: "Batch title" },
-      });
-
-      expect(result).toMatchObject({
-        ok: false,
-        reason: "stale",
-        staleTargets: [{ sourceDocumentId: staleDoc.id, expectedVersion: 1, currentVersion: 2 }],
-      });
-      // The non-stale document's write is rolled back too — atomic, not partial.
+      await expect(
+        batchUpdateSourceDocumentsAction({
+          sourceDocumentIds: [okDoc.id, deletedDoc.id],
+          data: { title: "Batch title" },
+        })
+      ).rejects.toThrow(ConflictError);
       const okDocument = await db.query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, okDoc.id),
       });

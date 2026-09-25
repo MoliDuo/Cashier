@@ -53,7 +53,6 @@ describe("useSourceDocumentDetailMutations", () => {
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          version: 7,
           onClose: vi.fn(),
         }),
       { wrapper }
@@ -78,45 +77,36 @@ describe("useSourceDocumentDetailMutations", () => {
     });
   });
 
-  it("passes only versioned split business input", async () => {
+  it("passes only split business input", async () => {
     const { client, wrapper } = setup();
     vi.spyOn(client, "invalidateQueries").mockResolvedValue();
     splitMock.mockResolvedValue({
-      ok: true,
-      sourceDocumentId: "source-1",
-      version: 8,
-      data: {
-        splitSourceDocumentId: "source-2",
-        splitVersion: 1,
-        movedEntryCount: 1,
-        sourceDocument: { id: "source-1", version: 8, ledgerEntries: [] },
-      },
+      splitSourceDocumentId: "source-2",
+      splitVersion: 1,
+      movedEntryCount: 1,
+      sourceDocument: { id: "source-1", version: 8, ledgerEntries: [] },
     });
     const { result } = renderHook(
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          version: 7,
           onClose: vi.fn(),
         }),
       { wrapper }
     );
     await act(async () => {
       await result.current.splitEntries({
-        expectedVersion: 7,
         ledgerEntryIds: ["entry-1"],
         entryDate: "2026-08-16",
       });
     });
     expect(splitMock).toHaveBeenCalledWith({
       sourceDocumentId: "source-1",
-      expectedVersion: 7,
       ledgerEntryIds: ["entry-1"],
       entryDate: "2026-08-16",
     });
     await expect(
       result.current.splitEntries({
-        expectedVersion: 7,
         ledgerEntryIds: ["entry-1"],
         entryDate: "2026-08-16",
       })
@@ -136,26 +126,21 @@ describe("useSourceDocumentDetailMutations", () => {
         finishRefresh = resolve;
       })
     );
-    splitMock.mockImplementation(async (input) => ({
-      ok: true,
-      sourceDocumentId: "source-1",
-      version: input.expectedVersion + 1,
-      data: {
-        splitSourceDocumentId: "source-2",
-        splitVersion: 1,
-        movedEntryCount: 1,
-        sourceDocument: {
-          id: "source-1",
-          version: input.expectedVersion + 1,
-          ledgerEntries: [{ id: "remaining" }],
-        },
+    let committedVersion = 7;
+    splitMock.mockImplementation(async () => ({
+      splitSourceDocumentId: "source-2",
+      splitVersion: 1,
+      movedEntryCount: 1,
+      sourceDocument: {
+        id: "source-1",
+        version: ++committedVersion,
+        ledgerEntries: [{ id: "remaining" }],
       },
     }));
     const { result } = renderHook(
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          version: 7,
           onClose: vi.fn(),
         }),
       { wrapper }
@@ -164,7 +149,6 @@ describe("useSourceDocumentDetailMutations", () => {
     for (const version of [7, 8]) {
       await act(async () => {
         await result.current.splitEntries({
-          expectedVersion: version,
           ledgerEntryIds: ["entry-1"],
           entryDate: "2026-08-16",
         });
@@ -180,41 +164,9 @@ describe("useSourceDocumentDetailMutations", () => {
     });
   });
 
-  it.each([
-    [
-      "save",
-      saveMock,
-      (result: ReturnType<typeof useSourceDocumentDetailMutations>) =>
-        result.saveChanges({
-          expectedVersion: 7,
-          changes: { sourceDoc: { title: "Updated" }, entries: {} },
-        }),
-    ],
-    [
-      "split",
-      splitMock,
-      (result: ReturnType<typeof useSourceDocumentDetailMutations>) =>
-        result.splitEntries({
-          expectedVersion: 7,
-          ledgerEntryIds: ["entry-1"],
-          entryDate: "2026-08-16",
-        }),
-    ],
-    [
-      "add entry",
-      createEntryMock,
-      (result: ReturnType<typeof useSourceDocumentDetailMutations>) =>
-        result.addEntry({ itemName: "Lunch", amount: 12 }),
-    ],
-    [
-      "delete entry",
-      deleteEntryMock,
-      (result: ReturnType<typeof useSourceDocumentDetailMutations>) =>
-        result.deleteEntry("entry-1"),
-    ],
-  ])("rejects stale %s results", async (_label, actionMock, run) => {
+  it("rejects a stale save result", async () => {
     const { wrapper } = setup();
-    actionMock.mockResolvedValue({
+    saveMock.mockResolvedValue({
       ok: false,
       reason: "stale",
       sourceDocumentId: "source-1",
@@ -225,14 +177,45 @@ describe("useSourceDocumentDetailMutations", () => {
       () =>
         useSourceDocumentDetailMutations({
           id: "source-1",
-          version: 7,
           onClose: vi.fn(),
         }),
       { wrapper }
     );
 
-    await expect(run(result.current)).rejects.toMatchObject({
+    await expect(
+      result.current.saveChanges({
+        expectedVersion: 7,
+        changes: { sourceDoc: { title: "Updated" }, entries: {} },
+      })
+    ).rejects.toMatchObject({
       code: "SOURCE_DOCUMENT_STALE",
     });
+  });
+
+  it("sends entry commands with only the document id", async () => {
+    const { client, wrapper } = setup();
+    vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    createEntryMock.mockResolvedValue({ ledgerEntryId: "entry-2" });
+    deleteEntryMock.mockResolvedValue({ ledgerEntryId: "entry-1", deleted: true });
+    const { result } = renderHook(
+      () =>
+        useSourceDocumentDetailMutations({
+          id: "source-1",
+          onClose: vi.fn(),
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.addEntry({ itemName: "Lunch", amount: 12 });
+      await result.current.deleteEntry("entry-1");
+    });
+
+    expect(createEntryMock).toHaveBeenCalledWith({
+      sourceDocumentId: "source-1",
+      itemName: "Lunch",
+      amount: "12",
+    });
+    expect(deleteEntryMock).toHaveBeenCalledWith("source-1", "entry-1");
   });
 });

@@ -4,8 +4,12 @@ import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listStreamPage as listStreamPageFor } from "@/modules/source-document/server/list-stream-page";
-import { applyDateOrganization } from "@/modules/source-document/server/date-organization";
+import {
+  applyDateOrganization,
+  dismissDateOrganization,
+} from "@/modules/source-document/server/date-organization";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
+import { addLedgerEntry } from "@/modules/source-document/server/entry-commands";
 
 const listStreamPage = (ledgerId: string) => listStreamPageFor(ledgerId, { limit: 20 });
 
@@ -93,7 +97,6 @@ describe("date organization", () => {
     const result = await applyDateOrganization({
       ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
-      expectedVersion: 1,
       suggestionId: fixture.suggestionId,
       groups: [
         { id: "retain", entryDate: null, ledgerEntryIds: [fixture.entries[0]!.id] },
@@ -103,21 +106,20 @@ describe("date organization", () => {
       appliedGroupIds: ["2026-09-09", "2026-09-08"],
     });
 
-    expect(result).toMatchObject({ ok: true, version: 2 });
-    if (!result.ok) throw new Error("Expected date organization to succeed");
-    expect(result.data.createdSourceDocumentIds).toHaveLength(2);
+    expect(result.sourceDocument.version).toBe(2);
+    expect(result.createdSourceDocumentIds).toHaveLength(2);
     const original = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
     expect(original.document.documentDate).toBe("2026-09-10");
     expect(original.names).toEqual(["Today"]);
     const created = await Promise.all(
-      result.data.createdSourceDocumentIds.map((id) => activeEntryNames(fixture.ledgerId, id))
+      result.createdSourceDocumentIds.map((id) => activeEntryNames(fixture.ledgerId, id))
     );
     expect(created.map(({ document, names }) => [document.documentDate, names])).toEqual([
       ["2026-09-09", ["Yesterday"]],
       ["2026-09-08", ["Earlier"]],
     ]);
     const stream = await listStreamPage(fixture.ledgerId);
-    const createdCards = result.data.createdSourceDocumentIds.map((id) =>
+    const createdCards = result.createdSourceDocumentIds.map((id) =>
       stream.items.find((item) => item.id === id)
     );
     expect(createdCards.map((item) => item?.ledgerEntries)).toMatchObject([
@@ -131,7 +133,6 @@ describe("date organization", () => {
     const result = await applyDateOrganization({
       ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
-      expectedVersion: 1,
       suggestionId: fixture.suggestionId,
       groups: [
         {
@@ -144,17 +145,63 @@ describe("date organization", () => {
       appliedGroupIds: ["2026-09-09", "2026-09-08"],
     });
 
-    expect(result).toMatchObject({ ok: true, version: 2 });
-    if (!result.ok) throw new Error("Expected date organization to succeed");
-    expect(result.data.createdSourceDocumentIds).toHaveLength(1);
+    expect(result.sourceDocument.version).toBe(2);
+    expect(result.createdSourceDocumentIds).toHaveLength(1);
     const original = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
     expect(original.document.documentDate).toBe("2026-09-09");
     expect(original.names).toEqual(["Today", "Yesterday"]);
-    const older = await activeEntryNames(
-      fixture.ledgerId,
-      result.data.createdSourceDocumentIds[0]!
-    );
+    const older = await activeEntryNames(fixture.ledgerId, result.createdSourceDocumentIds[0]!);
     expect(older.document.documentDate).toBe("2026-09-08");
     expect(older.names).toEqual(["Earlier"]);
+  });
+
+  it("applies after an entry was added to the bill and keeps it in the original", async () => {
+    const fixture = await createFixture();
+    await addLedgerEntry({
+      ledgerId: fixture.ledgerId,
+      sourceDocumentId: fixture.created.sourceDocumentId,
+      amount: "4.00",
+      itemName: "Added later",
+    });
+
+    const result = await applyDateOrganization({
+      ledgerId: fixture.ledgerId,
+      sourceDocumentId: fixture.created.sourceDocumentId,
+      suggestionId: fixture.suggestionId,
+      groups: [
+        { id: "2026-09-09", entryDate: "2026-09-09", ledgerEntryIds: [fixture.entries[1]!.id] },
+      ],
+      appliedGroupIds: ["2026-09-09"],
+    });
+
+    expect(result.sourceDocument.version).toBe(3);
+    const original = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    expect(original.names).toEqual(["Today", "Earlier", "Added later"]);
+    const moved = await activeEntryNames(fixture.ledgerId, result.createdSourceDocumentIds[0]!);
+    expect(moved.names).toEqual(["Yesterday"]);
+  });
+
+  it("leaves a newer suggestion in place when an older one is dismissed", async () => {
+    const fixture = await createFixture();
+    const staleSuggestionId = crypto.randomUUID();
+
+    await expect(
+      dismissDateOrganization({
+        ledgerId: fixture.ledgerId,
+        sourceDocumentId: fixture.created.sourceDocumentId,
+        suggestionId: staleSuggestionId,
+      })
+    ).resolves.toEqual({ dismissed: true });
+    const kept = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    expect(kept.document.dateOrganizationSuggestion?.id).toBe(fixture.suggestionId);
+
+    await dismissDateOrganization({
+      ledgerId: fixture.ledgerId,
+      sourceDocumentId: fixture.created.sourceDocumentId,
+      suggestionId: fixture.suggestionId,
+    });
+    const dismissed = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    expect(dismissed.document.dateOrganizationSuggestion).toBeNull();
+    expect(dismissed.document.version).toBe(1);
   });
 });

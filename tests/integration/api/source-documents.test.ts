@@ -221,11 +221,8 @@ describe("SourceDocument Actions", () => {
     });
     expect(entriesBefore.length).toBeGreaterThan(0);
 
-    // 2. DELETE request - deleteSourceDocumentAction returns void in new format
-    const document = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, sourceDocumentId),
-    });
-    await deleteSourceDocumentAction(sourceDocumentId, document!.version);
+    // 2. DELETE request
+    await deleteSourceDocumentAction(sourceDocumentId);
 
     // 3. Verify deletion
     const docAfter = await db.query.sourceDocuments.findFirst({

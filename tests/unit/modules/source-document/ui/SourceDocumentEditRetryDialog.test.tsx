@@ -37,7 +37,6 @@ function renderDialog() {
       <SourceDocumentEditRetryDialog
         sourceDocument={{
           id: "00000000-0000-4000-8000-000000000001",
-          version: 1,
           text: null,
           files: [],
           hasImages: true,
@@ -72,7 +71,7 @@ describe("SourceDocumentEditRetryDialog", () => {
     const onOpenChange = vi.fn();
     const props = {
       ledgerId: "ledger-1",
-      sourceDocument: { id: "source-1", version: 7, text: "Original" },
+      sourceDocument: { id: "source-1", text: "Original" },
       onOpenChange,
     };
     const form = (open: boolean) => (

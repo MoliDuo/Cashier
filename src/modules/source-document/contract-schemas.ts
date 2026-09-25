@@ -78,34 +78,6 @@ const IMAGE_MIME_REGEX = new RegExp(`^image/(${SUPPORTED_MIME_PATTERN})$`);
 
 export const sourceDocumentIdSchema = uuidSchema;
 export const clientSubmissionIdSchema = uuidSchema;
-export const versionedTargetSchema = strictObjectSchema({
-  sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
-});
-
-const versionedTargetsSchema = z
-  .array(versionedTargetSchema)
-  .min(1)
-  .max(MAX_BATCH_SIZE)
-  .superRefine((targets, ctx) => {
-    const versions = new Map<string, number>();
-    for (const target of targets) {
-      const previous = versions.get(target.sourceDocumentId);
-      if (previous != null) {
-        ctx.addIssue({
-          code: "custom",
-          message:
-            previous === target.expectedVersion
-              ? "A source document may only appear once"
-              : "A source document has conflicting expected versions",
-        });
-      }
-      versions.set(target.sourceDocumentId, target.expectedVersion);
-    }
-  })
-  .transform((targets) =>
-    [...targets].sort((left, right) => left.sourceDocumentId.localeCompare(right.sourceDocumentId))
-  );
 
 /**
  * Idempotency-Key header contract for POST /api/v1/source-documents.
@@ -125,6 +97,11 @@ export const apiV1IdempotencyKeySchema = z
 export const sourceDocumentIdsSchema = z.preprocess(
   (value) => (Array.isArray(value) ? [...new Set(value)] : value),
   z.array(uuidSchema).min(1).max(MAX_BATCH_SIZE)
+);
+
+/** The documents a batch command touches, in the order they are locked. */
+const sourceDocumentTargetIdsSchema = sourceDocumentIdsSchema.transform((ids) =>
+  [...ids].sort((left, right) => left.localeCompare(right))
 );
 
 const sourceDocumentPayloadSchema = strictObjectSchema({
@@ -356,7 +333,6 @@ export const saveSourceDocumentChangesInputSchema = strictObjectSchema({
 
 export const splitSourceDocumentInputSchema = strictObjectSchema({
   sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
   ledgerEntryIds: z
     .array(uuidSchema)
     .min(1)
@@ -377,7 +353,6 @@ const dateOrganizationGroupSchema = strictObjectSchema({
 
 export const applyDateOrganizationInputSchema = strictObjectSchema({
   sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
   suggestionId: uuidSchema,
   groups: z.array(dateOrganizationGroupSchema).min(1).max(MAX_BATCH_SIZE),
   appliedGroupIds: z.array(z.string().trim().min(1).max(80)).min(1).max(MAX_BATCH_SIZE),
@@ -408,12 +383,11 @@ export const applyDateOrganizationInputSchema = strictObjectSchema({
 
 export const dismissDateOrganizationInputSchema = strictObjectSchema({
   sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
   suggestionId: uuidSchema,
 });
 
 export const batchUpdateSourceDocumentsInputSchema = strictObjectSchema({
-  targets: versionedTargetsSchema,
+  sourceDocumentIds: sourceDocumentTargetIdsSchema,
   data: updateSourceDocumentInputSchema,
 });
 
@@ -438,12 +412,12 @@ function parseSourceDocumentContract<T>(schema: z.ZodType<T>, input: unknown): T
   return result.data;
 }
 
-export function parseVersionedTarget(input: unknown): z.infer<typeof versionedTargetSchema> {
-  return parseSourceDocumentContract(versionedTargetSchema, input);
+export function parseSourceDocumentId(input: unknown): string {
+  return parseSourceDocumentContract(sourceDocumentIdSchema, input);
 }
 
-export function parseVersionedTargets(input: unknown): z.infer<typeof versionedTargetsSchema> {
-  return parseSourceDocumentContract(versionedTargetsSchema, input);
+export function parseSourceDocumentTargetIds(input: unknown): string[] {
+  return parseSourceDocumentContract(sourceDocumentTargetIdsSchema, input);
 }
 
 export type CreateSourceDocumentInputContract = z.infer<typeof createSourceDocumentInputSchema>;

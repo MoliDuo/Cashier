@@ -236,7 +236,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
           confirmLabel={tCommon("delete")}
           onConfirm={async () => {
             const result = await batch.remove.mutateAsync();
-            return result.stale.length + result.failed.length === 0;
+            return result.failed.length === 0;
           }}
         />
         <BatchDateDialog

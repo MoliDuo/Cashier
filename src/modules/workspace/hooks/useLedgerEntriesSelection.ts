@@ -31,16 +31,6 @@ export function useLedgerEntriesSelection({
       }),
     [advancedFilters, periodParams]
   );
-  const sourceDocumentVersions = useMemo(
-    () =>
-      new Map(
-        streamGroups.flatMap((group) =>
-          group.items.map((item) => [item.sourceDocument.id, item.sourceDocument.version] as const)
-        )
-      ),
-    [streamGroups]
-  );
-
   const {
     isSelectionMode,
     toggleSelectionMode,
@@ -56,7 +46,7 @@ export function useLedgerEntriesSelection({
   } = useSelection({ allIds: allSourceDocumentIds, queryFingerprint });
 
   const { deleteSourceDocument, batchUpdateDates, batchDelete, batchRetry } =
-    useBatchSourceDocumentActions(clearSelection, retainSelection, sourceDocumentVersions);
+    useBatchSourceDocumentActions(clearSelection, retainSelection);
   const selectedEntryIds = useMemo(() => {
     const selected = new Set(selectedIds);
     return [

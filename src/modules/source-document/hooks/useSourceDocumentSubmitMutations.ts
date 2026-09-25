@@ -14,10 +14,6 @@ import type {
 } from "./source-document-input-controller.types";
 import { uploadSourceDocumentSubmissionImages } from "./source-document-submission-upload";
 import { useSubmitProgress } from "./source-document-submit-progress";
-import {
-  requireSourceDocumentVersion,
-  unwrapVersionedCommandResult,
-} from "@/modules/source-document/command-results";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,10 +40,7 @@ type UseSourceDocumentSubmitMutationsOptions = {
   bookId?: string;
   messages: SourceDocumentInputControllerMessages;
   onSuccess?: (result: CreatedRecordResult) => void;
-} & (
-  | { mode: "create"; sourceDocumentId?: never; sourceDocumentVersion?: never }
-  | { mode: "retry"; sourceDocumentId: string; sourceDocumentVersion: number }
-);
+} & ({ mode: "create"; sourceDocumentId?: never } | { mode: "retry"; sourceDocumentId: string });
 
 function waitForPaint(): Promise<void> {
   return new Promise((resolve) => {
@@ -109,7 +102,6 @@ function snapshotPayload(payload: SourceDocumentSubmitPayload): SourceDocumentSu
 export function useSourceDocumentSubmitMutations({
   mode,
   sourceDocumentId,
-  sourceDocumentVersion,
   messages,
   onSuccess,
   bookId,
@@ -200,9 +192,6 @@ export function useSourceDocumentSubmitMutations({
     invalidates: ["documents", "stats"],
     mutationFn: async (variables: RetryVariables) => {
       if (sourceDocumentId == null) throw new Error("No source document ID for retry");
-      // Fail before uploading anything: a missing version must not upload
-      // files or call the action, and the form content stays intact for retry.
-      const expectedVersion = requireSourceDocumentVersion(sourceDocumentVersion, sourceDocumentId);
       const { payload } = variables;
       const uploadedPayload = await uploadSourceDocumentSubmissionImages(
         payload,
@@ -210,12 +199,7 @@ export function useSourceDocumentSubmitMutations({
         setMonotonicProgress
       );
       setMonotonicProgress({ phase: "submitting", percent: 90 });
-      const result = await editRetrySourceDocumentAction(
-        sourceDocumentId,
-        uploadedPayload,
-        expectedVersion
-      );
-      return unwrapVersionedCommandResult(result);
+      return editRetrySourceDocumentAction(sourceDocumentId, uploadedPayload);
     },
     successMessage: messages.retrySuccess,
     errorMessage: null,

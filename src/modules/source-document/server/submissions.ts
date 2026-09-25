@@ -1,12 +1,7 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
-import {
-  ConflictError,
-  NotFoundError,
-  StaleSourceDocumentVersionError,
-  ValidationError,
-} from "@/lib/errors";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import {
   idempotencyRecords,
   processingOutbox,
@@ -44,7 +39,6 @@ async function submitInTransaction(
       .select({
         activeRevisionId: sourceDocuments.activeRevisionId,
         latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
-        version: sourceDocuments.version,
       })
       .from(sourceDocuments)
       .where(
@@ -57,13 +51,6 @@ async function submitInTransaction(
       .for("update")
       .then((rows) => rows[0]);
     if (document == null) throw new NotFoundError("Source document");
-    if (input.expectedVersion != null && document.version !== input.expectedVersion) {
-      throw new StaleSourceDocumentVersionError(
-        input.sourceDocumentId,
-        input.expectedVersion,
-        document.version
-      );
-    }
     const inputRevisionId = document.latestSubmissionRevisionId;
 
     if (input.inheritInput === true) {
@@ -337,7 +324,6 @@ export interface SourceDocumentSubmissionResult {
 /** Atomically persists submitted evidence and the durable work needed to process it. */
 export type SourceDocumentSubmissionInput = {
   ledgerId: string;
-  expectedVersion?: number;
   input?: SourceDocumentInputContract;
   inheritInput?: boolean;
   supersedeProcessing?: boolean;

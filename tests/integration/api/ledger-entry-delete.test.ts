@@ -44,11 +44,7 @@ describe("Ledger Entry Delete Action", () => {
   });
 
   it("should delete a ledger entry", async () => {
-    // deleteLedgerEntryAction returns void in new format
-    await deleteLedgerEntryAction(
-      { sourceDocumentId: testSourceDocId, expectedVersion: 1 },
-      testEntryId
-    );
+    await deleteLedgerEntryAction(testSourceDocId, testEntryId);
 
     const db = getTestDb();
     const deletedEntry = await db.query.ledgerEntries.findFirst({
@@ -72,8 +68,9 @@ describe("Ledger Entry Delete Action", () => {
       "11111111-1111-1111-1111-111111111111"
     );
 
-    const target = { sourceDocumentId: testSourceDocId, expectedVersion: 1 };
-    await expect(deleteLedgerEntryAction(target, testEntryId)).rejects.toThrow("Ledger not found");
+    await expect(deleteLedgerEntryAction(testSourceDocId, testEntryId)).rejects.toThrow(
+      "Ledger not found"
+    );
 
     const survivor = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, testEntryId),

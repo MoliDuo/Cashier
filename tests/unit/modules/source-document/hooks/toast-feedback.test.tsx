@@ -65,24 +65,13 @@ describe("source document mutation toast ownership", () => {
 
   it("reports list deletion success and failure exactly once", async () => {
     const clearSelection = vi.fn();
-    const { result } = renderHook(
-      () =>
-        useBatchSourceDocumentActions(
-          clearSelection,
-          undefined,
-          new Map([
-            ["document-1", 1],
-            ["document-2", 1],
-          ])
-        ),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useBatchSourceDocumentActions(clearSelection, undefined), {
+      wrapper: createWrapper(),
+    });
 
     deleteSourceDocumentActionMock.mockResolvedValueOnce({
-      ok: true,
       sourceDocumentId: "document-1",
-      version: 2,
-      data: { sourceDocumentId: "document-1", deleted: true },
+      deleted: true,
     });
     await act(async () => {
       await result.current.deleteSourceDocument.mutateAsync("document-1");
@@ -110,16 +99,13 @@ describe("source document mutation toast ownership", () => {
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     deleteSourceDocumentActionMock.mockResolvedValueOnce({
-      ok: true,
       sourceDocumentId: "document-1",
-      version: 2,
-      data: { sourceDocumentId: "document-1", deleted: true },
+      deleted: true,
     });
     const clearSelection = vi.fn();
-    const { result } = renderHook(
-      () => useBatchSourceDocumentActions(clearSelection, undefined, new Map([["document-1", 1]])),
-      { wrapper: createWrapper(queryClient) }
-    );
+    const { result } = renderHook(() => useBatchSourceDocumentActions(clearSelection, undefined), {
+      wrapper: createWrapper(queryClient),
+    });
 
     let mutation!: Promise<void>;
     const onCommitted = vi.fn();
@@ -149,15 +135,12 @@ describe("source document mutation toast ownership", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(queryClient, "invalidateQueries").mockRejectedValue(new Error("offline"));
     deleteSourceDocumentActionMock.mockResolvedValueOnce({
-      ok: true,
       sourceDocumentId: "document-1",
-      version: 2,
-      data: { sourceDocumentId: "document-1", deleted: true },
+      deleted: true,
     });
-    const { result } = renderHook(
-      () => useBatchSourceDocumentActions(vi.fn(), undefined, new Map([["document-1", 1]])),
-      { wrapper: createWrapper(queryClient) }
-    );
+    const { result } = renderHook(() => useBatchSourceDocumentActions(vi.fn(), undefined), {
+      wrapper: createWrapper(queryClient),
+    });
 
     await act(async () => {
       await result.current.deleteSourceDocument.mutateAsync("document-1");
@@ -170,27 +153,26 @@ describe("source document mutation toast ownership", () => {
     expect(toastErrorMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not clear selection or show success for stale atomic updates", async () => {
-    batchUpdateSourceDocumentsActionMock.mockResolvedValueOnce({
-      ok: false,
-      reason: "stale",
-      staleTargets: [{ sourceDocumentId: "document-1", expectedVersion: 1, currentVersion: 2 }],
-    });
+  it("does not clear selection or show success when a batch date update fails", async () => {
+    batchUpdateSourceDocumentsActionMock.mockRejectedValueOnce(new Error("not found"));
     const clearSelection = vi.fn();
-    const { result } = renderHook(
-      () => useBatchSourceDocumentActions(clearSelection, undefined, new Map([["document-1", 1]])),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useBatchSourceDocumentActions(clearSelection, undefined), {
+      wrapper: createWrapper(),
+    });
 
     await expect(
       result.current.batchUpdateDates.mutateAsync({
         ids: ["document-1"],
         entryDate: "2026-09-04",
       })
-    ).rejects.toMatchObject({ code: "SOURCE_DOCUMENT_STALE" });
+    ).rejects.toThrow("not found");
 
+    expect(batchUpdateSourceDocumentsActionMock).toHaveBeenCalledWith({
+      sourceDocumentIds: ["document-1"],
+      data: { documentDate: "2026-09-04" },
+    });
     expect(clearSelection).not.toHaveBeenCalled();
     expect(toastSuccessMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith("selectionChanged");
+    expect(toastErrorMock).toHaveBeenCalledWith("error");
   });
 });

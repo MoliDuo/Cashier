@@ -1,16 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { StaleSourceDocumentVersionError } from "@/lib/errors";
 import { sourceDocumentRevisions } from "@/persistence";
-
-export function assertExpectedSourceDocumentVersion(
-  sourceDocumentId: string,
-  expectedVersion: number,
-  actualVersion: number
-) {
-  if (actualVersion !== expectedVersion) {
-    throw new StaleSourceDocumentVersionError(sourceDocumentId, expectedVersion, actualVersion);
-  }
-}
 
 export function ledgerScopedRevisionWhere(
   ledgerId: string,

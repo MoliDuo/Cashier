@@ -184,8 +184,7 @@ describe("useDetailsBatchController", () => {
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     batchDeleteLedgerEntriesActionMock.mockResolvedValueOnce({
-      succeeded: [{ id: "entry-1", sourceDocumentId: "document-1", version: 2 }],
-      stale: [],
+      succeeded: [{ id: "entry-1", sourceDocumentId: "document-1" }],
       failed: [],
     });
     const { result } = renderHook(
@@ -218,9 +217,7 @@ describe("useDetailsBatchController", () => {
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     batchUpdateLedgerEntryDatesActionMock.mockResolvedValueOnce({
-      ok: true,
-      versions: [{ sourceDocumentId: "document-1", version: 2 }],
-      data: { impact: { affectedEntryCount: 1 } },
+      impact: { affectedEntryCount: 1 },
     });
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce({
       selectedEntryCount: 1,
@@ -259,9 +256,8 @@ describe("useDetailsBatchController", () => {
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
-      ok: true,
-      versions: [{ sourceDocumentId: "document-1", version: 2 }],
-      data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
+      ledgerEntryIds: ["entry-1"],
+      affectedCount: 1,
     });
     const { result } = renderHook(
       () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
@@ -293,9 +289,7 @@ describe("useDetailsBatchController", () => {
       sourceDocumentIds: ["document-1"],
     });
     batchUpdateLedgerEntryDatesActionMock.mockResolvedValueOnce({
-      ok: true,
-      versions: [{ sourceDocumentId: "document-1", version: 2 }],
-      data: { impact: { affectedEntryCount: 2 } },
+      impact: { affectedEntryCount: 2 },
     });
     const { result } = renderHook(
       () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
@@ -314,7 +308,7 @@ describe("useDetailsBatchController", () => {
       await result.current.updateDates.mutateAsync();
     });
     expect(batchUpdateLedgerEntryDatesActionMock).toHaveBeenCalledWith(
-      [{ sourceDocumentId: "document-1", expectedVersion: 1 }],
+      ["document-1"],
       ["entry-1", "entry-2"],
       result.current.selectedDate
     );
@@ -345,28 +339,24 @@ describe("useDetailsBatchController", () => {
     expect(batchUpdateLedgerEntryDatesActionMock).not.toHaveBeenCalled();
   });
 
-  it("keeps selection when an atomic batch update is stale", async () => {
+  it("keeps selection when a batch update fails", async () => {
     const { wrapper } = setup();
-    batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
-      ok: false,
-      reason: "stale",
-      staleTargets: [{ sourceDocumentId: "document-1", expectedVersion: 1, currentVersion: 2 }],
-    });
+    batchUpdateLedgerEntriesActionMock.mockRejectedValueOnce(new Error("Ledger entry not found"));
     const { result } = renderHook(
       () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
     );
     act(() => result.current.handleSelect("entry-1", true));
 
-    await expect(
-      result.current.update.mutateAsync({ categoryId: "category-1" })
-    ).rejects.toMatchObject({ code: "SOURCE_DOCUMENT_STALE" });
+    await expect(result.current.update.mutateAsync({ categoryId: "category-1" })).rejects.toThrow(
+      "Ledger entry not found"
+    );
 
     expect(result.current.selectedIds).toEqual(["entry-1"]);
     expect(toastErrorMock).toHaveBeenCalledWith("error");
   });
 
-  it("keeps the date dialog and selection when confirmation is stale", async () => {
+  it("keeps the date dialog and selection when confirmation fails", async () => {
     const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce({
       selectedEntryCount: 1,
@@ -374,11 +364,9 @@ describe("useDetailsBatchController", () => {
       affectedEntryCount: 1,
       sourceDocumentIds: ["document-1"],
     });
-    batchUpdateLedgerEntryDatesActionMock.mockResolvedValueOnce({
-      ok: false,
-      reason: "stale",
-      staleTargets: [{ sourceDocumentId: "document-1", expectedVersion: 1, currentVersion: 2 }],
-    });
+    batchUpdateLedgerEntryDatesActionMock.mockRejectedValueOnce(
+      new Error("Ledger entry not found")
+    );
     const { result } = renderHook(
       () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
       { wrapper }
@@ -387,9 +375,9 @@ describe("useDetailsBatchController", () => {
     act(() => result.current.openDateDialog());
     await act(async () => Promise.resolve());
 
-    await expect(result.current.updateDates.mutateAsync()).rejects.toMatchObject({
-      code: "SOURCE_DOCUMENT_STALE",
-    });
+    await expect(result.current.updateDates.mutateAsync()).rejects.toThrow(
+      "Ledger entry not found"
+    );
 
     expect(result.current.dateDialogOpen).toBe(true);
     expect(result.current.selectedIds).toEqual(["entry-1"]);
@@ -451,9 +439,8 @@ describe("useDetailsBatchController", () => {
   it("writes one picked category straight through instead of asking the model", async () => {
     const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
-      ok: true,
-      versions: [{ sourceDocumentId: "document-1", version: 2 }],
-      data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
+      ledgerEntryIds: ["entry-1"],
+      affectedCount: 1,
     });
     const { result } = renderHook(
       () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
@@ -478,9 +465,8 @@ describe("useDetailsBatchController", () => {
   it("takes the clear row as an answer, and drops the categories it excluded", async () => {
     const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
-      ok: true,
-      versions: [{ sourceDocumentId: "document-1", version: 2 }],
-      data: { ledgerEntryIds: ["entry-1"], affectedCount: 1 },
+      ledgerEntryIds: ["entry-1"],
+      affectedCount: 1,
     });
     const { result } = renderHook(
       () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
@@ -576,9 +562,8 @@ describe("useDetailsBatchController", () => {
     const { wrapper } = setup();
     const ids = Array.from({ length: 100 }, (_, index) => `entry-${index}`);
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
-      ok: true,
-      versions: [{ sourceDocumentId: "document-1", version: 2 }],
-      data: { ledgerEntryIds: ids, affectedCount: 100 },
+      ledgerEntryIds: ids,
+      affectedCount: 100,
     });
     const { result } = renderHook(
       () =>

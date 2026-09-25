@@ -11,7 +11,7 @@ import {
 } from "../../helpers/schema-setup";
 import { getTestDb } from "../../setup";
 
-describe("SourceDocument delete CAS", () => {
+describe("SourceDocument delete idempotency", () => {
   let ledgerId: string;
 
   beforeEach(async () => {
@@ -35,28 +35,26 @@ describe("SourceDocument delete CAS", () => {
     return document;
   }
 
-  it("deletes once and increments the document version once", async () => {
+  it("deletes once without bumping the document version", async () => {
     const document = await createDocument();
-    await expect(deleteSourceDocumentAction(document.id, 1)).resolves.toEqual({
-      ok: true,
+    await expect(deleteSourceDocumentAction(document.id)).resolves.toEqual({
       sourceDocumentId: document.id,
-      version: 2,
-      data: { sourceDocumentId: document.id, deleted: true },
+      deleted: true,
     });
     const deleted = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });
     expect(deleted?.deletedAt).not.toBeNull();
-    expect(deleted?.version).toBe(2);
+    expect(deleted?.version).toBe(document.version);
   });
 
   it("does not durably replay a lost delete response", async () => {
     const document = await createDocument();
-    await deleteSourceDocumentAction(document.id, 1);
-    await expect(deleteSourceDocumentAction(document.id, 1)).rejects.toThrow(NotFoundError);
+    await deleteSourceDocumentAction(document.id);
+    await expect(deleteSourceDocumentAction(document.id)).rejects.toThrow(NotFoundError);
     const deleted = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });
-    expect(deleted?.version).toBe(2);
+    expect(deleted?.version).toBe(document.version);
   });
 });

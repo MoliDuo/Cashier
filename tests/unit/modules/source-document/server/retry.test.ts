@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NotFoundError, StaleSourceDocumentVersionError } from "@/lib/errors";
+import { NotFoundError } from "@/lib/errors";
 
 const { submit, scheduleProcessing } = vi.hoisted(() => ({
   submit: vi.fn(),
@@ -37,25 +37,8 @@ describe("retrySourceDocument", () => {
   it("propagates missing-document failures without dispatch", async () => {
     submit.mockRejectedValueOnce(new NotFoundError("Source document"));
     await expect(
-      retrySourceDocument({ ledgerId: ledger.id, sourceDocumentId: "missing", expectedVersion: 1 })
+      retrySourceDocument({ ledgerId: ledger.id, sourceDocumentId: "missing" })
     ).rejects.toThrow(NotFoundError);
-    expect(scheduleProcessing).not.toHaveBeenCalled();
-  });
-
-  it("reports a stale version instead of dispatching", async () => {
-    submit.mockRejectedValueOnce(new StaleSourceDocumentVersionError("doc-1", 1, 2));
-    const result = await retrySourceDocument({
-      ledgerId: ledger.id,
-      sourceDocumentId: "doc-1",
-      expectedVersion: 1,
-    });
-    expect(result).toEqual({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: "doc-1",
-      expectedVersion: 1,
-      currentVersion: 2,
-    });
     expect(scheduleProcessing).not.toHaveBeenCalled();
   });
 
@@ -63,12 +46,10 @@ describe("retrySourceDocument", () => {
     const result = await retrySourceDocument({
       ledgerId: ledger.id,
       sourceDocumentId: "doc-1",
-      expectedVersion: 1,
     });
     expect(submit).toHaveBeenCalledWith({
       ledgerId: ledger.id,
       sourceDocumentId: "doc-1",
-      expectedVersion: 1,
       inheritInput: true,
       supersedeProcessing: true,
     });
@@ -77,19 +58,13 @@ describe("retrySourceDocument", () => {
     expect(submit.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleProcessing.mock.invocationCallOrder[0]!
     );
-    expect(result).toEqual({
-      ok: true,
-      sourceDocumentId: "doc-1",
-      version: 2,
-      data: { status: "processing" },
-    });
+    expect(result).toEqual({ status: "processing" });
   });
 
   it("creates immutable edit-retry evidence from finalized file identities", async () => {
     await retrySourceDocument({
       ledgerId: ledger.id,
       sourceDocumentId: "doc-1",
-      expectedVersion: 1,
       input: {
         text: "corrected",
         documentDate: "2026-07-16",
@@ -99,7 +74,6 @@ describe("retrySourceDocument", () => {
     expect(submit).toHaveBeenCalledWith({
       ledgerId: ledger.id,
       sourceDocumentId: "doc-1",
-      expectedVersion: 1,
       inheritInput: false,
       supersedeProcessing: true,
       input: {

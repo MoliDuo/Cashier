@@ -82,7 +82,7 @@ interface SourceDocumentDetailModalProps {
   onCancelProcessing?: () => Promise<void>;
   isCancelling?: boolean;
   onApplyDateOrganization?: (
-    input: Omit<ApplyDateOrganizationInput, "sourceDocumentId" | "expectedVersion">
+    input: Omit<ApplyDateOrganizationInput, "sourceDocumentId">
   ) => Promise<ApplyDateOrganizationResultDto>;
   onDismissDateOrganization?: (suggestionId: string) => Promise<unknown>;
   isOrganizingDates?: boolean;

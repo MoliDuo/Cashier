@@ -1,13 +1,10 @@
 "use server";
 
 import { deleteSourceDocumentAtomically } from "../server/delete";
-import type {
-  PartialBatchCommandResult,
-  VersionedTarget,
-} from "@/modules/source-document/contracts";
+import type { PartialBatchCommandResult } from "@/modules/source-document/contracts";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { parseVersionedTargets } from "@/modules/source-document/contract-schemas";
+import { parseSourceDocumentTargetIds } from "@/modules/source-document/contract-schemas";
 import { retrySourceDocument } from "../server/retry";
 import { withSourceDocumentLedgerAccess } from "./access";
 
@@ -46,41 +43,22 @@ function logBatchFailure(operation: "delete" | "retry", error: unknown, code: st
   );
 }
 
-/** What one item of a versioned batch came back as, once it did not throw. */
-type VersionedBatchOutcome =
-  | { status: "succeeded"; version: number }
-  | { status: "stale"; expectedVersion: number; currentVersion: number };
-
 /**
  * Runs one batch item at a time, keeping the order it was given, and reports
- * each one as succeeded, stale, or failed under a stable code. Both batch
- * actions differ only in the item they run, so the classification, logging and
+ * each one as succeeded or failed under a stable code. Both batch actions
+ * differ only in the item they run, so the classification, logging and
  * partial-success shape live here rather than twice over.
  */
-async function runVersionedBatch(
+async function runBatch(
   operation: "delete" | "retry",
-  targets: VersionedTarget[],
-  run: (target: VersionedTarget) => Promise<VersionedBatchOutcome>
+  sourceDocumentIds: string[],
+  run: (sourceDocumentId: string) => Promise<unknown>
 ): Promise<PartialBatchCommandResult> {
-  const result: PartialBatchCommandResult = {
-    succeeded: [],
-    stale: [],
-    failed: [],
-  };
-  for (const target of targets) {
-    const id = target.sourceDocumentId;
+  const result: PartialBatchCommandResult = { succeeded: [], failed: [] };
+  for (const id of sourceDocumentIds) {
     try {
-      const outcome = await run(target);
-      if (outcome.status === "succeeded") {
-        result.succeeded.push({ id, sourceDocumentId: id, version: outcome.version });
-      } else {
-        result.stale.push({
-          id,
-          sourceDocumentId: id,
-          expectedVersion: outcome.expectedVersion,
-          currentVersion: outcome.currentVersion,
-        });
-      }
+      await run(id);
+      result.succeeded.push({ id, sourceDocumentId: id });
     } catch (error) {
       const code = stableBatchFailureCode(error);
       logBatchFailure(operation, error, code);
@@ -91,36 +69,15 @@ async function runVersionedBatch(
 }
 
 export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> =>
-    runVersionedBatch("delete", parseVersionedTargets(inputTargets), async (target) => {
-      const deleted = await deleteSourceDocumentAtomically({
-        ledgerId,
-        target,
-      });
-      return deleted.ok
-        ? { status: "succeeded", version: deleted.version }
-        : {
-            status: "stale",
-            expectedVersion: deleted.expectedVersion,
-            currentVersion: deleted.currentVersion,
-          };
-    })
+  async ({ ledgerId }, sourceDocumentIds: string[]): Promise<PartialBatchCommandResult> =>
+    runBatch("delete", parseSourceDocumentTargetIds(sourceDocumentIds), (sourceDocumentId) =>
+      deleteSourceDocumentAtomically({ ledgerId, sourceDocumentId })
+    )
 );
 
 export const batchRetrySourceDocumentsAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, inputTargets: VersionedTarget[]): Promise<PartialBatchCommandResult> =>
-    runVersionedBatch("retry", parseVersionedTargets(inputTargets), async (target) => {
-      const retried = await retrySourceDocument({
-        ledgerId,
-        sourceDocumentId: target.sourceDocumentId,
-        expectedVersion: target.expectedVersion,
-      });
-      return retried.ok
-        ? { status: "succeeded", version: retried.version }
-        : {
-            status: "stale",
-            expectedVersion: retried.expectedVersion,
-            currentVersion: retried.currentVersion,
-          };
-    })
+  async ({ ledgerId }, sourceDocumentIds: string[]): Promise<PartialBatchCommandResult> =>
+    runBatch("retry", parseSourceDocumentTargetIds(sourceDocumentIds), (sourceDocumentId) =>
+      retrySourceDocument({ ledgerId, sourceDocumentId })
+    )
 );

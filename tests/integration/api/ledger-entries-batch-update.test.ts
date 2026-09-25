@@ -62,15 +62,10 @@ describe("Batch Update Ledger Entries Action", () => {
   });
 
   it("should batch update category and currency", async () => {
-    // batchUpdateLedgerEntriesAction returns void in new format
-    await batchUpdateLedgerEntriesAction(
-      [{ sourceDocumentId: testSourceDocId, expectedVersion: 1 }],
-      testEntryIds,
-      {
-        categoryId: testCategoryId,
-        currency: "USD",
-      }
-    );
+    await batchUpdateLedgerEntriesAction([testSourceDocId], testEntryIds, {
+      categoryId: testCategoryId,
+      currency: "USD",
+    });
 
     // Verify in DB
     const db = getTestDb();
@@ -87,11 +82,7 @@ describe("Batch Update Ledger Entries Action", () => {
   });
 
   it("normalizes a cleared currency to the ledger main currency", async () => {
-    await batchUpdateLedgerEntriesAction(
-      [{ sourceDocumentId: testSourceDocId, expectedVersion: 1 }],
-      testEntryIds,
-      { currency: null }
-    );
+    await batchUpdateLedgerEntriesAction([testSourceDocId], testEntryIds, { currency: null });
 
     const updatedEntries = await getTestDb()
       .select()
@@ -105,14 +96,9 @@ describe("Batch Update Ledger Entries Action", () => {
   it("should batch update description", async () => {
     const newDescription = "Batch updated description";
 
-    // batchUpdateLedgerEntriesAction returns void in new format
-    await batchUpdateLedgerEntriesAction(
-      [{ sourceDocumentId: testSourceDocId, expectedVersion: 1 }],
-      testEntryIds,
-      {
-        description: newDescription,
-      }
-    );
+    await batchUpdateLedgerEntriesAction([testSourceDocId], testEntryIds, {
+      description: newDescription,
+    });
 
     // Verify in DB
     const db = getTestDb();

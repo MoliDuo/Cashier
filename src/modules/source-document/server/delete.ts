@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   ledgerEntries,
   processingOutbox,
@@ -7,7 +7,6 @@ import {
 } from "@/persistence";
 import { NotFoundError } from "@/lib/errors";
 import { db } from "@/lib/db";
-import type { VersionedCommandResult, VersionedTarget } from "@/modules/source-document/contracts";
 import type { DeleteSourceDocumentResultDto } from "@/modules/source-document/contracts";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
@@ -49,11 +48,7 @@ async function softDeleteLockedSourceDocument(
     );
   const deleted = await tx
     .update(sourceDocuments)
-    .set({
-      deletedAt: now,
-      version: sql`${sourceDocuments.version} + 1`,
-      updatedAt: now,
-    })
+    .set({ deletedAt: now, updatedAt: now })
     .where(
       and(
         eq(sourceDocuments.ledgerId, ledgerId),
@@ -78,31 +73,13 @@ async function softDeleteLockedSourceDocument(
 
 export async function deleteSourceDocumentAtomically(input: {
   ledgerId: string;
-  target: VersionedTarget;
-}): Promise<VersionedCommandResult<DeleteSourceDocumentResultDto>> {
+  sourceDocumentId: string;
+}): Promise<DeleteSourceDocumentResultDto> {
   return db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, input.ledgerId);
-    const document = await lockSourceDocumentForUpdate(
-      tx,
-      input.ledgerId,
-      input.target.sourceDocumentId
-    );
-    if (document.version !== input.target.expectedVersion) {
-      return {
-        ok: false,
-        reason: "stale",
-        sourceDocumentId: input.target.sourceDocumentId,
-        expectedVersion: input.target.expectedVersion,
-        currentVersion: document.version,
-      };
-    }
+    const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
     const deleted = await softDeleteLockedSourceDocument(tx, input.ledgerId, document);
     if (!deleted) throw new NotFoundError("Source document");
-    return {
-      ok: true,
-      sourceDocumentId: input.target.sourceDocumentId,
-      version: input.target.expectedVersion + 1,
-      data: { sourceDocumentId: input.target.sourceDocumentId, deleted: true },
-    };
+    return { sourceDocumentId: input.sourceDocumentId, deleted: true };
   });
 }

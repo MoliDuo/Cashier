@@ -19,9 +19,7 @@ interface Props {
   entries: LedgerEntryEmbeddedViewDto[];
   mainCurrency?: string;
   disabled: boolean;
-  onApply: (
-    input: Omit<ApplyDateOrganizationInput, "sourceDocumentId" | "expectedVersion">
-  ) => Promise<unknown>;
+  onApply: (input: Omit<ApplyDateOrganizationInput, "sourceDocumentId">) => Promise<unknown>;
   onDismiss: (suggestionId: string) => Promise<unknown>;
   onAdjustmentStateChange?: (active: boolean, dirty: boolean) => void;
   /** Ledger timezone, so 今天/昨天 match the dates the ledger stream groups by. */

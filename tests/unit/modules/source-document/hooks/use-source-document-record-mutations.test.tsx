@@ -20,14 +20,8 @@ vi.mock("@/modules/source-document/server-actions/delete", () => ({
 import { useSourceDocumentRecordMutations } from "@/modules/source-document/hooks/useSourceDocumentRecordMutations";
 
 describe("useSourceDocumentRecordMutations", () => {
-  it("keeps the detail open when delete is stale", async () => {
-    deleteSourceDocumentActionMock.mockResolvedValue({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: "document-1",
-      expectedVersion: 1,
-      currentVersion: 2,
-    });
+  it("keeps the detail open when delete fails", async () => {
+    deleteSourceDocumentActionMock.mockRejectedValue(new Error("Source document not found"));
     const client = new QueryClient({
       defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
     });
@@ -39,18 +33,17 @@ describe("useSourceDocumentRecordMutations", () => {
       () =>
         useSourceDocumentRecordMutations({
           id: "document-1",
-          version: 1,
           onClose,
         }),
       { wrapper }
     );
 
-    await expect(result.current.deleteDocumentMutation.mutateAsync()).rejects.toMatchObject({
-      code: "SOURCE_DOCUMENT_STALE",
-    });
+    await expect(result.current.deleteDocumentMutation.mutateAsync()).rejects.toThrow(
+      "Source document not found"
+    );
+    expect(deleteSourceDocumentActionMock).toHaveBeenCalledWith("document-1");
     expect(onClose).not.toHaveBeenCalled();
     expect(toastSuccessMock).not.toHaveBeenCalled();
-    // Stale is distinct from a genuine delete failure.
-    expect(toastErrorMock).toHaveBeenCalledWith("actionContextChanged");
+    expect(toastErrorMock).toHaveBeenCalledWith("deleteFailed");
   });
 });

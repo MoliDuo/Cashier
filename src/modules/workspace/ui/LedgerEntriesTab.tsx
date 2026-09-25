@@ -149,7 +149,7 @@ export function LedgerEntriesTab({
             ids: selection.selectedIds,
             onCommitted,
           });
-          return result.stale.length + result.failed.length === 0;
+          return result.failed.length === 0;
         }}
         isRetrying={selection.batchRetry.isPending}
         isDeleting={selection.batchDelete.isPending}

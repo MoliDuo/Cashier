@@ -59,17 +59,11 @@ describe("ledger server-action validation", () => {
 
   it("createLedgerEntryAction rejects invalid sourceDocumentId with ValidationError", async () => {
     await expect(
-      createLedgerEntryAction(
-        {
-          sourceDocumentId: "bad-id",
-          expectedVersion: 1,
-        } as never,
-        {
-          amount: 1,
-          itemName: "x",
-          sourceDocumentId: "bad-id",
-        } as never
-      )
+      createLedgerEntryAction({
+        amount: 1,
+        itemName: "x",
+        sourceDocumentId: "bad-id",
+      } as never)
     ).rejects.toBeInstanceOf(ValidationError);
   });
 

@@ -25,11 +25,10 @@ export interface CreateSourceDocumentResponseDto {
   status: "processing";
 }
 
-export interface VersionedTarget {
-  sourceDocumentId: string;
-  expectedVersion: number;
-}
-
+/**
+ * The whole-document save's result: it commits only against the version the
+ * draft was loaded at, so a draft another writer overtook comes back stale.
+ */
 export type VersionedCommandResult<T> =
   | { ok: true; sourceDocumentId: string; version: number; data: T }
   | {
@@ -41,39 +40,14 @@ export type VersionedCommandResult<T> =
     };
 
 /**
- * Transaction semantics: one atomic transaction covers every target. If any
- * target's `version` no longer matches its `expectedVersion`, the whole
- * command rolls back with zero writes — `staleTargets` lists every mismatched
- * target, not just the first. On success, every target advanced together in
- * that same transaction.
- */
-export type AtomicBatchCommandResult<T> =
-  | { ok: true; versions: Array<{ sourceDocumentId: string; version: number }>; data: T }
-  | {
-      ok: false;
-      reason: "stale";
-      staleTargets: Array<{
-        sourceDocumentId: string;
-        expectedVersion: number;
-        currentVersion: number;
-      }>;
-    };
-
-/**
  * Transaction semantics: one transaction per document, not one for the whole
  * batch. Entries belonging to the same document either all succeed or all
- * roll back together (that document lands in exactly one of `succeeded`,
- * `stale`, or `failed`), but different documents commit independently — one
- * document's stale version or failure never blocks or rolls back another's.
+ * roll back together (that document lands in exactly one of `succeeded` or
+ * `failed`), but different documents commit independently — one document's
+ * failure never blocks or rolls back another's.
  */
 export interface PartialBatchCommandResult<TId extends string = string> {
-  succeeded: Array<{ id: TId; sourceDocumentId: string; version: number }>;
-  stale: Array<{
-    id: TId;
-    sourceDocumentId: string;
-    expectedVersion: number;
-    currentVersion: number;
-  }>;
+  succeeded: Array<{ id: TId; sourceDocumentId: string }>;
   failed: Array<{ id: TId; code: string }>;
 }
 

@@ -1,7 +1,6 @@
 "use server";
 import type {
   BatchUpdateSourceDocumentsResultDto,
-  AtomicBatchCommandResult,
   SaveSourceDocumentChangesInput,
   SaveSourceDocumentChangesResultDto,
   VersionedCommandResult,
@@ -20,14 +19,14 @@ export const batchUpdateSourceDocumentsAction = withSourceDocumentLedgerAccess(
   async (
     { ledgerId },
     input: {
-      targets: import("../contracts").VersionedTarget[];
+      sourceDocumentIds: string[];
       data: BatchUpdateSourceDocumentsInput;
     }
-  ): Promise<AtomicBatchCommandResult<BatchUpdateSourceDocumentsResultDto>> => {
+  ): Promise<BatchUpdateSourceDocumentsResultDto> => {
     const validated = batchUpdateSourceDocumentsInputSchema.parse(input);
     return updateSourceDocuments({
       ledgerId,
-      targets: validated.targets,
+      sourceDocumentIds: validated.sourceDocumentIds,
       data: validated.data,
     });
   }

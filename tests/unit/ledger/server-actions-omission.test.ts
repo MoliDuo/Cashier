@@ -61,17 +61,11 @@ describe("ledger server action omission semantics", () => {
   });
 
   it("omits absent optional create-entry fields", async () => {
-    await createLedgerEntryAction(
-      {
-        sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",
-        expectedVersion: 1,
-      },
-      {
-        amount: "12.5",
-        itemName: "Lunch",
-        sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",
-      }
-    );
+    await createLedgerEntryAction({
+      amount: "12.5",
+      itemName: "Lunch",
+      sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",
+    });
 
     const payload = createLedgerEntryWithConversionMock.mock.calls[0]?.[0] as Record<
       string,
@@ -79,6 +73,7 @@ describe("ledger server action omission semantics", () => {
     >;
 
     expect(payload.ledgerId).toBe("ledger-1");
+    expect(payload.sourceDocumentId).toBe("123e4567-e89b-42d3-a456-426614174000");
     expect(payload.amount).toBe("12.5");
     expect(payload.itemName).toBe("Lunch");
     expect(Object.prototype.hasOwnProperty.call(payload, "currency")).toBe(false);
@@ -88,12 +83,7 @@ describe("ledger server action omission semantics", () => {
 
   it("omits absent optional batch-update fields", async () => {
     await batchUpdateLedgerEntriesAction(
-      [
-        {
-          sourceDocumentId: "123e4567-e89b-42d3-a456-426614174000",
-          expectedVersion: 1,
-        },
-      ],
+      ["123e4567-e89b-42d3-a456-426614174000"],
       ["123e4567-e89b-42d3-a456-426614174002"],
       { amount: "9.99" }
     );
@@ -101,6 +91,7 @@ describe("ledger server action omission semantics", () => {
     const payload = batchUpdateLedgerEntriesMock.mock.calls[0]?.[0] as Record<string, unknown>;
 
     expect(payload.ledgerId).toBe("ledger-1");
+    expect(payload.sourceDocumentIds).toEqual(["123e4567-e89b-42d3-a456-426614174000"]);
     expect(payload.ledgerEntryIds).toEqual(["123e4567-e89b-42d3-a456-426614174002"]);
     expect(payload.amount).toBe("9.99");
     expect(Object.prototype.hasOwnProperty.call(payload, "categoryId")).toBe(false);

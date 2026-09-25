@@ -44,7 +44,7 @@ interface SourceDocumentViewDetailsProps {
   onDeleteEntry?: (entryId: string) => void;
   onRequestEdit?: () => void;
   onApplyDateOrganization?: (
-    input: Omit<ApplyDateOrganizationInput, "sourceDocumentId" | "expectedVersion">
+    input: Omit<ApplyDateOrganizationInput, "sourceDocumentId">
   ) => Promise<unknown>;
   onDismissDateOrganization?: (suggestionId: string) => Promise<unknown>;
   isOrganizingDates?: boolean;

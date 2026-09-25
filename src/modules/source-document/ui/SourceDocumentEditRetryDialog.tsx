@@ -138,7 +138,6 @@ function EditRetryDialogContent({
               <SourceDocumentInput
                 mode="retry"
                 sourceDocumentId={sourceDocument.id}
-                sourceDocumentVersion={sourceDocument.version}
                 initialData={initialData}
                 onPendingChange={handlePendingChange}
                 onDirtyChange={setIsDirty}

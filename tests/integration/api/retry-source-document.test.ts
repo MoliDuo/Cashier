@@ -70,17 +70,12 @@ describe("source-document retry action", () => {
         ],
       }) as unknown as ReturnType<typeof getOpenAIClient>
     );
-    const retried = await editRetrySourceDocumentAction(
-      created.sourceDocumentId,
-      { text: "晚餐 50元", storedFileIds: [], documentDate: null },
-      before!.version
-    );
-    expect(retried).toEqual({
-      ok: true,
-      sourceDocumentId: created.sourceDocumentId,
-      version: before!.version + 1,
-      data: { status: "processing" },
+    const retried = await editRetrySourceDocumentAction(created.sourceDocumentId, {
+      text: "晚餐 50元",
+      storedFileIds: [],
+      documentDate: null,
     });
+    expect(retried).toEqual({ status: "processing" });
     await processAllPendingTasks();
 
     const after = await db.query.sourceDocuments.findFirst({
@@ -112,20 +107,12 @@ describe("source-document retry action", () => {
   });
 
   it("rejects raw image payloads that bypass upload finalization", async () => {
-    const db = getTestDb();
     const created = await createDocument("Lunch 25");
     await processAllPendingTasks();
-    const before = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
     await expect(
-      editRetrySourceDocumentAction(
-        created.sourceDocumentId,
-        {
-          images: [{ data: "/api/uploads/private.jpg", mimeType: "image/jpeg" }],
-        } as never,
-        before!.version
-      )
+      editRetrySourceDocumentAction(created.sourceDocumentId, {
+        images: [{ data: "/api/uploads/private.jpg", mimeType: "image/jpeg" }],
+      } as never)
     ).rejects.toThrow(ZodError);
   });
 
@@ -147,11 +134,11 @@ describe("source-document retry action", () => {
       generateContent: vi.fn().mockRejectedValue(new Error("AI service failure")),
     } as unknown as ReturnType<typeof getOpenAIClient>);
 
-    await editRetrySourceDocumentAction(
-      created.sourceDocumentId,
-      { text: "修改 50元", storedFileIds: [], documentDate: null },
-      before!.version
-    );
+    await editRetrySourceDocumentAction(created.sourceDocumentId, {
+      text: "修改 50元",
+      storedFileIds: [],
+      documentDate: null,
+    });
     await processAllPendingTasks();
 
     // Step 3: Verify the previous active revision is preserved despite the failed retry
@@ -159,6 +146,8 @@ describe("source-document retry action", () => {
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
     expect(afterFail?.activeRevisionId).toBe(originalActiveRevisionId);
+    // Neither the retry submission nor the recorded failure changes saveable content.
+    expect(afterFail?.version).toBe(before!.version);
 
     const revisions1 = await db.query.sourceDocumentRevisions.findMany({
       where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
@@ -184,12 +173,12 @@ describe("source-document retry action", () => {
       }) as unknown as ReturnType<typeof getOpenAIClient>
     );
 
-    const retried = await editRetrySourceDocumentAction(
-      created.sourceDocumentId,
-      { text: "晚餐 50元", storedFileIds: [], documentDate: null },
-      afterFail!.version
-    );
-    expect(retried).toMatchObject({ ok: true, data: { status: "processing" } });
+    const retried = await editRetrySourceDocumentAction(created.sourceDocumentId, {
+      text: "晚餐 50元",
+      storedFileIds: [],
+      documentDate: null,
+    });
+    expect(retried).toEqual({ status: "processing" });
     await processAllPendingTasks();
 
     // Step 5: Verify final state: the successful retry replaces the active result.

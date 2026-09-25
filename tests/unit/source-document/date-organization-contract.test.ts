@@ -9,7 +9,6 @@ const ENTRY_TWO_ID = "44444444-4444-4444-8444-444444444444";
 function validInput() {
   return {
     sourceDocumentId: SOURCE_DOCUMENT_ID,
-    expectedVersion: 1,
     suggestionId: SUGGESTION_ID,
     groups: [
       { id: "retain", entryDate: null, ledgerEntryIds: [ENTRY_ONE_ID] },

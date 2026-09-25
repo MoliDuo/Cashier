@@ -19,7 +19,7 @@ describe("SourceDocument delete concurrency", () => {
     ({ ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID));
   });
 
-  it("allows only one same-version delete to commit", async () => {
+  it("allows only one concurrent delete to commit", async () => {
     const db = getTestDb();
     const [document] = await db
       .insert(sourceDocuments)
@@ -32,14 +32,15 @@ describe("SourceDocument delete concurrency", () => {
     if (document == null) throw new Error("Expected source document");
     await activateTestSourceDocumentProjection(db, document.id);
     const results = await Promise.allSettled([
-      deleteSourceDocumentAction(document.id, 1),
-      deleteSourceDocumentAction(document.id, 1),
+      deleteSourceDocumentAction(document.id),
+      deleteSourceDocumentAction(document.id),
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
     const deleted = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, document.id),
     });
-    expect(deleted?.version).toBe(2);
+    expect(deleted?.deletedAt).not.toBeNull();
+    expect(deleted?.version).toBe(document.version);
   });
 });

@@ -37,15 +37,10 @@ describe("source-document delete tolerance", () => {
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
-    await expect(
-      deleteSourceDocumentAction(document!.id, document!.version)
-    ).resolves.toMatchObject({
-      ok: true,
+    await expect(deleteSourceDocumentAction(document!.id)).resolves.toEqual({
       sourceDocumentId: document!.id,
-      data: { deleted: true },
+      deleted: true,
     });
-    await expect(deleteSourceDocumentAction(document!.id, document!.version)).rejects.toThrow(
-      NotFoundError
-    );
+    await expect(deleteSourceDocumentAction(document!.id)).rejects.toThrow(NotFoundError);
   });
 });

@@ -17,12 +17,9 @@ describe("cancel source-document processing", () => {
       bookId: await testBookId(db, ledgerId),
     });
 
-    await expect(
-      cancelSourceDocumentProcessing(ledgerId, submission.document.id, submission.document.version)
-    ).resolves.toMatchObject({
-      processingStatus: "cancelled",
-      version: submission.document.version + 1,
-    });
+    await expect(cancelSourceDocumentProcessing(ledgerId, submission.document.id)).resolves.toEqual(
+      { processingStatus: "cancelled" }
+    );
 
     const [document, revision, outbox] = await Promise.all([
       db.query.sourceDocuments.findFirst({
@@ -36,6 +33,7 @@ describe("cancel source-document processing", () => {
       }),
     ]);
     expect(document?.latestSubmissionRevisionId).toBe(submission.revision.id);
+    expect(document?.version).toBe(submission.document.version);
     expect(revision).toMatchObject({
       processingStatus: "cancelled",
       inputText: "Lunch 12 CNY",
@@ -60,19 +58,15 @@ describe("cancel source-document processing", () => {
       ],
       bookId: await testBookId(db, ledgerId),
     });
-    const before = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, active.sourceDocumentId),
-    });
     const retry = await submitSourceDocument({
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
-      expectedVersion: before!.version,
       supersedeProcessing: true,
       input: { text: "Replacement", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
 
-    await cancelSourceDocumentProcessing(ledgerId, active.sourceDocumentId, retry.document.version);
+    await cancelSourceDocumentProcessing(ledgerId, active.sourceDocumentId);
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, active.sourceDocumentId),
     });

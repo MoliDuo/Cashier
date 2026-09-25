@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import "server-only";
 import type {
   RevisionFailureKind,
@@ -218,7 +218,6 @@ export async function createProcessingRevisionInTransaction(
     .update(sourceDocuments)
     .set({
       latestSubmissionRevisionId: revision.id,
-      ...(existingDocument == null ? {} : { version: sql`${sourceDocuments.version} + 1` }),
       updatedAt: new Date(),
     })
     .where(activeDocumentWhere(input.ledgerId, sourceDocumentId))
@@ -302,10 +301,7 @@ export async function recordProcessingFailure(
     if (updated.length === 0) return false;
     await tx
       .update(sourceDocuments)
-      .set({
-        version: sql`${sourceDocuments.version} + 1`,
-        updatedAt: new Date(),
-      })
+      .set({ updatedAt: new Date() })
       .where(
         and(
           activeDocumentWhere(input.ledgerId, input.sourceDocumentId),

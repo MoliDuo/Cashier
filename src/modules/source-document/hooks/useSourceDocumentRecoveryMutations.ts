@@ -3,12 +3,10 @@
 import { useCallback, useRef } from "react";
 import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/server-actions/processing";
 import { useTranslations } from "next-intl";
-import { useVersionedSourceDocumentMutation } from "./useVersionedSourceDocumentMutation";
+import { useSourceDocumentCommandMutation } from "./useSourceDocumentCommandMutation";
 
 interface UseSourceDocumentRecoveryMutationsOptions {
   sourceDocumentId: string;
-  /** Read fresh at submission time — never captured ahead of the actual click. */
-  version: number | null;
   onSuccess?: () => void;
 }
 
@@ -18,15 +16,13 @@ interface UseSourceDocumentRecoveryMutationsOptions {
  */
 export function useSourceDocumentRecoveryMutations({
   sourceDocumentId,
-  version,
   onSuccess,
 }: UseSourceDocumentRecoveryMutationsOptions) {
   const actionLockRef = useRef(false);
   const tActions = useTranslations("SourceDocumentAction");
 
-  const cancelMutation = useVersionedSourceDocumentMutation({
+  const cancelMutation = useSourceDocumentCommandMutation({
     sourceDocumentId,
-    expectedVersion: version,
     action: cancelSourceDocumentProcessingAction,
     successMessage: tActions("cancelSuccess"),
     errorMessage: tActions("cancelError"),

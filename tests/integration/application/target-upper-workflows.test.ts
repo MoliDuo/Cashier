@@ -169,9 +169,9 @@ describe("target upper workflows", () => {
     await expect(
       deleteSourceDocumentAtomically({
         ledgerId,
-        target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 3 },
+        sourceDocumentId: created.sourceDocumentId,
       })
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ deleted: true });
     await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
     await expect(findVisibleEntry(activeEntry!.id, ledgerId)).resolves.toBeNull();
   });
@@ -367,7 +367,7 @@ describe("target upper workflows", () => {
 
     const updated = await batchUpdateLedgerEntries({
       ledgerId,
-      targets: [{ sourceDocumentId: created.sourceDocumentId, expectedVersion: initialVersion }],
+      sourceDocumentIds: [created.sourceDocumentId],
       ledgerEntryIds: [original!.id],
       amount: "18",
     });
@@ -387,7 +387,7 @@ describe("target upper workflows", () => {
       ),
     });
 
-    expect(updated).toMatchObject({ ok: true, data: { ledgerEntryIds: [original!.id] } });
+    expect(updated).toMatchObject({ ledgerEntryIds: [original!.id] });
     expect(document?.activeRevisionId).toBe(created.revisionId);
     expect(document?.version).toBe(initialVersion + 1);
     expect(revisions).toHaveLength(1);
@@ -428,10 +428,9 @@ describe("target upper workflows", () => {
       ),
     });
 
-    const versionBeforeUpdate = await currentVersion(pending.document.id);
     await batchUpdateLedgerEntries({
       ledgerId,
-      targets: [{ sourceDocumentId: pending.document.id, expectedVersion: versionBeforeUpdate }],
+      sourceDocumentIds: [pending.document.id],
       ledgerEntryIds: [original!.id],
       amount: "18",
     });
@@ -449,12 +448,7 @@ describe("target upper workflows", () => {
     await expect(
       batchUpdateLedgerEntries({
         ledgerId,
-        targets: [
-          {
-            sourceDocumentId: pending.document.id,
-            expectedVersion: afterUpdate!.version,
-          },
-        ],
+        sourceDocumentIds: [pending.document.id],
         ledgerEntryIds: [original!.id],
         categoryId: otherCategory!.id,
       })
@@ -467,12 +461,7 @@ describe("target upper workflows", () => {
     await expect(
       batchUpdateLedgerEntries({
         ledgerId: otherLedgerId,
-        targets: [
-          {
-            sourceDocumentId: pending.document.id,
-            expectedVersion: afterUpdate!.version,
-          },
-        ],
+        sourceDocumentIds: [pending.document.id],
         ledgerEntryIds: [original!.id],
         amount: "99",
       })
@@ -481,17 +470,10 @@ describe("target upper workflows", () => {
     await expect(
       deleteLedgerEntry({
         ledgerId,
-        target: {
-          sourceDocumentId: pending.document.id,
-          expectedVersion: afterUpdate!.version,
-        },
+        sourceDocumentId: pending.document.id,
         ledgerEntryId: original!.id,
       })
-    ).resolves.toMatchObject({
-      ok: true,
-      sourceDocumentId: pending.document.id,
-      data: { ledgerEntryId: original!.id, deleted: true },
-    });
+    ).resolves.toEqual({ ledgerEntryId: original!.id, deleted: true });
     await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
     await expect(findVisibleEntry(original!.id, ledgerId)).resolves.toBeNull();
     await expect(calculateLedgerStats(ledgerId, {})).resolves.toMatchObject({

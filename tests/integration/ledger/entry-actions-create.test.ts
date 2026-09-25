@@ -9,7 +9,7 @@ import {
   ensureTestLedgerBooks,
 } from "../../helpers/schema-setup";
 
-describe("createLedgerEntryAction version CAS", () => {
+describe("createLedgerEntryAction", () => {
   let ledgerId: string;
   let sourceDocumentId: string;
 
@@ -29,42 +29,22 @@ describe("createLedgerEntryAction version CAS", () => {
   });
 
   it("creates one entry, preserves a server UUID, and increments the document once", async () => {
-    const result = await createLedgerEntryAction(
-      { sourceDocumentId, expectedVersion: 1 },
-      { sourceDocumentId, amount: "50", currency: "CNY", itemName: "Lunch" }
-    );
-    expect(result).toMatchObject({ ok: true, sourceDocumentId, version: 2 });
-    if (!result.ok) throw new Error("Expected successful create");
+    const result = await createLedgerEntryAction({
+      sourceDocumentId,
+      amount: "50",
+      currency: "CNY",
+      itemName: "Lunch",
+    });
+    expect(result).toEqual({ ledgerEntryId: expect.any(String) });
 
     const db = getTestDb();
     const entry = await db.query.ledgerEntries.findFirst({
-      where: eq(ledgerEntries.id, result.data.ledgerEntryId),
+      where: eq(ledgerEntries.id, result.ledgerEntryId),
     });
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
     expect(entry).toMatchObject({ itemName: "Lunch", amount: "50.000", currency: "CNY" });
     expect(document?.version).toBe(2);
-  });
-
-  it("returns stale for a lost-response retry and creates no second entry", async () => {
-    const command = () =>
-      createLedgerEntryAction(
-        { sourceDocumentId, expectedVersion: 1 },
-        { sourceDocumentId, amount: "10", currency: "CNY", itemName: "Coffee" }
-      );
-    await expect(command()).resolves.toMatchObject({ ok: true, version: 2 });
-    await expect(command()).resolves.toEqual({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId,
-      expectedVersion: 1,
-      currentVersion: 2,
-    });
-    const rows = await getTestDb()
-      .select({ id: ledgerEntries.id })
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId));
-    expect(rows.filter((row) => row.id != null)).toHaveLength(1);
   });
 });

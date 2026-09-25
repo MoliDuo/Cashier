@@ -19,25 +19,17 @@ import {
 import { updateLedgerEntryDates } from "@/modules/source-document/server/updates";
 import { getBatchEntryDateImpact } from "../server/entry-reads/get-batch-entry-date-impact";
 import {
-  parseVersionedTarget,
-  parseVersionedTargets,
+  parseSourceDocumentId,
+  parseSourceDocumentTargetIds,
 } from "@/modules/source-document/contract-schemas";
-import type {
-  AtomicBatchCommandResult,
-  PartialBatchCommandResult,
-  VersionedTarget,
-} from "@/modules/source-document/contracts";
+import type { PartialBatchCommandResult } from "@/modules/source-document/contracts";
 
 export const createLedgerEntryAction = withLedgerAccess(
-  async (ledgerId: string, target: VersionedTarget, data: CreateLedgerEntryInput) => {
-    const validatedTarget = parseVersionedTarget(target);
+  async (ledgerId: string, data: CreateLedgerEntryInput) => {
     const validated = parseCreateLedgerEntryInput(data);
-    if (validated.sourceDocumentId !== validatedTarget.sourceDocumentId) {
-      throw new Error("Source document target does not match entry payload");
-    }
     return addLedgerEntry({
       ledgerId,
-      target: validatedTarget,
+      sourceDocumentId: validated.sourceDocumentId,
       amount: String(validated.amount),
       itemName: validated.itemName,
       ...(validated.currency === undefined ? {} : { currency: validated.currency }),
@@ -48,12 +40,12 @@ export const createLedgerEntryAction = withLedgerAccess(
 );
 
 export const deleteLedgerEntryAction = withLedgerAccess(
-  async (ledgerId: string, target: VersionedTarget, ledgerEntryId: string) => {
-    const validatedTarget = parseVersionedTarget(target);
+  async (ledgerId: string, sourceDocumentId: string, ledgerEntryId: string) => {
+    const validatedSourceDocumentId = parseSourceDocumentId(sourceDocumentId);
     const validatedLedgerEntryId = parseLedgerEntryId(ledgerEntryId);
     return deleteLedgerEntry({
       ledgerId,
-      target: validatedTarget,
+      sourceDocumentId: validatedSourceDocumentId,
       ledgerEntryId: validatedLedgerEntryId,
     });
   }
@@ -62,16 +54,16 @@ export const deleteLedgerEntryAction = withLedgerAccess(
 export const batchUpdateLedgerEntriesAction = withLedgerAccess(
   async (
     ledgerId: string,
-    inputTargets: VersionedTarget[],
+    sourceDocumentIds: string[],
     ledgerEntryIds: string[],
     data: BatchUpdateLedgerEntriesInput
-  ): Promise<AtomicBatchCommandResult<{ ledgerEntryIds: string[]; affectedCount: number }>> => {
-    const targets = parseVersionedTargets(inputTargets);
+  ): Promise<{ ledgerEntryIds: string[]; affectedCount: number }> => {
+    const validatedSourceDocumentIds = parseSourceDocumentTargetIds(sourceDocumentIds);
     const validatedLedgerEntryIds = parseLedgerEntryIds(ledgerEntryIds);
     const validated = parseBatchUpdateLedgerEntriesInput(data);
     const payload: BatchUpdateLedgerEntriesCommand = {
       ledgerId,
-      targets,
+      sourceDocumentIds: validatedSourceDocumentIds,
       ledgerEntryIds: validatedLedgerEntryIds,
     };
     if (validated.categoryId !== undefined) payload.categoryId = validated.categoryId;
@@ -86,14 +78,14 @@ export const batchUpdateLedgerEntriesAction = withLedgerAccess(
 export const batchDeleteLedgerEntriesAction = withLedgerAccess(
   async (
     ledgerId: string,
-    inputTargets: VersionedTarget[],
+    sourceDocumentIds: string[],
     inputIds: string[]
   ): Promise<PartialBatchCommandResult> => {
-    const targets = parseVersionedTargets(inputTargets);
+    const validatedSourceDocumentIds = parseSourceDocumentTargetIds(sourceDocumentIds);
     const ids = parseLedgerEntryIds(inputIds);
     return batchDeleteLedgerEntries({
       ledgerId,
-      targets,
+      sourceDocumentIds: validatedSourceDocumentIds,
       ledgerEntryIds: ids,
     });
   }
@@ -109,20 +101,15 @@ export const previewBatchLedgerEntryDateAction = withLedgerAccess(
 );
 
 export const batchUpdateLedgerEntryDatesAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    inputTargets: VersionedTarget[],
-    inputIds: string[],
-    entryDate: string
-  ) => {
-    const targets = parseVersionedTargets(inputTargets);
+  async (ledgerId: string, sourceDocumentIds: string[], inputIds: string[], entryDate: string) => {
+    const validatedSourceDocumentIds = parseSourceDocumentTargetIds(sourceDocumentIds);
     const validated = parseBatchUpdateLedgerEntryDatesInput({
       entryIds: inputIds,
       entryDate,
     });
     const impact = await updateLedgerEntryDates({
       ledgerId,
-      targets,
+      sourceDocumentIds: validatedSourceDocumentIds,
       ledgerEntryIds: validated.entryIds,
       entryDate: validated.entryDate,
     });

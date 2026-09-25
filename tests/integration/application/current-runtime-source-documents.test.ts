@@ -229,13 +229,13 @@ describe("current-runtime target adapters", () => {
     await expect(
       deleteSourceDocumentAtomically({
         ledgerId,
-        target: { sourceDocumentId: active.sourceDocumentId, expectedVersion: 2 },
+        sourceDocumentId: active.sourceDocumentId,
       })
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ deleted: true });
     await expect(
       deleteSourceDocumentAtomically({
         ledgerId,
-        target: { sourceDocumentId: active.sourceDocumentId, expectedVersion: 2 },
+        sourceDocumentId: active.sourceDocumentId,
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(

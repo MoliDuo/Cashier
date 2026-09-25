@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ZodError } from "zod";
-import { StaleSourceDocumentVersionError } from "@/lib/errors";
+import { ValidationError } from "@/lib/errors";
 
 const { cancelProcessingMock } = vi.hoisted(() => ({
   cancelProcessingMock: vi.fn(),
@@ -28,44 +27,26 @@ describe("cancelSourceDocumentProcessingAction", () => {
     vi.clearAllMocks();
   });
 
-  it("returns the cancelled version and processing status", async () => {
-    cancelProcessingMock.mockResolvedValueOnce({ version: 4, processingStatus: "cancelled" });
+  it("returns the cancelled processing status", async () => {
+    cancelProcessingMock.mockResolvedValueOnce({ processingStatus: "cancelled" });
 
-    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 3)).resolves.toEqual({
-      ok: true,
-      sourceDocumentId,
-      version: 4,
-      data: { processingStatus: "cancelled" },
+    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId)).resolves.toEqual({
+      processingStatus: "cancelled",
     });
-    expect(cancelProcessingMock).toHaveBeenCalledWith("ledger-1", sourceDocumentId, 3);
+    expect(cancelProcessingMock).toHaveBeenCalledWith("ledger-1", sourceDocumentId);
   });
 
-  it("maps a stale version to the existing stale result", async () => {
-    cancelProcessingMock.mockRejectedValueOnce(
-      new StaleSourceDocumentVersionError(sourceDocumentId, 2, 5)
-    );
-
-    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 2)).resolves.toEqual({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId,
-      expectedVersion: 2,
-      currentVersion: 5,
-    });
-  });
-
-  it("propagates every other failure", async () => {
+  it("propagates every failure", async () => {
     cancelProcessingMock.mockRejectedValueOnce(new Error("database unavailable"));
 
-    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 3)).rejects.toThrow(
+    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId)).rejects.toThrow(
       "database unavailable"
     );
   });
 
-  it("validates the source document id and expected version", async () => {
-    await expect(cancelSourceDocumentProcessingAction("not-a-uuid", 3)).rejects.toThrow(ZodError);
-    await expect(cancelSourceDocumentProcessingAction(sourceDocumentId, 0)).rejects.toThrow(
-      ZodError
+  it("validates the source document id", async () => {
+    await expect(cancelSourceDocumentProcessingAction("not-a-uuid")).rejects.toThrow(
+      ValidationError
     );
     expect(cancelProcessingMock).not.toHaveBeenCalled();
   });

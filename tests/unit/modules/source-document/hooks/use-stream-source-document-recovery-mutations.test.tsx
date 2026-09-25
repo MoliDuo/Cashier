@@ -61,19 +61,19 @@ describe("useStreamSourceDocumentRecoveryMutations", () => {
 
       expect(mutationObservers).toHaveBeenCalledTimes(2);
       act(() => {
-        void result.current[method]({ sourceDocumentId: "doc-1", expectedVersion: 3 });
-        void result.current[method]({ sourceDocumentId: "doc-1", expectedVersion: 3 });
+        void result.current[method]({ sourceDocumentId: "doc-1" });
+        void result.current[method]({ sourceDocumentId: "doc-1" });
       });
       expect(action).toHaveBeenCalledTimes(1);
       expect(result.current[pendingKey].has("doc-1")).toBe(true);
       expect(result.current[method]).toBe(initialAction);
 
-      command.resolve({ ok: true, data: {} });
+      command.resolve({});
       await waitFor(() => expect(awaitInvalidation).toHaveBeenCalledTimes(1));
       expect(result.current[pendingKey].has("doc-1")).toBe(true);
 
       act(() => {
-        void result.current[method]({ sourceDocumentId: "doc-1", expectedVersion: 3 });
+        void result.current[method]({ sourceDocumentId: "doc-1" });
       });
       expect(action).toHaveBeenCalledTimes(1);
 

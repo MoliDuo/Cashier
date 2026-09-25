@@ -10,7 +10,6 @@ import type {
   SplitSourceDocumentResultDto,
 } from "@/modules/source-document/contracts";
 import { openLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
-import { SourceDocumentStaleCommandError } from "@/modules/source-document/command-results";
 import type { AddEntryData } from "./useSourceDocumentDetailMutations";
 
 interface UseSourceDocumentEntryActionsOptions {
@@ -72,15 +71,13 @@ export function useSourceDocumentEntryActions({
   const handleSplit = useCallback(
     async (entryDate: string) => {
       if (busy) return;
-      const expectedVersion = sourceDocument?.version;
-      if (expectedVersion == null || onSplit == null) {
+      if (onSplit == null) {
         toast.error(t("splitFailed"));
         return;
       }
       setIsSplitting(true);
       try {
         const result = await onSplit({
-          expectedVersion,
           ledgerEntryIds: selectedIds,
           entryDate,
         });
@@ -97,12 +94,8 @@ export function useSourceDocumentEntryActions({
               }),
           },
         });
-      } catch (error) {
-        toast.error(
-          error instanceof SourceDocumentStaleCommandError
-            ? t("actionContextChanged")
-            : t("splitFailed")
-        );
+      } catch {
+        toast.error(t("splitFailed"));
       } finally {
         setIsSplitting(false);
       }
@@ -110,7 +103,6 @@ export function useSourceDocumentEntryActions({
     [
       busy,
       feedbackToastId,
-      sourceDocument?.version,
       onSplit,
       t,
       selectedIds,
@@ -133,12 +125,8 @@ export function useSourceDocumentEntryActions({
         await onAddEntry(data);
         toast.success(t("addEntrySuccess"), { id: feedbackToastId, action: null });
         return true;
-      } catch (error) {
-        toast.error(
-          error instanceof SourceDocumentStaleCommandError
-            ? t("actionContextChanged")
-            : t("addEntryError")
-        );
+      } catch {
+        toast.error(t("addEntryError"));
         return false;
       } finally {
         setIsSaving(false);
@@ -155,18 +143,14 @@ export function useSourceDocumentEntryActions({
         await onDeleteEntry(entryId, () => setPendingDeleteEntryId(null));
         toast.success(tCommon("deleteSuccess"), { id: feedbackToastId, action: null });
         return true;
-      } catch (error) {
-        toast.error(
-          error instanceof SourceDocumentStaleCommandError
-            ? t("actionContextChanged")
-            : tCommon("deleteFailed")
-        );
+      } catch {
+        toast.error(tCommon("deleteFailed"));
         return false;
       } finally {
         setIsSaving(false);
       }
     },
-    [onDeleteEntry, busy, feedbackToastId, setIsSaving, setPendingDeleteEntryId, t, tCommon]
+    [onDeleteEntry, busy, feedbackToastId, setIsSaving, setPendingDeleteEntryId, tCommon]
   );
 
   const handleRequestDeleteEntry = useCallback(

@@ -4,7 +4,6 @@ import { splitSourceDocumentInputSchema } from "@/modules/source-document/contra
 function validInput() {
   return {
     sourceDocumentId: crypto.randomUUID(),
-    expectedVersion: 1,
     ledgerEntryIds: [crypto.randomUUID()],
     entryDate: "2026-08-16",
   };
@@ -35,8 +34,14 @@ describe("splitSourceDocumentInputSchema", () => {
       splitSourceDocumentInputSchema.parse({ ...validInput(), entryDate: "2026-02-30" })
     ).toThrow();
     expect(() =>
-      splitSourceDocumentInputSchema.parse({ ...validInput(), expectedVersion: 0 })
+      splitSourceDocumentInputSchema.parse({
+        ...validInput(),
+        sourceDocumentId: "11111111-1111-1111-8111-111111111111",
+      })
     ).toThrow();
     expect(() => splitSourceDocumentInputSchema.parse({ ...validInput(), extra: true })).toThrow();
+    expect(() =>
+      splitSourceDocumentInputSchema.parse({ ...validInput(), expectedVersion: 1 })
+    ).toThrow();
   });
 });

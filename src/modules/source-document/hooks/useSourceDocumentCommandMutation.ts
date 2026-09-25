@@ -2,44 +2,31 @@
 
 import type { UseLedgerMutationOptions } from "@/lib/mutations/use-ledger-mutation";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
-import type { VersionedCommandResult } from "@/modules/source-document/contracts";
-import {
-  requireSourceDocumentVersion,
-  unwrapVersionedCommandResult,
-} from "@/modules/source-document/command-results";
 
-interface UseVersionedSourceDocumentMutationOptions<TResult> {
+interface UseSourceDocumentCommandMutationOptions<TResult> {
   refreshMode?: "wait" | "background";
   sourceDocumentId: string;
-  expectedVersion: number | null;
-  action: (
-    sourceDocumentId: string,
-    expectedVersion: number
-  ) => Promise<VersionedCommandResult<TResult>>;
+  action: (sourceDocumentId: string) => Promise<TResult>;
   successMessage: string;
   errorMessage: string | null;
   onSuccess?: UseLedgerMutationOptions<TResult, void>["onSuccess"];
   onError?: UseLedgerMutationOptions<TResult, void>["onError"];
 }
 
-export function useVersionedSourceDocumentMutation<TResult>({
+/** Runs a one-document command, calling an optional `onCommitted` once it succeeds. */
+export function useSourceDocumentCommandMutation<TResult>({
   refreshMode = "wait",
   sourceDocumentId,
-  expectedVersion,
   action,
   successMessage,
   errorMessage,
   onSuccess,
   onError,
-}: UseVersionedSourceDocumentMutationOptions<TResult>) {
+}: UseSourceDocumentCommandMutationOptions<TResult>) {
   return useLedgerMutation<TResult, void | (() => void)>({
     refreshMode,
     invalidates: ["documents", "stats"],
-    mutationFn: async () => {
-      const version = requireSourceDocumentVersion(expectedVersion, sourceDocumentId);
-      const result = await action(sourceDocumentId, version);
-      return unwrapVersionedCommandResult(result);
-    },
+    mutationFn: () => action(sourceDocumentId),
     successMessage,
     errorMessage,
     onSuccess: (result, onCommitted) => {

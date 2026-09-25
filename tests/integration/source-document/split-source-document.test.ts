@@ -26,16 +26,11 @@ describe("splitSourceDocumentAction", () => {
     for (const [index, id] of fixture.ids.slice(0, 2).entries()) {
       const result = await splitSourceDocumentAction({
         sourceDocumentId: fixture.document.id,
-        expectedVersion: index + 1,
         ledgerEntryIds: [id],
         entryDate: "2026-08-16",
       });
-      expect(result).toMatchObject({
-        ok: true,
-        data: { sourceDocument: { version: index + 2 } },
-      });
-      if (!result.ok) throw new Error("Expected success");
-      expect(result.data.sourceDocument.ledgerEntries).toHaveLength(2 - index);
+      expect(result).toMatchObject({ sourceDocument: { version: index + 2 } });
+      expect(result.sourceDocument.ledgerEntries).toHaveLength(2 - index);
     }
     const split = await listStreamPage(fixture.ledger.id, { limit: 20 });
     const movedEntries = split.items
@@ -84,23 +79,21 @@ describe("splitSourceDocumentAction", () => {
     const movedIds = [fixture.ids[0]!, fixture.ids[2]!];
     const result = await splitSourceDocumentAction({
       sourceDocumentId: fixture.document.id,
-      expectedVersion: 1,
       ledgerEntryIds: movedIds,
       entryDate: "2026-08-16",
     });
     expect(result).toMatchObject({
-      ok: true,
-      version: 2,
-      data: { splitVersion: 1, movedEntryCount: 2 },
+      sourceDocument: { version: 2 },
+      splitVersion: 1,
+      movedEntryCount: 2,
     });
-    if (!result.ok) throw new Error("Expected split success");
     const live = await fixture.db
       .select()
       .from(ledgerEntries)
       .where(and(eq(ledgerEntries.ledgerId, fixture.ledger.id), isNull(ledgerEntries.deletedAt)));
     expect(
       live
-        .filter((entry) => entry.sourceDocumentId === result.data.splitSourceDocumentId)
+        .filter((entry) => entry.sourceDocumentId === result.splitSourceDocumentId)
         .map((entry) => entry.id)
         .sort()
     ).toEqual([...movedIds].sort());
@@ -108,27 +101,47 @@ describe("splitSourceDocumentAction", () => {
       where: eq(sourceDocuments.id, fixture.document.id),
     });
     const split = await fixture.db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, result.data.splitSourceDocumentId),
+      where: eq(sourceDocuments.id, result.splitSourceDocumentId),
     });
     expect(source?.version).toBe(2);
     expect(split?.version).toBe(1);
   });
 
-  it("returns stale on lost-response retry", async () => {
+  it("rejects a repeated split once its entry has moved", async () => {
     const fixture = await seed();
     const input = {
       sourceDocumentId: fixture.document.id,
-      expectedVersion: 1,
       ledgerEntryIds: [fixture.ids[0]!],
       entryDate: "2026-08-16",
     };
     await expect(splitSourceDocumentAction(input)).resolves.toMatchObject({
-      ok: true,
+      movedEntryCount: 1,
     });
-    await expect(splitSourceDocumentAction(input)).resolves.toMatchObject({
-      ok: false,
-      reason: "stale",
-      currentVersion: 2,
+    await expect(splitSourceDocumentAction(input)).rejects.toThrow(/not in the active/);
+    expect(
+      await fixture.db.query.sourceDocuments.findMany({
+        where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
+      })
+    ).toHaveLength(2);
+  });
+
+  it("moves an entry edited after it was selected as it is now", async () => {
+    const fixture = await seed();
+    await fixture.db
+      .update(ledgerEntries)
+      .set({ itemName: "Edited meanwhile" })
+      .where(eq(ledgerEntries.id, fixture.ids[0]!));
+    const result = await splitSourceDocumentAction({
+      sourceDocumentId: fixture.document.id,
+      ledgerEntryIds: [fixture.ids[0]!],
+      entryDate: "2026-08-16",
+    });
+    const moved = await fixture.db.query.ledgerEntries.findFirst({
+      where: eq(ledgerEntries.id, fixture.ids[0]!),
+    });
+    expect(moved).toMatchObject({
+      sourceDocumentId: result.splitSourceDocumentId,
+      itemName: "Edited meanwhile",
     });
   });
 
@@ -136,7 +149,6 @@ describe("splitSourceDocumentAction", () => {
     const fixture = await seed();
     const input = {
       sourceDocumentId: fixture.document.id,
-      expectedVersion: 1,
       ledgerEntryIds: fixture.ids,
       entryDate: "2026-08-16",
     };
@@ -159,27 +171,28 @@ describe("splitSourceDocumentAction", () => {
     ).toHaveLength(1);
   });
 
-  it("allows only one of two concurrent splits at the same version to commit", async () => {
+  it("serializes concurrent splits of different entries", async () => {
     const fixture = await seed();
     const results = await Promise.all(
       fixture.ids.slice(0, 2).map((id) =>
         splitSourceDocumentAction({
           sourceDocumentId: fixture.document.id,
-          expectedVersion: 1,
           ledgerEntryIds: [id],
           entryDate: "2026-08-16",
         })
       )
     );
-    expect(results.filter((result) => result.ok)).toHaveLength(1);
-    expect(results.filter((result) => !result.ok)).toMatchObject([
-      { ok: false, reason: "stale", currentVersion: 2 },
-    ]);
+    expect(results.map((result) => result.movedEntryCount)).toEqual([1, 1]);
+    expect(
+      await fixture.db.query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, fixture.document.id),
+      })
+    ).toMatchObject({ version: 3 });
     expect(
       await fixture.db.query.sourceDocuments.findMany({
         where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
       })
-    ).toHaveLength(2);
+    ).toHaveLength(3);
   });
 
   it("moves a 100-entry batch with contiguous positions", async () => {
@@ -187,19 +200,17 @@ describe("splitSourceDocumentAction", () => {
     const movedIds = fixture.ids.slice(0, 100);
     const result = await splitSourceDocumentAction({
       sourceDocumentId: fixture.document.id,
-      expectedVersion: 1,
       ledgerEntryIds: movedIds,
       entryDate: "2026-08-16",
     });
-    expect(result).toMatchObject({ ok: true, data: { movedEntryCount: 100 } });
-    if (!result.ok) throw new Error("Expected split success");
+    expect(result).toMatchObject({ movedEntryCount: 100 });
 
     const live = await fixture.db
       .select()
       .from(ledgerEntries)
       .where(and(eq(ledgerEntries.ledgerId, fixture.ledger.id), isNull(ledgerEntries.deletedAt)));
     const splitEntries = live
-      .filter((entry) => entry.sourceDocumentId === result.data.splitSourceDocumentId)
+      .filter((entry) => entry.sourceDocumentId === result.splitSourceDocumentId)
       .sort((left, right) => left.position - right.position);
     const retainedEntries = live.filter((entry) => entry.sourceDocumentId === fixture.document.id);
     expect(splitEntries.map((entry) => entry.id)).toEqual(movedIds);

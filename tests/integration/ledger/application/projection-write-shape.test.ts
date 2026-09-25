@@ -151,7 +151,7 @@ describe("projection write shape", () => {
 
     await addLedgerEntry({
       ledgerId,
-      target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 1 },
+      sourceDocumentId: created.sourceDocumentId,
       amount: "10",
       currency: "CNY",
       itemName: "C",
@@ -332,39 +332,27 @@ describe("projection write shape", () => {
         ),
         orderBy: ledgerEntries.position,
       });
-      const expectedVersion = 1 + iteration * 2;
       expect(
         await deleteLedgerEntry({
           ledgerId,
-          target: { sourceDocumentId: created.sourceDocumentId, expectedVersion },
+          sourceDocumentId: created.sourceDocumentId,
           ledgerEntryId: rows[1]!.id,
         })
-      ).toMatchObject({ ok: true, version: expectedVersion + 1 });
+      ).toEqual({ ledgerEntryId: rows[1]!.id, deleted: true });
       expect(
         await addLedgerEntry({
           ledgerId,
-          target: {
-            sourceDocumentId: created.sourceDocumentId,
-            expectedVersion: expectedVersion + 1,
-          },
+          sourceDocumentId: created.sourceDocumentId,
           amount: "10",
           currency: "CNY",
           itemName: `Replacement ${iteration}`,
         })
-      ).toMatchObject({ ok: true, version: expectedVersion + 2 });
+      ).toEqual({ ledgerEntryId: expect.any(String) });
     }
-    expect(
-      await addLedgerEntry({
-        ledgerId,
-        target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 1 },
-        amount: "10",
-        currency: "CNY",
-        itemName: "Stale",
-      })
-    ).toMatchObject({ ok: false, reason: "stale", currentVersion: 7 });
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
+    // Each entry add and delete changes whole-save content and bumps the version once.
     expect(document).toMatchObject({ activeRevisionId: created.revisionId, version: 7 });
     expect(
       await db.query.sourceDocumentRevisions.findMany({

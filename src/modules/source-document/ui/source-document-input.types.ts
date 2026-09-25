@@ -21,11 +21,10 @@ interface SourceDocumentInputBaseProps {
 
 export type SourceDocumentInputProps = SourceDocumentInputBaseProps &
   (
-    | { mode?: "create"; sourceDocumentId?: never; sourceDocumentVersion?: never }
+    | { mode?: "create"; sourceDocumentId?: never }
     | {
         mode: "retry";
         sourceDocumentId: string;
-        sourceDocumentVersion: number;
         initialData: NonNullable<SourceDocumentInputBaseProps["initialData"]>;
       }
   );

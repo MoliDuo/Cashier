@@ -208,7 +208,6 @@ export async function replaceActiveProjectionInTransaction(
     previousEntries: readonly (typeof ledgerEntries.$inferSelect)[];
     sourceDocumentId: string;
     expectedActiveRevisionId: string;
-    expectedStateVersion: number;
     entries: readonly LedgerProjectionEntryContract[];
     title?: string;
     entryDate?: string;
@@ -216,9 +215,6 @@ export async function replaceActiveProjectionInTransaction(
 ): Promise<string> {
   const document = input.document;
   const dateChanged = input.entryDate !== undefined && input.entryDate !== document.documentDate;
-  if (document.version !== input.expectedStateVersion) {
-    throw new ConflictError("Source document changed during the edit");
-  }
   if (!hasEditableActiveProjection(document)) {
     throw new ConflictError("Source document is not editable");
   }
@@ -259,8 +255,7 @@ export async function replaceActiveProjectionInTransaction(
     .where(
       and(
         activeDocumentWhere(input.ledgerId, input.sourceDocumentId),
-        eq(sourceDocuments.activeRevisionId, input.expectedActiveRevisionId),
-        eq(sourceDocuments.version, input.expectedStateVersion)
+        eq(sourceDocuments.activeRevisionId, input.expectedActiveRevisionId)
       )
     )
     .returning({ id: sourceDocuments.id })

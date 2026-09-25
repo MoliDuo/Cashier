@@ -4,7 +4,7 @@ import { buildSourceDocumentRetrySeed } from "@/modules/source-document/ui/sourc
 describe("source document retry seed", () => {
   it("uses stored-file URLs while preserving file identity order", () => {
     const seed = buildSourceDocumentRetrySeed(
-      { id: "doc-1", version: 1, text: "fallback", files: [], hasImages: true },
+      { id: "doc-1", text: "fallback", files: [], hasImages: true },
       {
         text: "receipt",
         documentDate: "2026-09-10",
@@ -25,7 +25,7 @@ describe("source document retry seed", () => {
 
   it("prefers the latest submission date over the active result date", () => {
     const seed = buildSourceDocumentRetrySeed(
-      { id: "doc-1", version: 2, documentDate: "2026-08-01" },
+      { id: "doc-1", documentDate: "2026-08-01" },
       { text: "retried receipt", files: [], documentDate: "2026-09-10" }
     );
 
@@ -34,7 +34,7 @@ describe("source document retry seed", () => {
 
   it("preserves a cleared latest submission date", () => {
     const seed = buildSourceDocumentRetrySeed(
-      { id: "doc-1", version: 2, documentDate: "2026-08-01" },
+      { id: "doc-1", documentDate: "2026-08-01" },
       { text: "retried receipt", files: [], documentDate: null }
     );
 

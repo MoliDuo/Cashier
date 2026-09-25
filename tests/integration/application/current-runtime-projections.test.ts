@@ -58,9 +58,9 @@ describe("current-runtime target adapters", () => {
     await expect(
       deleteSourceDocumentAtomically({
         ledgerId,
-        target: { sourceDocumentId: created.sourceDocumentId, expectedVersion: 2 },
+        sourceDocumentId: created.sourceDocumentId,
       })
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ deleted: true });
     const deleted = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });

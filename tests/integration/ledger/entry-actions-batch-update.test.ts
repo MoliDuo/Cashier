@@ -90,11 +90,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, doc.id),
     });
-    await batchUpdateLedgerEntriesAction(
-      [{ sourceDocumentId: doc.id, expectedVersion: before!.version }],
-      ids,
-      { categoryId: catId }
-    );
+    await batchUpdateLedgerEntriesAction([doc.id], ids, { categoryId: catId });
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, doc.id),
     });
@@ -145,7 +141,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
     }
     await activateTestSourceDocumentProjection(db, doc.id);
 
-    await batchUpdateLedgerEntriesAction([{ sourceDocumentId: doc.id, expectedVersion: 1 }], ids, {
+    await batchUpdateLedgerEntriesAction([doc.id], ids, {
       categoryId: null,
     });
 
@@ -178,7 +174,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
     await activateTestSourceDocumentProjection(db, doc.id);
     ensureRatesMock.mockClear();
 
-    await batchUpdateLedgerEntriesAction([{ sourceDocumentId: doc.id, expectedVersion: 1 }], ids, {
+    await batchUpdateLedgerEntriesAction([doc.id], ids, {
       currency: "USD",
     });
 
@@ -186,7 +182,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
     expect(new Set(ensureRatesMock.mock.calls[0]?.[0])).toEqual(new Set(["2026-09-01"]));
   });
 
-  it("rolls back the entire atomic batch when one target is stale", async () => {
+  it("updates every targeted document even when one version has moved on", async () => {
     const db = getTestDb();
     const categoryId = randomUUID();
     await db.insert(entryCategories).values({
@@ -204,7 +200,7 @@ describe("batchUpdateLedgerEntriesAction", () => {
             id: randomUUID(),
             ledgerId,
             sourceDocumentId: document.id,
-            itemName: `Atomic ${index}`,
+            itemName: `Batch ${index}`,
             amount: "10.00",
             currency: "CNY",
           })
@@ -217,29 +213,16 @@ describe("batchUpdateLedgerEntriesAction", () => {
       .update(sourceDocuments)
       .set({ version: 2 })
       .where(eq(sourceDocuments.id, documents[1]!.id));
-    const before = await db.query.sourceDocuments.findMany({
-      where: inArray(
-        sourceDocuments.id,
-        documents.map((document) => document.id)
-      ),
-    });
 
     const result = await batchUpdateLedgerEntriesAction(
-      documents.map((document) => ({ sourceDocumentId: document.id, expectedVersion: 1 })),
+      documents.map((document) => document.id),
       entries.map((entry) => entry.id),
       { categoryId }
     );
 
     expect(result).toEqual({
-      ok: false,
-      reason: "stale",
-      staleTargets: [
-        {
-          sourceDocumentId: documents[1]!.id,
-          expectedVersion: 1,
-          currentVersion: 2,
-        },
-      ],
+      ledgerEntryIds: entries.map((entry) => entry.id).sort(),
+      affectedCount: 2,
     });
     const afterEntries = await db.query.ledgerEntries.findMany({
       where: inArray(
@@ -247,27 +230,18 @@ describe("batchUpdateLedgerEntriesAction", () => {
         entries.map((entry) => entry.id)
       ),
     });
-    expect(afterEntries.every((entry) => entry.categoryId == null)).toBe(true);
+    expect(afterEntries.every((entry) => entry.categoryId === categoryId)).toBe(true);
     const after = await db.query.sourceDocuments.findMany({
       where: inArray(
         sourceDocuments.id,
         documents.map((document) => document.id)
       ),
     });
-    expect(
-      after.map((document) => ({
-        id: document.id,
-        activeRevisionId: document.activeRevisionId,
-        version: document.version,
-        updatedAt: document.updatedAt,
-      }))
-    ).toEqual(
-      before.map((document) => ({
-        id: document.id,
-        activeRevisionId: document.activeRevisionId,
-        version: document.version,
-        updatedAt: document.updatedAt,
-      }))
+    expect(new Map(after.map((document) => [document.id, document.version]))).toEqual(
+      new Map([
+        [documents[0]!.id, 2],
+        [documents[1]!.id, 3],
+      ])
     );
   });
 
@@ -300,16 +274,10 @@ describe("batchUpdateLedgerEntriesAction", () => {
     const activeRevisionId = await activateTestSourceDocumentProjection(db, doc.id);
     const preview = await previewBatchLedgerEntryDateAction([ids[0]!]);
 
-    const committed = await batchUpdateLedgerEntryDatesAction(
-      [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
-      [ids[0]!],
-      "2026-01-02"
-    );
+    const committed = await batchUpdateLedgerEntryDatesAction([doc.id], [ids[0]!], "2026-01-02");
 
-    expect(committed).toMatchObject({ ok: true });
-    if (!committed.ok) throw new Error("Expected date update to succeed");
-    expect(committed.data.impact).toEqual(preview);
-    expect(committed.data.impact).toMatchObject({
+    expect(committed.impact).toEqual(preview);
+    expect(committed.impact).toMatchObject({
       selectedEntryCount: 1,
       sourceDocumentCount: 1,
       affectedEntryCount: 2,

@@ -13,8 +13,6 @@ import {
   previewBatchLedgerEntryDateAction,
 } from "@/modules/ledger/server-actions/entries";
 import type { EntryCategory, ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
-import type { VersionedTarget } from "@/modules/source-document/contracts";
-import { unwrapAtomicBatchCommandResult } from "@/modules/source-document/command-results";
 import { useDetailsCategoryAssignment } from "./useDetailsCategoryAssignment";
 import { selectionMatches } from "./selection-snapshot";
 
@@ -23,7 +21,7 @@ type BatchDateImpact = Awaited<ReturnType<typeof previewBatchLedgerEntryDateActi
 /** The selection a date preview answered for, kept so confirmation can use it. */
 interface DatePreviewRequest {
   entryIds: string[];
-  targets: VersionedTarget[];
+  sourceDocumentIds: string[];
   queryFingerprint: string;
   impact: BatchDateImpact;
 }
@@ -51,22 +49,15 @@ export function useDetailsBatchController(
   const tCommon = useTranslations("Common");
   const allIds = useMemo(() => entries.map((entry) => entry.id), [entries]);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
-  const targetsFor = useCallback(
-    (ids: readonly string[]): VersionedTarget[] => {
-      const versions = new Map<string, number>();
+  const sourceDocumentIdsFor = useCallback(
+    (ids: readonly string[]): string[] => {
+      const sourceDocumentIds = new Set<string>();
       for (const id of ids) {
         const entry = entryById.get(id);
         if (entry == null) throw new Error("Selected entry is no longer in the loaded page");
-        const { sourceDocument } = entry;
-        const previous = versions.get(sourceDocument.id);
-        if (previous != null && previous !== sourceDocument.version) {
-          throw new Error("Selected entries contain conflicting source document versions");
-        }
-        versions.set(sourceDocument.id, sourceDocument.version);
+        sourceDocumentIds.add(entry.sourceDocument.id);
       }
-      return [...versions]
-        .map(([sourceDocumentId, expectedVersion]) => ({ sourceDocumentId, expectedVersion }))
-        .sort((left, right) => left.sourceDocumentId.localeCompare(right.sourceDocumentId));
+      return [...sourceDocumentIds].sort((left, right) => left.localeCompare(right));
     },
     [entryById]
   );
@@ -92,14 +83,12 @@ export function useDetailsBatchController(
   >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    mutationFn: async (data: { categoryId?: string | null; currency?: string | null }) => {
-      const result = await batchUpdateLedgerEntriesAction(
-        targetsFor(selection.selectedIds),
+    mutationFn: (data: { categoryId?: string | null; currency?: string | null }) =>
+      batchUpdateLedgerEntriesAction(
+        sourceDocumentIdsFor(selection.selectedIds),
         selection.selectedIds,
         data
-      );
-      return unwrapAtomicBatchCommandResult(result);
-    },
+      ),
     errorMessage: tCommon("error"),
     onSuccess: (result) => {
       if (result.affectedCount > 0)
@@ -125,10 +114,13 @@ export function useDetailsBatchController(
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: () =>
-      batchDeleteLedgerEntriesAction(targetsFor(selection.selectedIds), selection.selectedIds),
+      batchDeleteLedgerEntriesAction(
+        sourceDocumentIdsFor(selection.selectedIds),
+        selection.selectedIds
+      ),
     errorMessage: tCommon("deleteFailed"),
     onSuccess: (result) => {
-      const unresolved = [...result.stale, ...result.failed].map((item) => item.id);
+      const unresolved = result.failed.map((item) => item.id);
       if (unresolved.length === 0) setDeleteDialogOpen(false);
       if (unresolved.length > 0) selection.retainSelection(unresolved);
       else selection.clearSelection();
@@ -152,10 +144,10 @@ export function useDetailsBatchController(
     setDatePreview({ status: "loading" });
     void (async () => {
       let impact: BatchDateImpact;
-      let targets: VersionedTarget[];
+      let sourceDocumentIds: string[];
       try {
         impact = await previewBatchLedgerEntryDateAction(entryIds);
-        targets = targetsFor(entryIds);
+        sourceDocumentIds = sourceDocumentIdsFor(entryIds);
       } catch {
         if (dateRequestIdRef.current === requestId) setDatePreview({ status: "error" });
         return;
@@ -163,10 +155,10 @@ export function useDetailsBatchController(
       if (dateRequestIdRef.current !== requestId) return;
       setDatePreview({
         status: "ready",
-        request: { entryIds, targets, queryFingerprint: capturedFingerprint, impact },
+        request: { entryIds, sourceDocumentIds, queryFingerprint: capturedFingerprint, impact },
       });
     })();
-  }, [queryFingerprint, selection.selectedIds, targetsFor]);
+  }, [queryFingerprint, selection.selectedIds, sourceDocumentIdsFor]);
 
   const setDateDialogVisibility = useCallback((open: boolean) => {
     dateRequestIdRef.current += 1;
@@ -213,12 +205,11 @@ export function useDetailsBatchController(
       ) {
         throw new Error("selection_changed");
       }
-      const result = await batchUpdateLedgerEntryDatesAction(
-        request.targets,
+      return batchUpdateLedgerEntryDatesAction(
+        request.sourceDocumentIds,
         request.entryIds,
         selectedDate
       );
-      return unwrapAtomicBatchCommandResult(result);
     },
     errorMessage: tBatch("selectionChanged"),
     onSuccess: (result) => {

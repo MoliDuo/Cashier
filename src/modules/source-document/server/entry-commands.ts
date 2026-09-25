@@ -1,12 +1,7 @@
 import { assertExpenseAmountDirection } from "@/lib/money/expense-amount";
 import { and, eq, getTableColumns, inArray, isNull } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
-import type {
-  AtomicBatchCommandResult,
-  PartialBatchCommandResult,
-  VersionedCommandResult,
-  VersionedTarget,
-} from "@/modules/source-document/contracts";
+import type { PartialBatchCommandResult } from "@/modules/source-document/contracts";
 import "server-only";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
@@ -23,19 +18,6 @@ import {
 } from "@/lib/db/transaction-locks";
 import { hasEditableActiveProjection } from "./write-guards";
 import { assertCategoryOwnership } from "./projections/shared";
-
-type EntryResult = VersionedCommandResult<{ ledgerEntryId: string }>;
-type DeleteEntryResult = VersionedCommandResult<{ ledgerEntryId: string; deleted: true }>;
-
-function stale<T>(target: VersionedTarget, currentVersion: number): VersionedCommandResult<T> {
-  return {
-    ok: false,
-    reason: "stale",
-    sourceDocumentId: target.sourceDocumentId,
-    expectedVersion: target.expectedVersion,
-    currentVersion,
-  };
-}
 
 async function listProjectionEntries(
   tx: PostgresTransaction,
@@ -126,14 +108,13 @@ async function prepareCreate(input: {
  */
 async function prepareBatchUpdate(input: {
   ledgerId: string;
-  targets: VersionedTarget[];
+  sourceDocumentIds: string[];
   ledgerEntryIds: string[];
   amount?: string;
   currency?: string | null;
 }): Promise<void> {
   if (input.amount === undefined && input.currency === undefined) return;
   const requestedIds = [...new Set(input.ledgerEntryIds)].sort();
-  const targetIds = input.targets.map((target) => target.sourceDocumentId);
   const rows = await db
     .select({
       mainCurrency: ledgers.mainCurrency,
@@ -148,7 +129,7 @@ async function prepareBatchUpdate(input: {
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
         eq(sourceDocuments.ledgerId, input.ledgerId),
         eq(sourceDocuments.activeRevisionId, ledgerEntries.sourceDocumentRevisionId),
-        inArray(sourceDocuments.id, targetIds),
+        inArray(sourceDocuments.id, input.sourceDocumentIds),
         isNull(sourceDocuments.deletedAt)
       )
     )
@@ -176,13 +157,9 @@ async function prepareBatchUpdate(input: {
   }
 }
 
-function targetMap(targets: readonly VersionedTarget[]) {
-  return new Map(targets.map((target) => [target.sourceDocumentId, target] as const));
-}
-
 export interface AddLedgerEntryInput {
   ledgerId: string;
-  target: VersionedTarget;
+  sourceDocumentId: string;
   amount: string;
   currency?: string;
   itemName: string;
@@ -192,7 +169,7 @@ export interface AddLedgerEntryInput {
 
 export interface BatchUpdateLedgerEntriesInput {
   ledgerId: string;
-  targets: VersionedTarget[];
+  sourceDocumentIds: string[];
   ledgerEntryIds: string[];
   categoryId?: string | null;
   amount?: string;
@@ -201,22 +178,17 @@ export interface BatchUpdateLedgerEntriesInput {
   description?: string | null;
 }
 
-export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryResult> {
+export async function addLedgerEntry(
+  input: AddLedgerEntryInput
+): Promise<{ ledgerEntryId: string }> {
   await prepareCreate({
     ledgerId: input.ledgerId,
-    sourceDocumentId: input.target.sourceDocumentId,
+    sourceDocumentId: input.sourceDocumentId,
     ...(input.currency === undefined ? {} : { currency: input.currency }),
   });
-  return db.transaction(async (tx): Promise<EntryResult> => {
+  return db.transaction(async (tx) => {
     const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
-    const document = await lockSourceDocumentForUpdate(
-      tx,
-      input.ledgerId,
-      input.target.sourceDocumentId
-    );
-    if (document.version !== input.target.expectedVersion) {
-      return stale(input.target, document.version);
-    }
+    const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
     if (!hasEditableActiveProjection(document)) {
       throw new NotFoundError("Active source document");
     }
@@ -235,8 +207,6 @@ export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryR
       ledgerId: input.ledgerId,
       sourceDocumentId: document.id,
       expectedActiveRevisionId: document.activeRevisionId,
-      expectedStateVersion: input.target.expectedVersion,
-
       entries: [
         ...entries.map(toProjectionEntry),
         {
@@ -249,30 +219,18 @@ export async function addLedgerEntry(input: AddLedgerEntryInput): Promise<EntryR
         },
       ],
     });
-    return {
-      ok: true,
-      sourceDocumentId: document.id,
-      version: input.target.expectedVersion + 1,
-      data: { ledgerEntryId },
-    };
+    return { ledgerEntryId };
   });
 }
 
 export async function deleteLedgerEntry(input: {
   ledgerId: string;
-  target: VersionedTarget;
+  sourceDocumentId: string;
   ledgerEntryId: string;
-}): Promise<DeleteEntryResult> {
-  return db.transaction(async (tx): Promise<DeleteEntryResult> => {
+}): Promise<{ ledgerEntryId: string; deleted: true }> {
+  return db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, input.ledgerId);
-    const document = await lockSourceDocumentForUpdate(
-      tx,
-      input.ledgerId,
-      input.target.sourceDocumentId
-    );
-    if (document.version !== input.target.expectedVersion) {
-      return stale(input.target, document.version);
-    }
+    const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
     if (!hasEditableActiveProjection(document)) {
       throw new NotFoundError("Active source document");
     }
@@ -291,41 +249,23 @@ export async function deleteLedgerEntry(input: {
       ledgerId: input.ledgerId,
       sourceDocumentId: document.id,
       expectedActiveRevisionId: document.activeRevisionId,
-      expectedStateVersion: input.target.expectedVersion,
-
       entries: entries.filter((entry) => entry.id !== input.ledgerEntryId).map(toProjectionEntry),
     });
-    return {
-      ok: true,
-      sourceDocumentId: document.id,
-      version: input.target.expectedVersion + 1,
-      data: { ledgerEntryId: input.ledgerEntryId, deleted: true },
-    };
+    return { ledgerEntryId: input.ledgerEntryId, deleted: true };
   });
 }
 
 export async function batchUpdateLedgerEntries(
   input: BatchUpdateLedgerEntriesInput
-): Promise<AtomicBatchCommandResult<{ ledgerEntryIds: string[]; affectedCount: number }>> {
+): Promise<{ ledgerEntryIds: string[]; affectedCount: number }> {
   await prepareBatchUpdate(input);
   return db.transaction(async (tx) => {
     const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
-    const targets = input.targets;
-    const expectedByDocument = targetMap(targets);
     const documents = await lockSourceDocumentsForUpdate(
       tx,
       input.ledgerId,
-      targets.map((target) => target.sourceDocumentId)
+      input.sourceDocumentIds
     );
-    const staleTargets = documents.flatMap((document) => {
-      const target = expectedByDocument.get(document.id)!;
-      return document.version === target.expectedVersion
-        ? []
-        : [{ ...target, currentVersion: document.version }];
-    });
-    if (staleTargets.length > 0) {
-      return { ok: false as const, reason: "stale" as const, staleTargets };
-    }
     if (documents.some((document) => !hasEditableActiveProjection(document))) {
       throw new NotFoundError("Active source document");
     }
@@ -373,8 +313,8 @@ export async function batchUpdateLedgerEntries(
       [...selectedById.values()].map((entry) => entry.sourceDocumentId!)
     );
     if (
-      selectedDocumentIds.size !== targets.length ||
-      targets.some((target) => !selectedDocumentIds.has(target.sourceDocumentId))
+      selectedDocumentIds.size !== input.sourceDocumentIds.length ||
+      input.sourceDocumentIds.some((id) => !selectedDocumentIds.has(id))
     ) {
       throw new NotFoundError("Source document target");
     }
@@ -382,16 +322,7 @@ export async function batchUpdateLedgerEntries(
     const changedIds = new Set(
       [...selectedById.values()].filter((entry) => changed(entry, input)).map((entry) => entry.id)
     );
-    if (changedIds.size === 0) {
-      return {
-        ok: true as const,
-        versions: documents.map((document) => ({
-          sourceDocumentId: document.id,
-          version: document.version,
-        })),
-        data: { ledgerEntryIds: requestedIds, affectedCount: 0 },
-      };
-    }
+    if (changedIds.size === 0) return { ledgerEntryIds: requestedIds, affectedCount: 0 };
 
     const nextById = new Map<string, LedgerProjectionEntryContract>();
     for (const entry of selectedById.values()) {
@@ -424,33 +355,20 @@ export async function batchUpdateLedgerEntries(
         ledgerId: input.ledgerId,
         sourceDocumentId: document.id,
         expectedActiveRevisionId: document.activeRevisionId!,
-        expectedStateVersion: document.version,
-
         entries: entries.map((entry) => nextById.get(entry.id) ?? toProjectionEntry(entry)),
       });
     }
-    return {
-      ok: true as const,
-      versions: documents.map((document) => ({
-        sourceDocumentId: document.id,
-        version: document.version + (changedDocumentIds.has(document.id) ? 1 : 0),
-      })),
-      data: { ledgerEntryIds: requestedIds, affectedCount: changedIds.size },
-    };
+    return { ledgerEntryIds: requestedIds, affectedCount: changedIds.size };
   });
 }
 
 export async function batchDeleteLedgerEntries(input: {
   ledgerId: string;
-  targets: VersionedTarget[];
+  sourceDocumentIds: string[];
   ledgerEntryIds: string[];
 }): Promise<PartialBatchCommandResult> {
   const requestedIds = [...new Set(input.ledgerEntryIds)].sort();
-  const result: import("@/modules/source-document/contracts").PartialBatchCommandResult = {
-    succeeded: [],
-    stale: [],
-    failed: [],
-  };
+  const result: PartialBatchCommandResult = { succeeded: [], failed: [] };
   const ownership = await db
     .select({
       id: ledgerEntries.id,
@@ -477,20 +395,18 @@ export async function batchDeleteLedgerEntries(input: {
     ids.push(id);
     groups.set(row.sourceDocumentId, ids);
   }
-  const targets = targetMap(input.targets);
+  const targets = new Set(input.sourceDocumentIds);
   for (const [sourceDocumentId, entryIds] of [...groups].sort(([left], [right]) =>
     left.localeCompare(right)
   )) {
-    const target = targets.get(sourceDocumentId);
-    if (target == null) {
+    if (!targets.has(sourceDocumentId)) {
       result.failed.push(...entryIds.map((id) => ({ id, code: "MISSING_TARGET" })));
       continue;
     }
     try {
-      const groupResult = await db.transaction(async (tx) => {
+      await db.transaction(async (tx) => {
         await lockLedgerForUpdate(tx, input.ledgerId);
         const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, sourceDocumentId);
-        if (document.version !== target.expectedVersion) return document.version;
         if (!hasEditableActiveProjection(document)) {
           throw new NotFoundError("Active source document");
         }
@@ -510,30 +426,10 @@ export async function batchDeleteLedgerEntries(input: {
           ledgerId: input.ledgerId,
           sourceDocumentId,
           expectedActiveRevisionId: document.activeRevisionId,
-          expectedStateVersion: target.expectedVersion,
-
           entries: entries.filter((entry) => !selected.has(entry.id)).map(toProjectionEntry),
         });
-        return null;
       });
-      if (groupResult != null) {
-        result.stale.push(
-          ...entryIds.map((id) => ({
-            id,
-            sourceDocumentId,
-            expectedVersion: target.expectedVersion,
-            currentVersion: groupResult,
-          }))
-        );
-      } else {
-        result.succeeded.push(
-          ...entryIds.map((id) => ({
-            id,
-            sourceDocumentId,
-            version: target.expectedVersion + 1,
-          }))
-        );
-      }
+      result.succeeded.push(...entryIds.map((id) => ({ id, sourceDocumentId })));
     } catch (error) {
       result.failed.push(
         ...entryIds.map((id) => ({

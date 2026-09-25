@@ -240,9 +240,10 @@ describe("Processing Recovery", () => {
       status: "failed",
       diagnosticCode: "request_bound_retry_exhausted",
     });
+    // A failure writes nothing a whole save could, so the version stays put.
     await expect(
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, job.sourceDocumentId) })
-    ).resolves.toMatchObject({ version: before!.version + 1 });
+    ).resolves.toMatchObject({ version: before!.version });
   });
 
   it("returns at most maxBatch intents", async () => {

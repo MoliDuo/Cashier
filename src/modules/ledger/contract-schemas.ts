@@ -225,7 +225,6 @@ const reorderBooksInputSchema = z.preprocess(
 const bookIdSchema = uuidSchema;
 const assignSourceDocumentBookInputSchema = strictObjectSchema({
   sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
   bookId: uuidSchema,
 });
 

@@ -132,7 +132,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       assignSourceDocumentBook({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
-        expectedVersion: other.version,
         bookId: callerBookId,
       }),
   ],
@@ -141,20 +140,19 @@ const REACHES: Array<[name: string, reach: Reach]> = [
     (ledgerId, other) =>
       deleteSourceDocumentAtomically({
         ledgerId,
-        target: { sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version },
+        sourceDocumentId: other.sourceDocumentId,
       }),
   ],
   [
     "cancelSourceDocumentProcessing",
-    (ledgerId, other) =>
-      cancelSourceDocumentProcessing(ledgerId, other.sourceDocumentId, other.version),
+    (ledgerId, other) => cancelSourceDocumentProcessing(ledgerId, other.sourceDocumentId),
   ],
   [
     "updateSourceDocuments",
     (ledgerId, other) =>
       updateSourceDocuments({
         ledgerId,
-        targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
+        sourceDocumentIds: [other.sourceDocumentId],
         data: { title: "Taken over" },
       }),
   ],
@@ -175,7 +173,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       splitSourceDocumentAtomically({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
-        expectedVersion: other.version,
         ledgerEntryIds: [other.ledgerEntryId],
         entryDate: "2026-01-02",
       }),
@@ -185,7 +182,7 @@ const REACHES: Array<[name: string, reach: Reach]> = [
     (ledgerId, other) =>
       updateLedgerEntryDates({
         ledgerId,
-        targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
+        sourceDocumentIds: [other.sourceDocumentId],
         ledgerEntryIds: [other.ledgerEntryId],
         entryDate: "2026-01-02",
       }),
@@ -196,7 +193,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       dismissDateOrganization({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
-        expectedVersion: other.version,
         suggestionId: crypto.randomUUID(),
       }),
   ],
@@ -206,7 +202,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       applyDateOrganization({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
-        expectedVersion: other.version,
         suggestionId: crypto.randomUUID(),
         groups: [{ id: "group-1", entryDate: "2026-01-02", ledgerEntryIds: [other.ledgerEntryId] }],
         appliedGroupIds: ["group-1"],
@@ -217,7 +212,7 @@ const REACHES: Array<[name: string, reach: Reach]> = [
     (ledgerId, other) =>
       deleteLedgerEntry({
         ledgerId,
-        target: { sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version },
+        sourceDocumentId: other.sourceDocumentId,
         ledgerEntryId: other.ledgerEntryId,
       }),
   ],
@@ -226,7 +221,7 @@ const REACHES: Array<[name: string, reach: Reach]> = [
     (ledgerId, other) =>
       batchUpdateLedgerEntries({
         ledgerId,
-        targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
+        sourceDocumentIds: [other.sourceDocumentId],
         ledgerEntryIds: [other.ledgerEntryId],
         itemName: "Taken over",
       }),
@@ -236,7 +231,7 @@ const REACHES: Array<[name: string, reach: Reach]> = [
     (ledgerId, other) =>
       batchDeleteLedgerEntries({
         ledgerId,
-        targets: [{ sourceDocumentId: other.sourceDocumentId, expectedVersion: other.version }],
+        sourceDocumentIds: [other.sourceDocumentId],
         ledgerEntryIds: [other.ledgerEntryId],
       }),
   ],
@@ -246,7 +241,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
       submitSourceDocument({
         ledgerId,
         sourceDocumentId: other.sourceDocumentId,
-        expectedVersion: other.version,
         input: { text: "rewritten", storedFileIds: [], documentDate: null },
       }),
   ],
@@ -263,8 +257,8 @@ describe("the aggregate refuses a record from another ledger", () => {
         () => ({ kind: "threw" as const, value: undefined })
       );
 
-      // Refusal comes back in three shapes: a throw, a versioned result with
-      // `ok: false`, and a partial batch that succeeded at nothing. None of
+      // Refusal comes back in three shapes: a throw, a result with `ok: false`,
+      // and a partial batch that succeeded at nothing. None of
       // them may answer as though the record were the caller's.
       if (outcome.kind === "returned") {
         const value = outcome.value as { ok?: boolean; succeeded?: unknown[] } | null;

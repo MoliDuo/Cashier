@@ -7,7 +7,6 @@ import type {
   ApplyDateOrganizationInput,
   ApplyDateOrganizationResultDto,
   DismissDateOrganizationInput,
-  VersionedCommandResult,
 } from "@/modules/source-document/contracts";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
@@ -19,51 +18,40 @@ function normalizeCurrency(value: string | null) {
   return value == null || value === "" ? "CNY" : value;
 }
 
+/**
+ * Drops the suggestion the reader dismissed. One already replaced or gone is
+ * left as it is; the suggestion is not part of a whole-document save, so the
+ * version is left alone.
+ */
 export async function dismissDateOrganization(
   input: DismissDateOrganizationInput & { ledgerId: string }
-): Promise<VersionedCommandResult<{ dismissed: true }>> {
-  const result = await db
+): Promise<{ dismissed: true }> {
+  const current = await db.query.sourceDocuments.findFirst({
+    where: and(
+      eq(sourceDocuments.ledgerId, input.ledgerId),
+      eq(sourceDocuments.id, input.sourceDocumentId),
+      isNull(sourceDocuments.deletedAt)
+    ),
+    columns: { id: true },
+  });
+  if (current == null) throw new NotFoundError("Source document");
+  await db
     .update(sourceDocuments)
-    .set({ dateOrganizationSuggestion: null, version: sql`${sourceDocuments.version} + 1` })
+    .set({ dateOrganizationSuggestion: null })
     .where(
       and(
         eq(sourceDocuments.ledgerId, input.ledgerId),
         eq(sourceDocuments.id, input.sourceDocumentId),
-        eq(sourceDocuments.version, input.expectedVersion),
         sql`${sourceDocuments.dateOrganizationSuggestion}->>'id' = ${input.suggestionId}`,
         isNull(sourceDocuments.deletedAt)
       )
-    )
-    .returning({ version: sourceDocuments.version });
-  if (result[0] == null) {
-    const current = await db.query.sourceDocuments.findFirst({
-      where: and(
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.id, input.sourceDocumentId),
-        isNull(sourceDocuments.deletedAt)
-      ),
-      columns: { version: true },
-    });
-    if (current == null) throw new NotFoundError("Source document");
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: current.version,
-    };
-  }
-  return {
-    ok: true,
-    sourceDocumentId: input.sourceDocumentId,
-    version: result[0].version,
-    data: { dismissed: true },
-  };
+    );
+  return { dismissed: true };
 }
 
 export async function applyDateOrganization(
   input: ApplyDateOrganizationInput & { ledgerId: string }
-): Promise<VersionedCommandResult<ApplyDateOrganizationResultDto>> {
+): Promise<ApplyDateOrganizationResultDto> {
   const [ledger, document] = await Promise.all([
     db.query.ledgers.findFirst({
       where: eq(ledgers.id, input.ledgerId),
@@ -78,14 +66,6 @@ export async function applyDateOrganization(
     }),
   ]);
   if (ledger == null || document == null) throw new NotFoundError("Source document");
-  if (document.version !== input.expectedVersion)
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: document.version,
-    };
   if (
     document.activeRevisionId == null ||
     document.dateOrganizationSuggestion?.id !== input.suggestionId
@@ -144,8 +124,6 @@ export async function applyDateOrganization(
       input.ledgerId,
       input.sourceDocumentId
     );
-    if (lockedDocument.version !== input.expectedVersion)
-      return { staleVersion: lockedDocument.version } as const;
     if (
       lockedDocument.activeRevisionId !== document.activeRevisionId ||
       lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId
@@ -159,18 +137,23 @@ export async function applyDateOrganization(
       ),
     });
     if (activeRevision == null) throw new ConflictError("Active revision is missing");
-    const currentIds = await tx.query.ledgerEntries.findMany({
+    const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
         eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
         eq(ledgerEntries.sourceDocumentRevisionId, lockedDocument.activeRevisionId!),
         isNull(ledgerEntries.deletedAt)
       ),
-      columns: { id: true },
+      columns: { id: true, position: true },
+      orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
     });
+    // Entries edited since the suggestion was read move as they are now; the
+    // groups only need their entries still here, and whether every entry
+    // moves must not have changed, since that picks the group that stays.
+    const currentIds = new Set(currentEntries.map((entry) => entry.id));
     if (
-      currentIds.length !== entries.length ||
-      currentIds.some((entry) => !entriesById.has(entry.id))
+      requestedIds.some((id) => !currentIds.has(id)) ||
+      (assigned.size === entries.length) !== (assigned.size === currentEntries.length)
     )
       throw new ConflictError("Source document entries changed before date organization");
     const destinationByEntry = new Map<
@@ -209,7 +192,7 @@ export async function applyDateOrganization(
         .where(eq(sourceDocuments.id, id));
     }
     // Free the active positions before assigning contiguous positions in the same revision.
-    const positionOffset = Math.max(0, ...entries.map((entry) => entry.position + 1));
+    const positionOffset = Math.max(0, ...currentEntries.map((entry) => entry.position + 1));
     await tx
       .update(ledgerEntries)
       .set({ position: sql`${ledgerEntries.position} + ${positionOffset}` })
@@ -223,7 +206,7 @@ export async function applyDateOrganization(
       );
 
     const positions = new Map<string, number>();
-    for (const entry of entries) {
+    for (const entry of currentEntries) {
       const destination = destinationByEntry.get(entry.id);
       const docId = destination?.documentId ?? input.sourceDocumentId;
       const position = positions.get(docId) ?? 0;
@@ -253,12 +236,7 @@ export async function applyDateOrganization(
         dateOrganizationSuggestion: remainingSuggestion,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(sourceDocuments.id, input.sourceDocumentId),
-          eq(sourceDocuments.version, input.expectedVersion)
-        )
-      );
+      .where(eq(sourceDocuments.id, input.sourceDocumentId));
     const sourceDocument = await getSourceDocumentInTransaction(
       tx,
       input.ledgerId,
@@ -267,18 +245,5 @@ export async function applyDateOrganization(
     if (sourceDocument == null) throw new NotFoundError("Source document");
     return { sourceDocument } as const;
   });
-  if ("staleVersion" in outcome)
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: outcome.staleVersion,
-    };
-  return {
-    ok: true,
-    sourceDocumentId: input.sourceDocumentId,
-    version: input.expectedVersion + 1,
-    data: { sourceDocument: outcome.sourceDocument, createdSourceDocumentIds: createdIds },
-  };
+  return { sourceDocument: outcome.sourceDocument, createdSourceDocumentIds: createdIds };
 }

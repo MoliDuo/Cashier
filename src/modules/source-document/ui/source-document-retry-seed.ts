@@ -4,7 +4,6 @@ import { storedFileReadUrl } from "../stored-file-read";
 
 export interface RetrySeedSourceDocument {
   id: string;
-  version: number;
   text?: string | null;
   files?: SourceDocumentStoredFileDto[];
   documentDate?: string | null;

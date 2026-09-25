@@ -82,7 +82,7 @@
     "retryImpact": "重试预览",
     "deleted": "已删除 {count} 条记录",
     "retried": "已提交 {count} 条记录重试",
-    "partialResult": "成功 {succeeded} 项，跳过 {skipped} 项，失败 {failed} 项",
+    "partialResult": "成功 {succeeded} 项，失败 {failed} 项",
     "loadedOnly": "仅选中已加载的部分",
     "deleteTitleDocuments": "删除所选单据",
     "deleteDescriptionDocuments": "确定删除所选 {count} 张单据吗？{scope} 此操作无法撤销。",
@@ -400,7 +400,6 @@
     "saveBeforeActionTitle": "先保存当前修改？",
     "saveBeforeActionDescription": "先保存当前编辑，再继续所选操作。保存失败时不会执行后续操作。",
     "saveAndContinue": "保存并继续",
-    "actionContextChanged": "账单内容已变化，请检查最新数据后重试。",
     "batchModePendingTitle": "先处理当前修改",
     "batchModePendingDescription": "进入批量操作前，请保存或放弃当前编辑。",
     "dateOrganization": {

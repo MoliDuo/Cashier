@@ -22,11 +22,8 @@ interface UnifiedStreamItemRowProps {
   onExpandedChange?: (sourceDocumentId: string, expanded: boolean) => void;
   isRetrying?: boolean;
   isCancelling?: boolean;
-  onRetry?: (variables: { sourceDocumentId: string; expectedVersion: number }) => Promise<void>;
-  onCancelProcessing?: (variables: {
-    sourceDocumentId: string;
-    expectedVersion: number;
-  }) => Promise<void>;
+  onRetry?: (variables: { sourceDocumentId: string }) => Promise<void>;
+  onCancelProcessing?: (variables: { sourceDocumentId: string }) => Promise<void>;
 }
 
 export function StreamItemRow({
@@ -102,10 +99,7 @@ const UnifiedStreamItemRow = memo(function UnifiedStreamItemRow({
     (nextExpanded: boolean) => onExpandedChange?.(sourceDocument.id, nextExpanded),
     [onExpandedChange, sourceDocument.id]
   );
-  const recoveryVariables = {
-    sourceDocumentId: sourceDocument.id,
-    expectedVersion: sourceDocument.version,
-  };
+  const recoveryVariables = { sourceDocumentId: sourceDocument.id };
 
   return (
     <SourceDocumentCard

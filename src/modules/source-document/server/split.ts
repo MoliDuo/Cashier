@@ -2,10 +2,7 @@ import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import type {
-  SplitSourceDocumentResultDto,
-  VersionedCommandResult,
-} from "@/modules/source-document/contracts";
+import type { SplitSourceDocumentResultDto } from "@/modules/source-document/contracts";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { getSourceDocumentInTransaction } from "./reads/list";
 import { logger } from "@/lib/logger";
@@ -14,36 +11,16 @@ import { copyRevisionFiles, createManualRevision } from "./projections/manual-en
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
 
-type EntrySnapshot = typeof ledgerEntries.$inferSelect;
-
 function effectiveTitle(documentTitle: string | null, revisionTitle: string | null): string | null {
   return documentTitle?.trim() || revisionTitle?.trim() || null;
-}
-
-function sameEntries(expected: readonly EntrySnapshot[], actual: readonly EntrySnapshot[]) {
-  if (expected.length !== actual.length) return false;
-  return expected.every((entry, index) => {
-    const current = actual[index];
-    return (
-      current != null &&
-      entry.id === current.id &&
-      entry.position === current.position &&
-      entry.categoryId === current.categoryId &&
-      entry.amount === current.amount &&
-      entry.currency === current.currency &&
-      entry.itemName === current.itemName &&
-      entry.description === current.description
-    );
-  });
 }
 
 export async function splitSourceDocumentAtomically(input: {
   ledgerId: string;
   sourceDocumentId: string;
-  expectedVersion: number;
   ledgerEntryIds: string[];
   entryDate: string;
-}): Promise<VersionedCommandResult<SplitSourceDocumentResultDto>> {
+}): Promise<SplitSourceDocumentResultDto> {
   const startedAt = performance.now();
   const requestId = crypto.randomUUID();
   const [ledger, document] = await Promise.all([
@@ -60,15 +37,6 @@ export async function splitSourceDocumentAtomically(input: {
     }),
   ]);
   if (ledger == null || document == null) throw new NotFoundError("Source document");
-  if (document.version !== input.expectedVersion) {
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: document.version,
-    };
-  }
   if (document.activeRevisionId == null) {
     throw new ConflictError("Source document cannot be split in its current state");
   }
@@ -104,9 +72,6 @@ export async function splitSourceDocumentAtomically(input: {
       input.ledgerId,
       input.sourceDocumentId
     );
-    if (lockedDocument.version !== input.expectedVersion) {
-      return { staleVersion: lockedDocument.version } as const;
-    }
     if (lockedDocument.activeRevisionId == null) {
       throw new ConflictError("Source document changed before the split");
     }
@@ -132,8 +97,15 @@ export async function splitSourceDocumentAtomically(input: {
       ),
       orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
     });
-    if (!sameEntries(initialEntries, currentEntries)) {
-      throw new ConflictError("Source document entries changed before the split");
+    // The split moves the selected entries as they are now, so an edit to any
+    // entry since the selection was made carries over; it only needs every
+    // selected entry still here and at least one left behind.
+    const currentIds = new Set(currentEntries.map((entry) => entry.id));
+    if ([...movedIds].some((id) => !currentIds.has(id))) {
+      throw new ConflictError("Selected entries are not in the active source document revision");
+    }
+    if (movedIds.size >= currentEntries.length) {
+      throw new ConflictError("The source document must retain at least one entry");
     }
 
     await tx.insert(sourceDocuments).values({
@@ -215,8 +187,7 @@ export async function splitSourceDocumentAtomically(input: {
       .where(
         and(
           eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, input.sourceDocumentId),
-          eq(sourceDocuments.version, input.expectedVersion)
+          eq(sourceDocuments.id, input.sourceDocumentId)
         )
       );
     await tx
@@ -249,24 +220,10 @@ export async function splitSourceDocumentAtomically(input: {
     "Source document split timing"
   );
 
-  if ("staleVersion" in outcome) {
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: outcome.staleVersion,
-    };
-  }
   return {
-    ok: true,
-    sourceDocumentId: input.sourceDocumentId,
-    version: input.expectedVersion + 1,
-    data: {
-      sourceDocument: outcome.sourceDocument,
-      splitSourceDocumentId,
-      splitVersion: 1,
-      movedEntryCount: outcome.movedEntryCount,
-    },
+    sourceDocument: outcome.sourceDocument,
+    splitSourceDocumentId,
+    splitVersion: 1,
+    movedEntryCount: outcome.movedEntryCount,
   };
 }

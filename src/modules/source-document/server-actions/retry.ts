@@ -1,11 +1,8 @@
 "use server";
 import { retrySourceDocument } from "../server/retry";
-import type {
-  RetrySourceDocumentResponseDto,
-  VersionedCommandResult,
-} from "@/modules/source-document/contracts";
+import type { RetrySourceDocumentResponseDto } from "@/modules/source-document/contracts";
 import {
-  versionedTargetSchema,
+  parseSourceDocumentId,
   retrySourceDocumentInputSchema,
   type RetrySourceDocumentInputContract,
 } from "@/modules/source-document/contract-schemas";
@@ -23,19 +20,10 @@ import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
  * For editing evidence before retry, use `editRetrySourceDocumentAction`.
  */
 export const retrySourceDocumentAction = withSourceDocumentLedgerAccess(
-  async (
-    { ledgerId },
-    sourceDocumentId: string,
-    expectedVersion: number
-  ): Promise<VersionedCommandResult<RetrySourceDocumentResponseDto>> => {
-    const identity = versionedTargetSchema.parse({
-      sourceDocumentId,
-      expectedVersion,
-    });
+  async ({ ledgerId }, sourceDocumentId: string): Promise<RetrySourceDocumentResponseDto> => {
     const result = await retrySourceDocument({
       ledgerId,
-      sourceDocumentId: identity.sourceDocumentId,
-      expectedVersion: identity.expectedVersion,
+      sourceDocumentId: parseSourceDocumentId(sourceDocumentId),
     });
 
     // Also recover any missed processing intents
@@ -57,13 +45,9 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
     { ledgerId },
     sourceDocumentId: string,
-    input: RetrySourceDocumentInputContract,
-    expectedVersion: number
-  ): Promise<VersionedCommandResult<RetrySourceDocumentResponseDto>> => {
-    const identity = versionedTargetSchema.parse({
-      sourceDocumentId,
-      expectedVersion,
-    });
+    input: RetrySourceDocumentInputContract
+  ): Promise<RetrySourceDocumentResponseDto> => {
+    const validatedSourceDocumentId = parseSourceDocumentId(sourceDocumentId);
     const parsedInput = retrySourceDocumentInputSchema.parse(input);
     const validatedInput: RetrySourceDocumentInputContract = {
       text: parsedInput.text,
@@ -74,8 +58,7 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
 
     const result = await retrySourceDocument({
       ledgerId,
-      sourceDocumentId: identity.sourceDocumentId,
-      expectedVersion: identity.expectedVersion,
+      sourceDocumentId: validatedSourceDocumentId,
       input: validatedInput,
     });
 

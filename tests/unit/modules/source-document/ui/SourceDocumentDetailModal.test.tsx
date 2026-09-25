@@ -218,7 +218,7 @@ function modal(
         : {})}
       {...(overrides.isCancelling !== undefined ? { isCancelling: overrides.isCancelling } : {})}
       onBatchUpdate={vi.fn(async () => ({ affectedCount: 1 }))}
-      onBatchDeleteEntries={vi.fn(async () => ({ succeeded: [], stale: [], failed: [] }))}
+      onBatchDeleteEntries={vi.fn(async () => ({ succeeded: [], failed: [] }))}
     />
   );
 }
@@ -468,19 +468,14 @@ describe("SourceDocumentDetailModal batch mode", () => {
     expect(onSaveAll.mock.calls[1]![0]).not.toHaveProperty("operationId");
   });
 
-  it("retries split using only the document version", async () => {
+  it("retries split with only the selected entries and date", async () => {
     const onSplit = vi
       .fn()
       .mockRejectedValueOnce(new Error("temporary failure"))
       .mockResolvedValueOnce({
-        ok: true,
-        sourceDocumentId: "doc-1",
-        version: 2,
-        data: {
-          splitSourceDocumentId: "doc-2",
-          splitVersion: 1,
-          movedEntryCount: 1,
-        },
+        splitSourceDocumentId: "doc-2",
+        splitVersion: 1,
+        movedEntryCount: 1,
       });
     render(
       modal(
@@ -500,8 +495,7 @@ describe("SourceDocumentDetailModal batch mode", () => {
 
     const firstInput = onSplit.mock.calls[0]![0];
     const secondInput = onSplit.mock.calls[1]![0];
-    expect(firstInput).toMatchObject({
-      expectedVersion: 1,
+    expect(firstInput).toEqual({
       ledgerEntryIds: ["entry-1"],
       entryDate: "2026-09-03",
     });

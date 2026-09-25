@@ -55,15 +55,10 @@ export function SourceDocumentDetailWrapper({
     applyDateOrganization,
     dismissDateOrganization,
     isOrganizingDates,
-  } = useSourceDocumentDetailMutations({
-    id,
-    version: sourceDocument?.version ?? null,
-    onClose,
-  });
+  } = useSourceDocumentDetailMutations({ id, onClose });
 
   const { cancelProcessing, isCancelling } = useSourceDocumentRecoveryMutations({
     sourceDocumentId: id,
-    version: sourceDocument?.version ?? null,
     onSuccess: onClose,
   });
 
@@ -91,14 +86,10 @@ export function SourceDocumentDetailWrapper({
   const assignment = useLedgerMutation({
     invalidates: ["documents", "stats"],
     // A failed change used to be silent: the picker snapped back with no
-    // explanation. A conflict or an archived target now says so.
+    // explanation. An archived target now says so.
     errorMessage: t("bookChangeFailed"),
     mutationFn: (bookId: string) =>
-      assignSourceDocumentBookAction({
-        sourceDocumentId: id,
-        expectedVersion: sourceDocument!.version,
-        bookId,
-      }),
+      assignSourceDocumentBookAction({ sourceDocumentId: id, bookId }),
     onSuccess: async () => {
       await refetch();
     },

@@ -1,4 +1,4 @@
-import type { AtomicBatchCommandResult, VersionedCommandResult } from "./contracts";
+import type { VersionedCommandResult } from "./contracts";
 
 export interface SourceDocumentStaleTarget {
   sourceDocumentId: string;
@@ -24,23 +24,4 @@ export function unwrapVersionedCommandResult<T>(result: VersionedCommandResult<T
       currentVersion: result.currentVersion,
     },
   ]);
-}
-
-export function unwrapAtomicBatchCommandResult<T>(result: AtomicBatchCommandResult<T>): T {
-  if (result.ok) return result.data;
-  throw new SourceDocumentStaleCommandError(result.staleTargets);
-}
-
-/**
- * A missing browser-side version for an existing document is a programming
- * error, not a runtime condition to recover from — never guess a default.
- */
-export function requireSourceDocumentVersion(
-  version: number | null | undefined,
-  sourceDocumentId: string
-): number {
-  if (version == null) {
-    throw new Error(`Missing source document version: ${sourceDocumentId}`);
-  }
-  return version;
 }

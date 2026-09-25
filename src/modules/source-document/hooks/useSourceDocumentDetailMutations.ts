@@ -22,10 +22,7 @@ import type {
   ApplyDateOrganizationInput,
   ApplyDateOrganizationResultDto,
 } from "@/modules/source-document/contracts";
-import {
-  requireSourceDocumentVersion,
-  unwrapVersionedCommandResult,
-} from "@/modules/source-document/command-results";
+import { unwrapVersionedCommandResult } from "@/modules/source-document/command-results";
 import type { PendingChanges } from "@/modules/source-document/detail-types";
 import { toSaveSourceDocumentChangesInput } from "@/modules/source-document/detail-save-input";
 import { useSourceDocumentEntryMutations } from "./useSourceDocumentEntryMutations";
@@ -34,8 +31,6 @@ import type { BatchEntryUpdateData } from "./source-document-detail-cache";
 
 interface UseSourceDocumentDetailMutationsOptions {
   id: string;
-  /** Read fresh at submission time — never captured ahead of the actual click. */
-  version: number | null;
   onClose: () => void;
 }
 
@@ -56,20 +51,14 @@ export interface AddEntryData {
 
 export function useSourceDocumentDetailMutations({
   id,
-  version,
   onClose,
 }: UseSourceDocumentDetailMutationsOptions) {
   const queryClient = useQueryClient();
 
-  const { deleteDocumentMutation } = useSourceDocumentRecordMutations({
-    id,
-    version,
-    onClose,
-  });
+  const { deleteDocumentMutation } = useSourceDocumentRecordMutations({ id, onClose });
 
   const { batchUpdateMutation, batchDeleteMutation } = useSourceDocumentEntryMutations({
     sourceDocumentId: id,
-    version,
   });
 
   /**
@@ -115,10 +104,8 @@ export function useSourceDocumentDetailMutations({
   >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
-    mutationFn: async (input: Omit<SplitSourceDocumentInput, "sourceDocumentId">) => {
-      const result = await splitSourceDocumentAction({ sourceDocumentId: id, ...input });
-      return unwrapVersionedCommandResult(result);
-    },
+    mutationFn: (input: Omit<SplitSourceDocumentInput, "sourceDocumentId">) =>
+      splitSourceDocumentAction({ sourceDocumentId: id, ...input }),
     successMessage: null,
     errorMessage: null,
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
@@ -126,19 +113,12 @@ export function useSourceDocumentDetailMutations({
 
   const dateOrganizationMutation = useLedgerMutation<
     ApplyDateOrganizationResultDto,
-    Omit<ApplyDateOrganizationInput, "sourceDocumentId" | "expectedVersion">
+    Omit<ApplyDateOrganizationInput, "sourceDocumentId">
   >({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     refreshQueryKey: queryKeys.sourceDocument(id),
-    mutationFn: async (input) => {
-      const result = await applyDateOrganizationAction({
-        sourceDocumentId: id,
-        expectedVersion: requireSourceDocumentVersion(version, id),
-        ...input,
-      });
-      return unwrapVersionedCommandResult(result);
-    },
+    mutationFn: (input) => applyDateOrganizationAction({ sourceDocumentId: id, ...input }),
     successMessage: null,
     errorMessage: null,
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
@@ -151,14 +131,8 @@ export function useSourceDocumentDetailMutations({
     refreshMode: "background",
     invalidates: ["documents"],
     refreshQueryKey: queryKeys.sourceDocument(id),
-    mutationFn: async ({ suggestionId }) => {
-      const result = await dismissDateOrganizationAction({
-        sourceDocumentId: id,
-        expectedVersion: requireSourceDocumentVersion(version, id),
-        suggestionId,
-      });
-      return unwrapVersionedCommandResult(result);
-    },
+    mutationFn: ({ suggestionId }) =>
+      dismissDateOrganizationAction({ sourceDocumentId: id, suggestionId }),
     successMessage: null,
     errorMessage: null,
   });
@@ -167,14 +141,8 @@ export function useSourceDocumentDetailMutations({
     refreshMode: "background",
     refreshQueryKey: queryKeys.sourceDocument(id),
     invalidates: ["documents", "stats"],
-    mutationFn: async (data: AddEntryData) => {
-      const expectedVersion = requireSourceDocumentVersion(version, id);
-      const result = await createLedgerEntryAction(
-        { sourceDocumentId: id, expectedVersion },
-        { sourceDocumentId: id, ...data, amount: String(data.amount) }
-      );
-      return unwrapVersionedCommandResult(result);
-    },
+    mutationFn: (data: AddEntryData) =>
+      createLedgerEntryAction({ sourceDocumentId: id, ...data, amount: String(data.amount) }),
     successMessage: null,
     errorMessage: null,
   });
@@ -184,14 +152,7 @@ export function useSourceDocumentDetailMutations({
     { entryId: string; onCommitted?: (() => void) | undefined }
   >({
     invalidates: ["documents", "stats"],
-    mutationFn: async ({ entryId }) => {
-      const expectedVersion = requireSourceDocumentVersion(version, id);
-      const result = await deleteLedgerEntryAction(
-        { sourceDocumentId: id, expectedVersion },
-        entryId
-      );
-      return unwrapVersionedCommandResult(result);
-    },
+    mutationFn: ({ entryId }) => deleteLedgerEntryAction(id, entryId),
     successMessage: null,
     errorMessage: null,
     refreshMode: "background",

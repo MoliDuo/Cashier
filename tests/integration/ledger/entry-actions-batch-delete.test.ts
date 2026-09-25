@@ -66,7 +66,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .from(sourceDocumentRevisions)
       .where(eq(sourceDocumentRevisions.sourceDocumentId, doc.id));
     const result = await batchDeleteLedgerEntriesAction(
-      [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
+      [doc.id],
       entries.slice(0, 2).map((entry) => entry.id)
     );
 
@@ -124,14 +124,13 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .returning();
 
     const result = await batchDeleteLedgerEntriesAction(
-      [{ sourceDocumentId: doc!.id, expectedVersion: 1 }],
+      [doc!.id],
       entries.map((entry) => entry.id)
     );
 
     // The document has no active projection, so the entries cannot be deleted.
     // The per-entry delete path reports this as a failure instead of a silent skip.
     expect(result.succeeded).toEqual([]);
-    expect(result.stale).toEqual([]);
     expect(result.failed.map((failure) => failure.id).sort()).toEqual(
       entries.map((entry) => entry.id).sort()
     );
@@ -159,15 +158,11 @@ describe("batchDeleteLedgerEntriesAction", () => {
     const foreignEntryId = randomUUID();
 
     const result = await batchDeleteLedgerEntriesAction(
-      [
-        { sourceDocumentId: okDoc.id, expectedVersion: 1 },
-        { sourceDocumentId: badDoc.id, expectedVersion: 1 },
-      ],
+      [okDoc.id, badDoc.id],
       [okEntry!.id, foreignEntryId]
     );
 
-    expect(result.succeeded).toEqual([{ id: okEntry!.id, sourceDocumentId: okDoc.id, version: 2 }]);
-    expect(result.stale).toEqual([]);
+    expect(result.succeeded).toEqual([{ id: okEntry!.id, sourceDocumentId: okDoc.id }]);
     expect(result.failed).toEqual([{ id: foreignEntryId, code: "NOT_FOUND" }]);
 
     const okDocument = await db.query.sourceDocuments.findFirst({
@@ -226,12 +221,11 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .returning();
 
     const result = await batchDeleteLedgerEntriesAction(
-      [{ sourceDocumentId: doc.id, expectedVersion: 1 }],
+      [doc.id],
       [...entries.map((entry) => entry.id), inactiveEntry!.id]
     );
 
     expect(result.succeeded).toEqual([]);
-    expect(result.stale).toEqual([]);
     expect(result.failed.map((failure) => failure.id).sort()).toEqual(
       [...entries.map((entry) => entry.id), inactiveEntry!.id].sort()
     );

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ZodError } from "zod";
+import { ValidationError } from "@/lib/errors";
 
 const { retrySourceDocumentMock } = vi.hoisted(() => ({
   retrySourceDocumentMock: vi.fn(),
@@ -29,42 +29,28 @@ const sourceDocumentId = "11111111-1111-4111-8111-111111111111";
 describe("retrySourceDocumentAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    retrySourceDocumentMock.mockResolvedValue({
-      ok: true,
-      sourceDocumentId,
-      version: 4,
-      data: { status: "processing" },
-    });
+    retrySourceDocumentMock.mockResolvedValue({ status: "processing" });
   });
 
   it("passes the document identity without browser idempotency metadata", async () => {
-    await retrySourceDocumentAction(sourceDocumentId, 3);
+    await expect(retrySourceDocumentAction(sourceDocumentId)).resolves.toEqual({
+      status: "processing",
+    });
     expect(retrySourceDocumentMock.mock.calls[0]?.[0]).toEqual({
       ledgerId: "ledger-1",
       sourceDocumentId,
-      expectedVersion: 3,
     });
   });
 
-  it("passes stale detection to the transactional submission boundary", async () => {
-    retrySourceDocumentMock.mockResolvedValueOnce({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId,
-      expectedVersion: 2,
-      currentVersion: 3,
-    });
-    await expect(retrySourceDocumentAction(sourceDocumentId, 2)).resolves.toEqual({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId,
-      expectedVersion: 2,
-      currentVersion: 3,
-    });
+  it("propagates submission failures", async () => {
+    retrySourceDocumentMock.mockRejectedValueOnce(new Error("Source document is processing"));
+    await expect(retrySourceDocumentAction(sourceDocumentId)).rejects.toThrow(
+      "Source document is processing"
+    );
   });
 
-  it("validates the source document id and expected version", async () => {
-    await expect(retrySourceDocumentAction("not-a-uuid", 3)).rejects.toThrow(ZodError);
-    await expect(retrySourceDocumentAction(sourceDocumentId, 0)).rejects.toThrow(ZodError);
+  it("validates the source document id", async () => {
+    await expect(retrySourceDocumentAction("not-a-uuid")).rejects.toThrow(ValidationError);
+    expect(retrySourceDocumentMock).not.toHaveBeenCalled();
   });
 });

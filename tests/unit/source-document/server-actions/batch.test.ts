@@ -38,13 +38,10 @@ describe("source document batch server actions", () => {
   it("returns a stable internal reason without exposing the original error", async () => {
     deleteDocumentsMock.mockRejectedValueOnce(new Error("database unavailable"));
 
-    const result = await batchDeleteSourceDocumentsAction([
-      { sourceDocumentId, expectedVersion: 1 },
-    ]);
+    const result = await batchDeleteSourceDocumentsAction([sourceDocumentId]);
 
     expect(result).toEqual({
       succeeded: [],
-      stale: [],
       failed: [{ id: sourceDocumentId, code: "INTERNAL" }],
     });
     expect(JSON.stringify(result)).not.toContain("database unavailable");
@@ -55,42 +52,26 @@ describe("source document batch server actions", () => {
       new AppError("storage provider unavailable", "STORAGE_UNAVAILABLE")
     );
 
-    const result = await batchRetrySourceDocumentsAction([
-      { sourceDocumentId, expectedVersion: 1 },
-    ]);
+    const result = await batchRetrySourceDocumentsAction([sourceDocumentId]);
 
     expect(result.failed).toEqual([{ id: sourceDocumentId, code: "PROCESSING_UNAVAILABLE" }]);
     expect(JSON.stringify(result)).not.toContain("storage provider unavailable");
   });
 
-  it("classifies every item separately and keeps the order it was given", async () => {
-    const staleId = "00000000-0000-4000-8000-000000000003";
+  it("classifies every item separately in sorted document order", async () => {
     const failedId = "00000000-0000-4000-8000-000000000004";
     deleteDocumentsMock
-      .mockResolvedValueOnce({ ok: true, version: 2 })
-      .mockResolvedValueOnce({
-        ok: false,
-        expectedVersion: 1,
-        currentVersion: 3,
-      })
+      .mockResolvedValueOnce({ sourceDocumentId, deleted: true })
       .mockRejectedValueOnce(new Error("database unavailable"));
 
-    const result = await batchDeleteSourceDocumentsAction([
-      { sourceDocumentId, expectedVersion: 1 },
-      { sourceDocumentId: staleId, expectedVersion: 1 },
-      { sourceDocumentId: failedId, expectedVersion: 1 },
-    ]);
+    const result = await batchDeleteSourceDocumentsAction([failedId, sourceDocumentId]);
 
+    expect(deleteDocumentsMock.mock.calls.map(([input]) => input)).toEqual([
+      { ledgerId, sourceDocumentId },
+      { ledgerId, sourceDocumentId: failedId },
+    ]);
     expect(result).toEqual({
-      succeeded: [{ id: sourceDocumentId, sourceDocumentId, version: 2 }],
-      stale: [
-        {
-          id: staleId,
-          sourceDocumentId: staleId,
-          expectedVersion: 1,
-          currentVersion: 3,
-        },
-      ],
+      succeeded: [{ id: sourceDocumentId, sourceDocumentId }],
       failed: [{ id: failedId, code: "INTERNAL" }],
     });
   });
@@ -101,27 +82,24 @@ describe("source document batch server actions", () => {
       if (input.sourceDocumentId === sourceDocumentId) {
         throw new AppError("storage provider unavailable", "STORAGE_UNAVAILABLE");
       }
-      return { ok: true, version: 2 };
+      return { status: "processing" };
     });
 
-    const result = await batchRetrySourceDocumentsAction([
-      { sourceDocumentId, expectedVersion: 1 },
-      { sourceDocumentId: laterId, expectedVersion: 1 },
-    ]);
+    const result = await batchRetrySourceDocumentsAction([sourceDocumentId, laterId]);
 
     expect(retrySourceDocumentMock).toHaveBeenCalledTimes(2);
-    expect(result.succeeded).toEqual([{ id: laterId, sourceDocumentId: laterId, version: 2 }]);
+    expect(result.succeeded).toEqual([{ id: laterId, sourceDocumentId: laterId }]);
     expect(result.failed).toEqual([{ id: sourceDocumentId, code: "PROCESSING_UNAVAILABLE" }]);
   });
 
-  it("refuses an empty batch and a duplicated target", async () => {
+  it("refuses an empty batch and runs a duplicated target once", async () => {
     await expect(batchDeleteSourceDocumentsAction([])).rejects.toThrow(ValidationError);
-    await expect(
-      batchDeleteSourceDocumentsAction([
-        { sourceDocumentId, expectedVersion: 1 },
-        { sourceDocumentId, expectedVersion: 2 },
-      ])
-    ).rejects.toThrow(ValidationError);
     expect(deleteDocumentsMock).not.toHaveBeenCalled();
+
+    deleteDocumentsMock.mockResolvedValueOnce({ sourceDocumentId, deleted: true });
+    const result = await batchDeleteSourceDocumentsAction([sourceDocumentId, sourceDocumentId]);
+
+    expect(deleteDocumentsMock).toHaveBeenCalledTimes(1);
+    expect(result.succeeded).toEqual([{ id: sourceDocumentId, sourceDocumentId }]);
   });
 });

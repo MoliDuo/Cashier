@@ -24,7 +24,6 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
       ? {
           mode: options.mode,
           sourceDocumentId: options.sourceDocumentId,
-          sourceDocumentVersion: options.sourceDocumentVersion,
         }
       : { mode: "create" as const }
   );

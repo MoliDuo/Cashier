@@ -8,7 +8,6 @@ import type {
   PartialBatchCommandResult,
   SourceDocument,
 } from "@/modules/source-document/contracts";
-import { SourceDocumentStaleCommandError } from "@/modules/source-document/command-results";
 
 interface UseSourceDocumentEntryBatchActionsOptions {
   busy: boolean;
@@ -117,12 +116,8 @@ export function useSourceDocumentEntryBatchActions({
         const affectedCount = result?.affectedCount ?? 0;
         if (affectedCount > 0) toast.success(t("batchUpdateSuccess", { count: affectedCount }));
         clearSelection();
-      } catch (error) {
-        toast.error(
-          error instanceof SourceDocumentStaleCommandError
-            ? t("actionContextChanged")
-            : t("batchUpdateError")
-        );
+      } catch {
+        toast.error(t("batchUpdateError"));
       } finally {
         setIsSaving(false);
       }
@@ -145,9 +140,9 @@ export function useSourceDocumentEntryBatchActions({
     setIsSaving(true);
     try {
       const result = await onBatchDeleteEntries(selectedIds, (result) => {
-        if (result.stale.length + result.failed.length === 0) setShowBatchDeleteConfirm(false);
+        if (result.failed.length === 0) setShowBatchDeleteConfirm(false);
       });
-      const unresolved = [...result.stale, ...result.failed].map((item) => item.id);
+      const unresolved = result.failed.map((item) => item.id);
       if (unresolved.length === 0) clearSelection();
       else retainSelection(unresolved);
       if (result.succeeded.length > 0) {

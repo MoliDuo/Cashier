@@ -12,7 +12,7 @@ import {
 } from "../../helpers/schema-setup";
 
 /**
- * The transport's own job is to reject a malformed target before the aggregate
+ * The transport's own job is to reject a malformed id before the aggregate
  * sees it. Proving that needs a ledger the caller really owns: without one the
  * access wrapper rejects first, and a bare "it threw" says nothing about which
  * guard fired.
@@ -38,18 +38,16 @@ async function seedOwnedEntry() {
 }
 
 describe("ledger entry update transport validation", () => {
-  it("rejects a malformed version target before the aggregate is reached", async () => {
+  it("rejects a malformed source document id before the aggregate is reached", async () => {
     const { entryId } = await seedOwnedEntry();
     const db = getTestDb();
     const before = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entryId),
     });
 
-    const rejection = await batchUpdateLedgerEntriesAction(
-      [{ sourceDocumentId: "not-a-uuid", expectedVersion: 1 }],
-      [entryId],
-      { itemName: "Updated" }
-    ).catch((error: unknown) => error);
+    const rejection = await batchUpdateLedgerEntriesAction(["not-a-uuid"], [entryId], {
+      itemName: "Updated",
+    }).catch((error: unknown) => error);
 
     // Not merely "it threw": the access wrapper would have thrown too, and it
     // would have meant the payload was never validated at all.
@@ -70,15 +68,13 @@ describe("ledger entry update transport validation", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
 
-    const rejection = await batchUpdateLedgerEntriesAction(
-      [{ sourceDocumentId, expectedVersion: 1 }],
-      ["not-an-entry"],
-      { itemName: "Updated" }
-    ).catch((error: unknown) => error);
+    const rejection = await batchUpdateLedgerEntriesAction([sourceDocumentId], ["not-an-entry"], {
+      itemName: "Updated",
+    }).catch((error: unknown) => error);
 
     expect(rejection).toBeInstanceOf(ValidationError);
-    // A rejected command must not burn a version, or the next optimistic write
-    // from an untouched client would fail for a change that never happened.
+    // A rejected command must not burn a version, or the next whole-document
+    // save from an untouched client would fail for a change that never happened.
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });

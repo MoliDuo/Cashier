@@ -255,45 +255,37 @@ describe("useSourceDocumentSubmitMutations", () => {
     expect(onSuccess).not.toHaveBeenCalled();
   });
 
-  it("forwards the retry draft version to the action and keeps stale drafts intact", async () => {
-    retrySourceDocumentActionMock.mockResolvedValue({
-      ok: false,
-      sourceDocumentId: "source-1",
-      expectedVersion: 7,
-      currentVersion: 8,
-    });
+  it("forwards the retry draft to the action and keeps failed drafts intact", async () => {
+    retrySourceDocumentActionMock.mockRejectedValue(new Error("Source document is processing"));
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
     const onSuccess = vi.fn();
-    const form = (version: number, id = "source-1") => (
+    const form = (id = "source-1") => (
       <QueryClientProvider client={queryClient}>
         <SourceDocumentInput
           mode="retry"
           sourceDocumentId={id}
-          sourceDocumentVersion={version}
           initialData={{ text: "Original", entryDate: "2026-07-17" }}
           onSuccess={onSuccess}
         />
       </QueryClientProvider>
     );
-    const view = render(form(7));
+    const view = render(form());
     fireEvent.change(screen.getByRole("textbox", { name: "draft" }), {
       target: { value: "Unsaved" },
     });
-    view.rerender(form(8));
     fireEvent.click(screen.getByRole("button", { name: "submit" }));
     await waitFor(() =>
       expect(retrySourceDocumentActionMock).toHaveBeenCalledWith(
         "source-1",
-        expect.objectContaining({ text: "Unsaved" }),
-        7
+        expect.objectContaining({ text: "Unsaved" })
       )
     );
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalled());
     expect(onSuccess).not.toHaveBeenCalled();
     expect(screen.getByRole("textbox", { name: "draft" })).toHaveValue("Unsaved");
-    view.rerender(form(2, "source-2"));
+    view.rerender(form("source-2"));
     expect(screen.getByRole("textbox", { name: "draft" })).toHaveValue("Original");
   });
 });
