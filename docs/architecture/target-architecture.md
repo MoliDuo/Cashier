@@ -24,8 +24,12 @@
 2. **一个概念只有一个状态。** 不允许两张表互相镜像同一个状态，然后再写代码去纠正它们之间的偏差。
 3. **并发控制只加在真正会并发的地方。**
    - AI 后台任务用租约加 fencing token。
-   - 两个人同时编辑同一张票据时，在整体保存那一步做前置检查（`updated_at`）。
-   - 其余写入一律用字段级 PATCH，最后写入者胜出。后台写入不改动用户能看到的版本号。
+   - 两个人同时编辑同一张票据时，在整体保存那一步做前置检查，用票据上的整数 `version`。
+     规则：**当且仅当整体保存能写的内容（标题、日期、条目集合与条目字段）发生变化时，`version` 加 1**。
+     换分账、提交提取、记录失败、分类任务都不改动它。不用 `updated_at`，是因为 JS 只有毫秒精度，
+     而 Postgres 存的是微秒，比较相等并不可靠。
+   - 其余写入一律用字段级 PATCH，最后写入者胜出。后台分类任务对单个条目做比较并交换
+     （`category_id` 仍是开始时的值才写入），不依赖票据的版本号。
 4. **默认硬删除。** 只有明确需要审计的地方才保留痕迹，例如凭证的 `revoked_at`。
 5. **离开页面是安全的。** 草稿会保留下来，而不是拦住用户不让离开。只有上传还在进行时才拦截关闭页面。
 6. **所有时间预算都从同一个数字推导。** 截止时间、租约长度、单次请求超时都由
@@ -41,24 +45,31 @@
 
 ## 2. 目标数据模型
 
-| 表                                        | 职责                                                                                       | 相对现状                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `ledgers`（单行）、`books`、`categories`  | 账本设置、分账、分类                                                                       | 分类改为硬删除；名称唯一约束设为 `DEFERRABLE`，去掉改名用的临时名技巧                                            |
-| `receipts`                                | 票据：所属分账、标题、默认日期、状态、当前输入、`updated_at`                               | 由 `source_documents` 演化而来，去掉 active/latest 两个 revision 指针                                            |
-| `receipt_files`                           | 票据与文件的关联                                                                           | 取代 `revision_files`                                                                                            |
-| `extraction_attempts`                     | 每一次提取：输入快照、状态、租约、尝试次数、失败码、`prompt_version`                       | 合并 `source_document_revisions` 和 `processing_outbox`，它本身就是任务队列                                      |
-| `entries`                                 | 条目：**`date NOT NULL`**、金额、币种、分类、`receipt_id NOT NULL`                         | 去掉 `converted_amount`、`exchange_rate` 和 revision 外键                                                        |
-| `currency_rates(date, currency, per_eur)` | 汇率，一行一个币种，日期取服务商返回的真实日期                                             | 取代现在每个日期一行的 jsonb；折算用一个 SQL 视图或片段在读取时完成                                              |
-| `stored_files`（`pending` / `ready`）     | 对象存储里文件的登记                                                                       | 删除 `upload_sessions`、`upload_session_files`、`object_cleanup_jobs`；`temporary/` 前缀交给 S3 生命周期规则清理 |
-| `category_jobs`、`category_job_documents` | 批量分类任务，租约放在 job 行上                                                            | 删除 chunks 表和父表上缓存的计数列                                                                               |
-| 认证                                      | `users`、`login_emails`、`verification_codes`、`rate_limit_buckets`、`service_credentials` | OTP 和改邮箱验证合成一张验证码表，尝试次数和锁定逻辑只实现一次                                                   |
-| `ledger_sync_state`                       | 客户端刷新用的水位线，由语句级触发器维护                                                   | 由行级触发器改来                                                                                                 |
-| 幂等                                      | 在 `receipts` 上加 `UNIQUE(来源, idempotency_key)`                                         | 删除 `idempotency_records`，不再需要它的租约和心跳                                                               |
+表名沿用现状。改表名在迁移和旧版本并存的部署窗口里没法安全进行，收益又只是名字好看，所以下表的
+"概念"一列只用来说明职责。
+
+| 概念与表名                                              | 职责                                                                                       | 相对现状                                                                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `ledgers`（单行）、`books`、`categories`                | 账本设置、分账、分类                                                                       | 分类改为硬删除；名称唯一约束设为 `DEFERRABLE`，去掉改名用的临时名技巧                                            |
+| 票据：`source_documents`                                | 所属分账、标题、日期、当前输入（文本）、`version`、指向当前提取尝试的指针                  | 去掉 `active_revision_id`，只保留 `latest_submission_revision_id` 作为"当前尝试"的引用                           |
+| 票据文件：`source_document_files`                       | 票据当前输入的文件                                                                         | 新表，取代 `revision_files`                                                                                      |
+| 提取尝试：`source_document_revisions`                   | 每一次提取：请求的日期、状态、租约、尝试次数、失败码                                       | 并入 `processing_outbox` 的租约与计数，它本身就是任务队列；不再有 manual revision                                |
+| 条目：`ledger_entries`                                  | 金额、币种、分类、所属票据                                                                 | 去掉 `converted_amount`、`exchange_rate` 和 revision 外键                                                        |
+| 汇率：`exchange_rates(rate_date, currency, per_eur, …)` | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间    | 取代每个日期一行的 jsonb `currency_rates`；折算由 SQL 函数在读取时完成                                           |
+| `stored_files`（`pending` / `ready`）                   | 对象存储里文件的登记                                                                       | 删除 `upload_sessions`、`upload_session_files`、`object_cleanup_jobs`；`temporary/` 前缀交给 S3 生命周期规则清理 |
+| `category_jobs`、`category_job_documents`               | 批量分类任务，租约放在 job 行上                                                            | 删除 chunks 表和父表上缓存的计数列                                                                               |
+| 认证                                                    | `users`、`login_emails`、`verification_codes`、`rate_limit_buckets`、`service_credentials` | OTP 和改邮箱验证合成一张验证码表，尝试次数和锁定逻辑只实现一次                                                   |
+| `ledger_sync_state`                                     | 客户端刷新用的水位线，由语句级触发器维护                                                   | 由行级触发器改来                                                                                                 |
+| 幂等                                                    | 在票据上加 `UNIQUE(来源, idempotency_key)`                                                 | 删除 `idempotency_records`，不再需要它的租约和心跳                                                               |
 
 语义约定：
 
-- **条目自带日期。** 新建条目时默认取票据日期；AI 给出的日期提示直接写进条目。
-  一张票据的条目可以落在不同的日子，因此"拆分票据"和"日期整理"两个功能都不再需要。
+- **日期挂在票据上。** 一张票据一个日期（`document_date`，缺省时 `effective_date` 取创建日）。
+  一次输入里出现多个日期时，继续由"日期整理"和"拆分"处理。条目自带日期的方案评估过（审计 A），
+  代价约 53 个文件，而多日期输入并不常见，所以不做。
+- **折算在读取时完成。** 折算额由金额、币种、票据的 `effective_date` 和账本主币种唯一确定，
+  按当天的汇率行精确匹配；没有汇率行就显示为未折算，不回退到别的日期。汇率行按自然日存放，
+  周末取服务商给出的上一个工作日。服务商还没发布当天汇率时先存一行临时值，之后由维护流程刷新。
 - **重新提取成功时，在同一个事务里替换全部条目。** 失败时旧条目原样保留，同时展示新的输入和失败原因。
 - **手动录入的票据没有提取记录。** 它的状态就是空闲。
 
@@ -100,7 +111,8 @@ src/persistence/      schema（按领域拆文件）和迁移
   重试策略和错误分类（暂时性 / 永久性 / 配置问题）也各只有一套。
 - **runner 没活就退出。** 认领不到工作时立刻返回，不空转等待；快用完预算时主动停下，
   剩下的工作交给下一次触发。
-- **汇率在写入时确保已缓存。** 因为折算在读取时完成，所以不需要汇率重算任务。
+- **汇率在写入前尽力缓存。** 拿不到也照常保存，读取时显示未折算，由维护流程补齐。
+  因为折算在读取时完成，所以不需要汇率重算任务，改主币种也只是改一个设置。
 - **必须保留的保护。** 提交事务里先写一条持久记录，再调用 `after()`；AI 结果写回时用 fencing 检查。
 
 ## 5. 前端
@@ -140,8 +152,8 @@ src/persistence/      schema（按领域拆文件）和迁移
 ## 8. 路线图
 
 - **Phase 0：先修的问题**，见审计第一节。
-- **Phase 1：票据模型。** 按 A 条目日期 → B 读时折算 → C 去掉版本协议 → D 合并 revision 与 outbox
-  的顺序推进。四项相互咬合，每一项都按 expand/contract 分多次发布。
+- **Phase 1：票据模型。** 按 B 读时折算 → C 收窄版本协议 → D 合并 revision 与 outbox 的顺序推进，
+  每一项都按 expand/contract 分多次发布。原计划的 A（条目自带日期）已取消，理由见第 2 节。
 - **Phase 2：后台与存储。** 包括 E 统一租约并加上每日 cron、F 精简上传、G 改为硬删除。
 - **Phase 3：前端与认证。** 前端是 H，认证是 I，两者互不依赖，可以穿插进行。
 - **持续进行：测试与工具**，即 J。每重写一块，就把对应的 mock 测试换成真实数据库测试。
