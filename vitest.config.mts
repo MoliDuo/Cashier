@@ -50,21 +50,20 @@ const coverageConfig = {
 
 const defaultProjectExcludes = ["node_modules", ".next"];
 const unitDomTypeScriptTests = [
-  "tests/unit/api/v1/source-documents-route-omission.test.ts",
   "tests/unit/lib/ai/openai-client.test.ts",
   "tests/unit/lib/drafts.test.ts",
   "tests/unit/lib/image-utils.test.ts",
   "tests/unit/lib/navigation/ledger-detail-navigation.test.ts",
+  "tests/unit/lib/store/modal-stack.test.ts",
   "tests/unit/lib/utils.test.ts",
-  "tests/unit/modal-stack.test.ts",
-  "tests/unit/modules/currency/useConvertedAmount.test.ts",
+  "tests/unit/modules/currency/hooks/useConvertedAmount.test.ts",
   "tests/unit/modules/source-document/hooks/source-document-input-images.test.ts",
   "tests/unit/modules/source-document/hooks/source-document-submission-upload.test.ts",
+  "tests/unit/modules/workspace/ledger-url-navigation.test.ts",
+  "tests/unit/modules/workspace/ledger-url-params.test.ts",
   "tests/unit/modules/workspace/pull-reveal.test.ts",
   "tests/unit/modules/workspace/tab-swipe.test.ts",
   "tests/unit/modules/workspace/ui/new-record-success-feedback.test.ts",
-  "tests/unit/workspace/ledger-url-navigation.test.ts",
-  "tests/unit/workspace/ledger-url-params.test.ts",
 ];
 const sharedProjectTestConfig = {
   globals: true,
@@ -122,7 +121,7 @@ export default defineConfig({
           include: ["tests/integration/**/*.test.ts", "tests/integration/**/*.test.tsx"],
           exclude: [
             ...defaultProjectExcludes,
-            "tests/integration/client/source-document-dialog-flows.test.tsx",
+            "tests/integration/modules/source-document/ui/source-document-dialog-flows.test.tsx",
           ],
           environment: "node",
           globalSetup: ["./tests/setup.postgres-global.ts"],
@@ -140,7 +139,9 @@ export default defineConfig({
           ...sharedProjectTestConfig,
           name: "integration-dom",
           sequence: { groupOrder: 4 },
-          include: ["tests/integration/client/source-document-dialog-flows.test.tsx"],
+          include: [
+            "tests/integration/modules/source-document/ui/source-document-dialog-flows.test.tsx",
+          ],
           exclude: defaultProjectExcludes,
           environment: "happy-dom",
           setupFiles: ["./tests/setup.dom.ts"],

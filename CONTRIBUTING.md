@@ -58,7 +58,8 @@ Never commit `.env`, provider credentials, real receipts, API keys, or raw perso
 - `src/lib/`, `src/components/`, `src/persistence/` — shared infrastructure, UI primitives, and schema
 - `src/persistence/postgres-migrations/` — PostgreSQL migrations
 - `messages/` — translations
-- `tests/unit/`, `tests/integration/`
+- `tests/unit/`, `tests/integration/` — tests at the path of the `src/` file they cover
+  (`src/modules/ledger/server/books.ts` → `tests/integration/modules/ledger/server/books.test.ts`)
 
 [Architecture and Coding Patterns](./docs/architecture/coding-patterns.md) describes the import
 boundaries, which `npm run check:architecture` (dependency-cruiser) enforces; the rules that are

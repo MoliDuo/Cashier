@@ -30,6 +30,18 @@ the container after the Vitest run. The first run may download PostgreSQL and re
 its last reference the moment nothing at all refers to it. An export that only tests use is not
 flagged, and does not need a label saying so.
 
+## Placement
+
+`tests/unit/` and `tests/integration/` mirror `src/`: a test sits at the path of the source file it
+covers, so `src/modules/ledger/server/books.ts` is tested by
+`tests/unit/modules/ledger/server/books.test.ts` or
+`tests/integration/modules/ledger/server/books.test.ts`, and a route handler under
+`src/app/api/...` by a test under the same path. A file that covers several source files goes
+beside the one it exercises most; split it when that is unclear. Tests of `scripts/` live in
+`tests/unit/scripts/` and `tests/integration/scripts/`, and the few checks that concern the whole
+repository (headers, retired files, shared mocks) live in `tests/unit/repo/`. Helpers, fixtures,
+stubs, setup files, and Playwright smoke tests keep their own directories under `tests/`.
+
 ## Isolation
 
 Browser smoke tests live in `tests/smoke/` and run with Playwright against a production build.

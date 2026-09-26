@@ -42,7 +42,7 @@ async function archiveBook(page: Page, name: string) {
 
 test("there is no web setup, and an enrollment link nobody issued is refused", async ({ page }) => {
   // Accounts come from `account:create`; enrollment itself is covered by
-  // tests/integration/auth/enrollment.test.ts.
+  // tests/integration/modules/auth/server/enrollment.test.ts.
   const response = await page.goto("/setup");
   expect(response?.status()).toBe(404);
 
@@ -247,7 +247,7 @@ test("@demo deletes, archives and restores a book it creates for itself", async 
   // The demo workspace is shared by every project in this file, so this test
   // brings its own book and removes it again instead of retiring a seeded one.
   // The rules that need a book with records or a bound key are pinned in
-  // tests/integration/ledger/books-adapter.test.ts, where fixtures are free.
+  // tests/integration/modules/ledger/server/books.test.ts, where fixtures are free.
   const bookName = "临时甲账";
 
   await page.goto("/");
