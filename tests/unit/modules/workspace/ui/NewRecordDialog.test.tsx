@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import zh from "../../../../../messages/zh.json";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { writeLastNewRecordBookId } from "@/modules/workspace/new-record-book-memory";
+import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 
 vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
   InputFormLoadingFallback: () => null,
@@ -11,6 +13,10 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
     viewedBookId: string | null;
     savedBook: { id: string; name: string } | null;
     timeZone?: string;
+    inputMode: string;
+    setInputMode: (mode: "ai" | "quick") => void;
+    setAiPending: (pending: boolean) => void;
+    setInputOpen: (open: boolean) => void;
   }) => (
     <div
       data-testid="record-forms"
@@ -20,7 +26,18 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
         props.savedBook == null ? "" : `${props.savedBook.id}:${props.savedBook.name}`
       }
       data-time-zone={props.timeZone ?? ""}
-    />
+      data-input-mode={props.inputMode}
+    >
+      <button type="button" onClick={() => props.setAiPending(true)}>
+        start submit
+      </button>
+      <button type="button" onClick={() => props.setAiPending(false)}>
+        settle submit
+      </button>
+      <button type="button" onClick={() => props.setInputOpen(false)}>
+        saved
+      </button>
+    </div>
   ),
 }));
 
@@ -81,36 +98,41 @@ const defaultBooks: BookDto[] = [
   }),
 ];
 
-function renderDialog(overrides: Partial<Parameters<typeof NewRecordDialog>[0]> = {}) {
-  const props: Parameters<typeof NewRecordDialog>[0] = {
+type DialogProps = Parameters<typeof NewRecordDialog>[0];
+
+/** Stands in for the shell's + button, which opens the dialog through the store. */
+function OpenFlag({ open }: { open: boolean }) {
+  const setOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
+  useLayoutEffect(() => setOpen(open), [open, setOpen]);
+  return null;
+}
+
+function renderDialog(overrides: Partial<DialogProps> = {}) {
+  const props: DialogProps = {
     scope: null,
     books: defaultBooks,
-    isOpen: false,
-    onOpenChange: vi.fn(),
-    isSubmitting: false,
     activeTab: "stream",
     committedFilters: {},
-    inputMode: "quick",
-    setInputMode: vi.fn(),
     categories: [],
     mainCurrency: "CNY",
     preferredCurrencies: [],
-    aiDirty: false,
-    quickDirty: false,
-    setInputOpen: vi.fn(),
-    setAiPending: vi.fn(),
-    setQuickPending: vi.fn(),
-    setAiDirty: vi.fn(),
-    setQuickDirty: vi.fn(),
     deviceTimeZone: "Europe/Berlin",
     ...overrides,
   };
-  const view = render(<NewRecordDialog {...props} />);
-  const open = (extra: Partial<Parameters<typeof NewRecordDialog>[0]> = {}) => {
-    view.rerender(<NewRecordDialog {...props} {...extra} isOpen />);
+  const tree = (isOpen: boolean, extra: Partial<DialogProps> = {}) => (
+    <WorkspaceStoreProvider initialBookId={null}>
+      <OpenFlag open={isOpen} />
+      <NewRecordDialog {...props} {...extra} />
+    </WorkspaceStoreProvider>
+  );
+  const view = render(tree(false));
+  const rerender = (isOpen: boolean, extra: Partial<DialogProps> = {}) =>
+    view.rerender(tree(isOpen, extra));
+  const open = (extra: Partial<DialogProps> = {}) => {
+    rerender(true, extra);
     return screen.getByTestId("record-forms");
   };
-  return { view, props, open };
+  return { view, open, rerender };
 }
 
 function formsAttrs() {
@@ -183,44 +205,83 @@ describe("NewRecordDialog book picker", () => {
   });
 
   it("keeps the pick when the books refetch while the dialog stays open", () => {
-    const { view, props, open } = renderDialog({ scope: BOOK_A });
+    const { rerender, open } = renderDialog({ scope: BOOK_A });
     open();
     fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_B } });
 
-    view.rerender(
-      <NewRecordDialog
-        {...props}
-        isOpen
-        books={[createBook({ name: "Household" }), defaultBooks[1]!]}
-      />
-    );
+    rerender(true, { books: [createBook({ name: "Household" }), defaultBooks[1]!] });
 
     expect(formsAttrs()).toMatchObject({ bookId: BOOK_B, savedBook: `${BOOK_B}:Travel` });
   });
 
   it("resets to the remembered pick every time the dialog opens", () => {
     writeLastNewRecordBookId(BOOK_B);
-    const { view, props, open } = renderDialog({});
+    const { rerender, open } = renderDialog({});
     open();
     fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_A } });
     expect(formsAttrs().bookId).toBe(BOOK_A);
 
-    view.rerender(<NewRecordDialog {...props} isOpen={false} />);
+    rerender(false);
     open();
 
     expect(formsAttrs().bookId).toBe(BOOK_B);
   });
 
   it("resolves to the first book when the pick is not (yet) live", () => {
-    const { view, props, open } = renderDialog({ books: [] });
+    const { rerender, open } = renderDialog({ books: [] });
     open();
 
-    view.rerender(<NewRecordDialog {...props} isOpen books={defaultBooks} />);
+    rerender(true, { books: defaultBooks });
 
     expect(formsAttrs()).toMatchObject({
       bookId: BOOK_A,
       savedBook: `${BOOK_A}:Daily`,
       timeZone: "Asia/Shanghai",
     });
+  });
+});
+
+describe("NewRecordDialog state", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("opens on AI parsing and switches to quick entry", () => {
+    const { open } = renderDialog();
+    open();
+    expect(screen.getByTestId("record-forms")).toHaveAttribute("data-input-mode", "ai");
+
+    fireEvent.click(screen.getByRole("button", { name: zh.LedgerPage.quickEntry }));
+
+    expect(screen.getByTestId("record-forms")).toHaveAttribute("data-input-mode", "quick");
+  });
+
+  it("cannot be closed or switched while a form is submitting", () => {
+    const { open } = renderDialog();
+    open();
+    expect(screen.getByRole("button", { name: zh.Common.close })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "start submit" }));
+
+    expect(screen.queryByRole("button", { name: zh.Common.close })).toBeNull();
+    expect(screen.getByRole("button", { name: zh.LedgerPage.quickEntry })).toBeDisabled();
+    act(() => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    });
+    expect(screen.getByTestId("record-forms")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "settle submit" }));
+    fireEvent.click(screen.getByRole("button", { name: zh.Common.close }));
+
+    expect(screen.queryByTestId("record-forms")).toBeNull();
+  });
+
+  it("closes when a form saves", () => {
+    const { open } = renderDialog();
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "saved" }));
+
+    expect(screen.queryByTestId("record-forms")).toBeNull();
   });
 });

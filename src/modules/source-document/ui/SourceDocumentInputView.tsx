@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import type { ChangeEvent, ClipboardEvent, RefObject } from "react";
+import { useTranslations } from "next-intl";
 import { Camera, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
@@ -9,10 +10,7 @@ import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { useFileDropZone } from "../hooks/useFileDropZone";
 import type { CameraCapture } from "../hooks/useCameraCapture";
-import {
-  SourceDocumentCameraPanel,
-  type SourceDocumentCameraPanelMessages,
-} from "./SourceDocumentCameraPanel";
+import { SourceDocumentCameraPanel } from "./SourceDocumentCameraPanel";
 import {
   SourceDocumentImageModal,
   type SourceDocumentModalImage,
@@ -21,25 +19,6 @@ import type { SourceDocumentSubmissionProgress } from "../hooks/source-document-
 
 const imageActionButtonClassName =
   "absolute right-0 top-0 z-10 flex h-7 w-7 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full text-white transition-opacity after:absolute after:h-11 after:w-11 after:content-[''] opacity-100 focus-visible:opacity-100 [@media(any-hover:hover)]:opacity-0 [@media(any-hover:hover)]:group-hover:opacity-100";
-
-interface SourceDocumentInputViewMessages {
-  placeholder: string;
-  image: string;
-  send: string;
-  retry: string;
-  delete: string;
-  sendingStatus: string;
-  entryDate: string;
-  preparing: string;
-  uploading: string;
-  finalizing: string;
-  submitting: string;
-  cancelling: string;
-  cancelUpload: string;
-  uploadedImage: (index: number) => string;
-  camera: SourceDocumentCameraPanelMessages;
-  dropImages: string;
-}
 
 export interface SourceDocumentInputViewProps {
   mode: "create" | "retry";
@@ -60,7 +39,6 @@ export interface SourceDocumentInputViewProps {
   remainingImageSlots: number;
   camera: CameraCapture;
   isDropEnabled: boolean;
-  messages: SourceDocumentInputViewMessages;
   onEntryDateChange: (date: Date) => void;
   onTextChange: (value: string) => void;
   onTextareaPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
@@ -94,7 +72,6 @@ export function SourceDocumentInputView({
   remainingImageSlots,
   camera,
   isDropEnabled,
-  messages,
   onEntryDateChange,
   onTextChange,
   onTextareaPaste,
@@ -109,6 +86,8 @@ export function SourceDocumentInputView({
   onImageOpen,
   onImageClose,
 }: SourceDocumentInputViewProps) {
+  const t = useTranslations("SourceDocumentInput");
+  const tCommon = useTranslations("Common");
   const drop = useFileDropZone({ enabled: isDropEnabled, onFiles: onAddImageFiles });
   const showsViewfinder =
     isCameraAvailable &&
@@ -124,14 +103,14 @@ export function SourceDocumentInputView({
     >
       {drop.isDragging ? (
         <p role="status" className={textRoleClassName("meta")}>
-          {messages.dropImages}
+          {t("dropImages")}
         </p>
       ) : null}
 
       <DateFilter
         value={entryDate}
         onChange={(date) => onEntryDateChange(date ?? new Date())}
-        placeholder={messages.entryDate}
+        placeholder={t("entryDate")}
         size="sm"
         className="w-full"
         disabled={isPending}
@@ -146,7 +125,6 @@ export function SourceDocumentInputView({
           isOpen={isCameraOpen}
           isBusy={isSubmitting}
           remaining={remainingImageSlots}
-          messages={messages.camera}
           onCapture={camera.capture}
           onSwitchFacing={camera.switchFacing}
           onOpen={onCameraOpen}
@@ -158,7 +136,7 @@ export function SourceDocumentInputView({
       {images.length > 0 && (
         <div className="grid grid-cols-4 gap-2">
           {images.map((image, index) => {
-            const imageLabel = messages.uploadedImage(index + 1);
+            const imageLabel = t("uploadedImage", { index: index + 1 });
             return (
               <div key={`${image.data}-${index}`} className="group relative">
                 <button
@@ -173,8 +151,8 @@ export function SourceDocumentInputView({
                 <button
                   onClick={() => onRemoveImage(index)}
                   type="button"
-                  aria-label={messages.delete}
-                  title={messages.delete}
+                  aria-label={tCommon("delete")}
+                  title={tCommon("delete")}
                   className={`${imageActionButtonClassName} bg-danger text-xs`}
                   disabled={isPending}
                 >
@@ -190,8 +168,8 @@ export function SourceDocumentInputView({
         value={text}
         onChange={(event) => onTextChange(event.target.value)}
         onPaste={onTextareaPaste}
-        placeholder={messages.placeholder}
-        aria-label={messages.placeholder}
+        placeholder={t("placeholder")}
+        aria-label={t("placeholder")}
         className="resize-none"
         rows={5}
         autoFocus={!showsViewfinder}
@@ -201,14 +179,13 @@ export function SourceDocumentInputView({
       {progress != null ? (
         <SubmissionProgress
           progress={progress}
-          messages={messages}
           canCancel={canCancelUpload}
           onCancel={onCancelUpload}
         />
       ) : isPreparingImages ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
           <RefreshCw className="h-4 w-4 animate-spin" />
-          {messages.preparing}
+          {t("preparing")}
         </div>
       ) : null}
 
@@ -219,7 +196,7 @@ export function SourceDocumentInputView({
           onChange={onFileInputChange}
           accept="image/jpeg,image/png,image/gif,image/webp"
           multiple
-          aria-label={messages.image}
+          aria-label={t("image")}
           className="hidden"
         />
         <Button
@@ -230,7 +207,7 @@ export function SourceDocumentInputView({
           disabled={isPending}
         >
           <Camera className="mr-2 h-4 w-4" />
-          {messages.image}
+          {t("image")}
         </Button>
         <div className="flex-1" />
         <Button
@@ -240,16 +217,16 @@ export function SourceDocumentInputView({
           className="flex-1 sm:flex-initial"
         >
           {isSubmitting ? (
-            messages.sendingStatus
+            tCommon("sending_status")
           ) : mode === "retry" ? (
             <>
               <RefreshCw className="mr-2 h-4 w-4" />
-              {messages.retry}
+              {tCommon("retry")}
             </>
           ) : (
             <>
               <Send className="mr-2 h-4 w-4" />
-              {messages.send}
+              {t("send")}
             </>
           )}
         </Button>
@@ -271,27 +248,26 @@ export function SourceDocumentInputView({
 
 function SubmissionProgress({
   progress,
-  messages,
   canCancel,
   onCancel,
 }: {
   progress: SourceDocumentSubmissionProgress;
-  messages: SourceDocumentInputViewMessages;
   canCancel: boolean;
   onCancel: () => void;
 }) {
+  const t = useTranslations("SourceDocumentInput");
   const percent = progress.percent;
   const isIndeterminate = progress.phase === "submitting";
   const phaseLabel =
     progress.phase === "preparing" || progress.phase === "planning"
-      ? messages.preparing
+      ? t("preparing")
       : progress.phase === "uploading"
-        ? messages.uploading
+        ? t("uploading")
         : progress.phase === "finalizing"
-          ? messages.finalizing
+          ? t("finalizing")
           : progress.phase === "cancelling"
-            ? messages.cancelling
-            : messages.submitting;
+            ? t("cancelling")
+            : t("submitting");
 
   return (
     <div className="space-y-2" role="status" aria-live="polite">
@@ -301,7 +277,7 @@ function SubmissionProgress({
           {isIndeterminate ? null : <span className="tabular-nums">{percent}%</span>}
           {canCancel ? (
             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-              {messages.cancelUpload}
+              {t("cancelUpload")}
             </Button>
           ) : null}
         </div>

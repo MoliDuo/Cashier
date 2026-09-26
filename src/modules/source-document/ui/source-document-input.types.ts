@@ -28,3 +28,5 @@ export type SourceDocumentInputProps = SourceDocumentInputBaseProps &
         initialData: NonNullable<SourceDocumentInputBaseProps["initialData"]>;
       }
   );
+
+export type SourceDocumentInputInitialData = NonNullable<SourceDocumentInputProps["initialData"]>;

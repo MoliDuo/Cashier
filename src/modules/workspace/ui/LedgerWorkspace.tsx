@@ -9,7 +9,6 @@ import { textRoleClassName } from "@/components/typography";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { useLedgerHistorySync } from "../hooks/useLedgerHistorySync";
-import { useNewRecordDialogState } from "../hooks/useNewRecordDialogState";
 import { useLedgerPageEnvironment } from "../hooks/useLedgerPageEnvironment";
 import { useRecordScope } from "../hooks/useRecordScope";
 import { buildLedgerEntryFilters } from "../ledger-filter-state";
@@ -52,21 +51,6 @@ export function LedgerWorkspace({
   const { books } = useBooks({});
   const { recordScope, onRecordScopeChange } = useRecordScope(books);
   useLedgerHistorySync({ activeTab, pathname, searchParams });
-
-  const {
-    isInputOpen,
-    setIsInputOpen,
-    inputMode,
-    setInputMode,
-    setAiPending,
-    setQuickPending,
-    aiDirty,
-    setAiDirty,
-    quickDirty,
-    setQuickDirty,
-    isInputSubmitting,
-    handleDialogOpenChange,
-  } = useNewRecordDialogState();
 
   const {
     ledger,
@@ -151,23 +135,11 @@ export function LedgerWorkspace({
         <NewRecordDialog
           scope={recordScope}
           books={value.books}
-          isOpen={isInputOpen}
-          onOpenChange={handleDialogOpenChange}
-          isSubmitting={isInputSubmitting}
           activeTab={activeTab}
           committedFilters={committedFilters}
-          inputMode={inputMode}
-          setInputMode={setInputMode}
           categories={categories}
           mainCurrency={mainCurrency}
           preferredCurrencies={preferredCurrencies}
-          aiDirty={aiDirty}
-          quickDirty={quickDirty}
-          setInputOpen={setIsInputOpen}
-          setAiPending={setAiPending}
-          setQuickPending={setQuickPending}
-          setAiDirty={setAiDirty}
-          setQuickDirty={setQuickDirty}
           deviceTimeZone={deviceTimeZone}
         />
 

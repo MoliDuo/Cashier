@@ -6,11 +6,23 @@ import {
   MAX_NORMALIZED_BYTES_PER_REVISION,
   MAX_ORIGINAL_BYTES_PER_FILE,
 } from "@/lib/storage/upload-policy";
-import type { SourceDocumentSubmitPayload } from "./source-document-input-controller.types";
 import {
   createSourceDocumentUploadPlanAction,
   finalizeSourceDocumentUploadAction,
 } from "@/modules/source-document/server-actions/uploads";
+
+export interface SourceDocumentUploadImage {
+  file: File;
+  mimeType: string;
+}
+
+export interface SourceDocumentSubmitPayload {
+  documentDate: string;
+  timezone?: string;
+  text: string | null;
+  images?: SourceDocumentUploadImage[];
+  storedFileIds: string[];
+}
 
 export interface SourceDocumentSubmissionProgress {
   phase:

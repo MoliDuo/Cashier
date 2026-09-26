@@ -1,6 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import zh from "../../../../../messages/zh.json";
 import type { CameraCapture } from "@/modules/source-document/hooks/useCameraCapture";
 import {
   SourceDocumentInputView,
@@ -15,36 +16,11 @@ vi.mock("@/modules/source-document/ui/SourceDocumentImageModal", () => ({
   SourceDocumentImageModal: () => null,
 }));
 
-const messages: SourceDocumentInputViewProps["messages"] = {
-  placeholder: "Record",
-  image: "Image",
-  send: "Send",
-  retry: "Retry",
-  delete: "Delete",
-  sendingStatus: "Sending",
-  entryDate: "Date",
-  preparing: "Preparing",
-  uploading: "Uploading",
-  finalizing: "Finalizing",
-  submitting: "Submitting",
-  cancelling: "Cancelling",
-  cancelUpload: "Cancel upload",
-  uploadedImage: (index) => `Uploaded image ${index}`,
-  camera: {
-    preview: "Camera preview",
-    starting: "Starting camera",
-    unavailable: "Camera unavailable",
-    unsupported: "This browser cannot take photos",
-    insecure: "This address is not HTTPS",
-    capture: "Take photo",
-    limitReached: "You can upload up to 3 images.",
-    switchCamera: "Switch camera",
-    collapse: "Collapse camera",
-    open: "Open camera",
-    retry: "Retry",
-  },
-  dropImages: "Drop images to add",
-};
+const messages = zh.SourceDocumentInput;
+
+function uploadedImage(index: number) {
+  return messages.uploadedImage.replace("{index}", String(index));
+}
 
 const camera: CameraCapture = {
   videoRef: createRef<HTMLVideoElement>(),
@@ -85,7 +61,6 @@ function renderView(
       progress={progress}
       canSubmit
       canCancelUpload={canCancelUpload}
-      messages={messages}
       onEntryDateChange={vi.fn()}
       onTextChange={vi.fn()}
       onTextareaPaste={vi.fn()}
@@ -106,7 +81,7 @@ describe("SourceDocumentInputView upload cancellation", () => {
     const onCancelUpload = vi.fn();
     const view = renderView({ phase: "uploading", percent: 70 }, true, onCancelUpload);
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel upload" }));
+    fireEvent.click(screen.getByRole("button", { name: messages.cancelUpload }));
     expect(onCancelUpload).toHaveBeenCalledTimes(1);
 
     view.rerender(
@@ -122,7 +97,6 @@ describe("SourceDocumentInputView upload cancellation", () => {
         progress={{ phase: "finalizing", percent: 88 }}
         canSubmit
         canCancelUpload={false}
-        messages={messages}
         onEntryDateChange={vi.fn()}
         onTextChange={vi.fn()}
         onTextareaPaste={vi.fn()}
@@ -137,24 +111,20 @@ describe("SourceDocumentInputView upload cancellation", () => {
       />
     );
 
-    expect(screen.queryByRole("button", { name: "Cancel upload" })).toBeNull();
-    expect(screen.getByText("Finalizing")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: messages.cancelUpload })).toBeNull();
+    expect(screen.getByText(messages.finalizing)).toBeTruthy();
   });
 
   it("announces the cancelling phase without exposing another cancel action", () => {
     renderView({ phase: "cancelling", percent: 70 }, false);
 
-    expect(screen.getByText("Cancelling")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Cancel upload" })).toBeNull();
+    expect(screen.getByText(messages.cancelling)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: messages.cancelUpload })).toBeNull();
   });
 });
 
 describe("SourceDocumentInputView image labels", () => {
-  it.each([
-    ["Uploaded image", (index: number) => `Uploaded image ${index}`],
-    ["已上传图片", (index: number) => `已上传图片 ${index}`],
-  ])("uses localized 1-based labels beginning with %s", (_, uploadedImage) => {
-    const localizedMessages = { ...messages, uploadedImage };
+  it("uses 1-based labels", () => {
     render(
       <SourceDocumentInputView
         mode="create"
@@ -171,7 +141,6 @@ describe("SourceDocumentInputView image labels", () => {
         progress={null}
         canSubmit
         canCancelUpload={false}
-        messages={localizedMessages}
         onEntryDateChange={vi.fn()}
         onTextChange={vi.fn()}
         onTextareaPaste={vi.fn()}
@@ -209,7 +178,6 @@ describe("SourceDocumentInputView image drop zone", () => {
         progress={null}
         canSubmit
         canCancelUpload={false}
-        messages={messages}
         onEntryDateChange={vi.fn()}
         onTextChange={vi.fn()}
         onTextareaPaste={vi.fn()}
@@ -265,7 +233,7 @@ describe("SourceDocumentInputView image drop zone", () => {
     fireEvent.dragEnter(form, drag);
     // The highlight is the visible half; the announcement is the half a reader
     // who cannot see it depends on, and both come from the same state.
-    expect(screen.getByRole("status")).toHaveTextContent("Drop images to add");
+    expect(screen.getByRole("status")).toHaveTextContent(messages.dropImages);
     expect(form).toHaveClass("ring-1");
 
     fireEvent.dragLeave(form, drag);

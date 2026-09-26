@@ -1,25 +1,13 @@
 "use client";
 
 import type { RefObject } from "react";
+import { useTranslations } from "next-intl";
 import { Camera, ChevronUp, RefreshCw, SwitchCamera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
+import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { cn } from "@/lib/utils";
 import type { CameraStatus } from "../hooks/useCameraCapture";
-
-export interface SourceDocumentCameraPanelMessages {
-  preview: string;
-  starting: string;
-  unavailable: string;
-  unsupported: string;
-  insecure: string;
-  capture: string;
-  limitReached: string;
-  switchCamera: string;
-  collapse: string;
-  open: string;
-  retry: string;
-}
 
 interface SourceDocumentCameraPanelProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -29,7 +17,6 @@ interface SourceDocumentCameraPanelProps {
   isOpen: boolean;
   isBusy: boolean;
   remaining: number;
-  messages: SourceDocumentCameraPanelMessages;
   onCapture: () => void;
   onSwitchFacing: () => void;
   onOpen: () => void;
@@ -52,17 +39,18 @@ export function SourceDocumentCameraPanel({
   isOpen,
   isBusy,
   remaining,
-  messages,
   onCapture,
   onSwitchFacing,
   onOpen,
   onCollapse,
   onRetry,
 }: SourceDocumentCameraPanelProps) {
+  const t = useTranslations("SourceDocumentInput");
+  const tCommon = useTranslations("Common");
   if (status === "insecure" || status === "unsupported") {
     return (
       <p role="status" className={textRoleClassName("meta")}>
-        {status === "insecure" ? messages.insecure : messages.unsupported}
+        {status === "insecure" ? t("cameraInsecure") : t("cameraUnsupported")}
       </p>
     );
   }
@@ -71,7 +59,7 @@ export function SourceDocumentCameraPanel({
     return (
       <Button type="button" variant="outline" size="sm" onClick={onOpen}>
         <Camera className="h-4 w-4" />
-        {messages.open}
+        {t("openCamera")}
       </Button>
     );
   }
@@ -79,10 +67,10 @@ export function SourceDocumentCameraPanel({
   if (status === "unavailable") {
     return (
       <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className={textRoleClassName("meta", "min-w-0")}>{messages.unavailable}</span>
+        <span className={textRoleClassName("meta", "min-w-0")}>{t("cameraUnavailable")}</span>
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>
           <RefreshCw className="h-4 w-4" />
-          {messages.retry}
+          {tCommon("retry")}
         </Button>
       </div>
     );
@@ -92,7 +80,7 @@ export function SourceDocumentCameraPanel({
   const isFull = remaining <= 0;
 
   return (
-    <div role="group" aria-label={messages.preview} className="space-y-2">
+    <div role="group" aria-label={t("cameraPreview")} className="space-y-2">
       <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-surface2">
         <video
           ref={videoRef}
@@ -109,7 +97,7 @@ export function SourceDocumentCameraPanel({
         {isReady ? null : (
           <div role="status" className="absolute inset-0 flex items-center justify-center">
             <RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="sr-only">{messages.starting}</span>
+            <span className="sr-only">{t("cameraStarting")}</span>
           </div>
         )}
       </div>
@@ -120,11 +108,11 @@ export function SourceDocumentCameraPanel({
           variant="ghost"
           size="sm"
           onClick={onCollapse}
-          aria-label={messages.collapse}
-          title={messages.collapse}
+          aria-label={t("collapseCamera")}
+          title={t("collapseCamera")}
         >
           <ChevronUp className="h-4 w-4" />
-          {messages.collapse}
+          {t("collapseCamera")}
         </Button>
         {canSwitch ? (
           <Button
@@ -135,19 +123,19 @@ export function SourceDocumentCameraPanel({
             disabled={!isReady}
           >
             <SwitchCamera className="h-4 w-4" />
-            {messages.switchCamera}
+            {t("switchCamera")}
           </Button>
         ) : null}
-        <span {...(isFull ? { title: messages.limitReached } : {})}>
+        <span {...(isFull ? { title: t("tooManyImages", { count: MAX_FILES }) } : {})}>
           <Button
             type="button"
             size="sm"
             onClick={onCapture}
             disabled={!isReady || isFull || isBusy}
-            aria-label={messages.capture}
+            aria-label={t("capturePhoto")}
           >
             <Camera className="h-4 w-4" />
-            {messages.capture}
+            {t("capturePhoto")}
           </Button>
         </span>
       </div>

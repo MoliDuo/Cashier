@@ -1,6 +1,8 @@
 import { compressImage } from "@/lib/image-utils";
-import { toEditableFileImage } from "./source-document-input-controller.core";
-import type { SourceDocumentInputImageLoadResult } from "./source-document-input-controller.types";
+import {
+  toEditableFileImage,
+  type SourceDocumentInputImageLoadResult,
+} from "./source-document-input.core";
 
 export async function loadSourceDocumentInputFiles(
   files: File[],

@@ -1,4 +1,4 @@
-import type { SourceDocumentInputInitialData } from "@/modules/source-document/hooks/source-document-input-controller.types";
+import type { SourceDocumentInputInitialData } from "./source-document-input.types";
 import type { SourceDocumentStoredFileDto } from "@/modules/source-document/contracts";
 import { storedFileReadUrl } from "../stored-file-read";
 

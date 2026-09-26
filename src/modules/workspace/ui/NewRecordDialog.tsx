@@ -8,6 +8,7 @@ import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts
 import type { RecordScope } from "@/modules/ledger/filters";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { readLastNewRecordBookId } from "../new-record-book-memory";
+import { useWorkspaceStore } from "../store";
 import { NewRecordForms } from "./NewRecordForms";
 import type { NewRecordInputMode } from "./new-record-success-feedback";
 import {
@@ -23,48 +24,28 @@ interface NewRecordDialogProps {
   scope: RecordScope;
   /** The live books, for the record's book picker. */
   books: readonly BookDto[];
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  isSubmitting: boolean;
   activeTab: LedgerTab;
   committedFilters: EntryFilters;
-  inputMode: NewRecordInputMode;
-  setInputMode: (mode: NewRecordInputMode) => void;
   categories: EntryCategoryWithCount[];
   mainCurrency: string;
   preferredCurrencies: string[];
-  aiDirty: boolean;
-  quickDirty: boolean;
-  setInputOpen: (open: boolean) => void;
-  setAiPending: (pending: boolean) => void;
-  setQuickPending: (pending: boolean) => void;
-  setAiDirty: (dirty: boolean) => void;
-  setQuickDirty: (dirty: boolean) => void;
   /** The device's zone, used when the picked book has none of its own. */
   deviceTimeZone?: string | undefined;
 }
 
-/** The "new record" dialog: AI-parse / quick-entry mode toggle plus the active input form. */
+/**
+ * The "new record" dialog: AI-parse / quick-entry mode toggle plus the active
+ * input form. Closing it never asks: each form keeps its unsaved input as a
+ * draft and restores it on the next opening.
+ */
 export function NewRecordDialog({
   scope,
   books,
-  isOpen,
-  onOpenChange,
-  isSubmitting,
   activeTab,
   committedFilters,
-  inputMode,
-  setInputMode,
   categories,
   mainCurrency,
   preferredCurrencies,
-  aiDirty,
-  quickDirty,
-  setInputOpen,
-  setAiPending,
-  setQuickPending,
-  setAiDirty,
-  setQuickDirty,
   deviceTimeZone,
 }: NewRecordDialogProps) {
   const t = useTranslations("LedgerPage");
@@ -72,6 +53,19 @@ export function NewRecordDialog({
   // The dialog opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
   const tBookPicker = useTranslations("BookPicker");
+  // The shell's + button opens it from outside the page, so the open flag is shared.
+  const isOpen = useWorkspaceStore((state) => state.newRecordOpen);
+  const setInputOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
+  const [inputMode, setInputMode] = useState<NewRecordInputMode>("ai");
+  const [aiPending, setAiPending] = useState(false);
+  const [quickPending, setQuickPending] = useState(false);
+  const [aiDirty, setAiDirty] = useState(false);
+  const [quickDirty, setQuickDirty] = useState(false);
+  const isSubmitting = aiPending || quickPending;
+  const handleOpenChange = (open: boolean) => {
+    if (!open && isSubmitting) return;
+    setInputOpen(open);
+  };
   // The picker opens on this device's last pick, falling back to the first
   // book in 设置 order. It is a per-record choice: changing it does not move
   // the view, and only a saved record updates the memory.
@@ -101,7 +95,7 @@ export function NewRecordDialog({
   const recordTimeZone = selectedBook?.timeZone ?? deviceTimeZone;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
         variant="detail"
         className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-md sm:rounded-lg"
