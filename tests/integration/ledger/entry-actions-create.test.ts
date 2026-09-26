@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { createLedgerEntryAction } from "@/modules/ledger/server-actions/entries";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "../../setup";
+import { ValidationError } from "@/lib/errors";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
@@ -46,5 +47,33 @@ describe("createLedgerEntryAction", () => {
     });
     expect(entry).toMatchObject({ itemName: "Lunch", amount: "50.000", currency: "CNY" });
     expect(document?.version).toBe(2);
+  });
+
+  it("fills an entry given only an amount and a name from the ledger's defaults", async () => {
+    const db = getTestDb();
+    await db.update(ledgers).set({ mainCurrency: "JPY" }).where(eq(ledgers.id, ledgerId));
+
+    const result = await createLedgerEntryAction({
+      sourceDocumentId,
+      amount: "1200",
+      itemName: "Ramen",
+    });
+
+    await expect(
+      db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, result.ledgerEntryId) })
+    ).resolves.toMatchObject({
+      itemName: "Ramen",
+      amount: "1200.000",
+      currency: "JPY",
+      categoryId: null,
+      description: null,
+    });
+  });
+
+  it("rejects an entry for a malformed document id and writes nothing", async () => {
+    await expect(
+      createLedgerEntryAction({ sourceDocumentId: "not-a-uuid", amount: "1", itemName: "Lunch" })
+    ).rejects.toThrow(ValidationError);
+    expect(await getTestDb().select().from(ledgerEntries)).toEqual([]);
   });
 });

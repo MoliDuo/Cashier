@@ -375,4 +375,24 @@ describe("getLedgerStatsAction", () => {
 
     await expect(getLedgerStatsAction({})).rejects.toThrow("Ledger not found");
   });
+
+  it("totals only uncategorized entries for the uncategorized sentinel", async () => {
+    const db = getTestDb();
+    const catId = randomUUID();
+    await db.insert(entryCategories).values({ id: catId, ledgerId, name: "餐饮", sortOrder: 1 });
+    await seedEntry(db, ledgerId, { amount: "100.00", categoryId: catId });
+    await seedEntry(db, ledgerId, { amount: "30.00" });
+
+    const result = await getLedgerStatsAction({ categoryId: "__uncategorized__" });
+
+    expect(result.totals).toEqual([expect.objectContaining({ currency: "CNY", total: "30" })]);
+  });
+
+  it("refuses a query it cannot read instead of totalling something else", async () => {
+    await expect(getLedgerStatsAction({ minAmount: "abc" })).rejects.toThrow("Validation failed");
+    // The internal flag is spelled by the sentinel on the wire, never directly.
+    await expect(getLedgerStatsAction({ uncategorizedOnly: true })).rejects.toThrow(
+      "Validation failed"
+    );
+  });
 });

@@ -2,7 +2,11 @@ import { asc, eq, and } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
-import { editRetrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
+import {
+  editRetrySourceDocumentAction,
+  retrySourceDocumentAction,
+} from "@/modules/source-document/server-actions/retry";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { createOpenAIMock } from "../../helpers/mocks/openai";
 import { processAllPendingTasks } from "../../helpers/processing";
@@ -99,6 +103,12 @@ describe("source-document retry action", () => {
     expect(revisions[0]?.processingStatus).toBe("completed");
     expect(revisions[1]?.processingStatus).toBe("completed");
     expect(activeEntries).toMatchObject([{ itemName: "晚餐" }]);
+  });
+
+  it("validates the document to retry and propagates a missing one", async () => {
+    await expect(retrySourceDocumentAction("not-a-uuid")).rejects.toThrow(ValidationError);
+    await expect(retrySourceDocumentAction(crypto.randomUUID())).rejects.toThrow(NotFoundError);
+    expect(await getTestDb().select().from(sourceDocumentRevisions)).toEqual([]);
   });
 
   it("rejects raw image payloads that bypass upload finalization", async () => {

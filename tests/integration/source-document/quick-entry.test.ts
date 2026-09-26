@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { ZodError } from "zod";
 import { getTestDb } from "../../setup";
 import {
+  books,
   entryCategories,
   ledgerEntries,
   ledgers,
@@ -274,5 +275,45 @@ describe("createQuickEntryAction", () => {
       where: eq(ledgerEntries.id, result.ledgerEntryId),
     });
     expect(entry?.description).toBeNull();
+  });
+
+  describe("the day an undated entry is filed under", () => {
+    // 20:00 UTC on 20 March is already the 21st in Shanghai but still the 20th in Paris.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-03-20T20:00:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function filedDate(input: Parameters<typeof createQuickEntryAction>[0]) {
+      const result = await createQuickEntryAction(input);
+      const document = await getTestDb().query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, result.sourceDocumentId),
+      });
+      return document?.documentDate;
+    }
+
+    it("uses the member's own zone when the book has none", async () => {
+      await expect(
+        filedDate({ categoryId, amount: "100", timezone: "Asia/Shanghai" })
+      ).resolves.toBe("2026-03-21");
+      await expect(
+        filedDate({ categoryId, amount: "100", timezone: "Europe/Paris" })
+      ).resolves.toBe("2026-03-20");
+    });
+
+    it("lets the book's zone win over the member's", async () => {
+      const [book] = await getTestDb()
+        .insert(books)
+        .values({ ledgerId, name: "Travel", sortOrder: 2, timeZone: "Asia/Shanghai" })
+        .returning({ id: books.id });
+
+      await expect(
+        filedDate({ categoryId, amount: "100", bookId: book!.id, timezone: "Europe/Paris" })
+      ).resolves.toBe("2026-03-21");
+    });
   });
 });

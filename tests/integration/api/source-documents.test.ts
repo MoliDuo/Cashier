@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { getTestDb } from "../../setup";
 import {
+  books,
   entryCategories as categories,
   ledgerEntries,
   sourceDocumentRevisions,
@@ -10,7 +11,7 @@ import {
   ledgers,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { createTestUserWithLedger, TEST_USER_ID } from "../../helpers/schema-setup";
+import { createTestUserWithLedger, TEST_USER_ID, testBookId } from "../../helpers/schema-setup";
 import { createOpenAIMock } from "../../helpers/mocks/openai";
 
 // Mock OpenAI
@@ -231,5 +232,78 @@ describe("SourceDocument Actions", () => {
       where: eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
     });
     expect(entriesAfter).toEqual([]);
+  });
+
+  describe("the zone a new record is dated in", () => {
+    // 20:00 UTC on 20 March is already the 21st in Singapore but still the
+    // 20th in Paris.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-03-20T20:00:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function createdDate(input: Parameters<typeof createSourceDocumentAction>[0]) {
+      const result = await createDocument(input);
+      const document = await getTestDb().query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, result.sourceDocumentId),
+      });
+      const revision = await getTestDb().query.sourceDocumentRevisions.findFirst({
+        where: eq(sourceDocumentRevisions.sourceDocumentId, result.sourceDocumentId),
+      });
+      await processAllPendingTasks();
+      return { bookId: document?.bookId, date: revision?.inputDocumentDate };
+    }
+
+    async function zonedBook(timeZone: string | null): Promise<string> {
+      const [book] = await getTestDb()
+        .insert(books)
+        .values({ ledgerId: testLedgerId, name: "哞哞的", sortOrder: 2, timeZone })
+        .returning({ id: books.id });
+      return book!.id;
+    }
+
+    it("files the record into the chosen book and dates it in that book's zone", async () => {
+      const bookId = await zonedBook("Asia/Singapore");
+
+      // The book owns the date: the request's zone is only the device the
+      // reader happened to use.
+      await expect(
+        createdDate({ text: "Lunch 12", bookId, timezone: "Europe/Paris" })
+      ).resolves.toEqual({ bookId, date: "2026-03-21" });
+      await expect(createdDate({ text: "Lunch 13", bookId })).resolves.toEqual({
+        bookId,
+        date: "2026-03-21",
+      });
+    });
+
+    it("falls back to the request's zone when the book has none of its own", async () => {
+      const bookId = await testBookId(getTestDb(), testLedgerId);
+
+      await expect(createdDate({ text: "Lunch 12", timezone: "Europe/Paris" })).resolves.toEqual({
+        bookId,
+        date: "2026-03-20",
+      });
+      await expect(
+        createdDate({ text: "Lunch 13", timezone: "Asia/Singapore" })
+      ).resolves.toMatchObject({ date: "2026-03-21" });
+    });
+  });
+
+  it("scopes browser idempotency to the payload as well as the key", async () => {
+    const clientSubmissionId = crypto.randomUUID();
+    await createSourceDocumentAction({ text: "Lunch 25" }, clientSubmissionId);
+
+    await expect(
+      createSourceDocumentAction({ text: "Dinner 40" }, clientSubmissionId)
+    ).rejects.toThrow();
+    await expect(createSourceDocumentAction({ text: "Lunch" }, "not-a-uuid")).rejects.toThrow(
+      "Invalid UUID"
+    );
+    expect(await getTestDb().select().from(sourceDocuments)).toHaveLength(1);
+    await processAllPendingTasks();
   });
 });

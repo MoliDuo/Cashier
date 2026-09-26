@@ -333,4 +333,54 @@ describe("API v1 source-documents route", () => {
     const conflict = await submit(different);
     expect(conflict.status).toBe(409);
   });
+
+  it("rejects an unusable Idempotency-Key before reading the request body", async () => {
+    // A body that fails as soon as it is pulled: had the route read it first,
+    // this error would surface instead of the key's validation failure.
+    const unreadableBody = () =>
+      new ReadableStream<Uint8Array>({
+        pull() {
+          throw new Error("request body was consumed");
+        },
+      });
+
+    const submit = (key: string) =>
+      POST(
+        new NextRequest("http://localhost/api/v1/source-documents", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${credentialKey}`, "Idempotency-Key": key },
+          body: unreadableBody(),
+          duplex: "half",
+        } as ConstructorParameters<typeof NextRequest>[1])
+      );
+
+    for (const key of ["k".repeat(513), " ".repeat(513)]) {
+      expect((await submit(key)).status).toBe(400);
+    }
+    // With a legal key the route does read the body, and fails differently.
+    expect((await submit("legal-key")).status).not.toBe(400);
+    expect(await getTestDb().select().from(sourceDocuments)).toEqual([]);
+  });
+
+  it("keys a replay on the header exactly as sent, up to its longest legal length", async () => {
+    const image = await validJpegBase64();
+    const submit = (key: string) =>
+      POST(
+        new NextRequest("http://localhost/api/v1/source-documents", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${credentialKey}`, "Idempotency-Key": key },
+          body: JSON.stringify({ images: [{ data: image, mimeType: "image/jpeg" }] }),
+        })
+      );
+    const longest = "k".repeat(512);
+
+    const first = await submit(longest);
+    const replay = await submit(longest);
+    const otherKey = await submit("key with inner spaces");
+
+    expect(first.status).toBe(201);
+    expect(await replay.json()).toEqual(await first.json());
+    expect(otherKey.status).toBe(201);
+    expect(await getTestDb().select().from(sourceDocuments)).toHaveLength(2);
+  });
 });

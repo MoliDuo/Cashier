@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
+import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
 import {
   activateTestSourceDocumentProjection,
@@ -463,5 +464,54 @@ describe("getLedgerEntriesAction", () => {
     const midEntry = result.items[0];
     expect(midEntry).toBeDefined();
     expect(midEntry?.itemName).toBe("Mid");
+  });
+
+  it("rejects a page size it cannot serve", async () => {
+    await expect(getLedgerEntriesAction({ limit: 0 })).rejects.toThrow("Validation failed");
+  });
+
+  it("lists exactly the entries the totals count for the same filtered window", async () => {
+    const db = getTestDb();
+    const catId = randomUUID();
+    await db.insert(entryCategories).values({ id: catId, ledgerId, name: "餐饮", sortOrder: 1 });
+    const doc = await seedDoc(db, ledgerId, "2026-03-10");
+    const entry = (itemName: string, amount: string, currency = "CNY", categoryId?: string) => ({
+      id: randomUUID(),
+      ledgerId,
+      sourceDocumentId: doc.id,
+      itemName,
+      amount,
+      currency,
+      categoryId: categoryId ?? null,
+    });
+    const [beans] = await db
+      .insert(ledgerEntries)
+      .values(entry("Coffee beans", "30.00"))
+      .returning({ id: ledgerEntries.id });
+    await db
+      .insert(ledgerEntries)
+      .values([
+        entry("Coffee", "20.00", "CNY", catId),
+        entry("Tea", "5.00"),
+        entry("Coffee", "7.00", "USD"),
+        entry("Coffee filter", "300.00"),
+      ]);
+    const window = {
+      startDate: "2026-03-01",
+      endDate: "2026-03-31",
+      categoryId: UNCATEGORIZED_SENTINEL,
+      currency: "CNY",
+      minAmount: "10",
+      maxAmount: "100",
+      search: "  coffee  ",
+    };
+
+    const listed = await getTargetLedgerEntriesAction(ledgerId, { ...window, limit: 20 });
+    const totals = await getLedgerStatsAction(window);
+
+    expect(listed.items.map((item) => item.id)).toEqual([beans!.id]);
+    expect(totals.totals).toEqual([
+      expect.objectContaining({ currency: "CNY", count: 1, total: "30" }),
+    ]);
   });
 });

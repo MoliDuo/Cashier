@@ -106,6 +106,39 @@ describe("batchUpdateLedgerEntriesAction", () => {
     }
   });
 
+  it("changes only the fields a batch names", async () => {
+    const db = getTestDb();
+    const catId = randomUUID();
+    await db.insert(entryCategories).values({ id: catId, ledgerId, name: "餐饮", sortOrder: 1 });
+    const doc = await seedDoc(db, ledgerId);
+    const [entry] = await db
+      .insert(ledgerEntries)
+      .values({
+        id: randomUUID(),
+        ledgerId,
+        sourceDocumentId: doc.id,
+        itemName: "Lunch",
+        amount: "10.00",
+        currency: "USD",
+        categoryId: catId,
+        description: "with a friend",
+      })
+      .returning({ id: ledgerEntries.id });
+    await activateTestSourceDocumentProjection(db, doc.id);
+
+    await batchUpdateLedgerEntriesAction([doc.id], [entry!.id], { amount: "9.99" });
+
+    await expect(
+      db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, entry!.id) })
+    ).resolves.toMatchObject({
+      amount: "9.990",
+      itemName: "Lunch",
+      currency: "USD",
+      categoryId: catId,
+      description: "with a friend",
+    });
+  });
+
   it("removes categories from entries when given categoryId null", async () => {
     const db = getTestDb();
     const catId = randomUUID();

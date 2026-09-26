@@ -269,6 +269,21 @@ describe("saveEntryCategoriesAction", () => {
     expect(active.map((category) => category.name)).toEqual(["Changed"]);
   });
 
+  it("rejects a malformed collection before touching the categories", async () => {
+    const db = getTestDb();
+    const ledger = createLedgerData();
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
+    await db.insert(entryCategories).values({ ledgerId: ledger.id, name: "Kept", sortOrder: 0 });
+
+    await expect(
+      saveEntryCategoriesAction({ expectedRevision: "invalid", categories: [] } as never)
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      db.query.entryCategories.findMany({ where: eq(entryCategories.ledgerId, ledger.id) })
+    ).resolves.toEqual([expect.objectContaining({ name: "Kept" })]);
+  });
+
   it("rejects a stale category collection revision without applying the draft", async () => {
     const db = getTestDb();
     const ledger = createLedgerData();

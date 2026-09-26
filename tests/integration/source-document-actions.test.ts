@@ -10,7 +10,7 @@ import {
   createLedgerEntryData,
 } from "../helpers/factories";
 import { randomUUID } from "node:crypto";
-import { NotFoundError } from "@/lib/errors";
+import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
@@ -132,6 +132,17 @@ describe("getSourceDocumentDetailAction", () => {
 
     const result = await getSourceDocumentDetailAction(randomUUID());
     expect(result).toBeNull();
+  });
+
+  it("validates the document identity and requires a session", async () => {
+    const db = getTestDb();
+    await createTestUserWithLedger(db);
+
+    await expect(getSourceDocumentDetailAction("not-a-uuid")).rejects.toThrow("Validation failed");
+    vi.mocked(getCurrentSession).mockResolvedValueOnce(null);
+    await expect(getSourceDocumentDetailAction(randomUUID())).rejects.toBeInstanceOf(
+      UnauthorizedError
+    );
   });
 
   it("surfaces NotFoundError for a ledger that is not the single live one", async () => {
