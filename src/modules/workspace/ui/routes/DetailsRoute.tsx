@@ -11,7 +11,7 @@ export function DetailsRoute() {
     useLedgerWorkspace();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { periodParams, filterParams, handleFiltersChange } = usePeriodFilter({
+  const { periodParams, filters, filterParams, handleFiltersChange } = usePeriodFilter({
     pathname,
     searchParams,
     ...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {}),
@@ -24,6 +24,7 @@ export function DetailsRoute() {
       categories={categories}
       ledger={ledger}
       periodParams={periodParams}
+      filters={filters}
       onFiltersChange={handleFiltersChange}
       advancedFilters={filterParams}
       {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}

@@ -2,8 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useDetailsBatchController } from "@/modules/workspace/ui/useDetailsBatchController";
+import type { ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
+import { useDetailsTab } from "@/modules/workspace/hooks/useDetailsTab";
 
 const {
   batchDeleteLedgerEntriesActionMock,
@@ -12,6 +13,8 @@ const {
   previewBatchLedgerEntryDateActionMock,
   startCategoryAssignmentActionMock,
   reclassificationJobMock,
+  fetchLedgerEntriesMock,
+  fetchLedgerSummaryMock,
   toastErrorMock,
   toastSuccessMock,
 } = vi.hoisted(() => ({
@@ -21,6 +24,8 @@ const {
   previewBatchLedgerEntryDateActionMock: vi.fn(),
   startCategoryAssignmentActionMock: vi.fn(),
   reclassificationJobMock: vi.fn(),
+  fetchLedgerEntriesMock: vi.fn(),
+  fetchLedgerSummaryMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
 }));
@@ -31,9 +36,6 @@ vi.mock("next-intl", () => ({
   useMessages: () => ({}),
   NextIntlClientProvider: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
-
-// The run is reported by the page that owns it; the messages it needs are
-// loaded by that boundary in production, so here it renders straight through.
 
 vi.mock("sonner", () => ({
   toast: { success: toastSuccessMock, error: toastErrorMock, warning: vi.fn() },
@@ -52,6 +54,8 @@ vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
 
 vi.mock("@/modules/ledger/queries", () => ({
   fetchCategoryReclassificationJob: reclassificationJobMock,
+  fetchLedgerEntries: fetchLedgerEntriesMock,
+  fetchLedgerSummary: fetchLedgerSummaryMock,
 }));
 
 function deferred() {
@@ -62,7 +66,17 @@ function deferred() {
   return { promise, resolve };
 }
 
-function setup() {
+type DetailsTabOptions = Parameters<typeof useDetailsTab>[0];
+
+const baseOptions: DetailsTabOptions = {
+  categories: [],
+  periodParams: { period: "all" },
+  advancedFilters: {},
+};
+
+/** Renders the tab over one loaded page of entries and waits for it to settle. */
+async function renderDetailsTab(entries: ActiveLedgerEntryDto[]) {
+  fetchLedgerEntriesMock.mockResolvedValue({ items: entries, nextCursor: null });
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
@@ -71,10 +85,22 @@ function setup() {
       <CategoryAssignmentProvider>{children}</CategoryAssignmentProvider>
     </QueryClientProvider>
   );
-  return { queryClient, wrapper };
+  const rendered = renderHook((options: DetailsTabOptions) => useDetailsTab(options), {
+    wrapper,
+    initialProps: baseOptions,
+  });
+  await waitFor(() => {
+    expect(rendered.result.current.queryStatus).toBe("success");
+    expect(rendered.result.current.entries).toHaveLength(entries.length);
+  });
+  return { ...rendered, queryClient };
 }
 
-function entry(id: string, sourceDocumentId = "document-1") {
+function entry(
+  id: string,
+  sourceDocumentId = "document-1",
+  { date = "2026-09-04", convertedAmount = "1" }: { date?: string; convertedAmount?: string } = {}
+): ActiveLedgerEntryDto {
   return {
     id,
     ledgerId: "ledger-1",
@@ -84,7 +110,7 @@ function entry(id: string, sourceDocumentId = "document-1") {
     currency: "CNY",
     itemName: id,
     description: null,
-    convertedAmount: "1",
+    convertedAmount,
     exchangeRate: "1",
     createdAt: "2026-09-04T00:00:00.000Z",
     updatedAt: "2026-09-04T00:00:00.000Z",
@@ -93,8 +119,7 @@ function entry(id: string, sourceDocumentId = "document-1") {
       version: 1,
       ledgerId: "ledger-1",
       title: null,
-      processingStatus: "completed" as const,
-      documentDate: "2026-09-04",
+      documentDate: date,
       createdAt: "2026-09-04T00:00:00.000Z",
       updatedAt: "2026-09-04T00:00:00.000Z",
     },
@@ -154,25 +179,85 @@ const succeededJob = () => ({
   completedAt: "2026-09-04T00:00:01.000Z",
 });
 
-describe("useDetailsBatchController", () => {
+describe("useDetailsTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     reclassificationJobMock.mockResolvedValue(null);
+    fetchLedgerSummaryMock.mockResolvedValue({
+      unconvertedCount: 0,
+      convertedTotal: { total: "0", currency: "CNY" },
+      totals: [],
+      trend: [],
+    });
     startCategoryAssignmentActionMock.mockResolvedValue(assignmentJob());
   });
 
+  it("groups entries by day in the order they were read, with decimal totals", async () => {
+    const { result } = await renderDetailsTab([
+      entry("new-large", "document-1", { date: "2026-03-01", convertedAmount: "9007199254740993" }),
+      entry("new-small", "document-2", { date: "2026-03-01", convertedAmount: "0.25" }),
+      entry("old", "document-3", { date: "2020-03-01", convertedAmount: "1" }),
+    ]);
+
+    expect(
+      result.current.groupedItems.map((group) => ({
+        ids: group.items.map((item) => item.id),
+        total: group.total,
+      }))
+    ).toEqual([
+      { ids: ["new-large", "new-small"], total: "9007199254740993.25" },
+      { ids: ["old"], total: "1" },
+    ]);
+  });
+
+  it("takes the total from the summary read", async () => {
+    fetchLedgerSummaryMock.mockResolvedValue({
+      unconvertedCount: 2,
+      convertedTotal: { total: "42.5", currency: "USD" },
+      totals: [],
+      trend: [],
+    });
+    const { result } = await renderDetailsTab([entry("entry-1")]);
+
+    expect(result.current.monthStats).toEqual({
+      mainTotal: "42.5",
+      mainCurrency: "USD",
+      unconvertedCount: 2,
+    });
+  });
+
+  it("holds the selection while a command is in flight", async () => {
+    const write = deferred();
+    batchUpdateLedgerEntriesActionMock.mockImplementationOnce(async () => {
+      await write.promise;
+      return { ledgerEntryIds: ["entry-1"], affectedCount: 1 };
+    });
+    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
+    act(() => result.current.toggleEntrySelection("entry-1"));
+    act(() => void result.current.update.mutateAsync({ currency: "USD" }));
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    act(() => {
+      result.current.toggleEntrySelection("entry-2");
+      result.current.setGroupSelection(["entry-2"], true);
+    });
+    expect(result.current.selectedIds).toEqual(["entry-1"]);
+
+    await act(async () => {
+      write.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+
   it("closes delete confirmation and finishes before refresh settles", async () => {
-    const { queryClient, wrapper } = setup();
+    const { result, queryClient } = await renderDetailsTab([entry("entry-1")]);
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     batchDeleteLedgerEntriesActionMock.mockResolvedValueOnce({
       succeeded: [{ id: "entry-1", sourceDocumentId: "document-1" }],
       failed: [],
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
 
     act(() => {
       result.current.handleSelect("entry-1", true);
@@ -195,7 +280,7 @@ describe("useDetailsBatchController", () => {
   });
 
   it("closes the date dialog and finishes before refresh settles", async () => {
-    const { queryClient, wrapper } = setup();
+    const { result, queryClient } = await renderDetailsTab([entry("entry-1")]);
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     batchUpdateLedgerEntryDatesActionMock.mockResolvedValueOnce({
@@ -207,10 +292,6 @@ describe("useDetailsBatchController", () => {
       affectedEntryCount: 1,
       sourceDocumentIds: [],
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
 
     act(() => {
       result.current.handleSelect("entry-1", true);
@@ -234,17 +315,13 @@ describe("useDetailsBatchController", () => {
   });
 
   it("clears selection and finishes the batch update before refresh", async () => {
-    const { queryClient, wrapper } = setup();
+    const { result, queryClient } = await renderDetailsTab([entry("entry-1")]);
     const refreshGate = deferred();
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() => refreshGate.promise);
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
       ledgerEntryIds: ["entry-1"],
       affectedCount: 1,
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
 
     act(() => result.current.handleSelect("entry-1", true));
     let mutation!: Promise<unknown>;
@@ -263,7 +340,6 @@ describe("useDetailsBatchController", () => {
   });
 
   it("confirms a date preview while its captured selection is unchanged", async () => {
-    const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce({
       selectedEntryCount: 2,
       sourceDocumentCount: 1,
@@ -273,10 +349,7 @@ describe("useDetailsBatchController", () => {
     batchUpdateLedgerEntryDatesActionMock.mockResolvedValueOnce({
       impact: { affectedEntryCount: 2 },
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
 
     act(() => {
       result.current.handleSelect("entry-1", true);
@@ -297,17 +370,13 @@ describe("useDetailsBatchController", () => {
   });
 
   it("rejects confirmation when selection changes after date preview", async () => {
-    const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce({
       selectedEntryCount: 2,
       sourceDocumentCount: 1,
       affectedEntryCount: 2,
       sourceDocumentIds: ["document-1"],
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
 
     act(() => {
       result.current.handleSelect("entry-1", true);
@@ -322,12 +391,8 @@ describe("useDetailsBatchController", () => {
   });
 
   it("keeps selection when a batch update fails", async () => {
-    const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockRejectedValueOnce(new Error("Ledger entry not found"));
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
 
     await expect(result.current.update.mutateAsync({ categoryId: "category-1" })).rejects.toThrow(
@@ -339,7 +404,6 @@ describe("useDetailsBatchController", () => {
   });
 
   it("keeps the date dialog and selection when confirmation fails", async () => {
-    const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce({
       selectedEntryCount: 1,
       sourceDocumentCount: 1,
@@ -349,10 +413,7 @@ describe("useDetailsBatchController", () => {
     batchUpdateLedgerEntryDatesActionMock.mockRejectedValueOnce(
       new Error("Ledger entry not found")
     );
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.openDateDialog());
     await act(async () => Promise.resolve());
@@ -366,12 +427,8 @@ describe("useDetailsBatchController", () => {
   });
 
   it("leaves the dialog open with the failure when the preview cannot be computed", async () => {
-    const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockRejectedValueOnce(new Error("preview down"));
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => {
       result.current.handleSelect("entry-1", true);
       result.current.openDateDialog();
@@ -384,11 +441,7 @@ describe("useDetailsBatchController", () => {
   });
 
   it("starts an AI sort for the captured selection and clears it", async () => {
-    const { wrapper } = setup();
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => {
@@ -410,15 +463,11 @@ describe("useDetailsBatchController", () => {
   });
 
   it("writes one picked category straight through instead of asking the model", async () => {
-    const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
       ledgerEntryIds: ["entry-1"],
       affectedCount: 1,
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => result.current.toggleCategoryPick("category-1", true));
@@ -436,15 +485,11 @@ describe("useDetailsBatchController", () => {
   });
 
   it("takes the clear row as an answer, and drops the categories it excluded", async () => {
-    const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
       ledgerEntryIds: ["entry-1"],
       affectedCount: 1,
     });
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => {
@@ -467,11 +512,7 @@ describe("useDetailsBatchController", () => {
   });
 
   it("refuses to start when the selection moved under the dialog", async () => {
-    const { wrapper } = setup();
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => result.current.toggleCategoryPick("category-1", true));
@@ -486,66 +527,13 @@ describe("useDetailsBatchController", () => {
     expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
   });
 
-  it("reports a finished run once, and only for a run this page watched", async () => {
-    const { wrapper, queryClient } = setup();
-    const running = assignmentJob("running");
-    // A fresh object per poll, so every response really does reach the page.
-    reclassificationJobMock
-      .mockResolvedValueOnce(running)
-      .mockImplementation(async () => succeededJob());
-    renderHook(() => useDetailsBatchController([entry("entry-1")], "fingerprint"), {
-      wrapper,
-    });
-    await waitFor(() =>
-      expect(queryClient.getQueryData(["ledger", "category-reclassification"])).toMatchObject({
-        id: "job-1",
-        status: "running",
-      })
-    );
-
-    await act(async () => {
-      await queryClient.refetchQueries({
-        queryKey: ["ledger", "category-reclassification"],
-      });
-    });
-    await act(async () => {
-      await queryClient.refetchQueries({
-        queryKey: ["ledger", "category-reclassification"],
-      });
-    });
-    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledTimes(1));
-  });
-
-  it("stays quiet about a run that finished before this page arrived", async () => {
-    const { wrapper, queryClient } = setup();
-    reclassificationJobMock.mockResolvedValue(succeededJob());
-    renderHook(() => useDetailsBatchController([entry("entry-1")], "fingerprint"), {
-      wrapper,
-    });
-    await waitFor(() =>
-      expect(queryClient.getQueryData(["ledger", "category-reclassification"])).toMatchObject({
-        status: "succeeded",
-      })
-    );
-    expect(toastSuccessMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).not.toHaveBeenCalled();
-  });
-
   it("writes a single pick straight through at the direct limit", async () => {
-    const { wrapper } = setup();
     const ids = Array.from({ length: 100 }, (_, index) => `entry-${index}`);
     batchUpdateLedgerEntriesActionMock.mockResolvedValueOnce({
       ledgerEntryIds: ids,
       affectedCount: 100,
     });
-    const { result } = renderHook(
-      () =>
-        useDetailsBatchController(
-          ids.map((id) => entry(id)),
-          "fingerprint"
-        ),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab(ids.map((id) => entry(id)));
     act(() => result.current.handleSelectMany(ids, true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => result.current.toggleCategoryPick("category-1", true));
@@ -561,16 +549,8 @@ describe("useDetailsBatchController", () => {
   });
 
   it("asks the model once a single pick passes the direct limit", async () => {
-    const { wrapper } = setup();
     const ids = Array.from({ length: 101 }, (_, index) => `entry-${index}`);
-    const { result } = renderHook(
-      () =>
-        useDetailsBatchController(
-          ids.map((id) => entry(id)),
-          "fingerprint"
-        ),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab(ids.map((id) => entry(id)));
     act(() => result.current.handleSelectMany(ids, true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => result.current.toggleCategoryPick("category-1", true));
@@ -589,16 +569,8 @@ describe("useDetailsBatchController", () => {
   });
 
   it("refuses a selection above the run limit without starting anything", async () => {
-    const { wrapper } = setup();
     const ids = Array.from({ length: 5001 }, (_, index) => `entry-${index}`);
-    const { result } = renderHook(
-      () =>
-        useDetailsBatchController(
-          ids.map((id) => entry(id)),
-          "fingerprint"
-        ),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab(ids.map((id) => entry(id)));
     act(() => result.current.handleSelectMany(ids, true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => result.current.toggleCategoryPick("category-1", true));
@@ -614,12 +586,8 @@ describe("useDetailsBatchController", () => {
   });
 
   it("keeps the picks when the direct write fails", async () => {
-    const { wrapper } = setup();
     batchUpdateLedgerEntriesActionMock.mockRejectedValueOnce(new Error("write failed"));
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => result.current.toggleCategoryPick("category-1", true));
@@ -635,15 +603,11 @@ describe("useDetailsBatchController", () => {
   });
 
   it("keeps following a run after its dialog is closed", async () => {
-    const { wrapper, queryClient } = setup();
     const running = assignmentJob("running");
     reclassificationJobMock.mockResolvedValueOnce(null).mockImplementation(async () => ({
       ...running,
     }));
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result, queryClient } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.setCategoryDialogOpen(true));
     act(() => {
@@ -675,7 +639,6 @@ describe("useDetailsBatchController", () => {
   });
 
   it("ignores a date preview that lands after the dialog was reopened", async () => {
-    const { wrapper } = setup();
     const firstPreview = deferred();
     previewBatchLedgerEntryDateActionMock
       .mockImplementationOnce(async () => {
@@ -683,10 +646,7 @@ describe("useDetailsBatchController", () => {
         return dateImpact(2);
       })
       .mockResolvedValueOnce(dateImpact(1));
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1"), entry("entry-2")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
     act(() => result.current.handleSelectMany(["entry-1", "entry-2"], true));
     act(() => result.current.openDateDialog());
     act(() => result.current.setDateDialogOpen(false));
@@ -706,14 +666,10 @@ describe("useDetailsBatchController", () => {
   });
 
   it("retries a failed date preview inside the open dialog", async () => {
-    const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock
       .mockRejectedValueOnce(new Error("preview down"))
       .mockResolvedValueOnce(dateImpact(1));
-    const { result } = renderHook(
-      () => useDetailsBatchController([entry("entry-1")], "fingerprint"),
-      { wrapper }
-    );
+    const { result } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.openDateDialog());
     await waitFor(() => expect(result.current.datePreviewFailed).toBe(true));
@@ -726,18 +682,13 @@ describe("useDetailsBatchController", () => {
   });
 
   it("refuses to confirm a preview once the filters moved under it", async () => {
-    const { wrapper } = setup();
     previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce(dateImpact(1));
-    const { result, rerender } = renderHook(
-      ({ fingerprint }: { fingerprint: string }) =>
-        useDetailsBatchController([entry("entry-1")], fingerprint),
-      { wrapper, initialProps: { fingerprint: "fingerprint" } }
-    );
+    const { result, rerender } = await renderDetailsTab([entry("entry-1")]);
     act(() => result.current.handleSelect("entry-1", true));
     act(() => result.current.openDateDialog());
     await waitFor(() => expect(result.current.dateImpact).toEqual(dateImpact(1)));
 
-    rerender({ fingerprint: "other-fingerprint" });
+    rerender({ ...baseOptions, advancedFilters: { search: "coffee" } });
 
     expect(result.current.dateSelectionChanged).toBe(true);
     await expect(result.current.updateDates.mutateAsync()).rejects.toThrow("selection_changed");

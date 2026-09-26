@@ -1,18 +1,30 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
-import type { EntryCategory, Ledger, LedgerEntry } from "@/modules/ledger/contracts";
+import { useTranslations } from "next-intl";
+import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
+import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
+import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
+import { LedgerEntryGroupsView } from "@/modules/ledger/ui/LedgerEntryGroupsView";
+import {
+  BatchDateDialog,
+  batchDateImpactSummary,
+  LedgerEntriesBatchActionToolbar,
+} from "@/modules/ledger/ui/batch-action-toolbar";
 import type { PeriodParams } from "@/lib/period-utils";
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
-import { useDetailsTabData } from "@/modules/ledger/hooks/useDetailsTabData";
-import { useDetailsTabGrouping } from "@/modules/ledger/hooks/useDetailsTabGrouping";
-import { useDetailsTabFilters } from "./useDetailsTabFilters";
-import { useDetailsBatchController } from "./useDetailsBatchController";
-import { DetailsTabView } from "./DetailsTabView";
+import { formatCurrencyAmount } from "@/lib/format/currency";
 import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
+import { DISPLAY_LOCALE } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/EmptyState";
+import { useDetailsTab } from "../hooks/useDetailsTab";
+import type { LedgerAdvancedFilters } from "../initial-query-state";
+import { EntriesToolbarShell } from "./EntriesToolbarShell";
+import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
+import { usePeriodLabel } from "./usePeriodLabel";
 
 interface DetailsTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -20,14 +32,9 @@ interface DetailsTabProps {
   categories: EntryCategory[];
   ledger?: Ledger;
   periodParams: PeriodParams;
+  filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters) => void;
-  advancedFilters: {
-    categoryId?: string | null;
-    currency?: string | null;
-    minAmount?: string | null;
-    maxAmount?: string | null;
-    search?: string | null;
-  };
+  advancedFilters: LedgerAdvancedFilters;
   timeZone?: string;
 }
 
@@ -36,80 +43,194 @@ export function DetailsTab({
   categories,
   ledger,
   periodParams,
+  filters,
   onFiltersChange,
   advancedFilters,
   timeZone,
 }: DetailsTabProps) {
-  const data = useDetailsTabData({
-    ...(bookId == null ? {} : { bookId }),
+  const t = useTranslations("DetailsTab");
+  const tCommon = useTranslations("Common");
+  const tFilter = useTranslations("EntryFilterPanel");
+  const { sentinelRef, ...tab } = useDetailsTab({
+    bookId,
+    categories,
+    ledger,
     periodParams,
     advancedFilters,
-    ...(timeZone != null ? { timeZone } : {}),
-    ...(ledger !== undefined ? { ledger } : {}),
+    timeZone,
   });
-  const queryClient = useQueryClient();
-  const retry = () => {
-    void queryClient.refetchQueries({
-      type: "active",
-      predicate: ({ queryKey: key }) =>
-        key[0] === "ledger" && (key[1] === "entries" || key[1] === "summary"),
-    });
-  };
-  const { groupedItems } = useDetailsTabGrouping(data.entries, timeZone);
-  const queryFingerprint = useMemo(
-    () =>
-      JSON.stringify({
-        tab: "details",
-        period: periodParams,
-        filters: advancedFilters,
-        bookId,
-      }),
-    [advancedFilters, bookId, periodParams]
-  );
-  const batch = useDetailsBatchController(data.entries, queryFingerprint, timeZone, categories);
-  const { filters } = useDetailsTabFilters({
-    periodParams,
-    advancedFilters,
-    ...(timeZone != null ? { timeZone } : {}),
-  });
-  const sentinelRef = useInfiniteScroll({
-    hasNextPage: data.hasNextPage,
-    isFetchingNextPage: data.isFetchingNextPage,
-    isFetchNextPageError: data.isFetchNextPageError,
-    fetchNextPage: data.fetchNextPage,
-  });
-  // An entry has no detail sheet of its own — opening one lands on the record
-  // it belongs to, the same sheet the stream card opens.
-  const handleViewEntry = useCallback(
-    (entry: LedgerEntry) => openLedgerEntrySourceDocument(entry),
-    []
-  );
+  const rangeLabel = usePeriodLabel(periodParams, timeZone);
+  const { entries, monthStats } = tab;
+
+  if (tab.queryStatus === "error" && !tab.queryHasData) {
+    return <LedgerQueryErrorBanner empty onRetry={tab.retry} />;
+  }
   return (
     <>
-      {data.queryStatus === "error" && (
-        <LedgerQueryErrorBanner empty={!data.queryHasData} onRetry={retry} />
-      )}
-      {(data.queryStatus !== "error" || data.queryHasData) && (
-        <DetailsTabView
-          categories={categories}
-          {...(ledger === undefined ? {} : { ledger })}
-          periodParams={periodParams}
-          filters={filters}
-          advancedFilters={advancedFilters}
-          onFiltersChange={onFiltersChange}
-          entries={data.entries}
-          groupedItems={groupedItems}
-          isLoading={data.isLoading}
-          isFetchingNextPage={data.isFetchingNextPage}
-          isFetchNextPageError={data.isFetchNextPageError}
-          onRetryNextPage={() => void data.fetchNextPage()}
-          hasNextPage={data.hasNextPage}
-          monthStats={data.monthStats}
-          sentinelRef={sentinelRef}
-          batch={batch}
-          onViewEntry={handleViewEntry}
+      {tab.queryStatus === "error" && <LedgerQueryErrorBanner empty={false} onRetry={tab.retry} />}
+      <EntriesToolbarShell
+        {...(!tab.isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
+        {...(!tab.isSelectionMode && monthStats.mainTotal != null
+          ? {
+              totalLabel: formatCurrencyAmount(
+                monthStats.mainTotal,
+                monthStats.mainCurrency,
+                DISPLAY_LOCALE
+              ),
+            }
+          : {})}
+        batchActions={
+          tab.isSelectionMode ? (
+            <LedgerEntriesBatchActionToolbar
+              selectedCount={tab.selectedIds.length}
+              loadedCount={entries.length}
+              isAllSelected={tab.isAllSelected}
+              hasMoreData={tab.hasNextPage || entries.length > tab.selectableCount}
+              onSelectAll={() => !tab.isPending && tab.selectAll()}
+              onClearSelection={() => !tab.isPending && tab.clearSelection()}
+              categories={categories}
+              preferredCurrencies={ledger?.settings.currencies ?? []}
+              onChangeCategory={async (categoryId) => {
+                await tab.update.mutateAsync({ categoryId });
+              }}
+              onChangeCurrency={async (currency) => {
+                await tab.update.mutateAsync({ currency });
+              }}
+              onChangeDate={tab.openDateDialog}
+              onDelete={() => tab.setDeleteDialogOpen(true)}
+              isDeleting={tab.remove.isPending}
+              categoryDialogOpen={tab.categoryDialogOpen}
+              onCategoryDialogOpenChange={tab.setCategoryDialogOpen}
+              pickedCategoryIds={tab.pickedCategoryIds}
+              clearCategoryPicked={tab.clearCategoryPicked}
+              onToggleCategoryPick={tab.toggleCategoryPick}
+              categorySelectionChanged={tab.categorySelectionChanged}
+              onConfirmCategory={tab.confirmCategory}
+              isConfirmingCategory={tab.isConfirmingCategory}
+              isReclassifying={false}
+              isProcessing={tab.isPending}
+            />
+          ) : undefined
+        }
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={tab.toggleSelectionMode}
+          disabled={tab.isPending}
+          className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
+          aria-label={tab.isSelectionMode ? t("cancelSelect") : t("select")}
+        >
+          {tab.isSelectionMode ? (
+            <ArrowLeft className="h-4 w-4" />
+          ) : (
+            <SquareDashedMousePointer className="h-4 w-4" />
+          )}
+        </Button>
+        {!tab.isSelectionMode ? (
+          <EntryFilterPanel
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            periodParams={periodParams}
+            categories={categories}
+            preferredCurrencies={ledger?.settings.currencies ?? []}
+            showStatus={false}
+            {...(timeZone != null ? { timeZone } : {})}
+            // Deliberately unsized, like the stream's: the panel does not grow
+            // past its trigger, so the toolbar's middle stays free for the
+            // centred refresh hint instead of being reserved by empty space.
+          />
+        ) : null}
+      </EntriesToolbarShell>
+      {monthStats.unconvertedCount > 0 ? (
+        <div
+          role="status"
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
+        >
+          {tCommon("incompleteAccountingProjection")}
+        </div>
+      ) : null}
+      <div className="space-y-4">
+        <div className="space-y-4">
+          <LedgerEntryGroupsView
+            groups={tab.groupedItems}
+            mainCurrency={ledger?.settings.mainCurrency ?? monthStats.mainCurrency}
+            // An entry has no detail sheet of its own — opening one lands on the
+            // record it belongs to, the same sheet the stream card opens.
+            onView={openLedgerEntrySourceDocument}
+            selectionMode={tab.isSelectionMode}
+            selectedIds={tab.selectedIds}
+            disableUnselected={tab.isSelectionLimitReached}
+            onToggleSelection={tab.toggleEntrySelection}
+            onSetGroupSelection={tab.setGroupSelection}
+          />
+          {tab.isLoading ? (
+            <div className="space-y-4 px-2 animate-pulse" role="status" aria-busy="true">
+              {[1, 2, 3].map((idx) => (
+                <div key={idx} className="bg-surface rounded-xl border border-border p-4 h-20" />
+              ))}
+            </div>
+          ) : null}
+          {!tab.isLoading && entries.length === 0 ? (
+            <EmptyState
+              title={
+                advancedFilters.search != null ||
+                advancedFilters.categoryId != null ||
+                advancedFilters.currency != null ||
+                advancedFilters.minAmount != null ||
+                advancedFilters.maxAmount != null
+                  ? tFilter("noMatchingResults")
+                  : tCommon("noRecords")
+              }
+            />
+          ) : null}
+          <div ref={sentinelRef} className="h-1" />
+          {tab.isFetchingNextPage ? (
+            <div className="flex justify-center py-4">
+              <span className="text-sm text-muted-foreground">{tCommon("loading")}</span>
+            </div>
+          ) : null}
+          {tab.isFetchNextPageError ? (
+            <div className="flex justify-center py-4">
+              <Button variant="outline" size="sm" onClick={() => void tab.fetchNextPage()}>
+                {t("loadMoreFailed")}
+              </Button>
+            </div>
+          ) : null}
+          {!tab.hasNextPage && entries.length > 0 ? (
+            <div className="flex justify-center py-4">
+              <span className="text-xs text-muted-foreground">— {t("noMore")} —</span>
+            </div>
+          ) : null}
+        </div>
+
+        <ConfirmDialog
+          open={tab.deleteDialogOpen}
+          onOpenChange={tab.setDeleteDialogOpen}
+          title={t("deleteSelectedTitle")}
+          description={t("deleteSelectedDescription", { count: tab.selectedIds.length })}
+          variant="destructive"
+          confirmLabel={tCommon("delete")}
+          onConfirm={async () => {
+            const result = await tab.remove.mutateAsync();
+            return result.failed.length === 0;
+          }}
         />
-      )}
+        <BatchDateDialog
+          open={tab.dateDialogOpen}
+          onOpenChange={tab.setDateDialogOpen}
+          value={tab.selectedDate}
+          onChange={tab.setSelectedDate}
+          impact={tab.dateImpact == null ? null : batchDateImpactSummary(tab.dateImpact)}
+          isPreviewing={tab.isPreviewingDate}
+          previewFailed={tab.datePreviewFailed}
+          onRetryPreview={tab.retryDatePreview}
+          selectionChanged={tab.dateSelectionChanged}
+          isConfirming={tab.updateDates.isPending}
+          onConfirm={() => tab.updateDates.mutate()}
+          {...(timeZone != null ? { timeZone } : {})}
+        />
+      </div>
     </>
   );
 }
