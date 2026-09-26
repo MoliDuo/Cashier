@@ -150,8 +150,8 @@ src/persistence/      schema（按领域拆文件）和迁移
 ## 7. 测试与工具
 
 - 测试目录镜像 `src/`，删掉那些 mock 掉被测服务端代码、只断言调用参数的单测。
-- 集成测试先迁移出一个模板库，每个 worker 从模板复制，不再每个测试文件都跑一遍迁移。
-- 用 dependency-cruiser 和 ESLint 取代自制的架构检查器，这样也解除了升级 TypeScript 7 的阻碍。
+- 集成测试先迁移出一个模板库，每个测试文件从模板复制一份自己的库，不再每个测试文件都跑一遍迁移。
+- 用 dependency-cruiser 和 ESLint 取代自制的架构检查器，仓库脚本不再调用 TypeScript 编译器 API；升级 TypeScript 7 仍要等 typescript-eslint 和 dependency-cruiser 支持。
 - scripts 改用 TypeScript，数据种子只保留一份实现。
 - 文档收敛为五份：README、api、architecture、testing、AGENTS。
 

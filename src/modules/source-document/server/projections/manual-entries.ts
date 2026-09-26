@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
-import type { DateOrganizationSuggestion } from "@/modules/source-document/date-organization-contracts";
+import type { DateOrganizationSuggestion } from "@/lib/ai/date-organization";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "../write-guards";

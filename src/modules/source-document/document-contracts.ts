@@ -43,7 +43,7 @@ export interface SourceDocumentDetailDto
   hasImages: boolean;
   activeResultSummary?: SourceDocumentActiveResultSummary;
   dateOrganizationSuggestion?:
-    import("./date-organization-contracts").DateOrganizationSuggestion | null;
+    import("@/lib/ai/date-organization").DateOrganizationSuggestion | null;
 }
 
 export interface SourceDocumentActiveResultSummary {

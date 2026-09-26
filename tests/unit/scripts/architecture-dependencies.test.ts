@@ -96,6 +96,7 @@ describe("dependency-cruiser architecture rules", () => {
         "modules-not-app src/modules/demo/widget.ts",
         "lib-not-feature-code src/lib/uses-module.ts",
         "persistence-not-feature-code src/persistence/schema.ts",
+        "persistence-not-feature-code src/persistence/typed.ts",
         "modules-not-workspace src/modules/demo/uses-workspace.ts",
         "domain-stays-pure src/modules/demo/domain/rule.ts",
         "server-flows-not-entrypoints src/server/flow-ui.ts",

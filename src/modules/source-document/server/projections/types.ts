@@ -1,8 +1,5 @@
 import type { ProcessingLeaseContract } from "@/server/processing/types";
-import type {
-  DateHint,
-  DateOrganizationSuggestion,
-} from "@/modules/source-document/date-organization-contracts";
+import type { DateHint, DateOrganizationSuggestion } from "@/lib/ai/date-organization";
 
 export interface LedgerProjectionEntryContract {
   id?: string;

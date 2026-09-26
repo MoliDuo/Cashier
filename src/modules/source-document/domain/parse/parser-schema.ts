@@ -4,7 +4,7 @@ import { isValidDecimal, compare } from "@/lib/money/decimal";
 import { getAiOutputCopy } from "@/config/ai-output-locales";
 import { normalizeTitle } from "@/modules/source-document/title-policy";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
-import { dateHintSchema } from "@/modules/source-document/date-organization-contracts";
+import { dateHintSchema } from "@/lib/ai/date-organization";
 
 // ===== Decimal string validation =====
 
@@ -107,7 +107,7 @@ export type NormalizedLedgerEntry = Omit<
 > & {
   amount: string;
   notes: string | null;
-  date_hint?: import("@/modules/source-document/date-organization-contracts").DateHint;
+  date_hint?: import("@/lib/ai/date-organization").DateHint;
 };
 
 export type NormalizedOrderAdjustment = Omit<

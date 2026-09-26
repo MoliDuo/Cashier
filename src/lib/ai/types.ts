@@ -1,3 +1,5 @@
+import type { DateHint } from "./date-organization";
+
 export interface ParsedLedgerEntry {
   itemName: string;
   amount: string; // canonical decimal string, e.g. "45.00"
@@ -7,7 +9,7 @@ export interface ParsedLedgerEntry {
   notes?: string | null; // Consolidated notes
   receiptIndex?: number; // index of receipt within multi-receipt document
   isAdjustment?: boolean; // true for order_adjustments rows (discounts, fees, etc.)
-  dateHint?: import("@/modules/source-document/date-organization-contracts").DateHint;
+  dateHint?: DateHint;
 }
 
 export interface CategoryInfo {

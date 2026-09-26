@@ -13,7 +13,7 @@ export interface EntryToInsert {
   itemName: string;
   description: string | null;
   entryDate: string;
-  dateHint?: import("@/modules/source-document/date-organization-contracts").DateHint;
+  dateHint?: import("@/lib/ai/date-organization").DateHint;
 }
 
 export interface BuildEntriesParams {

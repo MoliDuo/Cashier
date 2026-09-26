@@ -62,7 +62,7 @@ export type ParseSourceDocumentOutput =
       ledgerEntries: ParsedLedgerEntry[];
       title?: string;
       verificationStatus: "passed";
-      dateHints?: import("@/modules/source-document/date-organization-contracts").DateHint[];
+      dateHints?: import("@/lib/ai/date-organization").DateHint[];
     }
   | {
       ledgerEntries: ParsedLedgerEntry[];
@@ -77,7 +77,7 @@ export type ParsePipelineResult =
       kind: "success";
       title: string;
       ledgerEntries: ParsedLedgerEntry[];
-      dateHints?: import("@/modules/source-document/date-organization-contracts").DateHint[];
+      dateHints?: import("@/lib/ai/date-organization").DateHint[];
     }
   | { kind: "invalid"; title: string; reason?: string; diagnostic: InvalidDiagnostic }
   | { kind: "cancelled" };

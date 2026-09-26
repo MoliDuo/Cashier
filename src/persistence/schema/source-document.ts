@@ -44,7 +44,7 @@ export const sourceDocuments = pgTable(
     /** The created content, so a repeat with other content is refused. */
     idempotencyFingerprint: text("idempotency_fingerprint"),
     dateOrganizationSuggestion: jsonb("date_organization_suggestion").$type<
-      import("@/modules/source-document/date-organization-contracts").DateOrganizationSuggestion
+      import("@/lib/ai/date-organization").DateOrganizationSuggestion
     >(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

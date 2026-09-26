@@ -25,8 +25,7 @@ export interface SourceDocumentRow {
   createdAt: Date;
   updatedAt: Date;
   dateOrganizationSuggestion:
-    | import("@/modules/source-document/date-organization-contracts").DateOrganizationSuggestion
-    | null;
+    import("@/lib/ai/date-organization").DateOrganizationSuggestion | null;
 }
 
 export interface SourceDocumentListHydrationRow {

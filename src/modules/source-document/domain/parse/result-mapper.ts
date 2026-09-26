@@ -7,7 +7,7 @@ import {
 } from "./contracts";
 import type { NormalizedLedgerEntry, NormalizedOrderAdjustment } from "./parser-schema";
 import { roundToCurrency } from "@/lib/money/currency-precision";
-import type { DateHint } from "@/modules/source-document/date-organization-contracts";
+import type { DateHint } from "@/lib/ai/date-organization";
 
 export function convertToParsedEntries({
   ledgerEntries,

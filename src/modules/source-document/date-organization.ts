@@ -2,7 +2,7 @@ import type {
   DateHint,
   DateOrganizationSuggestion,
   DateOrganizationSuggestionItem,
-} from "./date-organization-contracts";
+} from "@/lib/ai/date-organization";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_DAY = /^(\d{1,2})-(\d{1,2})$/;

@@ -40,13 +40,7 @@ function sourceFiles(directory) {
   });
 }
 
-/**
- * `import("…")` type references have never been checked, and three of them
- * reach from src/lib and src/persistence into modules. They stay outside the
- * rules until those are fixed.
- */
-const importTypeReference = ["type-import"];
-const onto = (paths) => ({ path: paths, dependencyTypesNot: importTypeReference });
+const onto = (paths) => ({ path: paths });
 
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const clientComponents = sourceFiles(path.join(__dirname, "src"))
@@ -61,11 +55,7 @@ module.exports = {
       comment: "Modules and src/server may call each other only without file-level import cycles.",
       severity: "error",
       from: { path: "^src/" },
-      to: {
-        circular: true,
-        dependencyTypesNot: importTypeReference,
-        viaOnly: { dependencyTypesNot: importTypeReference },
-      },
+      to: { circular: true },
     },
     {
       name: "modules-not-app",

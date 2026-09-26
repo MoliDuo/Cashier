@@ -184,7 +184,7 @@ export const categoryReclassificationJobs = pgTable(
     mode: text("mode").$type<"ai" | "assign" | "clear">().notNull().default("ai"),
     directCategoryId: uuid("direct_category_id"),
     candidateSnapshot: jsonb("candidate_snapshot")
-      .$type<import("@/modules/ledger/contracts").CategoryAssignmentCandidateSnapshot[]>()
+      .$type<Array<{ id: string; name: string; description: string | null }>>()
       .notNull()
       .default([]),
     customPromptSnapshot: text("custom_prompt_snapshot"),
