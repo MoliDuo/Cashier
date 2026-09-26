@@ -217,6 +217,12 @@ describe("PostgreSQL schema contract", () => {
     expect(credentialColumns).toContain("deleted_at");
   });
 
+  it("keeps no passwords, auth versions or setup state", async () => {
+    const userColumns = (await fetchColumns("users")).map((column) => column.columnName);
+    expect(userColumns.sort()).toEqual(["created_at", "id", "updated_at"]);
+    expect(await fetchColumns("setup_state")).toEqual([]);
+  });
+
   it("checks category names per ledger when a statement ends", async () => {
     const result = await getTestDb().execute<{ definition: string; deferrable: boolean }>(sql`
       SELECT pg_get_constraintdef(oid) AS definition, condeferrable AS deferrable
@@ -265,7 +271,7 @@ describe("PostgreSQL schema contract", () => {
   it("has no named constraint or index drift from the Drizzle model", async () => {
     // Names a later contract migration drops once the model has let go of
     // them; empty while the model and the database agree.
-    const retiredNames = new Set<string>(["ck_users_auth_version_positive"]);
+    const retiredNames = new Set<string>([]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(

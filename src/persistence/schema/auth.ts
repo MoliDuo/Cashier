@@ -59,34 +59,6 @@ export const loginEmails = pgTable(
 export type LoginEmail = InferSelectModel<typeof loginEmails>;
 
 /**
- * The first-run setup code, while setup is pending. A table rather than process
- * state because a production build renders `/setup` and runs its server action
- * in separate realms; the boolean primary key can only be true, so at most one
- * row exists, and the wizard deletes it as part of creating the account.
- *
- * The row is also the code's clock and its lockout counter: `created_at` dates
- * the code so a log line nobody read cannot lock the instance forever, and
- * `failed_attempts` retires a code that is being guessed at.
- */
-export const setupState = pgTable(
-  "setup_state",
-  {
-    id: boolean("id").primaryKey().default(true),
-    codeHash: text("code_hash").notNull(),
-    failedAttempts: integer("failed_attempts").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-  },
-  (table) => [
-    check("ck_setup_state_single_row", sql`${table.id}`),
-    check("ck_setup_state_failed_attempts", sql`${table.failedAttempts} >= 0`),
-  ]
-);
-
-export type SetupState = InferSelectModel<typeof setupState>;
-
-/**
  * A signed-in browser. The cookie carries a random token; only its keyed digest
  * is stored, so a leaked table cannot be replayed. Signing out, or anything that
  * must end every session, deletes rows.

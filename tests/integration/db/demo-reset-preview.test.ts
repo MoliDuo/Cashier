@@ -58,8 +58,7 @@ async function createLegacySchema(
       id uuid PRIMARY KEY,
       email text NOT NULL,
       nickname text NOT NULL,
-      gender text NOT NULL,
-      password_hash text
+      gender text NOT NULL
     );
     CREATE TABLE ${quoteIdentifier(dataSchema)}.ledgers (
       id uuid PRIMARY KEY,

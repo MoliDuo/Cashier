@@ -1,6 +1,6 @@
 {
-  "id": "117aa35c-7767-405e-a728-601bba3df84a",
-  "prevId": "f7bad6c7-33ea-4471-8086-4e1de6c3ac12",
+  "id": "7ce5b98f-dea0-4fe3-86e4-0522054f3d7d",
+  "prevId": "117aa35c-7767-405e-a728-601bba3df84a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -541,54 +541,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.setup_state": {
-      "name": "setup_state",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "boolean",
-          "primaryKey": true,
-          "notNull": true,
-          "default": true
-        },
-        "code_hash": {
-          "name": "code_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "failed_attempts": {
-          "name": "failed_attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ck_setup_state_single_row": {
-          "name": "ck_setup_state_single_row",
-          "value": "\"setup_state\".\"id\""
-        },
-        "ck_setup_state_failed_attempts": {
-          "name": "ck_setup_state_failed_attempts",
-          "value": "\"setup_state\".\"failed_attempts\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -599,18 +551,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "password_hash": {
-          "name": "password_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "password_updated_at": {
-          "name": "password_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
