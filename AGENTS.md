@@ -30,11 +30,11 @@ code is organized and tested.
 ## Repository gate
 
 `npm run check` must pass before a commit lands. It runs formatting (Prettier), the architecture
-check (dependency-cruiser), dead-code detection (knip), ESLint with zero warnings, `tsc`, message
-catalog validation, the full test suite with the coverage thresholds in `vitest.config.mts`, and a
-production build against isolated placeholders with the protected-route bundle budget. Integration
-tests need a running Docker daemon. Run `npm run test:smoke` as well when a change touches sign-in,
-routing, or the flows the smoke specs cover.
+check (dependency-cruiser), dead-code detection (knip), ESLint with zero warnings, `tsc`, the full
+test suite with the coverage thresholds in `vitest.config.mts`, and a production build against
+isolated placeholders with the protected-route bundle budget. Integration tests need a running
+Docker daemon. Run `npm run test:smoke` as well when a change touches sign-in, routing, or the flows
+the smoke specs cover.
 
 Pushing to `main` deploys: Vercel migrates the production database and builds in parallel with CI,
 so CI does not gate the deploy. The local gate is the gate.

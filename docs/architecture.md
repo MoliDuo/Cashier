@@ -63,6 +63,7 @@ src/server/               跨模块的后台流程：processing、category-recla
 src/lib/                  共享基础设施：db（含租约帮手）、s3、ai、email、logger、env、money、format、
                           security、drafts、queries 传输层
 src/persistence/          schema（按领域拆文件）和迁移
+src/copy/                 全部界面与邮件文案，按界面区域分文件
 ```
 
 依赖规则：
@@ -73,6 +74,7 @@ src/persistence/          schema（按领域拆文件）和迁移
 3. server action 和 API 路由不直接碰数据库或服务商 SDK。
 4. 只改名转发参数的函数不应该存在，直接调用目标。
 5. `domain/` 不得 import 数据库；客户端代码不得 import `server/`。
+6. `src/copy` 是叶子：只放文案，除了 `src/config` 的类型什么都不 import；任何一层都可以 import 它。
 
 有值得单测的分支时，把决策抽到 `domain/`；直来直去的数据访问留在 `server/`，用 PostgreSQL 集成测试覆盖。
 
@@ -249,8 +251,10 @@ src/persistence/          schema（按领域拆文件）和迁移
 - **页面各管自己的加载和错误状态。** 统计在刷新期间保留上一次成功的数据和对应周期；同一代的流水刷新保留已加载的页。
 - **流水。** 流水页显示处理中、失败和已完成的全部票据。服务端 keyset 分页按
   `entryDate DESC, createdAt DESC, id DESC` 排序，浏览器保持服务端顺序。
-- **国际化。** next-intl，消息目录是一个语言一个文件，随页面下发。消息 key 通过 `AppConfig` 有类型，
-  缺失的 key 由 `tsc` 报出；目录校验检查 ICU 语法并报告没人读的 key。日期和数字格式固定为 `zh-CN`。
+- **文案。** 界面只有中文，全部文案集中在 `src/copy/`，按界面区域分文件，每个文件导出若干 `xxxCopy` 对象。
+  普通文案是字符串，带参数的是函数（`batchDeleted({ count })`），组件、hook、服务端直接 import，
+  不经过 hook 或 provider。没有自动的"没人读的文案"检查：删功能时顺手删它的文案，整个对象没人用时 knip 会报。
+  日期和数字格式固定为 `zh-CN`（`DISPLAY_LOCALE`）。
 
 ### 刷新
 
@@ -278,8 +282,8 @@ src/persistence/          schema（按领域拆文件）和迁移
 
 ### 组件结构
 
-- 一个界面一个组件，配一个 hook。hook 直接调用 mutation 和 `useTranslations`，不经过层层转发，
-  也不把消息对象或 `t` 传进 hook。
+- 一个界面一个组件，配一个 hook。hook 直接调用 mutation、直接 import 文案，不经过层层转发，
+  也不把文案对象当参数传进 hook 或函数。
 - 渲染状态直接派生，状态更新用函数式写法；客户端入口里不 import 模块 barrel。
 
 ### 编辑交互
@@ -352,12 +356,13 @@ src/persistence/          schema（按领域拆文件）和迁移
 - **Phase 3：前端、认证、测试与工具。** 自建会话与 passkey、去掉密码和网页 setup；真实路由、草稿代替离开拦截、
   设置即时生效、hook 收拢；集成测试模板库、测试目录镜像 `src/`、dependency-cruiser 与 ESLint 取代自制检查器、
   scripts 改 TypeScript、文档收敛。
+- **之后：文案模块。** 去掉 next-intl，文案改为 `src/copy/` 下的普通 TS 模块。只有一种语言，多语言框架带来的
+  只有 provider、目录校验和测试 mock；集中存放保留了"一处看全部文案"的好处，类型和跳转由 TS 直接提供。
 
 ### 不做
 
 - **条目自带日期。** 多日期输入不常见，为它改约 53 个文件不划算，拆分和日期整理保留。
 - **去掉 `ledger_id`。** 与租户隔离的要求冲突，改动面约 250 个文件，收益很低。
-- **彻底移除 i18n。** 消息有类型之后，剩下的成本已经很小。
 - **CI 拦部署。** 推送到 `main` 后 Vercel 立刻迁移并部署，与 CI 并行。继续靠提交前本地 `npm run check` 兜底。
 - **升级到 TypeScript 7。** 仓库脚本已不再调用 TS 编译器 API，但 typescript-eslint 和 dependency-cruiser
   还依赖它，要等两者支持。

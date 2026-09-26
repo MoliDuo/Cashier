@@ -233,7 +233,7 @@ npm run account:enroll -- --email you@example.com
 npm run check
 ```
 
-它依次检查格式、架构（dependency-cruiser）与死代码（knip）、lint、类型、翻译目录，跑带覆盖率的全部测试，
+它依次检查格式、架构（dependency-cruiser）与死代码（knip）、lint、类型，跑带覆盖率的全部测试，
 再用隔离的占位配置做一次生产构建并检查受保护路由的包体积。集成测试需要 Docker。
 
 | 命令                     | 用途                                   |
