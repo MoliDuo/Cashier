@@ -19,7 +19,7 @@ import {
 import { ConflictError, ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { createTestBooks, createTestUserWithLedger, testBookId } from "../../helpers/schema-setup";
-import { getTestDb, getTestSchemaName } from "../../setup";
+import { getTestDb } from "../../setup";
 import {
   activateRevision,
   createManualDocument,
@@ -474,13 +474,7 @@ describe("target source-document submissions", () => {
  * pool the shared `db` uses for the code under test.
  */
 function racePool(): Pool {
-  const schema = getTestSchemaName();
-  if (!/^[a-zA-Z0-9_]+$/.test(schema)) throw new Error("Unexpected test schema name");
-  return new Pool({
-    connectionString: process.env.DATABASE_URL,
-    options: `-c search_path=${schema},public`,
-    max: 4,
-  });
+  return new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
 }
 
 /**

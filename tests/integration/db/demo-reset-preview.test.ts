@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { describe, expect, it } from "vitest";
 import { inspectDemoResetTargets, previewDemoReset } from "../../../scripts/demo-data.mjs";
-import { getTestPool, getTestSchemaName } from "../../setup";
+import { getTestMigrationsSchemaName, getTestPool, getTestSchemaName } from "../../setup";
 
 /**
  * Anything that changes a database: a preview that ran one of these would be a
@@ -100,10 +100,10 @@ describe("demo reset preview against a real database", () => {
   it("counts the tables of the migrated schema and leaves them alone", async () => {
     const client = await getTestPool().connect();
     try {
-      // The worker schema is a real migrated database, so every counted table
+      // The file's database is a real migrated copy, so every counted table
       // exists and its count is a count a rebuild would replace.
       const { previewClient, statements } = recordStatements(client);
-      const migrationsSchema = `${getTestSchemaName()}_migrations`;
+      const migrationsSchema = getTestMigrationsSchemaName();
       const result = await inspectDemoResetTargets(previewClient, {
         dataSchema: getTestSchemaName(),
         migrationsSchema,

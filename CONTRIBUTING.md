@@ -63,8 +63,9 @@ read it before changing the data model or restructuring a module.
 ## Checks
 
 Unit tests need only Node.js 24. Integration tests also need a running Docker daemon; the runner
-starts an isolated `postgres:17-alpine` container itself. No `.env`, no real credentials, no fixed
-port, no manually created database. The first integration run is slow while Docker pulls its images.
+starts an isolated `postgres:18-alpine` container itself, migrates one template database, and gives
+each test file its own copy of it. No `.env`, no real credentials, no fixed port, no manually
+created database. The first integration run is slow while Docker pulls its images.
 
 ```bash
 npm test                  # unit
@@ -79,8 +80,8 @@ translation validation, the full test suite with coverage, and a production buil
 placeholders. Coverage thresholds live in `vitest.config.mts`.
 
 `TEST_DATABASE_URL` may be set for advanced workflows, but it must name a PostgreSQL database
-ending in `_test`, with `public.pg_trgm` installed and permission to create schemas. Test commands
-never fall back to `DATABASE_URL`.
+ending in `_test` whose user may create databases; the run's template and per-file copies are
+created beside it and dropped afterwards. Test commands never fall back to `DATABASE_URL`.
 
 ## Browser smoke tests
 

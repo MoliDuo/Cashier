@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, defineProject } from "vitest/config";
@@ -127,9 +128,9 @@ export default defineConfig({
           globalSetup: ["./tests/setup.postgres-global.ts"],
           setupFiles: ["./tests/setup.ts"],
           pool: "forks",
-          // Each integration worker owns a migrated PostgreSQL schema. Keep
-          // concurrent migrations below the container's lock-table capacity.
-          maxWorkers: 2,
+          // Each file copies the migrated template into a database of its own,
+          // so files no longer contend for migration locks.
+          maxWorkers: Math.max(2, Math.floor(os.availableParallelism() / 2)),
           testTimeout: 30000,
         },
       }),

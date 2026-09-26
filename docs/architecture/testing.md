@@ -12,7 +12,7 @@ Cashier keeps fast, deterministic unit tests separate from database-backed integ
 - `npm run test:coverage` runs every project with the repository coverage thresholds.
 
 Database-backed commands require a running Docker daemon but no `.env`, credentials, fixed port, or
-manual migration step. Testcontainers uses `postgres:17-alpine` with a random host port and releases
+manual migration step. Testcontainers uses `postgres:18-alpine`, the production major version, with a random host port and releases
 the container after the Vitest run. The first run may download PostgreSQL and resource-reaper images.
 `npm run test:prepare` checks this lifecycle once and immediately releases the resource.
 
@@ -38,17 +38,19 @@ owns a separate `smoke_<uuid>` database; desktop/mobile scenarios run serially w
 contexts. The runner seeds one password account, its ledger, two books, and a few categories
 directly into that database. No existing user database is migrated, seeded, or truncated. See `CONTRIBUTING.md` for the command.
 
-Database-backed Vitest global setup provides a unique run ID and connection URL to its workers. Each
-isolated Vitest worker uses a schema
-named `test_<run-id>_w<worker-id>`; the pool slot and isolated worker identity both participate in
-the actual identifier. Separate runs never share schemas. The runner removes only schemas belonging
-to its own run after normal completion, failure, or interruption.
+Database-backed Vitest global setup migrates one template database, `test_<run-id>_template`, and
+provides it to the workers. Each test file runs `CREATE DATABASE … TEMPLATE` into a database of its
+own, `test_<run-id>_p<pool>_w<worker>`, laid out like production (tables in `public`, the migration
+log in `drizzle`), and drops it when the file ends. No file replays migrations, so integration
+workers scale with the machine (half its cores). Separate runs never share databases. The runner
+removes only databases carrying its own run prefix after normal completion, failure, or
+interruption.
 
 `TEST_DATABASE_URL` is an explicit advanced override and never falls back to `DATABASE_URL`. It must
-be a PostgreSQL URL whose database name ends in `_test`; the target must already have `pg_trgm` in
-`public` and allow schema creation. Connection or validation failures stop the run instead of
-starting a local container. Cleanup first enumerates matching run schemas and never removes the
-database, `public`, or another run's schemas.
+be a PostgreSQL URL whose database name ends in `_test`, and its user must be allowed to create
+databases. Connection or validation failures stop the run instead of starting a local container.
+Cleanup first enumerates databases with the run prefix and never removes the named database or
+another run's databases.
 
 Every test worker installs an MSW network guard. Shared deterministic handlers cover the background
 OpenAI failure path and Frankfurter exchange-rate fixture; tests may add case-specific handlers or
@@ -56,8 +58,7 @@ use existing mocks. Any other unhandled HTTP request fails the test even when ap
 catches the request error. Diagnostics contain only `TEST_UNEXPECTED_HTTP`, the method, and the
 origin; paths, query parameters, credentials, and bodies are excluded.
 
-Integration files are serialized within a worker because their setup truncates the worker schema
-between tests. Do not use `test.concurrent` or `describe.concurrent` in database-backed tests
+Tests within a file run serially because the file's setup truncates its database between tests. Do not use `test.concurrent` or `describe.concurrent` in database-backed tests
 without introducing test-case-level isolation.
 
 The `after()` mock runs callbacks immediately and tracks their returned promises. Teardown drains

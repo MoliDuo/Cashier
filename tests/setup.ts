@@ -1,28 +1,27 @@
-import path from "node:path";
 import { afterAll, beforeAll, beforeEach, inject, vi } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import * as schema from "@/persistence";
+import { databaseUrlFor, runDatabaseName } from "../scripts/prepare-test-postgres.mjs";
 import { flushAfterCallbacks } from "./setup.common";
 
 const postgresContext = inject("cashierPostgres");
-const TEST_DATABASE_URL = postgresContext.databaseUrl;
-const TEST_RUN_ID = postgresContext.runId;
 // VITEST_POOL_ID identifies a reusable worker slot; VITEST_WORKER_ID identifies the
-// isolated worker instance, so both are part of the schema name.
-const VITEST_POOL_ID = requireEnvironment("VITEST_POOL_ID");
-const VITEST_WORKER_ID = requireEnvironment("VITEST_WORKER_ID");
-const SCHEMA_NAME = `test_${sanitizeIdentifierPart(TEST_RUN_ID)}_p${sanitizeIdentifierPart(
-  VITEST_POOL_ID
-)}_w${sanitizeIdentifierPart(VITEST_WORKER_ID)}`;
+// isolated worker instance, so both are part of the database name.
+const DATABASE_NAME = runDatabaseName(
+  postgresContext.runId,
+  `p${requireEnvironment("VITEST_POOL_ID")}_w${requireEnvironment("VITEST_WORKER_ID")}`
+);
+const DATABASE_URL = databaseUrlFor(postgresContext.databaseUrl, DATABASE_NAME);
+// The copy is laid out like production: tables in public, the migration log in drizzle.
+const DATA_SCHEMA = "public";
+const MIGRATIONS_SCHEMA = "drizzle";
 
-process.env.DATABASE_URL = TEST_DATABASE_URL;
+process.env.DATABASE_URL = DATABASE_URL;
 
 interface TestDatabase {
   pool: Pool;
   db: ReturnType<typeof drizzle<typeof schema>>;
-  schemaName: string;
 }
 
 let testDatabase: TestDatabase | undefined;
@@ -31,27 +30,14 @@ function requireEnvironment(name: string): string {
   const value = process.env[name];
   if (value == null || value === "") {
     throw new Error(
-      `Missing ${name}. Run database-backed tests through the npm test scripts so test schemas are isolated.`
+      `Missing ${name}. Run database-backed tests through the npm test scripts so test databases are isolated.`
     );
   }
   return value;
 }
 
-function sanitizeIdentifierPart(value: string): string {
-  const sanitized = value.replace(/[^a-zA-Z0-9_]/g, "_");
-  if (sanitized.length === 0) throw new Error("Cannot derive a PostgreSQL schema name");
-  if (sanitized.length > 40) {
-    throw new Error("CASHIER_TEST_RUN_ID is too long for a PostgreSQL schema name");
-  }
-  return sanitized;
-}
-
 function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
-}
-
-function advisoryLockKey(schemaName: string): string {
-  return `cashier-test-schema:${schemaName}`;
 }
 
 export function getTestDb() {
@@ -69,8 +55,21 @@ export function getTestPool() {
 }
 
 export function getTestSchemaName(): string {
-  if (testDatabase == null) throw new Error("Test PostgreSQL database is not initialized");
-  return testDatabase.schemaName;
+  return DATA_SCHEMA;
+}
+
+export function getTestMigrationsSchemaName(): string {
+  return MIGRATIONS_SCHEMA;
+}
+
+/** Runs a statement against the server outside this file's database. */
+async function administer(statement: string): Promise<void> {
+  const admin = new Pool({ connectionString: postgresContext.databaseUrl, max: 1 });
+  try {
+    await admin.query(statement);
+  } finally {
+    await admin.end();
+  }
 }
 
 /** TRUNCATE only after all request-bound work has settled. */
@@ -83,7 +82,7 @@ async function truncateAllTables(database: TestDatabase): Promise<void> {
      ORDER BY table_name`
   );
   const tableNames = tables.rows.map(
-    ({ table_name }) => `${quoteIdentifier(database.schemaName)}.${quoteIdentifier(table_name)}`
+    ({ table_name }) => `${quoteIdentifier(DATA_SCHEMA)}.${quoteIdentifier(table_name)}`
   );
   if (tableNames.length === 0) return;
   const statement = `TRUNCATE TABLE ${tableNames.join(", ")} RESTART IDENTITY CASCADE`;
@@ -91,43 +90,20 @@ async function truncateAllTables(database: TestDatabase): Promise<void> {
 }
 
 beforeAll(async () => {
-  const admin = new Pool({ connectionString: TEST_DATABASE_URL, max: 1 });
-  const adminClient = await admin.connect();
-  let pool: Pool | undefined;
-
-  try {
-    await adminClient.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [
-      advisoryLockKey(SCHEMA_NAME),
-    ]);
-    await adminClient.query(`CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(SCHEMA_NAME)}`);
-
-    pool = new Pool({
-      connectionString: TEST_DATABASE_URL,
-      options: `-c search_path=${quoteIdentifier(SCHEMA_NAME)},public`,
-      max: 2,
-    });
-    const db = drizzle(pool, { schema });
-    await migrate(db, {
-      migrationsFolder: path.resolve("src/persistence/postgres-migrations"),
-      migrationsSchema: `${SCHEMA_NAME}_migrations`,
-    });
-    testDatabase = { pool, db, schemaName: SCHEMA_NAME };
-  } catch (error) {
-    await pool?.end();
-    throw error;
-  } finally {
-    await adminClient.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [
-      advisoryLockKey(SCHEMA_NAME),
-    ]);
-    adminClient.release();
-    await admin.end();
-  }
+  await administer(
+    `CREATE DATABASE ${quoteIdentifier(DATABASE_NAME)} TEMPLATE ${quoteIdentifier(
+      postgresContext.templateDatabase
+    )}`
+  );
+  const pool = new Pool({ connectionString: DATABASE_URL, max: 2 });
+  testDatabase = { pool, db: drizzle(pool, { schema }) };
 });
 
 afterAll(async () => {
   await flushAfterCallbacks();
   await testDatabase?.pool.end();
   testDatabase = undefined;
+  await administer(`DROP DATABASE IF EXISTS ${quoteIdentifier(DATABASE_NAME)} WITH (FORCE)`);
 });
 
 beforeEach(async () => {

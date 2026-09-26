@@ -5,7 +5,7 @@ import pg from "pg";
 import { z } from "zod";
 
 const DATABASE_NAME = "cashier_test";
-const IMAGE = "postgres:17-alpine";
+const IMAGE = "postgres:18-alpine";
 const STARTUP_TIMEOUT_MS = 120_000;
 
 const postgresTestUrlSchema = z
@@ -34,7 +34,7 @@ export function sanitizeIdentifierPart(value) {
   const sanitized = value.replace(/[^a-zA-Z0-9_]/g, "_");
   if (sanitized.length === 0) throw new Error("Cannot derive a PostgreSQL identifier component");
   if (sanitized.length > 40) {
-    throw new Error("CASHIER_TEST_RUN_ID is too long for a PostgreSQL test schema name");
+    throw new Error("CASHIER_TEST_RUN_ID is too long for a PostgreSQL test database name");
   }
   return sanitized;
 }
@@ -47,51 +47,50 @@ export function validateTestDatabaseUrl(value) {
   return postgresTestUrlSchema.parse(value);
 }
 
-export async function listRunSchemas(pool, runId) {
+/** The database a run's file, or its template, lives in; every one shares the run prefix. */
+export function runDatabaseName(runId, suffix) {
+  return `test_${sanitizeIdentifierPart(runId)}_${sanitizeIdentifierPart(suffix)}`;
+}
+
+/** The same server and credentials as `baseUrl`, pointed at another database. */
+export function databaseUrlFor(baseUrl, databaseName) {
+  const url = new URL(baseUrl);
+  url.pathname = `/${encodeURIComponent(databaseName)}`;
+  return url.toString();
+}
+
+export async function listRunDatabases(pool, runId) {
   const prefix = `test_${sanitizeIdentifierPart(runId)}_`;
   const result = await pool.query(
-    `SELECT nspname
-     FROM pg_namespace
-     WHERE left(nspname, char_length($1)) = $1
-     ORDER BY nspname`,
+    `SELECT datname
+     FROM pg_database
+     WHERE left(datname, char_length($1)) = $1
+     ORDER BY datname`,
     [prefix]
   );
-  return result.rows.map(({ nspname }) => nspname);
+  return result.rows.map(({ datname }) => datname);
 }
 
-export async function cleanupRunSchemas(pool, runId, logger = console) {
+export async function cleanupRunDatabases(pool, runId, logger = console) {
   const prefix = `test_${sanitizeIdentifierPart(runId)}_`;
-  const schemas = await listRunSchemas(pool, runId);
-  if (schemas.length > 0) logger.info(`Cleaning test schemas: ${schemas.join(", ")}`);
+  const databases = await listRunDatabases(pool, runId);
+  if (databases.length > 0) logger.info(`Cleaning ${databases.length} test databases`);
 
-  for (const schemaName of schemas) {
-    if (!schemaName.startsWith(prefix) || schemaName === "public") {
-      throw new Error(`Refusing to remove unexpected PostgreSQL schema: ${schemaName}`);
+  for (const databaseName of databases) {
+    if (!databaseName.startsWith(prefix)) {
+      throw new Error(`Refusing to remove unexpected PostgreSQL database: ${databaseName}`);
     }
-    await pool.query(`DROP SCHEMA IF EXISTS ${quoteIdentifier(schemaName)} CASCADE`);
+    await pool.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`);
   }
 }
 
-async function verifyExternalDatabase(pool, runId) {
+async function verifyExternalDatabase(pool) {
   await pool.query("SELECT 1");
-  const extension = await pool.query(
-    "SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm' AND extnamespace = 'public'::regnamespace"
+  const role = await pool.query(
+    "SELECT rolcreatedb OR rolsuper AS can_create FROM pg_roles WHERE rolname = current_user"
   );
-  if (extension.rowCount !== 1) {
-    throw new Error("TEST_DATABASE_URL must provide the pg_trgm extension in the public schema");
-  }
-
-  const probeSchema = `test_${sanitizeIdentifierPart(runId)}_permission_probe`;
-  try {
-    await pool.query(`CREATE SCHEMA ${quoteIdentifier(probeSchema)}`);
-  } catch (error) {
-    throw new Error("TEST_DATABASE_URL user must have permission to create schemas", {
-      cause: error,
-    });
-  } finally {
-    await pool
-      .query(`DROP SCHEMA IF EXISTS ${quoteIdentifier(probeSchema)} CASCADE`)
-      .catch(() => {});
+  if (role.rows[0]?.can_create !== true) {
+    throw new Error("TEST_DATABASE_URL user must be allowed to create databases");
   }
 }
 
@@ -139,7 +138,7 @@ export async function prepareTestPostgres({
       databaseUrl = validateTestDatabaseUrl(externalUrl);
       pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 5_000 });
       try {
-        await verifyExternalDatabase(pool, runId);
+        await verifyExternalDatabase(pool);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`TEST_DATABASE_URL validation failed: ${message}`, { cause: error });
@@ -149,7 +148,6 @@ export async function prepareTestPostgres({
       databaseUrl = container.getConnectionUri();
       pool = new Pool({ connectionString: databaseUrl, max: 1 });
       await pool.query("SELECT 1");
-      await pool.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
     }
 
     let cleaned = false;
@@ -161,7 +159,7 @@ export async function prepareTestPostgres({
         cleaned = true;
         let cleanupError;
         try {
-          await cleanupRunSchemas(pool, runId, logger);
+          await cleanupRunDatabases(pool, runId, logger);
         } catch (error) {
           cleanupError = error;
         } finally {
