@@ -1,8 +1,6 @@
 import type { CommonLucideIcon } from "@/config/icons";
 
 export const settingsCopy = {
-  title: "设置",
-  ledger: "账本",
   account: "账户",
   appearance: "外观",
   bookkeepingRules: "记账规则",
@@ -10,7 +8,6 @@ export const settingsCopy = {
   themeAuto: "跟随系统",
   themeLight: "浅色模式",
   themeDark: "深色模式",
-  assistant: "智能助理",
   aiLanguage: "AI 输出语言",
   mainCurrency: "主货币",
   collapseEntries: "默认折叠记录",
@@ -82,7 +79,6 @@ export const settingsCopy = {
   deleteCategoryDescription: (v: { name: string | number }) =>
     `确定删除分类“${v.name}”吗？相关明细将变为未分类。`,
   categoryName: "分类名称",
-  cancel: "取消",
   aiPrompt: "账本提示词",
   newCategoryPlaceholder: "新分类名称",
   addCategory: "添加",
@@ -91,7 +87,6 @@ export const settingsCopy = {
   unsupportedCurrency: "所选币种暂不受汇率数据支持",
   validationFailed: "设置内容无效，请检查后重试",
   updateConflict: "未保存：设置已在别处更改，已载入最新设置，请重新修改。",
-  save: "保存",
   saving: "(保存中...)",
   mainCurrencyMustBeEnabled: "主货币必须包含在偏好货币中。",
   categoriesSaved: "分类已保存",
@@ -109,7 +104,6 @@ export const settingsCopy = {
   retryMetadata: "重试生成",
   categoryItemCount: (v: { count: string | number }) => `${v.count} 条明细`,
   uncategorized: "未分类",
-  confirm: "确认",
   signOut: "退出登录",
   signOutConfirmTitle: "退出登录？",
   signOutConfirmDescription: "结束当前会话前，将清理本机缓存的账本数据。",
@@ -178,8 +172,6 @@ export const settingsCopy = {
 };
 
 export const settingsAccountCopy = {
-  reauthRequired: "请重新登录以继续此操作。",
-  cancel: "取消",
   passkeySection: "通行密钥",
 };
 
@@ -216,10 +208,8 @@ export const settingsBooksCopy = {
   notFound: "找不到该分账，可能已被删除。",
   lastBook: "最后一个分账不能归档或删除。",
   nameTaken: "已有同名分账。",
-  createFailed: "新增分账失败。",
   saveFailed: "保存分账失败。",
   empty: "还没有分账。",
-  cancel: "取消",
 };
 
 export const settingsPasskeysCopy = {
@@ -254,7 +244,6 @@ export const settingsPasskeysCopy = {
 
 export const settingsEmailsCopy = {
   title: "登录邮箱",
-  description: "列表中的任意邮箱都可以收验证码登录。",
   add: "添加邮箱",
   addTitle: "添加登录邮箱",
   addDesc: "我们会向新邮箱发送验证码，确认后它才能用于登录。",
@@ -268,7 +257,6 @@ export const settingsEmailsCopy = {
   lastEmail: "账户至少要保留一个登录邮箱。",
   codeSent: "验证码已发送",
   added: "已添加邮箱",
-  removed: "已移除邮箱",
   sessionsEnded: "邮箱已移除，所有设备均已退出登录。",
   invalidEmail: "请输入有效的邮箱地址。",
   invalidCode: "验证码不正确。",
@@ -278,12 +266,10 @@ export const settingsEmailsCopy = {
   locked: "尝试次数过多，验证已暂时锁定。",
   reauthRequired: "请重新登录后再继续此操作。",
   unknown: "出了点问题，请重试。",
-  verified: "已验证",
 };
 
 export const serviceCredentialsCopy = {
   title: "API 密钥",
-  description: "供脚本、快捷指令和外部集成访问当前账本。",
   newCredential: "新建密钥",
   noCredentials: "暂无服务密钥",
   createdAt: (v: { date: string | number }) => `创建于 ${v.date}`,
@@ -299,12 +285,9 @@ export const serviceCredentialsCopy = {
   deleteDesc: (v: { name: string | number }) =>
     `确定要删除凭证“${v.name}”吗？删除后使用此凭证的外部应用将无法访问。此操作无法撤销。`,
   deleteButton: (v: { name: string | number }) => `删除${v.name}`,
-  createFailed: "创建密钥失败",
   maxActive: "每个账本最多可有 20 个有效服务凭据。",
   bookUnavailable: "所选分账不可用：它可能已被归档或删除。请选择其他分账。",
-  deleteFailed: "删除密钥失败",
   copied: "密钥已复制到剪贴板",
-  book: (v: { book: string | number }) => `写入「${v.book}」`,
   bookDesc: "通过此密钥上传的记录会归入该分账。",
   changeBook: (v: { name: string | number }) => `修改「${v.name}」的分账`,
   archivedBook: "（已归档）",

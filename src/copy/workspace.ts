@@ -1,12 +1,7 @@
 export const detailsTabCopy = {
   loadMoreFailed: "加载更多失败，重试",
-  today: "今天",
-  yesterday: "昨天",
   select: "选择",
   cancelSelect: "取消",
-  deselectAll: "取消全选",
-  deleteConfirmTitle: "确认删除",
-  deleteConfirmDesc: "确定要删除这条记录吗？此操作无法撤销。",
   noMore: "没有更多了",
   batchUpdated: (v: { count: string | number }) => `已更新 ${v.count} 项明细`,
   batchDeleted: (v: { count: string | number }) => `已删除 ${v.count} 项明细`,
@@ -14,7 +9,6 @@ export const detailsTabCopy = {
   deleteSelectedTitle: "删除所选明细",
   deleteSelectedDescription: (v: { count: string | number }) =>
     `确定删除所选 ${v.count} 项明细吗？此操作无法撤销。`,
-  book: "分账",
 };
 
 export const batchActionsCopy = {
@@ -144,25 +138,16 @@ export const entryFilterPanelCopy = {
   statusCompleted: "已完成",
   statusFailed: "失败",
   statusCancelled: "已取消",
-  search: "搜索",
   searchPlaceholder: "搜索标题、名称或描述",
-  uncategorized: "未分类",
   noMatchingResults: "没有符合条件的结果",
 };
 
 export const ledgerEntriesTabCopy = {
-  processing: "处理中",
   select: "选择",
   cancelSelect: "取消",
-  deselectAll: "取消全选",
-  noRecords: "暂无记录",
-  loadMore: "加载更多",
   loadMoreFailed: "加载更多失败，重试",
   noMore: "没有更多了",
   deleteConfirmTitle: "确认删除",
   deleteConfirmDesc: "确定要删除这条记录吗？此操作无法撤销。",
-  deleteSuccess: "删除成功",
-  deleteFailed: "删除失败",
   loadingMore: "加载更多…",
-  retry: "编辑重试",
 };

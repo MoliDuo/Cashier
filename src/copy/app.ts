@@ -15,7 +15,6 @@ export const errorCopy = {
   errorId: (v: { id: string | number }) => `错误 ID：${v.id}`,
   goHome: "返回首页",
   retry: "重试",
-  backToHome: "返回主页",
 };
 
 export const ledgerQueryErrorCopy = {
@@ -34,7 +33,4 @@ export const ledgerPageCopy = {
   newRecord: "记一笔",
   aiParse: "智能记账",
   quickEntry: "快速记账",
-  readOnlyPreview: "只读预览",
-  retry: "重试",
-  total: "合计",
 };

@@ -9,9 +9,7 @@ export const dateRangeFilterCopy = {
 
 export const dateFilterCopy = {
   selectDate: "选择日期",
-  today: "今天",
   clear: "清除",
-  apply: "确定",
 };
 
 export const calculatorCopy = {
@@ -33,16 +31,9 @@ export const calendarCopy = {
   weekDays: ["日", "一", "二", "三", "四", "五", "六"],
   weekDaysMon: ["一", "二", "三", "四", "五", "六", "日"],
   currency: "货币",
-  allCurrencies: "全部货币",
-  category: "分类",
-  allCategories: "全部分类",
-  uncategorized: "未分类",
-  reset: "重置",
-  loading: "加载中…",
   noData: "暂无数据",
   less: "少",
   more: "多",
-  totalExpense: "总支出",
   count: (v: { count: string | number }) => `${v.count}笔`,
   expense: "支出",
   noConsumption: "无消费",
@@ -52,11 +43,7 @@ export const calendarCopy = {
   heatmapLevel3: "中等",
   heatmapLevel4: "较多",
   heatmapLevel5: "很多",
-  year: "年",
-  month: "月",
   dateFormat: (v: { year: string | number; month: string | number }) => `${v.year}年${v.month}月`,
-  scaleAdjusted: "已调整显示比例",
-  exceedsLimit: "（超出显示上限）",
   productName: "商品名称",
   notes: "备注",
 };

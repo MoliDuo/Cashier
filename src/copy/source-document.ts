@@ -1,7 +1,6 @@
 export const sourceDocumentCardCopy = {
   expand: "展开",
   collapse: "折叠",
-  editRetry: "编辑重试",
   moreActions: "更多操作",
   image: "图片",
   imageAlt: (v: { index: string | number }) => `图片 ${v.index}`,
@@ -57,17 +56,12 @@ export const sourceDocumentEditRetryDialogCopy = {
   title: "编辑重试",
   loadError: "无法加载原始凭证。",
   reload: "重新加载",
-  continueEditing: "继续编辑",
 };
 
 export const sourceDocumentDetailCopy = {
-  title: "账单详情",
-  entries: "明细项目",
   selectCategory: "选择分类",
   select: "选择",
   cancelSelect: "取消",
-  done: "完成",
-  deselectAll: "取消全选",
   noEntries: "暂无明细项目",
   deleteConfirmDesc: "确定要删除此原始凭证吗？这将同时删除所有关联的账本记录。",
   rawContent: "原始输入",
@@ -134,8 +128,6 @@ export const sourceDocumentDetailCopy = {
     applyFailed: "应用失败，账单未更改。请重试。",
     groupDate: "分组日期",
   },
-  book: "分账",
-  bookDesc: "把这条记录移到其他分账。",
 };
 
 export const sourceDocumentImageModalCopy = {
@@ -143,14 +135,12 @@ export const sourceDocumentImageModalCopy = {
   titleWithIndex: (v: { current: string | number; total: string | number }) =>
     `图片 ${v.current}/${v.total}`,
   imageAlt: (v: { index: string | number }) => `图片 ${v.index}`,
-  edit: "编辑当前图片",
   close: "关闭",
   previous: "上一张图片",
   next: "下一张图片",
   zoomIn: "放大",
   zoomOut: "缩小",
   resetZoom: "重置缩放",
-  continueEditing: "继续编辑",
 };
 
 export const sourceDocumentActionCopy = {
@@ -198,5 +188,4 @@ export const quickEntryFormCopy = {
   categoryRequired: "请选择分类",
   noCategories: "请先创建分类，再添加快速记录。",
   goToSettings: "前往设置",
-  book: "分账",
 };

@@ -1,5 +1,4 @@
 export const authCopy = {
-  signOut: "退出登录",
   email: "邮箱",
   emailPlaceholder: "输入您的邮箱",
   sending: "发送中...",
