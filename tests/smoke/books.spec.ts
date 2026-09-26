@@ -262,7 +262,7 @@ test("@demo deletes, archives and restores a book it creates for itself", async 
   // A key is still bound to 梁梁, so archiving it is refused with the reason,
   // and the refusal changes nothing.
   await archiveBook(page, "梁梁");
-  await expect(page.getByText(/Rebind them first/)).toBeVisible();
+  await expect(page.getByText(/请先改绑这些密钥/)).toBeVisible();
   await expect(bookRow(page, "梁梁").getByRole("button", { name: "归档" })).toBeEnabled();
 
   // Create the book this test owns.
