@@ -3,7 +3,6 @@ import { getTestDb } from "tests/setup";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { ledgerEntries, ledgers } from "@/persistence";
 import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
-import { previewSourceDocumentDateImpact } from "@/modules/workspace/server/source-document-date-impact";
 
 describe("previewSourceDocumentDateImpactAction", () => {
   let ledgerId = "";
@@ -38,11 +37,8 @@ describe("previewSourceDocumentDateImpactAction", () => {
   it("counts documents without entries, which still move to the new date", async () => {
     const empty = await documentWithEntries(0);
 
-    // The action's entry-id schema still requires at least one entry, so this
-    // selection is exercised one layer down.
     await expect(
-      previewSourceDocumentDateImpact({
-        ledgerId,
+      previewSourceDocumentDateImpactAction({
         sourceDocumentIds: [empty.sourceDocumentId, empty.sourceDocumentId],
         ledgerEntryIds: [],
       })

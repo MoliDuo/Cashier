@@ -10,6 +10,8 @@ export const previewSourceDocumentDateImpactAction = withLedgerAccess(
     previewSourceDocumentDateImpact({
       ledgerId,
       sourceDocumentIds: sourceDocumentIdsSchema.parse(input.sourceDocumentIds),
-      ledgerEntryIds: parseLedgerEntryIds(input.ledgerEntryIds),
+      // A selection of documents without entries has no entry ids, and still moves.
+      ledgerEntryIds:
+        input.ledgerEntryIds.length === 0 ? [] : parseLedgerEntryIds(input.ledgerEntryIds),
     })
 );
