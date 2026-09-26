@@ -11,7 +11,6 @@ export type ApplicationErrorCode =
   | "STATS_RANGE_TOO_LARGE"
   | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
-  | "PROCESSING_UNAVAILABLE"
   | "STORAGE_UNAVAILABLE"
   | "INTERNAL";
 
@@ -38,18 +37,19 @@ const APPLICATION_CODE_BY_APP_CODE: Readonly<Record<string, ApplicationErrorCode
   FILE_NOT_FOUND: "NOT_FOUND",
 };
 
+const HIDDEN_MESSAGE = "The request could not be completed.";
+
+function hidden(code: ApplicationErrorCode): ApplicationErrorContract {
+  return { code, message: HIDDEN_MESSAGE, correlationId: crypto.randomUUID() };
+}
+
+/**
+ * Only application errors with a known code keep their message; everything
+ * else reaches the client as a code and a correlation id for the logs.
+ */
 export function toApplicationError(error: unknown): ApplicationErrorContract {
-  const appCode = error instanceof AppError ? error.code : undefined;
-  const code = appCode == null ? "INTERNAL" : (APPLICATION_CODE_BY_APP_CODE[appCode] ?? "INTERNAL");
-  const hidesDetails =
-    code === "INTERNAL" || code === "STORAGE_UNAVAILABLE" || code === "PROCESSING_UNAVAILABLE";
-  return {
-    code,
-    message: hidesDetails
-      ? "The request could not be completed."
-      : error instanceof AppError
-        ? error.message
-        : "The request could not be completed.",
-    ...(hidesDetails ? { correlationId: crypto.randomUUID() } : {}),
-  };
+  if (!(error instanceof AppError)) return hidden("INTERNAL");
+  const code = APPLICATION_CODE_BY_APP_CODE[error.code] ?? "INTERNAL";
+  if (code === "INTERNAL" || code === "STORAGE_UNAVAILABLE") return hidden(code);
+  return { code, message: error.message };
 }

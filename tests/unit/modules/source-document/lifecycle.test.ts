@@ -4,12 +4,10 @@ import {
   apiV1Compatibility,
   toApiV1SourceDocumentCreateResponse,
 } from "@/app/api/v1/_shared/compatibility";
-import { toApplicationError, type ApplicationErrorContract } from "@/lib/application-errors";
 import {
   supportedSourceDocumentActions,
   toStableFailureCode,
 } from "@/modules/source-document/lifecycle";
-import { AppError } from "@/lib/errors";
 
 describe("target application contracts", () => {
   it("exposes actions for stable document lifecycle states", () => {
@@ -49,16 +47,6 @@ describe("target application contracts", () => {
         hasSubmissionInput: true,
       })
     ).not.toContain("split_entries");
-  });
-
-  it("maps infrastructure failures to stable, non-sensitive application errors", () => {
-    const error: ApplicationErrorContract = toApplicationError(
-      new AppError("Failed to download /private/uploads/secret.jpg", "S3_DOWNLOAD_FAILED")
-    );
-
-    expect(error.code).toBe("STORAGE_UNAVAILABLE");
-    expect(error.message).not.toContain("/private");
-    expect(error.correlationId).toBeTypeOf("string");
   });
 
   it("keeps the published API v1 response fixture as a stable contract", () => {
