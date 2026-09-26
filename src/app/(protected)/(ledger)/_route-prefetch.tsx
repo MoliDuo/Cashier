@@ -10,6 +10,7 @@ import {
   getLedgerRouteBootstrap,
   loadLedgerView,
 } from "@/modules/workspace/server/ledger-page-bootstrap";
+import { orSignIn } from "./_sign-in";
 
 export type RouteSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -39,7 +40,7 @@ export async function RoutePrefetch({
 }) {
   if ((await headers()).get("rsc") != null) return children;
 
-  const view = await loadLedgerView();
+  const view = await orSignIn(loadLedgerView());
   const ledgerDto = view.context.ledgerDto;
   const params = toUrlSearchParams(await searchParams);
   let state: DehydratedState | undefined;

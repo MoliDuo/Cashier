@@ -1,7 +1,5 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { HydrationBoundary, type DehydratedState } from "@tanstack/react-query";
-import { UnauthorizedError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import {
@@ -14,6 +12,7 @@ import { LedgerWorkspace } from "@/modules/workspace/ui/LedgerWorkspace";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { LedgerRouteFallback } from "./_route-fallback";
 import { LedgerShell } from "./_shell";
+import { orSignIn } from "./_sign-in";
 
 /**
  * What the ledger's four routes share: the header and tab bar, the book being
@@ -21,13 +20,7 @@ import { LedgerShell } from "./_shell";
  * routes keeps all of it mounted; only the page below it changes.
  */
 export default async function LedgerLayout({ children }: { children: React.ReactNode }) {
-  let view: LedgerView;
-  try {
-    view = await loadLedgerView();
-  } catch (error) {
-    if (error instanceof UnauthorizedError) redirect("/login");
-    throw error;
-  }
+  const view = await orSignIn(loadLedgerView());
   // Authenticated request boundary for processing recovery: the reads stay
   // side-effect free, but every document load still gets a recovery pass
   // after the response finishes.

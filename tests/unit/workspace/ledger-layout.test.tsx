@@ -186,6 +186,14 @@ describe("RoutePrefetch", () => {
     );
   });
 
+  it("sends a signed-out document request to sign in instead of failing the page", async () => {
+    loadLedgerViewMock.mockRejectedValue(new UnauthorizedError());
+
+    await expect(
+      RoutePrefetch({ tab: "stream", searchParams: Promise.resolve({}), children: child })
+    ).rejects.toThrow("REDIRECT");
+  });
+
   it("falls back to client queries when the prefetch fails", async () => {
     getLedgerRouteBootstrapMock.mockRejectedValue(new Error("stats are down"));
 
