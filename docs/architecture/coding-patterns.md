@@ -59,7 +59,7 @@ with `vi.mock` of the concrete module rather than injected fakes.
   implementation) at the document's effective date. A missing rate reads as unconverted;
   cross-currency 1:1 fallback and falling back to another day's rate are forbidden.
 - Source-document writes live in the registered writers under `src/modules/source-document/server/`
-  (the architecture check lists them), not a second write path. External IO — FX conversion, provider calls — runs before the transaction
+  (`registeredSourceDocumentWriters` in `eslint.config.mjs` lists them), not a second write path. External IO — FX conversion, provider calls — runs before the transaction
   starts, never inside it; a write transaction locks the ledger row first, then locks the target
   document row(s) in ascending ID order. Only the whole save from the detail page
   (`saveSourceDocumentChanges`) compares the locked row's `version` against the caller's
@@ -87,9 +87,10 @@ with `vi.mock` of the concrete module rather than injected fakes.
   route owns its own unprefixed query parameters; an open record is `?detail=<id>`. Routes prefetch
   on the server only for document requests — a client-side move carries the `rsc` header and
   renders at once from the query cache. The message catalog is one file for
-  one language; it ships with the page rather than being fetched per feature. Catalog validation checks
-  ICU syntax and statically known message keys. Chinese literals and dynamic keys are allowed;
-  dynamic keys remain the caller's responsibility.
+  one language; it ships with the page rather than being fetched per feature. Message keys are
+  typed, so `tsc` rejects a missing one; catalog validation checks ICU syntax and reports keys
+  nothing reads. Chinese literals and dynamic keys are allowed; dynamic keys remain the caller's
+  responsibility.
 - Keep browser image data as `File`/`Blob` through compression and upload. Object URLs are UI
   resources and must be revoked when an image is replaced, removed, reset, or unmounted.
 - Treat Infinite Query pages and detail queries as independent server-state views. Ledger mutations
@@ -166,10 +167,13 @@ headings, metadata and micro labels identical across surfaces.
 - Interactive controls keep their own sizes. Input and Textarea use 16px on mobile to avoid
   focus zoom in iOS Safari and 14px on desktop; Button uses its existing size variants.
 
-Run `npm run check:architecture` locally. CI must reject import cycles.
-Architecture rules inspect TypeScript syntax for protected writes and structured log fields; comments
-and ordinary strings are not architectural evidence. The typography rules read class literals, so
-arbitrary text sizes and the retired `text-muted` alias fail the check while comments stay exempt.
+`npm run check:architecture` runs dependency-cruiser (`.dependency-cruiser.cjs`) over `src`: the
+import directions above, the client-component and entrypoint boundaries, and file-level import
+cycles, type-only imports included. The rules that are not about imports live in
+`eslint.config.mjs` as `no-restricted-syntax` selectors, so they read syntax rather than text:
+identifier fields in `logger`/`console` calls go through `logIdentifier`, only the registered
+writers insert, update, or delete `sourceDocuments`, and class literals may not use arbitrary text
+sizes or the retired `text-muted` alias. Comments are never evidence.
 
 ### Category assignment writes
 

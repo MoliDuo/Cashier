@@ -56,7 +56,8 @@ Never commit `.env`, provider credentials, real receipts, API keys, or raw perso
 - `tests/unit/`, `tests/integration/`
 
 [Architecture and Coding Patterns](./docs/architecture/coding-patterns.md) describes the import
-boundaries, which `npm run check:architecture` enforces.
+boundaries, which `npm run check:architecture` (dependency-cruiser) enforces; the rules that are
+not about imports run as part of `npm run lint`.
 [Testing Architecture](./docs/architecture/testing.md) covers test placement and isolation.
 [Target Architecture](./docs/architecture/target-architecture.md) is where the codebase is heading;
 read it before changing the data model or restructuring a module.

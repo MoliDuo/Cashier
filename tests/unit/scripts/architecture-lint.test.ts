@@ -1,0 +1,127 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { ESLint } from "eslint";
+import { beforeAll, describe, expect, it } from "vitest";
+import { registeredSourceDocumentWriters } from "../../../eslint.config.mjs";
+
+const repositoryRoot = process.cwd();
+let eslint: ESLint;
+
+beforeAll(() => {
+  eslint = new ESLint({
+    cwd: repositoryRoot,
+    overrideConfigFile: path.join(repositoryRoot, "eslint.config.mjs"),
+  });
+});
+
+/** Messages from the architecture's `no-restricted-syntax` rules only. */
+async function restrictedSyntax(code: string, filePath: string): Promise<string[]> {
+  const [result] = await eslint.lintText(code, { filePath: path.join(repositoryRoot, filePath) });
+  return (result?.messages ?? [])
+    .filter((message) => message.ruleId === "no-restricted-syntax")
+    .map((message) => message.message);
+}
+
+const serverFile = "src/modules/demo/server/probe.ts";
+const logIdentifierImport = 'import { logIdentifier } from "@/lib/security/log-identifier";\n';
+
+describe("log identifier rule", () => {
+  it.each([
+    ["a shorthand identifier", "logger.info({ userId }, 'x');"],
+    ["a raw identifier value", "logger.error({ ledgerId: ledger.id }, 'x');"],
+    ["a quoted identifier key", "console.warn({ 'documentId': id });"],
+    ["a fatal log", "logger.fatal({ storedFileId: id });"],
+  ])("reports %s", async (_label, call) => {
+    const messages = await restrictedSyntax(`${logIdentifierImport}${call}`, serverFile);
+
+    expect(messages).toEqual([expect.stringContaining("logIdentifier")]);
+  });
+
+  it("reports a logIdentifier call that is not the imported helper", async () => {
+    const messages = await restrictedSyntax(
+      "logger.info({ userId: logIdentifier('user', id) });",
+      serverFile
+    );
+
+    expect(messages).toEqual([expect.stringContaining("logIdentifier")]);
+  });
+
+  it.each([
+    ["an identifier through logIdentifier", "logger.info({ userId: logIdentifier('user', id) });"],
+    ["an unrelated field", "logger.info({ count: 1 });"],
+    ["another receiver", "audit.info({ userId });"],
+    ["console.log, which the rule never covered", "console.log({ userId });"],
+    ["a computed key", "logger.info({ [userId]: 1 });"],
+    ["an object nested in another call", "logger.info(fields({ userId }));"],
+  ])("allows %s", async (_label, call) => {
+    expect(await restrictedSyntax(`${logIdentifierImport}${call}`, serverFile)).toEqual([]);
+  });
+
+  it("leaves files outside src alone", async () => {
+    expect(await restrictedSyntax("logger.info({ userId });", "tests/unit/probe.test.ts")).toEqual(
+      []
+    );
+  });
+});
+
+describe("typography rules", () => {
+  const component = "src/modules/demo/ui/probe.tsx";
+
+  it.each([
+    [
+      "an arbitrary size in a class attribute",
+      '<p className="mt-1 text-[13px]" />',
+      "frozen scale",
+    ],
+    ["an arbitrary rem size in a template", "cn(`p-2 text-[0.8rem] ${tone}`);", "frozen scale"],
+    ["the text-muted alias", 'cn("text-muted");', "text-muted-foreground"],
+    ["the alias after a substitution", "cn(`${base} text-muted`);", "text-muted-foreground"],
+  ])("reports %s", async (_label, code, message) => {
+    expect(await restrictedSyntax(`export const x = ${code}`, component)).toEqual([
+      expect.stringContaining(message),
+    ]);
+  });
+
+  it.each([
+    ["the muted foreground token", 'cn("text-muted-foreground text-muted-foreground/60");'],
+    ["a scale size", 'cn("text-sm text-micro");'],
+    ["a comment", "// text-[13px] and text-muted\nnull;"],
+    ["a longer class name", 'cn("my-text-muted");'],
+  ])("allows %s", async (_label, code) => {
+    expect(await restrictedSyntax(`export const x = ${code}`, component)).toEqual([]);
+  });
+});
+
+describe("source document writer rule", () => {
+  const writes = [
+    "tx.insert(sourceDocuments).values(row);",
+    "db.update(sourceDocuments).set(patch);",
+    "tx.delete(sourceDocuments).where(match);",
+  ];
+
+  it.each(writes)("reports %s outside a registered writer", async (write) => {
+    expect(await restrictedSyntax(write, serverFile)).toEqual([
+      expect.stringContaining("registered source-document writer"),
+    ]);
+  });
+
+  it.each(writes)("allows %s in a registered writer or a migration", async (write) => {
+    expect(await restrictedSyntax(write, registeredSourceDocumentWriters[0]!)).toEqual([]);
+    expect(await restrictedSyntax(write, "src/persistence/postgres-migrations/probe.ts")).toEqual(
+      []
+    );
+  });
+
+  it("allows reads and writes to other tables", async () => {
+    const code = "tx.select().from(sourceDocuments);\ntx.insert(ledgerEntries).values(row);";
+
+    expect(await restrictedSyntax(code, serverFile)).toEqual([]);
+  });
+
+  it.each(registeredSourceDocumentWriters)("%s still writes sourceDocuments", async (file) => {
+    const source = readFileSync(path.join(repositoryRoot, file), "utf8");
+    const messages = await restrictedSyntax(source, serverFile);
+
+    expect(messages).toContainEqual(expect.stringContaining("registered source-document writer"));
+  });
+});

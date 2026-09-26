@@ -21,8 +21,10 @@ updates:
     # Majors land on their own, because they are the ones worth reading a
     # changelog for.
     ignore:
-      # TypeScript 7 drops the JS compiler API the architecture and i18n
-      # scripts import, and typescript-eslint does not support it yet.
+      # TypeScript 7 drops the JS compiler API. No repository script imports
+      # it any more; typescript-eslint, which does, is what still has to
+      # support TypeScript 7 first. dependency-cruiser parses TypeScript
+      # through the same API (it accepts typescript <7), so check it too.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
       # The runtime is Node 24 (engines and CI), so its types must not
