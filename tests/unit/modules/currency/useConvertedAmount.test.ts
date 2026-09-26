@@ -4,10 +4,10 @@ import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useConvertedAmount } from "@/modules/currency/hooks/useConvertedAmount";
 
-const mockConvertCurrencyAction = vi.hoisted(() => vi.fn(async () => ({ converted: "42" })));
+const mockFetchConvertedAmount = vi.hoisted(() => vi.fn(async () => ({ converted: "42" })));
 
-vi.mock("@/modules/currency/server-actions/convert-currency", () => ({
-  convertCurrencyAction: mockConvertCurrencyAction,
+vi.mock("@/modules/currency/queries", () => ({
+  fetchConvertedAmount: mockFetchConvertedAmount,
 }));
 
 function createWrapper(
@@ -26,7 +26,7 @@ function createWrapper(
 
 describe("useConvertedAmount", () => {
   beforeEach(() => {
-    mockConvertCurrencyAction.mockClear();
+    mockFetchConvertedAmount.mockClear();
   });
 
   it("delegates conversion requests through currency actions", async () => {
@@ -38,8 +38,13 @@ describe("useConvertedAmount", () => {
       expect(result.current.status).toBe("success");
     });
 
-    expect(mockConvertCurrencyAction).toHaveBeenCalledTimes(1);
-    expect(mockConvertCurrencyAction).toHaveBeenCalledWith("100", "CNY", "USD", "2026-02-04");
+    expect(mockFetchConvertedAmount).toHaveBeenCalledTimes(1);
+    expect(mockFetchConvertedAmount).toHaveBeenCalledWith({
+      amount: "100",
+      from: "CNY",
+      to: "USD",
+      date: "2026-02-04",
+    });
     expect(result.current).toEqual({ status: "success", converted: "42" });
   });
 
@@ -49,7 +54,7 @@ describe("useConvertedAmount", () => {
     });
 
     expect(result.current).toEqual({ status: "idle", converted: "88" });
-    expect(mockConvertCurrencyAction).not.toHaveBeenCalled();
+    expect(mockFetchConvertedAmount).not.toHaveBeenCalled();
   });
 
   it("does not run a query when disabled (persisted value is authoritative)", async () => {
@@ -62,11 +67,11 @@ describe("useConvertedAmount", () => {
     );
 
     expect(result.current).toEqual({ status: "idle", converted: "100" });
-    expect(mockConvertCurrencyAction).not.toHaveBeenCalled();
+    expect(mockFetchConvertedAmount).not.toHaveBeenCalled();
   });
 
   it("reports loading and error states from the query", async () => {
-    mockConvertCurrencyAction.mockRejectedValueOnce(new Error("rates unavailable"));
+    mockFetchConvertedAmount.mockRejectedValueOnce(new Error("rates unavailable"));
     const { result } = renderHook(() => useConvertedAmount("100", "CNY", "USD", "2026-02-04"), {
       wrapper: createWrapper(),
     });
@@ -92,7 +97,12 @@ describe("useConvertedAmount", () => {
         wrapper: createWrapper(queryClient),
       });
       await vi.advanceTimersByTimeAsync(1);
-      expect(mockConvertCurrencyAction).toHaveBeenCalledWith("100", "CNY", "USD", "2026-02-04");
+      expect(mockFetchConvertedAmount).toHaveBeenCalledWith({
+        amount: "100",
+        from: "CNY",
+        to: "USD",
+        date: "2026-02-04",
+      });
       expect(queryClient.getQueryCache().getAll()[0]?.queryKey).toEqual([
         "ledger",
         "convert",
@@ -115,12 +125,17 @@ describe("useConvertedAmount", () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => expect(mockConvertCurrencyAction).toHaveBeenCalled());
-    expect(mockConvertCurrencyAction).toHaveBeenCalledWith("100", "CNY", "USD", expected);
+    await waitFor(() => expect(mockFetchConvertedAmount).toHaveBeenCalled());
+    expect(mockFetchConvertedAmount).toHaveBeenCalledWith({
+      amount: "100",
+      from: "CNY",
+      to: "USD",
+      date: expected,
+    });
   });
 
   it.each(["bad", "12oops", "Infinity"])("rejects invalid action result %s", async (converted) => {
-    mockConvertCurrencyAction.mockResolvedValueOnce({ converted });
+    mockFetchConvertedAmount.mockResolvedValueOnce({ converted });
     const { result } = renderHook(() => useConvertedAmount("100", "CNY", "USD", "2026-02-04"), {
       wrapper: createWrapper(),
     });
@@ -133,19 +148,19 @@ describe("useConvertedAmount", () => {
   });
 
   it("keeps a large decimal string intact", async () => {
-    mockConvertCurrencyAction.mockResolvedValueOnce({ converted: "9007199254740993.12" });
+    mockFetchConvertedAmount.mockResolvedValueOnce({ converted: "9007199254740993.12" });
     const { result } = renderHook(
       () => useConvertedAmount("9007199254740993.12", "CNY", "USD", "2026-02-04"),
       { wrapper: createWrapper() }
     );
 
     await waitFor(() => expect(result.current.status).toBe("success"));
-    expect(mockConvertCurrencyAction).toHaveBeenCalledWith(
-      "9007199254740993.12",
-      "CNY",
-      "USD",
-      "2026-02-04"
-    );
+    expect(mockFetchConvertedAmount).toHaveBeenCalledWith({
+      amount: "9007199254740993.12",
+      from: "CNY",
+      to: "USD",
+      date: "2026-02-04",
+    });
     expect(result.current.converted).toBe("9007199254740993.12");
   });
 
@@ -155,6 +170,6 @@ describe("useConvertedAmount", () => {
     });
 
     expect(result.current).toEqual({ status: "idle", converted: "100" });
-    expect(mockConvertCurrencyAction).not.toHaveBeenCalled();
+    expect(mockFetchConvertedAmount).not.toHaveBeenCalled();
   });
 });

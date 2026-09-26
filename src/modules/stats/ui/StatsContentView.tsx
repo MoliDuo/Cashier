@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { BarChart3, Grid3X3 } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import type { DateRangeType } from "@/lib/date-utils";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
@@ -15,6 +15,7 @@ import { StatsPeriodBar } from "./StatsPeriodBar";
 import { StatsRanking } from "./StatsRanking";
 import { StatsSummary } from "./StatsSummary";
 import { StatsWeekdayRhythm } from "./StatsWeekdayRhythm";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface StatsContentViewProps {
   rangeType: DateRangeType;
@@ -63,7 +64,7 @@ export function StatsContentView({
 }: StatsContentViewProps) {
   const t = useTranslations("StatsTab");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const currencySymbol = stats?.summary.currency ?? fallbackCurrency;
   const periodLabel =
     contentRangeType === "week"

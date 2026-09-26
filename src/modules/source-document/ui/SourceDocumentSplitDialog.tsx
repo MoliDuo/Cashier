@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Loader2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { formatDateTimeForApi } from "@/lib/date-utils";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface SourceDocumentSplitDialogProps {
   open: boolean;
@@ -41,7 +42,7 @@ export function SourceDocumentSplitDialog({
 }: SourceDocumentSplitDialogProps) {
   const t = useTranslations("SourceDocumentDetail");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const [entryDate, setEntryDate] = useState(() => initialDate);
   const previewEntries = selectedEntries.slice(0, 5);
   const remainingCount = selectedEntries.length - previewEntries.length;

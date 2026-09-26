@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
-import { getBooksAction, getBooksIncludingArchivedAction } from "@/lib/queries/ledger-query-client";
+import { fetchBooks, fetchBooksIncludingArchived } from "@/modules/ledger/queries";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 interface UseBooksOptions {
@@ -25,7 +25,7 @@ interface UseBooksOptions {
 export function useBooks({ initialBooks, includeArchived }: UseBooksOptions) {
   const booksQuery = useQuery({
     queryKey: includeArchived ? queryKeys.booksIncludingArchived() : queryKeys.books(),
-    queryFn: () => (includeArchived ? getBooksIncludingArchivedAction() : getBooksAction()),
+    queryFn: () => (includeArchived ? fetchBooksIncludingArchived() : fetchBooks()),
     staleTime: LEDGER.STALE_TIME_MS,
     ...(initialBooks !== undefined ? { initialData: [...initialBooks] } : {}),
   });

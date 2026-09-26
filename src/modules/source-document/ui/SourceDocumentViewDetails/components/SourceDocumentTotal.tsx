@@ -1,7 +1,8 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { AmountText } from "@/modules/currency/ui/amount-text";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface SourceDocumentTotalProps {
   totalInMainCurrency: string;
@@ -22,7 +23,7 @@ export function SourceDocumentTotal({
 }: SourceDocumentTotalProps) {
   const t = useTranslations("SourceDocumentDetail");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const amount = formatCurrencyAmount(totalInMainCurrency, mainCurrency, locale);
 
   return (

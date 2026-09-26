@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,6 @@ interface BookRow {
 export function SetupForm() {
   const t = useTranslations("Setup");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
   const router = useRouter();
   const nextBookId = useRef(1);
   const [setupCode, setSetupCode] = useState("");
@@ -85,7 +84,6 @@ export function SetupForm() {
       setupCode,
       email,
       password,
-      locale,
       books: bookRows.map((row) => row.name),
     });
     if (!result.ok) {

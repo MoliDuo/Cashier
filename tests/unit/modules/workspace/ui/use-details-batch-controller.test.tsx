@@ -50,8 +50,8 @@ vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
   startCategoryAssignmentAction: startCategoryAssignmentActionMock,
 }));
 
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getCategoryReclassificationJobAction: reclassificationJobMock,
+vi.mock("@/modules/ledger/queries", () => ({
+  fetchCategoryReclassificationJob: reclassificationJobMock,
 }));
 
 function deferred() {

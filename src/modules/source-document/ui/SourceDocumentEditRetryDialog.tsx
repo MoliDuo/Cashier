@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SourceDocumentInput } from "./SourceDocumentInput";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { getSourceDocumentInputAction } from "@/modules/source-document/server-actions/queries";
+import { fetchSourceDocumentInput } from "@/modules/source-document/queries";
 import { queryKeys } from "@/lib/query-keys";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,7 @@ function EditRetryDialogContent({
   } = useQuery({
     queryKey: queryKeys.sourceDocumentInput(sourceDocument.id),
     queryFn: async () => {
-      const result = await getSourceDocumentInputAction(sourceDocument.id);
+      const result = await fetchSourceDocumentInput(sourceDocument.id);
       if (result == null) return null;
       return result;
     },

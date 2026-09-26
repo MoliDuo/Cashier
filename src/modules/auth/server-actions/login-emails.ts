@@ -57,12 +57,6 @@ function mapError(error: unknown): LoginEmailErrorCode {
   return "unknown";
 }
 
-/** The account's login addresses, for the 设置 list. */
-export const listLoginEmailsAction = async (): Promise<string[]> => {
-  const userId = await requireAuth();
-  return (await listLoginEmails(userId)).map((row) => row.email);
-};
-
 /** Sends an OTP to an address that is not yet a login address. */
 export async function sendLoginEmailCodeAction(
   inputEmail: string

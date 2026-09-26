@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
+import { fetchEnhancedStats } from "@/modules/stats/queries";
 import {
   addPeriod,
   formatCivilDate,
@@ -12,11 +12,11 @@ import {
   type DateRangeType,
 } from "@/lib/date-utils";
 import { StatsContentView } from "@/modules/stats/ui/StatsContentView";
-import { useLocale } from "next-intl";
+
 import type { Ledger } from "@/modules/ledger/contracts";
 import { MAX_CHART_POINTS } from "@/modules/stats/lib/chart-points";
 import { MAX_HEATMAP_DAYS } from "@/modules/stats/lib/heatmap-range";
-import { QUERY } from "@/lib/constants";
+import { QUERY, DISPLAY_LOCALE } from "@/lib/constants";
 import { DEFAULT_STATS_RANGE_TYPE } from "@/modules/workspace/initial-query-state";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { usePathname } from "next/navigation";
@@ -49,7 +49,7 @@ export function StatsTab({
   ledgerToday,
   timeZone,
 }: StatsTabProps) {
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const statsUrlState = useMemo(() => readStatsSearchParams(searchParams), [searchParams]);
@@ -115,7 +115,7 @@ export function StatsTab({
       : statsDescriptor;
   const statsQuery = useQuery({
     queryKey: scopeDescriptor.queryKey,
-    queryFn: () => getEnhancedStats(scopeDescriptor.input),
+    queryFn: () => fetchEnhancedStats(scopeDescriptor.input),
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     refetchOnWindowFocus: false,
   });

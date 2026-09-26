@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 
+const fetchPasskeys = vi.hoisted(() => vi.fn());
 const actions = vi.hoisted(() => ({
-  listPasskeysAction: vi.fn(),
   startPasskeyRegistrationAction: vi.fn(),
   finishPasskeyRegistrationAction: vi.fn(),
   renamePasskeyAction: vi.fn(),
@@ -15,6 +15,7 @@ const actions = vi.hoisted(() => ({
 const browser = vi.hoisted(() => ({ supported: true, startRegistration: vi.fn() }));
 
 vi.mock("@/modules/auth/server-actions/passkeys", () => actions);
+vi.mock("@/modules/auth/queries", () => ({ fetchPasskeys }));
 vi.mock("@simplewebauthn/browser", () => ({
   browserSupportsWebAuthn: () => browser.supported,
   startRegistration: browser.startRegistration,
@@ -52,7 +53,7 @@ describe("PasskeySettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     browser.supported = true;
-    actions.listPasskeysAction.mockResolvedValue([laptop]);
+    fetchPasskeys.mockResolvedValue([laptop]);
     actions.startPasskeyRegistrationAction.mockResolvedValue({
       ok: true,
       challengeId: "challenge",

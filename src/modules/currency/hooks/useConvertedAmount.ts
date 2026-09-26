@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
-import { convertCurrencyAction } from "@/modules/currency/server-actions/convert-currency";
+import { fetchConvertedAmount } from "@/modules/currency/queries";
 import type { ConvertCurrencyResult } from "../contracts";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { formatDateTimeForApi } from "@/lib/date-utils";
@@ -64,12 +64,12 @@ export function useConvertedAmount(
         return { converted: amount };
       }
 
-      const result = await convertCurrencyAction(
+      const result = await fetchConvertedAmount({
         amount,
-        normalizedFrom,
-        normalizedTo,
-        effectiveDate ?? ""
-      );
+        from: normalizedFrom,
+        to: normalizedTo,
+        ...(effectiveDate != null ? { date: effectiveDate } : {}),
+      });
       if (typeof result.converted !== "string" || !isValidDecimal(result.converted)) {
         throw new Error("Invalid currency conversion result");
       }

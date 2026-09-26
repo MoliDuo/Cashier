@@ -19,8 +19,8 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
+import { fetchLoginEmails } from "@/modules/auth/queries";
 import {
-  listLoginEmailsAction,
   removeLoginEmailAction,
   sendLoginEmailCodeAction,
   verifyLoginEmailCodeAction,
@@ -55,7 +55,7 @@ export function EmailSettings({
   const key = queryKeys.loginEmails();
   const { data } = useQuery({
     queryKey: key,
-    queryFn: () => listLoginEmailsAction(),
+    queryFn: fetchLoginEmails,
     staleTime: LEDGER.STALE_TIME_MS,
   });
   // The in-page tab only knows the signed-in address, so the query fills in the

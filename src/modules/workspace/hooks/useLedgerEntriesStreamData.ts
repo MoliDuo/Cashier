@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSourceDocumentStream } from "@/modules/source-document/hooks/useSourceDocumentStream";
-import { getStreamTotalAction } from "@/lib/queries/ledger-query-client";
+import { fetchStreamTotal } from "@/modules/source-document/queries";
 import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 
@@ -48,7 +48,7 @@ export function useLedgerEntriesStreamData({
   );
   const streamTotalQuery = useQuery({
     queryKey: streamQueryDescriptor.totalQueryKey,
-    queryFn: () => getStreamTotalAction(streamQueryDescriptor.totalInput),
+    queryFn: () => fetchStreamTotal(streamQueryDescriptor.totalInput),
   });
   const { data: streamTotalData } = streamTotalQuery;
   const filteredTotal = streamTotalData?.total;

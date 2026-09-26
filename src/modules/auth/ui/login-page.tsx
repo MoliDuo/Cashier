@@ -20,7 +20,7 @@ export function AuthLoginPage({
 }) {
   const t = useTranslations("Auth");
   const searchParams = useSearchParams();
-  const flow = useLoginFlow(t, {
+  const flow = useLoginFlow({
     initialMode: emailAuthEnabled ? "otp" : "password",
     isDevAuthAvailable: devAuthAvailable,
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, type RefCallback } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import type { EntryCategory, Ledger, LedgerEntry } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -23,6 +23,7 @@ import { DetailsToolbar } from "./DetailsToolbar";
 import { usePeriodLabel } from "./usePeriodLabel";
 import { EmptyState } from "@/components/EmptyState";
 import type { useDetailsBatchController } from "./useDetailsBatchController";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 type BatchController = ReturnType<typeof useDetailsBatchController>;
 interface DetailsTabViewProps {
@@ -74,7 +75,7 @@ export function DetailsTabView(props: DetailsTabViewProps) {
   const t = useTranslations("DetailsTab");
   const tCommon = useTranslations("Common");
   const tFilter = useTranslations("EntryFilterPanel");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const rangeLabel = usePeriodLabel(periodParams, batch.timeZone);
   const { isPending, toggleSelection, handleSelectMany } = batch;
   const handleToggleSelection = useCallback(

@@ -2,11 +2,12 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { EntryGroupHeader, groupSelectionState } from "@/components/EntryGroupHeader";
 import { LedgerEntryCard } from "./LedgerEntryCard";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface LedgerEntryGroupsViewProps {
   groups: readonly { title: string; items: LedgerEntry[]; total: string }[];
@@ -51,7 +52,7 @@ export function LedgerEntryGroupsView({
   onToggleSelection,
   onSetGroupSelection,
 }: LedgerEntryGroupsViewProps) {
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const tBatch = useTranslations("BatchActions");
   const rows = useMemo(() => flattenLedgerEntryGroups(groups), [groups]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);

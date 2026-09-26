@@ -1,9 +1,10 @@
 "use client";
 import { useCallback } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import { useDateGrouping } from "@/hooks/use-date-grouping";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 export interface GroupedEntry {
   title: string;
@@ -22,7 +23,7 @@ export function useDetailsTabGrouping(
   timeZone?: string
 ): UseDetailsTabGroupingReturn {
   const t = useTranslations("DetailsTab");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
 
   const getDateStr = useCallback((entry: ActiveLedgerEntryDto) => {
     if (entry.sourceDocument.documentDate != null && entry.sourceDocument.documentDate !== "") {

@@ -8,7 +8,7 @@ import { useSourceDocumentRecoveryMutations } from "@/modules/source-document/ho
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
-import { getBookAction } from "@/lib/queries/ledger-query-client";
+import { fetchBook } from "@/modules/ledger/queries";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
@@ -76,7 +76,7 @@ export function SourceDocumentDetailWrapper({
   const recordBookIsLive = recordBookId != null && books.some((book) => book.id === recordBookId);
   const { data: archivedRecordBook } = useQuery({
     queryKey: queryKeys.book(recordBookId ?? ""),
-    queryFn: () => getBookAction(recordBookId!),
+    queryFn: () => fetchBook(recordBookId!),
     enabled: open && recordBookId != null && !recordBookIsLive,
     staleTime: LEDGER.STALE_TIME_MS,
   });

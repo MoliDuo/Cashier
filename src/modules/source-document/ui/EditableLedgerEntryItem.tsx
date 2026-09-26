@@ -1,7 +1,7 @@
 "use client";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { memo, type ReactNode } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { getCurrencySymbol } from "@/lib/format/currency";
 import { amountTextClassName } from "@/modules/currency/ui/amount-text";
 import { AmountDisplay } from "@/modules/currency/ui/AmountDisplay";
 import { getCurrencyDecimals } from "@/lib/money/currency-precision";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 function parseAmount(amount: string | null | undefined): number {
   if (amount == null) return 0;
@@ -91,7 +92,7 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
 }: EditableLedgerEntryItemProps) {
   const t = useTranslations("Calendar");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
 
   // Merge pending changes with original data
   const displayData = {

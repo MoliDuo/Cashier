@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
@@ -19,16 +19,16 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatInstantDateLabel } from "@/lib/date-utils";
-import { LEDGER } from "@/lib/constants";
+import { LEDGER, DISPLAY_LOCALE } from "@/lib/constants";
 import { queryKeys } from "@/lib/query-keys";
 import {
   deletePasskeyAction,
   finishPasskeyRegistrationAction,
-  listPasskeysAction,
   renamePasskeyAction,
   startPasskeyRegistrationAction,
   type PasskeyActionErrorCode,
 } from "@/modules/auth/server-actions/passkeys";
+import { fetchPasskeys } from "@/modules/auth/queries";
 import { isCancelledCeremony, usePasskeySupport } from "@/modules/auth/hooks/use-passkey-support";
 import { PASSKEY_NAME_MAX_LENGTH } from "@/modules/auth/constants";
 import type { PasskeySummary } from "@/modules/auth/contracts";
@@ -45,13 +45,13 @@ interface PasskeySettingsProps {
 export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsProps) {
   const t = useTranslations("Settings.Passkeys");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const queryClient = useQueryClient();
   const key = queryKeys.passkeys();
   const supported = usePasskeySupport();
   const { data: passkeys = [], isPending: isListPending } = useQuery({
     queryKey: key,
-    queryFn: () => listPasskeysAction(),
+    queryFn: fetchPasskeys,
     staleTime: LEDGER.STALE_TIME_MS,
   });
   const [isAddOpen, setIsAddOpen] = useState(false);

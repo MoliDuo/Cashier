@@ -18,8 +18,8 @@ vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
   retryCategoryAssignmentFailuresAction: vi.fn(),
   retryCategoryAssignmentLatestAction: vi.fn(),
 }));
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getCategoryAssignmentResultsAction: vi.fn(async () => ({ items: [], nextCursor: null })),
+vi.mock("@/modules/ledger/queries", () => ({
+  fetchCategoryAssignmentResults: vi.fn(async () => ({ items: [], nextCursor: null })),
 }));
 
 function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {

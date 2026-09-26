@@ -25,10 +25,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatInstantDateLabel } from "@/lib/date-utils";
 import { copyToClipboard } from "@/lib/utils";
-import { UI } from "@/lib/constants";
+import { UI, DISPLAY_LOCALE } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SettingsSection } from "./settings/SettingsSection";
 
@@ -56,7 +56,7 @@ export function ServiceCredentialSection({
   const tBooks = useTranslations("Settings.Books");
   const t = useTranslations("ServiceCredentials");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const firstBookId = books[0]?.id ?? "";
   const [newCredName, setNewCredName] = useState("");
   const [newCredBookId, setNewCredBookId] = useState(firstBookId);

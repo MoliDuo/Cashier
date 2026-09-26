@@ -86,7 +86,7 @@ describe("SetupForm", () => {
     expect(alerts().length).toBeGreaterThan(0);
   });
 
-  it("submits the account, the books and the locale once the password passes", async () => {
+  it("submits the account, and the books once the password passes", async () => {
     const user = userEvent.setup();
     render(<SetupForm />);
     fill({ setupCode: "12345678", email: "owner@example.com", password: LEGAL_PASSWORD });
@@ -98,7 +98,6 @@ describe("SetupForm", () => {
       setupCode: "12345678",
       email: "owner@example.com",
       password: LEGAL_PASSWORD,
-      locale: "zh",
       books: [zh.Setup.sharedBookName],
     });
     await waitFor(() =>

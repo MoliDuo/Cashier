@@ -19,11 +19,11 @@ const { getLedgerActionMock, getEntryCategoriesActionMock, getBooksActionMock, b
     browserZone: { value: null as string | null },
   }));
 
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getLedgerAction: getLedgerActionMock,
-  getEntryCategoriesAction: getEntryCategoriesActionMock,
-  getBooksAction: getBooksActionMock,
-  getBooksIncludingArchivedAction: getBooksActionMock,
+vi.mock("@/modules/ledger/queries", () => ({
+  fetchLedger: getLedgerActionMock,
+  fetchEntryCategories: getEntryCategoriesActionMock,
+  fetchBooks: getBooksActionMock,
+  fetchBooksIncludingArchived: getBooksActionMock,
 }));
 vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
   preloadNewRecordModules: vi.fn(),

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -18,6 +18,7 @@ import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import type { ReactNode } from "react";
 import { usePeriodLabel } from "./usePeriodLabel";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface LedgerEntriesToolbarProps {
   isSelectionMode: boolean;
@@ -82,7 +83,7 @@ export function LedgerEntriesToolbar({
   const t = useTranslations("LedgerEntriesTab");
   const tCommon = useTranslations("Common");
   const tBatch = useTranslations("BatchActions");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const rangeLabel = usePeriodLabel(periodParams, timeZone);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(

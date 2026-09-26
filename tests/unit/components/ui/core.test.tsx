@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 vi.mock("next-intl", async () => {
-  const msgs = (await import("messages/zh.json")).default as Record<string, Record<string, string>>;
+  const msgs = (await import("../../../../messages/zh.json")).default as unknown as Record<
+    string,
+    Record<string, string>
+  >;
 
   return {
     useTranslations: (namespace?: string) => {

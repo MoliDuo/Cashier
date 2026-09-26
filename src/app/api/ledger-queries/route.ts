@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { AppError } from "@/lib/errors";
+import { AppError, NotFoundError } from "@/lib/errors";
 import { omitUndefinedProperties } from "@/lib/validation";
 import { requireLedgerAccess } from "@/modules/ledger/access";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
@@ -29,6 +29,11 @@ import {
 } from "@/modules/ledger/server/get-category-reclassification-job";
 import { scheduleCategoryReclassificationRecoveryAfter } from "@/server/category-reclassification/schedule";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
+import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
+import { convertCurrency } from "@/modules/currency/server/convert-currency";
+import { requireAuth } from "@/modules/auth/server/session-guards";
+import { listLoginEmails } from "@/modules/auth/server/users";
+import { listPasskeys } from "@/modules/auth/server/passkeys";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
 /**
@@ -56,6 +61,10 @@ const requestSchema = z
       "stats",
       "reclassification",
       "category-assignment-results",
+      "source-document-input",
+      "convert-currency",
+      "login-emails",
+      "passkeys",
     ]),
     args: z.array(z.unknown()).max(1),
   })
@@ -103,6 +112,29 @@ export async function POST(request: Request) {
         scheduleProcessingRecoveryAfter(ledger.id);
         break;
       }
+      case "source-document-input": {
+        const id = sourceDocumentIdSchema.parse(input);
+        const { ledger } = await requireLedgerAccess();
+        const document = await getSourceDocumentInput(ledger.id, id);
+        if (document == null) throw new NotFoundError("Source document");
+        result = document;
+        scheduleProcessingRecoveryAfter(ledger.id);
+        break;
+      }
+      case "convert-currency":
+        result = await convertCurrency(input);
+        break;
+      // The account's sign-in methods belong to the person, not the ledger.
+      case "login-emails": {
+        noArgumentsSchema.parse(payload.args);
+        const userId = await requireAuth();
+        result = (await listLoginEmails(userId)).map((row) => row.email);
+        break;
+      }
+      case "passkeys":
+        noArgumentsSchema.parse(payload.args);
+        result = await listPasskeys(await requireAuth());
+        break;
       case "entries":
         result = await getLedgerEntriesAction(input);
         break;

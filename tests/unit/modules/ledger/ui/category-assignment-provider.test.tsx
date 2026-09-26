@@ -12,9 +12,9 @@ const { getJob, toastSuccess, toastError } = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getCategoryReclassificationJobAction: getJob,
-  getCategoryAssignmentResultsAction: vi.fn(async () => ({ items: [], nextCursor: null })),
+vi.mock("@/modules/ledger/queries", () => ({
+  fetchCategoryReclassificationJob: getJob,
+  fetchCategoryAssignmentResults: vi.fn(async () => ({ items: [], nextCursor: null })),
 }));
 vi.mock("@/lib/mutations/ledger-invalidation", () => ({
   invalidateLedgerQueries: vi.fn(async () => undefined),

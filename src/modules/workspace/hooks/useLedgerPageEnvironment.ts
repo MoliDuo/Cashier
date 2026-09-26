@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
 import { runtimeEnv } from "@/lib/env/runtime";
-import { getEntryCategoriesAction, getLedgerAction } from "@/lib/queries/ledger-query-client";
+import { fetchEntryCategories, fetchLedger } from "@/modules/ledger/queries";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
 import { useShellController } from "@/components/providers/shell-controller";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
@@ -53,14 +53,14 @@ export function useLedgerPageEnvironment({
 }: UseLedgerPageEnvironmentOptions) {
   const { data: ledger } = useQuery({
     queryKey: queryKeys.ledger(),
-    queryFn: () => getLedgerAction(),
+    queryFn: () => fetchLedger(),
     staleTime: STALE_TIME,
     ...(initialLedger !== undefined ? { initialData: initialLedger } : {}),
   });
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.entryCategories(),
-    queryFn: () => getEntryCategoriesAction(),
+    queryFn: () => fetchEntryCategories(),
     staleTime: STALE_TIME,
     ...(initialCategories !== undefined ? { initialData: initialCategories } : {}),
   });

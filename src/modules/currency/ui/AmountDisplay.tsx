@@ -1,8 +1,9 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { useAmountDisplay } from "@/modules/currency/hooks/useAmountDisplay";
 import { AmountText, type AmountVariant } from "./amount-text";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface AmountDisplayProps {
   amount: string;
@@ -25,7 +26,7 @@ export function AmountDisplay({
   variant = "item",
   showOriginal = true,
 }: AmountDisplayProps) {
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const t = useTranslations("Currency");
   const { displayAmount, isDifferentCurrency, originalCurrency, status } = useAmountDisplay({
     amount,

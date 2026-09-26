@@ -1,8 +1,9 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatCivilDate } from "@/lib/date-utils";
 import { periodToDateRange, type PeriodParams } from "@/lib/period-utils";
 import { resolveActivePreset } from "@/modules/ledger/entry-filter-presets";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 /**
  * Names the span a ledger toolbar is showing, so the row reads as "本月 ·
@@ -12,7 +13,7 @@ import { resolveActivePreset } from "@/modules/ledger/entry-filter-presets";
  * opened on a range the panel cannot express still says what it covers.
  */
 export function usePeriodLabel(periodParams: PeriodParams, timeZone?: string): string | null {
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const t = useTranslations("DateRangeFilter");
   const preset = resolveActivePreset(periodParams);
 

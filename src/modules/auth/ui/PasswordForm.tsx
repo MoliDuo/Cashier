@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { changePasswordAction } from "@/modules/auth/server-actions/change-passw
 import { setPasswordAction } from "@/modules/auth/server-actions/set-password";
 import type { PasswordMutationActionErrorCode } from "@/modules/auth/contracts";
 import { CredentialChangeDialog } from "./CredentialChangeDialog";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 function PasswordField(props: {
   id: string;
@@ -68,7 +69,7 @@ export function PasswordForm({
 }) {
   const t = useTranslations("Settings.Account");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const [open, setOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");

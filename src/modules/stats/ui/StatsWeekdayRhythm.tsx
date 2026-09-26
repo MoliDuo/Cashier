@@ -1,11 +1,12 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { compare } from "@/lib/money/decimal";
 import { cn } from "@/lib/utils";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsPanel } from "./StatsPanel";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface StatsWeekdayRhythmProps {
   weekdayAverages: StatsInsights["weekdayAverages"];
@@ -22,7 +23,7 @@ interface StatsWeekdayRhythmProps {
 export function StatsWeekdayRhythm({ weekdayAverages, currencySymbol }: StatsWeekdayRhythmProps) {
   const t = useTranslations("StatsTab");
   const tCalendar = useTranslations("Calendar");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   // The key is spelled out rather than built, so the catalogue check can see it.
   const weekdayNames = tCalendar.raw("weekDaysMon") as string[];
 

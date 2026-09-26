@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { textRoleClassName } from "@/components/typography";
-import { getCategoryAssignmentResultsAction } from "@/lib/queries/ledger-query-client";
+import { fetchCategoryAssignmentResults } from "@/modules/ledger/queries";
 import { queryKeys } from "@/lib/query-keys";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 
@@ -78,7 +78,7 @@ export function CategoryAssignmentResultDialog({
   const results = useInfiniteQuery({
     queryKey: queryKeys.categoryAssignmentResults(job.id),
     queryFn: ({ pageParam }) =>
-      getCategoryAssignmentResultsAction({
+      fetchCategoryAssignmentResults({
         jobId: job.id,
         ...(pageParam == null ? {} : { cursor: pageParam }),
         limit: 50,

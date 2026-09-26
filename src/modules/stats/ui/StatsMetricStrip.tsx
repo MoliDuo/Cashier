@@ -1,9 +1,10 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface StatsMetricStripProps {
   insights: StatsInsights;
@@ -22,7 +23,7 @@ export function StatsMetricStrip({
   currencySymbol,
 }: StatsMetricStripProps) {
   const t = useTranslations("StatsTab");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const money = (amount: string) => formatCurrencyAmount(amount, currencySymbol, locale);
 
   const metrics: { label: string; value: React.ReactNode }[] = [

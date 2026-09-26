@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getCategoryReclassificationJobAction } from "@/lib/queries/ledger-query-client";
+import { fetchCategoryReclassificationJob } from "@/modules/ledger/queries";
 import { queryKeys } from "@/lib/query-keys";
 import { invalidateLedgerQueries } from "@/lib/mutations/ledger-invalidation";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
@@ -87,7 +87,7 @@ export function useCategoryAssignmentJob(): CategoryAssignmentJobState {
   const [notices, setNotices] = useState<CategoryAssignmentNotice[]>([]);
   const query = useQuery<CategoryReclassificationJob | null>({
     queryKey: queryKeys.categoryReclassification(),
-    queryFn: () => getCategoryReclassificationJobAction(),
+    queryFn: () => fetchCategoryReclassificationJob(),
     refetchInterval: (query) => {
       if (query.state.status === "error") {
         const attempt = Math.max(0, query.state.fetchFailureCount - 1);

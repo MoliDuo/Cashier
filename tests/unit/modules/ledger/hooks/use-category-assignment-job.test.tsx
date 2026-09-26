@@ -9,8 +9,8 @@ const { getJob, invalidateLedger } = vi.hoisted(() => ({
   invalidateLedger: vi.fn(),
 }));
 
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getCategoryReclassificationJobAction: getJob,
+vi.mock("@/modules/ledger/queries", () => ({
+  fetchCategoryReclassificationJob: getJob,
 }));
 vi.mock("@/lib/mutations/ledger-invalidation", () => ({
   invalidateLedgerQueries: invalidateLedger,

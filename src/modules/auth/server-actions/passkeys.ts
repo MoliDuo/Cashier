@@ -12,7 +12,6 @@ import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import {
   deletePasskey,
   finishPasskeyRegistration,
-  listPasskeys,
   renamePasskey,
   startPasskeyRegistration,
 } from "@/modules/auth/server/passkeys";
@@ -39,11 +38,6 @@ function failure(error: unknown, action: string): Failure {
     "Passkey action failed"
   );
   return { ok: false, code: "unexpected" };
-}
-
-/** The account's passkeys, for the 设置 list. */
-export async function listPasskeysAction(): Promise<PasskeySummary[]> {
-  return listPasskeys(await requireAuth());
 }
 
 export async function startPasskeyRegistrationAction(): Promise<

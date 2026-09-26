@@ -6,19 +6,19 @@ import { toast } from "sonner";
 import { EmailSettings } from "@/modules/ledger/ui/settings/EmailSettings";
 
 const {
-  listLoginEmailsAction,
+  fetchLoginEmails,
   removeLoginEmailAction,
   sendLoginEmailCodeAction,
   verifyLoginEmailCodeAction,
 } = vi.hoisted(() => ({
-  listLoginEmailsAction: vi.fn(),
+  fetchLoginEmails: vi.fn(),
   removeLoginEmailAction: vi.fn(),
   sendLoginEmailCodeAction: vi.fn(),
   verifyLoginEmailCodeAction: vi.fn(),
 }));
 
+vi.mock("@/modules/auth/queries", () => ({ fetchLoginEmails: fetchLoginEmails }));
 vi.mock("@/modules/auth/server-actions/login-emails", () => ({
-  listLoginEmailsAction,
   removeLoginEmailAction,
   sendLoginEmailCodeAction,
   verifyLoginEmailCodeAction,
@@ -57,11 +57,11 @@ async function addEmail(address: string, code: string) {
 describe("EmailSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listLoginEmailsAction.mockResolvedValue(["me@example.com"]);
+    fetchLoginEmails.mockResolvedValue(["me@example.com"]);
   });
 
   it("lists every login email of the account, not only the signed-in one", async () => {
-    listLoginEmailsAction.mockResolvedValue(["me@example.com", "other@example.com"]);
+    fetchLoginEmails.mockResolvedValue(["me@example.com", "other@example.com"]);
     renderEmailSettings();
 
     expect(await screen.findByText("other@example.com")).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe("EmailSettings", () => {
   });
 
   it("announces that every session ended before signing out after a removal", async () => {
-    listLoginEmailsAction.mockResolvedValue(["me@example.com", "other@example.com"]);
+    fetchLoginEmails.mockResolvedValue(["me@example.com", "other@example.com"]);
     removeLoginEmailAction.mockResolvedValue({ ok: true, emails: ["me@example.com"] });
     const onAllSessionsEnded = vi.fn();
     renderEmailSettings({}, { onAllSessionsEnded });
@@ -152,7 +152,7 @@ describe("EmailSettings", () => {
   });
 
   it("routes a re-auth requirement on removal into the re-auth flow", async () => {
-    listLoginEmailsAction.mockResolvedValue(["me@example.com", "other@example.com"]);
+    fetchLoginEmails.mockResolvedValue(["me@example.com", "other@example.com"]);
     removeLoginEmailAction.mockResolvedValue({ ok: false, code: "reauth_required" });
     const onRequireReauthentication = vi.fn();
     const onAllSessionsEnded = vi.fn();

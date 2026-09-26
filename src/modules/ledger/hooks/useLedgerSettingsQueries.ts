@@ -4,11 +4,7 @@ import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSmartPolling } from "@/hooks/use-smart-polling";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  getEntryCategoriesAction,
-  getLedgerAction,
-  getLedgerSettingsAction,
-} from "@/lib/queries/ledger-query-client";
+import { fetchEntryCategories, fetchLedger, fetchLedgerSettings } from "@/modules/ledger/queries";
 import type { EntryCategoryWithCount, Ledger, ServiceCredential } from "@/modules/ledger/contracts";
 import { LEDGER } from "@/lib/constants";
 
@@ -42,7 +38,7 @@ export function useLedgerSettingsQueries({
 
   const ledgerQuery = useQuery<Ledger | null>({
     queryKey: queryKeys.ledger(),
-    queryFn: () => getLedgerAction(),
+    queryFn: () => fetchLedger(),
     initialData: initialLedger,
     staleTime: LEDGER.STALE_TIME_MS,
     refetchOnWindowFocus: true,
@@ -51,7 +47,7 @@ export function useLedgerSettingsQueries({
 
   const categoriesQuery = useQuery<EntryCategoryWithCount[]>({
     queryKey: queryKeys.entryCategories(),
-    queryFn: () => getEntryCategoriesAction(),
+    queryFn: () => fetchEntryCategories(),
     initialData: initialCategories,
     refetchInterval: categoryMetadataPolling,
     staleTime: LEDGER.STALE_TIME_MS,
@@ -64,7 +60,7 @@ export function useLedgerSettingsQueries({
     credentials: ServiceCredential[];
   }>({
     queryKey: settingsQueryKey,
-    queryFn: () => getLedgerSettingsAction(),
+    queryFn: () => fetchLedgerSettings(),
     staleTime: LEDGER.STALE_TIME_MS,
     refetchOnWindowFocus: true,
   });

@@ -42,7 +42,8 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next-intl", () => ({
-  useLocale: () => "en",
+  useLocale: () => "zh",
+  useTranslations: () => (key: string) => key,
 }));
 
 vi.mock("@/modules/auth/server-actions/send-otp", () => ({
@@ -51,7 +52,6 @@ vi.mock("@/modules/auth/server-actions/send-otp", () => ({
 
 import { useLoginFlow } from "@/modules/auth/hooks/use-login-flow";
 
-const t = (key: string) => key;
 function createEmailSubmitEvent(email: string): React.FormEvent<HTMLFormElement> {
   const form = document.createElement("form");
   const emailInput = document.createElement("input");
@@ -94,7 +94,7 @@ describe("useLoginFlow OTP sending", () => {
       code: "rate_limited",
       retryAfter: 42,
     });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     act(() => result.current.setEmail("user@example.com"));
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
@@ -111,7 +111,7 @@ describe("useLoginFlow OTP sending", () => {
       expiresAt: 1_800_000_000,
       canResendAt: 1_799_999_760,
     });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     act(() => result.current.setEmail("user@example.com"));
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
@@ -124,7 +124,7 @@ describe("useLoginFlow OTP sending", () => {
   });
 
   it("starts in the requested login mode", () => {
-    const { result } = renderHook(() => useLoginFlow(t, { initialMode: "otp" }));
+    const { result } = renderHook(() => useLoginFlow({ initialMode: "otp" }));
 
     expect(result.current.mode).toBe("otp");
   });
@@ -136,7 +136,7 @@ describe("useLoginFlow OTP sending", () => {
       expiresAt: 1_800_000_000,
       canResendAt: 1_799_999_760,
     });
-    const { result } = renderHook(() => useLoginFlow(t, { initialMode: "otp" }));
+    const { result } = renderHook(() => useLoginFlow({ initialMode: "otp" }));
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
     act(() => result.current.setOtp("123456"));
 
@@ -149,15 +149,15 @@ describe("useLoginFlow OTP sending", () => {
 
   it("returns a same-site callbackUrl and refuses anything else", () => {
     searchParams.value = "callbackUrl=%2Fstats";
-    expect(renderHook(() => useLoginFlow(t)).result.current.callbackUrl).toBe("/stats");
+    expect(renderHook(() => useLoginFlow()).result.current.callbackUrl).toBe("/stats");
 
     searchParams.value = "callbackUrl=%2F%2Fevil.example";
-    expect(renderHook(() => useLoginFlow(t)).result.current.callbackUrl).toBe("/");
+    expect(renderHook(() => useLoginFlow()).result.current.callbackUrl).toBe("/");
   });
 
   it("submits browser-filled password fields even when React state is empty", async () => {
     passwordSignInMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     await act(() =>
       result.current.handlePasswordLogin(
@@ -172,7 +172,7 @@ describe("useLoginFlow OTP sending", () => {
 
   it("shows the failure and stays on the page for a rejected login", async () => {
     passwordSignInMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
     await act(() =>
       result.current.handlePasswordLogin(
         createPasswordSubmitEvent("smoke@example.com", "Wrong-password9")
@@ -187,7 +187,7 @@ describe("useLoginFlow OTP sending", () => {
 
   it("signs in as the single dev account", async () => {
     devSignInMock.mockResolvedValue({ ok: true });
-    const { result } = renderHook(() => useLoginFlow(t, { isDevAuthAvailable: true }));
+    const { result } = renderHook(() => useLoginFlow({ isDevAuthAvailable: true }));
 
     await act(() => result.current.handleDevSignIn());
 
@@ -196,7 +196,7 @@ describe("useLoginFlow OTP sending", () => {
   });
 
   it("ignores the development sign-in when the entry is unavailable", async () => {
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     await act(() => result.current.handleDevSignIn());
 
@@ -217,7 +217,7 @@ describe("useLoginFlow passkey sign-in", () => {
   it("reports browser support and signs in with the assertion the browser returns", async () => {
     startAuthenticationMock.mockResolvedValue(assertion);
     finishPasskeyMock.mockResolvedValue({ ok: true });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
     expect(result.current.passkeySupported).toBe(true);
 
     await act(async () => {
@@ -233,7 +233,7 @@ describe("useLoginFlow passkey sign-in", () => {
     startAuthenticationMock.mockRejectedValue(
       Object.assign(new Error("cancelled"), { name: "NotAllowedError" })
     );
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     await act(async () => {
       await result.current.handlePasskeyLogin();
@@ -247,7 +247,7 @@ describe("useLoginFlow passkey sign-in", () => {
   it("shows a passkey message, not the email-and-password one, for an unknown passkey", async () => {
     startAuthenticationMock.mockResolvedValue(assertion);
     finishPasskeyMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     await act(async () => {
       await result.current.handlePasskeyLogin();
@@ -259,7 +259,7 @@ describe("useLoginFlow passkey sign-in", () => {
 
   it("shows the rate-limit message when starts are throttled", async () => {
     startPasskeyMock.mockResolvedValue({ ok: false, code: "passkey_rate_limited" });
-    const { result } = renderHook(() => useLoginFlow(t));
+    const { result } = renderHook(() => useLoginFlow());
 
     await act(async () => {
       await result.current.handlePasskeyLogin();

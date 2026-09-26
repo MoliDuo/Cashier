@@ -31,7 +31,7 @@ const createDevFlow = (handleDevSignIn: Mock) => ({
 });
 
 const mockUseLoginFlow = vi.hoisted(() =>
-  vi.fn((_t, options?: { initialMode?: "password" | "otp"; isDevAuthAvailable?: boolean }) => ({
+  vi.fn((options?: { initialMode?: "password" | "otp"; isDevAuthAvailable?: boolean }) => ({
     passkeySupported: false,
     handlePasskeyLogin: vi.fn(),
     callbackUrl: "/",

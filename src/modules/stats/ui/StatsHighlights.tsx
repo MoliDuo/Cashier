@@ -1,11 +1,12 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCivilDate } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsPanel } from "./StatsPanel";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface StatsHighlightsProps {
   insights: StatsInsights;
@@ -29,7 +30,7 @@ export function StatsHighlights({
   onDateDrilldown,
 }: StatsHighlightsProps) {
   const t = useTranslations("StatsTab");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const { busiestDay, longestStreak, topMover } = insights;
 
   if (busiestDay == null && longestStreak === 0 && topMover == null) return null;

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getEnhancedStats } from "@/lib/queries/ledger-query-client";
+import { fetchEnhancedStats } from "@/modules/stats/queries";
 import { StatsTab } from "@/modules/workspace/ui/StatsTab";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
@@ -17,8 +17,8 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/ledgers/ledger-1",
 }));
 
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getEnhancedStats: vi.fn(),
+vi.mock("@/modules/stats/queries", () => ({
+  fetchEnhancedStats: vi.fn(),
 }));
 
 const ledgerFixture: Ledger = {
@@ -50,7 +50,7 @@ describe("StatsTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsState.current = new URLSearchParams();
-    vi.mocked(getEnhancedStats).mockImplementation(async (input) => ({
+    vi.mocked(fetchEnhancedStats).mockImplementation(async (input) => ({
       ...statsFixture,
       summary: {
         ...statsFixture.summary,
@@ -61,7 +61,7 @@ describe("StatsTab", () => {
 
   it("charts the book the page picked", async () => {
     const { rerender, queryClient } = renderStatsTab();
-    await waitFor(() => expect(getEnhancedStats).toHaveBeenCalled());
+    await waitFor(() => expect(fetchEnhancedStats).toHaveBeenCalled());
 
     rerender(
       <QueryClientProvider client={queryClient}>
@@ -70,7 +70,7 @@ describe("StatsTab", () => {
     );
     await waitFor(() =>
       expect(
-        vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.bookId === "book-2")
+        vi.mocked(fetchEnhancedStats).mock.calls.some(([input]) => input.bookId === "book-2")
       ).toBe(true)
     );
   });
@@ -79,7 +79,7 @@ describe("StatsTab", () => {
     const { rerender, queryClient } = renderStatsTab("book-1");
     expect(await screen.findByText("¥40.00")).toBeInTheDocument();
 
-    vi.mocked(getEnhancedStats).mockImplementation(() => new Promise<EnhancedStatsDto>(() => {}));
+    vi.mocked(fetchEnhancedStats).mockImplementation(() => new Promise<EnhancedStatsDto>(() => {}));
     rerender(
       <QueryClientProvider client={queryClient}>
         <StatsTab bookId="book-2" ledger={ledgerFixture} ledgerToday="2026-08-24" />
@@ -89,14 +89,14 @@ describe("StatsTab", () => {
     // The cached figures belong to the previous book and must not stand in for
     // book-2's.
     await waitFor(() =>
-      expect(vi.mocked(getEnhancedStats).mock.calls.some(([input]) => input.bookId === "book-2"))
+      expect(vi.mocked(fetchEnhancedStats).mock.calls.some(([input]) => input.bookId === "book-2"))
     );
     expect(screen.queryByText("¥40.00")).not.toBeInTheDocument();
     expect(screen.getByTestId("stats-visualization-skeleton")).toBeInTheDocument();
   });
 
   it("shows retry when the selected scope fails", async () => {
-    vi.mocked(getEnhancedStats).mockRejectedValue(new Error("unavailable"));
+    vi.mocked(fetchEnhancedStats).mockRejectedValue(new Error("unavailable"));
     renderStatsTab();
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();

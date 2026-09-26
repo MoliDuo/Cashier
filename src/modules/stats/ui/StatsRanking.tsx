@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { EmptyState } from "@/components/EmptyState";
 import { textRoleClassName } from "@/components/typography";
@@ -10,6 +10,7 @@ import { compare } from "@/lib/money/decimal";
 import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { StatsPanel } from "./StatsPanel";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 /** Past this many, the tail is folded away: a ranking is read from the top. */
 const COLLAPSED_LENGTH = 6;
@@ -39,7 +40,7 @@ export function StatsRanking({
 }: StatsRankingProps) {
   const t = useTranslations("StatsTab");
   const tCalendar = useTranslations("Calendar");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const [expanded, setExpanded] = useState(false);
 
   if (isLoading) {

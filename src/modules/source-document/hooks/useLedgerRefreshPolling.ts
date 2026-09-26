@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getStreamRefreshAction } from "@/lib/queries/ledger-query-client";
+import { fetchStreamRefresh } from "@/modules/source-document/queries";
 import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
 import { queryKeys } from "@/lib/query-keys";
 import { applyStreamRefreshToCache } from "./stream-refresh-cache";
@@ -20,7 +20,7 @@ export function useLedgerRefreshPolling(enabled = true) {
     queryFn: async (): Promise<LedgerRefreshResult> => {
       try {
         const previous = queryClient.getQueryData<LedgerRefreshResult>(queryKey);
-        const result = await getStreamRefreshAction({
+        const result = await fetchStreamRefresh({
           afterVersion: previous?.version ?? "0",
         });
         await applyStreamRefreshToCache(queryClient, result);

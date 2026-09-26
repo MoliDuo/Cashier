@@ -26,7 +26,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { SettingsSectionActions } from "./settings/SettingsSectionActions";
 import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { queryKeys } from "@/lib/query-keys";
-import { getEntryCategoriesAction } from "@/lib/queries/ledger-query-client";
+import { fetchEntryCategories } from "@/modules/ledger/queries";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import type { BookDto } from "@/modules/ledger/contracts";
@@ -114,7 +114,7 @@ export function SettingsTab({
   // pickers read it, so a rename or reorder lands everywhere at once.
   const { books } = useBooks({ initialBooks });
   const reloadCategories = async () => {
-    const latest = await getEntryCategoriesAction();
+    const latest = await fetchEntryCategories();
     queryClient.setQueryData(queryKeys.entryCategories(), latest);
     return latest;
   };

@@ -2,7 +2,7 @@
 import type { ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import { useMemo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { getLedgerEntriesAction, getLedgerStatsAction } from "@/lib/queries/ledger-query-client";
+import { fetchLedgerEntries, fetchLedgerSummary } from "@/modules/ledger/queries";
 import { type PeriodParams } from "@/lib/period-utils";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { QUERY } from "@/lib/constants";
@@ -10,7 +10,7 @@ import { buildDetailsQueryDescriptor } from "@/modules/ledger/ledger-query-descr
 
 export interface UseDetailsTabDataReturn {
   entries: ActiveLedgerEntryDto[];
-  summaryData: Awaited<ReturnType<typeof getLedgerStatsAction>> | undefined;
+  summaryData: Awaited<ReturnType<typeof fetchLedgerSummary>> | undefined;
   isLoading: boolean;
   isFetchingNextPage: boolean;
   isFetchNextPageError: boolean;
@@ -68,7 +68,7 @@ export function useDetailsTabData({
 
   const summaryQuery = useQuery({
     queryKey: descriptor.summaryQueryKey,
-    queryFn: () => getLedgerStatsAction(descriptor.summaryInput),
+    queryFn: () => fetchLedgerSummary(descriptor.summaryInput),
     enabled: true,
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     refetchOnWindowFocus: false,
@@ -78,7 +78,7 @@ export function useDetailsTabData({
   const entriesQuery = useInfiniteQuery({
     queryKey: descriptor.entriesQueryKey,
     queryFn: ({ pageParam }) =>
-      getLedgerEntriesAction(descriptor.getEntriesInput(pageParam as string | undefined)),
+      fetchLedgerEntries(descriptor.getEntriesInput(pageParam as string | undefined)),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: undefined as string | undefined,
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,

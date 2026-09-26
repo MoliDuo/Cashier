@@ -2,7 +2,8 @@ import { EntryGroupHeader, groupSelectionState } from "@/components/EntryGroupHe
 import { formatRelativeDateLabel } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 export interface UnifiedGroupHeaderSelection {
   /** The day's own cards, in list order. */
@@ -24,7 +25,7 @@ export function UnifiedGroupHeader({
   timeZone?: string;
   selection?: UnifiedGroupHeaderSelection | undefined;
 }) {
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const t = useTranslations("SourceDocumentCard");
   const tBatch = useTranslations("BatchActions");
   const tCommon = useTranslations("Common");

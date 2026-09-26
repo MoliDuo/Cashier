@@ -4,6 +4,12 @@
  * Centralized constants to avoid magic numbers throughout the codebase
  */
 
+/**
+ * The one locale dates, numbers and amounts are formatted in. The catalog is
+ * Chinese only, so nothing reads a locale from the request.
+ */
+export const DISPLAY_LOCALE = "zh-CN";
+
 // Time constants (milliseconds)
 export const TIME = {
   SECOND: 1000,

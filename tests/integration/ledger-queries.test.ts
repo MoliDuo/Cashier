@@ -8,8 +8,10 @@ import { ledgers, sourceDocuments } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "../helpers/factories";
 import {
   activateTestSourceDocumentProjection,
+  createTestUserWithLedger,
   ensureTestLedgerBooks,
 } from "../helpers/schema-setup";
+import { insertExchangeRates } from "../helpers/exchange-rates";
 
 vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
@@ -79,6 +81,10 @@ describe("session ledger query transport", () => {
       "categories",
       "summary",
       "settings",
+      "source-document-input",
+      "convert-currency",
+      "login-emails",
+      "passkeys",
     ]) {
       const response = await POST(request(query, [{ unexpected: true }]));
       expect(response.status).toBe(400);
@@ -140,5 +146,64 @@ describe("session ledger query transport", () => {
 
     // A read that takes no arguments refuses one.
     expect((await POST(request("books", [ledger.id]))).status).toBe(400);
+  });
+
+  it("serves a document's input for a retry, and 404 for an unknown one", async () => {
+    const db = getTestDb();
+    const ledger = createLedgerData();
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db, ledger.id);
+    const document = createSourceDocumentData(ledger.id, { status: "completed" });
+    await db.insert(sourceDocuments).values({
+      ...document,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+    });
+    await activateTestSourceDocumentProjection(db, document.id);
+
+    const read = await POST(request("source-document-input", [document.id]));
+    expect(read.status).toBe(200);
+    expect(await read.json()).toHaveProperty("files");
+    expect((await POST(request("source-document-input", [crypto.randomUUID()]))).status).toBe(404);
+    expect((await POST(request("source-document-input", ["not-a-uuid"]))).status).toBe(400);
+  });
+
+  it("converts with the stored rate of the day, and is a 409 without one", async () => {
+    const ledger = createLedgerData();
+    await getTestDb().insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(getTestDb(), ledger.id);
+    await insertExchangeRates("2026-02-04", { CNY: 7.5, USD: 1.1 });
+
+    const converted = await POST(
+      request("convert-currency", [{ amount: "100", from: "CNY", to: "USD", date: "2026-02-04" }])
+    );
+    expect(converted.status).toBe(200);
+    const { converted: amount } = (await converted.json()) as { converted: string };
+    expect(Number.parseFloat(amount)).toBeCloseTo(14.67, 1);
+
+    const missing = await POST(
+      request("convert-currency", [{ amount: "100", from: "CNY", to: "JPY", date: "2026-02-04" }])
+    );
+    expect(missing.status).toBe(409);
+  });
+
+  it("serves the account's login emails and passkeys to its own session", async () => {
+    const { userId: ownerId } = await createTestUserWithLedger(
+      getTestDb(),
+      "owner@example.com",
+      undefined,
+      crypto.randomUUID()
+    );
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession(ownerId));
+
+    const emails = await POST(request("login-emails", []));
+    expect(emails.status).toBe(200);
+    expect(await emails.json()).toEqual(["owner@example.com"]);
+    const passkeys = await POST(request("passkeys", []));
+    expect(passkeys.status).toBe(200);
+    expect(await passkeys.json()).toEqual([]);
+
+    vi.mocked(getCurrentSession).mockResolvedValue(null);
+    expect((await POST(request("login-emails", []))).status).toBe(401);
+    expect((await POST(request("passkeys", []))).status).toBe(401);
   });
 });

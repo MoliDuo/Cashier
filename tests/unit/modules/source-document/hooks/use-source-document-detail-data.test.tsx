@@ -7,8 +7,8 @@ import { queryKeys } from "@/lib/query-keys";
 
 const getSourceDocumentDetailAction = vi.fn();
 
-vi.mock("@/lib/queries/ledger-query-client", () => ({
-  getSourceDocumentDetailAction: (...args: unknown[]) => getSourceDocumentDetailAction(...args),
+vi.mock("@/modules/source-document/queries", () => ({
+  fetchSourceDocumentDetail: (...args: unknown[]) => getSourceDocumentDetailAction(...args),
 }));
 
 describe("useSourceDocumentDetailData", () => {

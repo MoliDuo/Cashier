@@ -25,7 +25,6 @@ vi.mock("next/headers", () => ({
 import {
   deletePasskeyAction,
   finishPasskeyRegistrationAction,
-  listPasskeysAction,
   renamePasskeyAction,
   startPasskeyRegistrationAction,
 } from "@/modules/auth/server-actions/passkeys";
@@ -34,6 +33,7 @@ import {
   startPasskeySignInAction,
 } from "@/modules/auth/server-actions/sign-in";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { POST } from "@/app/api/ledger-queries/route";
 
 const EMAIL = "owner@example.com";
 
@@ -60,6 +60,19 @@ async function startSignIn() {
   return started;
 }
 
+/** The 设置 list, read through the registry the way the browser reads it. */
+async function listedPasskeys(): Promise<unknown> {
+  const response = await POST(
+    new Request("http://localhost/api/ledger-queries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "passkeys", args: [] }),
+    })
+  );
+  expect(response.status).toBe(200);
+  return response.json();
+}
+
 describe("passkeys", () => {
   beforeEach(() => jar.clear());
 
@@ -72,7 +85,7 @@ describe("passkeys", () => {
       ok: true,
       passkey: { id: authenticator.id, name: "MacBook" },
     });
-    await expect(listPasskeysAction()).resolves.toEqual([
+    await expect(listedPasskeys()).resolves.toEqual([
       expect.objectContaining({ id: authenticator.id, name: "MacBook", lastUsedAt: null }),
     ]);
 
@@ -185,16 +198,14 @@ describe("passkeys", () => {
     await expect(renamePasskeyAction(authenticator.id, "  iPhone  ")).resolves.toEqual({
       ok: true,
     });
-    await expect(listPasskeysAction()).resolves.toEqual([
-      expect.objectContaining({ name: "iPhone" }),
-    ]);
+    await expect(listedPasskeys()).resolves.toEqual([expect.objectContaining({ name: "iPhone" })]);
     await expect(renamePasskeyAction(authenticator.id, "   ")).resolves.toEqual({
       ok: false,
       code: "invalid",
     });
 
     await expect(deletePasskeyAction(authenticator.id)).resolves.toEqual({ ok: true });
-    await expect(listPasskeysAction()).resolves.toEqual([]);
+    await expect(listedPasskeys()).resolves.toEqual([]);
     await expect(deletePasskeyAction(authenticator.id)).resolves.toEqual({
       ok: false,
       code: "not_found",

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { isCancelledCeremony, usePasskeySupport } from "./use-passkey-support";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
@@ -24,6 +25,8 @@ interface LoginFlowOptions {
   isDevAuthAvailable?: boolean;
 }
 
+type AuthTranslator = ReturnType<typeof useTranslations<"Auth">>;
+
 /** Where to land after signing in; anything not a same-site path becomes "/". */
 function sanitizeCallbackUrl(value: string | null): string {
   return value != null && value.startsWith("/") && !value.startsWith("//") ? value : "/";
@@ -31,7 +34,7 @@ function sanitizeCallbackUrl(value: string | null): string {
 
 function getSignInErrorMessage(
   result: Extract<SignInActionResult, { ok: false }>,
-  t: (key: string, values?: Record<string, string | number>) => string
+  t: AuthTranslator
 ): string {
   switch (result.code) {
     case AUTH_ERROR_CODES.INVALID_CREDENTIALS:
@@ -61,7 +64,7 @@ function getSignInErrorMessage(
 
 function getSendOTPErrorMessage(
   result: Extract<SendOTPActionResult, { ok: false }>,
-  t: (key: string, values?: Record<string, string | number>) => string,
+  t: AuthTranslator,
   fallbackKey: "sendCodeFailed" | "resendFailed"
 ): string {
   switch (result.code) {
@@ -84,10 +87,11 @@ function getSendOTPErrorMessage(
   }
 }
 
-export function useLoginFlow(
-  t: (key: string, values?: Record<string, string | number>) => string,
-  { initialMode = "password", isDevAuthAvailable = false }: LoginFlowOptions = {}
-) {
+export function useLoginFlow({
+  initialMode = "password",
+  isDevAuthAvailable = false,
+}: LoginFlowOptions = {}) {
+  const t = useTranslations("Auth");
   const router = useRouter();
   const passkeySupported = usePasskeySupport();
   const callbackUrl = sanitizeCallbackUrl(useSearchParams().get("callbackUrl"));

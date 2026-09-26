@@ -6,13 +6,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   formatDateTimeForApi,
   formatRelativeDateLabel,
   isValidDateString,
   parseDateString,
 } from "@/lib/date-utils";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface DateFilterProps {
   /** Selected date */
@@ -79,7 +80,7 @@ export function DateFilter({
 }: DateFilterProps) {
   const t = useTranslations("DateFilter");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const [open, setOpen] = React.useState(false);
 
   const civilDateString = React.useMemo(() => {

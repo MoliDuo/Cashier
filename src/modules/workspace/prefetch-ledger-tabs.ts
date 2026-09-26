@@ -24,14 +24,13 @@ function scopeTimeZone(queryClient: QueryClient, bookId?: string) {
   const book = bookId == null ? null : books?.find((row) => row.id === bookId);
   return book?.timeZone ?? getDeviceTimeZone() ?? runtimeEnv.timeZone;
 }
+import { fetchLedgerEntries, fetchLedgerSummary } from "@/modules/ledger/queries";
+import type { LedgerEntryPageDto } from "@/modules/ledger/contracts";
+import { fetchEnhancedStats } from "@/modules/stats/queries";
 import {
   buildDetailsQueryDescriptor,
   buildStatsQueryDescriptor,
 } from "./ledger-tab-query-descriptors";
-
-type LedgerEntriesPage = Awaited<
-  ReturnType<(typeof import("@/lib/queries/ledger-query-client"))["getLedgerEntriesAction"]>
->;
 
 export async function prefetchDetailsTabQuery(
   queryClient: QueryClient,
@@ -39,8 +38,6 @@ export async function prefetchDetailsTabQuery(
   periodParams: PeriodParams,
   advancedFilters: LedgerAdvancedFilters
 ) {
-  const { getLedgerEntriesAction, getLedgerStatsAction } =
-    await import("@/lib/queries/ledger-query-client");
   const ledger = queryClient.getQueryData<Ledger>(queryKeys.ledger());
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const descriptor = buildDetailsQueryDescriptor({
@@ -54,14 +51,14 @@ export async function prefetchDetailsTabQuery(
   await Promise.all([
     queryClient.prefetchQuery({
       queryKey: descriptor.summaryQueryKey,
-      queryFn: () => getLedgerStatsAction(descriptor.summaryInput),
+      queryFn: () => fetchLedgerSummary(descriptor.summaryInput),
       staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     }),
     queryClient.prefetchInfiniteQuery({
       queryKey: descriptor.entriesQueryKey,
-      queryFn: ({ pageParam }) => getLedgerEntriesAction(descriptor.getEntriesInput(pageParam)),
+      queryFn: ({ pageParam }) => fetchLedgerEntries(descriptor.getEntriesInput(pageParam)),
       initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage: LedgerEntriesPage) => lastPage.nextCursor,
+      getNextPageParam: (lastPage: LedgerEntryPageDto) => lastPage.nextCursor,
       staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     }),
   ]);
@@ -72,7 +69,6 @@ export async function prefetchStatsTabQuery(
   bookId: string | undefined,
   statsState: StatsUrlState = { range: "month", offset: 0, view: "heatmap" }
 ) {
-  const { getEnhancedStats } = await import("@/lib/queries/ledger-query-client");
   const ledger = queryClient.getQueryData<Ledger>(queryKeys.ledger());
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const fixedTimeZone = scopeTimeZone(queryClient, bookId);
@@ -88,7 +84,7 @@ export async function prefetchStatsTabQuery(
 
   await queryClient.prefetchQuery({
     queryKey: descriptor.queryKey,
-    queryFn: () => getEnhancedStats(descriptor.input),
+    queryFn: () => fetchEnhancedStats(descriptor.input),
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
   });
 }

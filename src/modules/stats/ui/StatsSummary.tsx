@@ -1,5 +1,5 @@
 "use client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { abs, compare } from "@/lib/money/decimal";
@@ -9,6 +9,7 @@ import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsMetricStrip } from "./StatsMetricStrip";
 import { StatsSparkline } from "./StatsSparkline";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface StatsSummaryProps {
   total: string;
@@ -38,7 +39,7 @@ export function StatsSummary({
   isLoading = false,
 }: StatsSummaryProps) {
   const t = useTranslations("StatsTab");
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
 
   const delta = comparison?.amountDelta ?? "0";
   const deltaComparison = compare(delta, "0");

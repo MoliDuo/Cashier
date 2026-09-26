@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SourceDocumentDetailDto } from "../contracts";
 import { queryKeys } from "@/lib/query-keys";
-import { getSourceDocumentDetailAction } from "@/lib/queries/ledger-query-client";
+import { fetchSourceDocumentDetail } from "@/modules/source-document/queries";
 import { QUERY } from "@/lib/constants";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
 
@@ -17,7 +17,7 @@ export function useSourceDocumentDetailData({ id, open }: UseSourceDocumentDetai
   const query = useQuery({
     queryKey: key,
     queryFn: async () => {
-      const incoming = await getSourceDocumentDetailAction(id);
+      const incoming = await fetchSourceDocumentDetail(id);
       const current = queryClient.getQueryData<SourceDocumentDetailDto>(key);
       return incoming != null && current != null && current.version > incoming.version
         ? current

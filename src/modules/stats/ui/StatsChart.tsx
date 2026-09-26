@@ -5,9 +5,10 @@ import {
   formatDateTimeForApi,
   formatRelativeDateLabel,
 } from "@/lib/date-utils";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatCompactCurrencyAmount, formatCurrencyAmount } from "@/lib/format/currency";
 import { buildChartPoints } from "@/modules/stats/lib/chart-points";
+import { DISPLAY_LOCALE } from "@/lib/constants";
 
 interface StatsChartProps {
   data: { date: string; total: string }[];
@@ -31,7 +32,7 @@ export function StatsChart({
   isLoading,
   currencySymbol = "CNY",
 }: StatsChartProps) {
-  const locale = useLocale();
+  const locale = DISPLAY_LOCALE;
   const t = useTranslations("StatsChart");
   const tTab = useTranslations("StatsTab");
   const tCommon = useTranslations("Common");

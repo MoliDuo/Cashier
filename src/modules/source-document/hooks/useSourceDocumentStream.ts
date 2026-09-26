@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useEffect } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { listStreamPageAction } from "@/lib/queries/ledger-query-client";
+import { fetchStreamPage } from "@/modules/source-document/queries";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import type { ListStreamPageInput } from "../contracts";
 import { queryKeys } from "@/lib/query-keys";
@@ -13,7 +13,7 @@ import {
 import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
 
-type StreamPage = Awaited<ReturnType<typeof listStreamPageAction>>;
+type StreamPage = Awaited<ReturnType<typeof fetchStreamPage>>;
 
 export interface UseSourceDocumentStreamOptions {
   mainCurrency?: string;
@@ -79,9 +79,9 @@ export function useSourceDocumentStream(options: UseSourceDocumentStreamOptions)
     queryKey: streamPageKey,
     queryFn: async ({ pageParam }) => {
       const pageInput = queryDescriptor.getPageInput(pageParam as string | undefined);
-      let page = await listStreamPageAction(pageInput);
+      let page = await fetchStreamPage(pageInput);
       if (pageParam == null && page.restartRequired) {
-        page = await listStreamPageAction(pageInput);
+        page = await fetchStreamPage(pageInput);
         if (page.restartRequired) {
           throw new Error("Stream restart did not produce a valid first page");
         }
@@ -124,8 +124,8 @@ export function useSourceDocumentStream(options: UseSourceDocumentStreamOptions)
     void (async () => {
       try {
         const firstPageInput = queryDescriptor.getPageInput(undefined);
-        let page = await listStreamPageAction(firstPageInput);
-        if (page.restartRequired) page = await listStreamPageAction(firstPageInput);
+        let page = await fetchStreamPage(firstPageInput);
+        if (page.restartRequired) page = await fetchStreamPage(firstPageInput);
         if (page.restartRequired || cancelled) return;
         seedRefreshBaseline(queryClient, page);
         queryClient.setQueryData<InfiniteData<StreamPage, string | undefined>>(streamPageKey, {
