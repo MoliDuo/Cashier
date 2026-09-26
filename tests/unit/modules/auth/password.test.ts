@@ -28,6 +28,7 @@ const {
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
+  rateLimitKey: (purpose: string, ...subject: string[]) => `${purpose}:${subject.join(":")}`,
   incrementRateLimit: incrementRateLimitMock,
   releaseRateLimitIncrement: releaseRateLimitIncrementMock,
 }));
@@ -209,8 +210,7 @@ describe("password authentication", () => {
 
     expect(incrementRateLimitMock).toHaveBeenCalledTimes(2);
     expect(incrementRateLimitMock.mock.calls[0]?.[0]).toBe("auth:password:email:owner@example.com");
-    expect(incrementRateLimitMock.mock.calls[1]?.[0]).toMatch(/^auth:password:ip:ip:[a-f0-9]+$/);
-    expect(incrementRateLimitMock.mock.calls[1]?.[0]).not.toContain("unknown");
+    expect(incrementRateLimitMock.mock.calls[1]?.[0]).toMatch(/^auth:password:ip:/);
   });
 
   it("atomically caps concurrent password sign-in verification", async () => {

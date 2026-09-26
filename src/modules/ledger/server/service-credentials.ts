@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   BookUnavailableError,
@@ -9,7 +9,11 @@ import {
 } from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
 import { books, ledgers, serviceCredentials } from "@/persistence";
-import { createToken, computeHash } from "@/lib/security/service-credential-token";
+import {
+  createToken,
+  computeHash,
+  computeLegacyHash,
+} from "@/lib/security/service-credential-token";
 import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import type {
   AuthenticatedServiceCredential,
@@ -64,8 +68,11 @@ async function assertBookInLedger(
 export async function authenticateServiceCredential(
   key: string
 ): Promise<AuthenticatedServiceCredential | null> {
-  // Hash-based lookup: compute hash and match in DB
+  // A key issued before the derived credential key is still stored under the
+  // old pepper; it matches here once and is rewritten below.
   const computedHash = computeHash(key);
+  const legacyHash = computeLegacyHash(key);
+  const candidateHashes = legacyHash == null ? [computedHash] : [computedHash, legacyHash];
 
   const hashMatch = await db
     .select({
@@ -73,6 +80,7 @@ export async function authenticateServiceCredential(
       ledgerId: serviceCredentials.ledgerId,
       bookId: serviceCredentials.bookId,
       lastUsedAt: serviceCredentials.lastUsedAt,
+      tokenHash: serviceCredentials.tokenHash,
     })
     .from(serviceCredentials)
     .innerJoin(ledgers, eq(ledgers.id, serviceCredentials.ledgerId))
@@ -80,7 +88,10 @@ export async function authenticateServiceCredential(
     // itself is untouched and starts working again if the book is restored.
     .innerJoin(books, and(eq(books.id, serviceCredentials.bookId), isNull(books.archivedAt)))
     .where(
-      and(eq(serviceCredentials.tokenHash, computedHash), isNull(serviceCredentials.deletedAt))
+      and(
+        inArray(serviceCredentials.tokenHash, candidateHashes),
+        isNull(serviceCredentials.deletedAt)
+      )
     )
     .then((rows) => rows[0]);
 
@@ -88,15 +99,16 @@ export async function authenticateServiceCredential(
 
   // Throttle the lastUsedAt write: credentials used within the last five
   // minutes skip the UPDATE entirely, so status polling cannot amplify
-  // write load for hot credentials.
+  // write load for hot credentials. A legacy hash is always rewritten.
   const lastUsedAt = hashMatch.lastUsedAt;
+  const rehash = hashMatch.tokenHash !== computedHash;
   const stale =
     lastUsedAt == null || Date.now() - lastUsedAt.getTime() > SERVICE_CREDENTIAL_LAST_USED_STALE_MS;
-  if (stale) {
+  if (stale || rehash) {
     try {
       const [updated] = await db
         .update(serviceCredentials)
-        .set({ lastUsedAt: new Date() })
+        .set({ lastUsedAt: new Date(), ...(rehash ? { tokenHash: computedHash } : {}) })
         .where(and(eq(serviceCredentials.id, hashMatch.id), isNull(serviceCredentials.deletedAt)))
         .returning({ id: serviceCredentials.id });
       // Revoke-race guard: if credential was revoked between SELECT and UPDATE,

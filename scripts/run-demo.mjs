@@ -47,8 +47,6 @@ export function createDemoEnvironment(environment = process.env) {
     AUTH_URL: appUrl,
     AUTH_TRUST_HOST: "true",
     AUTH_SECRET: "cashier-demo-only-auth-secret",
-    API_KEY_PEPPER: "cashier-demo-only-api-key-pepper",
-    AUTH_OTP_PEPPER: "cashier-demo-only-auth-otp-pepper",
     AUTH_RESEND_KEY: "",
     OPENAI_API_KEY: "demo-unused",
     OPENAI_BASE_URL: "http://127.0.0.1:1/v1",

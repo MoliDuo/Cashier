@@ -2,10 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { authenticateServiceCredential } from "@/modules/ledger/server/service-credentials";
 import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
-import { incrementRateLimit, type RateLimitResult } from "@/lib/rate-limit";
+import { incrementRateLimit, rateLimitKey, type RateLimitResult } from "@/lib/rate-limit";
 import { UnauthorizedError, RateLimitError } from "@/lib/errors";
 import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handlers";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { getClientIPFromHeaders } from "@/lib/utils/ip";
 import { logger } from "@/lib/logger";
 import { API_RATE_LIMIT_PER_MINUTE } from "@/config/tuning";
@@ -60,9 +59,7 @@ function getBearerToken(request: NextRequest): string | null {
  * as an HMAC digest so the raw address never reaches the database.
  */
 function preAuthBucketKey(clientIp: string): string {
-  const hmac = crypto.createHmac("sha256", `rl-pre-auth:${runtimeEnv.apiKeyPepper}`);
-  hmac.update(clientIp);
-  return `rl_api_v1_preauth:${hmac.digest("hex")}`;
+  return rateLimitKey("api-v1:preauth", clientIp);
 }
 
 /**
@@ -71,9 +68,7 @@ function preAuthBucketKey(clientIp: string): string {
  * the IP must not be part of the key.
  */
 function validCredentialBucketKey(credentialId: string): string {
-  const hmac = crypto.createHmac("sha256", `rl-valid:${runtimeEnv.apiKeyPepper}`);
-  hmac.update(credentialId);
-  return `rl_valid_cred:${hmac.digest("hex")}`;
+  return rateLimitKey("api-v1:credential", credentialId);
 }
 
 function applyRateLimitHeaders(

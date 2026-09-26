@@ -35,6 +35,9 @@ with `vi.mock` of the concrete module rather than injected fakes.
 - Treat forwarded client addresses as untrusted unless `TRUSTED_PROXY` is explicitly configured.
 - Log correlation IDs and identifiers tagged by logIdentifier; email and IP identifiers are hashed. Do not log raw email addresses, IP addresses,
   bearer tokens, OTP values, image contents, or provider payloads.
+- Key every digest with `deriveKey` / `keyedDigest` (`src/lib/security/keys.ts`), one purpose per
+  use, all derived from `AUTH_SECRET`. Name rate-limit buckets with `rateLimitKey`, which stores the
+  subject (email, IP, user or credential id) only as an HMAC.
 - Keep external email, exchange-rate, AI, and object-store calls outside database transactions and
   ledger locks.
 - Use conditional writes, row locks, or fencing tokens for one-shot and leased workflows.

@@ -50,7 +50,7 @@ describe("runtimeEnv", () => {
     const { runtimeEnv } = await import("@/lib/env/runtime");
 
     expect(runtimeEnv.databaseUrl).toBe("postgresql://cashier:cashier@localhost:5432/cashier");
-    expect(runtimeEnv.apiKeyPepper).toBe("test-pepper");
+    expect(runtimeEnv.legacyApiKeyPepper).toBe("test-pepper");
     expect(runtimeEnv.openaiApiKey).toBe("sk-test");
     expect(runtimeEnv.openaiBaseUrl).toBe("https://openai-proxy.example/v1");
     expect(runtimeEnv.hasOpenaiBaseUrl).toBe(true);

@@ -41,15 +41,14 @@
 
 ## 认证与内部密钥
 
-| 变量              | 必需   | 默认值                          | 说明                                                             |
-| ----------------- | ------ | ------------------------------- | ---------------------------------------------------------------- |
-| `AUTH_SECRET`     | 运行时 | 本地模板提供                    | Auth.js 会话签名密钥。                                           |
-| `API_KEY_PEPPER`  | 运行时 | 本地模板提供                    | 服务凭证哈希使用的 pepper。                                      |
-| `AUTH_OTP_PEPPER` | 运行时 | 本地模板提供                    | 邮箱验证码哈希使用的 pepper。                                    |
-| `CRON_SECRET`     | 部署   | 无                              | 每日 cron 的调用密钥，至少 32 个字符；未设置时 cron 拒绝运行。   |
-| `AUTH_RESEND_KEY` | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和添加登录邮箱。                 |
-| `AUTH_EMAIL_FROM` | 否     | `Cashier <noreply@example.com>` | 邮箱验证码的发件人。                                             |
-| `DEV_AUTH_BYPASS` | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。 |
+| 变量              | 必需   | 默认值                          | 说明                                                              |
+| ----------------- | ------ | ------------------------------- | ----------------------------------------------------------------- |
+| `AUTH_SECRET`     | 运行时 | 本地模板提供                    | 唯一的内部密钥，会话、验证码、限流、API key 的密钥都由它派生。    |
+| `API_KEY_PEPPER`  | 否     | 无                              | 旧 API key 的哈希 pepper；旧 key 首次使用时改写，全部改写后可删。 |
+| `CRON_SECRET`     | 部署   | 无                              | 每日 cron 的调用密钥，至少 32 个字符；未设置时 cron 拒绝运行。    |
+| `AUTH_RESEND_KEY` | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和添加登录邮箱。                  |
+| `AUTH_EMAIL_FROM` | 否     | `Cashier <noreply@example.com>` | 邮箱验证码的发件人。                                              |
+| `DEV_AUTH_BYPASS` | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。  |
 
 `.env.local.example` 内置公开的固定开发值，复制后可直接运行本地源码；这些值不能用于
 可被外部访问的部署。Vercel 部署必须自行提供安全随机值，并保证重启、预览实例和多实例

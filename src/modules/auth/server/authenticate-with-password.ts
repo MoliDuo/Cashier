@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { AuthSignInError, AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { normalizeEmail } from "@/lib/utils/email";
 import { verifyPassword } from "@/modules/auth/domain/password";
-import { incrementRateLimit, releaseRateLimitIncrement } from "@/lib/rate-limit";
+import { incrementRateLimit, rateLimitKey, releaseRateLimitIncrement } from "@/lib/rate-limit";
 import { findUserByEmail, type UserAccount } from "./users";
 import {
   AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
@@ -14,8 +14,6 @@ import {
   AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
 } from "@/config/tuning";
 
-const PASSWORD_EMAIL_PREFIX = "auth:password:email:";
-const PASSWORD_IP_PREFIX = "auth:password:ip:";
 const DUMMY_PASSWORD_HASH = "$2b$12$E.Rov9WCSx5iCVVlYJTgLOGGjHYsuet/YKxmEZ03AXS8OY.ivReI2";
 
 type PasswordRateLimitReservation = { key: string; resetTime: number };
@@ -27,7 +25,7 @@ async function reservePasswordRateLimits(
   const reservations: PasswordRateLimitReservation[] = [];
   const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
   try {
-    const emailKey = `${PASSWORD_EMAIL_PREFIX}${email}`;
+    const emailKey = rateLimitKey("auth:password:email", email);
     const emailResult = await incrementRateLimit(
       emailKey,
       AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
@@ -38,7 +36,7 @@ async function reservePasswordRateLimits(
     }
     reservations.push({ key: emailKey, resetTime: emailResult.resetTime });
 
-    const ipKey = `${PASSWORD_IP_PREFIX}${logIdentifier("ip", ip)}`;
+    const ipKey = rateLimitKey("auth:password:ip", ip);
     const ipResult = await incrementRateLimit(ipKey, AUTH_PASSWORD_IP_MAX_ATTEMPTS, windowSeconds);
     if (!ipResult.success) {
       await Promise.all(

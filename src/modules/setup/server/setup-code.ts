@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { runtimeEnv } from "@/lib/env/runtime";
+import { deriveKey } from "@/lib/security/keys";
 import { setupState } from "@/persistence";
 
 /**
@@ -61,7 +61,7 @@ export interface PendingSetupCode {
 function hashSetupCode(code: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto
-    .createHmac("sha256", runtimeEnv.authOtpPepper)
+    .createHmac("sha256", deriveKey("otp"))
     .update(`${salt}:${code}`)
     .digest("hex");
   return `v1:${hash}:${salt}`;
@@ -71,7 +71,7 @@ function setupCodeMatches(code: string, stored: string): boolean {
   const [version, hash, salt] = stored.split(":");
   if (version !== "v1" || hash == null || salt == null) return false;
   const candidate = crypto
-    .createHmac("sha256", runtimeEnv.authOtpPepper)
+    .createHmac("sha256", deriveKey("otp"))
     .update(`${salt}:${code}`)
     .digest("hex");
   const expected = Buffer.from(hash, "utf8");

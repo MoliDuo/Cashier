@@ -1,20 +1,17 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import {
   createToken,
   prefixSuffix,
   computeHash,
+  computeLegacyHash,
   DOMAIN_PREFIX,
   DISPLAY_PREFIX_LENGTH,
   DISPLAY_SUFFIX_LENGTH,
 } from "@/lib/security/service-credential-token";
 import crypto from "crypto";
+import { deriveKey } from "@/lib/security/keys";
 
-const TEST_PEPPER = "test-pepper-for-testing-only";
-
-beforeAll(() => {
-  // Ensure pepper is set (setup.common.ts normally does this)
-  process.env.API_KEY_PEPPER = TEST_PEPPER;
-});
+const TEST_PEPPER = "legacy-pepper-for-testing-only";
 
 describe("computeHash", () => {
   it("produces a deterministic hex HMAC-SHA-256", () => {
@@ -26,35 +23,53 @@ describe("computeHash", () => {
     expect(hash1).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("domain-separates with the credential:v1: prefix", () => {
+  it("keys the hash with the derived credential key, domain-separated", () => {
     const token = "sk_live_test_domain_separation";
-    const hash = computeHash(token);
-
-    // Verify the hash uses the domain prefix by checking HMAC output
-    const expectedHmac = crypto.createHmac("sha256", TEST_PEPPER);
-    expectedHmac.update(DOMAIN_PREFIX);
-    expectedHmac.update(token);
-    expect(hash).toBe(expectedHmac.digest("hex"));
+    const expected = crypto
+      .createHmac("sha256", deriveKey("credential"))
+      .update(DOMAIN_PREFIX)
+      .update(token)
+      .digest("hex");
+    expect(computeHash(token)).toBe(expected);
   });
 
-  it("produces different hashes for different peppers", () => {
-    const token = "sk_live_pepper_test";
-
-    const hashWithOriginal = computeHash(token);
-
-    // Temporarily change pepper
-    const originalPepper = process.env.API_KEY_PEPPER;
-    process.env.API_KEY_PEPPER = "different-pepper";
-    const hashWithDifferent = computeHash(token);
-    process.env.API_KEY_PEPPER = originalPepper;
-
-    expect(hashWithOriginal).not.toBe(hashWithDifferent);
+  it("changes with AUTH_SECRET", () => {
+    const token = "sk_live_secret_test";
+    const original = computeHash(token);
+    const secret = process.env.AUTH_SECRET;
+    process.env.AUTH_SECRET = "a-different-auth-secret";
+    try {
+      expect(computeHash(token)).not.toBe(original);
+    } finally {
+      process.env.AUTH_SECRET = secret;
+    }
   });
 
-  it("produces different hashes for different tokens with same pepper", () => {
-    const hash1 = computeHash("sk_live_token_a");
-    const hash2 = computeHash("sk_live_token_b");
-    expect(hash1).not.toBe(hash2);
+  it("produces different hashes for different tokens", () => {
+    expect(computeHash("sk_live_token_a")).not.toBe(computeHash("sk_live_token_b"));
+  });
+});
+
+describe("computeLegacyHash", () => {
+  afterEach(() => {
+    delete process.env.API_KEY_PEPPER;
+  });
+
+  it("is null without the old pepper", () => {
+    delete process.env.API_KEY_PEPPER;
+    expect(computeLegacyHash("sk_live_test")).toBeNull();
+  });
+
+  it("reproduces the hash stored under the old pepper", () => {
+    process.env.API_KEY_PEPPER = TEST_PEPPER;
+    const token = "sk_live_legacy";
+    const expected = crypto
+      .createHmac("sha256", TEST_PEPPER)
+      .update(DOMAIN_PREFIX)
+      .update(token)
+      .digest("hex");
+    expect(computeLegacyHash(token)).toBe(expected);
+    expect(computeLegacyHash(token)).not.toBe(computeHash(token));
   });
 });
 
@@ -111,17 +126,5 @@ describe("prefixSuffix", () => {
     const middle = token.slice(DISPLAY_PREFIX_LENGTH, -DISPLAY_SUFFIX_LENGTH);
     expect(result.prefix).not.toContain(middle);
     expect(result.suffix).not.toContain(middle);
-  });
-});
-
-describe("missing pepper fails startup validation", () => {
-  it("throws when computeHash is called without API_KEY_PEPPER set", () => {
-    const originalPepper = process.env.API_KEY_PEPPER;
-    delete process.env.API_KEY_PEPPER;
-
-    // computeHash calls getStartupEnvValue which validates API_KEY_PEPPER is set
-    expect(() => computeHash("sk_live_test")).toThrow(/API_KEY_PEPPER/);
-
-    process.env.API_KEY_PEPPER = originalPepper;
   });
 });

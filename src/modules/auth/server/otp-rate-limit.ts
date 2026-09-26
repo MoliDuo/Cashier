@@ -3,8 +3,12 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { RateLimitUnavailableError } from "@/lib/errors";
 import { getResendCooldown } from "../domain/otp";
-import { acquireCooldown, incrementRateLimit, releaseCooldown } from "@/lib/rate-limit";
-import { createHash } from "node:crypto";
+import {
+  acquireCooldown,
+  incrementRateLimit,
+  rateLimitKey,
+  releaseCooldown,
+} from "@/lib/rate-limit";
 import {
   AUTH_RATE_LIMIT_MAX,
   AUTH_RATE_LIMIT_WINDOW_SECONDS,
@@ -20,12 +24,8 @@ const OTP_VERIFY_PREFIX = "otp:verify:";
 const IP_WINDOW_SECONDS = 60 * 60;
 const VERIFY_WINDOW_SECONDS = 60;
 
-// The digest is unkeyed on purpose. It bounds the key's length and keeps raw
-// addresses out of `rate_limit_buckets`; it is not hiding anything, because the
-// same database stores the login emails in plain text two tables over.
 function bucketKey(purpose: string, identifier: string): string {
-  const digest = createHash("sha256").update(identifier.trim().toLowerCase()).digest("hex");
-  return `${purpose}:${digest}`;
+  return rateLimitKey(purpose, identifier.trim().toLowerCase());
 }
 
 export async function checkSendRateLimit(email: string): Promise<{

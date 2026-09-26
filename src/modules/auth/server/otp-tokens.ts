@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { otpTokens } from "@/persistence";
 import { getOTPExpiration, hashOTP } from "@/modules/auth/domain/otp";
-import { OTP_LOCKOUT_MINUTES } from "@/config/tuning";
+import { carriedFailures, recordedFailure } from "./challenge-failures";
 
 export interface OtpToken {
   email: string;
@@ -21,7 +21,6 @@ async function replaceOtpToken(input: {
   expiresAt: Date;
 }): Promise<void> {
   const now = new Date();
-  const recentFailureCutoff = new Date(now.getTime() - OTP_LOCKOUT_MINUTES * 60 * 1000);
   await db
     .insert(otpTokens)
     .values({
@@ -34,18 +33,7 @@ async function replaceOtpToken(input: {
       set: {
         tokenHash: input.tokenHash,
         expires: input.expiresAt,
-        // A fresh code does not refill the guessing budget: failed attempts
-        // carry over until a whole lockout window passes without one, and a
-        // lockout outlives any number of resends.
-        attempts: sql`case
-          when ${otpTokens.lockedUntil} > ${now}
-            or ${otpTokens.lastAttemptAt} > ${recentFailureCutoff}
-          then ${otpTokens.attempts}
-          else 0
-        end`,
-        lockedUntil: sql`case
-          when ${otpTokens.lockedUntil} > ${now} then ${otpTokens.lockedUntil}
-        end`,
+        ...carriedFailures(otpTokens, now),
         createdAt: now,
       },
     });
@@ -78,14 +66,7 @@ export async function recordOtpFailure(input: {
 }): Promise<{ attempts: number; lockedUntil: Date | null } | null> {
   const rows = await db
     .update(otpTokens)
-    .set({
-      attempts: sql`${otpTokens.attempts} + 1`,
-      lastAttemptAt: new Date(),
-      lockedUntil: sql`case
-        when ${otpTokens.attempts} + 1 >= ${input.maxAttempts} then ${input.lockedUntil}
-        else ${otpTokens.lockedUntil}
-      end`,
-    })
+    .set(recordedFailure(otpTokens, { ...input, now: new Date() }))
     .where(
       and(
         eq(otpTokens.email, input.email),

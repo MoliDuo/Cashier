@@ -78,8 +78,6 @@ const env = {
   AUTH_URL: baseURL,
   AUTH_TRUST_HOST: "true",
   AUTH_SECRET: randomUUID(),
-  API_KEY_PEPPER: randomUUID(),
-  AUTH_OTP_PEPPER: randomUUID(),
   AUTH_RESEND_KEY: "",
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
   OPENAI_API_KEY: "smoke-unused",

@@ -73,6 +73,22 @@ describe("OTP Rate Limiting", () => {
   });
 
   describe("checkSendRateLimitByIP", () => {
+    it("never stores the address or the IP in a bucket key", async () => {
+      await checkSendRateLimit("Person@Example.com");
+      await checkSendRateLimitByIP("203.0.113.9");
+      await acquireResendCooldown("person@example.com");
+      await checkVerifyRateLimit("203.0.113.9");
+
+      const rows = await db.execute<{ bucket_key: string }>(
+        sql`SELECT bucket_key FROM rate_limit_buckets`
+      );
+      expect(rows.rows).toHaveLength(4);
+      for (const row of rows.rows) {
+        expect(row.bucket_key).toMatch(/^otp:[a-z:]+:[a-f0-9]{64}$/);
+        expect(row.bucket_key).not.toMatch(/example|203\.0/i);
+      }
+    });
+
     it("uses a hashed shared IP bucket when the client IP is unknown", async () => {
       const increment = vi.spyOn(rateLimit, "incrementRateLimit");
 

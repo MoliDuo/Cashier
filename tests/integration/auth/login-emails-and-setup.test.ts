@@ -87,6 +87,29 @@ describe("login emails", () => {
     });
   });
 
+  it("keeps the failed attempts across a resent code", async () => {
+    const db = getTestDb();
+    const userId = await createTestUser(db, "owner@example.com");
+    const issue = (otp: string) =>
+      createEmailChangeChallenge({
+        userId,
+        newEmail: "added@example.com",
+        tokenHash: hashOTP(otp),
+        expiresAt: new Date(Date.now() + 60_000),
+        now: new Date(),
+        minimumIntervalMs: 0,
+      });
+    const guess = (otp: string) =>
+      verifyEmailChangeChallenge({ userId, newEmail: "added@example.com", otp, now: new Date() });
+
+    expect(await issue("123456")).toBe("created");
+    expect(await guess("000000")).toMatchObject({ status: "incorrect", attemptsRemaining: 4 });
+    expect(await guess("000001")).toMatchObject({ status: "incorrect", attemptsRemaining: 3 });
+
+    expect(await issue("654321")).toBe("created");
+    expect(await guess("000002")).toMatchObject({ status: "incorrect", attemptsRemaining: 2 });
+  });
+
   it("refuses an address that another account already signs in with", async () => {
     const db = getTestDb();
     const userId = await createTestUser(db, "owner@example.com");

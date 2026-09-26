@@ -54,9 +54,10 @@ export function fixtureCredentialToken(credential) {
  *
  * Hashes a fixture credential token the way the app does.
  */
-export function computeCredentialHash(token, pepper) {
+export function computeCredentialHash(token, authSecret) {
+  const key = Buffer.from(crypto.hkdfSync("sha256", authSecret, "", "cashier:credential", 32));
   return crypto
-    .createHmac("sha256", pepper)
+    .createHmac("sha256", key)
     .update(CREDENTIAL_DOMAIN_PREFIX)
     .update(token)
     .digest("hex");
@@ -89,8 +90,8 @@ export function validateDemoEnvironment(environment = process.env) {
   if (!Array.isArray(fixture.books) || fixture.books.length === 0) {
     throw new Error("Demo fixture must define the books its records belong to");
   }
-  if ((environment.API_KEY_PEPPER ?? "").trim() === "") {
-    throw new Error("API_KEY_PEPPER is required to seed demo service credentials");
+  if ((environment.AUTH_SECRET ?? "").trim() === "") {
+    throw new Error("AUTH_SECRET is required to seed demo service credentials");
   }
   return { databaseUrl: databaseUrl.toString(), storageUrl: storageUrl.toString() };
 }
@@ -288,7 +289,7 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
         ledgerId,
         bookIds.get(credential.book),
         credential.name,
-        computeCredentialHash(token, environment.API_KEY_PEPPER),
+        computeCredentialHash(token, environment.AUTH_SECRET),
         token.slice(0, CREDENTIAL_DISPLAY_PREFIX_LENGTH),
         token.slice(-CREDENTIAL_DISPLAY_SUFFIX_LENGTH),
         now,

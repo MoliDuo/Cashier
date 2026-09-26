@@ -8,6 +8,15 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { keyedDigest } from "@/lib/security/keys";
+
+/**
+ * The one way to name a bucket: the purpose stays readable, and the subject —
+ * an email, an IP, a user or credential id — is only ever stored as an HMAC.
+ */
+export function rateLimitKey(purpose: string, ...subject: string[]): string {
+  return `${purpose}:${keyedDigest("rate-limit", [purpose, ...subject].join("\0"))}`;
+}
 
 export interface RateLimitResult {
   success: boolean;

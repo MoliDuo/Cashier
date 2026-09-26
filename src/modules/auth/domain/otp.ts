@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { runtimeEnv } from "@/lib/env/runtime";
+import { deriveKey } from "@/lib/security/keys";
 import { OTP_LENGTH } from "../constants";
 import {
   OTP_EXPIRES_SECONDS,
@@ -19,10 +19,7 @@ export function hashOTP(otp: string): string {
   // Per-token salt keeps token hashes unique even when two accounts receive
   // the same six-digit code; otp_tokens.token_hash has a global unique index.
   const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .createHmac("sha256", runtimeEnv.authOtpPepper)
-    .update(`${salt}:${otp}`)
-    .digest("hex");
+  const hash = crypto.createHmac("sha256", deriveKey("otp")).update(`${salt}:${otp}`).digest("hex");
   return `v2:${hash}:${salt}`;
 }
 
@@ -32,7 +29,7 @@ export function verifyOTP(otp: string, storedHash: string): boolean {
   const expectedHash = v2Match[1]!;
   const salt = v2Match[2]!;
   const computed = crypto
-    .createHmac("sha256", runtimeEnv.authOtpPepper)
+    .createHmac("sha256", deriveKey("otp"))
     .update(`${salt}:${otp}`)
     .digest("hex");
 

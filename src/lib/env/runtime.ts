@@ -2,13 +2,13 @@ import { getStartupEnvValue } from "./startup";
 
 export interface RuntimeEnv {
   readonly databaseUrl: string;
-  readonly apiKeyPepper: string;
+  readonly authSecret: string;
+  readonly legacyApiKeyPepper: string | undefined;
   readonly openaiApiKey: string;
   readonly openaiBaseUrl: string;
   readonly hasOpenaiBaseUrl: boolean;
   readonly authResendKey: string | undefined;
   readonly authEmailFrom: string;
-  readonly authOtpPepper: string;
   readonly s3Endpoint: string;
   readonly s3PublicEndpoint: string | undefined;
   readonly s3Region: string;
@@ -33,7 +33,10 @@ export const runtimeEnv: RuntimeEnv = {
   get databaseUrl() {
     return getStartupEnvValue("DATABASE_URL");
   },
-  get apiKeyPepper() {
+  get authSecret() {
+    return getStartupEnvValue("AUTH_SECRET");
+  },
+  get legacyApiKeyPepper() {
     return getStartupEnvValue("API_KEY_PEPPER");
   },
   get openaiApiKey() {
@@ -50,9 +53,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get authEmailFrom() {
     return getStartupEnvValue("AUTH_EMAIL_FROM");
-  },
-  get authOtpPepper() {
-    return getStartupEnvValue("AUTH_OTP_PEPPER");
   },
   get s3Endpoint() {
     return getStartupEnvValue("S3_ENDPOINT");

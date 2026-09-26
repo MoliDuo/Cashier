@@ -56,13 +56,13 @@ function booleanStringWithDefault(name: keyof typeof ENV_DEFAULTS) {
 
 const startupEnvFields = {
   DATABASE_URL: requiredPostgresUrl("DATABASE_URL"),
-  API_KEY_PEPPER: requiredString("API_KEY_PEPPER"),
+  // Only read to find API keys hashed before the derived credential key.
+  API_KEY_PEPPER: z.preprocess(blankToUndefined, z.string().trim().optional()),
   OPENAI_API_KEY: requiredString("OPENAI_API_KEY"),
   OPENAI_BASE_URL: urlWithDefault("OPENAI_BASE_URL"),
   AUTH_SECRET: requiredString("AUTH_SECRET"),
   APP_URL: urlWithDefault("APP_URL"),
   AUTH_RESEND_KEY: z.preprocess(blankToUndefined, z.string().trim().optional()),
-  AUTH_OTP_PEPPER: requiredString("AUTH_OTP_PEPPER"),
   AUTH_EMAIL_FROM: z.preprocess(
     blankToUndefined,
     z

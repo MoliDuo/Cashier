@@ -3,6 +3,8 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { emailChangeChallenges, loginEmails, users } from "@/persistence";
 import { verificationChallenges } from "@/modules/auth/domain/verification-challenge";
+import { getLockoutExpiration, getMaxAttempts } from "@/modules/auth/domain/otp";
+import { carriedFailures, recordedFailure } from "./challenge-failures";
 
 export async function getPasswordHash(userId: string): Promise<string | null | undefined> {
   const user = await db.query.users.findFirst({
@@ -103,10 +105,8 @@ export async function createEmailChangeChallenge(input: {
           newEmail: input.newEmail,
           tokenHash: input.tokenHash,
           expiresAt: input.expiresAt,
-          attempts: 0,
-          lockedUntil: null,
+          ...carriedFailures(emailChangeChallenges, input.now),
           createdAt: input.now,
-          lastAttemptAt: null,
         },
       });
     return "created" as const;
@@ -157,19 +157,23 @@ export async function verifyEmailChangeChallenge(input: {
       if (!check.ok && check.reason === "locked") return { status: "locked" as const };
       if (!check.ok && check.reason === "expired") return { status: "expired" as const };
       if (!check.ok) {
-        const failure = verificationChallenges.nextFailure(challenge.attempts);
-        await tx
+        const maxAttempts = getMaxAttempts();
+        const [failure] = await tx
           .update(emailChangeChallenges)
-          .set({
-            attempts: failure.attempts,
-            lockedUntil: failure.lockedUntil,
-            lastAttemptAt: input.now,
-          })
-          .where(eq(emailChangeChallenges.id, challenge.id));
+          .set(
+            recordedFailure(emailChangeChallenges, {
+              maxAttempts,
+              lockedUntil: getLockoutExpiration(),
+              now: input.now,
+            })
+          )
+          .where(eq(emailChangeChallenges.id, challenge.id))
+          .returning({ attempts: emailChangeChallenges.attempts });
+        const attempts = failure?.attempts ?? maxAttempts;
         return {
           status: "incorrect" as const,
-          locked: failure.lockedUntil != null,
-          attemptsRemaining: failure.attemptsRemaining,
+          locked: attempts >= maxAttempts,
+          attemptsRemaining: Math.max(0, maxAttempts - attempts),
         };
       }
       const duplicate = await tx.query.loginEmails.findFirst({

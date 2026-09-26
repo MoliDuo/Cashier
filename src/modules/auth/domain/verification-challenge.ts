@@ -1,4 +1,4 @@
-import { getLockoutExpiration, getMaxAttempts, verifyOTP } from "./otp";
+import { verifyOTP } from "./otp";
 
 interface VerificationChallengeRecord {
   tokenHash: string;
@@ -19,17 +19,6 @@ class VerificationChallengeService {
     }
     if (record.expiresAt <= now) return { ok: false, reason: "expired" };
     return verifyOTP(otp, record.tokenHash) ? { ok: true } : { ok: false, reason: "invalid" };
-  }
-
-  nextFailure(attempts: number) {
-    const nextAttempts = attempts + 1;
-    const maxAttempts = getMaxAttempts();
-    const lockedUntil = nextAttempts >= maxAttempts ? getLockoutExpiration() : null;
-    return {
-      attempts: nextAttempts,
-      lockedUntil,
-      attemptsRemaining: Math.max(0, maxAttempts - nextAttempts),
-    };
   }
 }
 

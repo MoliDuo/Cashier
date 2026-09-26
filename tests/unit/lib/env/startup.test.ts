@@ -152,13 +152,18 @@ describe("validateStartupEnv", () => {
     ).toThrow(/AUTH_EMAIL_FROM/);
   });
 
-  it("requires API_KEY_PEPPER", () => {
+  it("requires AUTH_SECRET", () => {
     expect(() =>
       validateStartupEnv({
         ...baseEnv,
-        API_KEY_PEPPER: "",
+        AUTH_SECRET: "",
       })
-    ).toThrow(/API_KEY_PEPPER/);
+    ).toThrow(/AUTH_SECRET/);
+  });
+
+  it("no longer requires the old peppers", () => {
+    const { API_KEY_PEPPER: _api, AUTH_OTP_PEPPER: _otp, ...env } = baseEnv;
+    expect(() => validateStartupEnv(env)).not.toThrow();
   });
 
   it("owns all app env defaults in the startup module", () => {

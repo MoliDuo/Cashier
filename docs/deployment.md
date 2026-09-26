@@ -19,8 +19,9 @@
 - `S3_PUBLIC_ENDPOINT`：浏览器可以访问的对象存储端点。
 - `OPENAI_API_KEY`：AI 服务密钥。
 - `TRUSTED_PROXY=platform`：让按 IP 的限流拿到真实客户端 IP（见上文）。
-- `AUTH_SECRET`、`API_KEY_PEPPER`、`AUTH_OTP_PEPPER`：三个内部密钥，
+- `AUTH_SECRET`：唯一的内部密钥，其余密钥都由它按用途派生。
   必须是安全随机值，并且在同一部署的重启、预览实例和多次构建之间保持一致。
+  更换它会让所有会话、未用的验证码和 API key 失效。
 - `CRON_SECRET`：每日 cron 的调用密钥，至少 32 个字符，例如用 `openssl rand -hex 32` 生成。
   Vercel Cron 调用 `/api/cron/daily` 时会带上 `Authorization: Bearer <CRON_SECRET>`。
 

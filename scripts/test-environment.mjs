@@ -2,13 +2,11 @@ export const TEST_DATABASE_PLACEHOLDER = "postgresql://cashier:cashier@127.0.0.1
 
 export const TEST_STARTUP_ENV = Object.freeze({
   DATABASE_URL: TEST_DATABASE_PLACEHOLDER,
-  API_KEY_PEPPER: "test-pepper-for-testing-only",
   OPENAI_API_KEY: "test-openai-key",
   OPENAI_BASE_URL: "",
   AUTH_SECRET: "test-auth-secret",
   APP_URL: "http://localhost:3000",
   AUTH_RESEND_KEY: "test-resend-key",
-  AUTH_OTP_PEPPER: "test-auth-otp-pepper",
   AUTH_EMAIL_FROM: "",
   S3_ENDPOINT: "http://127.0.0.1:1",
   S3_PUBLIC_ENDPOINT: "",

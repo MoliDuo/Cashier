@@ -5,21 +5,21 @@
  * domain-separated HMAC-SHA-256 with a configurable pepper.
  *
  * Hash format: lowercase hex
- *   HMAC-SHA-256(API_KEY_PEPPER, "credential:v1:" + token)
+ *   HMAC-SHA-256(derived "credential" key, "credential:v1:" + token)
+ *
+ * Keys issued before the derived key are hashed with `API_KEY_PEPPER`;
+ * `computeLegacyHash` finds those so the first use can rewrite them.
  */
 
 import crypto from "crypto";
-import { getStartupEnvValue } from "@/lib/env/startup";
+import { runtimeEnv } from "@/lib/env/runtime";
+import { deriveKey } from "./keys";
 
 export const DOMAIN_PREFIX = "credential:v1:";
 const TOKEN_PREFIX = "sk_live_";
 const TOKEN_HEX_LENGTH = 48; // 24 random bytes => 48 hex chars
 export const DISPLAY_PREFIX_LENGTH = 8;
 export const DISPLAY_SUFFIX_LENGTH = 4;
-
-function getPepper(): string {
-  return getStartupEnvValue("API_KEY_PEPPER");
-}
 
 /**
  * Generate a random 48-hex-char token (with `sk_live_` prefix), compute its
@@ -48,14 +48,20 @@ export function prefixSuffix(token: string): { prefix: string; suffix: string } 
   };
 }
 
-/**
- * Compute the HMAC-SHA-256 hash of a token using the configured pepper.
- *
- * @internal Exported for testing purposes only.
- */
-export function computeHash(token: string): string {
-  const hmac = crypto.createHmac("sha256", getPepper());
+function hashWith(key: crypto.BinaryLike, token: string): string {
+  const hmac = crypto.createHmac("sha256", key);
   hmac.update(DOMAIN_PREFIX);
   hmac.update(token);
   return hmac.digest("hex");
+}
+
+/** The stored hash of a token. */
+export function computeHash(token: string): string {
+  return hashWith(deriveKey("credential"), token);
+}
+
+/** The hash a key issued before the derived key was stored under, if the old pepper is set. */
+export function computeLegacyHash(token: string): string | null {
+  const pepper = runtimeEnv.legacyApiKeyPepper;
+  return pepper == null ? null : hashWith(pepper, token);
 }

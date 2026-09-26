@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import {
   incrementRateLimit,
+  rateLimitKey,
   releaseRateLimitIncrement,
   type RateLimitResult,
 } from "@/lib/rate-limit";
@@ -15,8 +16,6 @@ import {
   AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS,
   AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
 } from "@/config/tuning";
-
-const PASSWORD_CHANGE_PREFIX = "auth:password-change:user:";
 
 async function releasePasswordChangeReservation(
   key: string,
@@ -46,7 +45,7 @@ export async function changePassword(params: {
   }
   validatePassword(params.newPassword);
 
-  const key = `${PASSWORD_CHANGE_PREFIX}${params.userId}`;
+  const key = rateLimitKey("auth:password-change", params.userId);
   const limit = AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS;
   const windowSeconds = AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS;
   let reservation: RateLimitResult;

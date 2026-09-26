@@ -83,7 +83,7 @@ const safeEnvironment = {
   CASHIER_DEMO_MODE: "true",
   DATABASE_URL: "postgresql://cashier:cashier@127.0.0.1:55433/cashier_demo",
   S3_ENDPOINT: "http://127.0.0.1:59000",
-  API_KEY_PEPPER: "test-pepper-for-testing-only",
+  AUTH_SECRET: "test-auth-secret",
 } satisfies NodeJS.ProcessEnv;
 
 // Anything that is not a read: a preview that ran one of these would be a
@@ -134,7 +134,7 @@ describe("demo data environment guard", () => {
       /cashier_demo/,
     ],
     [{ ...safeEnvironment, S3_ENDPOINT: "https://storage.example.com" }, /loopback/],
-    [{ ...safeEnvironment, API_KEY_PEPPER: "   " }, /API_KEY_PEPPER/],
+    [{ ...safeEnvironment, AUTH_SECRET: "   " }, /AUTH_SECRET/],
   ])("rejects unsafe resources", (environment, message) => {
     expect(() => validateDemoEnvironment(environment)).toThrow(message);
   });
@@ -262,13 +262,13 @@ describe("demo workspace fixture", () => {
    * this is what keeps its copy of the rule from drifting away from the app's.
    */
   it("hashes fixture tokens exactly like the app does", () => {
-    const pepper = process.env.API_KEY_PEPPER ?? "";
+    const secret = process.env.AUTH_SECRET ?? "";
     const credentials = fixture.serviceCredentials as Array<{ tokenBody: string }>;
 
-    expect(pepper).not.toBe("");
+    expect(secret).not.toBe("");
     for (const credential of credentials) {
       const token = fixtureCredentialToken(credential);
-      expect(computeCredentialHash(token, pepper)).toBe(computeHash(token));
+      expect(computeCredentialHash(token, secret)).toBe(computeHash(token));
     }
   });
 });
@@ -280,7 +280,7 @@ describe("demo reset preview", () => {
       CASHIER_DEMO_MODE: "true",
       DATABASE_URL: "postgresql://cashier:cashier@127.0.0.1:55433/cashier_demo",
       S3_ENDPOINT: "http://127.0.0.1:59000",
-      API_KEY_PEPPER: "test-pepper-for-testing-only",
+      AUTH_SECRET: "test-auth-secret",
     });
 
     expect(result).toMatchObject({

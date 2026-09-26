@@ -22,9 +22,14 @@ vi.mock("@/modules/ledger/server/service-credentials", () => ({
   authenticateServiceCredential: serviceCredentialsMock.authenticate,
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
-  incrementRateLimit: rateLimiterMock.increment,
-}));
+vi.mock("@/lib/rate-limit", async () => {
+  const { createHash } = await import("node:crypto");
+  return {
+    incrementRateLimit: rateLimiterMock.increment,
+    rateLimitKey: (purpose: string, ...subject: string[]) =>
+      `${purpose}:${createHash("sha256").update(subject.join("\0")).digest("hex")}`,
+  };
+});
 
 vi.mock("@/lib/utils/ip", () => ({
   getClientIPFromHeaders: getClientIPFromHeadersMock,
@@ -33,7 +38,7 @@ vi.mock("@/lib/utils/ip", () => ({
 vi.mock("@/lib/env/runtime", () => ({
   runtimeEnv: {
     apiRateLimitPerMinute: 60,
-    apiKeyPepper: "unit-test-pepper",
+    authSecret: "unit-test-auth-secret",
   },
 }));
 
@@ -93,7 +98,7 @@ describe("api/v1 route helper", () => {
 
   it("rejects over the pre-auth IP limit without parsing the business request", async () => {
     rateLimiterMock.increment.mockImplementation(async (key: string, limit: number) =>
-      key.startsWith("rl_api_v1_preauth:")
+      key.startsWith("api-v1:preauth:")
         ? { success: false, remaining: 0, resetTime: now + 60_000 }
         : successResult(limit)
     );
@@ -118,8 +123,8 @@ describe("api/v1 route helper", () => {
     const validKeys = new Set<string>();
     const preAuthKeys = new Set<string>();
     rateLimiterMock.increment.mockImplementation(async (key: string, limit: number) => {
-      if (key.startsWith("rl_valid_cred:")) validKeys.add(key);
-      if (key.startsWith("rl_api_v1_preauth:")) preAuthKeys.add(key);
+      if (key.startsWith("api-v1:credential:")) validKeys.add(key);
+      if (key.startsWith("api-v1:preauth:")) preAuthKeys.add(key);
       return successResult(limit);
     });
     const handler = vi.fn().mockResolvedValue({
@@ -173,7 +178,7 @@ describe("api/v1 route helper", () => {
 
   it("sets Retry-After and rate limit headers on credential 429 responses", async () => {
     rateLimiterMock.increment.mockImplementation(async (key: string, limit: number) =>
-      key.startsWith("rl_valid_cred:")
+      key.startsWith("api-v1:credential:")
         ? { success: false, remaining: 0, resetTime: now + 60_000 }
         : successResult(limit)
     );
@@ -250,9 +255,9 @@ describe("api/v1 route helper", () => {
 
     expect(response.status).toBe(200);
     expect(rateLimiterMock.increment).toHaveBeenCalledTimes(2);
-    expect(rateLimiterMock.increment.mock.calls[0]?.[0]).toMatch(/^rl_api_v1_preauth:/);
+    expect(rateLimiterMock.increment.mock.calls[0]?.[0]).toMatch(/^api-v1:preauth:/);
     expect(rateLimiterMock.increment.mock.calls[0]?.[0]).not.toContain("unknown");
-    expect(rateLimiterMock.increment.mock.calls[1]?.[0]).toMatch(/^rl_valid_cred:/);
+    expect(rateLimiterMock.increment.mock.calls[1]?.[0]).toMatch(/^api-v1:credential:/);
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
@@ -272,7 +277,7 @@ describe("api/v1 route helper", () => {
     expect(response.headers.get("WWW-Authenticate")).toBe("Bearer");
     expect(serviceCredentialsMock.authenticate).toHaveBeenCalledTimes(1);
     expect(rateLimiterMock.increment).toHaveBeenCalledOnce();
-    expect(rateLimiterMock.increment.mock.calls[0]?.[0]).toMatch(/^rl_api_v1_preauth:/);
+    expect(rateLimiterMock.increment.mock.calls[0]?.[0]).toMatch(/^api-v1:preauth:/);
     expect(rateLimiterMock.increment.mock.calls[0]?.[0]).not.toContain("unknown");
     expect(handler).not.toHaveBeenCalled();
   });

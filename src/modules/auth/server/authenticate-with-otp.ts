@@ -96,14 +96,6 @@ export async function authenticateWithOTP(params: {
     throw new OTPInvalidSignInError();
   }
 
-  if (record.lockedUntil != null && record.lockedUntil > new Date()) {
-    logger.warn(
-      { subject: logIdentifier("email", normalizedEmail), lockedUntil: record.lockedUntil },
-      "OTP account locked"
-    );
-    throw new OTPLockedSignInError();
-  }
-
   const result = await verifyOTPWithPolicy(normalizedEmail, params.otp, record);
 
   if (!result.success) {

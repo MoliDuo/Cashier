@@ -1,5 +1,4 @@
-import { createHmac } from "node:crypto";
-import { runtimeEnv } from "@/lib/env/runtime";
+import { keyedDigest } from "./keys";
 
 /**
  * Two kinds of identifier end up in a log line, and they want opposite things.
@@ -24,9 +23,6 @@ export type LogIdentifierKind =
 
 export function logIdentifier(kind: LogIdentifierKind, value: string): string {
   if (!(PERSONAL_KINDS as readonly string[]).includes(kind)) return `${kind}:${value}`;
-  const digest = createHmac("sha256", runtimeEnv.apiKeyPepper)
-    .update(value.trim().toLowerCase())
-    .digest("hex")
-    .slice(0, 16);
+  const digest = keyedDigest("log-identifier", value.trim().toLowerCase()).slice(0, 16);
   return `${kind}:${digest}`;
 }
