@@ -3,7 +3,7 @@ import {
   collectTranslationUsage,
   tokenize,
   validateCatalog,
-} from "../../../scripts/validate-i18n-catalogs.mjs";
+} from "../../../scripts/validate-i18n-catalogs";
 
 const catalog = JSON.stringify({
   Ledger: {

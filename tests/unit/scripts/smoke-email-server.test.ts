@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Resend } from "resend";
 import OTPEmail from "@/emails/otp-email";
-import {
-  acceptEmail,
-  codeFromHtml,
-  createSmokeOutbox,
-} from "../../../scripts/smoke-email-server.mjs";
+import { acceptEmail, codeFromHtml, createSmokeOutbox } from "../../../scripts/smoke-email-server";
 
 const copy = {
   preview: "preview",

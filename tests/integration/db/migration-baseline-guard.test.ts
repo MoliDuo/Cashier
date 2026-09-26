@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { assertBaselineReached } from "../../../scripts/migrate-database.mjs";
+import { assertBaselineReached } from "@/persistence/migrate";
 import { getTestPool, getTestSchemaName } from "../../setup";
 
 const journal = JSON.parse(

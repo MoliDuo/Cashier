@@ -5,7 +5,7 @@ import {
   TEST_STARTUP_ENV,
   createTestEnvironment,
   installTestEnvironment,
-} from "../../../scripts/test-environment.mjs";
+} from "../../../scripts/test-environment";
 
 describe("test environment", () => {
   it("overrides inherited startup configuration with isolated placeholders", () => {

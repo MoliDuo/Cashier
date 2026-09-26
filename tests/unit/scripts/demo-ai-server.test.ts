@@ -5,7 +5,7 @@ import {
   chatCompletionEnvelope,
   readScenarioToken,
   selectScenario,
-} from "../../../scripts/demo-ai-server.mjs";
+} from "../../../scripts/demo-ai-server";
 import { parserOutputSchema } from "@/modules/source-document/domain/parse/parser-schema";
 
 const PARSE_SCENARIOS = ["success", "slow", "foreign", "unparsable"] as const;
@@ -50,7 +50,7 @@ describe("demo AI scenarios", () => {
     const answer = answerFor(promptFor("provider-error"));
 
     expect(answer.status).toBe(503);
-    expect(answer.error.message).toBeTruthy();
+    expect(answer.error?.message).toBeTruthy();
     expect(answer.body).toBeUndefined();
   });
 

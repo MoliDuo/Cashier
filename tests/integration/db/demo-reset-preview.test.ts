@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { describe, expect, it } from "vitest";
-import { inspectDemoResetTargets, previewDemoReset } from "../../../scripts/demo-data.mjs";
+import { inspectDemoResetTargets, previewDemoReset } from "../../../scripts/demo-data";
 import { getTestMigrationsSchemaName, getTestPool, getTestSchemaName } from "../../setup";
 
 /**

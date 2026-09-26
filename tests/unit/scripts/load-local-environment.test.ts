@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadLocalEnvironment } from "../../../scripts/load-local-environment.mjs";
+import { loadLocalEnvironment } from "../../../scripts/load-local-environment";
 
 const { files } = vi.hoisted(() => ({ files: new Map<string, string>() }));
 vi.mock("node:fs", () => ({

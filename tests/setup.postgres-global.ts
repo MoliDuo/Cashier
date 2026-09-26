@@ -1,13 +1,11 @@
-import path from "node:path";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import type { TestProject } from "vitest/node";
+import { migrateDatabase } from "@/persistence/migrate";
 import {
   databaseUrlFor,
   prepareTestPostgres,
   runDatabaseName,
-} from "../scripts/prepare-test-postgres.mjs";
+} from "../scripts/prepare-test-postgres";
 
 export interface CashierPostgresContext {
   databaseUrl: string;
@@ -33,19 +31,9 @@ async function createTemplate(databaseUrl: string, runId: string): Promise<strin
   } finally {
     await admin.end();
   }
-  // A template must have no open connections when it is copied, so this pool
-  // is closed before any file starts.
-  const pool = new Pool({
-    connectionString: databaseUrlFor(databaseUrl, templateDatabase),
-    max: 1,
-  });
-  try {
-    await migrate(drizzle(pool), {
-      migrationsFolder: path.resolve("src/persistence/postgres-migrations"),
-    });
-  } finally {
-    await pool.end();
-  }
+  // A template must have no open connections when it is copied; the
+  // migration closes its connection before any file starts.
+  await migrateDatabase(databaseUrlFor(databaseUrl, templateDatabase));
   return templateDatabase;
 }
 

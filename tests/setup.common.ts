@@ -1,7 +1,7 @@
 import { afterEach, vi } from "vitest";
 import React from "react";
 import type * as ReactModule from "react";
-import { installTestEnvironment } from "../scripts/test-environment.mjs";
+import { installTestEnvironment } from "../scripts/test-environment";
 import "./setup.network";
 
 installTestEnvironment();

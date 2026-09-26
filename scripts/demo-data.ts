@@ -1,21 +1,99 @@
-#!/usr/bin/env node
-
 import crypto from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { eq, inArray, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import type { DateOrganizationSuggestion } from "@/lib/ai/date-organization";
+import { computeHash, prefixSuffix } from "@/lib/security/service-credential-token";
+import * as schema from "@/persistence";
+import { durableKey } from "@/server/stored-files/shared";
+import {
+  seedBooks,
+  seedCategories,
+  seedExchangeRates,
+  seedLedger,
+  seedServiceCredential,
+  seedSourceDocument,
+  seedUser,
+  type SeedDatabase,
+  type SeedRevision,
+} from "./lib/seed";
+
+interface FixtureEntry {
+  id: string;
+  category: string | null;
+  itemName: string;
+  amount: string;
+  currency: string;
+  description?: string;
+}
+
+interface FixtureDocument {
+  id: string;
+  revisionId: string;
+  title: string | null;
+  dayOffset: number;
+  inputText: string;
+  book: string;
+  status: SeedRevision["processingStatus"];
+  failureKind?: NonNullable<SeedRevision["failureKind"]>;
+  failureCode?: string;
+  failureMessage?: string;
+  image?: { fileId: string; filename: string; asset: string };
+  entries: FixtureEntry[];
+  dateSuggestionId?: string;
+  dateSuggestionEntryId?: string;
+  retainedResult?: { revisionId: string; title: string | null; entries: FixtureEntry[] };
+}
+
+export interface FixtureCredential {
+  id: string;
+  name: string;
+  tokenBody: string;
+  book: string;
+}
+
+interface DemoFixture {
+  user: { id: string; email: string };
+  ledger: { id: string; mainCurrency: string; preferredCurrencies: string[]; aiLanguage: string };
+  exchangeRates?: Record<string, string>;
+  books: Array<{ id: string; name: string; timeZone: string | null; sortOrder: number }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    sortOrder: number;
+  }>;
+  documents: FixtureDocument[];
+  serviceCredentials: FixtureCredential[];
+}
+
+export interface UploadedImage {
+  fileId: string;
+  filename: string;
+  bytes: Buffer;
+}
+
+interface DemoTarget {
+  user_id: string;
+  ledger_id: string | null;
+}
+
+type Environment = Partial<NodeJS.ProcessEnv>;
 
 const FIXTURE_DIR = path.dirname(
   fileURLToPath(new URL("./fixtures/demo-workspace.json", import.meta.url))
 );
-const fixture = JSON.parse(await readFile(path.join(FIXTURE_DIR, "demo-workspace.json"), "utf8"));
+const fixture = JSON.parse(
+  readFileSync(path.join(FIXTURE_DIR, "demo-workspace.json"), "utf8")
+) as DemoFixture;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const DEMO_DATABASE = "cashier_demo";
-const CREDENTIAL_DOMAIN_PREFIX = "credential:v1:";
-const CREDENTIAL_DISPLAY_PREFIX_LENGTH = 8;
-const CREDENTIAL_DISPLAY_SUFFIX_LENGTH = 4;
 const CREDENTIAL_TOKEN_PREFIX = "sk_live_";
 
 /**
@@ -43,27 +121,11 @@ const DEMO_RESET_DATA_TABLES = [
  *
  * Composes a fixture credential's demo token.
  */
-export function fixtureCredentialToken(credential) {
+export function fixtureCredentialToken(credential: Pick<FixtureCredential, "tokenBody">): string {
   return `${CREDENTIAL_TOKEN_PREFIX}${credential.tokenBody}`;
 }
 
-/**
- * Mirrors src/lib/security/service-credential-token.ts, which lives behind the
- * `@/` alias and cannot be imported from this script. The focused test pins
- * both implementations to the same digest so the rule cannot drift.
- *
- * Hashes a fixture credential token the way the app does.
- */
-export function computeCredentialHash(token, authSecret) {
-  const key = Buffer.from(crypto.hkdfSync("sha256", authSecret, "", "cashier:credential", 32));
-  return crypto
-    .createHmac("sha256", key)
-    .update(CREDENTIAL_DOMAIN_PREFIX)
-    .update(token)
-    .digest("hex");
-}
-
-function requiredUrl(name, value) {
+function requiredUrl(name: string, value: string | undefined): URL {
   try {
     return new URL(value ?? "");
   } catch {
@@ -72,7 +134,10 @@ function requiredUrl(name, value) {
 }
 
 /** Verifies that focused tests reject non-local demo targets. */
-export function validateDemoEnvironment(environment = process.env) {
+export function validateDemoEnvironment(environment: Environment = process.env): {
+  databaseUrl: string;
+  storageUrl: string;
+} {
   if (environment.CASHIER_DEMO_MODE !== "true") {
     throw new Error("CASHIER_DEMO_MODE=true is required");
   }
@@ -99,13 +164,13 @@ export function validateDemoEnvironment(environment = process.env) {
 /** Any positive value works: demo conversions only depend on the fixture's rates. */
 const DEMO_MAIN_CURRENCY_PER_EUR = "7.8";
 
-function isoDateWithOffset(anchorDate, dayOffset) {
+function isoDateWithOffset(anchorDate: string, dayOffset: number): string {
   const date = new Date(`${anchorDate}T12:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + dayOffset);
   return date.toISOString().slice(0, 10);
 }
 
-function anchorDate(environment) {
+function anchorDate(environment: Environment): string {
   const explicit = environment.CASHIER_DEMO_AS_OF;
   if (explicit != null) {
     if (
@@ -119,37 +184,40 @@ function anchorDate(environment) {
   return new Date().toISOString().slice(0, 10);
 }
 
-function createStorage(environment) {
+function createStorage(environment: Environment): S3Client {
   return new S3Client({
     region: environment.S3_REGION ?? "auto",
-    endpoint: environment.S3_ENDPOINT,
+    ...(environment.S3_ENDPOINT == null ? {} : { endpoint: environment.S3_ENDPOINT }),
     forcePathStyle: true,
     credentials: {
-      accessKeyId: environment.S3_ACCESS_KEY_ID,
-      secretAccessKey: environment.S3_SECRET_ACCESS_KEY,
+      accessKeyId: environment.S3_ACCESS_KEY_ID ?? "",
+      secretAccessKey: environment.S3_SECRET_ACCESS_KEY ?? "",
     },
   });
 }
 
-function activeEntries(document) {
+function activeEntries(document: FixtureDocument): FixtureEntry[] {
   return document.retainedResult?.entries ?? document.entries;
 }
 
-async function uploadFixtureImages(storage, environment, ledgerId) {
-  const uploaded = [];
+async function uploadFixtureImages(
+  storage: S3Client,
+  environment: Environment,
+  ledgerId: string
+): Promise<UploadedImage[]> {
+  const uploaded: UploadedImage[] = [];
   for (const document of fixture.documents) {
     if (document.image == null) continue;
     const bytes = await readFile(path.join(FIXTURE_DIR, document.image.asset));
-    const key = `${ledgerId}/stored/${document.image.fileId}`;
     await storage.send(
       new PutObjectCommand({
         Bucket: environment.S3_BUCKET,
-        Key: key,
+        Key: durableKey(ledgerId, document.image.fileId),
         Body: bytes,
         ContentType: "image/jpeg",
       })
     );
-    uploaded.push({ ...document.image, bytes, key });
+    uploaded.push({ fileId: document.image.fileId, filename: document.image.filename, bytes });
   }
   return uploaded;
 }
@@ -168,13 +236,13 @@ async function uploadFixtureImages(storage, environment, ledgerId) {
  *
  * Empties the demo schemas, refusing anything but the demo database.
  */
-export async function resetDemoSchema(environment = process.env) {
+export async function resetDemoSchema(environment: Environment = process.env): Promise<void> {
   const { databaseUrl } = validateDemoEnvironment(environment);
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();
   try {
-    for (const schema of ["public", "drizzle"]) {
-      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    for (const schemaName of ["public", "drizzle"]) {
+      await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
     }
     await client.query("CREATE SCHEMA public");
   } finally {
@@ -182,9 +250,9 @@ export async function resetDemoSchema(environment = process.env) {
   }
 }
 
-async function findDemoTarget(client) {
+async function findDemoTarget(client: pg.Client): Promise<DemoTarget | null> {
   // The account is found through its login address; the one ledger belongs to it.
-  const result = await client.query(
+  const result = await client.query<DemoTarget>(
     `SELECT u.id AS user_id, (SELECT id FROM ledgers ORDER BY created_at, id LIMIT 1) AS ledger_id
        FROM users u
        JOIN login_emails e ON e.user_id = u.id
@@ -195,12 +263,18 @@ async function findDemoTarget(client) {
   return result.rows[0] ?? null;
 }
 
-async function inspectDemoTarget(client) {
+interface DemoInspection {
+  target: DemoTarget | null;
+  counts: { ledgers: number; documents: number; entries: number; files: number };
+  keys: string[];
+}
+
+async function inspectDemoTarget(client: pg.Client): Promise<DemoInspection> {
   const target = await findDemoTarget(client);
   if (target == null) {
     return { target: null, counts: { ledgers: 0, documents: 0, entries: 0, files: 0 }, keys: [] };
   }
-  const counts = await client.query(
+  const counts = await client.query<DemoInspection["counts"]>(
     `SELECT
        (SELECT count(*)::int FROM ledgers) AS ledgers,
        (SELECT count(*)::int FROM source_documents WHERE ledger_id = $1) AS documents,
@@ -210,19 +284,60 @@ async function inspectDemoTarget(client) {
   );
   const keys =
     target.ledger_id == null
-      ? { rows: [] }
-      : await client.query(
-          "SELECT storage_key FROM stored_files WHERE ledger_id = $1 ORDER BY storage_key",
-          [target.ledger_id]
-        );
+      ? []
+      : (
+          await client.query<{ storage_key: string }>(
+            "SELECT storage_key FROM stored_files WHERE ledger_id = $1 ORDER BY storage_key",
+            [target.ledger_id]
+          )
+        ).rows.map((row) => row.storage_key);
+  const [countRow] = counts.rows;
+  if (countRow == null) throw new Error("Demo target counts are missing");
+  return { target, counts: countRow, keys };
+}
+
+function dateSuggestion(
+  document: FixtureDocument,
+  documentDate: string,
+  asOf: string
+): DateOrganizationSuggestion | null {
+  if (document.dateSuggestionEntryId == null || document.dateSuggestionId == null) return null;
+  const resolvedDate = isoDateWithOffset(asOf, document.dayOffset + 1);
+  const entry = document.entries.find((item) => item.id === document.dateSuggestionEntryId);
+  if (entry == null) throw new Error(`Unknown demo suggestion entry: ${document.id}`);
   return {
-    target,
-    counts: counts.rows[0],
-    keys: keys.rows.map((row) => row.storage_key),
+    schemaVersion: 1,
+    id: document.dateSuggestionId,
+    referenceDate: documentDate,
+    sourceDocumentDate: documentDate,
+    items: [
+      {
+        ledgerEntryId: entry.id,
+        dateHint: { kind: "relative", value: "tomorrow", sourceText: "tomorrow" },
+        resolvedDate,
+        sourceText: "tomorrow",
+        snapshot: { itemName: entry.itemName, amount: entry.amount, currency: entry.currency },
+      },
+    ],
   };
 }
 
-async function insertFixture(client, environment, { userId, ledgerId, uploadedImages, reset }) {
+function requireBookId(bookIds: Map<string, string>, name: string): string {
+  const id = bookIds.get(name);
+  if (id == null) throw new Error(`Unknown demo book: ${name}`);
+  return id;
+}
+
+export async function insertFixture(
+  db: SeedDatabase,
+  environment: Environment,
+  {
+    userId,
+    ledgerId,
+    uploadedImages,
+    reset,
+  }: { userId: string; ledgerId: string; uploadedImages: UploadedImage[]; reset: boolean }
+): Promise<void> {
   const asOf = anchorDate(environment);
   const now = new Date(`${asOf}T12:00:00.000Z`);
   if (reset) {
@@ -230,227 +345,126 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
     // removes both, so it restores the fixture instead of layering onto
     // whatever the last session left behind. The file links go first: they
     // reference stored files without cascading.
-    await client.query("DELETE FROM source_document_files");
-    await client.query("DELETE FROM ledgers");
-    await client.query(
-      `DELETE FROM users WHERE id IN
-        (SELECT user_id FROM login_emails WHERE lower(email) = $1)`,
-      [fixture.user.email]
+    await db.delete(schema.sourceDocumentFiles);
+    await db.delete(schema.ledgers);
+    await db.delete(schema.users).where(
+      inArray(
+        schema.users.id,
+        db
+          .select({ id: schema.loginEmails.userId })
+          .from(schema.loginEmails)
+          .where(sql`lower(${schema.loginEmails.email}) = ${fixture.user.email}`)
+      )
     );
   }
-  await client.query(
-    `INSERT INTO users (id, created_at, updated_at)
-     VALUES ($1, $2, $2)
-     ON CONFLICT (id) DO NOTHING`,
-    [userId, now]
-  );
-  await client.query(
-    `INSERT INTO login_emails (user_id, email, email_verified, created_at, updated_at)
-     VALUES ($1, $2, $3, $3, $3)
-     ON CONFLICT (id) DO NOTHING`,
-    [userId, fixture.user.email, now]
-  );
-  await client.query(
-    `INSERT INTO ledgers
-      (id, ai_language, preferred_currencies, main_currency, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $5)
-     ON CONFLICT (id) DO NOTHING`,
-    [
-      ledgerId,
-      fixture.ledger.aiLanguage,
-      fixture.ledger.preferredCurrencies,
-      fixture.ledger.mainCurrency,
-      now,
-    ]
-  );
-
-  const bookIds = new Map();
-  for (const book of fixture.books) {
-    await client.query(
-      `INSERT INTO books (id, ledger_id, name, time_zone, sort_order, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $6)
-       ON CONFLICT (id) DO NOTHING`,
-      [book.id, ledgerId, book.name, book.timeZone, book.sortOrder, now]
-    );
-    bookIds.set(book.name, book.id);
-  }
+  await seedUser(db, { id: userId, email: fixture.user.email, at: now });
+  await seedLedger(db, {
+    id: ledgerId,
+    aiLanguage: fixture.ledger.aiLanguage,
+    preferredCurrencies: fixture.ledger.preferredCurrencies,
+    mainCurrency: fixture.ledger.mainCurrency,
+    at: now,
+  });
+  const bookIds = await seedBooks(db, ledgerId, fixture.books, now);
 
   // The reset above deletes the ledger, so cascade already removed any earlier
   // credentials for this workspace; these rows are recreated with it.
   for (const credential of fixture.serviceCredentials) {
     const token = fixtureCredentialToken(credential);
-    await client.query(
-      `INSERT INTO service_credentials
-        (id, ledger_id, book_id, name, token_hash, token_prefix, token_suffix, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (id) DO NOTHING`,
-      [
-        credential.id,
-        ledgerId,
-        bookIds.get(credential.book),
-        credential.name,
-        computeCredentialHash(token, environment.AUTH_SECRET),
-        token.slice(0, CREDENTIAL_DISPLAY_PREFIX_LENGTH),
-        token.slice(-CREDENTIAL_DISPLAY_SUFFIX_LENGTH),
-        now,
-      ]
-    );
+    const { prefix, suffix } = prefixSuffix(token);
+    await seedServiceCredential(db, {
+      id: credential.id,
+      ledgerId,
+      bookId: requireBookId(bookIds, credential.book),
+      name: credential.name,
+      tokenHash: computeHash(token),
+      tokenPrefix: prefix,
+      tokenSuffix: suffix,
+      at: now,
+    });
   }
 
-  const categoryIds = new Map();
-  for (const category of fixture.categories) {
-    const existing = await client.query(
-      "SELECT id FROM entry_categories WHERE ledger_id = $1 AND name = $2",
-      [ledgerId, category.name]
-    );
-    const categoryId = existing.rows[0]?.id ?? category.id;
-    if (existing.rowCount === 0) {
-      await client.query(
-        `INSERT INTO entry_categories
-          (id, ledger_id, name, description, icon, sort_order, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
-        [
-          categoryId,
-          ledgerId,
-          category.name,
-          category.description,
-          category.icon,
-          category.sortOrder,
-          now,
-        ]
-      );
-    }
-    categoryIds.set(category.name, categoryId);
-  }
+  // A seed over an existing ledger keeps the categories it already has.
+  const existing = await db
+    .select({ id: schema.entryCategories.id, name: schema.entryCategories.name })
+    .from(schema.entryCategories)
+    .where(eq(schema.entryCategories.ledgerId, ledgerId));
+  const categoryIds = new Map(existing.map((row) => [row.name, row.id]));
+  const seeded = await seedCategories(
+    db,
+    ledgerId,
+    fixture.categories.filter((category) => !categoryIds.has(category.name)),
+    now
+  );
+  for (const [name, id] of seeded) categoryIds.set(name, id);
 
   const imagesByFileId = new Map(uploadedImages.map((image) => [image.fileId, image]));
   for (const document of fixture.documents) {
     const documentDate = isoDateWithOffset(asOf, document.dayOffset);
     const createdAt = new Date(`${documentDate}T12:00:00.000Z`);
-    let suggestion = null;
-    if (document.dateSuggestionEntryId != null) {
-      const resolvedDate = isoDateWithOffset(asOf, document.dayOffset + 1);
-      const entry = document.entries.find((item) => item.id === document.dateSuggestionEntryId);
-      suggestion = {
-        schemaVersion: 1,
-        id: document.dateSuggestionId,
-        referenceDate: documentDate,
-        sourceDocumentDate: documentDate,
-        items: [
-          {
-            ledgerEntryId: entry.id,
-            dateHint: { kind: "relative", value: "tomorrow", sourceText: "tomorrow" },
-            resolvedDate,
-            sourceText: "tomorrow",
-            snapshot: { itemName: entry.itemName, amount: entry.amount, currency: entry.currency },
-          },
-        ],
-      };
-    }
-    await client.query(
-      `INSERT INTO source_documents
-        (id, ledger_id, book_id, title, input_text, document_date, version,
-         date_organization_suggestion, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $8)`,
-      [
-        document.id,
-        ledgerId,
-        bookIds.get(document.book),
-        document.title,
-        document.inputText,
-        documentDate,
-        suggestion,
-        createdAt,
-      ]
-    );
-    if (document.retainedResult != null) {
-      await client.query(
-        `INSERT INTO source_document_revisions
-          (id, ledger_id, source_document_id, title, input_document_date,
-           input_date_reference, processing_status, submitted_at, finished_at, created_at)
-         VALUES ($1, $2, $3, $4, $5::text, $5::date, 'completed', $6, $6, $6)`,
-        [
-          document.retainedResult.revisionId,
-          ledgerId,
-          document.id,
-          document.retainedResult.title,
-          documentDate,
-          createdAt,
-        ]
-      );
-    }
-    await client.query(
-      `INSERT INTO source_document_revisions
-        (id, ledger_id, source_document_id, title, input_document_date,
-         input_date_reference, processing_status, failure_kind, failure_code, failure_message,
-         submitted_at, finished_at, created_at)
-       VALUES ($1, $2, $3, $4, $5::text, $5::date, $6, $7, $8, $9, $10, $10, $10)`,
-      [
-        document.revisionId,
-        ledgerId,
-        document.id,
-        document.title,
-        documentDate,
-        document.status,
-        document.failureKind ?? null,
-        document.failureCode ?? null,
-        document.failureMessage ?? null,
-        createdAt,
-      ]
-    );
-    if (document.image != null) {
-      const image = imagesByFileId.get(document.image.fileId);
-      await client.query(
-        `INSERT INTO stored_files
-          (id, ledger_id, storage_key, content_type, byte_size, original_filename, checksum,
-           created_at, finalized_at)
-         VALUES ($1, $2, $3, 'image/jpeg', $4, $5, $6, $7, $7)`,
-        [
-          image.fileId,
-          ledgerId,
-          image.key,
-          image.bytes.length,
-          image.filename,
-          crypto.createHash("sha256").update(image.bytes).digest("hex"),
-          createdAt,
-        ]
-      );
-      await client.query(
-        `INSERT INTO source_document_files
-          (ledger_id, source_document_id, stored_file_id, position, created_at)
-         VALUES ($1, $2, $3, 0, $4)`,
-        [ledgerId, document.id, image.fileId, createdAt]
-      );
-    }
-    for (const [position, entry] of activeEntries(document).entries()) {
-      const categoryId = entry.category == null ? null : (categoryIds.get(entry.category) ?? null);
-      if (entry.category != null && categoryId == null) {
-        throw new Error(`Unknown demo category: ${entry.category}`);
-      }
-      await client.query(
-        `INSERT INTO ledger_entries
-          (id, ledger_id, category_id, source_document_id,
-           position, amount, currency, item_name, description, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
-        [
-          entry.id,
-          ledgerId,
+    const image = document.image == null ? undefined : imagesByFileId.get(document.image.fileId);
+    const revisions: SeedRevision[] = [
+      ...(document.retainedResult == null
+        ? []
+        : [
+            {
+              id: document.retainedResult.revisionId,
+              title: document.retainedResult.title,
+              inputDocumentDate: documentDate,
+              processingStatus: "completed" as const,
+            },
+          ]),
+      {
+        id: document.revisionId,
+        title: document.title,
+        inputDocumentDate: documentDate,
+        processingStatus: document.status,
+        failureKind: document.failureKind ?? null,
+        failureCode: document.failureCode ?? null,
+        failureMessage: document.failureMessage ?? null,
+        finishedAt: createdAt,
+      },
+    ];
+    const entries = activeEntries(document);
+    await seedSourceDocument(db, {
+      id: document.id,
+      ledgerId,
+      bookId: requireBookId(bookIds, document.book),
+      title: document.title,
+      inputText: document.inputText,
+      documentDate,
+      dateOrganizationSuggestion: dateSuggestion(document, documentDate, asOf),
+      revisions,
+      files:
+        image == null
+          ? []
+          : [
+              {
+                id: image.fileId,
+                contentType: "image/jpeg",
+                byteSize: image.bytes.length,
+                originalFilename: image.filename,
+                checksum: crypto.createHash("sha256").update(image.bytes).digest("hex"),
+              },
+            ],
+      entries: entries.map((entry) => {
+        const categoryId =
+          entry.category == null ? null : (categoryIds.get(entry.category) ?? null);
+        if (entry.category != null && categoryId == null) {
+          throw new Error(`Unknown demo category: ${entry.category}`);
+        }
+        return {
+          id: entry.id,
           categoryId,
-          document.id,
-          position,
-          entry.amount,
-          entry.currency,
-          entry.itemName,
-          entry.description ?? null,
-          createdAt,
-        ]
-      );
-    }
-    await seedExchangeRates(client, fixture, documentDate, activeEntries(document), now);
-    await client.query(
-      `UPDATE source_documents SET latest_submission_revision_id = $1 WHERE id = $2`,
-      [document.revisionId, document.id]
-    );
+          itemName: entry.itemName,
+          amount: entry.amount,
+          currency: entry.currency,
+          description: entry.description ?? null,
+        };
+      }),
+      at: createdAt,
+    });
+    await seedDemoExchangeRates(db, documentDate, entries, now);
   }
 }
 
@@ -459,78 +473,89 @@ async function insertFixture(client, environment, { userId, ledgerId, uploadedIm
  * shows converted totals without reaching the rate provider. The rows are
  * final, so maintenance never replaces them.
  */
-async function seedExchangeRates(client, fixture, rateDate, entries, now) {
+async function seedDemoExchangeRates(
+  db: SeedDatabase,
+  rateDate: string,
+  entries: readonly FixtureEntry[],
+  now: Date
+): Promise<void> {
   const mainCurrency = fixture.ledger.mainCurrency;
   const foreign = [...new Set(entries.map((entry) => entry.currency))].filter(
     (currency) => currency !== mainCurrency
   );
   if (foreign.length === 0) return;
   const mainPerEur = mainCurrency === "EUR" ? "1" : DEMO_MAIN_CURRENCY_PER_EUR;
-  // Each row is [currency, dividend, divisor]: a foreign currency's rate is
-  // how many main-currency units one unit buys, so it buys main/rate per euro.
-  const rows = [
-    ["EUR", "1", "1"],
-    [mainCurrency, mainPerEur, "1"],
-    ...foreign.map((currency) => {
-      const rate = fixture.exchangeRates?.[currency];
-      if (rate == null) throw new Error(`Demo fixture has no exchange rate for ${currency}`);
-      return [currency, mainPerEur, rate];
-    }),
-  ];
-  for (const [currency, dividend, divisor] of rows) {
-    await client.query(
-      `INSERT INTO exchange_rates (rate_date, currency, per_eur, source_date, fetched_at)
-       VALUES ($1, $2, $3::numeric / $4::numeric, $1, $5)
-       ON CONFLICT (rate_date, currency) DO NOTHING`,
-      [rateDate, currency, dividend, divisor, now]
-    );
-  }
+  // A foreign currency's rate is how many main-currency units one unit buys,
+  // so it buys main/rate per euro.
+  await seedExchangeRates(
+    db,
+    rateDate,
+    [
+      { currency: "EUR", dividend: "1", divisor: "1" },
+      { currency: mainCurrency, dividend: mainPerEur, divisor: "1" },
+      ...foreign.map((currency) => {
+        const rate = fixture.exchangeRates?.[currency];
+        if (rate == null) throw new Error(`Demo fixture has no exchange rate for ${currency}`);
+        return { currency, dividend: mainPerEur, divisor: rate };
+      }),
+    ],
+    now
+  );
 }
 
-function quoteIdentifier(value) {
+function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
-async function schemaExists(client, schema) {
-  /**
-   * What one schema of a demo database holds. `rows` maps a counted table to its
-   * row count, or to null when the schema exists but that table does not.
-   *
-   * @typedef {{ exists: boolean, tables: string[], rows: Record<string, number | null> }} DemoResetSchema
-   */
+/**
+ * What one schema of a demo database holds. `rows` maps a counted table to its
+ * row count, or to null when the schema exists but that table does not.
+ */
+interface DemoResetSchema {
+  exists: boolean;
+  tables: string[];
+  rows: Record<string, number | null>;
+}
 
-  /**
-   * Just enough of a database client to describe a schema: the preview never
-   * opens a pool, and a test can record every statement by standing in with this
-   * shape.
-   *
-   * @typedef {{ query: (sql: string, values?: unknown[]) => Promise<{ rows: any[] }> }} DemoResetClient
-   */
+/**
+ * Just enough of a database client to describe a schema: the preview never
+ * opens a pool, and a test can record every statement by standing in with this
+ * shape.
+ */
+interface DemoResetClient {
+  query(sql: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
+}
 
-  const result = await client.query("SELECT 1 FROM pg_namespace WHERE nspname = $1", [schema]);
+/** One column of a catalog row the preview reads. */
+function column(row: unknown, name: string): unknown {
+  return typeof row === "object" && row !== null
+    ? (row as Record<string, unknown>)[name]
+    : undefined;
+}
+
+async function schemaExists(client: DemoResetClient, schemaName: string): Promise<boolean> {
+  const result = await client.query("SELECT 1 FROM pg_namespace WHERE nspname = $1", [schemaName]);
   return result.rows.length > 0;
 }
 
-async function listSchemaTables(client, schema) {
+async function listSchemaTables(client: DemoResetClient, schemaName: string): Promise<string[]> {
   const result = await client.query(
     `SELECT c.relname AS name
        FROM pg_class c
        JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')
       ORDER BY c.relname`,
-    [schema]
+    [schemaName]
   );
-  return result.rows.map((row) => row.name);
+  return result.rows.map((row) => String(column(row, "name")));
 }
 
-/**
- * @param {DemoResetClient} client
- * @param {string} schema
- * @param {readonly string[] | null} countedTables
- * @returns {Promise<DemoResetSchema>}
- */
-async function describeSchema(client, schema, countedTables) {
-  if (!(await schemaExists(client, schema))) {
+async function describeSchema(
+  client: DemoResetClient,
+  schemaName: string,
+  countedTables: readonly string[] | null
+): Promise<DemoResetSchema> {
+  if (!(await schemaExists(client, schemaName))) {
     // A preview of a database that is not there yet is still a preview: the
     // targets are named, and every one of them is absent rather than zero.
     return {
@@ -539,21 +564,21 @@ async function describeSchema(client, schema, countedTables) {
       rows: Object.fromEntries((countedTables ?? []).map((table) => [table, null])),
     };
   }
-  const tables = await listSchemaTables(client, schema);
+  const tables = await listSchemaTables(client, schemaName);
   const existing = new Set(tables);
   // The data tables are asked about by name, so an un-migrated database reports
   // them as absent; the bookkeeping schema is whatever Drizzle created there.
   const targets = countedTables ?? tables;
-  const rows = {};
+  const rows: Record<string, number | null> = {};
   for (const table of targets) {
     if (!existing.has(table)) {
       rows[table] = null;
       continue;
     }
     const counted = await client.query(
-      `SELECT count(*)::int AS count FROM ${quoteIdentifier(schema)}.${quoteIdentifier(table)}`
+      `SELECT count(*)::int AS count FROM ${quoteIdentifier(schemaName)}.${quoteIdentifier(table)}`
     );
-    rows[table] = counted.rows[0].count;
+    rows[table] = (column(counted.rows[0], "count") ?? null) as number | null;
   }
   return { exists: true, tables, rows };
 }
@@ -568,10 +593,11 @@ async function describeSchema(client, schema, countedTables) {
  * preview into a rebuild.
  *
  * Reports the demo reset targets from a live connection, read-only.
- * @param {DemoResetClient} client
- * @param {{ dataSchema?: string, migrationsSchema?: string }} [options]
  */
-export async function inspectDemoResetTargets(client, options = {}) {
+export async function inspectDemoResetTargets(
+  client: DemoResetClient,
+  options: { dataSchema?: string; migrationsSchema?: string } = {}
+): Promise<{ schemas: Record<string, DemoResetSchema> }> {
   const dataSchema = options.dataSchema ?? DEMO_RESET_SCHEMAS.data;
   const migrationsSchema = options.migrationsSchema ?? DEMO_RESET_SCHEMAS.migrations;
   await client.query("BEGIN READ ONLY");
@@ -596,9 +622,8 @@ export async function inspectDemoResetTargets(client, options = {}) {
  * object storage client is built, so no object can be written or deleted.
  *
  * Prints the reset preview; refuses every non-demo target.
- * @param {NodeJS.ProcessEnv} [environment]
  */
-export async function previewDemoReset(environment = process.env) {
+export async function previewDemoReset(environment: Environment = process.env) {
   const { databaseUrl } = validateDemoEnvironment(environment);
   const target = new URL(databaseUrl);
   const client = new pg.Client({ connectionString: databaseUrl });
@@ -619,7 +644,11 @@ export async function previewDemoReset(environment = process.env) {
   }
 }
 
-async function runDemoData({ mode = "seed", apply = false, environment = process.env } = {}) {
+async function runDemoData({
+  mode = "seed",
+  apply = false,
+  environment = process.env,
+}: { mode?: "seed" | "reset"; apply?: boolean; environment?: Environment } = {}) {
   const { databaseUrl } = validateDemoEnvironment(environment);
   if (
     !environment.S3_BUCKET ||
@@ -656,7 +685,7 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
       console.log("[demo] Demo workspace already exists; existing test changes were preserved.");
       return { status: "existing", ...inspection };
     }
-    if (mode === "seed" && present.rowCount > 0) {
+    if (mode === "seed" && (present.rowCount ?? 0) > 0) {
       throw new Error("Demo workspace is partial; run npm run demo:reset -- --apply");
     }
 
@@ -667,17 +696,12 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
         ? fixture.ledger.id
         : inspection.target.ledger_id;
     const uploadedImages = await uploadFixtureImages(storage, environment, ledgerId);
-    await client.query("BEGIN");
-    try {
-      await client.query("SELECT pg_advisory_xact_lock($1)", [1_536_335_661]);
-      await insertFixture(client, environment, { userId, ledgerId, uploadedImages, reset });
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    }
+    await drizzle(client, { schema }).transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${1_536_335_661})`);
+      await insertFixture(tx, environment, { userId, ledgerId, uploadedImages, reset });
+    });
 
-    const fixtureKeys = new Set(uploadedImages.map((image) => image.key));
+    const fixtureKeys = new Set(uploadedImages.map((image) => durableKey(ledgerId, image.fileId)));
     const staleKeys = inspection.keys.filter((key) => !fixtureKeys.has(key));
     if (reset && staleKeys.length > 0) {
       try {
@@ -713,7 +737,7 @@ async function runDemoData({ mode = "seed", apply = false, environment = process
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   const args = new Set(process.argv.slice(2));
   // Checked before anything else: `preview-reset` has to answer without the
   // schema drop, the migrations or the seed that follow it ever running.
@@ -731,7 +755,7 @@ async function main() {
 }
 
 if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  main().catch((error: unknown) => {
     console.error(`[demo] ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   });

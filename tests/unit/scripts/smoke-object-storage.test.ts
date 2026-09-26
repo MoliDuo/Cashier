@@ -6,7 +6,7 @@ import {
   etagOf,
   splitPath,
   xmlEscape,
-} from "../../../scripts/smoke-object-storage.mjs";
+} from "../../../scripts/smoke-object-storage";
 
 /**
  * The smoke run uploads through the real S3 client against this endpoint, so

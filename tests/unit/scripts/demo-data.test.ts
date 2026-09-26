@@ -1,12 +1,10 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  computeCredentialHash,
   fixtureCredentialToken,
   previewDemoReset,
   validateDemoEnvironment,
-} from "../../../scripts/demo-data.mjs";
-import { computeHash } from "@/lib/security/service-credential-token";
+} from "../../../scripts/demo-data";
 
 /**
  * The preview is judged by what it refuses to do, so every statement the
@@ -255,21 +253,6 @@ describe("demo workspace fixture", () => {
     const fixtures = JSON.stringify(fixture);
 
     expect(fixtures).not.toMatch(/sk_live_[0-9a-zA-Z]{24,}/);
-  });
-
-  /**
-   * The script cannot import src/lib/security/service-credential-token.ts, so
-   * this is what keeps its copy of the rule from drifting away from the app's.
-   */
-  it("hashes fixture tokens exactly like the app does", () => {
-    const secret = process.env.AUTH_SECRET ?? "";
-    const credentials = fixture.serviceCredentials as Array<{ tokenBody: string }>;
-
-    expect(secret).not.toBe("");
-    for (const credential of credentials) {
-      const token = fixtureCredentialToken(credential);
-      expect(computeCredentialHash(token, secret)).toBe(computeHash(token));
-    }
   });
 });
 

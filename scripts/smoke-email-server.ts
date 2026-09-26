@@ -17,16 +17,47 @@
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 
+/** The part of a Resend send request the outbox reads. */
+export interface SmokeEmail {
+  to?: unknown;
+  subject?: string;
+  html?: unknown;
+}
+
+interface StoredEmail {
+  id: string;
+  to: string[];
+  subject: string | undefined;
+  html: string;
+}
+
+/** The newest message to an address, as `GET /outbox` answers it. */
+export interface OutboxMessage {
+  subject: string | undefined;
+  code: string | null;
+}
+
+export interface SmokeOutbox {
+  add(email: SmokeEmail & { html: string }): string;
+  latestTo(address: string): OutboxMessage | null;
+}
+
+/** What `POST /emails` answers: a status and Resend's JSON body. */
+export interface EmailResponse {
+  status: number;
+  body: { id: string } | { name: string; message: string };
+}
+
 /** The code in an OTP email: the one text node that is exactly six digits. */
-export function codeFromHtml(html) {
+export function codeFromHtml(html: string): string | null {
   return />\s*(\d{6})\s*</.exec(html)?.[1] ?? null;
 }
 
-export function createSmokeOutbox() {
-  const messages = [];
+export function createSmokeOutbox(): SmokeOutbox {
+  const messages: StoredEmail[] = [];
   return {
     add({ to, subject, html }) {
-      const recipients = (Array.isArray(to) ? to : [to]).map((address) =>
+      const recipients = (Array.isArray(to) ? to : [to]).map((address: unknown) =>
         String(address).toLowerCase()
       );
       const id = randomUUID();
@@ -43,19 +74,21 @@ export function createSmokeOutbox() {
 }
 
 /** What `POST /emails` answers for one request body: Resend's `{ id }`, or its error shape. */
-export function acceptEmail(outbox, email) {
+export function acceptEmail(outbox: SmokeOutbox, email: SmokeEmail | null): EmailResponse {
   if (email?.to == null || typeof email.html !== "string") {
     return { status: 422, body: { name: "validation_error", message: "to and html are required" } };
   }
-  return { status: 200, body: { id: outbox.add(email) } };
+  return { status: 200, body: { id: outbox.add({ ...email, html: email.html }) } };
 }
 
 /**
  * A running, empty outbox. Listen on the returned server and point
  * `RESEND_BASE_URL` at `http://127.0.0.1:<port>`.
  */
-export function createSmokeEmailServer({ outbox = createSmokeOutbox() } = {}) {
-  const sendJson = (response, status, body) => {
+export function createSmokeEmailServer({
+  outbox = createSmokeOutbox(),
+}: { outbox?: SmokeOutbox } = {}): http.Server {
+  const sendJson = (response: http.ServerResponse, status: number, body: object) => {
     const payload = Buffer.from(JSON.stringify(body), "utf8");
     response.writeHead(status, {
       "content-type": "application/json",
@@ -68,11 +101,11 @@ export function createSmokeEmailServer({ outbox = createSmokeOutbox() } = {}) {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     try {
       if (request.method === "POST" && url.pathname === "/emails") {
-        const chunks = [];
+        const chunks: Buffer[] = [];
         for await (const chunk of request) chunks.push(chunk);
         const { status, body } = acceptEmail(
           outbox,
-          JSON.parse(Buffer.concat(chunks).toString("utf8"))
+          JSON.parse(Buffer.concat(chunks).toString("utf8")) as SmokeEmail | null
         );
         sendJson(response, status, body);
         return;

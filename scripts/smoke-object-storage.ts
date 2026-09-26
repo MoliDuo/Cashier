@@ -23,7 +23,44 @@ import http from "node:http";
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8"?>';
 
-export function xmlEscape(value) {
+export interface StoredObject {
+  body: Buffer;
+  contentType: string;
+  metadata: Record<string, string>;
+  lastModified: Date;
+}
+
+export interface PutObjectInput {
+  body: Buffer;
+  contentType?: string;
+  metadata?: Record<string, string>;
+}
+
+type ListEntry = [key: string, object: StoredObject];
+
+/** One page of a listing. */
+export interface ListPage {
+  entries: ListEntry[];
+  keyCount: number;
+  isTruncated: boolean;
+}
+
+export interface SmokeObjectStore {
+  put(key: string, input: PutObjectInput): StoredObject;
+  get(key: string): StoredObject | null;
+  copy(sourceKey: string, destinationKey: string): StoredObject | null;
+  delete(key: string): boolean;
+  list(prefix?: string, maxKeys?: number): ListPage;
+  size(): number;
+}
+
+export interface ListXmlInput extends ListPage {
+  prefix: string;
+  maxKeys: number;
+  encodingType: string | null;
+}
+
+export function xmlEscape(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -32,12 +69,12 @@ export function xmlEscape(value) {
 }
 
 /** The ETag S3 reports for an object: its MD5, quoted. */
-export function etagOf(body) {
+export function etagOf(body: Buffer): string {
   return `"${createHash("md5").update(body).digest("hex")}"`;
 }
 
 /** Splits a path-style request target into its bucket and key. */
-export function splitPath(pathname) {
+export function splitPath(pathname: string): { bucket: string; key: string } {
   const segments = pathname.replace(/^\/+/, "").split("/");
   const bucket = decodeURIComponent(segments[0] ?? "");
   const key = segments.slice(1).map(decodeURIComponent).join("/");
@@ -45,8 +82,8 @@ export function splitPath(pathname) {
 }
 
 /** The user metadata a request carries, in the `x-amz-meta-` namespace S3 uses. */
-export function collectMetadata(headers) {
-  const metadata = {};
+export function collectMetadata(headers: http.IncomingHttpHeaders): Record<string, string> {
+  const metadata: Record<string, string> = {};
   for (const [header, value] of Object.entries(headers)) {
     if (header.startsWith("x-amz-meta-") && typeof value === "string") {
       metadata[header.slice("x-amz-meta-".length)] = value;
@@ -55,7 +92,7 @@ export function collectMetadata(headers) {
   return metadata;
 }
 
-function byKey([left], [right]) {
+function byKey([left]: ListEntry, [right]: ListEntry): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
@@ -63,8 +100,8 @@ function byKey([left], [right]) {
  * The objects, with the behavior the client depends on: what a put stores, what
  * a copy copies, and how a listing pages. No HTTP, no XML.
  */
-export function createSmokeObjectStore() {
-  const objects = new Map();
+export function createSmokeObjectStore(): SmokeObjectStore {
+  const objects = new Map<string, StoredObject>();
 
   return {
     put(key, { body, contentType = "application/octet-stream", metadata = {} }) {
@@ -100,8 +137,15 @@ export function createSmokeObjectStore() {
 }
 
 /** The ListObjectsV2 envelope the AWS SDK parses. */
-export function buildListXml({ prefix, maxKeys, encodingType, entries, keyCount, isTruncated }) {
-  const encode = (value) => (encodingType === "url" ? encodeURIComponent(value) : value);
+export function buildListXml({
+  prefix,
+  maxKeys,
+  encodingType,
+  entries,
+  keyCount,
+  isTruncated,
+}: ListXmlInput): string {
+  const encode = (value: string) => (encodingType === "url" ? encodeURIComponent(value) : value);
   const contents = entries
     .map(
       ([key, object]) =>
@@ -128,8 +172,8 @@ export function buildListXml({ prefix, maxKeys, encodingType, entries, keyCount,
 export function createSmokeObjectStorage({
   log = () => {},
   store = createSmokeObjectStore(),
-} = {}) {
-  const sendXml = (response, status, body) => {
+}: { log?: (line: string) => void; store?: SmokeObjectStore } = {}): http.Server {
+  const sendXml = (response: http.ServerResponse, status: number, body: string) => {
     const payload = Buffer.from(`${XML_HEADER}\n${body}`, "utf8");
     response.writeHead(status, {
       "content-type": "application/xml",
@@ -137,20 +181,30 @@ export function createSmokeObjectStorage({
     });
     response.end(payload);
   };
-  const sendError = (response, status, code, message) => {
+  const sendError = (
+    response: http.ServerResponse,
+    status: number,
+    code: string,
+    message: string
+  ) => {
     sendXml(
       response,
       status,
       `<Error><Code>${xmlEscape(code)}</Code><Message>${xmlEscape(message)}</Message></Error>`
     );
   };
-  const readBody = async (request) => {
-    const chunks = [];
+  const readBody = async (request: http.IncomingMessage): Promise<Buffer> => {
+    const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(chunk);
     return Buffer.concat(chunks);
   };
 
-  const handlePut = (response, request, key, body) => {
+  const handlePut = (
+    response: http.ServerResponse,
+    request: http.IncomingMessage,
+    key: string,
+    body: Buffer
+  ) => {
     // A PUT against the bucket itself stands in for bucket creation.
     if (key === "") {
       response.writeHead(200);
@@ -185,7 +239,12 @@ export function createSmokeObjectStorage({
     response.end();
   };
 
-  const handleRead = (response, request, key, { headOnly }) => {
+  const handleRead = (
+    response: http.ServerResponse,
+    request: http.IncomingMessage,
+    key: string,
+    { headOnly }: { headOnly: boolean }
+  ) => {
     if (key === "") {
       response.writeHead(200);
       response.end();
@@ -202,7 +261,7 @@ export function createSmokeObjectStorage({
       sendError(response, 404, "NoSuchKey", "The specified key does not exist.");
       return;
     }
-    const headers = {
+    const headers: Record<string, string> = {
       "content-type": object.contentType,
       "content-length": String(object.body.length),
       etag: etagOf(object.body),
@@ -256,8 +315,9 @@ export function createSmokeObjectStorage({
             sendError(response, 501, "NotImplemented", `${request.method} is not supported.`);
         }
       })
-      .catch((error) => {
-        log(`[smoke-storage] ${request.method} ${request.url} failed: ${error.message}`);
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`[smoke-storage] ${request.method} ${request.url} failed: ${message}`);
         if (!response.writableEnded) {
           sendError(response, 500, "InternalError", "The smoke object store failed.");
         }

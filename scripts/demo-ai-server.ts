@@ -13,6 +13,78 @@
 
 import http from "node:http";
 
+/** One expense line, in the shape the app's parser schema accepts. */
+interface LedgerEntry {
+  receipt_index: number;
+  item_name: string;
+  /** A quoted decimal; a JSON number only where a scenario means to break the schema. */
+  amount: string | number;
+  currency: string;
+  category_index: number;
+  notes: string | null;
+  date_hint: string | null;
+}
+
+/** The parse body the app's parser schema reads. */
+interface ParseBody {
+  outcome: "success" | "invalid";
+  invalid_reason: string | null;
+  title: string;
+  receipt_count: number;
+  receipt_totals: unknown[];
+  ledger_entries: LedgerEntry[];
+  order_adjustments: unknown[];
+  reasoning: string;
+}
+
+/** The body of an OpenAI-shaped failure. */
+interface ProviderError {
+  message: string;
+  type: string;
+}
+
+/** What one scenario answers: a parse body, or an HTTP failure to answer with. */
+type ScenarioAnswer = { delayMs?: number } & (
+  { body: ParseBody } | { status: number; error: ProviderError }
+);
+
+type Scenario = (options: { slowMs: number }) => ScenarioAnswer;
+
+/** What the stub answers a given prompt. */
+export interface DemoAnswer {
+  scenario: ScenarioName;
+  requested: string | null;
+  delayMs: number;
+  status?: number;
+  error?: ProviderError;
+  body?: ParseBody;
+}
+
+export interface DemoAiOptions {
+  slowMs?: number;
+  latencyMs?: number;
+  log?: (line: string) => void;
+}
+
+interface ChatContentPart {
+  type?: string;
+  text?: unknown;
+}
+
+interface ChatMessage {
+  content?: string | ChatContentPart[] | null;
+}
+
+/** The part of a chat-completion request the stub reads. */
+interface ChatCompletionRequest {
+  model?: string;
+  messages?: ChatMessage[];
+}
+
+interface CategoryAssignment {
+  decisions: { entry_index: number; category_index: number }[];
+}
+
 const DEFAULT_LATENCY_MS = 1500;
 const DEFAULT_SLOW_MS = 5 * 60 * 1000;
 const DEFAULT_SCENARIO = "success";
@@ -21,7 +93,12 @@ const DEFAULT_SCENARIO = "success";
 const SCENARIO_TOKEN = /demo:([a-z0-9-]+)/i;
 
 /** One expense line, in the shape the app's parser schema accepts. */
-function entry(itemName, amount, currency, notes = null) {
+function entry(
+  itemName: string,
+  amount: string,
+  currency: string,
+  notes: string | null = null
+): LedgerEntry {
   return {
     receipt_index: 0,
     item_name: itemName,
@@ -34,7 +111,15 @@ function entry(itemName, amount, currency, notes = null) {
 }
 
 /** A parse the app's own schema accepts, with one receipt and no adjustments. */
-function parsedBody({ title, entries, reasoning }) {
+function parsedBody({
+  title,
+  entries,
+  reasoning,
+}: {
+  title: string;
+  entries: LedgerEntry[];
+  reasoning: string;
+}): ParseBody {
   return {
     outcome: "success",
     invalid_reason: null,
@@ -128,20 +213,26 @@ const SCENARIOS = {
     status: 503,
     error: { message: "Demo AI provider outage", type: "server_error" },
   }),
-};
+} satisfies Record<string, Scenario>;
+
+type ScenarioName = keyof typeof SCENARIOS;
+
+function isScenarioName(name: string): name is ScenarioName {
+  return Object.hasOwn(SCENARIOS, name);
+}
 
 export const DEMO_AI_SCENARIOS = Object.keys(SCENARIOS);
 
 /** The scenario name a prompt asks for, or null when it asks for none. */
-export function readScenarioToken(prompt) {
+export function readScenarioToken(prompt: string): string | null {
   const match = SCENARIO_TOKEN.exec(prompt);
-  return match == null ? null : match[1].toLowerCase();
+  return match?.[1]?.toLowerCase() ?? null;
 }
 
 /** The scenario a prompt resolves to: its own request, or the default. */
-export function selectScenario(prompt) {
+export function selectScenario(prompt: string): ScenarioName {
   const requested = readScenarioToken(prompt);
-  return requested != null && Object.hasOwn(SCENARIOS, requested) ? requested : DEFAULT_SCENARIO;
+  return requested != null && isScenarioName(requested) ? requested : DEFAULT_SCENARIO;
 }
 
 /**
@@ -149,23 +240,31 @@ export function selectScenario(prompt) {
  * the scenarios can be checked against the application's own parser schema.
  */
 export function answerFor(
-  prompt,
-  { slowMs = DEFAULT_SLOW_MS, latencyMs = DEFAULT_LATENCY_MS } = {}
-) {
+  prompt: string,
+  {
+    slowMs = DEFAULT_SLOW_MS,
+    latencyMs = DEFAULT_LATENCY_MS,
+  }: Pick<DemoAiOptions, "slowMs" | "latencyMs"> = {}
+): DemoAnswer {
   const requested = readScenarioToken(prompt);
   const scenario = selectScenario(prompt);
-  const answer = SCENARIOS[scenario]({ slowMs });
+  const run: Scenario = SCENARIOS[scenario];
+  const answer = run({ slowMs });
   return {
     scenario,
     requested,
     delayMs: answer.delayMs ?? latencyMs,
-    ...(answer.status == null ? {} : { status: answer.status, error: answer.error }),
-    ...(answer.body == null ? {} : { body: answer.body }),
+    ...("status" in answer
+      ? { status: answer.status, error: answer.error }
+      : { body: answer.body }),
   };
 }
 
 /** The chat-completion envelope the app's OpenAI client reads. */
-export function chatCompletionEnvelope(payload, content) {
+export function chatCompletionEnvelope(
+  payload: Pick<ChatCompletionRequest, "model">,
+  content: string
+) {
   return {
     id: "chatcmpl-demo",
     object: "chat.completion",
@@ -181,29 +280,29 @@ export function chatCompletionEnvelope(payload, content) {
   };
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readBody(request) {
-  const chunks = [];
+async function readBody(request: http.IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
   for await (const chunk of request) chunks.push(chunk);
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function promptOf(payload) {
+function promptOf(payload: ChatCompletionRequest): string {
   return (payload.messages ?? [])
     .flatMap((message) =>
       typeof message.content === "string"
         ? [message.content]
-        : (message.content ?? [])
-            .filter((part) => part.type === "text" && typeof part.text === "string")
-            .map((part) => part.text)
+        : (message.content ?? []).flatMap((part) =>
+            part.type === "text" && typeof part.text === "string" ? [part.text] : []
+          )
     )
     .join("\n");
 }
 
-function categoryAssignmentBody(prompt, scenario) {
+function categoryAssignmentBody(prompt: string, scenario: ScenarioName): CategoryAssignment | null {
   if (!prompt.includes("You are an expense categorizer")) return null;
   if (scenario === "schema-invalid") {
     return { decisions: [{ entry_index: 1, category_index: 0 }] };
@@ -218,7 +317,11 @@ function categoryAssignmentBody(prompt, scenario) {
   };
 }
 
-async function respond(request, response, options) {
+async function respond(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+  options: Required<DemoAiOptions>
+): Promise<void> {
   if (request.method !== "POST" || request.url?.endsWith("/chat/completions") !== true) {
     response.writeHead(404, { "content-type": "application/json" });
     response.end(
@@ -227,7 +330,7 @@ async function respond(request, response, options) {
     return;
   }
 
-  const payload = JSON.parse((await readBody(request)) || "{}");
+  const payload = JSON.parse((await readBody(request)) || "{}") as ChatCompletionRequest;
   const prompt = promptOf(payload);
   const answer = answerFor(prompt, options);
   const assignmentBody = categoryAssignmentBody(prompt, answer.scenario);
@@ -258,9 +361,9 @@ export function createDemoAiServer({
   slowMs = DEFAULT_SLOW_MS,
   latencyMs = DEFAULT_LATENCY_MS,
   log = () => {},
-} = {}) {
+}: DemoAiOptions = {}): http.Server {
   return http.createServer((request, response) => {
-    respond(request, response, { slowMs, latencyMs, log }).catch((error) => {
+    respond(request, response, { slowMs, latencyMs, log }).catch((error: unknown) => {
       log(`[demo-ai] request failed: ${error instanceof Error ? error.message : String(error)}`);
       if (!response.writableEnded) {
         response.writeHead(500, { "content-type": "application/json" });

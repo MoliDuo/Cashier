@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { fixtureCredentialToken } from "../../../scripts/demo-data.mjs";
+import { fixtureCredentialToken } from "../../../scripts/demo-data";
 import {
   createDemoComposeArgs,
   createDemoDataArgs,
@@ -8,7 +8,10 @@ import {
   createDemoPreviewComposeArgs,
   formatDemoCredentialLines,
   runDemoCommands,
-} from "../../../scripts/run-demo.mjs";
+} from "../../../scripts/run-demo";
+
+/** How a repository script runs: through tsx, under the react-server condition. */
+const TSX = ["--conditions=react-server", "--import", "tsx"];
 
 const fixture = JSON.parse(
   readFileSync(new URL("../../../scripts/fixtures/demo-workspace.json", import.meta.url), "utf8")
@@ -44,10 +47,11 @@ describe("demo runtime environment", () => {
   });
 
   it("rebuilds fixture data on each demo launch but keeps reset preview-only by default", () => {
-    expect(createDemoDataArgs()).toEqual(["scripts/demo-data.mjs", "reset", "--apply"]);
-    expect(createDemoDataArgs({ reset: true })).toEqual(["scripts/demo-data.mjs", "reset"]);
+    expect(createDemoDataArgs()).toEqual([...TSX, "scripts/demo-data.ts", "reset", "--apply"]);
+    expect(createDemoDataArgs({ reset: true })).toEqual([...TSX, "scripts/demo-data.ts", "reset"]);
     expect(createDemoDataArgs({ reset: true, apply: true })).toEqual([
-      "scripts/demo-data.mjs",
+      ...TSX,
+      "scripts/demo-data.ts",
       "reset",
       "--apply",
     ]);
@@ -112,7 +116,7 @@ describe("demo runtime environment", () => {
 
     for (const credential of credentials) {
       const token = fixtureCredentialToken(credential);
-      const line = credentialLines.find((candidate) => candidate.includes(token));
+      const line = credentialLines.find((candidate: string) => candidate.includes(token));
       expect(line, credential.name).toContain(credential.name);
       expect(line).toContain(credential.book);
     }
@@ -156,7 +160,7 @@ describe("demo command sequencing", () => {
           "postgres",
         ],
       },
-      { command: process.execPath, args: ["scripts/demo-data.mjs", "preview-reset"] },
+      { command: process.execPath, args: [...TSX, "scripts/demo-data.ts", "preview-reset"] },
     ]);
     const sequence = flat(calls);
     expect(sequence).not.toContain("reset-schema");
@@ -190,9 +194,9 @@ describe("demo command sequencing", () => {
         "minio",
         "storage-bootstrap",
       ],
-      [process.execPath, "scripts/demo-data.mjs", "reset-schema"],
-      [process.execPath, "scripts/migrate-database.mjs"],
-      [process.execPath, "scripts/demo-data.mjs", "reset", "--apply"],
+      [process.execPath, ...TSX, "scripts/demo-data.ts", "reset-schema"],
+      [process.execPath, ...TSX, "scripts/migrate-database.ts"],
+      [process.execPath, ...TSX, "scripts/demo-data.ts", "reset", "--apply"],
     ]);
   });
 
@@ -202,7 +206,7 @@ describe("demo command sequencing", () => {
     const result = await runDemoCommands({ args: [], environment: {}, execute });
 
     expect(result.mode).toBe("seed");
-    expect(flat(calls)).toContain("scripts/demo-data.mjs reset --apply");
+    expect(flat(calls)).toContain("scripts/demo-data.ts reset --apply");
   });
 
   it("reuses the isolated demo environment rather than the caller's", async () => {

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
@@ -7,6 +6,40 @@ import { z } from "zod";
 const DATABASE_NAME = "cashier_test";
 const IMAGE = "postgres:18-alpine";
 const STARTUP_TIMEOUT_MS = 120_000;
+
+/** The slice of a `pg.Pool` this module uses, so tests can stand in for it. */
+interface QueryPool {
+  query<Row extends pg.QueryResultRow>(
+    sql: string,
+    values?: unknown[]
+  ): Promise<pg.QueryResult<Row>>;
+  end(): Promise<void>;
+}
+
+type PoolConstructor = new (config: pg.PoolConfig) => QueryPool;
+
+interface ContainerOptions {
+  image: string;
+  database: string;
+  username: string;
+  password: string;
+  startupTimeoutMs: number;
+}
+
+interface StartedContainer {
+  getConnectionUri(): string;
+  stop(): Promise<unknown>;
+}
+
+type ContainerFactory = (options: ContainerOptions) => Promise<StartedContainer>;
+
+type Logger = Pick<Console, "info">;
+
+export interface TestPostgres {
+  databaseUrl: string;
+  runId: string;
+  cleanup(): Promise<void>;
+}
 
 const postgresTestUrlSchema = z
   .string()
@@ -26,11 +59,11 @@ const postgresTestUrlSchema = z
     }
   });
 
-export function createTestRunId() {
+export function createTestRunId(): string {
   return `${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
 }
 
-export function sanitizeIdentifierPart(value) {
+export function sanitizeIdentifierPart(value: string): string {
   const sanitized = value.replace(/[^a-zA-Z0-9_]/g, "_");
   if (sanitized.length === 0) throw new Error("Cannot derive a PostgreSQL identifier component");
   if (sanitized.length > 40) {
@@ -39,29 +72,32 @@ export function sanitizeIdentifierPart(value) {
   return sanitized;
 }
 
-function quoteIdentifier(value) {
+function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
-export function validateTestDatabaseUrl(value) {
+export function validateTestDatabaseUrl(value: string): string {
   return postgresTestUrlSchema.parse(value);
 }
 
 /** The database a run's file, or its template, lives in; every one shares the run prefix. */
-export function runDatabaseName(runId, suffix) {
+export function runDatabaseName(runId: string, suffix: string): string {
   return `test_${sanitizeIdentifierPart(runId)}_${sanitizeIdentifierPart(suffix)}`;
 }
 
 /** The same server and credentials as `baseUrl`, pointed at another database. */
-export function databaseUrlFor(baseUrl, databaseName) {
+export function databaseUrlFor(baseUrl: string, databaseName: string): string {
   const url = new URL(baseUrl);
   url.pathname = `/${encodeURIComponent(databaseName)}`;
   return url.toString();
 }
 
-export async function listRunDatabases(pool, runId) {
+export async function listRunDatabases(
+  pool: Pick<QueryPool, "query">,
+  runId: string
+): Promise<string[]> {
   const prefix = `test_${sanitizeIdentifierPart(runId)}_`;
-  const result = await pool.query(
+  const result = await pool.query<{ datname: string }>(
     `SELECT datname
      FROM pg_database
      WHERE left(datname, char_length($1)) = $1
@@ -71,7 +107,11 @@ export async function listRunDatabases(pool, runId) {
   return result.rows.map(({ datname }) => datname);
 }
 
-export async function cleanupRunDatabases(pool, runId, logger = console) {
+export async function cleanupRunDatabases(
+  pool: Pick<QueryPool, "query">,
+  runId: string,
+  logger: Logger = console
+): Promise<void> {
   const prefix = `test_${sanitizeIdentifierPart(runId)}_`;
   const databases = await listRunDatabases(pool, runId);
   if (databases.length > 0) logger.info(`Cleaning ${databases.length} test databases`);
@@ -84,9 +124,9 @@ export async function cleanupRunDatabases(pool, runId, logger = console) {
   }
 }
 
-async function verifyExternalDatabase(pool) {
+async function verifyExternalDatabase(pool: QueryPool): Promise<void> {
   await pool.query("SELECT 1");
-  const role = await pool.query(
+  const role = await pool.query<{ can_create: boolean }>(
     "SELECT rolcreatedb OR rolsuper AS can_create FROM pg_roles WHERE rolname = current_user"
   );
   if (role.rows[0]?.can_create !== true) {
@@ -94,7 +134,7 @@ async function verifyExternalDatabase(pool) {
   }
 }
 
-async function defaultContainerFactory(options) {
+async function defaultContainerFactory(options: ContainerOptions): Promise<StartedContainer> {
   const { PostgreSqlContainer } = await import("@testcontainers/postgresql");
   return new PostgreSqlContainer(options.image)
     .withDatabase(options.database)
@@ -104,7 +144,7 @@ async function defaultContainerFactory(options) {
     .start();
 }
 
-async function startContainer(containerFactory) {
+async function startContainer(containerFactory: ContainerFactory): Promise<StartedContainer> {
   try {
     return await containerFactory({
       image: IMAGE,
@@ -127,18 +167,29 @@ export async function prepareTestPostgres({
   containerFactory = defaultContainerFactory,
   Pool = pg.Pool,
   logger = console,
-} = {}) {
+}: {
+  environment?: NodeJS.ProcessEnv;
+  runId?: string;
+  containerFactory?: ContainerFactory;
+  Pool?: PoolConstructor;
+  logger?: Logger;
+} = {}): Promise<TestPostgres> {
   const externalUrl = environment.TEST_DATABASE_URL?.trim();
-  let container;
-  let databaseUrl;
-  let pool;
+  let container: StartedContainer | undefined;
+  let pool: QueryPool | undefined;
 
   try {
+    let databaseUrl: string;
+    let openPool: QueryPool;
     if (externalUrl) {
       databaseUrl = validateTestDatabaseUrl(externalUrl);
-      pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 5_000 });
+      openPool = pool = new Pool({
+        connectionString: databaseUrl,
+        max: 1,
+        connectionTimeoutMillis: 5_000,
+      });
       try {
-        await verifyExternalDatabase(pool);
+        await verifyExternalDatabase(openPool);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`TEST_DATABASE_URL validation failed: ${message}`, { cause: error });
@@ -146,10 +197,11 @@ export async function prepareTestPostgres({
     } else {
       container = await startContainer(containerFactory);
       databaseUrl = container.getConnectionUri();
-      pool = new Pool({ connectionString: databaseUrl, max: 1 });
-      await pool.query("SELECT 1");
+      openPool = pool = new Pool({ connectionString: databaseUrl, max: 1 });
+      await openPool.query("SELECT 1");
     }
 
+    const startedContainer = container;
     let cleaned = false;
     return {
       databaseUrl,
@@ -157,16 +209,16 @@ export async function prepareTestPostgres({
       async cleanup() {
         if (cleaned) return;
         cleaned = true;
-        let cleanupError;
+        let cleanupError: unknown;
         try {
-          await cleanupRunDatabases(pool, runId, logger);
+          await cleanupRunDatabases(openPool, runId, logger);
         } catch (error) {
           cleanupError = error;
         } finally {
-          await pool.end().catch((error) => {
+          await openPool.end().catch((error: unknown) => {
             cleanupError ??= error;
           });
-          await container?.stop().catch((error) => {
+          await startedContainer?.stop().catch((error: unknown) => {
             cleanupError ??= error;
           });
         }
@@ -180,7 +232,7 @@ export async function prepareTestPostgres({
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   const resource = await prepareTestPostgres();
   try {
     console.info("Test PostgreSQL environment is ready.");
@@ -190,7 +242,7 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((error) => {
+  main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   });

@@ -23,16 +23,24 @@ export const TEST_STARTUP_ENV = Object.freeze({
   DATABASE_POOL_MAX: "",
 });
 
-export function createTestEnvironment(baseEnvironment = process.env, overrides = {}) {
+type Overrides = Partial<NodeJS.ProcessEnv>;
+
+export function createTestEnvironment(
+  baseEnvironment: Overrides = process.env,
+  overrides: Overrides = {}
+): NodeJS.ProcessEnv {
   return {
     ...baseEnvironment,
     ...TEST_STARTUP_ENV,
-    NODE_ENV: "test",
+    NODE_ENV: "test" as const,
     ...overrides,
   };
 }
 
-export function installTestEnvironment(environment = process.env, overrides = {}) {
+export function installTestEnvironment(
+  environment: Overrides = process.env,
+  overrides: Overrides = {}
+): Overrides {
   Object.assign(environment, TEST_STARTUP_ENV, { NODE_ENV: "test" }, overrides);
   return environment;
 }

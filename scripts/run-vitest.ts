@@ -1,11 +1,12 @@
-#!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { createTestEnvironment } from "./test-environment.mjs";
+import { createTestEnvironment } from "./test-environment";
 
-export function signalExitCode(signal) {
+type SpawnProcess = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+
+export function signalExitCode(signal: NodeJS.Signals): number {
   return signal === "SIGINT" ? 130 : signal === "SIGTERM" ? 143 : 1;
 }
 
@@ -13,7 +14,11 @@ export async function runVitest({
   args = process.argv.slice(2),
   environment = process.env,
   spawnProcess = spawn,
-} = {}) {
+}: {
+  args?: string[];
+  environment?: NodeJS.ProcessEnv;
+  spawnProcess?: SpawnProcess;
+} = {}): Promise<number> {
   if (args.includes("--coverage")) {
     mkdirSync(path.resolve("coverage/.tmp"), { recursive: true });
   }
@@ -23,9 +28,9 @@ export async function runVitest({
     env: createTestEnvironment(environment),
     stdio: "inherit",
   });
-  let requestedSignal;
+  let requestedSignal: NodeJS.Signals | undefined;
 
-  const forwardSignal = (signal) => {
+  const forwardSignal = (signal: NodeJS.Signals) => {
     requestedSignal = signal;
     if (!child.killed) child.kill(signal);
   };
@@ -35,10 +40,12 @@ export async function runVitest({
   process.on("SIGTERM", onSigterm);
 
   try {
-    const result = await new Promise((resolve, reject) => {
-      child.once("error", reject);
-      child.once("exit", (code, signal) => resolve({ code, signal }));
-    });
+    const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+      (resolve, reject) => {
+        child.once("error", reject);
+        child.once("exit", (code, signal) => resolve({ code, signal }));
+      }
+    );
     if (requestedSignal) return signalExitCode(requestedSignal);
     return result.signal ? signalExitCode(result.signal) : (result.code ?? 1);
   } finally {
@@ -52,7 +59,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     .then((exitCode) => {
       process.exitCode = exitCode;
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.error(error);
       process.exitCode = 1;
     });

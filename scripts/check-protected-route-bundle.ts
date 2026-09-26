@@ -2,6 +2,10 @@ import fs from "node:fs";
 import vm from "node:vm";
 import zlib from "node:zlib";
 
+interface ClientReferenceManifest {
+  clientModules: Record<string, { chunks?: string[] }>;
+}
+
 // 流水 is where the app opens, so its bundle is the one a reader waits on.
 const manifestPath =
   ".next/server/app/(protected)/(ledger)/stream/page_client-reference-manifest.js";
@@ -16,13 +20,16 @@ if (!fs.existsSync(manifestPath)) {
   throw new Error(`Protected-route client manifest is missing: ${manifestPath}`);
 }
 
-const context = {};
+const context: {
+  globalThis?: unknown;
+  __RSC_MANIFEST?: Record<string, ClientReferenceManifest>;
+} = {};
 context.globalThis = context;
 vm.runInNewContext(fs.readFileSync(manifestPath, "utf8"), context, { filename: manifestPath });
 const manifest = context.__RSC_MANIFEST?.[routeKey];
 if (manifest == null) throw new Error(`Protected-route manifest entry is missing: ${routeKey}`);
 
-const files = new Set();
+const files = new Set<string>();
 for (const clientModule of Object.values(manifest.clientModules)) {
   for (const chunk of clientModule.chunks ?? []) {
     if (chunk.endsWith(".js")) files.add(decodeURIComponent(chunk));

@@ -10,7 +10,7 @@
  */
 import { parseArgs } from "node:util";
 import { z } from "zod";
-import { loadLocalEnvironment } from "./load-local-environment.mjs";
+import { loadLocalEnvironment } from "./load-local-environment";
 
 const DEFAULT_BOOK_NAMES = ["共同支出"];
 

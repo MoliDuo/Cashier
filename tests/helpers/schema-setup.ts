@@ -1,6 +1,13 @@
 import { eq, sql } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/persistence";
+import {
+  seedBooks,
+  seedDocumentFiles,
+  seedLedger,
+  seedSourceDocument,
+  seedUser,
+} from "../../scripts/lib/seed";
 
 type TestDatabase = NodePgDatabase<typeof schema>;
 
@@ -43,17 +50,7 @@ export async function createTestBooks(
   ledgerId: string,
   names: readonly string[] = ["共同支出"]
 ): Promise<Map<string, string>> {
-  const rows = await db
-    .insert(schema.books)
-    .values(
-      names.map((name, index) => ({
-        ledgerId,
-        name,
-        sortOrder: index + 1,
-      }))
-    )
-    .returning({ id: schema.books.id, name: schema.books.name });
-  return new Map(rows.map((row) => [row.name, row.id]));
+  return seedBooks(db, ledgerId, names);
 }
 
 /**
@@ -70,13 +67,6 @@ export async function testBookId(db: TestDatabase, ledgerId: string): Promise<st
     .then((rows) => rows[0]);
   if (row == null) throw new Error(`Ledger ${ledgerId} has no book fixture`);
   return row.id;
-}
-
-function requireDefined<T>(value: T | undefined, message: string): T {
-  if (value === undefined) {
-    throw new Error(message);
-  }
-  return value;
 }
 
 // Helper to create a test user and its login address, returning the user ID.
@@ -100,13 +90,7 @@ export async function createTestUser(
     return id;
   }
 
-  await db.insert(schema.users).values({ id });
-  await db.insert(schema.loginEmails).values({
-    userId: id,
-    email: finalEmail,
-    emailVerified: new Date(),
-  });
-  return id;
+  return seedUser(db, { id, email: finalEmail });
 }
 
 // Helper to create a test user and ledger together
@@ -118,41 +102,15 @@ export async function createTestUserWithLedger(
 ): Promise<{ userId: string; ledgerId: string }> {
   const finalUserId = await createTestUser(db, email, userId ?? TEST_USER_ID);
 
-  const ledgerId = crypto.randomUUID();
-  await db.insert(schema.ledgers).values({ id: ledgerId });
+  const ledgerId = await seedLedger(db);
   await createTestBooks(db, ledgerId);
 
   return { userId: finalUserId, ledgerId };
 }
 
-async function insertTestDocumentFiles(
-  tx: Parameters<Parameters<TestDatabase["transaction"]>[0]>[0],
-  document: { ledgerId: string; id: string },
-  imageUrls: readonly string[]
-): Promise<void> {
-  for (const [position] of imageUrls.entries()) {
-    const file = requireDefined(
-      (
-        await tx
-          .insert(schema.storedFiles)
-          .values({
-            ledgerId: document.ledgerId,
-            storageKey: `tests/${document.id}/${position}`,
-            contentType: "image/jpeg",
-            byteSize: 1,
-            finalizedAt: new Date(),
-          })
-          .returning()
-      )[0],
-      "Expected inserted stored file"
-    );
-    await tx.insert(schema.sourceDocumentFiles).values({
-      ledgerId: document.ledgerId,
-      sourceDocumentId: document.id,
-      storedFileId: file.id,
-      position,
-    });
-  }
+/** One single-byte JPEG stored file per image a fixture names. */
+function testImageFiles(imageUrls: readonly string[]) {
+  return imageUrls.map(() => ({ contentType: "image/jpeg", byteSize: 1 }));
 }
 
 /**
@@ -170,55 +128,33 @@ export async function createTestSourceDocument(
     title: string | null;
   }> = {}
 ): Promise<string> {
-  return db.transaction(async (tx) => {
-    const status = overrides.status ?? "completed";
-    const doc = requireDefined(
-      (
-        await tx
-          .insert(schema.sourceDocuments)
-          .values({
-            ledgerId,
-            documentDate: overrides.entryDate,
-            title: overrides.title,
-            inputText: overrides.text ?? "Test document",
-            bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
-          })
-          .returning()
-      )[0],
-      "Expected inserted source document"
-    );
-    const revision = requireDefined(
-      (
-        await tx
-          .insert(schema.sourceDocumentRevisions)
-          .values({
-            ledgerId,
-            sourceDocumentId: doc.id,
-            processingStatus:
-              status === "processing"
-                ? "processing"
-                : status === "invalid" || status === "failed"
-                  ? "failed"
-                  : "completed",
-            failureKind:
-              status === "invalid"
-                ? "invalid_input"
-                : status === "failed"
-                  ? "processing_error"
-                  : null,
-            finishedAt: status === "processing" ? null : new Date(),
-          })
-          .returning()
-      )[0],
-      "Expected inserted source document revision"
-    );
-    await tx
-      .update(schema.sourceDocuments)
-      .set({ latestSubmissionRevisionId: revision.id })
-      .where(eq(schema.sourceDocuments.id, doc.id));
-    await insertTestDocumentFiles(tx, doc, overrides.imageUrls ?? []);
-    return doc.id;
-  });
+  const status = overrides.status ?? "completed";
+  return db.transaction((tx) =>
+    seedSourceDocument(tx, {
+      ledgerId,
+      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      documentDate: overrides.entryDate ?? null,
+      title: overrides.title ?? null,
+      inputText: overrides.text ?? "Test document",
+      revisions: [
+        {
+          processingStatus:
+            status === "processing"
+              ? "processing"
+              : status === "invalid" || status === "failed"
+                ? "failed"
+                : "completed",
+          failureKind:
+            status === "invalid"
+              ? "invalid_input"
+              : status === "failed"
+                ? "processing_error"
+                : null,
+        },
+      ],
+      files: testImageFiles(overrides.imageUrls ?? []),
+    })
+  );
 }
 
 /**
@@ -257,7 +193,7 @@ export async function activateTestSourceDocumentProjection(
       .where(eq(schema.sourceDocumentFiles.sourceDocumentId, sourceDocumentId))
       .limit(1);
     if (existingFiles.length === 0) {
-      await insertTestDocumentFiles(tx, document, content.imageUrls ?? []);
+      await seedDocumentFiles(tx, document, testImageFiles(content.imageUrls ?? []));
     }
     if (content.parsed === true && document.latestSubmissionRevisionId == null) {
       const [revision] = await tx

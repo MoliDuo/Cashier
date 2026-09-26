@@ -2,7 +2,8 @@ import { afterAll, beforeAll, beforeEach, inject, vi } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@/persistence";
-import { databaseUrlFor, runDatabaseName } from "../scripts/prepare-test-postgres.mjs";
+import { databaseUrlFor, runDatabaseName } from "../scripts/prepare-test-postgres";
+import { seedUser } from "../scripts/lib/seed";
 import { flushAfterCallbacks } from "./setup.common";
 
 const postgresContext = inject("cashierPostgres");
@@ -116,13 +117,9 @@ beforeEach(async () => {
 
   await truncateAllTables(database);
 
-  await database.db.insert(schema.users).values({
+  await seedUser(database.db, {
     id: "00000000-0000-0000-0000-000000000000",
-  });
-  await database.db.insert(schema.loginEmails).values({
-    userId: "00000000-0000-0000-0000-000000000000",
     email: "test@example.com",
-    emailVerified: new Date(),
   });
 });
 

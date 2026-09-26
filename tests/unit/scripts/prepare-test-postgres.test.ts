@@ -5,7 +5,7 @@ import {
   prepareTestPostgres,
   runDatabaseName,
   validateTestDatabaseUrl,
-} from "../../../scripts/prepare-test-postgres.mjs";
+} from "../../../scripts/prepare-test-postgres";
 
 function createPoolClass(query: (sql: string, values?: unknown[]) => unknown) {
   const instances: Array<{ query: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> }> = [];

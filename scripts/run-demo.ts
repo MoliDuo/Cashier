@@ -1,18 +1,24 @@
-#!/usr/bin/env node
-
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import net from "node:net";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { fixtureCredentialToken } from "./demo-data.mjs";
+import { fixtureCredentialToken, type FixtureCredential } from "./demo-data";
+import { tsxArgs } from "./lib/tsx";
+
+type Environment = Partial<NodeJS.ProcessEnv>;
+type Execute = (
+  command: string,
+  args: string[],
+  environment: NodeJS.ProcessEnv
+) => Promise<unknown>;
 
 const DEFAULT_PORTS = { app: 3000, postgres: 55433, s3: 59000 };
 const fixture = JSON.parse(
-  readFileSync(new URL("./fixtures/demo-workspace.json", import.meta.url))
-);
+  readFileSync(new URL("./fixtures/demo-workspace.json", import.meta.url), "utf8")
+) as { serviceCredentials: FixtureCredential[] };
 
-function integerPort(name, value, fallback) {
+function integerPort(name: string, value: string | undefined, fallback: number): number {
   const parsed = value == null || value === "" ? fallback : Number(value);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
     throw new Error(`${name} must be an integer between 1 and 65535`);
@@ -21,7 +27,7 @@ function integerPort(name, value, fallback) {
 }
 
 /** Builds the forced local environment for focused safety tests. */
-export function createDemoEnvironment(environment = process.env) {
+export function createDemoEnvironment(environment: Environment = process.env) {
   const appPort = integerPort(
     "CASHIER_DEMO_APP_PORT",
     environment.CASHIER_DEMO_APP_PORT,
@@ -40,7 +46,7 @@ export function createDemoEnvironment(environment = process.env) {
   const appUrl = `http://127.0.0.1:${appPort}`;
   return {
     ...environment,
-    NODE_ENV: "development",
+    NODE_ENV: "development" as const,
     CASHIER_DEMO_MODE: "true",
     DATABASE_URL: `postgresql://cashier:cashier-local-only@127.0.0.1:${postgresPort}/cashier_demo`,
     APP_URL: appUrl,
@@ -64,16 +70,16 @@ export function createDemoEnvironment(environment = process.env) {
   };
 }
 
-async function run(command, args, environment) {
+async function run(command: string, args: string[], environment: NodeJS.ProcessEnv): Promise<void> {
   const child = spawn(command, args, { env: environment, stdio: "inherit" });
-  const [code, signal] = await once(child, "exit");
+  const [code, signal] = (await once(child, "exit")) as [number | null, NodeJS.Signals | null];
   if (code !== 0) {
     throw new Error(`${command} failed (${signal ?? code})`);
   }
 }
 
 /** Returns the standalone Compose invocation used by the demo stack. */
-export function createDemoComposeArgs(environment = process.env) {
+export function createDemoComposeArgs(environment: Environment = process.env): string[] {
   return [...composeProjectArgs(environment), "up", "-d", "postgres", "minio", "storage-bootstrap"];
 }
 
@@ -84,11 +90,11 @@ export function createDemoComposeArgs(environment = process.env) {
  *
  * Returns the database-only Compose invocation the preview uses.
  */
-export function createDemoPreviewComposeArgs(environment = process.env) {
+export function createDemoPreviewComposeArgs(environment: Environment = process.env): string[] {
   return [...composeProjectArgs(environment), "up", "-d", "postgres"];
 }
 
-function composeProjectArgs(environment) {
+function composeProjectArgs(environment: Environment): string[] {
   const project = environment.CASHIER_DEMO_PROJECT ?? "cashier-demo";
   if (!/^[a-z][a-z0-9-]{0,40}$/.test(project)) {
     throw new Error("CASHIER_DEMO_PROJECT must be a lowercase Compose project name");
@@ -97,8 +103,8 @@ function composeProjectArgs(environment) {
 }
 
 /** Returns the fixture command while preserving reset preview semantics. */
-export function createDemoDataArgs({ reset = false, apply = false } = {}) {
-  return ["scripts/demo-data.mjs", "reset", ...(!reset || apply ? ["--apply"] : [])];
+export function createDemoDataArgs({ reset = false, apply = false } = {}): string[] {
+  return tsxArgs("scripts/demo-data.ts", "reset", ...(!reset || apply ? ["--apply"] : []));
 }
 
 /**
@@ -108,7 +114,7 @@ export function createDemoDataArgs({ reset = false, apply = false } = {}) {
  *
  * Lists the seeded sample credentials printed once the demo is up.
  */
-export function formatDemoCredentialLines() {
+export function formatDemoCredentialLines(): string[] {
   return [
     "[demo] Sample API keys (valid for this local demo only):",
     ...fixture.serviceCredentials.map((credential) => {
@@ -121,23 +127,23 @@ export function formatDemoCredentialLines() {
   ];
 }
 
-async function isPortAvailable(port) {
+async function isPortAvailable(port: number): Promise<boolean> {
   const server = net.createServer();
   try {
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(port, "127.0.0.1", resolve);
     });
     return true;
   } catch (error) {
-    if (error?.code === "EADDRINUSE") return false;
+    if ((error as NodeJS.ErrnoException | null)?.code === "EADDRINUSE") return false;
     throw error;
   } finally {
     if (server.listening) await new Promise((resolve) => server.close(resolve));
   }
 }
 
-async function waitForApp(url, child) {
+async function waitForApp(url: string, child: ChildProcess): Promise<void> {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode != null || child.signalCode != null) {
@@ -152,7 +158,7 @@ async function waitForApp(url, child) {
   throw new Error("Demo server did not become ready within 60 seconds");
 }
 
-async function stop(child) {
+async function stop(child: ChildProcess | undefined): Promise<void> {
   if (child == null || child.exitCode != null || child.signalCode != null) return;
   const exited = once(child, "exit");
   child.kill("SIGTERM");
@@ -170,32 +176,31 @@ async function stop(child) {
  * `dev:demo`/`test:demo` launch, runs the destructive path.
  *
  * Exposes the demo command sequence to an injected executor.
- * @param {{ args?: string[], environment?: Record<string, string | undefined>, execute?: (command: string, args: string[], environment: Record<string, string | undefined>) => Promise<unknown> }} [options]
  */
 export async function runDemoCommands({
   args = [],
   environment = process.env,
   execute = run,
-} = {}) {
+}: { args?: string[]; environment?: Environment; execute?: Execute } = {}) {
   const demoEnv = createDemoEnvironment(environment);
   const reset = args.includes("--reset");
   const apply = args.includes("--apply");
   if (reset && !apply) {
     await execute("docker", createDemoPreviewComposeArgs(demoEnv), demoEnv);
-    await execute(process.execPath, ["scripts/demo-data.mjs", "preview-reset"], demoEnv);
+    await execute(process.execPath, tsxArgs("scripts/demo-data.ts", "preview-reset"), demoEnv);
     return { mode: "preview-reset", environment: demoEnv };
   }
   await execute("docker", createDemoComposeArgs(demoEnv), demoEnv);
   // The demo workspace is disposable and rebuilt from the fixture on every
   // launch, so its schema is dropped before migrating: a demo database left
   // over from an earlier release is not a database 0048 can migrate.
-  await execute(process.execPath, ["scripts/demo-data.mjs", "reset-schema"], demoEnv);
-  await execute(process.execPath, ["scripts/migrate-database.mjs"], demoEnv);
+  await execute(process.execPath, tsxArgs("scripts/demo-data.ts", "reset-schema"), demoEnv);
+  await execute(process.execPath, tsxArgs("scripts/migrate-database.ts"), demoEnv);
   await execute(process.execPath, createDemoDataArgs({ reset, apply }), demoEnv);
   return { mode: reset ? "reset" : "seed", environment: demoEnv };
 }
 
-async function main(args = process.argv.slice(2), environment = process.env) {
+async function main(args = process.argv.slice(2), environment = process.env): Promise<void> {
   const test = args.includes("--test");
   const { mode, environment: demoEnv } = await runDemoCommands({ args, environment });
   // A preview stops at its report, and a reset asked for by name stops once the
@@ -226,7 +231,7 @@ async function main(args = process.argv.slice(2), environment = process.env) {
         { ...demoEnv, SMOKE_BASE_URL: demoEnv.APP_URL }
       );
     } else {
-      const [code] = await once(server, "exit");
+      const [code] = (await once(server, "exit")) as [number | null];
       if (code !== 0 && code != null) throw new Error(`Next.js exited (${code})`);
     }
   } finally {
@@ -237,7 +242,7 @@ async function main(args = process.argv.slice(2), environment = process.env) {
 }
 
 if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  main().catch((error: unknown) => {
     console.error(`[demo] ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   });

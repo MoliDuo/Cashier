@@ -11,6 +11,32 @@ import { parse } from "@formatjs/icu-messageformat-parser";
  * as raw strings, and keys that nothing reads any more.
  */
 
+export interface Token {
+  type: "identifier" | "number" | "punctuator" | "string" | "regex";
+  value: string;
+  start: number;
+  /** Set on the brackets that stand in for a template substitution's `${` and `}`. */
+  template?: boolean;
+}
+
+/** A dotted string literal and where it starts in its file. */
+export interface DottedLiteral {
+  value: string;
+  start: number;
+}
+
+export interface TranslationUsage {
+  staticKeys: string[];
+  literals: string[];
+  dottedLiterals: DottedLiteral[];
+}
+
+/** A file under src, by its repository-relative name. */
+export interface SourceFile {
+  fileName: string;
+  source: string;
+}
+
 const CATALOG_FILE = "zh.json";
 /**
  * Namespaces read straight from the JSON rather than through a translator, so
@@ -19,6 +45,7 @@ const CATALOG_FILE = "zh.json";
 const DIRECTLY_READ_NAMESPACES = ["AuthEmail"];
 const FACTORY_NAMES = ["getTranslations", "createTranslator"];
 const TRANSLATOR_METHODS = new Set(["raw", "rich", "markup", "has"]);
+const DECLARATION_STARTS = ["const", "let", "var", ","];
 const REGEX_PRECEDING_KEYWORDS = new Set([
   "return",
   "typeof",
@@ -38,17 +65,38 @@ const PUNCTUATOR =
   /=>|\.\.\.|\?\?=|\?\.(?!\d)|[=!]==?|[<>]=|&&=?|\|\|=?|\?\?|\*\*=?|<<=?|>>>?=?|[-+*/%&|^]=|\+\+|--|[{}()[\];,<>+\-*/%&|^!~?:=.@#]/y;
 const IDENTIFIER = /[\p{ID_Start}$_][\p{ID_Continue}$\u200c\u200d]*/uy;
 const NUMBER = /(?:0[xXoObB][\da-fA-F_]+|(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(?:[eE][+-]?\d+)?)n?/y;
+/** The sticky patterns tried, in order, where no other token starts. */
+const WORD_PATTERNS: readonly (readonly [Token["type"], RegExp])[] = [
+  ["identifier", IDENTIFIER],
+  ["number", NUMBER],
+  ["punctuator", PUNCTUATOR],
+];
 
-const ESCAPES = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", 0: "\0" };
+const ESCAPES: Record<string, string> = {
+  b: "\b",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+  v: "\v",
+  0: "\0",
+};
 
-function cook(raw) {
+function cook(raw: string): string {
   return raw.replace(
-    /\\(?:u\{([\da-fA-F]+)\}|u([\da-fA-F]{4})|x([\da-fA-F]{2})|(\r\n|[\n\r\u2028\u2029])|(.))/gsu,
-    (_match, codePoint, unicode, hex, lineBreak, other) => {
+    /\\(?:u\{([\da-fA-F]+)\}|u([\da-fA-F]{4})|x([\da-fA-F]{2})|(\r\n|[\n\r\u2028\u2029])|([\s\S]))/gu,
+    (
+      _match: string,
+      codePoint: string | undefined,
+      unicode: string | undefined,
+      hex: string | undefined,
+      lineBreak: string | undefined,
+      // The one group left when none of the others matched.
+      other: string
+    ) => {
       if (codePoint != null) return String.fromCodePoint(Number.parseInt(codePoint, 16));
-      if (unicode != null || hex != null) {
-        return String.fromCharCode(Number.parseInt(unicode ?? hex, 16));
-      }
+      const escaped = unicode ?? hex;
+      if (escaped != null) return String.fromCharCode(Number.parseInt(escaped, 16));
       if (lineBreak != null) return "";
       return ESCAPES[other] ?? other;
     }
@@ -62,10 +110,10 @@ function cook(raw) {
  * expressions, and template parts around substitutions are skipped. JSX text
  * is read as code, which only matters if it holds a quote character.
  */
-export function tokenize(source) {
-  const tokens = [];
+export function tokenize(source: string): Token[] {
+  const tokens: Token[] = [];
   /** Brace depth inside each open template substitution. */
-  const templateDepths = [];
+  const templateDepths: number[] = [];
   let index = 0;
 
   const previous = () => tokens.at(-1);
@@ -78,7 +126,7 @@ export function tokenize(source) {
   };
 
   /** Read a template from `start` (just past a backtick or a closing `}`). */
-  const readTemplate = (start, opensAtBacktick) => {
+  const readTemplate = (start: number, opensAtBacktick: boolean): number => {
     let cursor = start;
     while (cursor < source.length) {
       const char = source[cursor];
@@ -105,7 +153,7 @@ export function tokenize(source) {
   };
 
   while (index < source.length) {
-    const char = source[index];
+    const char = source[index]!;
     const next = source[index + 1];
     if (/\s/.test(char)) {
       index++;
@@ -145,11 +193,7 @@ export function tokenize(source) {
       tokens.push({ type: "regex", value: "", start: index });
     } else {
       let matched = false;
-      for (const [type, pattern] of [
-        ["identifier", IDENTIFIER],
-        ["number", NUMBER],
-        ["punctuator", PUNCTUATOR],
-      ]) {
+      for (const [type, pattern] of WORD_PATTERNS) {
         pattern.lastIndex = index;
         const match = pattern.exec(source);
         if (match == null || match[0] === "") continue;
@@ -160,9 +204,10 @@ export function tokenize(source) {
       }
       if (!matched) index++;
       const last = previous();
-      if (templateDepths.length > 0 && last?.type === "punctuator") {
-        if (last.value === "{") templateDepths[templateDepths.length - 1]++;
-        else if (last.value === "}") templateDepths[templateDepths.length - 1]--;
+      const depth = templateDepths.length - 1;
+      if (depth >= 0 && last?.type === "punctuator") {
+        if (last.value === "{") templateDepths[depth]!++;
+        else if (last.value === "}") templateDepths[depth]!--;
       }
     }
   }
@@ -170,7 +215,7 @@ export function tokenize(source) {
 }
 
 /** A string token that is a whole argument or initializer on its own. */
-function standaloneString(tokens, index) {
+function standaloneString(tokens: Token[], index: number): string | null {
   const token = tokens[index];
   const after = tokens[index + 1]?.value;
   return token?.type === "string" && (after === "," || after === ")" || after === "}")
@@ -179,17 +224,18 @@ function standaloneString(tokens, index) {
 }
 
 /** `[imported, local]` pairs of the named bindings of the import at `index`. */
-function namedImports(tokens, index) {
+function namedImports(tokens: Token[], index: number): [string, string][] {
   let cursor = index;
-  while (cursor < tokens.length && !["{", ";", "from"].includes(tokens[cursor].value)) cursor++;
+  while (cursor < tokens.length && !["{", ";", "from"].includes(tokens[cursor]!.value)) cursor++;
   if (tokens[cursor]?.value !== "{") return [];
-  const pairs = [];
-  let element = [];
+  const pairs: [string, string][] = [];
+  let element: string[] = [];
   for (cursor++; cursor < tokens.length; cursor++) {
-    const value = tokens[cursor].value;
+    const value = tokens[cursor]!.value;
     if (value === "," || value === "}") {
       const names = element[0] === "type" && element.length > 1 ? element.slice(1) : element;
-      if (names.length > 0) pairs.push([names[0], names[2] ?? names[0]]);
+      const [imported, , local] = names;
+      if (imported != null) pairs.push([imported, local ?? imported]);
       element = [];
       if (value === "}") break;
     } else {
@@ -200,11 +246,11 @@ function namedImports(tokens, index) {
 }
 
 /** Where a declarator's initializer starts, past a type annotation on a first declarator. */
-function initializerStart(tokens, index) {
+function initializerStart(tokens: Token[], index: number): number | null {
   if (tokens[index]?.value === "=") return index + 1;
   if (tokens[index]?.value !== ":" || tokens[index - 2]?.value === ",") return null;
   for (let cursor = index + 1; cursor < tokens.length; cursor++) {
-    const value = tokens[cursor].value;
+    const value = tokens[cursor]!.value;
     if (value === "=") return cursor + 1;
     if (value === ";" || value === "const" || value === "let") return null;
   }
@@ -212,7 +258,7 @@ function initializerStart(tokens, index) {
 }
 
 /** The namespace a translator factory call binds, or null when it is not static. */
-function factoryNamespace(tokens, openIndex) {
+function factoryNamespace(tokens: Token[], openIndex: number): string | null {
   const first = tokens[openIndex + 1];
   if (first?.value === ")") return "";
   const literal = standaloneString(tokens, openIndex + 1);
@@ -220,7 +266,7 @@ function factoryNamespace(tokens, openIndex) {
   if (first?.value !== "{") return null;
   let depth = 0;
   for (let index = openIndex + 1; index < tokens.length; index++) {
-    const token = tokens[index];
+    const token = tokens[index]!;
     if (token.type === "punctuator" && /^[{[(]$/.test(token.value)) depth++;
     if (token.type === "punctuator" && /^[}\])]$/.test(token.value)) {
       depth--;
@@ -243,19 +289,18 @@ function factoryNamespace(tokens, openIndex) {
  * every string literal (a dynamic key is built from one of these), and
  * dotted string literals that are not the namespace of a translator factory.
  */
-export function collectTranslationUsage(source) {
+export function collectTranslationUsage(source: string): TranslationUsage {
   const tokens = tokenize(source);
   const translatorHooks = new Set(["useTranslations"]);
   const translatorFactories = new Set(FACTORY_NAMES);
-  const bindings = new Map();
-  const staticKeys = [];
-  const literals = [];
-  const dottedLiterals = [];
+  const bindings = new Map<string, string>();
+  const staticKeys: string[] = [];
+  const literals: string[] = [];
+  const dottedLiterals: DottedLiteral[] = [];
   /** Callee of each open bracket, or null for a non-call bracket. */
-  const openCalls = [];
+  const openCalls: (string | null)[] = [];
 
-  for (let index = 0; index < tokens.length; index++) {
-    const token = tokens[index];
+  for (const [index, token] of tokens.entries()) {
     const before = tokens[index - 1];
 
     if (token.value === "import" && before?.value !== "." && tokens[index + 1]?.value !== "(") {
@@ -270,7 +315,7 @@ export function collectTranslationUsage(source) {
     }
 
     const initializer =
-      token.type === "identifier" && ["const", "let", "var", ","].includes(before?.value)
+      token.type === "identifier" && before != null && DECLARATION_STARTS.includes(before.value)
         ? initializerStart(tokens, index + 1)
         : null;
     if (initializer != null) {
@@ -278,7 +323,7 @@ export function collectTranslationUsage(source) {
       const awaited = tokens[callee]?.value === "await" || tokens[callee]?.value === "(";
       while (tokens[callee]?.value === "await" || tokens[callee]?.value === "(") callee++;
       const name = tokens[callee]?.value;
-      if (tokens[callee + 1]?.value === "(") {
+      if (name != null && tokens[callee + 1]?.value === "(") {
         if (!awaited && translatorHooks.has(name)) {
           const namespace = standaloneString(tokens, callee + 2);
           if (namespace != null) bindings.set(token.value, namespace);
@@ -293,7 +338,7 @@ export function collectTranslationUsage(source) {
       const direct = tokens[index + 1]?.value === "(" ? index + 1 : null;
       const method =
         tokens[index + 1]?.value === "." &&
-        TRANSLATOR_METHODS.has(tokens[index + 2]?.value) &&
+        TRANSLATOR_METHODS.has(tokens[index + 2]?.value ?? "") &&
         tokens[index + 3]?.value === "("
           ? index + 3
           : null;
@@ -330,7 +375,7 @@ export function collectTranslationUsage(source) {
   return { staticKeys, literals, dottedLiterals };
 }
 
-function flattenKeys(value, prefix = "") {
+function flattenKeys(value: unknown, prefix = ""): string[] {
   if (value == null || typeof value !== "object" || Array.isArray(value)) return [];
   return Object.entries(value).flatMap(([key, nested]) => {
     const path = prefix === "" ? key : `${prefix}.${key}`;
@@ -338,7 +383,7 @@ function flattenKeys(value, prefix = "") {
   });
 }
 
-function leafKeys(value, prefix = "") {
+function leafKeys(value: unknown, prefix = ""): string[] {
   if (value != null && typeof value === "object" && !Array.isArray(value)) {
     return Object.entries(value).flatMap(([key, nested]) =>
       leafKeys(nested, prefix === "" ? key : `${prefix}.${key}`)
@@ -347,17 +392,18 @@ function leafKeys(value, prefix = "") {
   return [prefix];
 }
 
-function duplicateTopLevelKeys(content) {
-  const seen = new Set();
-  const duplicates = new Set();
+function duplicateTopLevelKeys(content: string): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
   for (const [, key] of content.matchAll(/^ {2}"([^"]+)":/gm)) {
+    if (key == null) continue;
     if (seen.has(key)) duplicates.add(key);
     seen.add(key);
   }
   return [...duplicates].sort();
 }
 
-function icuErrors(value, location) {
+function icuErrors(value: unknown, location: string): string[] {
   if (typeof value === "string") {
     try {
       parse(value);
@@ -379,18 +425,17 @@ function icuErrors(value, location) {
 }
 
 /**
- * @param {string} catalogContent - the raw catalog JSON
- * @param {{ fileName: string, source: string }[]} sources - files under src
- * @returns {string[]} validation errors
+ * Validates the raw catalog JSON against the files under src, returning the
+ * validation errors.
  */
-export function validateCatalog(catalogContent, sources) {
-  const errors = [];
+export function validateCatalog(catalogContent: string, sources: SourceFile[]): string[] {
+  const errors: string[] = [];
   const duplicates = duplicateTopLevelKeys(catalogContent);
   if (duplicates.length > 0) {
     errors.push(`${CATALOG_FILE}: duplicate top-level keys detected: ${duplicates.join(", ")}`);
   }
 
-  let catalog;
+  let catalog: unknown;
   try {
     catalog = JSON.parse(catalogContent);
   } catch (error) {
@@ -400,8 +445,8 @@ export function validateCatalog(catalogContent, sources) {
   errors.push(...icuErrors(catalog, ""));
 
   const catalogKeys = new Set(flattenKeys(catalog));
-  const staticKeys = new Set();
-  const literals = new Set();
+  const staticKeys = new Set<string>();
+  const literals = new Set<string>();
   for (const { fileName, source } of sources) {
     const usage = collectTranslationUsage(source);
     for (const key of usage.staticKeys) staticKeys.add(key);
@@ -425,14 +470,14 @@ export function validateCatalog(catalogContent, sources) {
     const readStatically = segments.some((_segment, index) =>
       staticKeys.has(segments.slice(0, index + 1).join("."))
     );
-    if (!readStatically && !literals.has(segments.at(-1))) {
+    if (!readStatically && !literals.has(segments.at(-1) ?? "")) {
       errors.push(`${CATALOG_FILE}: unused message key ${key}`);
     }
   }
   return errors;
 }
 
-function sourceFilesIn(directory) {
+function sourceFilesIn(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) return sourceFilesIn(entryPath);
@@ -440,7 +485,7 @@ function sourceFilesIn(directory) {
   });
 }
 
-function main() {
+function main(): void {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const sources = sourceFilesIn(path.join(root, "src")).map((file) => ({
     fileName: path.relative(root, file).split(path.sep).join("/"),

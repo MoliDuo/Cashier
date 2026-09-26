@@ -1,9 +1,13 @@
-#!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { createTestEnvironment } from "./test-environment.mjs";
+import { createTestEnvironment } from "./test-environment";
 
-export async function runCheckBuild({ environment = process.env, spawnProcess = spawn } = {}) {
+type SpawnProcess = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+
+export async function runCheckBuild({
+  environment = process.env,
+  spawnProcess = spawn,
+}: { environment?: NodeJS.ProcessEnv; spawnProcess?: SpawnProcess } = {}): Promise<number> {
   const child = spawnProcess(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], {
     env: createTestEnvironment(environment, { NODE_ENV: "production" }),
     stdio: "inherit",
@@ -24,7 +28,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     .then((exitCode) => {
       process.exitCode = exitCode;
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.error(error);
       process.exitCode = 1;
     });
