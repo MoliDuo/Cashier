@@ -3,8 +3,10 @@
 本地开发从 `.env.local.example` 开始；Vercel 部署的环境变量从 `.env.example` 参考填写。
 空字符串会被当作未配置，除非下面另有说明。
 
-账号、账本和分账都不在环境变量里：空库首次启动时，服务端会打印一次性初始化代码，
-在 `/setup` 向导中填入代码、邮箱和分账名称即可创建。账号没有密码，用邮件验证码或通行密钥登录。
+账号、账本和分账都不在环境变量里：用 `npm run account:create -- --email …` 创建，
+再用 `npm run account:enroll -- --email …` 生成添加通行密钥的一次性链接。这两个命令读取
+`DATABASE_URL`、`AUTH_SECRET` 和 `APP_URL`（环境变量，或项目根目录的 `.env.local` / `.env`）。
+账号没有密码，用通行密钥或邮件验证码登录。
 
 ## 应用与 AI
 

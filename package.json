@@ -38,6 +38,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-database.mjs",
     "db:studio": "drizzle-kit studio",
+    "account:create": "tsx --conditions=react-server scripts/account.ts create",
+    "account:enroll": "tsx --conditions=react-server scripts/account.ts enroll",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -119,6 +121,7 @@
     "postcss": "^8.5.28",
     "prettier": "3.9.8",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
     "typescript": "6.0.3",
     "vitest": "4.1.10"

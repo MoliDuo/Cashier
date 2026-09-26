@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["scripts/**/*.mjs", "tests/stubs/server-only.ts"],
-  "project": ["src/**/*.{ts,tsx}!", "scripts/**/*.mjs", "tests/**/*.{ts,tsx}", "*.{ts,mts}"],
+  "entry": ["scripts/**/*.{mjs,ts}", "tests/stubs/server-only.ts"],
+  "project": ["src/**/*.{ts,tsx}!", "scripts/**/*.{mjs,ts}", "tests/**/*.{ts,tsx}", "*.{ts,mts}"],
   "ignoreExportsUsedInFile": true,
   "ignoreDependencies": ["pino-pretty", "tailwindcss", "tw-animate-css"]
 }

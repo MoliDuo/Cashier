@@ -13,9 +13,11 @@ import { textRoleClassName } from "@/components/typography";
 export function AuthLoginPage({
   emailAuthEnabled = false,
   devAuthAvailable = false,
+  accountMissing = false,
 }: {
   emailAuthEnabled?: boolean;
   devAuthAvailable?: boolean;
+  accountMissing?: boolean;
 }) {
   const t = useTranslations("Auth");
   const searchParams = useSearchParams();
@@ -26,9 +28,7 @@ export function AuthLoginPage({
       ? t("reauthRequiredNotice")
       : notice === "credentials_changed"
         ? t("credentialsChangedNotice")
-        : notice === "setup_complete"
-          ? t("setupCompleteNotice")
-          : null;
+        : null;
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8">
@@ -48,6 +48,18 @@ export function AuthLoginPage({
         </div>
 
         <div className="rounded-lg border border-border bg-surface p-6 shadow-none">
+          {accountMissing ? (
+            <div role="status" className="mb-5 rounded-md bg-surface2 p-3">
+              <p className={textRoleClassName("bodyStrong")}>{t("noAccountTitle")}</p>
+              <p className={textRoleClassName("bodyMuted", "mt-1")}>{t("noAccountDesc")}</p>
+              <pre className="mt-2 overflow-x-auto text-xs text-text">
+                <code translate="no">
+                  {"npm run account:create -- --email you@example.com\n"}
+                  {"npm run account:enroll -- --email you@example.com"}
+                </code>
+              </pre>
+            </div>
+          ) : null}
           {noticeMessage != null ? (
             <p role="status" className="mb-5 rounded-md bg-surface2 p-3 text-sm text-text">
               {noticeMessage}

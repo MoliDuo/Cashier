@@ -8,7 +8,6 @@ const baseEnv = {
   API_KEY_PEPPER: "test-pepper",
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
-  AUTH_OTP_PEPPER: "otp-pepper",
   APP_URL: "http://localhost:3000",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "cashier-images",

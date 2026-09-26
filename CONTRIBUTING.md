@@ -38,10 +38,15 @@ npm run db:migrate
 npm run dev
 ```
 
-Fill in the AI values. Accounts do not come from the environment: against an empty database the
-server prints a one-time setup code to its logs, and `/setup` asks for that code plus one
-login email and the book names. There are no passwords: sign in with a code sent to that email
-(which needs the Resend key), then add a passkey under 设置.
+Fill in the AI values. Accounts do not come from the environment or a web wizard:
+
+```bash
+npm run account:create -- --email you@example.com   # account, ledger, books, categories
+npm run account:enroll -- --email you@example.com   # prints a one-time passkey link
+```
+
+Open the printed link to add a passkey and sign in. There are no passwords; a code sent to the
+email (which needs the Resend key) is the fallback, and `account:enroll` is also the recovery path.
 
 Never commit `.env`, provider credentials, real receipts, API keys, or raw personal data.
 

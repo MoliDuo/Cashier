@@ -23,3 +23,9 @@ const pool =
 globalForDb.pool = pool;
 
 export const db = drizzle(pool, { schema });
+
+/** Ends the pool, so a command-line script can exit once its work is done. */
+export async function closeDatabase(): Promise<void> {
+  globalForDb.pool = undefined;
+  await pool.end();
+}

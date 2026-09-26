@@ -43,7 +43,7 @@ npm ci
 cp .env.local.example .env
 ```
 
-编辑 `.env`，填入 AI 密钥即可。账号、账本和分账都不在这里配置，由初始化向导创建：
+编辑 `.env`，填入 AI 密钥即可。账号、账本和分账都不在这里配置，由下文的账号命令创建：
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
@@ -57,12 +57,17 @@ npm run db:migrate
 npm run dev
 ```
 
-首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表，但不会创建账号。打开
-[http://localhost:3000](http://localhost:3000)：所有页面都会跳到 `/setup`
-初始化向导。服务端日志会打印一次性初始化代码，
-日志行以 `First-run setup is pending` 开头。在向导中填入该代码、登录邮箱和
-分账名称（默认预填 `共同支出`）即可创建账号，之后 `/setup` 永久返回 404。账号没有密码：
-用该邮箱接收验证码登录（需要配置 `AUTH_RESEND_KEY`），再在设置里添加通行密钥。
+首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表，但不会创建账号。在同一台机器上创建账号，
+再生成添加通行密钥的一次性链接：
+
+```bash
+npm run account:create -- --email you@example.com
+npm run account:enroll -- --email you@example.com
+```
+
+`account:create` 一次性创建账号、账本、分账（默认 `共同支出`，可用 `--book` 多次指定）和默认分类。
+`account:enroll` 只在终端打印一个 30 分钟内有效、只能用一次的链接；在浏览器打开它创建通行密钥，
+随即登录。账号没有密码，之后用通行密钥登录，邮件验证码（需要 `AUTH_RESEND_KEY`）是备用方式。
 
 `AI_MODEL` 默认为 `gpt-4o`。如果你使用其他 OpenAI 兼容服务，请同时修改
 `OPENAI_BASE_URL` 和 `AI_MODEL`。

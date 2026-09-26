@@ -25,7 +25,7 @@
 - `CRON_SECRET`：每日 cron 的调用密钥，至少 32 个字符，例如用 `openssl rand -hex 32` 生成。
   Vercel Cron 调用 `/api/cron/daily` 时会带上 `Authorization: Bearer <CRON_SECRET>`。
 
-账号、账本和分账由首次启动的向导创建，不需要环境变量。
+账号、账本和分账由 `account:create` 命令创建（见“首次启动”），不需要环境变量。
 
 迁移由构建命令自己执行。`vercel.json` 里的 `buildCommand` 是
 `npm run db:migrate && npm run build`：迁移跑在构建前面，失败就直接让整次构建失败，
@@ -94,21 +94,21 @@ npm run dev
 
 ## 首次启动
 
-空数据库首次启动后，打开服务地址：所有页面都会跳转到 `/setup`。服务端日志中
-会打印一次性初始化代码，例如：
+没有网页初始化向导。迁移完成后，在能连到生产数据库的机器上，用与部署相同的
+`DATABASE_URL`、`AUTH_SECRET` 和 `APP_URL` 运行：
 
+```bash
+npm run account:create -- --email you@example.com [--book 共同支出 --book …]
+npm run account:enroll -- --email you@example.com
 ```
-First-run setup is pending. Enter this setup code in the wizard to create the account.
-```
 
-在向导中填入该代码、一个登录邮箱，以及一到多个分账名称（默认预填 `共同支出`），
-提交后会一次性创建账号、账本、分账和默认分类，随后 `/setup` 永久返回 404。
+`account:create` 在一个事务里创建账号、已验证的登录邮箱、账本、分账（默认 `共同支出`）和默认分类；
+已有账号或邮箱已被使用时拒绝执行。`account:enroll` 只在终端打印
+`APP_URL/enroll?token=…`：链接 30 分钟内有效、只能使用一次，重新运行会作废之前的链接。
+库里只保存令牌的 HMAC。在浏览器打开链接创建通行密钥，随即登录。
 
-初始化代码只保护“数据库为空”到“账号已创建”这段窗口，因此它只存在于进程内存中；
-重启服务会重新生成并再次打印。已有数据的部署不会看到这个向导。
-
-账号没有密码。初始化后用该邮箱接收验证码登录（需要 `AUTH_RESEND_KEY`），再在设置里添加通行密钥；
-之后通行密钥是主要登录方式，邮件验证码是备用方式。
+账号没有密码。通行密钥是主要登录方式，邮件验证码（需要 `AUTH_RESEND_KEY`）是备用方式。
+所有通行密钥都丢失、邮箱也收不到验证码时，再运行一次 `account:enroll` 即可找回。
 
 ## 升级
 
@@ -156,10 +156,12 @@ First-run setup is pending. Enter this setup code in the wizard to create the ac
 
 ## 常用命令
 
-| 命令                   | 用途                           |
-| ---------------------- | ------------------------------ |
-| `npm run docker:local` | 启动本地 PostgreSQL 和 MinIO   |
-| `npm run docker:down`  | 停止本地基础服务，保留具名卷   |
-| `npm run db:migrate`   | 对当前 `DATABASE_URL` 应用迁移 |
+| 命令                     | 用途                                   |
+| ------------------------ | -------------------------------------- |
+| `npm run docker:local`   | 启动本地 PostgreSQL 和 MinIO           |
+| `npm run docker:down`    | 停止本地基础服务，保留具名卷           |
+| `npm run db:migrate`     | 对当前 `DATABASE_URL` 应用迁移         |
+| `npm run account:create` | 创建唯一的账号、账本、分账和默认分类   |
+| `npm run account:enroll` | 打印添加通行密钥的一次性链接（可找回） |
 
 所有配置项见 [配置参考](./configuration.md)。

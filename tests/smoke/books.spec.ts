@@ -40,6 +40,17 @@ async function archiveBook(page: Page, name: string) {
   await page.getByRole("dialog").getByRole("button", { name: "归档", exact: true }).click();
 }
 
+test("there is no web setup, and an enrollment link nobody issued is refused", async ({ page }) => {
+  // Accounts come from `account:create`; enrollment itself is covered by
+  // tests/integration/auth/enrollment.test.ts.
+  const response = await page.goto("/setup");
+  expect(response?.status()).toBe(404);
+
+  await page.goto(`/enroll?token=${"A".repeat(43)}`);
+  await expect(page.getByRole("heading", { name: "链接不可用" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "创建通行密钥" })).toHaveCount(0);
+});
+
 /**
  * The book switcher and the per-book bookkeeping that replaced the member
  * switch: 总账 is the sum of the books, a record can be filed into a chosen
@@ -48,16 +59,6 @@ async function archiveBook(page: Page, name: string) {
  * These run against the demo workspace, which is the only environment with
  * more than one book.
  */
-test("first-run setup is closed once an account exists", async ({ page }) => {
-  // The smoke database is seeded with an account, so the wizard's window has
-  // passed. The wizard's own transaction is covered by
-  // tests/integration/auth/login-emails-and-setup.test.ts, because reaching it
-  // end to end needs an empty database, which this runner deliberately avoids.
-  const response = await page.goto("/setup");
-  expect(response?.status()).toBe(404);
-  await expect(page.getByRole("button", { name: "创建账户", exact: true })).toHaveCount(0);
-});
-
 test("@demo files a record into a book and moves it to another", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

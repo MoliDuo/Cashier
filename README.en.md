@@ -43,8 +43,8 @@ npm ci
 cp .env.local.example .env
 ```
 
-Fill in the AI key in `.env`. The account, ledger and books are not configured here; the first-run
-wizard creates them:
+Fill in the AI key in `.env`. The account, ledger and books are not configured here; the account
+commands below create them:
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
@@ -59,12 +59,19 @@ npm run dev
 ```
 
 On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the database schema. It does
-not create an account. Open [http://localhost:3000](http://localhost:3000): every page leads to the
-`/setup` wizard. The server logs print a one-time setup code, on a line starting with
-`First-run setup is pending`. Enter that code, a
-sign-in email and your book names (共同支出 is pre-filled as the default) to create the
-account; `/setup` returns 404 afterwards. There is no password: sign in with a code sent to that
-email (this needs `AUTH_RESEND_KEY`), then add a passkey under 设置.
+not create an account. Create it from the same machine, then issue a one-time link that adds a
+passkey:
+
+```bash
+npm run account:create -- --email you@example.com
+npm run account:enroll -- --email you@example.com
+```
+
+`account:create` writes the account, the ledger, the books (共同支出 by default; repeat `--book`
+for others) and the default categories in one go. `account:enroll` prints, to the terminal only, a
+link that works once within 30 minutes; open it to create a passkey and be signed in. There is no
+password: passkeys sign in, and a code sent to the email (this needs `AUTH_RESEND_KEY`) is the
+fallback.
 
 `AI_MODEL` defaults to `gpt-4o`. When using another OpenAI-compatible service, set both
 `OPENAI_BASE_URL` and `AI_MODEL`.

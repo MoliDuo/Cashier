@@ -39,6 +39,9 @@ with `vi.mock` of the concrete module rather than injected fakes.
 - Passkeys (`src/modules/auth/server/passkeys.ts`) use discoverable credentials with the relying
   party taken from `APP_URL`. Each ceremony stores a `webauthn_challenges` row that finishing
   deletes, so a challenge answers once; adding or deleting a passkey needs `requireRecentAuth`.
+  The account itself comes from `npm run account:create`. `account:enroll` stores an `enroll`
+  challenge holding only the link token's HMAC; `/enroll` registers the passkey and deletes that
+  row in one transaction, so a link works once.
 - Treat forwarded client addresses as untrusted unless `TRUSTED_PROXY` is explicitly configured.
 - Log correlation IDs and identifiers tagged by logIdentifier; email and IP identifiers are hashed. Do not log raw email addresses, IP addresses,
   bearer tokens, OTP values, image contents, or provider payloads.

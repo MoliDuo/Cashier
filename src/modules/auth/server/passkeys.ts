@@ -12,6 +12,7 @@ import {
 } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { db } from "@/lib/db";
+import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
 import { incrementRateLimit, rateLimitKey } from "@/lib/rate-limit";
@@ -25,6 +26,8 @@ import type { AuthenticatedPrincipal, PasskeySummary } from "@/modules/auth/cont
 import { findUserById } from "./users";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+type Executor = PostgresTransaction | typeof db;
 
 function relyingParty() {
   const url = new URL(runtimeEnv.appUrl);
@@ -51,13 +54,16 @@ async function storeChallenge(input: {
 }
 
 /** Deletes and returns a live challenge, so each one finishes at most one ceremony. */
-async function consumeChallenge(input: {
-  id: string;
-  purpose: "register" | "login";
-  userId: string | null;
-  now: Date;
-}): Promise<string | null> {
-  const [row] = await db
+async function consumeChallenge(
+  input: {
+    id: string;
+    purpose: "register" | "login";
+    userId: string | null;
+    now: Date;
+  },
+  executor: Executor = db
+): Promise<string | null> {
+  const [row] = await executor
     .delete(webauthnChallenges)
     .where(
       and(
@@ -126,20 +132,22 @@ export type PasskeyRegistrationResult =
   | { ok: true; passkey: PasskeySummary }
   | { ok: false; reason: "expired" | "invalid" | "duplicate" };
 
-export async function finishPasskeyRegistration(input: {
-  userId: string;
-  challengeId: string;
-  response: RegistrationResponseJSON;
-  name: string;
-  now?: Date;
-}): Promise<PasskeyRegistrationResult> {
+/** Runs in the caller's transaction when given one, so enrollment can spend its link with it. */
+export async function finishPasskeyRegistration(
+  input: {
+    userId: string;
+    challengeId: string;
+    response: RegistrationResponseJSON;
+    name: string;
+    now?: Date;
+  },
+  executor: Executor = db
+): Promise<PasskeyRegistrationResult> {
   const now = input.now ?? new Date();
-  const challenge = await consumeChallenge({
-    id: input.challengeId,
-    purpose: "register",
-    userId: input.userId,
-    now,
-  });
+  const challenge = await consumeChallenge(
+    { id: input.challengeId, purpose: "register", userId: input.userId, now },
+    executor
+  );
   if (challenge == null) return { ok: false, reason: "expired" };
 
   const { rpID, origin } = relyingParty();
@@ -159,7 +167,7 @@ export async function finishPasskeyRegistration(input: {
   if (!verification.verified) return { ok: false, reason: "invalid" };
 
   const info = verification.registrationInfo;
-  const [row] = await db
+  const [row] = await executor
     .insert(passkeys)
     .values({
       id: info.credential.id,

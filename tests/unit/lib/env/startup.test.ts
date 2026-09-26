@@ -7,7 +7,6 @@ const baseEnv = {
   API_KEY_PEPPER: "test-pepper",
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
-  AUTH_OTP_PEPPER: "otp-pepper",
   APP_URL: "http://localhost:3000",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "cashier-images",
@@ -161,8 +160,8 @@ describe("validateStartupEnv", () => {
     ).toThrow(/AUTH_SECRET/);
   });
 
-  it("no longer requires the old peppers", () => {
-    const { API_KEY_PEPPER: _api, AUTH_OTP_PEPPER: _otp, ...env } = baseEnv;
+  it("does not require the old API key pepper", () => {
+    const { API_KEY_PEPPER: _api, ...env } = baseEnv;
     expect(() => validateStartupEnv(env)).not.toThrow();
   });
 

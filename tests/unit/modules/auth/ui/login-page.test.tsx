@@ -130,13 +130,23 @@ describe("AuthLoginPage", () => {
     expect(screen.getByText("一个安静的个人账本")).toBeInTheDocument();
   });
 
+  it("tells an instance with no account which commands create one", async () => {
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    const { unmount } = render(<AuthLoginPage emailAuthEnabled accountMissing />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("还没有账户");
+    expect(screen.getByText(/npm run account:create -- --email/)).toHaveTextContent(
+      /npm run account:enroll -- --email/
+    );
+    unmount();
+
+    render(<AuthLoginPage emailAuthEnabled />);
+    expect(screen.queryByText("还没有账户")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["reauth_required", "请重新登录以继续此操作。"],
     ["credentials_changed", "登录凭据已更新，请重新登录。"],
-    [
-      "setup_complete",
-      "初始化已完成。请用刚设置的登录邮箱获取验证码登录，然后在设置里添加通行密钥。",
-    ],
   ])("renders the %s login notice as status", async (notice, message) => {
     searchState.query = `notice=${notice}&callbackUrl=%2Fsettings`;
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
