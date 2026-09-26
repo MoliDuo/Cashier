@@ -269,19 +269,26 @@ describe("submitSelection", () => {
       categoryId: null,
       count: 1,
     });
-    // A run already in flight: its after() callback is never flushed, so no
-    // model call is left pending.
+    // after() runs the job straight away here, so the model call is held open
+    // to keep the first run active until the second request arrives.
+    const held = Promise.withResolvers<never>();
+    held.promise.catch(() => {});
+    generateContent.mockReturnValue(held.promise);
     await submitSelection(ledger.id, {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
 
-    await expect(
-      submitSelection(ledger.id, {
-        ledgerEntryIds: entryIds,
-        candidateCategoryIds: [food.id, home.id],
-      })
-    ).rejects.toMatchObject({ code: "CONFLICT" });
+    try {
+      await expect(
+        submitSelection(ledger.id, {
+          ledgerEntryIds: entryIds,
+          candidateCategoryIds: [food.id, home.id],
+        })
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+    } finally {
+      held.reject(new Error("released"));
+    }
   });
 
   it("returns the started run when the same request is sent again", async () => {
