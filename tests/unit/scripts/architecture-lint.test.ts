@@ -64,6 +64,25 @@ describe("log identifier rule", () => {
   });
 });
 
+describe("detached logger method rule", () => {
+  it.each([
+    ["a method picked by a condition", "const log = failed ? logger.error : logger.warn;"],
+    ["a method passed as a callback", "promise.catch(logger.error);"],
+  ])("reports %s", async (_label, code) => {
+    const messages = await restrictedSyntax(code, serverFile);
+
+    expect(messages.length).toBeGreaterThan(0);
+    expect(messages).toEqual(messages.map(() => expect.stringContaining("detached pino method")));
+  });
+
+  it.each([
+    ["a direct call", "logger.warn({ count: 1 }, 'x');"],
+    ["a computed level", "logger[failed ? 'error' : 'warn']({ count: 1 }, 'x');"],
+  ])("allows %s", async (_label, code) => {
+    expect(await restrictedSyntax(code, serverFile)).toEqual([]);
+  });
+});
+
 describe("typography rules", () => {
   const component = "src/modules/demo/ui/probe.tsx";
 

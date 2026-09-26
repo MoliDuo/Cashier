@@ -27,6 +27,11 @@ const importsLogIdentifier =
 const identifierMessage =
   "logger/console must wrap identifier properties in logIdentifier (from @/lib/security/log-identifier) or omit them.";
 
+// Pino's methods read their logger from `this`; a detached one throws once
+// logging is on, which it is in production but not in tests.
+const detachedLogMethod =
+  "MemberExpression[object.name='logger'][computed=false][property.name=/^(?:trace|debug|info|warn|error|fatal)$/]:not(CallExpression > MemberExpression.callee)";
+
 const arbitraryTextSize = "/(?<![\\w-])text-\\[\\d+(?:\\.\\d+)?(?:px|rem|em)\\]/";
 const mutedAlias = "/(?<![\\w-])text-muted(?![-\\w])/";
 const textSizeMessage =
@@ -38,6 +43,10 @@ const architectureSyntax = [
   {
     selector: `Program:not(:has(${importsLogIdentifier})) ${loggedIdentifier}${logIdentifierCall}`,
     message: identifierMessage,
+  },
+  {
+    selector: detachedLogMethod,
+    message: "Call logger methods directly; a detached pino method loses its logger.",
   },
   { selector: `Literal[value=${arbitraryTextSize}]`, message: textSizeMessage },
   { selector: `TemplateElement[value.cooked=${arbitraryTextSize}]`, message: textSizeMessage },

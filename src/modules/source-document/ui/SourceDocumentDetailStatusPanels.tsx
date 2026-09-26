@@ -21,7 +21,7 @@ interface SourceDocumentDetailStatusPanelsProps {
 }
 
 /**
- * Loading/error skeletons plus the revision-conflict, diagnostic, and
+ * Loading/error skeletons plus the reload-failure, diagnostic, and
  * retained-result banners shown above the document body.
  */
 export function SourceDocumentDetailStatusPanels({

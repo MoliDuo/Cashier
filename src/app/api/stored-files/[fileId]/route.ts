@@ -36,8 +36,7 @@ export async function GET(
   } catch (error) {
     const status = getErrorStatusCode(error);
     const body = toSanitizedErrorResponse(error);
-    const log = status < 500 ? logger.warn : logger.error;
-    log(
+    logger[status < 500 ? "warn" : "error"](
       { requestId, status, errorCode: body.error.code },
       status < 500 ? "Stored file request rejected" : "Stored file request failed"
     );

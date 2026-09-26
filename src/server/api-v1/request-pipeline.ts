@@ -196,9 +196,7 @@ export async function handleApiV1Route(
         response.headers.set("X-RateLimit-Reset", String(Math.floor(resetTime / 1000)));
       }
     }
-    const isClientError = status < 500;
-    const log = isClientError ? logger.warn : logger.error;
-    log(
+    logger[status < 500 ? "warn" : "error"](
       {
         requestId,
         logContext,
