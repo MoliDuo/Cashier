@@ -603,7 +603,8 @@
       "savePassword": "保存密码",
       "passwordSaved": "密码已保存",
       "passwordError": "无法保存密码",
-      "cancel": "取消"
+      "cancel": "取消",
+      "passkeySection": "通行密钥"
     },
     "Books": {
       "title": "分账",
@@ -641,6 +642,35 @@
       "saveFailed": "保存分账失败。",
       "empty": "还没有分账。",
       "cancel": "取消"
+    },
+    "Passkeys": {
+      "description": "用指纹、面容或设备密码登录，不需要输入邮箱。",
+      "unsupported": "当前浏览器不支持通行密钥。",
+      "add": "添加通行密钥",
+      "addTitle": "添加通行密钥",
+      "addDesc": "给它起个名字，方便以后辨认是哪台设备。接下来浏览器会请你确认。",
+      "defaultName": "我的设备",
+      "name": "名称",
+      "create": "继续",
+      "empty": "还没有通行密钥，目前只能用邮箱验证码登录。",
+      "createdAt": "添加于 {date}",
+      "lastUsedAt": "上次使用 {date}",
+      "rename": "重命名 {name}",
+      "renameTitle": "重命名通行密钥",
+      "renameDesc": "名称只用于在这里辨认，不影响登录。",
+      "delete": "删除 {name}",
+      "deleteTitle": "删除 {name}？",
+      "deleteDesc": "这台设备将不能再用通行密钥登录。",
+      "deleteLastDesc": "这是最后一个通行密钥。删除后只能用邮箱验证码登录。",
+      "added": "已添加通行密钥",
+      "renamed": "已重命名",
+      "deleted": "已删除通行密钥",
+      "expired": "操作超时，请重试。",
+      "invalid": "浏览器返回的通行密钥无法验证，请重试。",
+      "duplicate": "这台设备已经添加过通行密钥。",
+      "notFound": "找不到这个通行密钥，请刷新后重试。",
+      "reauthRequired": "请重新登录后再继续此操作。",
+      "unknown": "出了点问题，请重试。"
     },
     "Emails": {
       "title": "登录邮箱",
@@ -827,7 +857,10 @@
     "devSignIn": "以开发身份进入",
     "devSignInDesc": "仅本地开发使用。无需邮件验证码，直接打开单账本工作台。",
     "devSignInFailed": "开发会话启动失败",
-    "otpDigitLabel": "第 {index} 位，共 {length} 位"
+    "otpDigitLabel": "第 {index} 位，共 {length} 位",
+    "passkeySignIn": "使用通行密钥登录",
+    "passkeyFailed": "无法用这个通行密钥登录，请重试或改用邮箱验证码。",
+    "orDivider": "或"
   },
   "Error": {
     "title": "应用错误",

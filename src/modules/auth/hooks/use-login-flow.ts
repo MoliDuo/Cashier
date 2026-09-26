@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { startAuthentication } from "@simplewebauthn/browser";
+import { isCancelledCeremony, usePasskeySupport } from "./use-passkey-support";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { sendOTPAction } from "@/modules/auth/server-actions/send-otp";
 import type { SendOTPActionResult } from "@/modules/auth/server-actions/send-otp";
 import {
   devSignInAction,
+  finishPasskeySignInAction,
   signInWithOtpAction,
   signInWithPasswordAction,
+  startPasskeySignInAction,
   type SignInActionResult,
 } from "@/modules/auth/server-actions/sign-in";
 
@@ -44,6 +47,7 @@ function getSignInErrorMessage(
     case AUTH_ERROR_CODES.OTP_RATE_LIMITED:
       return t("rateLimitedDesc");
     case AUTH_ERROR_CODES.PASSWORD_RATE_LIMITED:
+    case AUTH_ERROR_CODES.PASSKEY_RATE_LIMITED:
       return t("rateLimitedDesc");
     case AUTH_ERROR_CODES.PASSWORD_RATE_LIMIT_UNAVAILABLE:
     case AUTH_ERROR_CODES.AUTH_RATE_LIMIT_UNAVAILABLE:
@@ -85,6 +89,7 @@ export function useLoginFlow(
   { initialMode = "password", isDevAuthAvailable = false }: LoginFlowOptions = {}
 ) {
   const router = useRouter();
+  const passkeySupported = usePasskeySupport();
   const callbackUrl = sanitizeCallbackUrl(useSearchParams().get("callbackUrl"));
 
   // The whole flow is one page's worth of state. Reloading in the middle of it
@@ -221,6 +226,41 @@ export function useLoginFlow(
     setStep("email");
   };
 
+  // Discoverable credentials: the browser offers whichever passkeys it holds
+  // for this site, so no email is asked for first.
+  const handlePasskeyLogin = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const start = await startPasskeySignInAction();
+      if (!start.ok) {
+        finishSignIn(start);
+        return;
+      }
+      let response;
+      try {
+        response = await startAuthentication({ optionsJSON: start.options });
+      } catch (error) {
+        if (!isCancelledCeremony(error)) setError(t("passkeyFailed"));
+        setIsLoading(false);
+        return;
+      }
+      const result = await finishPasskeySignInAction(start.challengeId, response);
+      // An unknown passkey and a bad signature both come back as invalid
+      // credentials, which for a passkey is not about any email or password.
+      if (!result.ok && result.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS) {
+        setError(t("passkeyFailed"));
+        setIsLoading(false);
+        return;
+      }
+      finishSignIn(result);
+    } catch {
+      setError(t("unexpectedError"));
+      setIsLoading(false);
+    }
+  };
+
   const handleDevSignIn = async () => {
     if (!isDevAuthAvailable) return;
     setIsLoading(true);
@@ -247,6 +287,7 @@ export function useLoginFlow(
     resendPending,
     otpExpired,
     isDevAuthAvailable,
+    passkeySupported,
     setMode,
     setEmail,
     setPassword,
@@ -260,6 +301,7 @@ export function useLoginFlow(
       setOtpExpired(true);
       setError(t("verifyExpired"));
     },
+    handlePasskeyLogin,
     handleDevSignIn,
   };
 }

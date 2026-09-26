@@ -57,3 +57,39 @@ export function parsePasswordMutationInput(input: unknown): PasswordMutationInpu
   }
   return result.data;
 }
+
+/**
+ * The browser's WebAuthn responses, checked for shape only: the WebAuthn
+ * library verifies what they contain.
+ */
+const base64Url = z
+  .string()
+  .regex(/^[\w-]*$/)
+  .max(16_384);
+
+export const registrationResponseSchema = z
+  .object({
+    id: base64Url,
+    rawId: base64Url,
+    type: z.literal("public-key"),
+    response: z.object({ clientDataJSON: base64Url, attestationObject: base64Url }).passthrough(),
+    clientExtensionResults: z.record(z.string(), z.unknown()),
+  })
+  .passthrough();
+
+export const authenticationResponseSchema = z
+  .object({
+    id: base64Url,
+    rawId: base64Url,
+    type: z.literal("public-key"),
+    response: z
+      .object({
+        clientDataJSON: base64Url,
+        authenticatorData: base64Url,
+        signature: base64Url,
+        userHandle: base64Url.optional(),
+      })
+      .passthrough(),
+    clientExtensionResults: z.record(z.string(), z.unknown()),
+  })
+  .passthrough();

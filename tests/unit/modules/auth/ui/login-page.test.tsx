@@ -15,6 +15,7 @@ const createDevFlow = (handleDevSignIn: Mock) => ({
   expiresAt: null,
   canResendAt: null,
   isDevAuthAvailable: true,
+  passkeySupported: false,
   setEmail: vi.fn(),
   setPassword: vi.fn(),
   setOtp: vi.fn(),
@@ -25,11 +26,14 @@ const createDevFlow = (handleDevSignIn: Mock) => ({
   handleResendOTP: vi.fn(),
   handleChangeEmail: vi.fn(),
   handleOTPExpired: vi.fn(),
+  handlePasskeyLogin: vi.fn(),
   handleDevSignIn,
 });
 
 const mockUseLoginFlow = vi.hoisted(() =>
   vi.fn((_t, options?: { initialMode?: "password" | "otp"; isDevAuthAvailable?: boolean }) => ({
+    passkeySupported: false,
+    handlePasskeyLogin: vi.fn(),
     callbackUrl: "/",
     mode: options?.initialMode ?? "password",
     step: "email",
@@ -85,6 +89,32 @@ describe("AuthLoginPage", () => {
       "true"
     );
     expect(screen.getByText("邮箱登录")).toBeInTheDocument();
+  });
+
+  it("puts passkey sign-in first, above the other ways in, where the browser supports it", async () => {
+    const handlePasskeyLogin = vi.fn();
+    mockUseLoginFlow.mockReturnValueOnce({
+      ...createDevFlow(vi.fn()),
+      isDevAuthAvailable: false,
+      passkeySupported: true,
+      handlePasskeyLogin,
+    });
+
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage />);
+
+    const passkey = screen.getByRole("button", { name: "使用通行密钥登录" });
+    const submit = screen.getByRole("button", { name: "登录" });
+    expect(passkey.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(passkey);
+    expect(handlePasskeyLogin).toHaveBeenCalledOnce();
+  });
+
+  it("hides passkey sign-in where the browser has no WebAuthn", async () => {
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage />);
+
+    expect(screen.queryByRole("button", { name: "使用通行密钥登录" })).not.toBeInTheDocument();
   });
 
   it("renders the development sign-in action only when enabled", async () => {

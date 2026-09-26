@@ -5,6 +5,9 @@ const {
   sendOTPActionMock,
   passwordSignInMock,
   devSignInMock,
+  startPasskeyMock,
+  finishPasskeyMock,
+  startAuthenticationMock,
   pushMock,
   refreshMock,
   searchParams,
@@ -12,6 +15,9 @@ const {
   sendOTPActionMock: vi.fn(),
   passwordSignInMock: vi.fn(),
   devSignInMock: vi.fn(),
+  startPasskeyMock: vi.fn(),
+  finishPasskeyMock: vi.fn(),
+  startAuthenticationMock: vi.fn(),
   pushMock: vi.fn(),
   refreshMock: vi.fn(),
   searchParams: { value: "" },
@@ -21,6 +27,13 @@ vi.mock("@/modules/auth/server-actions/sign-in", () => ({
   signInWithPasswordAction: passwordSignInMock,
   signInWithOtpAction: vi.fn(),
   devSignInAction: devSignInMock,
+  startPasskeySignInAction: startPasskeyMock,
+  finishPasskeySignInAction: finishPasskeyMock,
+}));
+
+vi.mock("@simplewebauthn/browser", () => ({
+  browserSupportsWebAuthn: () => true,
+  startAuthentication: startAuthenticationMock,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -188,5 +201,71 @@ describe("useLoginFlow OTP sending", () => {
     await act(() => result.current.handleDevSignIn());
 
     expect(devSignInMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("useLoginFlow passkey sign-in", () => {
+  const options = { challenge: "c", rpId: "localhost" };
+  const assertion = { id: "cred", rawId: "cred", type: "public-key" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams.value = "";
+    startPasskeyMock.mockResolvedValue({ ok: true, challengeId: "id", options });
+  });
+
+  it("reports browser support and signs in with the assertion the browser returns", async () => {
+    startAuthenticationMock.mockResolvedValue(assertion);
+    finishPasskeyMock.mockResolvedValue({ ok: true });
+    const { result } = renderHook(() => useLoginFlow(t));
+    expect(result.current.passkeySupported).toBe(true);
+
+    await act(async () => {
+      await result.current.handlePasskeyLogin();
+    });
+
+    expect(startAuthenticationMock).toHaveBeenCalledWith({ optionsJSON: options });
+    expect(finishPasskeyMock).toHaveBeenCalledWith("id", assertion);
+    expect(pushMock).toHaveBeenCalledWith("/");
+  });
+
+  it("says nothing when the person dismisses the browser prompt", async () => {
+    startAuthenticationMock.mockRejectedValue(
+      Object.assign(new Error("cancelled"), { name: "NotAllowedError" })
+    );
+    const { result } = renderHook(() => useLoginFlow(t));
+
+    await act(async () => {
+      await result.current.handlePasskeyLogin();
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    expect(finishPasskeyMock).not.toHaveBeenCalled();
+  });
+
+  it("shows a passkey message, not the email-and-password one, for an unknown passkey", async () => {
+    startAuthenticationMock.mockResolvedValue(assertion);
+    finishPasskeyMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
+    const { result } = renderHook(() => useLoginFlow(t));
+
+    await act(async () => {
+      await result.current.handlePasskeyLogin();
+    });
+
+    expect(result.current.error).toBe("passkeyFailed");
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the rate-limit message when starts are throttled", async () => {
+    startPasskeyMock.mockResolvedValue({ ok: false, code: "passkey_rate_limited" });
+    const { result } = renderHook(() => useLoginFlow(t));
+
+    await act(async () => {
+      await result.current.handlePasskeyLogin();
+    });
+
+    expect(result.current.error).toBe("rateLimitedDesc");
+    expect(startAuthenticationMock).not.toHaveBeenCalled();
   });
 });

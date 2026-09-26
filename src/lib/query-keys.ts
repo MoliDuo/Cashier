@@ -21,6 +21,8 @@ export const queryKeys = {
   // === Login emails ===
   /** The addresses that can sign in, so an add or remove shows without a reload. */
   loginEmails: () => ["account", "login-emails"] as const,
+  /** The account's passkeys, so an add, rename or delete shows without a reload. */
+  passkeys: () => ["account", "passkeys"] as const,
 
   // === Books ===
   /** The switcher's books, so a rename or reorder shows without a fresh page. */

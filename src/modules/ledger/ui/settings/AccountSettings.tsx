@@ -8,6 +8,7 @@ import type {
 import { useTranslations } from "next-intl";
 import { EmailSettings } from "./EmailSettings";
 import { PasswordForm } from "@/modules/auth/ui/PasswordForm";
+import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
 import { SettingsField } from "./SettingsField";
 import { SettingsSection } from "./SettingsSection";
@@ -61,8 +62,11 @@ export function AccountSettings({
 
   return (
     <>
-      {/* 密码 and API 密钥 each save on their own, so each is a card of its own
-          rather than a field inside this one, the way 分账 and 记账规则 are. */}
+      {/* 通行密钥, 密码 and API 密钥 each save on their own, so each is a card of
+          its own rather than a field inside 账户, the way 分账 and 记账规则 are. */}
+      <SettingsSection title={ta("passkeySection")}>
+        <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
+      </SettingsSection>
       <SettingsSection title={ta("passwordSection")}>
         <PasswordForm
           hasPassword={hasPassword}

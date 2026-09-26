@@ -11,6 +11,7 @@ export const AUTH_ERROR_CODES = {
   PASSWORD_RATE_LIMITED: "password_rate_limited",
   PASSWORD_RATE_LIMIT_UNAVAILABLE: "password_rate_limit_unavailable",
   AUTH_RATE_LIMIT_UNAVAILABLE: "auth_rate_limit_unavailable",
+  PASSKEY_RATE_LIMITED: "passkey_rate_limited",
   PASSWORD_TOO_SHORT: "password_too_short",
   PASSWORD_REQUIREMENTS_NOT_MET: "password_requirements_not_met",
   PASSWORD_MISMATCH: "password_mismatch",

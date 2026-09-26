@@ -5,6 +5,7 @@ import {
   categoryReclassificationJobs,
   emailChangeChallenges,
   sessions,
+  webauthnChallenges,
   ledgers,
   sourceDocumentFiles,
   storedFiles,
@@ -98,6 +99,9 @@ async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void
     )`,
     sql`DELETE FROM otp_tokens WHERE id IN (
       SELECT id FROM otp_tokens WHERE expires < ${now} LIMIT ${BATCH}
+    )`,
+    sql`DELETE FROM ${webauthnChallenges} WHERE id IN (
+      SELECT id FROM ${webauthnChallenges} WHERE expires_at < ${now} LIMIT ${BATCH}
     )`,
     sql`DELETE FROM ${sessions} WHERE id IN (
       SELECT id FROM ${sessions} WHERE expires_at < ${now} LIMIT ${BATCH}

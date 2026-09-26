@@ -3,6 +3,10 @@
 import crypto from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/server";
 import { logger } from "@/lib/logger";
 import { AUTH_ERROR_CODES, AuthSignInError, type AuthErrorCode } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
@@ -11,6 +15,9 @@ import { authenticateWithPassword } from "@/modules/auth/server/authenticate-wit
 import { authenticateDevUser } from "@/modules/auth/server/authenticate-dev-user";
 import { completeInteractiveSignIn } from "@/modules/auth/server/complete-interactive-sign-in";
 import { endSession, startSession } from "@/modules/auth/server/current-session";
+import { authenticateWithPasskey, startPasskeySignIn } from "@/modules/auth/server/passkeys";
+import { authenticationResponseSchema } from "@/modules/auth/contract-schemas";
+import { getClientIPFromHeaders } from "@/lib/utils/ip";
 
 export type SignInActionResult = { ok: true } | { ok: false; code: AuthErrorCode | "unexpected" };
 
@@ -67,6 +74,40 @@ export async function signInWithPasswordAction(
       email: parsed.data.email,
       password: parsed.data.secret,
       requestHeaders,
+    })
+  );
+}
+
+export async function startPasskeySignInAction(): Promise<
+  | { ok: true; challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }
+  | { ok: false; code: AuthErrorCode | "unexpected" }
+> {
+  try {
+    const ip = getClientIPFromHeaders(await headers());
+    return { ok: true, ...(await startPasskeySignIn(ip)) };
+  } catch (error) {
+    if (error instanceof AuthSignInError) return { ok: false, code: error.code };
+    logger.error(
+      { error, correlationId: crypto.randomUUID(), errorCode: "PASSKEY_SIGN_IN_START_FAILED" },
+      "Passkey sign-in could not start"
+    );
+    return { ok: false, code: "unexpected" };
+  }
+}
+
+export async function finishPasskeySignInAction(
+  challengeId: string,
+  response: AuthenticationResponseJSON
+): Promise<SignInActionResult> {
+  const parsedId = z.uuid().safeParse(challengeId);
+  const parsedResponse = authenticationResponseSchema.safeParse(response);
+  if (!parsedId.success || !parsedResponse.success) {
+    return { ok: false, code: AUTH_ERROR_CODES.INVALID_CREDENTIALS };
+  }
+  return signInWith(() =>
+    authenticateWithPasskey({
+      challengeId: parsedId.data,
+      response: parsedResponse.data as AuthenticationResponseJSON,
     })
   );
 }

@@ -36,6 +36,9 @@ with `vi.mock` of the concrete module rather than injected fakes.
   digest is stored. Read the session with `getCurrentSession`, guard with `requireAuth`,
   `requireRecentAuth` or `withAuth` (`src/modules/auth/server/session-guards.ts`), and end sessions
   by deleting rows. The proxy only checks that the cookie is present.
+- Passkeys (`src/modules/auth/server/passkeys.ts`) use discoverable credentials with the relying
+  party taken from `APP_URL`. Each ceremony stores a `webauthn_challenges` row that finishing
+  deletes, so a challenge answers once; adding or deleting a passkey needs `requireRecentAuth`.
 - Treat forwarded client addresses as untrusted unless `TRUSTED_PROXY` is explicitly configured.
 - Log correlation IDs and identifiers tagged by logIdentifier; email and IP identifiers are hashed. Do not log raw email addresses, IP addresses,
   bearer tokens, OTP values, image contents, or provider payloads.

@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { KeyRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { useLoginFlow } from "../hooks/use-login-flow";
 import { EmailStep } from "./email-step";
@@ -55,6 +57,24 @@ export function AuthLoginPage({
             <p role="status" className="mb-5 rounded-md bg-surface2 p-3 text-sm text-text">
               {noticeMessage}
             </p>
+          ) : null}
+          {flow.passkeySupported ? (
+            <div className="mb-5">
+              <Button
+                type="button"
+                className="min-h-11 w-full"
+                disabled={flow.isLoading || flow.resendPending}
+                onClick={() => void flow.handlePasskeyLogin()}
+              >
+                <KeyRound aria-hidden="true" className="size-4" />
+                {t("passkeySignIn")}
+              </Button>
+              <div className="mt-5 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className={textRoleClassName("meta")}>{t("orDivider")}</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </div>
           ) : null}
           {emailAuthEnabled ? (
             <div className="mb-5 grid grid-cols-2 gap-1 rounded-md bg-surface2 p-1">
