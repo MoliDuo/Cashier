@@ -9,6 +9,7 @@ export default defineConfig([
     ".next/**",
     ".next-cashier-*/**",
     ".worktrees/**",
+    ".claude/**",
     ".tmp/**",
     "out/**",
     "build/**",
