@@ -2,8 +2,10 @@ import fs from "node:fs";
 import vm from "node:vm";
 import zlib from "node:zlib";
 
-const manifestPath = ".next/server/app/(protected)/page_client-reference-manifest.js";
-const routeKey = "/(protected)/page";
+// 流水 is where the app opens, so its bundle is the one a reader waits on.
+const manifestPath =
+  ".next/server/app/(protected)/(ledger)/stream/page_client-reference-manifest.js";
+const routeKey = "/(protected)/(ledger)/stream/page";
 // The protected route is the app's largest client bundle. This reports its
 // weight rather than gating on it: two readers on an installed PWA are not the
 // audience a byte budget protects, and keeping the number honest cost more

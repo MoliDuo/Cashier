@@ -13,7 +13,7 @@ describe("buildPwaManifest", () => {
       name: "Cashier - AI 记账助手",
       short_name: "Cashier",
       description: "AI 驱动的智能记账工具",
-      start_url: "/",
+      start_url: "/stream",
       display: "standalone",
       background_color: "#ffffff",
       theme_color: "#ffffff",

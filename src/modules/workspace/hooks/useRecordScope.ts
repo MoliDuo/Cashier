@@ -1,22 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 import { resolveLiveRecordScope } from "../record-scope";
 import { writeBookScopeCookie } from "@/lib/book-scope-cookie";
-import { useBookScopeStore } from "@/lib/store/book-scope";
-
-interface UseRecordScopeOptions {
-  /** The live books the scope is validated against; undefined while loading. */
-  books: readonly BookDto[] | undefined;
-  /**
-   * The scope the server resolved from this device's remembered choice, null
-   * for 总账. Seeding from it — rather than from the store — is what keeps the
-   * hydration render identical to the server's.
-   */
-  initialScope: string | null;
-}
+import { useWorkspaceStore } from "../store";
 
 interface UseRecordScopeResult {
   /** The book the page is showing, or null for 总账. */
@@ -28,38 +17,29 @@ interface UseRecordScopeResult {
  * The page's book scope: this device's last choice, remembered by a cookie the
  * server reads before the first request renders. Picking a book is therefore
  * not a history entry either — Back belongs to navigation, not to a preference.
+ *
+ * @param books The live books the scope is validated against; undefined while loading.
  */
-export function useRecordScope({
-  books,
-  initialScope,
-}: UseRecordScopeOptions): UseRecordScopeResult {
-  const [scope, setScope] = useState<RecordScope>(initialScope);
-  const setSharedScope = useBookScopeStore((state) => state.setBookId);
-
-  const recordScope = resolveLiveRecordScope(scope, books);
+export function useRecordScope(books: readonly BookDto[] | undefined): UseRecordScopeResult {
+  const scope = useWorkspaceStore((state) => state.bookId);
+  const setScope = useWorkspaceStore((state) => state.setBookId);
 
   // A selected book can be archived or deleted while it is the scope — 设置 is
-  // one tab away. Once the live list says it is gone, the scope falls back to
-  // 总账 here, during render, so no committed frame ever shows a dead book and
-  // a later restore cannot resurrect it. The list is undefined while it loads,
-  // which is not a reason to reset a scope that may still be perfectly live.
-  if (scope != null && books !== undefined && recordScope == null) {
-    setScope(null);
-  }
+  // one tab away. The rendered scope falls back to 总账 as soon as the live list
+  // says it is gone, so no frame shows a dead book, and the effect below then
+  // forgets it. The list is undefined while it loads, which is not a reason to
+  // reset a scope that may still be perfectly live.
+  const recordScope = resolveLiveRecordScope(scope, books);
+  const dead = scope != null && recordScope == null;
 
-  // The shell's hover prefetch reads the shared store, and the cookie is what
-  // the next page load and a new tab are remembered by; both follow the view.
   useEffect(() => {
-    setSharedScope(scope);
-    writeBookScopeCookie(scope);
-  }, [scope, setSharedScope]);
+    if (dead) setScope(null);
+  }, [dead, setScope]);
 
-  const onRecordScopeChange = useCallback(
-    (next: RecordScope) => {
-      setScope(next);
-    },
-    [setScope]
-  );
+  // The cookie is what the next page load and a new tab are remembered by.
+  useEffect(() => {
+    if (!dead) writeBookScopeCookie(scope);
+  }, [dead, scope]);
 
-  return { recordScope, onRecordScopeChange };
+  return { recordScope, onRecordScopeChange: setScope };
 }

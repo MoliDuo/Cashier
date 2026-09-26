@@ -12,12 +12,11 @@ describe("usePeriodFilter", () => {
   }
 
   it("includes statuses in filters built from URL state", () => {
-    const searchParams = createSearchParams("streamStatuses=cancelled,failed");
+    const searchParams = createSearchParams("statuses=cancelled,failed");
     const { result } = renderHook(() =>
       usePeriodFilter({
         pathname: "/ledger/test",
         searchParams,
-        scope: "stream",
       })
     );
 

@@ -1,9 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
-import { getLedgerPageBootstrap as getLedgerPageBootstrapUseCase } from "@/modules/workspace/server/ledger-page-bootstrap";
+import {
+  getLedgerRouteBootstrap,
+  getLedgerShellBootstrap,
+  loadLedgerView,
+} from "@/modules/workspace/server/ledger-page-bootstrap";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
+import type { LedgerTab } from "@/lib/ledger-tabs";
+import type { PeriodParams } from "@/lib/period-utils";
+import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
+import type { StatsUrlState } from "@/modules/workspace/stats-url-params";
 
 const listBooksMock = vi.hoisted(() => vi.fn());
+const requestState = vi.hoisted(() => ({
+  ledgerDto: null as unknown,
+  cookies: {} as Record<string, string>,
+}));
+
+vi.mock("@/modules/workspace/server/resolve-authenticated-home", () => ({
+  resolveAuthenticatedHome: async () => ({
+    ledgerId: "ledger-1",
+    ledgerDto: requestState.ledgerDto,
+    session: { user: { id: "user-1" } },
+  }),
+}));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      const value = requestState.cookies[name];
+      return value == null ? undefined : { name, value };
+    },
+  }),
+}));
 
 /**
  * The zone a repeat visit arrives with: the browser has already written its
@@ -13,15 +41,50 @@ const listBooksMock = vi.hoisted(() => vi.fn());
  */
 const REPORTED_DEVICE_TIME_ZONE = "Asia/Shanghai";
 
-const getLedgerPageBootstrap = (
-  input: Omit<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto"> &
-    Partial<Pick<Parameters<typeof getLedgerPageBootstrapUseCase>[0], "ledgerDto">>
-) =>
-  getLedgerPageBootstrapUseCase({
-    deviceTimeZone: REPORTED_DEVICE_TIME_ZONE,
-    ...input,
-    ledgerDto: input.ledgerDto ?? createPreAuthorizedLedgerDto(),
-  });
+interface BootstrapInput {
+  initialTab: LedgerTab;
+  periodParams?: PeriodParams;
+  advancedFilters?: LedgerAdvancedFilters;
+  statsState?: StatsUrlState;
+  ledgerDto?: ReturnType<typeof createPreAuthorizedLedgerDto>;
+  /** The book the scope cookie names. */
+  bookId?: string;
+  /** The zone the device cookie names, null for none. */
+  deviceTimeZone?: string | null;
+}
+
+/**
+ * One document request: the layout's view and shell data, then the route's
+ * first screen, the way the ledger layout and page compose them.
+ */
+async function getLedgerPageBootstrap(input: BootstrapInput) {
+  const ledgerDto = input.ledgerDto ?? createPreAuthorizedLedgerDto();
+  requestState.ledgerDto = ledgerDto;
+  const deviceTimeZone =
+    input.deviceTimeZone === undefined ? REPORTED_DEVICE_TIME_ZONE : input.deviceTimeZone;
+  requestState.cookies = {
+    ...(input.bookId == null ? {} : { CASHIER_BOOK_SCOPE: input.bookId }),
+    ...(deviceTimeZone == null ? {} : { CASHIER_TIME_ZONE: deviceTimeZone }),
+  };
+  const view = await loadLedgerView();
+  const [shell, route] = await Promise.all([
+    getLedgerShellBootstrap({ ledgerDto, books: view.books, categories: view.categories }),
+    getLedgerRouteBootstrap({
+      tab: input.initialTab,
+      ledgerDto,
+      scope: view,
+      ...(input.periodParams !== undefined ? { periodParams: input.periodParams } : {}),
+      ...(input.advancedFilters !== undefined ? { advancedFilters: input.advancedFilters } : {}),
+      ...(input.statsState !== undefined ? { statsState: input.statsState } : {}),
+    }),
+  ]);
+  return {
+    dehydratedState: { ...route, queries: [...shell.queries, ...route.queries] },
+    initialBookId: view.bookId,
+    initialBooks: view.books,
+    ledgerToday: view.ledgerToday,
+  };
+}
 
 const listEntryCategoriesMock = vi.hoisted(() => vi.fn());
 const calculateLedgerStatsMock = vi.hoisted(() => vi.fn());
@@ -74,7 +137,7 @@ describe("getLedgerPageBootstrap", () => {
     listEntryCategoriesMock.mockResolvedValue([]);
     listBooksMock.mockResolvedValue([
       {
-        id: "book-1",
+        id: "10000000-0000-4000-8000-000000000001",
         name: "共同支出",
         timeZone: null,
         sortOrder: 1,
@@ -109,7 +172,7 @@ describe("getLedgerPageBootstrap", () => {
 
     releaseBooks([
       {
-        id: "book-1",
+        id: "10000000-0000-4000-8000-000000000001",
         name: "共同支出",
         timeZone: null,
         sortOrder: 1,
@@ -440,7 +503,7 @@ describe("getLedgerPageBootstrap", () => {
       try {
         listBooksMock.mockResolvedValue([
           {
-            id: "book-1",
+            id: "10000000-0000-4000-8000-000000000001",
             name: "共同支出",
             timeZone: "Asia/Shanghai",
             sortOrder: 1,
@@ -451,7 +514,7 @@ describe("getLedgerPageBootstrap", () => {
           periodParams: { period: "thisMonth" },
           ledgerDto: createPreAuthorizedLedgerDto(),
           deviceTimeZone: "Europe/London",
-          bookId: "book-1",
+          bookId: "10000000-0000-4000-8000-000000000001",
         });
 
         // 16:30 UTC is 00:30 in Shanghai (the next day) but still 17:30 in
@@ -519,18 +582,20 @@ describe("getLedgerPageBootstrap", () => {
         periodParams: { period: "thisMonth" },
         statsState: { range: "month", offset: 0, view: "heatmap" },
         ledgerDto: createPreAuthorizedLedgerDto(),
-        bookId: "book-1",
+        bookId: "10000000-0000-4000-8000-000000000001",
       });
 
       const statsQuery = result?.dehydratedState.queries.find(
         (query) => query.queryKey[0] === "ledger" && query.queryKey[1] === "enhanced-stats"
       );
-      expect(statsQuery?.queryKey[2]).toMatchObject({ bookId: "book-1" });
+      expect(statsQuery?.queryKey[2]).toMatchObject({
+        bookId: "10000000-0000-4000-8000-000000000001",
+      });
       expect(getEnhancedStatsMock).toHaveBeenCalledWith(
         "ledger-1",
-        expect.objectContaining({ bookId: "book-1" })
+        expect.objectContaining({ bookId: "10000000-0000-4000-8000-000000000001" })
       );
-      expect(result?.initialBookId).toBe("book-1");
+      expect(result?.initialBookId).toBe("10000000-0000-4000-8000-000000000001");
     });
 
     it("prefetches 总账 when the remembered book is no longer live", async () => {
@@ -542,7 +607,7 @@ describe("getLedgerPageBootstrap", () => {
         // The live list holds only book-1; this id was archived after the
         // choice was made. The client resets the scope, and the prefetch must
         // match it.
-        bookId: "book-archived",
+        bookId: "10000000-0000-4000-8000-0000000000ff",
       });
 
       const statsQuery = result?.dehydratedState.queries.find(
@@ -555,6 +620,25 @@ describe("getLedgerPageBootstrap", () => {
       );
       expect(result?.initialBookId).toBeNull();
     });
+  });
+
+  it("keeps the remembered book and leaves dated reads to the client when the books fail", async () => {
+    listBooksMock.mockRejectedValue(new Error("books are down"));
+
+    const result = await getLedgerPageBootstrap({
+      initialTab: "stream",
+      bookId: "10000000-0000-4000-8000-000000000001",
+    });
+
+    // A list that failed is not evidence the book is gone; losing it would
+    // quietly reset the reader to 总账.
+    expect(result.initialBookId).toBe("10000000-0000-4000-8000-000000000001");
+    expect(result.initialBooks).toBeNull();
+    expect(result.ledgerToday).toBeUndefined();
+    expect(listStreamPageMock).not.toHaveBeenCalled();
+    expect(result.dehydratedState.queries.some((query) => query.queryKey[1] === "books")).toBe(
+      false
+    );
   });
 
   it("does not prefetch a multi-ledger list for the single-ledger workspace", async () => {
@@ -660,7 +744,7 @@ describe("getLedgerPageBootstrap", () => {
     it("dates 总账 by the device and does not inherit a book's fixed zone", async () => {
       listBooksMock.mockResolvedValue([
         {
-          id: "book-1",
+          id: "10000000-0000-4000-8000-000000000001",
           name: "共同支出",
           timeZone: "Asia/Shanghai",
           sortOrder: 1,
@@ -689,7 +773,7 @@ describe("getLedgerPageBootstrap", () => {
     it("lets a viewed book's fixed zone beat the device zone across the month boundary", async () => {
       listBooksMock.mockResolvedValue([
         {
-          id: "book-1",
+          id: "10000000-0000-4000-8000-000000000001",
           name: "共同支出",
           timeZone: "Europe/London",
           sortOrder: 1,
@@ -701,14 +785,14 @@ describe("getLedgerPageBootstrap", () => {
         periodParams: { period: "thisMonth" },
         ledgerDto: createPreAuthorizedLedgerDto(),
         deviceTimeZone: "Asia/Shanghai",
-        bookId: "book-1",
+        bookId: "10000000-0000-4000-8000-000000000001",
       });
 
       // Shanghai is already into October; the book the page is narrowed to is
       // not, and the book is the authority for its own records.
       expect(result?.ledgerToday).toBe("2026-09-30");
       expect(listStreamPageMock).toHaveBeenCalledWith("ledger-1", {
-        bookId: "book-1",
+        bookId: "10000000-0000-4000-8000-000000000001",
         startDate: "2026-09-01",
         endDate: "2026-09-30",
         cursor: undefined,

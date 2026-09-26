@@ -5,7 +5,7 @@ import { useModalStackStore } from "@/lib/store/modal-stack";
 describe("openLedgerEntrySourceDocument", () => {
   beforeEach(() => {
     useModalStackStore.setState({ stack: [] });
-    window.history.replaceState({}, "", "/zh/ledger/ledger-1?tab=details");
+    window.history.replaceState({}, "", "/details?period=week");
   });
 
   afterEach(() => {
@@ -33,7 +33,7 @@ describe("openLedgerEntrySourceDocument", () => {
     expect(pushState).toHaveBeenCalledWith(
       expect.objectContaining({ cashier: expect.objectContaining({ kind: "detail" }) }),
       "",
-      "/zh/ledger/ledger-1?tab=details&detailType=source-document&detailId=document-1"
+      "/details?period=week&detail=document-1"
     );
   });
 

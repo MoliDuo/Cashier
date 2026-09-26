@@ -3,7 +3,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { ShellControllerProvider } from "@/components/providers/shell-controller";
+import { WorkspaceStoreProvider } from "@/modules/workspace/store";
+import { queryKeys } from "@/lib/query-keys";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
@@ -60,14 +61,25 @@ type EnvironmentProps = {
   withInitialData?: boolean;
 };
 
-function createWrapper() {
+/** A query client holding what the layout's server render hydrates. */
+function createClient(props: EnvironmentProps) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  if (props.withInitialData !== false) {
+    client.setQueryData(queryKeys.ledger(), ledgerDto);
+    client.setQueryData(queryKeys.entryCategories(), [] as EntryCategoryWithCount[]);
+  }
+  if (props.initialBooks !== undefined) client.setQueryData(queryKeys.books(), props.initialBooks);
+  return client;
+}
+
+function createWrapper(props: EnvironmentProps) {
+  const client = createClient(props);
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={client}>
-        <ShellControllerProvider>{children}</ShellControllerProvider>
+        <WorkspaceStoreProvider initialBookId={props.scope}>{children}</WorkspaceStoreProvider>
       </QueryClientProvider>
     );
   };
@@ -78,14 +90,9 @@ function renderEnvironment(props: EnvironmentProps) {
     (current: EnvironmentProps) =>
       useLedgerPageEnvironment({
         scope: current.scope,
-        ...(current.withInitialData === false
-          ? {}
-          : { initialLedger: ledgerDto, initialCategories: [] as EntryCategoryWithCount[] }),
-        ...(current.initialBooks !== undefined ? { initialBooks: current.initialBooks } : {}),
         initialDeviceTimeZone: current.initialDeviceTimeZone,
-        setIsInputOpen: vi.fn(),
       }),
-    { wrapper: createWrapper(), initialProps: props }
+    { wrapper: createWrapper(props), initialProps: props }
   );
 }
 
@@ -98,11 +105,7 @@ function renderServerFrame(props: EnvironmentProps): string {
   function Probe() {
     const environment = useLedgerPageEnvironment({
       scope: props.scope,
-      initialLedger: ledgerDto,
-      initialCategories: [] as EntryCategoryWithCount[],
-      ...(props.initialBooks !== undefined ? { initialBooks: props.initialBooks } : {}),
       initialDeviceTimeZone: props.initialDeviceTimeZone,
-      setIsInputOpen: vi.fn(),
     });
     return (
       <span
@@ -114,10 +117,10 @@ function renderServerFrame(props: EnvironmentProps): string {
   }
 
   return renderToString(
-    <QueryClientProvider client={new QueryClient()}>
-      <ShellControllerProvider>
+    <QueryClientProvider client={createClient(props)}>
+      <WorkspaceStoreProvider initialBookId={props.scope}>
         <Probe />
-      </ShellControllerProvider>
+      </WorkspaceStoreProvider>
     </QueryClientProvider>
   );
 }
@@ -269,7 +272,7 @@ describe("useLedgerPageEnvironment time zone readiness", () => {
     await waitFor(() => expect(document.cookie).toContain("CASHIER_TIME_ZONE=Asia/Tokyo"));
   });
 
-  it("serves the server-provided ledger and categories without a browser round trip", () => {
+  it("serves the hydrated ledger and categories without a browser round trip", () => {
     renderEnvironment({ scope: null, initialBooks: [], initialDeviceTimeZone: "Asia/Tokyo" });
 
     expect(getLedgerActionMock).not.toHaveBeenCalled();

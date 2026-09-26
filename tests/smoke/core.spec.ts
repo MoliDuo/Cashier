@@ -65,7 +65,7 @@ test("password login, default ledger, manual entry, edit, delete and sign out", 
   await page.getByRole("dialog").first().getByRole("button", { name: "删除", exact: true }).click();
   await page.getByRole("dialog").last().getByRole("button", { name: "删除", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page).not.toHaveURL(/detailId=/);
+  await expect(page).not.toHaveURL(/detail=/);
   await page.reload();
   await expect(page.getByText(`${item} edited`, { exact: true })).toHaveCount(0);
   await expect(refreshControl).toBeEnabled();

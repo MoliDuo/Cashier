@@ -4,15 +4,18 @@ import type { ModalItem } from "@/lib/store/modal-stack";
 import { useModalStackStore } from "@/lib/store/modal-stack";
 import { writeLedgerHistory } from "@/lib/navigation/ledger-history";
 
-function setDetailParams(detail: { type: ModalItem["type"]; id: string } | null): URLSearchParams {
+/** The open record, as `?detail=<id>` on whichever ledger route it was opened from. */
+export const LEDGER_DETAIL_PARAM = "detail";
+
+export function readLedgerDetailParam(params: Pick<URLSearchParams, "get">): string | null {
+  const id = params.get(LEDGER_DETAIL_PARAM);
+  return id == null || id === "" ? null : id;
+}
+
+function setDetailParams(detail: { id: string } | null): URLSearchParams {
   const params = new URLSearchParams(window.location.search);
-  if (detail == null) {
-    params.delete("detailType");
-    params.delete("detailId");
-  } else {
-    params.set("detailType", detail.type);
-    params.set("detailId", detail.id);
-  }
+  if (detail == null) params.delete(LEDGER_DETAIL_PARAM);
+  else params.set(LEDGER_DETAIL_PARAM, detail.id);
   return params;
 }
 
@@ -24,11 +27,7 @@ function detailUrl(params: URLSearchParams): string {
 export function openLedgerDetail(item: Omit<ModalItem, "returnFocus">): void {
   const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   useModalStackStore.getState().push({ ...item, returnFocus } as ModalItem);
-  writeLedgerHistory(
-    "push",
-    detailUrl(setDetailParams({ type: item.type, id: item.id })),
-    "detail"
-  );
+  writeLedgerHistory("push", detailUrl(setDetailParams({ id: item.id })), "detail");
 }
 
 /**
@@ -48,18 +47,14 @@ export function closeLedgerDetail(): void {
   const modalState = useModalStackStore.getState();
   const current = modalState.stack.at(-1);
   const previous = modalState.stack.at(-2);
-  const params =
-    previous == null
-      ? setDetailParams(null)
-      : setDetailParams({ type: previous.type, id: previous.id });
+  const params = setDetailParams(previous == null ? null : { id: previous.id });
   const detail = new URLSearchParams(window.location.search);
   const state = window.history.state as {
     cashier?: { ledgerNavigation?: boolean; kind?: string };
   } | null;
   if (
     current != null &&
-    detail.get("detailType") === current.type &&
-    detail.get("detailId") === current.id &&
+    readLedgerDetailParam(detail) === current.id &&
     state?.cashier?.ledgerNavigation === true &&
     state.cashier.kind === "detail"
   ) {

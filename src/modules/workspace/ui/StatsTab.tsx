@@ -25,7 +25,7 @@ import {
   setStatsSearchParams,
   type StatsRange,
   type StatsView,
-} from "@/modules/workspace/ledger-url-params";
+} from "@/modules/workspace/stats-url-params";
 import { pushLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 

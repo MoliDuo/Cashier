@@ -1,6 +1,6 @@
 "use client";
 
-export type LedgerNavigationKind = "tab" | "filter" | "stats" | "drilldown" | "detail";
+export type LedgerNavigationKind = "filter" | "stats" | "detail";
 
 interface CashierHistoryMetadata {
   cashier?: {

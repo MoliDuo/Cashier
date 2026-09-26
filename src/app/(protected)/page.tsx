@@ -1,19 +1,16 @@
-import { Suspense } from "react";
-import { LedgerPageSkeleton } from "@/components/skeletons";
-import { ActiveTab } from "./_active-tab";
-
-export const maxDuration = 120;
+import { redirect } from "next/navigation";
+import { legacyLedgerHref } from "@/modules/workspace/legacy-ledger-url";
 
 interface HomePageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+/** `/` and every `/?tab=…` bookmark land on the tab's own route. */
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const resolvedSearchParams = await searchParams;
-
-  return (
-    <Suspense fallback={<LedgerPageSkeleton />}>
-      <ActiveTab searchParams={resolvedSearchParams} />
-    </Suspense>
-  );
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (first != null) params.set(key, first);
+  }
+  redirect(legacyLedgerHref(params));
 }

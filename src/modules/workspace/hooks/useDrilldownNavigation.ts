@@ -1,14 +1,12 @@
 "use client";
 import { useCallback } from "react";
-import { buildDetailsDrilldownSearchParams } from "../ledger-url-params";
-import { pushLedgerUrl } from "../ledger-url-navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { buildDetailsDrilldownSearchParams } from "../ledger-url-params";
 import { prefetchDetailsTabQuery } from "../prefetch-ledger-tabs";
+import { useLedgerNavigation } from "./useLedgerNavigation";
 
 interface UseDrilldownNavigationOptions {
   bookId?: string;
-  searchParams: URLSearchParams;
-  pathname: string;
 }
 
 interface UseDrilldownNavigationResult {
@@ -19,49 +17,41 @@ interface UseDrilldownNavigationResult {
   ) => void;
 }
 
+/** 统计's way into 明细: a date range, and the category or currency that was pressed. */
 export function useDrilldownNavigation({
   bookId,
-  searchParams,
-  pathname,
 }: UseDrilldownNavigationOptions): UseDrilldownNavigationResult {
   const queryClient = useQueryClient();
+  const { navigate } = useLedgerNavigation();
   const handleCategoryDrilldown = useCallback(
     (categoryId: string, startDate: string, endDate: string) => {
-      const params = buildDetailsDrilldownSearchParams(searchParams, {
-        startDate,
-        endDate,
-        categoryId,
-      });
       void prefetchDetailsTabQuery(
         queryClient,
         bookId,
         { period: "custom", startDate, endDate },
         { categoryId }
       );
-      pushLedgerUrl(pathname, params, "drilldown");
+      navigate("details", buildDetailsDrilldownSearchParams({ startDate, endDate, categoryId }));
     },
-    [bookId, pathname, queryClient, searchParams]
+    [bookId, navigate, queryClient]
   );
 
   const handleDateDrilldown = useCallback(
     (date: string, filters?: { currency?: string | null; categoryId?: string | null }) => {
-      const nextCategoryId = filters?.categoryId ?? null;
-
-      const params = buildDetailsDrilldownSearchParams(searchParams, {
-        startDate: date,
-        endDate: date,
-        categoryId: nextCategoryId,
-        currency: filters?.currency ?? null,
-      });
+      const categoryId = filters?.categoryId ?? null;
+      const currency = filters?.currency ?? null;
       void prefetchDetailsTabQuery(
         queryClient,
         bookId,
         { period: "custom", startDate: date, endDate: date },
-        { categoryId: nextCategoryId, currency: filters?.currency ?? null }
+        { categoryId, currency }
       );
-      pushLedgerUrl(pathname, params, "drilldown");
+      navigate(
+        "details",
+        buildDetailsDrilldownSearchParams({ startDate: date, endDate: date, categoryId, currency })
+      );
     },
-    [bookId, pathname, queryClient, searchParams]
+    [bookId, navigate, queryClient]
   );
 
   return {

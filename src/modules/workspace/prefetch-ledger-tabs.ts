@@ -9,7 +9,7 @@ import type { LedgerAdvancedFilters } from "./initial-query-state";
 import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { getDeviceTimeZone } from "@/lib/time-zone-cookie";
-import type { StatsUrlState } from "./ledger-url-params";
+import type { StatsUrlState } from "./stats-url-params";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 /**

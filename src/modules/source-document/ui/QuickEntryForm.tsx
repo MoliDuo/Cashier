@@ -146,10 +146,7 @@ export function QuickEntryForm({
             className="mb-2 rounded-md border border-danger/30 bg-danger/10 p-3 text-sm"
           >
             <p>{t("noCategories")}</p>
-            <Link
-              href="/?tab=settings"
-              className="mt-2 inline-flex font-medium text-primary underline"
-            >
+            <Link href="/settings" className="mt-2 inline-flex font-medium text-primary underline">
               {t("goToSettings")}
             </Link>
           </div>

@@ -28,11 +28,7 @@ describe("new record success feedback", () => {
   beforeEach(() => {
     toastSuccessMock.mockReset();
     useModalStackStore.getState().closeAll();
-    window.history.replaceState(
-      { next: "preserved" },
-      "",
-      "/ledger-1?tab=stats&streamSearch=lunch"
-    );
+    window.history.replaceState({ next: "preserved" }, "", "/stats?range=year");
   });
 
   it("shows a single action toast and preserves filters when opening the record", () => {
@@ -60,10 +56,9 @@ describe("new record success feedback", () => {
     options.action.onClick();
 
     const params = new URLSearchParams(window.location.search);
-    expect(params.get("tab")).toBe("stats");
-    expect(params.get("streamSearch")).toBe("lunch");
-    expect(params.get("detailType")).toBe("source-document");
-    expect(params.get("detailId")).toBe("source-1");
+    expect(window.location.pathname).toBe("/stats");
+    expect(params.get("range")).toBe("year");
+    expect(params.get("detail")).toBe("source-1");
     expect(window.history.state).toMatchObject({
       next: "preserved",
       cashier: { ledgerNavigation: true, kind: "detail" },

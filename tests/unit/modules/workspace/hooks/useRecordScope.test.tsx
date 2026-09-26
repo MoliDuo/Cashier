@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import { describe, expect, it, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useRecordScope } from "@/modules/workspace/hooks/useRecordScope";
-import { useBookScopeStore } from "@/lib/store/book-scope";
+import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 import type { BookDto } from "@/modules/ledger/contracts";
 
 const BOOK_LIVE = "10000000-0000-4000-8000-000000000001";
@@ -17,13 +18,21 @@ const liveBook: BookDto = {
 };
 
 function renderScope(initialScope: string | null, books: readonly BookDto[] | undefined) {
-  return renderHook(() => useRecordScope({ books, initialScope }));
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <WorkspaceStoreProvider initialBookId={initialScope}>{children}</WorkspaceStoreProvider>
+  );
+  return renderHook(
+    ({ books: current }) => ({
+      ...useRecordScope(current),
+      storedBookId: useWorkspaceStore((state) => state.bookId),
+    }),
+    { wrapper, initialProps: { books } }
+  );
 }
 
 describe("useRecordScope", () => {
   beforeEach(() => {
     document.cookie = "CASHIER_BOOK_SCOPE=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-    act(() => useBookScopeStore.getState().setBookId(null));
   });
 
   it("starts on the scope the server resolved", () => {
@@ -36,13 +45,13 @@ describe("useRecordScope", () => {
     expect(result.current.recordScope).toBeNull();
   });
 
-  it("publishes the scope to the shared store and writes the cookie on a pick", () => {
+  it("keeps the scope in the workspace store and writes the cookie on a pick", () => {
     const { result } = renderScope(null, [liveBook]);
 
     act(() => result.current.onRecordScopeChange(BOOK_LIVE));
 
     expect(result.current.recordScope).toBe(BOOK_LIVE);
-    expect(useBookScopeStore.getState().bookId).toBe(BOOK_LIVE);
+    expect(result.current.storedBookId).toBe(BOOK_LIVE);
     expect(document.cookie).toContain(`CASHIER_BOOK_SCOPE=${BOOK_LIVE}`);
   });
 
@@ -53,7 +62,7 @@ describe("useRecordScope", () => {
     act(() => result.current.onRecordScopeChange(null));
 
     expect(result.current.recordScope).toBeNull();
-    expect(useBookScopeStore.getState().bookId).toBeNull();
+    expect(result.current.storedBookId).toBeNull();
     expect(document.cookie).toContain("CASHIER_BOOK_SCOPE=all");
   });
 
@@ -85,7 +94,7 @@ describe("useRecordScope", () => {
   it("does not fall back for a live scope once the books arrive", () => {
     const { result, rerender } = renderScope(BOOK_LIVE, undefined);
 
-    rerender({ books: [liveBook], initialScope: BOOK_LIVE });
+    rerender({ books: [liveBook] });
 
     expect(result.current.recordScope).toBe(BOOK_LIVE);
   });

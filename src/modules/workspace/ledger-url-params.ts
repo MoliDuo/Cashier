@@ -2,24 +2,11 @@ import type { SourceDocumentProcessingStatus } from "@/modules/source-document/t
 import { DECIMAL_STRING_PATTERN, normalize as normalizeDecimal } from "@/lib/money/decimal";
 import { isValidDateString } from "@/lib/date-utils";
 
+/**
+ * The filters 流水 and 明细 carry in their URLs. Each route owns its own query
+ * string, so the two share these names without a prefix and cannot collide.
+ */
 const STATUSES_URL_PARAM = "statuses";
-export type LedgerFilterScope = "stream" | "details";
-/** Only records have a detail sheet; an entry URL is no longer a valid target
- * and parses to null, so a stale `detailType=ledger-entry` link is dropped. */
-type LedgerDetailType = "source-document";
-export type StatsRange = "week" | "month" | "year";
-export type StatsView = "heatmap" | "trend";
-
-export interface LedgerDetailUrlState {
-  detailType: LedgerDetailType;
-  detailId: string;
-}
-
-export interface StatsUrlState {
-  range: StatsRange;
-  offset: number;
-  view: StatsView;
-}
 const STATUSES_URL_DELIMITER = ",";
 
 /**
@@ -85,7 +72,8 @@ export interface LedgerFilterParams {
 type SearchParamsLike = Pick<URLSearchParams, "get" | "toString">;
 type SearchParamsStringLike = Pick<URLSearchParams, "toString">;
 
-const FILTER_KEYS = [
+/** Every query key 流水 and 明细 read their filters from. */
+export const LEDGER_FILTER_KEYS = [
   "period",
   "startDate",
   "endDate",
@@ -96,34 +84,6 @@ const FILTER_KEYS = [
   "statuses",
   "search",
 ] as const;
-
-type FilterKey = (typeof FILTER_KEYS)[number];
-
-function scopedKey(scope: LedgerFilterScope, key: FilterKey): string {
-  return `${scope}${key[0]!.toUpperCase()}${key.slice(1)}`;
-}
-
-function readScopedValue(
-  searchParams: Pick<URLSearchParams, "get">,
-  key: FilterKey,
-  scope: LedgerFilterScope
-): string | null {
-  return searchParams.get(scopedKey(scope, key));
-}
-
-/** Projects scoped filters into the shared period parser input. */
-export function getScopedLedgerSearchParams(
-  searchParams: SearchParamsLike,
-  scope: LedgerFilterScope
-): URLSearchParams {
-  const scoped = new URLSearchParams(searchParams.toString());
-  for (const key of FILTER_KEYS) {
-    const value = readScopedValue(searchParams, key, scope);
-    if (value == null || value === "") scoped.delete(key);
-    else scoped.set(key, value);
-  }
-  return scoped;
-}
 
 export interface LedgerUrlUpdate {
   period?: string | null;
@@ -137,146 +97,49 @@ export interface LedgerUrlUpdate {
   search?: string | null;
 }
 
-const DETAIL_TYPES = new Set<LedgerDetailType>(["source-document"]);
-const STATS_RANGES = new Set<StatsRange>(["week", "month", "year"]);
-const STATS_VIEWS = new Set<StatsView>(["heatmap", "trend"]);
-const MIN_STATS_OFFSET: Readonly<Record<StatsRange, number>> = {
-  week: -521,
-  month: -119,
-  year: -9,
-};
-
-export function readLedgerDetailSearchParams(
-  searchParams: Pick<URLSearchParams, "get">
-): LedgerDetailUrlState | null {
-  const detailType = searchParams.get("detailType");
-  const detailId = searchParams.get("detailId");
+/**
+ * Drops a custom period that cannot be read — a missing or reversed bound — so
+ * the page falls back to its default period instead of an empty one. Returns
+ * null when the query is already canonical.
+ */
+export function normalizeLedgerFilterSearchParams(
+  current: SearchParamsLike
+): URLSearchParams | null {
+  const params = createMutableSearchParams(current);
+  if (params.get("period") !== "custom") return null;
+  const start = params.get("startDate");
+  const end = params.get("endDate");
   if (
-    detailId == null ||
-    detailId === "" ||
-    detailType == null ||
-    !DETAIL_TYPES.has(detailType as LedgerDetailType)
+    start != null &&
+    end != null &&
+    isValidDateString(start) &&
+    isValidDateString(end) &&
+    start <= end
   ) {
     return null;
   }
-  return { detailType: detailType as LedgerDetailType, detailId };
-}
-
-export function setLedgerDetailSearchParams(
-  current: SearchParamsLike,
-  detail: LedgerDetailUrlState | null
-): URLSearchParams {
-  const params = createMutableSearchParams(current);
-  if (detail == null) {
-    params.delete("detailType");
-    params.delete("detailId");
-  } else {
-    params.set("detailType", detail.detailType);
-    params.set("detailId", detail.detailId);
-  }
+  params.delete("period");
+  params.delete("startDate");
+  params.delete("endDate");
   return params;
 }
 
-export function readStatsSearchParams(searchParams: Pick<URLSearchParams, "get">): StatsUrlState {
-  const rawRange = searchParams.get("statsRange");
-  const rawView = searchParams.get("statsView");
-  const rawOffset = searchParams.get("statsOffset");
-  const parsedOffset = rawOffset == null ? 0 : Number(rawOffset);
-
-  const range =
-    rawRange != null && STATS_RANGES.has(rawRange as StatsRange)
-      ? (rawRange as StatsRange)
-      : "month";
-
-  return {
-    range,
-    offset:
-      Number.isFinite(parsedOffset) && Number.isInteger(parsedOffset) && parsedOffset <= 0
-        ? Math.max(MIN_STATS_OFFSET[range], parsedOffset)
-        : 0,
-    view:
-      rawView != null && STATS_VIEWS.has(rawView as StatsView) ? (rawView as StatsView) : "heatmap",
-  };
-}
-
-export function setStatsSearchParams(
-  current: SearchParamsLike,
-  state: StatsUrlState
-): URLSearchParams {
-  const params = createMutableSearchParams(current);
-  if (state.range === "month") params.delete("statsRange");
-  else params.set("statsRange", state.range);
-  if (state.offset === 0) params.delete("statsOffset");
-  else {
-    const offset = Number.isFinite(state.offset) ? Math.trunc(state.offset) : 0;
-    params.set("statsOffset", String(Math.max(MIN_STATS_OFFSET[state.range], Math.min(0, offset))));
-  }
-  if (state.view === "heatmap") params.delete("statsView");
-  else params.set("statsView", state.view);
-  return params;
-}
-
-export function normalizeLedgerUrlSearchParams(current: SearchParamsLike): URLSearchParams | null {
-  const params = createMutableSearchParams(current);
-  const detail = readLedgerDetailSearchParams(params);
-  const stats = readStatsSearchParams(params);
-  let changed = false;
-
-  for (const scope of ["stream", "details"] as const) {
-    const periodKey = scopedKey(scope, "period");
-    const startKey = scopedKey(scope, "startDate");
-    const endKey = scopedKey(scope, "endDate");
-    if (params.get(periodKey) !== "custom") continue;
-    const start = params.get(startKey);
-    const end = params.get(endKey);
-    if (
-      start == null ||
-      end == null ||
-      !isValidDateString(start) ||
-      !isValidDateString(end) ||
-      start > end
-    ) {
-      params.delete(periodKey);
-      params.delete(startKey);
-      params.delete(endKey);
-      changed = true;
-    }
-  }
-
-  if (detail == null && (params.has("detailType") || params.has("detailId"))) {
-    params.delete("detailType");
-    params.delete("detailId");
-    changed = true;
-  }
-
-  const normalizedStats = setStatsSearchParams(params, stats);
-  if (normalizedStats.toString() !== params.toString()) {
-    changed = true;
-  }
-  return changed ? normalizedStats : null;
-}
-
-export function buildDetailsDrilldownSearchParams(
-  current: SearchParamsLike,
-  input: {
-    startDate: string;
-    endDate: string;
-    categoryId?: string | null;
-    currency?: string | null;
-  }
-): URLSearchParams {
-  const params = createMutableSearchParams(current);
-  for (const key of FILTER_KEYS) params.delete(scopedKey("details", key));
-
-  params.set("tab", "details");
-  params.set("detailsPeriod", "custom");
-  params.set("detailsStartDate", input.startDate);
-  params.set("detailsEndDate", input.endDate);
+/** The 明细 query a drilldown lands on: a date range, and optionally a category or currency. */
+export function buildDetailsDrilldownSearchParams(input: {
+  startDate: string;
+  endDate: string;
+  categoryId?: string | null;
+  currency?: string | null;
+}): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("period", "custom");
+  params.set("startDate", input.startDate);
+  params.set("endDate", input.endDate);
   if (input.categoryId != null && input.categoryId !== "") {
-    params.set("detailsCategoryId", input.categoryId);
+    params.set("categoryId", input.categoryId);
   }
   if (input.currency != null && input.currency !== "") {
-    params.set("detailsCurrency", input.currency);
+    params.set("currency", input.currency);
   }
   return params;
 }
@@ -314,11 +177,10 @@ function setOrDeleteDecimalParam(
 }
 
 export function readLedgerFilterParams(
-  searchParams: SearchParamsLike,
-  scope: LedgerFilterScope
+  searchParams: Pick<URLSearchParams, "get">
 ): LedgerFilterParams {
   const readDecimal = (key: "minAmount" | "maxAmount"): string | null => {
-    const raw = readScopedValue(searchParams, key, scope);
+    const raw = searchParams.get(key);
     if (raw == null || raw.trim() === "") return null;
     const trimmed = raw.trim();
     return DECIMAL_STRING_PATTERN.test(trimmed) && !trimmed.startsWith("-")
@@ -327,30 +189,27 @@ export function readLedgerFilterParams(
   };
 
   return {
-    categoryId: readScopedValue(searchParams, "categoryId", scope),
-    currency: readScopedValue(searchParams, "currency", scope),
+    categoryId: searchParams.get("categoryId"),
+    currency: searchParams.get("currency"),
     minAmount: readDecimal("minAmount"),
     maxAmount: readDecimal("maxAmount"),
-    statuses: parseStatusesParam(readScopedValue(searchParams, STATUSES_URL_PARAM, scope)),
-    search: readScopedValue(searchParams, "search", scope),
+    statuses: parseStatusesParam(searchParams.get(STATUSES_URL_PARAM)),
+    search: searchParams.get("search"),
   };
 }
 
 export function updateLedgerSearchParams(
   searchParams: SearchParamsLike,
-  updates: LedgerUrlUpdate,
-  scope: LedgerFilterScope
+  updates: LedgerUrlUpdate
 ): URLSearchParams {
   const params = createMutableSearchParams(searchParams);
 
-  const keyFor = (key: FilterKey) => scopedKey(scope, key);
-
   if ("period" in updates) {
-    setOrDeleteStringParam(params, keyFor("period"), updates.period);
+    setOrDeleteStringParam(params, "period", updates.period);
 
     if (updates.period !== "custom") {
-      params.delete(keyFor("startDate"));
-      params.delete(keyFor("endDate"));
+      params.delete("startDate");
+      params.delete("endDate");
     }
   }
 
@@ -358,28 +217,24 @@ export function updateLedgerSearchParams(
     updates.period === "custom" ||
     (!("period" in updates) && ("startDate" in updates || "endDate" in updates))
   ) {
-    if ("startDate" in updates)
-      setOrDeleteStringParam(params, keyFor("startDate"), updates.startDate);
-    if ("endDate" in updates) setOrDeleteStringParam(params, keyFor("endDate"), updates.endDate);
+    if ("startDate" in updates) setOrDeleteStringParam(params, "startDate", updates.startDate);
+    if ("endDate" in updates) setOrDeleteStringParam(params, "endDate", updates.endDate);
   }
 
-  if ("categoryId" in updates)
-    setOrDeleteStringParam(params, keyFor("categoryId"), updates.categoryId);
-  if ("currency" in updates) setOrDeleteStringParam(params, keyFor("currency"), updates.currency);
-  if ("minAmount" in updates)
-    setOrDeleteDecimalParam(params, keyFor("minAmount"), updates.minAmount);
-  if ("maxAmount" in updates)
-    setOrDeleteDecimalParam(params, keyFor("maxAmount"), updates.maxAmount);
+  if ("categoryId" in updates) setOrDeleteStringParam(params, "categoryId", updates.categoryId);
+  if ("currency" in updates) setOrDeleteStringParam(params, "currency", updates.currency);
+  if ("minAmount" in updates) setOrDeleteDecimalParam(params, "minAmount", updates.minAmount);
+  if ("maxAmount" in updates) setOrDeleteDecimalParam(params, "maxAmount", updates.maxAmount);
 
   if ("statuses" in updates) {
     const formatted = updates.statuses != null ? formatStatusesParam(updates.statuses) : null;
     if (formatted != null) {
-      params.set(keyFor(STATUSES_URL_PARAM), formatted);
+      params.set(STATUSES_URL_PARAM, formatted);
     } else {
-      params.delete(keyFor(STATUSES_URL_PARAM));
+      params.delete(STATUSES_URL_PARAM);
     }
   }
-  if ("search" in updates) setOrDeleteStringParam(params, keyFor("search"), updates.search);
+  if ("search" in updates) setOrDeleteStringParam(params, "search", updates.search);
 
   return params;
 }

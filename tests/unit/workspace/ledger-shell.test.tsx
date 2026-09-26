@@ -5,16 +5,14 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { activeTabState, handleTabChangeMock, toastError } = vi.hoisted(() => ({
-  activeTabState: { current: "stream" as string },
-  handleTabChangeMock: vi.fn(),
-  toastError: vi.fn(),
-}));
-
-vi.mock("next/navigation", () => ({
-  usePathname: () => "/ledgers/ledger-1",
-  useSearchParams: () => new URLSearchParams(),
-}));
+const { activeTabState, navigateMock, routerPrefetchMock, toastError, prefetchStatsTabQueryMock } =
+  vi.hoisted(() => ({
+    activeTabState: { current: "stream" as string },
+    navigateMock: vi.fn(),
+    routerPrefetchMock: vi.fn(),
+    toastError: vi.fn(),
+    prefetchStatsTabQueryMock: vi.fn(),
+  }));
 
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
 
@@ -27,10 +25,12 @@ vi.mock("next-intl", async (importOriginal) => {
   };
 });
 
-vi.mock("@/modules/workspace/hooks/useLedgerTabs", () => ({
-  useLedgerTabs: () => ({
+vi.mock("@/modules/workspace/hooks/useLedgerNavigation", () => ({
+  useLedgerNavigation: () => ({
     activeTab: activeTabState.current,
-    handleTabChange: handleTabChangeMock,
+    hrefFor: (tab: string) => `/${tab}`,
+    navigate: navigateMock,
+    prefetch: routerPrefetchMock,
   }),
 }));
 
@@ -51,41 +51,60 @@ vi.mock("@/modules/workspace/ui/SwipeTabSurface", () => ({
   SwipeTabSurface: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-// Hovering or pressing a destination preloads its tab's code without awaiting
-// it. The real tabs pull in most of the app, and an import still in flight when
-// the file ends fails the run after every test has passed.
-vi.mock("@/modules/workspace/ui/DetailsTab", () => ({ DetailsTab: () => null }));
-vi.mock("@/modules/workspace/ui/StatsTab", () => ({ StatsTab: () => null }));
-vi.mock("@/modules/ledger/ui/SettingsTab", () => ({ SettingsTab: () => null }));
+vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({ preloadNewRecordModules: vi.fn() }));
 
 vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
   prefetchDetailsTabQuery: vi.fn(),
-  prefetchStatsTabQuery: vi.fn(),
+  prefetchStatsTabQuery: prefetchStatsTabQueryMock,
 }));
 
-import { ActiveShell } from "@/app/(protected)/_active-shell";
-import { useShellController } from "@/components/providers/shell-controller";
+import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
+import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
+
+const BOOK_ID = "10000000-0000-4000-8000-000000000001";
 
 /**
- * Stands in for the tab content: it holds the tab's query, and it registers the
- * new-record handler the shell waits on before it enables its destinations.
+ * Stands in for the route: it holds the route's query, and it marks the
+ * workspace ready, which the shell waits on before it enables its destinations.
  */
-function TabContent({ queryKey, queryFn }: { queryKey: string[]; queryFn: () => Promise<string> }) {
-  const { registerOpenInput } = useShellController();
-  useEffect(() => registerOpenInput(() => {}), [registerOpenInput]);
+function RouteContent({
+  queryKey,
+  queryFn,
+}: {
+  queryKey: string[];
+  queryFn: () => Promise<string>;
+}) {
+  const setReady = useWorkspaceStore((state) => state.setReady);
+  useEffect(() => setReady(true), [setReady]);
   useQuery({ queryKey, queryFn });
   return null;
 }
 
-function renderShell(queryKey: string[], queryFn: () => Promise<string>) {
+/** A book switch is a store update with no server render behind it. */
+function BookSwitch() {
+  const setBookId = useWorkspaceStore((state) => state.setBookId);
+  return (
+    <button type="button" onClick={() => setBookId(BOOK_ID)}>
+      switch-book
+    </button>
+  );
+}
+
+function renderShell(
+  queryKey: string[] = ["ledger", "source-documents", "stream"],
+  queryFn: () => Promise<string> = vi.fn().mockResolvedValue("stream")
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ActiveShell>
-        <TabContent queryKey={queryKey} queryFn={queryFn} />
-      </ActiveShell>
+      <WorkspaceStoreProvider initialBookId={null}>
+        <BookSwitch />
+        <LedgerShell>
+          <RouteContent queryKey={queryKey} queryFn={queryFn} />
+        </LedgerShell>
+      </WorkspaceStoreProvider>
     </QueryClientProvider>
   );
 }
@@ -95,7 +114,7 @@ function destination(name: string) {
   return screen.getByRole("button", { name: new RegExp(`^${name}\\b`) });
 }
 
-describe("ActiveShell tab refresh", () => {
+describe("LedgerShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     activeTabState.current = "stream";
@@ -110,10 +129,10 @@ describe("ActiveShell tab refresh", () => {
     await user.click(destination("stream"));
 
     await waitFor(() => expect(stream).toHaveBeenCalledTimes(2));
-    expect(handleTabChangeMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it("still navigates when the destination is another tab", async () => {
+  it("navigates when the destination is another tab", async () => {
     const user = userEvent.setup();
     const stream = vi.fn().mockResolvedValue("stream");
     renderShell(["ledger", "source-documents", "stream"], stream);
@@ -121,7 +140,7 @@ describe("ActiveShell tab refresh", () => {
 
     await user.click(destination("stats"));
 
-    expect(handleTabChangeMock).toHaveBeenCalledWith("stats");
+    expect(navigateMock).toHaveBeenCalledWith("stats");
     expect(stream).toHaveBeenCalledTimes(1);
   });
 
@@ -135,7 +154,7 @@ describe("ActiveShell tab refresh", () => {
     await user.click(destination("settings"));
 
     await waitFor(() => expect(settings).toHaveBeenCalledTimes(2));
-    expect(handleTabChangeMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it("reports a refresh that failed, so a stale tab is not read as a fresh one", async () => {
@@ -147,5 +166,29 @@ describe("ActiveShell tab refresh", () => {
     await user.click(destination("stream"));
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("refreshFailed"));
+  });
+
+  it("prefetches a hovered route for the book being viewed now", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await waitFor(() => expect(destination("stats")).toBeEnabled());
+
+    await user.click(screen.getByRole("button", { name: "switch-book" }));
+    await user.hover(destination("stats"));
+
+    await waitFor(() => expect(prefetchStatsTabQueryMock).toHaveBeenCalled());
+    expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[1]).toBe(BOOK_ID);
+    expect(routerPrefetchMock).toHaveBeenCalledWith("/stats");
+  });
+
+  it("prefetches 总账 with no book when none is viewed", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await waitFor(() => expect(destination("stats")).toBeEnabled());
+
+    await user.hover(destination("stats"));
+
+    await waitFor(() => expect(prefetchStatsTabQueryMock).toHaveBeenCalled());
+    expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[1]).toBeUndefined();
   });
 });

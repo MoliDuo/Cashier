@@ -5,11 +5,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { fetchEntryCategories, fetchLedger } from "@/modules/ledger/queries";
-import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
-import { useShellController } from "@/components/providers/shell-controller";
-import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
+import { useWorkspaceStore } from "../store";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
-import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 import {
   getDeviceTimeZone as readDeviceTimeZone,
@@ -25,52 +22,40 @@ const getServerSnapshotFalse = () => false;
 interface UseLedgerPageEnvironmentOptions {
   /** The book being viewed, or null for 总账. */
   scope: RecordScope;
-  initialLedger?: LedgerDto | undefined;
-  initialCategories?: EntryCategoryWithCount[] | undefined;
-  initialBooks?: readonly BookDto[] | undefined;
   /**
    * The device zone the server read from this browser's cookie, null when it had
    * none. It is the server's own answer, so the first client render matches the
    * markup the server sent.
    */
   initialDeviceTimeZone: string | null;
-  setIsInputOpen: (open: boolean) => void;
 }
 
 /**
  * Owns the ledger/categories queries, device-vs-fixed timezone resolution, and the
- * page-level side effects (the device-zone cookie, shell-controller wiring)
+ * page-level side effects (the device-zone cookie, the workspace's ready flag)
  * that every ledger page tab depends on.
  */
 export function useLedgerPageEnvironment({
   scope,
-  initialLedger,
-  initialCategories,
-  initialBooks,
   initialDeviceTimeZone,
-  setIsInputOpen,
 }: UseLedgerPageEnvironmentOptions) {
   const { data: ledger } = useQuery({
     queryKey: queryKeys.ledger(),
     queryFn: () => fetchLedger(),
     staleTime: STALE_TIME,
-    ...(initialLedger !== undefined ? { initialData: initialLedger } : {}),
   });
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.entryCategories(),
     queryFn: () => fetchEntryCategories(),
     staleTime: STALE_TIME,
-    ...(initialCategories !== undefined ? { initialData: initialCategories } : {}),
   });
   const categories = categoriesQuery.data ?? [];
   const categoriesHaveNoData = categoriesQuery.data === undefined;
 
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const preferredCurrencies = ledger?.settings.currencies ?? [];
-  const { books, booksQuery } = useBooks({
-    ...(initialBooks !== undefined ? { initialBooks } : {}),
-  });
+  const { books, booksQuery } = useBooks({});
   // The viewed book's zone decides; on 总账 — every book at once — the device's
   // own zone does, since no single book owns the view.
   const scopeBook = scope == null ? null : (books?.find((b) => b.id === scope) ?? null);
@@ -111,16 +96,13 @@ export function useLedgerPageEnvironment({
     writeDeviceTimeZoneCookie(deviceTimeZone);
   }, [deviceTimeZone]);
 
-  // Wire the real new-record handler into the shell once this component mounts.
-  const { registerInputIntent, registerOpenInput } = useShellController();
-
+  // The shell's navigation waits for the page to mount, so an early tap cannot
+  // race hydration.
+  const setReady = useWorkspaceStore((state) => state.setReady);
   useEffect(() => {
-    return registerOpenInput(() => setIsInputOpen(true));
-  }, [registerOpenInput, setIsInputOpen]);
-
-  useEffect(() => {
-    return registerInputIntent(preloadNewRecordModules);
-  }, [registerInputIntent]);
+    setReady(true);
+    return () => setReady(false);
+  }, [setReady]);
 
   return {
     ledger,

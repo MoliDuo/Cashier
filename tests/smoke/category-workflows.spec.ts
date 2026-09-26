@@ -24,6 +24,9 @@ test("AI category assignment remains visible across tabs and fits narrow screens
 
   const navigation = page.getByRole("navigation", { name: "账本导航" });
   await navigation.getByRole("button", { name: "明细", exact: true }).click();
+  await expect(page).toHaveURL(/\/details/);
+  // 流水 leaves the page when 明细 commits, not when the URL changes.
+  await expect(page.getByText(item, { exact: true })).toHaveCount(1);
   await expect(page.getByText(item, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "选择", exact: true }).click();
   await page.getByRole("checkbox", { name: `选择${item}`, exact: true }).click();

@@ -81,7 +81,12 @@ with `vi.mock` of the concrete module rather than injected fakes.
 ## Frontend
 
 - Use centralized query keys and `useLedgerMutation` for server state changes.
-- Load tab-specific components only when that tab is active. The message catalog is one file for
+- Each ledger tab is its own route under `src/app/(protected)/(ledger)/`. The shared layout owns the
+  shell, the viewed book, the new-record dialog and the detail sheets; cross-route state lives in the
+  per-layout workspace store (`src/modules/workspace/store.tsx`), not in registration contexts. A
+  route owns its own unprefixed query parameters; an open record is `?detail=<id>`. Routes prefetch
+  on the server only for document requests — a client-side move carries the `rsc` header and
+  renders at once from the query cache. The message catalog is one file for
   one language; it ships with the page rather than being fetched per feature. Catalog validation checks
   ICU syntax and statically known message keys. Chinese literals and dynamic keys are allowed;
   dynamic keys remain the caller's responsibility.

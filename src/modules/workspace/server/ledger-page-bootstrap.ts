@@ -1,4 +1,6 @@
 import "server-only";
+import { cache } from "react";
+import { cookies } from "next/headers";
 import {
   QueryClient,
   dehydrate,
@@ -6,6 +8,8 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import { runtimeEnv } from "@/lib/env/runtime";
+import { logger } from "@/lib/logger";
+import { logIdentifier } from "@/lib/security/log-identifier";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER, QUERY } from "@/lib/constants";
 import { resolveRequestTimeZone } from "@/lib/time-zone-cookie";
@@ -20,124 +24,182 @@ import { getStreamTotal } from "@/modules/source-document/server/stream-total";
 import type { StreamPage } from "@/modules/source-document/contracts";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
 import type { PeriodParams } from "@/lib/period-utils";
-import type { LedgerDto } from "@/modules/ledger/contracts";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { addPeriod, getDateInTimezone, isValidTimeZone, parseDateString } from "@/lib/date-utils";
-import type { BookDto } from "@/modules/ledger/contracts";
-import type { EntryCategoryWithCountDto } from "@/modules/ledger/contracts";
 import {
   buildDetailsQueryDescriptor,
   buildStatsQueryDescriptor,
   buildStreamQueryDescriptor,
 } from "@/modules/workspace/ledger-tab-query-descriptors";
-import type { StatsUrlState } from "@/modules/workspace/ledger-url-params";
+import type { StatsUrlState } from "@/modules/workspace/stats-url-params";
 import { SOURCE_DOC_STALE_TIME_MS } from "@/config/tuning";
 
-interface LedgerPageBootstrapResult {
-  dehydratedState: DehydratedState;
-  /**
-   * Today in the zone the page is read in, absent when the request named neither
-   * a book zone nor a device zone. The date reads are then left to the client,
-   * which knows the browser's zone by the time it mounts them.
-   */
-  ledgerToday?: string;
-  initialCategories: EntryCategoryWithCountDto[];
-  initialBooks: readonly BookDto[];
-  /**
-   * The book the page is narrowed to after the live-list check, null for 总账.
-   * The client seeds its scope memory with it, so the first paint already shows
-   * the same book the prefetch filled.
-   */
-  initialBookId: string | null;
-}
+import type { BookDto, EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
+import { DEVICE_TIME_ZONE_COOKIE, parseDeviceTimeZoneCookie } from "@/lib/time-zone-cookie";
+import { BOOK_SCOPE_COOKIE, parseBookScopeCookie } from "@/lib/book-scope-cookie";
+import {
+  resolveAuthenticatedHome,
+  type AuthenticatedHomeContext,
+} from "./resolve-authenticated-home";
 
 /** A zone is usable when it is present and this runtime can format with it. */
 function isUsableTimeZone(timeZone: string | null | undefined): boolean {
   return timeZone != null && timeZone !== "" && isValidTimeZone(timeZone);
 }
 
-export interface GetLedgerPageBootstrapInput {
-  initialTab: LedgerTab;
-  periodParams: PeriodParams;
-  advancedFilters?: LedgerAdvancedFilters;
-  statsState?: StatsUrlState;
-  /** Ledger DTO returned by the authenticated page boundary. */
-  ledgerDto: LedgerDto;
-  /** The book being viewed, or null for 总账. */
-  bookId?: string | null;
+export interface LedgerViewScope {
   /**
-   * The device zone the browser reported, when it has done so. A null book zone
-   * dates by this before falling back to the deployment's `TZ`.
+   * The book the page is narrowed to after the live-list check, null for 总账.
+   * The remembered scope can name a book that has since been archived or
+   * deleted; the live list is the authority, and the server must not prefetch
+   * the dead book's records.
    */
-  deviceTimeZone?: string | null;
+  bookId: string | null;
+  /** The zone the page is read in, absent until one is known. */
+  fixedTimeZone?: string;
+  /**
+   * Today in that zone, absent when the request named neither a book zone nor
+   * a device zone. The date reads are then left to the client, which knows the
+   * browser's zone by the time it mounts them.
+   */
+  ledgerToday?: string;
 }
 
-export async function getLedgerPageBootstrap(
-  input: GetLedgerPageBootstrapInput
-): Promise<LedgerPageBootstrapResult> {
-  const ledgerDto = input.ledgerDto;
-  const ledgerId = ledgerDto.id;
-
-  const queryClient = new QueryClient();
-  queryClient.setQueryData(queryKeys.ledger(), ledgerDto);
-
-  const mainCurrency = ledgerDto.settings.mainCurrency;
-  // The categories and the settings view do not depend on the viewed book, so
-  // they start here: only the date-scoped reads below have to wait for it. Each
-  // promise joins this chain immediately, so a failure is reported by the page
-  // boundary rather than left unhandled.
-  const categoriesPromise = queryClient.fetchQuery({
-    queryKey: queryKeys.entryCategories(),
-    queryFn: () => listCategoriesWithCount(ledgerId),
-    staleTime: LEDGER.STALE_TIME_MS,
-  });
-  const settingsPromise =
-    input.initialTab === "settings"
-      ? queryClient.prefetchQuery({
-          queryKey: queryKeys.ledgerSettings(),
-          queryFn: () => getLedgerSettingsView(ledgerId),
-          staleTime: LEDGER.STALE_TIME_MS,
-        })
-      : Promise.resolve();
-  const booksPromise = listBooks(ledgerId).then((books) => {
-    queryClient.setQueryData(queryKeys.books(), books);
-    return books;
-  });
-  const [books] = await Promise.all([booksPromise, categoriesPromise, settingsPromise]);
-  // The remembered scope can name a book that has since been archived or
-  // deleted. The live list is the authority: the scope resets to 总账 on the
-  // client, and the server must not prefetch the dead book's records in the
-  // meantime.
+/**
+ * The zone the page is read in is the viewed book's; on 总账 it is the device
+ * that asked, since no single book owns that view.
+ *
+ * A page can only be dated once that zone is known. With neither a book zone
+ * nor a reported device zone this is the first visit, before the client has
+ * written its cookie: dating it by the deployment's zone would prefetch a day
+ * (or a month) the tab never asks for, because the tab dates by the device.
+ */
+export function resolveLedgerViewScope(input: {
+  /** The live books, or null when they could not be read. */
+  books: readonly BookDto[] | null;
+  rememberedBookId: string | null;
+  deviceTimeZone: string | null;
+}): LedgerViewScope {
+  // Without the live list the remembered book cannot be checked, so the page
+  // keeps it — losing it would quietly reset the reader to 总账 — and leaves
+  // every dated read to the client, which will have the list.
+  if (input.books == null) return { bookId: input.rememberedBookId };
   const bookId =
-    input.bookId != null && books.some((book) => book.id === input.bookId) ? input.bookId : null;
-  const viewedBook = bookId == null ? null : (books.find((book) => book.id === bookId) ?? null);
-  // The zone the page is read in is the viewed book's; on 总账 it is the device
-  // that asked, since no single book owns that view.
-  //
-  // A page can only be dated once that zone is known. With neither a book zone
-  // nor a reported device zone this is the first visit, before the client has
-  // written its cookie: dating it by the deployment's zone would prefetch a day
-  // (or a month) the tab never asks for, because the tab dates by the device.
-  // The date reads below wait for the browser to answer; the ledger, books,
-  // categories and settings loads do not.
+    input.rememberedBookId != null && input.books.some((book) => book.id === input.rememberedBookId)
+      ? input.rememberedBookId
+      : null;
+  const viewedBook =
+    bookId == null ? null : (input.books.find((book) => book.id === bookId) ?? null);
   const timeZoneReady =
     isUsableTimeZone(viewedBook?.timeZone) || isUsableTimeZone(input.deviceTimeZone);
-  const fixedTimeZone = timeZoneReady
-    ? resolveRequestTimeZone({
-        bookTimeZone: viewedBook?.timeZone,
-        deviceTimeZone: input.deviceTimeZone,
-        fallbackTimeZone: runtimeEnv.timeZone,
-      })
-    : undefined;
-  const ledgerToday = timeZoneReady
-    ? (getDateInTimezone(fixedTimeZone) ?? getDateInTimezone("UTC"))
-    : undefined;
+  if (!timeZoneReady) return { bookId };
+  const fixedTimeZone = resolveRequestTimeZone({
+    bookTimeZone: viewedBook?.timeZone,
+    deviceTimeZone: input.deviceTimeZone,
+    fallbackTimeZone: runtimeEnv.timeZone,
+  });
+  return {
+    bookId,
+    fixedTimeZone,
+    ledgerToday: getDateInTimezone(fixedTimeZone) ?? getDateInTimezone("UTC")!,
+  };
+}
+
+export interface LedgerView extends LedgerViewScope {
+  context: AuthenticatedHomeContext;
+  /** The live books, or null when they could not be read. */
+  books: readonly BookDto[] | null;
+  /** The book this device's cookie names, before the live-list check. */
+  rememberedBookId: string | null;
+  deviceTimeZone: string | null;
+  /**
+   * The categories read, started alongside the books rather than after them.
+   * The shell's bootstrap awaits it and handles its failure.
+   */
+  categories: Promise<EntryCategoryWithCount[]>;
+}
+
+/**
+ * What every ledger route is rendered against: the session's ledger, its live
+ * books, and the book and zone this device reads it in. Cached per request, so
+ * the layout and the page share one read.
+ */
+export const loadLedgerView = cache(async (): Promise<LedgerView> => {
+  const context = await resolveAuthenticatedHome();
+  const cookieStore = await cookies();
+  const rememberedBookId = parseBookScopeCookie(cookieStore.get(BOOK_SCOPE_COOKIE)?.value ?? null);
+  const deviceTimeZone = parseDeviceTimeZoneCookie(
+    cookieStore.get(DEVICE_TIME_ZONE_COOKIE)?.value ?? null
+  );
+  const categories = listCategoriesWithCount(context.ledgerId);
+  categories.catch(() => {});
+  let books: readonly BookDto[] | null;
+  try {
+    books = await listBooks(context.ledgerId);
+  } catch (error) {
+    logger.error(
+      { error, ledgerSubject: logIdentifier("ledger", context.ledgerId) },
+      "Ledger books failed to load; falling back to client queries"
+    );
+    books = null;
+  }
+  return {
+    context,
+    books,
+    rememberedBookId,
+    deviceTimeZone,
+    categories,
+    ...resolveLedgerViewScope({ books, rememberedBookId, deviceTimeZone }),
+  };
+});
+
+/** The ledger, its books and its categories: what the layout's shell renders from. */
+export async function getLedgerShellBootstrap(input: {
+  ledgerDto: LedgerDto;
+  books: readonly BookDto[] | null;
+  categories: Promise<EntryCategoryWithCount[]>;
+}): Promise<DehydratedState> {
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(queryKeys.ledger(), input.ledgerDto);
+  if (input.books != null) queryClient.setQueryData(queryKeys.books(), input.books);
+  queryClient.setQueryData(queryKeys.entryCategories(), await input.categories);
+  return dehydrate(queryClient);
+}
+
+export interface GetLedgerRouteBootstrapInput {
+  tab: LedgerTab;
+  ledgerDto: LedgerDto;
+  scope: LedgerViewScope;
+  periodParams?: PeriodParams;
+  advancedFilters?: LedgerAdvancedFilters;
+  statsState?: StatsUrlState;
+}
+
+/** The first screen of one route, so its HTML arrives filled rather than as a skeleton. */
+export async function getLedgerRouteBootstrap(
+  input: GetLedgerRouteBootstrapInput
+): Promise<DehydratedState> {
+  const ledgerId = input.ledgerDto.id;
+  const mainCurrency = input.ledgerDto.settings.mainCurrency;
+  const { bookId, fixedTimeZone, ledgerToday } = input.scope;
+  const queryClient = new QueryClient();
+
+  if (input.tab === "settings") {
+    await queryClient.prefetchQuery({
+      queryKey: queryKeys.ledgerSettings(),
+      queryFn: () => getLedgerSettingsView(ledgerId),
+      staleTime: LEDGER.STALE_TIME_MS,
+    });
+    return dehydrate(queryClient);
+  }
+  const periodParams: PeriodParams = input.periodParams ?? { period: "thisMonth" };
+
   const detailsDescriptor =
     ledgerToday == null
       ? null
       : buildDetailsQueryDescriptor({
           ...(bookId == null ? {} : { bookId }),
-          periodParams: input.periodParams,
+          periodParams,
           ...(input.advancedFilters !== undefined
             ? { advancedFilters: input.advancedFilters }
             : {}),
@@ -175,7 +237,7 @@ export async function getLedgerPageBootstrap(
         });
 
   await Promise.all([
-    ...(input.initialTab === "stream" && streamDescriptor != null
+    ...(input.tab === "stream" && streamDescriptor != null
       ? [
           // First stream page (all-statuses, filtered by period+amount, paginated)
           queryClient.prefetchInfiniteQuery({
@@ -202,7 +264,7 @@ export async function getLedgerPageBootstrap(
           }),
         ]
       : []),
-    ...(input.initialTab === "details" && detailsDescriptor != null
+    ...(input.tab === "details" && detailsDescriptor != null
       ? [
           queryClient.prefetchQuery({
             queryKey: detailsDescriptor.summaryQueryKey,
@@ -223,7 +285,7 @@ export async function getLedgerPageBootstrap(
           }),
         ]
       : []),
-    ...(input.initialTab === "stats" && statsDescriptor != null
+    ...(input.tab === "stats" && statsDescriptor != null
       ? [
           queryClient.prefetchQuery({
             queryKey: statsDescriptor.queryKey,
@@ -233,7 +295,7 @@ export async function getLedgerPageBootstrap(
         ]
       : []),
   ]);
-  if (input.initialTab === "stream" && streamDescriptor != null) {
+  if (input.tab === "stream" && streamDescriptor != null) {
     const stream = queryClient.getQueryData<InfiniteData<StreamPage>>(streamDescriptor.queryKey);
     const firstPage = stream?.pages[0];
     if (firstPage != null && !firstPage.restartRequired) {
@@ -245,13 +307,5 @@ export async function getLedgerPageBootstrap(
       });
     }
   }
-  const initialCategories = await categoriesPromise;
-
-  return {
-    dehydratedState: dehydrate(queryClient),
-    ...(ledgerToday != null ? { ledgerToday } : {}),
-    initialCategories,
-    initialBooks: books,
-    initialBookId: bookId,
-  };
+  return dehydrate(queryClient);
 }

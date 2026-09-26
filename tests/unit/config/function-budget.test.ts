@@ -12,7 +12,10 @@ import {
 } from "@/config/tuning";
 
 const AI_RUNNING_ROUTES = [
-  "src/app/(protected)/page.tsx",
+  "src/app/(protected)/(ledger)/stream/page.tsx",
+  "src/app/(protected)/(ledger)/details/page.tsx",
+  "src/app/(protected)/(ledger)/stats/page.tsx",
+  "src/app/(protected)/(ledger)/settings/page.tsx",
   "src/app/api/ledger-queries/route.ts",
   "src/app/api/v1/source-documents/route.ts",
   "src/app/api/cron/daily/route.ts",

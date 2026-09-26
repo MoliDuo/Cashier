@@ -8,8 +8,6 @@ import {
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import {
-  getScopedLedgerSearchParams,
-  type LedgerFilterScope,
   type LedgerUrlUpdate,
   readLedgerFilterParams,
   updateLedgerSearchParams,
@@ -29,7 +27,6 @@ interface FilterParams {
 interface UsePeriodFilterParams {
   pathname: string;
   searchParams: URLSearchParams;
-  scope: LedgerFilterScope;
   timeZone?: string;
 }
 
@@ -62,21 +59,16 @@ function buildPeriodUrlUpdate(
 export function usePeriodFilter({
   pathname,
   searchParams,
-  scope,
   timeZone,
 }: UsePeriodFilterParams): UsePeriodFilterReturn {
-  const scopedSearchParams = useMemo(
-    () => getScopedLedgerSearchParams(searchParams, scope),
-    [scope, searchParams]
+  const periodParams = useMemo<PeriodParams>(
+    () => parsePeriodFromSearchParams(searchParams),
+    [searchParams]
   );
-  const periodParams = useMemo<PeriodParams>(() => {
-    const parsed = parsePeriodFromSearchParams(scopedSearchParams);
-    return parsed;
-  }, [scopedSearchParams]);
 
   const filterParams = useMemo<FilterParams>(
-    () => readLedgerFilterParams(searchParams, scope),
-    [scope, searchParams]
+    () => readLedgerFilterParams(searchParams),
+    [searchParams]
   );
 
   const filters: EntryFilters = useMemo(
@@ -92,18 +84,14 @@ export function usePeriodFilter({
         nextFilters: newFilters,
         ...(requestedPeriod !== undefined ? { requestedPeriod } : {}),
       });
-      const params = updateLedgerSearchParams(
-        searchParams,
-        {
-          ...(periodUpdate != null ? buildPeriodUrlUpdate(periodUpdate) : {}),
-          ...advancedFilterUpdate,
-        },
-        scope
-      );
+      const params = updateLedgerSearchParams(searchParams, {
+        ...(periodUpdate != null ? buildPeriodUrlUpdate(periodUpdate) : {}),
+        ...advancedFilterUpdate,
+      });
 
       pushLedgerUrl(pathname, params, "filter");
     },
-    [filters, pathname, periodParams, scope, searchParams]
+    [filters, pathname, periodParams, searchParams]
   );
 
   return {

@@ -78,7 +78,7 @@
 
 ```
 src/app/              路由与 API handler，只做校验、授权和调用
-  (app)/stream|details|stats|settings   真实路由，共用一个 layout
+  (protected)/(ledger)/stream|details|stats|settings   真实路由，共用一个 layout
   api/queries         类型化查询注册表的唯一入口
   api/v1              外部 API（快捷指令）
   api/cron/daily      每日兜底清扫

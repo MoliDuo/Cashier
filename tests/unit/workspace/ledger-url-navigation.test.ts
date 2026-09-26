@@ -9,11 +9,11 @@ describe("ledger-url-navigation", () => {
 
   it("replaceLedgerUrl updates history and returns the built url", () => {
     const historySpy = vi.spyOn(window.history, "replaceState");
-    const params = new URLSearchParams("tab=details&period=thisMonth");
+    const params = new URLSearchParams("period=thisMonth");
 
-    const url = replaceLedgerUrl("/ledgers/ledger-1", params);
+    const url = replaceLedgerUrl("/details", params);
 
-    expect(url).toBe("/ledgers/ledger-1?tab=details&period=thisMonth");
+    expect(url).toBe("/details?period=thisMonth");
     expect(historySpy).toHaveBeenCalledWith(
       { cashier: { ledgerNavigation: true, kind: "filter" } },
       "",
@@ -31,18 +31,18 @@ describe("ledger-url-navigation", () => {
         cashier: { ledgerNavigation: true, kind: "filter" },
       },
       "",
-      "/ledgers/ledger-1?tab=stream"
+      "/stream"
     );
     const historySpy = vi.spyOn(window.history, "pushState");
 
-    const url = pushLedgerUrl("/ledgers/ledger-1", new URLSearchParams("tab=details"), "tab");
+    const url = pushLedgerUrl("/stream", new URLSearchParams("period=week"), "filter");
 
-    expect(url).toBe("/ledgers/ledger-1?tab=details");
+    expect(url).toBe("/stream?period=week");
 
     expect(historySpy).toHaveBeenCalledWith(
       {
         unrelatedCustomState: "keep",
-        cashier: { ledgerNavigation: true, kind: "tab" },
+        cashier: { ledgerNavigation: true, kind: "filter" },
       },
       "",
       url
@@ -58,14 +58,11 @@ describe("ledger-url-navigation", () => {
         unrelatedCustomState: "keep",
       },
       "",
-      "/ledgers/ledger-1?tab=details"
+      "/details"
     );
     const historySpy = vi.spyOn(window.history, "replaceState");
 
-    const url = replaceLedgerUrl(
-      "/ledgers/ledger-1",
-      new URLSearchParams("tab=details&detailId=document-1")
-    );
+    const url = replaceLedgerUrl("/details", new URLSearchParams("detail=document-1"));
 
     expect(historySpy).toHaveBeenCalledWith(
       {
