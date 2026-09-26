@@ -1,25 +1,13 @@
-import type { Ledger, LedgerEntry } from "@/modules/ledger/contracts";
-import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import { useCallback } from "react";
+import type { Ledger } from "@/modules/ledger/contracts";
 import { useTranslations } from "next-intl";
 import { type PeriodParams } from "@/lib/period-utils";
-import {
-  openLedgerDetail,
-  openLedgerEntrySourceDocument,
-} from "@/lib/navigation/ledger-detail-navigation";
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
+import { useLedgerEntriesTab } from "@/modules/workspace/hooks/useLedgerEntriesTab";
 import { LedgerEntriesToolbar } from "./LedgerEntriesToolbar";
 import { LedgerEntriesStreamBody } from "./LedgerEntriesStreamBody";
 import { LedgerEntriesOverlays, preloadEditRetryDialog } from "./LedgerEntriesOverlays";
-import { useLedgerEntriesTabState } from "./useLedgerEntriesTabState";
-import { useLedgerEntriesFilters } from "./useLedgerEntriesFilters";
-import { useLedgerEntriesStreamData } from "@/modules/workspace/hooks/useLedgerEntriesStreamData";
-import { useLedgerEntriesSelection } from "@/modules/workspace/hooks/useLedgerEntriesSelection";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
-import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
-import { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
 
 interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -41,80 +29,14 @@ export function LedgerEntriesTab({
   collapseEntriesDefault = false,
   timeZone,
 }: LedgerEntriesTabProps) {
-  const t = useTranslations("LedgerEntriesTab");
   const tCommon = useTranslations("Common");
-  const { filters, startDateStr, endDateStr } = useLedgerEntriesFilters(
-    periodParams,
-    advancedFilters,
-    timeZone
-  );
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
-
-  const {
-    deleteConfirm,
-    setDeleteConfirm,
-    closeDeleteConfirm,
-    retrySourceDocument,
-    setRetrySourceDocument,
-    openSourceDocumentDeleteConfirm,
-    closeRetrySourceDocument,
-  } = useLedgerEntriesTabState();
-
-  const recovery = useStreamSourceDocumentRecoveryMutations();
-
-  const streamData = useLedgerEntriesStreamData({
-    ...(bookId == null ? {} : { bookId }),
+  const { filters, stream, selection, recovery, dialogs, actions } = useLedgerEntriesTab({
+    bookId,
     mainCurrency,
-    filters,
-    startDateStr,
-    endDateStr,
-  });
-
-  const selection = useLedgerEntriesSelection({
-    streamGroups: streamData.streamGroups,
     periodParams,
     advancedFilters,
-  });
-
-  const handleViewSourceDetail = useCallback(
-    (group: { sourceDocument: SourceDocumentListItemDto; ledgerEntries: LedgerEntry[] }) => {
-      openLedgerDetail({
-        type: "source-document",
-        id: group.sourceDocument.id,
-      });
-    },
-    []
-  );
-
-  // An entry row opens the record it belongs to; entries have no sheet of
-  // their own.
-  const handleViewLedgerEntry = useCallback(
-    (entry: LedgerEntry) => openLedgerEntrySourceDocument(entry),
-    []
-  );
-
-  const handleDeleteSourceConfirm = useCallback(
-    (doc: SourceDocumentListItemDto) =>
-      openSourceDocumentDeleteConfirm(doc.id, t("deleteConfirmTitle"), t("deleteConfirmDesc")),
-    [openSourceDocumentDeleteConfirm, t]
-  );
-
-  const handleDeleteConfirmAction = useCallback(async () => {
-    if (deleteConfirm.id == null || deleteConfirm.id === "" || deleteConfirm.type == null) return;
-    if (deleteConfirm.type === "sourceDocument") {
-      await selection.deleteSourceDocument.mutateAsync({
-        id: deleteConfirm.id,
-        onCommitted: closeDeleteConfirm,
-      });
-    }
-  }, [deleteConfirm, selection.deleteSourceDocument, closeDeleteConfirm]);
-
-  const sentinelRef = useInfiniteScroll({
-    hasNextPage: streamData.hasNextPage,
-    isFetchingNextPage: streamData.isFetchingNextPage,
-    isFetchNextPageError: streamData.isFetchNextPageError,
-    fetchNextPage: streamData.fetchNextPage,
-    rootMargin: "400px",
+    timeZone,
   });
 
   return (
@@ -122,49 +44,30 @@ export function LedgerEntriesTab({
       <LedgerEntriesToolbar
         isSelectionMode={selection.isSelectionMode}
         isAllSelected={selection.isAllSelected}
-        hasMoreData={
-          streamData.hasNextPage ||
-          selection.allSourceDocumentIds.length > selection.selectableCount
-        }
+        hasMoreData={selection.hasMoreData}
         selectedCount={selection.selectedIds.length}
         queryFingerprint={selection.queryFingerprint}
         selectedSourceDocumentIds={selection.selectedIds}
         selectedEntryIds={selection.selectedEntryIds}
         onToggleSelectionMode={selection.handleToggleSelectionMode}
-        onSelectAll={() => !selection.isBatchPending && selection.selectAll()}
-        onClearSelection={() => !selection.isBatchPending && selection.clearSelection()}
-        onUpdateDates={selection.handleBatchUpdateDates}
-        onPreviewDateImpact={(sourceDocumentIds, entryIds) =>
-          previewSourceDocumentDateImpactAction({
-            sourceDocumentIds,
-            ledgerEntryIds: entryIds,
-          })
-        }
-        isUpdatingDates={selection.batchUpdateDates.isPending}
-        onRetry={async () => {
-          await selection.batchRetry.mutateAsync(selection.selectedIds);
-        }}
-        onDelete={async (onCommitted) => {
-          const result = await selection.batchDelete.mutateAsync({
-            ids: selection.selectedIds,
-            onCommitted,
-          });
-          return result.failed.length === 0;
-        }}
-        isRetrying={selection.batchRetry.isPending}
-        isDeleting={selection.batchDelete.isPending}
+        onSelectAll={selection.handleSelectAll}
+        onClearSelection={selection.handleClearSelection}
+        onUpdateDates={selection.handleUpdateDates}
+        onPreviewDateImpact={selection.handlePreviewDateImpact}
+        isUpdatingDates={selection.isUpdatingDates}
+        onRetry={selection.handleRetry}
+        onDelete={selection.handleDelete}
+        isRetrying={selection.isRetrying}
+        isDeleting={selection.isDeleting}
         isProcessing={selection.isBatchPending}
         filters={filters}
         onFiltersChange={onFiltersChange}
         periodParams={periodParams}
         mainCurrency={mainCurrency}
-        {...(streamData.filteredTotal === undefined
-          ? {}
-          : { filteredTotal: streamData.filteredTotal })}
+        {...(stream.filteredTotal === undefined ? {} : { filteredTotal: stream.filteredTotal })}
         {...(timeZone != null ? { timeZone } : {})}
       />
-      {streamData.streamTotalData?.unconvertedCount != null &&
-      streamData.streamTotalData.unconvertedCount > 0 ? (
+      {stream.hasUnconverted ? (
         <div
           role="status"
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
@@ -173,20 +76,18 @@ export function LedgerEntriesTab({
         </div>
       ) : null}
 
-      {streamData.isError && (
-        <LedgerQueryErrorBanner empty={!streamData.hasData} onRetry={streamData.retry} />
-      )}
-      {(!streamData.isError || streamData.hasData) && (
+      {stream.isError && <LedgerQueryErrorBanner empty={!stream.hasData} onRetry={stream.retry} />}
+      {(!stream.isError || stream.hasData) && (
         <LedgerEntriesStreamBody
-          isLoading={streamData.isLoading}
-          streamGroups={streamData.streamGroups}
+          isLoading={stream.isLoading}
+          streamGroups={stream.groups}
           mainCurrency={mainCurrency}
           filters={filters}
-          onViewLedgerEntry={handleViewLedgerEntry}
-          onViewSourceDetail={handleViewSourceDetail}
-          onEditRetry={setRetrySourceDocument}
+          onViewLedgerEntry={actions.handleViewLedgerEntry}
+          onViewSourceDetail={actions.handleViewSourceDetail}
+          onEditRetry={dialogs.setRetrySourceDocument}
           onEditRetryIntent={preloadEditRetryDialog}
-          onDeleteSourceConfirm={handleDeleteSourceConfirm}
+          onDeleteSourceConfirm={actions.handleRequestDelete}
           isSelectionMode={selection.isSelectionMode}
           selectedIds={selection.selectedIds}
           disableUnselected={selection.isSelectionLimitReached}
@@ -195,21 +96,20 @@ export function LedgerEntriesTab({
           timeZone={timeZone}
           collapseEntriesDefault={collapseEntriesDefault}
           recovery={recovery}
-          hasNextPage={streamData.hasNextPage}
-          isFetchingNextPage={streamData.isFetchingNextPage}
-          isFetchNextPageError={streamData.isFetchNextPageError}
-          fetchNextPage={streamData.fetchNextPage}
-          sentinelRef={sentinelRef}
+          hasNextPage={stream.hasNextPage}
+          isFetchingNextPage={stream.isFetchingNextPage}
+          isFetchNextPageError={stream.isFetchNextPageError}
+          fetchNextPage={stream.fetchNextPage}
+          sentinelRef={stream.sentinelRef}
         />
       )}
 
       <LedgerEntriesOverlays
-        deleteConfirm={deleteConfirm}
-        onDeleteConfirmOpenChange={(open) => setDeleteConfirm((prev) => ({ ...prev, open }))}
-        onDeleteConfirm={handleDeleteConfirmAction}
-        deleteLabel={tCommon("delete")}
-        retrySourceDocument={retrySourceDocument}
-        onRetryDialogOpenChange={(open) => !open && closeRetrySourceDocument()}
+        deleteConfirmOpen={dialogs.deleteConfirmOpen}
+        onDeleteConfirmOpenChange={dialogs.setDeleteConfirmOpen}
+        onDeleteConfirm={actions.handleConfirmDelete}
+        retrySourceDocument={dialogs.retrySourceDocument}
+        onRetryDialogOpenChange={(open) => !open && dialogs.closeRetrySourceDocument()}
       />
     </>
   );

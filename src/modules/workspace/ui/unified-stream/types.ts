@@ -1,7 +1,7 @@
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import type { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
+import type { useLedgerEntriesTab } from "@/modules/workspace/hooks/useLedgerEntriesTab";
 
 export interface UnifiedStreamGroupProps {
   streamGroups: UnifiedStreamGroup[];
@@ -23,7 +23,7 @@ export interface UnifiedStreamGroupProps {
   onSetGroupSelection?: (ids: readonly string[], selected: boolean) => void;
   timeZone?: string;
   collapseEntriesDefault?: boolean;
-  recovery?: ReturnType<typeof useStreamSourceDocumentRecoveryMutations>;
+  recovery?: ReturnType<typeof useLedgerEntriesTab>["recovery"];
 }
 
 export type UnifiedStreamItem = UnifiedStreamGroup["items"][number];

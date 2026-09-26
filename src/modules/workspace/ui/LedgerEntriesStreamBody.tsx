@@ -8,7 +8,7 @@ import type { UnifiedStreamGroup } from "@/modules/source-document/stream-groupi
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { LedgerEntriesLoading } from "./LedgerEntriesLoading";
 import { LedgerEntriesUnifiedGroups } from "./UnifiedStreamGroups";
-import type { useStreamSourceDocumentRecoveryMutations } from "@/modules/source-document/hooks/useStreamSourceDocumentRecoveryMutations";
+import type { useLedgerEntriesTab } from "@/modules/workspace/hooks/useLedgerEntriesTab";
 
 interface LedgerEntriesStreamBodyProps {
   isLoading: boolean;
@@ -36,7 +36,7 @@ interface LedgerEntriesStreamBodyProps {
   isFetchNextPageError: boolean;
   fetchNextPage: () => void;
   sentinelRef: (node: HTMLDivElement | null) => void;
-  recovery: ReturnType<typeof useStreamSourceDocumentRecoveryMutations>;
+  recovery: ReturnType<typeof useLedgerEntriesTab>["recovery"];
 }
 
 /** The stream tab's list body: loading state, grouped results, empty state, and pagination footer. */

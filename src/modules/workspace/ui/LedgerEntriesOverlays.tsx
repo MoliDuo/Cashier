@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import type { LedgerEntriesDeleteConfirmState } from "./useLedgerEntriesTabState";
-import dynamic from "next/dynamic";
 
 const loadEditRetryDialog = () =>
   import("@/modules/source-document/ui/SourceDocumentEditRetryDialog");
@@ -18,31 +18,31 @@ export function preloadEditRetryDialog() {
 }
 
 interface LedgerEntriesOverlaysProps {
-  deleteConfirm: LedgerEntriesDeleteConfirmState;
+  deleteConfirmOpen: boolean;
   onDeleteConfirmOpenChange: (open: boolean) => void;
-  onDeleteConfirm: () => void;
-  deleteLabel: string;
+  onDeleteConfirm: () => Promise<void>;
   retrySourceDocument: SourceDocumentListItemDto | null;
   onRetryDialogOpenChange: (open: boolean) => void;
 }
 
 export function LedgerEntriesOverlays({
-  deleteConfirm,
+  deleteConfirmOpen,
   onDeleteConfirmOpenChange,
   onDeleteConfirm,
-  deleteLabel,
   retrySourceDocument,
   onRetryDialogOpenChange,
 }: LedgerEntriesOverlaysProps) {
+  const t = useTranslations("LedgerEntriesTab");
+  const tCommon = useTranslations("Common");
   return (
     <>
       <ConfirmDialog
-        open={deleteConfirm.open}
+        open={deleteConfirmOpen}
         onOpenChange={onDeleteConfirmOpenChange}
-        title={deleteConfirm.title}
-        description={deleteConfirm.description}
+        title={t("deleteConfirmTitle")}
+        description={t("deleteConfirmDesc")}
         onConfirm={onDeleteConfirm}
-        confirmLabel={deleteLabel}
+        confirmLabel={tCommon("delete")}
         variant="destructive"
       />
 
