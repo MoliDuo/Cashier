@@ -1,16 +1,8 @@
 import { z } from "zod";
 import { ValidationError } from "@/lib/errors";
-import { getPasswordRuleViolation, PASSWORD_RULE_MESSAGES } from "@/modules/auth/password-rules";
 
 const bookNameSchema = z.string().trim().min(1).max(20);
 const emailSchema = z.string().trim().min(3).max(254).email("Enter a valid email address");
-// The wizard and the server policy read the same rule, so a password the form
-// accepts cannot be one the API rejects.
-const passwordSchema = z.string().superRefine((password, context) => {
-  const violation = getPasswordRuleViolation(password);
-  if (violation == null) return;
-  context.addIssue({ code: "custom", message: PASSWORD_RULE_MESSAGES[violation] });
-});
 const setupCodeSchema = z.string().trim().min(6).max(32);
 
 /**
@@ -33,7 +25,6 @@ export const setupInputSchema = z
   .object({
     setupCode: setupCodeSchema,
     email: emailSchema,
-    password: passwordSchema,
     books: z
       .array(bookNameSchema)
       .min(1, "Add at least one book")

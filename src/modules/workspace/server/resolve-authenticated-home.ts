@@ -16,8 +16,6 @@ export interface AuthenticatedHomeContext {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      hasPassword: boolean;
-      passwordUpdatedAt: string | null;
     };
   };
 }
@@ -48,8 +46,6 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
       user: {
         id: userId,
         email: session.email,
-        hasPassword: session.hasPassword,
-        passwordUpdatedAt: session.passwordUpdatedAt?.toISOString() ?? null,
       },
     },
   };

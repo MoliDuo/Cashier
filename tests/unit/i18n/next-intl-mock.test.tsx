@@ -15,7 +15,7 @@ function ContextProbe() {
 
   return (
     <>
-      <span>{tAccount("passwordSection")}</span>
+      <span>{tAccount("passkeySection")}</span>
       <span>{tAccount("shared")}</span>
       <span>{tOther("shared")}</span>
       <span>{locale}</span>
@@ -32,7 +32,7 @@ describe("next-intl test mock", () => {
         messages={{
           Settings: {
             Account: {
-              passwordSection: "Password",
+              passkeySection: "Passkeys",
             },
           },
           // @ts-expect-error -- a namespace the real catalog lacks is what the mock must handle
@@ -45,7 +45,7 @@ describe("next-intl test mock", () => {
       </NextIntlClientProvider>
     );
 
-    expect(screen.getByText("Password")).toBeInTheDocument();
+    expect(screen.getByText("Passkeys")).toBeInTheDocument();
     expect(screen.getByText("Settings.Account.shared")).toBeInTheDocument();
     expect(screen.getByText("Other value")).toBeInTheDocument();
     expect(screen.getByText("zh")).toBeInTheDocument();

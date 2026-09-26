@@ -89,12 +89,9 @@ export const AUTH_RATE_LIMIT_WINDOW_SECONDS = 900;
 export const OTP_IP_MAX_ATTEMPTS_PER_HOUR = 10;
 export const OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE = 5;
 
-/** Password sign-in, per address and per IP, over the same window. */
-export const AUTH_PASSWORD_EMAIL_MAX_ATTEMPTS = 10;
-export const AUTH_PASSWORD_IP_MAX_ATTEMPTS = 50;
-export const AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS = 900;
-/** Passkey sign-ins started per IP address in the same window. */
+/** Passkey sign-ins started per IP address, and the window they are counted over. */
 export const AUTH_PASSKEY_IP_MAX_ATTEMPTS = 30;
+export const AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS = 900;
 
 /** API v1, per credential. */
 export const API_RATE_LIMIT_PER_MINUTE = 60;

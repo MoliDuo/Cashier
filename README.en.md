@@ -62,8 +62,9 @@ On the first start, Cashier creates PostgreSQL, the MinIO bucket, and the databa
 not create an account. Open [http://localhost:3000](http://localhost:3000): every page leads to the
 `/setup` wizard. The server logs print a one-time setup code, on a line starting with
 `First-run setup is pending`. Enter that code, a
-sign-in email, a password and your book names (共同支出 is pre-filled as the default) to create the
-account; `/setup` returns 404 afterwards.
+sign-in email and your book names (共同支出 is pre-filled as the default) to create the
+account; `/setup` returns 404 afterwards. There is no password: sign in with a code sent to that
+email (this needs `AUTH_RESEND_KEY`), then add a passkey under 设置.
 
 `AI_MODEL` defaults to `gpt-4o`. When using another OpenAI-compatible service, set both
 `OPENAI_BASE_URL` and `AI_MODEL`.

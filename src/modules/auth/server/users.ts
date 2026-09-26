@@ -10,26 +10,12 @@ import { loginEmails, users } from "@/persistence";
 export interface UserAccount {
   id: string;
   email: string;
-  passwordHash: string | null;
-  passwordUpdatedAt: Date | null;
 }
 
 export interface LoginEmail {
   email: string;
   emailVerifiedAt: string | null;
 }
-
-const accountColumns = {
-  id: true,
-  passwordHash: true,
-  passwordUpdatedAt: true,
-} as const;
-
-type AccountRow = {
-  id: string;
-  passwordHash: string | null;
-  passwordUpdatedAt: Date | null;
-};
 
 /**
  * The account's first login address, oldest first. `email` on the contract is
@@ -47,22 +33,11 @@ async function firstLoginEmail(userId: string): Promise<string> {
   return row?.email ?? "";
 }
 
-function toAccount(row: AccountRow, email: string): UserAccount {
-  return {
-    id: row.id,
-    email,
-    passwordHash: row.passwordHash,
-    passwordUpdatedAt: row.passwordUpdatedAt,
-  };
-}
-
 /** `email` is one of the account's login addresses, matched case-insensitively. */
 export async function findUserByEmail(email: string): Promise<UserAccount | null> {
   const row = await db
     .select({
       id: users.id,
-      passwordHash: users.passwordHash,
-      passwordUpdatedAt: users.passwordUpdatedAt,
       loginEmail: loginEmails.email,
     })
     .from(loginEmails)
@@ -72,16 +47,16 @@ export async function findUserByEmail(email: string): Promise<UserAccount | null
     .where(sql`lower(${loginEmails.email}) = lower(${email})`)
     .limit(1)
     .then((rows) => rows[0]);
-  return row == null ? null : toAccount(row, row.loginEmail);
+  return row == null ? null : { id: row.id, email: row.loginEmail };
 }
 
 export async function findUserById(id: string): Promise<UserAccount | null> {
   const row = await db.query.users.findFirst({
     where: eq(users.id, id),
-    columns: accountColumns,
+    columns: { id: true },
   });
   if (row == null) return null;
-  return toAccount(row, await firstLoginEmail(row.id));
+  return { id: row.id, email: await firstLoginEmail(row.id) };
 }
 
 /** The account's login addresses, oldest first. */

@@ -1,14 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { signIn } from "./sign-in";
 
 test("each tab is its own route, Back walks them, and old bookmarks land on them", async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/login");
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await signIn(page);
   await expect(page).toHaveURL(/\/stream$/);
 
   const navigation = page.getByRole("navigation", { name: "账本导航" });

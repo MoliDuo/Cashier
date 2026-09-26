@@ -37,12 +37,12 @@ interface EmailSettingsProps {
 }
 
 /**
- * 登录邮箱: every address here signs in with a code or with the shared password.
- * An address is added by verifying an OTP sent to it, and the account keeps at
- * least one, so a removal can be refused with a reason rather than a crash.
+ * 登录邮箱: every address here signs in with a code sent to it. An address is
+ * added by verifying an OTP sent to it, and the account keeps at least one, so a
+ * removal can be refused with a reason rather than a crash.
  *
  * It is the field 账户 is about, so it keeps a field heading inside that card:
- * 密码 and API 密钥 stand alone as cards because each saves on its own.
+ * 通行密钥 and API 密钥 stand alone as cards because each saves on its own.
  */
 export function EmailSettings({
   userEmail,

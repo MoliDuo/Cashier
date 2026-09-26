@@ -1,6 +1,6 @@
 "use server";
 
-import { AppError, ConflictError, ValidationError } from "@/lib/errors";
+import { ConflictError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { normalizeEmail } from "@/lib/utils/email";
 import { parseSetupInput } from "../contract-schemas";
@@ -13,17 +13,11 @@ export type SetupErrorCode =
   | "code_expired"
   | "code_locked_out"
   | "invalid_email"
-  | "weak_password"
   | "invalid_books"
   | "unexpected";
 
 export type SetupActionResult =
   { ok: true; ledgerId: string } | { ok: false; code: SetupErrorCode };
-
-/** `password_too_short` and `password_requirements_not_met` are the policy's own codes. */
-function isPasswordPolicyError(error: AppError): boolean {
-  return error.code.startsWith("password_");
-}
 
 /**
  * The only unauthenticated write in the app. The setup code is what stands in
@@ -46,7 +40,6 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
     const result = await createInitialAccount({
       bookNames: parsed.books,
       email: normalizeEmail(parsed.email),
-      password: parsed.password,
     });
     logger.info(
       { ledgerSubject: result.ledgerId },
@@ -55,11 +48,6 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
     return { ok: true, ledgerId: result.ledgerId };
   } catch (error) {
     if (error instanceof ConflictError) return { ok: false, code: "already_done" };
-    // The password policy reports its own `AppError` codes; without this the
-    // wizard would answer "weak password" with a generic failure.
-    if (error instanceof AppError && isPasswordPolicyError(error)) {
-      return { ok: false, code: "weak_password" };
-    }
     if (error instanceof ValidationError) {
       const fields = (error.details?.issues as { path?: unknown[] }[] | undefined)?.map((issue) =>
         String(issue.path?.[0] ?? "")
@@ -68,7 +56,6 @@ export async function completeSetupAction(input: unknown): Promise<SetupActionRe
       // one is a wrong code, whether it was absent, blank, or the wrong shape.
       if (fields?.includes("setupCode")) return { ok: false, code: "wrong_code" };
       if (fields?.includes("email")) return { ok: false, code: "invalid_email" };
-      if (fields?.includes("password")) return { ok: false, code: "weak_password" };
       if (fields?.includes("books")) return { ok: false, code: "invalid_books" };
       return { ok: false, code: "unexpected" };
     }

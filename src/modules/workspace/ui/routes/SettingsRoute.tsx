@@ -7,12 +7,10 @@ import { useLedgerWorkspace } from "../ledger-workspace-context";
 
 interface SettingsRouteProps {
   userEmail?: string;
-  hasPassword: boolean;
-  passwordUpdatedAt: string | null;
 }
 
 /** 设置. The account facts come from the page's own server render. */
-export function SettingsRoute({ userEmail, hasPassword, passwordUpdatedAt }: SettingsRouteProps) {
+export function SettingsRoute({ userEmail }: SettingsRouteProps) {
   const { ledger, categories, books } = useLedgerWorkspace();
   const { navigate } = useLedgerNavigation();
   const detailsQuery = useWorkspaceStore((state) => state.routeQueries.details ?? "");
@@ -38,8 +36,6 @@ export function SettingsRoute({ userEmail, hasPassword, passwordUpdatedAt }: Set
       initialCategories={categories}
       initialBooks={books}
       {...(userEmail !== undefined ? { userEmail } : {})}
-      hasPassword={hasPassword}
-      passwordUpdatedAt={passwordUpdatedAt}
       onGoToDetails={goToDetails}
     />
   );

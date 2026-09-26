@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { signIn } from "./sign-in";
 
 test("selection, discard confirmation and one-tap split navigation", async ({
   page,
@@ -6,11 +7,7 @@ test("selection, discard confirmation and one-tap split navigation", async ({
 }, testInfo) => {
   const activate = (locator: Locator) => (isMobile ? locator.tap() : locator.click());
   const name = `Interaction ${testInfo.project.name}`;
-  await page.goto("/login");
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await signIn(page);
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   let dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "快速记账", exact: true }).click();

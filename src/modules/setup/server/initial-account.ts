@@ -3,14 +3,11 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { books, entryCategories, ledgers, loginEmails, setupState, users } from "@/persistence";
-import { hashPassword } from "@/modules/auth/domain/password";
-import { validatePassword } from "@/modules/auth/domain/password-policy";
 import { getCategoryPreset } from "@/config/category-presets";
 
 export interface SetupInput {
   bookNames: readonly string[];
   email: string;
-  password: string;
 }
 
 export interface SetupResult {
@@ -29,9 +26,10 @@ export async function isSetupPending(): Promise<boolean> {
 /**
  * First-run setup: the one write path that runs without a session.
  *
- * Everything the wizard collects — the account, its login address and password,
- * the ledger, the books and the default categories — is written in a single
- * transaction. A half-created instance would leave `/setup` past its guard with
+ * Everything the wizard collects — the account, its login address, the ledger,
+ * the books and the default categories — is written in a single transaction.
+ * The account has no credential yet: its owner signs in with a code sent to
+ * that address and then adds a passkey. A half-created instance would leave `/setup` past its guard with
  * no account able to sign in, so partial success is not an option.
  */
 export async function createInitialAccount(input: SetupInput): Promise<SetupResult> {
@@ -42,11 +40,9 @@ export async function createInitialAccount(input: SetupInput): Promise<SetupResu
   if (new Set(bookNames).size !== bookNames.length) {
     throw new ValidationError("Book names must be unique");
   }
-  validatePassword(input.password);
   const email = input.email.trim().toLowerCase();
 
   const categories = getCategoryPreset("default");
-  const passwordHash = await hashPassword(input.password);
   const now = new Date();
 
   return db.transaction(async (tx) => {
@@ -56,10 +52,7 @@ export async function createInitialAccount(input: SetupInput): Promise<SetupResu
     const existing = await tx.select({ id: users.id }).from(users).limit(1);
     if (existing.length > 0) throw new ConflictError("Setup has already been completed");
 
-    const [user] = await tx
-      .insert(users)
-      .values({ passwordHash, passwordUpdatedAt: now })
-      .returning();
+    const [user] = await tx.insert(users).values({}).returning();
     if (user == null) throw new AppError("Failed to create the account", "SETUP_FAILED", 500);
 
     await tx.insert(loginEmails).values({

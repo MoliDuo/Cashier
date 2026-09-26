@@ -11,7 +11,6 @@ import { logger } from "@/lib/logger";
 import { AUTH_ERROR_CODES, AuthSignInError, type AuthErrorCode } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { authenticateWithOTP } from "@/modules/auth/server/authenticate-with-otp";
-import { authenticateWithPassword } from "@/modules/auth/server/authenticate-with-password";
 import { authenticateDevUser } from "@/modules/auth/server/authenticate-dev-user";
 import { completeInteractiveSignIn } from "@/modules/auth/server/complete-interactive-sign-in";
 import { endSession, startSession } from "@/modules/auth/server/current-session";
@@ -21,9 +20,9 @@ import { getClientIPFromHeaders } from "@/lib/utils/ip";
 
 export type SignInActionResult = { ok: true } | { ok: false; code: AuthErrorCode | "unexpected" };
 
-const credentialsSchema = z.object({
+const otpCredentialsSchema = z.object({
   email: z.string().max(254),
-  secret: z.string().max(128),
+  otp: z.string().max(128),
 });
 
 async function signInWith(
@@ -45,34 +44,14 @@ async function signInWith(
   }
 }
 
-function parseCredentials(email: unknown, secret: unknown) {
-  return credentialsSchema.safeParse({ email, secret });
-}
-
 export async function signInWithOtpAction(email: string, otp: string): Promise<SignInActionResult> {
-  const parsed = parseCredentials(email, otp);
+  const parsed = otpCredentialsSchema.safeParse({ email, otp });
   if (!parsed.success) return { ok: false, code: AUTH_ERROR_CODES.OTP_INVALID };
   const requestHeaders = await headers();
   return signInWith(() =>
     authenticateWithOTP({
       email: parsed.data.email,
-      otp: parsed.data.secret,
-      requestHeaders,
-    })
-  );
-}
-
-export async function signInWithPasswordAction(
-  email: string,
-  password: string
-): Promise<SignInActionResult> {
-  const parsed = parseCredentials(email, password);
-  if (!parsed.success) return { ok: false, code: AUTH_ERROR_CODES.INVALID_CREDENTIALS };
-  const requestHeaders = await headers();
-  return signInWith(() =>
-    authenticateWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.secret,
+      otp: parsed.data.otp,
       requestHeaders,
     })
   );

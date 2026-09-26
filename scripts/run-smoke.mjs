@@ -3,11 +3,11 @@ import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import net from "node:net";
 import pg from "pg";
-import bcrypt from "bcryptjs";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { prepareTestPostgres } from "./prepare-test-postgres.mjs";
 import { createDemoAiServer } from "./demo-ai-server.mjs";
+import { createSmokeEmailServer } from "./smoke-email-server.mjs";
 import { createSmokeObjectStorage } from "./smoke-object-storage.mjs";
 
 const adminUrl = new URL(
@@ -67,7 +67,10 @@ const baseURL = `http://127.0.0.1:${port}`;
 // in-memory S3 endpoint instead of a bucket: the image still travels through
 // the real client, and nothing leaves this machine or outlives the run.
 const storageEndpoint = `http://127.0.0.1:${storagePort}`;
-const password = `Smoke9-${randomUUID()}`;
+// Sign-in codes go through the real Resend client too, to an in-memory outbox
+// the OTP spec reads them back from.
+const emailServer = createSmokeEmailServer();
+const emailEndpoint = `http://127.0.0.1:${await listenOnAnyPort(emailServer)}`;
 const userId = randomUUID();
 const sharedLedgerId = randomUUID();
 const env = {
@@ -76,7 +79,8 @@ const env = {
   DATABASE_URL: databaseUrl.toString(),
   APP_URL: baseURL,
   AUTH_SECRET: randomUUID(),
-  AUTH_RESEND_KEY: "",
+  AUTH_RESEND_KEY: "re_smoke_unused",
+  RESEND_BASE_URL: emailEndpoint,
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
   OPENAI_API_KEY: "smoke-unused",
   OPENAI_BASE_URL: `http://127.0.0.1:${aiPort}/v1`,
@@ -86,12 +90,15 @@ const env = {
   S3_ACCESS_KEY_ID: "smoke-unused",
   S3_SECRET_ACCESS_KEY: "smoke-unused",
   S3_FORCE_PATH_STYLE: "true",
+  // `next build` compiles NODE_ENV in as "production", so the dev sign-in is
+  // off in this server whatever this says; the specs sign in through
+  // tests/smoke/sign-in.ts instead.
   DEV_AUTH_BYPASS: "false",
   TRUSTED_PROXY: "",
   TZ: "UTC",
   SMOKE_BASE_URL: baseURL,
   SMOKE_EMAIL: "smoke@example.com",
-  SMOKE_PASSWORD: password,
+  SMOKE_EMAIL_OUTBOX_URL: emailEndpoint,
 };
 let activeChild;
 let server;
@@ -142,14 +149,12 @@ try {
   try {
     await db.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
     await migrate(drizzle(db), { migrationsFolder: "src/persistence/postgres-migrations" });
-    const hash = await bcrypt.hash(password, 12);
     // One account with one login address and one ledger with two books: the
-    // smoke suite signs in with the password, and a record written from 总账
+    // smoke suite signs in as that address, and a record written from 总账
     // lands in whichever book the writer picked (or the first one, 共同支出).
-    await db.query(
-      `INSERT INTO users (id, password_hash, password_updated_at, created_at, updated_at) VALUES ($1, $2, now(), now(), now())`,
-      [userId, hash]
-    );
+    await db.query(`INSERT INTO users (id, created_at, updated_at) VALUES ($1, now(), now())`, [
+      userId,
+    ]);
     await db.query(
       `INSERT INTO login_emails (user_id, email, email_verified, created_at, updated_at) VALUES ($1, $2, now(), now(), now())`,
       [userId, env.SMOKE_EMAIL]
@@ -185,8 +190,8 @@ try {
   // Without this, a server that never came up leaves every spec to time out
   // against whatever answers on the port, and the real error scrolls past.
   await waitForServer(server);
-  // The @demo spec needs the dev sign-in, which this runner deliberately keeps
-  // off (DEV_AUTH_BYPASS is false and NODE_ENV is production). It runs under
+  // The @demo spec needs the dev sign-in, which a production build cannot
+  // offer (NODE_ENV is compiled in as production). It runs under
   // `npm run test:demo`, which boots the demo environment instead.
   await run([
     "node_modules/@playwright/test/cli.js",
@@ -200,6 +205,7 @@ try {
   await stop(server);
   if (aiServer.listening) await new Promise((resolve) => aiServer.close(resolve));
   if (storageServer.listening) await new Promise((resolve) => storageServer.close(resolve));
+  if (emailServer.listening) await new Promise((resolve) => emailServer.close(resolve));
   if (created && /^smoke_[a-f0-9]{32}$/.test(databaseName)) {
     const target = await admin.query("SELECT datname FROM pg_database WHERE datname = $1", [
       databaseName,

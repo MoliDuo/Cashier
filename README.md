@@ -60,8 +60,9 @@ npm run dev
 首次启动会创建 PostgreSQL、MinIO 存储桶和数据库表，但不会创建账号。打开
 [http://localhost:3000](http://localhost:3000)：所有页面都会跳到 `/setup`
 初始化向导。服务端日志会打印一次性初始化代码，
-日志行以 `First-run setup is pending` 开头。在向导中填入该代码、登录邮箱、密码和
-分账名称（默认预填 `共同支出`）即可创建账号，之后 `/setup` 永久返回 404。
+日志行以 `First-run setup is pending` 开头。在向导中填入该代码、登录邮箱和
+分账名称（默认预填 `共同支出`）即可创建账号，之后 `/setup` 永久返回 404。账号没有密码：
+用该邮箱接收验证码登录（需要配置 `AUTH_RESEND_KEY`），再在设置里添加通行密钥。
 
 `AI_MODEL` 默认为 `gpt-4o`。如果你使用其他 OpenAI 兼容服务，请同时修改
 `OPENAI_BASE_URL` 和 `AI_MODEL`。

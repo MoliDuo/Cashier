@@ -35,7 +35,7 @@ flagged, and does not need a label saying so.
 Browser smoke tests live in `tests/smoke/` and run with Playwright against a production build.
 They exercise actual browser, authentication, server-action, and PostgreSQL boundaries. Each run
 owns a separate `smoke_<uuid>` database; desktop/mobile scenarios run serially with fresh browser
-contexts. The runner seeds one password account, its ledger, two books, and a few categories
+contexts. The runner seeds one account, its ledger, two books, and a few categories
 directly into that database. No existing user database is migrated, seeded, or truncated. See `CONTRIBUTING.md` for the command.
 
 Database-backed Vitest global setup migrates one template database, `test_<run-id>_template`, and

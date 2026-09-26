@@ -40,7 +40,8 @@ npm run dev
 
 Fill in the AI values. Accounts do not come from the environment: against an empty database the
 server prints a one-time setup code to its logs, and `/setup` asks for that code plus one
-login email, one password, and the book names.
+login email and the book names. There are no passwords: sign in with a code sent to that email
+(which needs the Resend key), then add a passkey under 设置.
 
 Never commit `.env`, provider credentials, real receipts, API keys, or raw personal data.
 
@@ -91,10 +92,12 @@ npm run test:smoke
 ```
 
 Starts a temporary PostgreSQL container and a uniquely named smoke database, applies real
-migrations, seeds a fictional password account, builds production assets, and runs desktop and
-mobile Chromium. No auth bypass, no real email, AI, or object storage. It covers password
-rejection and login, ledger access, manual entry, editing, persistence across reload,
-deletion, logout, and protected-page redirects. Failures keep screenshots and traces in
+migrations, seeds a fictional account, builds production assets, and runs desktop and mobile
+Chromium. No auth bypass, no real email, AI, or object storage: emails go through the real Resend
+client to an in-memory outbox. One spec signs in with an emailed code (and has a wrong one
+refused); the others open a session for the seeded account directly in the database. It covers
+ledger access, manual entry, editing, persistence across reload, deletion, logout, and
+protected-page redirects. Failures keep screenshots and traces in
 `test-results/` and a report in `playwright-report/`.
 
 ## Commits

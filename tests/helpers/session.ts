@@ -12,8 +12,6 @@ export function testSession(
     sessionId: "00000000-0000-0000-0000-00000000000a",
     userId,
     email: "test@example.com",
-    hasPassword: false,
-    passwordUpdatedAt: null,
     authenticatedAt: now,
     expiresAt: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
     ...overrides,

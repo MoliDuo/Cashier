@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signIn } from "./sign-in";
 
 test("AI category assignment remains visible across tabs and fits narrow screens", async ({
   page,
@@ -8,11 +9,7 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   if (isMobile && !isShortMobile) await page.setViewportSize({ width: 390, height: 844 });
   const item = `Category workflow ${testInfo.project.name}`;
 
-  await page.goto("/login");
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await signIn(page);
 
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   const create = page.getByRole("dialog");

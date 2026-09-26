@@ -1,12 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { signIn } from "./sign-in";
 
 test("unsaved input is kept as a draft and leaving never asks", async ({ page }, testInfo) => {
   const text = `Draft ${testInfo.project.name} ${Date.now()}`;
-  await page.goto("/login");
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await signIn(page);
 
   // A typed record survives closing the dialog and a reload.
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
@@ -57,11 +54,7 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
 });
 
 test("settings save as they change, with nothing to confirm on the way out", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await signIn(page);
 
   const navigation = page.getByRole("navigation");
   await navigation.getByRole("button", { name: "设置", exact: true }).click();

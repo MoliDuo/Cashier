@@ -17,8 +17,6 @@ export interface SessionUser {
   userId: string;
   /** The account's first login address, for display. */
   email: string;
-  hasPassword: boolean;
-  passwordUpdatedAt: Date | null;
   authenticatedAt: Date;
   expiresAt: Date;
 }
@@ -57,8 +55,6 @@ export async function readSession(token: string, now = new Date()): Promise<Sess
       lastSeenAt: sessions.lastSeenAt,
       authenticatedAt: sessions.authenticatedAt,
       expiresAt: sessions.expiresAt,
-      passwordHash: users.passwordHash,
-      passwordUpdatedAt: users.passwordUpdatedAt,
       email: sql<string | null>`(
         SELECT ${loginEmails.email} FROM ${loginEmails}
         WHERE ${loginEmails.userId} = ${sessions.userId}
@@ -86,8 +82,6 @@ export async function readSession(token: string, now = new Date()): Promise<Sess
     sessionId: row.sessionId,
     userId: row.userId,
     email: row.email ?? "",
-    hasPassword: row.passwordHash != null,
-    passwordUpdatedAt: row.passwordUpdatedAt,
     authenticatedAt: row.authenticatedAt,
     expiresAt,
   };

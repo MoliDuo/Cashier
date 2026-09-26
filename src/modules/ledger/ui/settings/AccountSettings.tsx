@@ -7,7 +7,6 @@ import type {
 } from "@/modules/ledger/contracts";
 import { useTranslations } from "next-intl";
 import { EmailSettings } from "./EmailSettings";
-import { PasswordForm } from "@/modules/auth/ui/PasswordForm";
 import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
 import { SettingsField } from "./SettingsField";
@@ -19,8 +18,6 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 interface AccountSettingsProps {
   /** The address this session signed in with, for the list's first frame. */
   userEmail?: string;
-  hasPassword: boolean;
-  passwordUpdatedAt: string | null;
   credentials: ServiceCredential[];
   isPending: boolean;
   books: readonly BookDto[];
@@ -33,16 +30,12 @@ interface AccountSettingsProps {
   onCredentialDialogClose: () => void;
   onSignOut: () => void | Promise<void>;
   onRequireReauthentication: () => void | Promise<void>;
-  /** A password change ends every session, so this one must sign in again. */
-  onCredentialsChanged: () => void | Promise<void>;
   /** Removing a login email ends every session, so each one signs in again. */
   onAllSessionsEnded: () => void | Promise<void>;
 }
 
 export function AccountSettings({
   userEmail,
-  hasPassword,
-  passwordUpdatedAt,
   credentials,
   isPending,
   books,
@@ -52,7 +45,6 @@ export function AccountSettings({
   onCredentialDialogClose,
   onSignOut,
   onRequireReauthentication,
-  onCredentialsChanged,
   onAllSessionsEnded,
 }: AccountSettingsProps) {
   const t = useTranslations("Settings");
@@ -62,18 +54,10 @@ export function AccountSettings({
 
   return (
     <>
-      {/* 通行密钥, 密码 and API 密钥 each save on their own, so each is a card of
+      {/* 通行密钥 and API 密钥 each save on their own, so each is a card of
           its own rather than a field inside 账户, the way 分账 and 记账规则 are. */}
       <SettingsSection title={ta("passkeySection")}>
         <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
-      </SettingsSection>
-      <SettingsSection title={ta("passwordSection")}>
-        <PasswordForm
-          hasPassword={hasPassword}
-          passwordUpdatedAt={passwordUpdatedAt}
-          onRequireReauthentication={onRequireReauthentication}
-          onCredentialsChanged={onCredentialsChanged}
-        />
       </SettingsSection>
       <ServiceCredentialSection
         credentials={credentials}

@@ -10,11 +10,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rou
   const { session } = await orSignIn(resolveAuthenticatedHome());
   return (
     <RoutePrefetch tab="settings" searchParams={searchParams}>
-      <SettingsRoute
-        {...(session.user?.email != null ? { userEmail: session.user.email } : {})}
-        hasPassword={session.user?.hasPassword ?? false}
-        passwordUpdatedAt={session.user?.passwordUpdatedAt ?? null}
-      />
+      <SettingsRoute {...(session.user?.email != null ? { userEmail: session.user.email } : {})} />
     </RoutePrefetch>
   );
 }

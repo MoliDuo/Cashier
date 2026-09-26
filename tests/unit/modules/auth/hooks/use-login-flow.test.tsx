@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   sendOTPActionMock,
-  passwordSignInMock,
+  otpSignInMock,
   devSignInMock,
   startPasskeyMock,
   finishPasskeyMock,
@@ -13,7 +13,7 @@ const {
   searchParams,
 } = vi.hoisted(() => ({
   sendOTPActionMock: vi.fn(),
-  passwordSignInMock: vi.fn(),
+  otpSignInMock: vi.fn(),
   devSignInMock: vi.fn(),
   startPasskeyMock: vi.fn(),
   finishPasskeyMock: vi.fn(),
@@ -24,8 +24,7 @@ const {
 }));
 
 vi.mock("@/modules/auth/server-actions/sign-in", () => ({
-  signInWithPasswordAction: passwordSignInMock,
-  signInWithOtpAction: vi.fn(),
+  signInWithOtpAction: otpSignInMock,
   devSignInAction: devSignInMock,
   startPasskeySignInAction: startPasskeyMock,
   finishPasskeySignInAction: finishPasskeyMock,
@@ -58,24 +57,6 @@ function createEmailSubmitEvent(email: string): React.FormEvent<HTMLFormElement>
   emailInput.name = "email";
   emailInput.value = email;
   form.append(emailInput);
-  return {
-    preventDefault: vi.fn(),
-    currentTarget: form,
-  } as unknown as React.FormEvent<HTMLFormElement>;
-}
-
-function createPasswordSubmitEvent(
-  email: string,
-  password: string
-): React.FormEvent<HTMLFormElement> {
-  const form = document.createElement("form");
-  const emailInput = document.createElement("input");
-  emailInput.name = "email";
-  emailInput.value = email;
-  const passwordInput = document.createElement("input");
-  passwordInput.name = "password";
-  passwordInput.value = password;
-  form.append(emailInput, passwordInput);
   return {
     preventDefault: vi.fn(),
     currentTarget: form,
@@ -116,35 +97,36 @@ describe("useLoginFlow OTP sending", () => {
     act(() => result.current.setEmail("user@example.com"));
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
 
-    expect(result.current.mode).toBe("otp");
     expect(result.current.step).toBe("otp");
     expect(result.current.expiresAt).toBe(1_800_000_000);
     expect(result.current.canResendAt).toBe(1_799_999_760);
     expect(result.current.error).toBeNull();
   });
 
-  it("starts in the requested login mode", () => {
-    const { result } = renderHook(() => useLoginFlow({ initialMode: "otp" }));
+  it("starts on the email step, with a code as the way in", () => {
+    const { result } = renderHook(() => useLoginFlow());
 
-    expect(result.current.mode).toBe("otp");
+    expect(result.current.step).toBe("email");
+    expect(result.current).not.toHaveProperty("mode");
+    expect(result.current).not.toHaveProperty("password");
   });
 
-  it("switches tabs and clears whatever the other tab was holding", async () => {
+  it("goes back to the email step and drops the typed code", async () => {
     sendOTPActionMock.mockResolvedValue({
       ok: true,
       expiresIn: 300,
       expiresAt: 1_800_000_000,
       canResendAt: 1_799_999_760,
     });
-    const { result } = renderHook(() => useLoginFlow({ initialMode: "otp" }));
+    const { result } = renderHook(() => useLoginFlow());
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
     act(() => result.current.setOtp("123456"));
 
-    act(() => result.current.setMode("password"));
+    act(() => result.current.handleChangeEmail());
 
-    expect(result.current.mode).toBe("password");
     expect(result.current.step).toBe("email");
     expect(result.current.otp).toBe("");
+    expect(result.current.email).toBe("user@example.com");
   });
 
   it("returns a same-site callbackUrl and refuses anything else", () => {
@@ -155,34 +137,75 @@ describe("useLoginFlow OTP sending", () => {
     expect(renderHook(() => useLoginFlow()).result.current.callbackUrl).toBe("/");
   });
 
-  it("submits browser-filled password fields even when React state is empty", async () => {
-    passwordSignInMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
+  it("submits a browser-filled email even when React state is empty", async () => {
+    sendOTPActionMock.mockResolvedValue({ ok: false, code: "email_send_failed" });
     const { result } = renderHook(() => useLoginFlow());
 
-    await act(() =>
-      result.current.handlePasswordLogin(
-        createPasswordSubmitEvent("autofill@example.com", "autofilled-password")
-      )
-    );
+    await act(() => result.current.handleSendOTP(createEmailSubmitEvent("autofill@example.com")));
 
-    expect(passwordSignInMock).toHaveBeenCalledWith("autofill@example.com", "autofilled-password");
+    expect(sendOTPActionMock).toHaveBeenCalledWith("autofill@example.com");
     expect(result.current.email).toBe("autofill@example.com");
-    expect(result.current.password).toBe("");
+    expect(result.current.error).toBe("emailSendFailed");
   });
 
-  it("shows the failure and stays on the page for a rejected login", async () => {
-    passwordSignInMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
-    const { result } = renderHook(() => useLoginFlow());
-    await act(() =>
-      result.current.handlePasswordLogin(
-        createPasswordSubmitEvent("smoke@example.com", "Wrong-password9")
-      )
-    );
+  async function reachCodeStep() {
+    sendOTPActionMock.mockResolvedValue({
+      ok: true,
+      expiresIn: 300,
+      expiresAt: 1_800_000_000,
+      canResendAt: 1_799_999_760,
+    });
+    const hook = renderHook(() => useLoginFlow());
+    await act(() => hook.result.current.handleSendOTP(createEmailSubmitEvent("smoke@example.com")));
+    return hook;
+  }
+
+  it("refuses a code that is not six digits without asking the server", async () => {
+    const { result } = await reachCodeStep();
+    act(() => result.current.setOtp("12a"));
+
+    await act(() => result.current.handleVerifyOTP());
+
+    expect(otpSignInMock).not.toHaveBeenCalled();
+    expect(result.current.error).toBe("invalidCode");
+  });
+
+  it("shows the failure and stays on the page for a rejected code", async () => {
+    otpSignInMock.mockResolvedValue({ ok: false, code: "otp_invalid" });
+    const { result } = await reachCodeStep();
+    act(() => result.current.setOtp("000000"));
+
+    await act(() => result.current.handleVerifyOTP());
+
+    expect(otpSignInMock).toHaveBeenCalledWith("smoke@example.com", "000000");
     expect(pushMock).not.toHaveBeenCalled();
     expect(refreshMock).not.toHaveBeenCalled();
-    expect(result.current.error).toBe("invalidCredentials");
-    expect(result.current.email).toBe("smoke@example.com");
+    expect(result.current.error).toBe("verifyFailed");
+    expect(result.current.step).toBe("otp");
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it("marks the code expired when the server says so", async () => {
+    otpSignInMock.mockResolvedValue({ ok: false, code: "otp_expired" });
+    const { result } = await reachCodeStep();
+    act(() => result.current.setOtp("123456"));
+
+    await act(() => result.current.handleVerifyOTP());
+
+    expect(result.current.otpExpired).toBe(true);
+    expect(result.current.error).toBe("codeExpiredMessage");
+  });
+
+  it("lands on the callback page once the code is accepted", async () => {
+    searchParams.value = "callbackUrl=%2Fsettings";
+    otpSignInMock.mockResolvedValue({ ok: true });
+    const { result } = await reachCodeStep();
+    act(() => result.current.setOtp("123456"));
+
+    await act(() => result.current.handleVerifyOTP());
+
+    expect(pushMock).toHaveBeenCalledWith("/settings");
+    expect(refreshMock).toHaveBeenCalledOnce();
   });
 
   it("signs in as the single dev account", async () => {
@@ -244,7 +267,7 @@ describe("useLoginFlow passkey sign-in", () => {
     expect(finishPasskeyMock).not.toHaveBeenCalled();
   });
 
-  it("shows a passkey message, not the email-and-password one, for an unknown passkey", async () => {
+  it("shows a passkey message, not a generic one, for an unknown passkey", async () => {
     startAuthenticationMock.mockResolvedValue(assertion);
     finishPasskeyMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
     const { result } = renderHook(() => useLoginFlow());

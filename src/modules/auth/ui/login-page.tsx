@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import { useLoginFlow } from "../hooks/use-login-flow";
 import { EmailStep } from "./email-step";
 import { OtpStep } from "./otp-step";
-import { PasswordStep } from "./password-step";
 import { useSearchParams } from "next/navigation";
 import { textRoleClassName } from "@/components/typography";
 
@@ -20,11 +19,7 @@ export function AuthLoginPage({
 }) {
   const t = useTranslations("Auth");
   const searchParams = useSearchParams();
-  const flow = useLoginFlow({
-    initialMode: emailAuthEnabled ? "otp" : "password",
-    isDevAuthAvailable: devAuthAvailable,
-  });
-  const passwordMode = flow.mode === "password";
+  const flow = useLoginFlow({ isDevAuthAvailable: devAuthAvailable });
   const notice = searchParams.get("notice");
   const noticeMessage =
     notice === "reauth_required"
@@ -69,87 +64,65 @@ export function AuthLoginPage({
                 <KeyRound aria-hidden="true" className="size-4" />
                 {t("passkeySignIn")}
               </Button>
-              <div className="mt-5 flex items-center gap-3" aria-hidden="true">
-                <span className="h-px flex-1 bg-border" />
-                <span className={textRoleClassName("meta")}>{t("orDivider")}</span>
-                <span className="h-px flex-1 bg-border" />
-              </div>
+              {emailAuthEnabled ? (
+                <div className="mt-5 flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1 bg-border" />
+                  <span className={textRoleClassName("meta")}>{t("orDivider")}</span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              ) : null}
             </div>
           ) : null}
           {emailAuthEnabled ? (
-            <div className="mb-5 grid grid-cols-2 gap-1 rounded-md bg-surface2 p-1">
-              <button
-                type="button"
-                aria-pressed={passwordMode}
-                disabled={flow.isLoading || flow.resendPending}
-                onClick={() => flow.setMode("password")}
-                className={`flex min-h-11 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors ${passwordMode ? "bg-surface text-text shadow-sm" : "text-muted-foreground hover:text-text"}`}
-              >
-                {t("password")}
-              </button>
-              <button
-                type="button"
-                aria-pressed={!passwordMode}
-                disabled={flow.isLoading || flow.resendPending}
-                onClick={() => flow.setMode("otp")}
-                className={`flex min-h-11 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors ${!passwordMode ? "bg-surface text-text shadow-sm" : "text-muted-foreground hover:text-text"}`}
-              >
-                {t("emailCode")}
-              </button>
-            </div>
-          ) : null}
-
-          <div className="mb-5">
-            <h2 className={textRoleClassName("sectionTitle")}>
-              {passwordMode
-                ? t("passwordLoginTitle")
-                : flow.step === "email"
-                  ? t("emailLoginTitle")
-                  : t("verifyCode")}
-            </h2>
-            <p className={textRoleClassName("bodyMuted", "mt-1")}>
-              {passwordMode
-                ? t("passwordLoginDesc")
-                : flow.step === "email"
-                  ? t("emailLoginDesc")
-                  : t("verifyCodeDesc", { email: flow.email })}
-            </p>
-          </div>
-
-          {passwordMode ? (
-            <PasswordStep
-              email={flow.email}
-              password={flow.password}
-              isLoading={flow.isLoading}
-              error={flow.error}
-              onEmailChange={flow.setEmail}
-              onPasswordChange={flow.setPassword}
-              onSubmit={flow.handlePasswordLogin}
-            />
-          ) : flow.step === "email" ? (
-            <EmailStep
-              callbackUrl={flow.callbackUrl}
-              email={flow.email}
-              isLoading={flow.isLoading}
-              error={flow.error}
-              onEmailChange={flow.setEmail}
-              onSubmit={flow.handleSendOTP}
-            />
+            <>
+              <div className="mb-5">
+                <h2 className={textRoleClassName("sectionTitle")}>
+                  {flow.step === "email" ? t("emailLoginTitle") : t("verifyCode")}
+                </h2>
+                <p className={textRoleClassName("bodyMuted", "mt-1")}>
+                  {flow.step === "email"
+                    ? t("emailLoginDesc")
+                    : t("verifyCodeDesc", { email: flow.email })}
+                </p>
+              </div>
+              {flow.step === "email" ? (
+                <EmailStep
+                  callbackUrl={flow.callbackUrl}
+                  email={flow.email}
+                  isLoading={flow.isLoading}
+                  error={flow.error}
+                  onEmailChange={flow.setEmail}
+                  onSubmit={flow.handleSendOTP}
+                />
+              ) : (
+                <OtpStep
+                  otp={flow.otp}
+                  isLoading={flow.isLoading}
+                  error={flow.error}
+                  expiresAt={flow.expiresAt}
+                  canResendAt={flow.canResendAt}
+                  resendPending={flow.resendPending}
+                  otpExpired={flow.otpExpired}
+                  onOtpChange={flow.setOtp}
+                  onVerify={flow.handleVerifyOTP}
+                  onResend={flow.handleResendOTP}
+                  onChangeEmail={flow.handleChangeEmail}
+                  onExpired={flow.handleOTPExpired}
+                />
+              )}
+            </>
           ) : (
-            <OtpStep
-              otp={flow.otp}
-              isLoading={flow.isLoading}
-              error={flow.error}
-              expiresAt={flow.expiresAt}
-              canResendAt={flow.canResendAt}
-              resendPending={flow.resendPending}
-              otpExpired={flow.otpExpired}
-              onOtpChange={flow.setOtp}
-              onVerify={flow.handleVerifyOTP}
-              onResend={flow.handleResendOTP}
-              onChangeEmail={flow.handleChangeEmail}
-              onExpired={flow.handleOTPExpired}
-            />
+            <>
+              <p className={textRoleClassName("bodyMuted")}>{t("emailAuthNotConfigured")}</p>
+              {flow.error != null ? (
+                <p
+                  role="alert"
+                  className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  {flow.error}
+                </p>
+              ) : null}
+            </>
           )}
         </div>
 

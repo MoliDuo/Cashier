@@ -19,8 +19,6 @@ import { sql, type InferSelectModel } from "drizzle-orm";
  */
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  passwordHash: text("password_hash"),
-  passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),

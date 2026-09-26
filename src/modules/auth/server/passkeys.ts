@@ -17,7 +17,7 @@ import { logger } from "@/lib/logger";
 import { incrementRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import {
   AUTH_PASSKEY_IP_MAX_ATTEMPTS,
-  AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+  AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS,
 } from "@/config/tuning";
 import { passkeys, webauthnChallenges } from "@/persistence";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
@@ -200,7 +200,7 @@ export async function startPasskeySignIn(
     limit = await incrementRateLimit(
       rateLimitKey("auth:passkey:ip", ip),
       AUTH_PASSKEY_IP_MAX_ATTEMPTS,
-      AUTH_PASSWORD_RATE_LIMIT_WINDOW_SECONDS
+      AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS
     );
   } catch {
     throw new AuthSignInError(AUTH_ERROR_CODES.AUTH_RATE_LIMIT_UNAVAILABLE);

@@ -1,62 +1,11 @@
 import "server-only";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { emailChangeChallenges, loginEmails, users } from "@/persistence";
 import { verificationChallenges } from "@/modules/auth/domain/verification-challenge";
 import { getLockoutExpiration, getMaxAttempts } from "@/modules/auth/domain/otp";
 import { carriedFailures, recordedFailure } from "./challenge-failures";
 import { deleteUserSessions } from "./sessions";
-
-export async function getPasswordHash(userId: string): Promise<string | null | undefined> {
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    columns: { passwordHash: true },
-  });
-  return user?.passwordHash;
-}
-
-export async function setInitialPasswordHash(input: {
-  userId: string;
-  passwordHash: string;
-  passwordUpdatedAt: Date;
-}): Promise<boolean> {
-  return db.transaction(async (tx) => {
-    const updated = await tx
-      .update(users)
-      .set({
-        passwordHash: input.passwordHash,
-        passwordUpdatedAt: input.passwordUpdatedAt,
-        updatedAt: input.passwordUpdatedAt,
-      })
-      .where(and(eq(users.id, input.userId), isNull(users.passwordHash)))
-      .returning({ id: users.id });
-    if (updated.length !== 1) return false;
-    await deleteUserSessions(input.userId, tx);
-    return true;
-  });
-}
-
-export async function replacePasswordHash(input: {
-  userId: string;
-  expectedPasswordHash: string;
-  passwordHash: string;
-  passwordUpdatedAt: Date;
-}): Promise<boolean> {
-  return db.transaction(async (tx) => {
-    const updated = await tx
-      .update(users)
-      .set({
-        passwordHash: input.passwordHash,
-        passwordUpdatedAt: input.passwordUpdatedAt,
-        updatedAt: input.passwordUpdatedAt,
-      })
-      .where(and(eq(users.id, input.userId), eq(users.passwordHash, input.expectedPasswordHash)))
-      .returning({ id: users.id });
-    if (updated.length !== 1) return false;
-    await deleteUserSessions(input.userId, tx);
-    return true;
-  });
-}
 
 /**
  * A challenge to add an address. `duplicate` covers both an address already on
@@ -221,7 +170,7 @@ export async function removeLoginEmail(input: {
     if (target == null) return "not_found" as const;
     await tx.delete(loginEmails).where(eq(loginEmails.id, target.id));
     // Removing an address must end every session that was opened with it; the
-    // account's other addresses sign in again with the password or an OTP.
+    // account signs in again with a passkey or a code sent to another address.
     await tx.update(users).set({ updatedAt: input.now }).where(eq(users.id, input.userId));
     await deleteUserSessions(input.userId, tx);
     return "removed" as const;

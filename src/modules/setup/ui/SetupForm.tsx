@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { textRoleClassName } from "@/components/typography";
 import { completeSetupAction, type SetupErrorCode } from "@/modules/setup/server-actions/setup";
-import { getPasswordRuleViolation } from "@/modules/auth/password-rules";
 
 interface BookRow {
   id: number;
@@ -28,7 +27,6 @@ export function SetupForm() {
   const nextBookId = useRef(1);
   const [setupCode, setSetupCode] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   // One row per book, each with a stable id: keying by name would remount the
   // input (and drop the caret) as soon as two rows traded names.
   const [bookRows, setBookRows] = useState<BookRow[]>(() => [{ id: 0, name: t("sharedBookName") }]);
@@ -47,8 +45,6 @@ export function SetupForm() {
         return t("codeLockedOut");
       case "invalid_email":
         return t("invalidEmail");
-      case "weak_password":
-        return t("weakPassword");
       case "invalid_books":
         return t("invalidBooks");
       default:
@@ -59,14 +55,6 @@ export function SetupForm() {
   const setRowName = (id: number, name: string) =>
     setBookRows((current) => current.map((row) => (row.id === id ? { ...row, name } : row)));
 
-  /**
-   * The server enforces the real policy; this only saves the reader a round trip
-   * and a generic-looking failure when the password obviously cannot pass. It is
-   * the same rule the policy applies — including the 72-byte limit, which a
-   * browser-only length check used to miss.
-   */
-  const showPasswordHint = password !== "" && getPasswordRuleViolation(password) != null;
-
   const removeRow = (id: number) => {
     setBookRows((current) => current.filter((row) => row.id !== id));
   };
@@ -74,16 +62,11 @@ export function SetupForm() {
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
-    if (getPasswordRuleViolation(password) != null) {
-      setError(t("weakPassword"));
-      return;
-    }
     setPending(true);
     setError(null);
     const result = await completeSetupAction({
       setupCode,
       email,
-      password,
       books: bookRows.map((row) => row.name),
     });
     if (!result.ok) {
@@ -131,24 +114,7 @@ export function SetupForm() {
             disabled={pending}
             onChange={(event) => setEmail(event.target.value)}
           />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="setup-password">{t("password")}</Label>
-          <Input
-            id="setup-password"
-            type="password"
-            value={password}
-            autoComplete="new-password"
-            disabled={pending}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <p className="text-micro text-muted-foreground">{t("passwordDesc")}</p>
-          {showPasswordHint ? (
-            <p role="alert" className="text-micro text-destructive">
-              {t("weakPassword")}
-            </p>
-          ) : null}
+          <p className="text-micro text-muted-foreground">{t("emailDesc")}</p>
         </div>
 
         <div className="space-y-3">

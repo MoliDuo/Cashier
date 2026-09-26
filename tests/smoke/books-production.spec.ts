@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { currentBookOption, openBookSwitcher, selectBook } from "./book-switch";
+import { signIn } from "./sign-in";
 
 /**
- * The multi-book flows the production runner can actually exercise: a real
- * password sign-in, the two seeded books (共同支出 and 旅行支出), the settings tab
+ * The multi-book flows the production runner can actually exercise: a signed-in
+ * session, the two seeded books (共同支出 and 旅行支出), the settings tab
  * driven from a second, independent browser context, and a real upload through
  * the public API v1 with a book-bound service credential.
  *
@@ -23,14 +24,8 @@ function apiBase(): string {
   return base;
 }
 
-/** Signs in with the account's real password; no development bypass exists here. */
 async function login(page: Page) {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/login/);
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await signIn(page);
   await expect(page.getByRole("button", { name: "记一笔", exact: true })).toBeEnabled();
 }
 

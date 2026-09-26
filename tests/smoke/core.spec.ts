@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { signIn } from "./sign-in";
 
-test("password login, default ledger, manual entry, edit, delete and sign out", async ({
+test("protected redirect, default ledger, manual entry, edit, delete and sign out", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -26,13 +27,7 @@ test("password login, default ledger, manual entry, edit, delete and sign out", 
     .toBe(200);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
-  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
-  await page.getByLabel("密码", { exact: true }).fill("Wrong-password9");
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "邮箱或密码不正确。" })).toBeVisible();
-  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
-  await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await signIn(page);
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   const create = page.getByRole("dialog");
   await create.getByRole("button", { name: "快速记账", exact: true }).click();

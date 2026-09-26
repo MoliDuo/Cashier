@@ -1,55 +1,25 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const searchState = vi.hoisted(() => ({ query: "" }));
 
-const createDevFlow = (handleDevSignIn: Mock) => ({
-  callbackUrl: "/",
-  mode: "password" as const,
-  step: "email" as const,
-  email: "",
-  password: "",
-  otp: "",
-  isLoading: false,
-  error: null,
-  expiresAt: null,
-  canResendAt: null,
-  isDevAuthAvailable: true,
-  passkeySupported: false,
-  setEmail: vi.fn(),
-  setPassword: vi.fn(),
-  setOtp: vi.fn(),
-  setMode: vi.fn(),
-  handlePasswordLogin: vi.fn(),
-  handleSendOTP: vi.fn(),
-  handleVerifyOTP: vi.fn(),
-  handleResendOTP: vi.fn(),
-  handleChangeEmail: vi.fn(),
-  handleOTPExpired: vi.fn(),
-  handlePasskeyLogin: vi.fn(),
-  handleDevSignIn,
-});
-
 const mockUseLoginFlow = vi.hoisted(() =>
-  vi.fn((options?: { initialMode?: "password" | "otp"; isDevAuthAvailable?: boolean }) => ({
+  vi.fn((options?: { isDevAuthAvailable?: boolean }) => ({
     passkeySupported: false,
     handlePasskeyLogin: vi.fn(),
     callbackUrl: "/",
-    mode: options?.initialMode ?? "password",
-    step: "email",
+    step: "email" as "email" | "otp",
     email: "",
-    password: "",
     otp: "",
     isLoading: false,
-    error: null,
+    error: null as string | null,
     expiresAt: null,
     canResendAt: null,
+    resendPending: false,
+    otpExpired: false,
     isDevAuthAvailable: options?.isDevAuthAvailable ?? false,
     setEmail: vi.fn(),
-    setPassword: vi.fn(),
     setOtp: vi.fn(),
-    setMode: vi.fn(),
-    handlePasswordLogin: vi.fn(),
     handleSendOTP: vi.fn(),
     handleVerifyOTP: vi.fn(),
     handleResendOTP: vi.fn(),
@@ -58,6 +28,10 @@ const mockUseLoginFlow = vi.hoisted(() =>
     handleDevSignIn: vi.fn(),
   }))
 );
+
+type Flow = ReturnType<typeof mockUseLoginFlow>;
+
+const flowWith = (overrides: Partial<Flow>) => ({ ...mockUseLoginFlow(), ...overrides });
 
 vi.mock("@/modules/auth/hooks/use-login-flow", () => ({
   useLoginFlow: mockUseLoginFlow,
@@ -68,76 +42,82 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("AuthLoginPage", () => {
-  it("renders password login by default", async () => {
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage />);
-
-    expect(screen.getByLabelText("邮箱")).toBeInTheDocument();
-    expect(screen.getByLabelText("密码")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "登录" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "邮箱验证码" })).not.toBeInTheDocument();
-    expect(screen.getByText("密码登录")).toBeInTheDocument();
-  });
-
-  it("offers OTP as an optional mode only when email delivery is enabled", async () => {
+  it("asks for an email address to send a code to, with no password field", async () => {
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
     render(<AuthLoginPage emailAuthEnabled />);
 
-    expect(screen.getByRole("button", { name: "密码" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "邮箱验证码" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+    expect(screen.getByLabelText("邮箱")).toBeInTheDocument();
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
     expect(screen.getByText("邮箱登录")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送验证码" })).toBeEnabled();
   });
 
-  it("puts passkey sign-in first, above the other ways in, where the browser supports it", async () => {
-    const handlePasskeyLogin = vi.fn();
-    mockUseLoginFlow.mockReturnValueOnce({
-      ...createDevFlow(vi.fn()),
-      isDevAuthAvailable: false,
-      passkeySupported: true,
-      handlePasskeyLogin,
-    });
+  it("moves on to the code once one was sent", async () => {
+    mockUseLoginFlow.mockReturnValueOnce(flowWith({ step: "otp", email: "a@example.com" }));
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage emailAuthEnabled />);
 
+    expect(screen.getByText("验证验证码")).toBeInTheDocument();
+    expect(screen.getByText("输入发送至 a@example.com 的 6 位验证码")).toBeInTheDocument();
+    expect(screen.queryByLabelText("邮箱")).not.toBeInTheDocument();
+  });
+
+  it("says email sign-in is unavailable instead of offering a form that cannot send", async () => {
+    mockUseLoginFlow.mockReturnValueOnce(flowWith({ error: "发生意外错误" }));
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
     render(<AuthLoginPage />);
 
+    expect(screen.getByText("邮箱登录未配置，请联系管理员")).toBeInTheDocument();
+    expect(screen.queryByLabelText("邮箱")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("发生意外错误");
+  });
+
+  it("puts passkey sign-in first, above the email code, where the browser supports it", async () => {
+    const handlePasskeyLogin = vi.fn();
+    mockUseLoginFlow.mockReturnValueOnce(flowWith({ passkeySupported: true, handlePasskeyLogin }));
+
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage emailAuthEnabled />);
+
     const passkey = screen.getByRole("button", { name: "使用通行密钥登录" });
-    const submit = screen.getByRole("button", { name: "登录" });
-    expect(passkey.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const send = screen.getByRole("button", { name: "发送验证码" });
+    expect(passkey.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("或")).toBeInTheDocument();
     fireEvent.click(passkey);
     expect(handlePasskeyLogin).toHaveBeenCalledOnce();
   });
 
-  it("hides passkey sign-in where the browser has no WebAuthn", async () => {
+  it("drops the divider when a passkey is the only way in", async () => {
+    mockUseLoginFlow.mockReturnValueOnce(flowWith({ passkeySupported: true }));
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
     render(<AuthLoginPage />);
+
+    expect(screen.getByRole("button", { name: "使用通行密钥登录" })).toBeInTheDocument();
+    expect(screen.queryByText("或")).not.toBeInTheDocument();
+  });
+
+  it("hides passkey sign-in where the browser has no WebAuthn", async () => {
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage emailAuthEnabled />);
 
     expect(screen.queryByRole("button", { name: "使用通行密钥登录" })).not.toBeInTheDocument();
   });
 
-  it("renders the development sign-in action only when enabled", async () => {
-    mockUseLoginFlow.mockReturnValue(createDevFlow(vi.fn()));
-
+  it("offers exactly one development entry, and only when enabled", async () => {
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage devAuthAvailable />);
+    const { unmount } = render(<AuthLoginPage />);
+    expect(screen.queryByRole("button", { name: /身份进入/ })).not.toBeInTheDocument();
+    unmount();
 
-    expect(screen.getByRole("button", { name: "以开发身份进入" })).toBeInTheDocument();
-  });
-
-  it("offers exactly one development entry, because there is one account", async () => {
     const handleDevSignIn = vi.fn();
-    mockUseLoginFlow.mockReturnValue(createDevFlow(handleDevSignIn));
-
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    mockUseLoginFlow.mockReturnValueOnce(flowWith({ isDevAuthAvailable: true, handleDevSignIn }));
     render(<AuthLoginPage devAuthAvailable />);
 
     const entries = screen.getAllByRole("button", { name: /身份进入/ });
     expect(entries).toHaveLength(1);
     fireEvent.click(entries[0]!);
-
     expect(handleDevSignIn).toHaveBeenCalledWith();
+    expect(mockUseLoginFlow).toHaveBeenLastCalledWith({ isDevAuthAvailable: true });
   });
 
   it("presents Cashier as a quiet app entry instead of a marketing page", async () => {
@@ -153,6 +133,10 @@ describe("AuthLoginPage", () => {
   it.each([
     ["reauth_required", "请重新登录以继续此操作。"],
     ["credentials_changed", "登录凭据已更新，请重新登录。"],
+    [
+      "setup_complete",
+      "初始化已完成。请用刚设置的登录邮箱获取验证码登录，然后在设置里添加通行密钥。",
+    ],
   ])("renders the %s login notice as status", async (notice, message) => {
     searchState.query = `notice=${notice}&callbackUrl=%2Fsettings`;
     const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");

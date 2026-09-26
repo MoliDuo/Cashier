@@ -32,8 +32,6 @@ interface SettingsTabProps {
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
   userEmail?: string;
-  hasPassword?: boolean;
-  passwordUpdatedAt?: string | null;
   onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
@@ -42,8 +40,6 @@ export function SettingsTab({
   initialCategories,
   initialBooks,
   userEmail,
-  hasPassword = false,
-  passwordUpdatedAt = null,
   onGoToDetails,
 }: SettingsTabProps) {
   const pathname = usePathname();
@@ -107,7 +103,7 @@ export function SettingsTab({
     await signOutTo(`/login?notice=reauth_required&callbackUrl=${encodeURIComponent(currentPath)}`);
   };
 
-  const handleCredentialsChanged = async () => {
+  const handleAllSessionsEnded = async () => {
     await signOutTo("/login?notice=credentials_changed");
   };
 
@@ -178,8 +174,6 @@ export function SettingsTab({
           leaving and then reuses the same credentials-changed sign-out. */}
       <AccountSettings
         {...(userEmail !== undefined ? { userEmail } : {})}
-        hasPassword={hasPassword}
-        passwordUpdatedAt={passwordUpdatedAt}
         credentials={credentials}
         isPending={updateLedgerMutation.isPending}
         books={books ?? initialBooks}
@@ -191,8 +185,7 @@ export function SettingsTab({
         onCredentialDialogClose={createCredential.reset}
         onSignOut={handleSignOut}
         onRequireReauthentication={handleRequireReauthentication}
-        onCredentialsChanged={handleCredentialsChanged}
-        onAllSessionsEnded={handleCredentialsChanged}
+        onAllSessionsEnded={handleAllSessionsEnded}
       />
     </div>
   );

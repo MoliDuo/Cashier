@@ -22,12 +22,9 @@ vi.mock("next/navigation", () => ({
 import { SetupForm } from "@/modules/setup/ui/SetupForm";
 import zh from "../../../../messages/zh.json";
 
-const { weakPassword, wrongCode } = zh.Setup;
-/** 100 ASCII characters: long enough in characters, too long for bcrypt. */
-const TOO_MANY_BYTES = "a".repeat(99) + "1";
-const LEGAL_PASSWORD = "setup-pass-1";
+const { wrongCode } = zh.Setup;
 
-function fill(text: { setupCode?: string; email?: string; password?: string }) {
+function fill(text: { setupCode?: string; email?: string }) {
   if (text.setupCode !== undefined) {
     fireEvent.change(screen.getByLabelText(zh.Setup.setupCode), {
       target: { value: text.setupCode },
@@ -35,11 +32,6 @@ function fill(text: { setupCode?: string; email?: string; password?: string }) {
   }
   if (text.email !== undefined) {
     fireEvent.change(screen.getByLabelText(zh.Setup.email), { target: { value: text.email } });
-  }
-  if (text.password !== undefined) {
-    fireEvent.change(screen.getByLabelText(zh.Setup.password), {
-      target: { value: text.password },
-    });
   }
 }
 
@@ -53,43 +45,18 @@ describe("SetupForm", () => {
     completeSetupActionMock.mockResolvedValue({ ok: true, ledgerId: "ledger-1" });
   });
 
-  /**
-   * The form used to check only the character count beside the server, so a
-   * password the server refuses could be typed, submitted and answered with a
-   * generic failure. The two now read one rule.
-   */
-  it("says why a password cannot work before anything is submitted", () => {
+  it("asks for no password: the account signs in with a code and then a passkey", () => {
     render(<SetupForm />);
 
-    fill({ password: TOO_MANY_BYTES });
-
-    expect(alerts()).toEqual([weakPassword]);
-    expect(completeSetupActionMock).not.toHaveBeenCalled();
-
-    fill({ password: LEGAL_PASSWORD });
-
-    expect(alerts()).toEqual([]);
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    expect(screen.getByText(zh.Setup.emailDesc)).toBeInTheDocument();
   });
 
-  it("refuses to submit a password the server would refuse", async () => {
+  it("submits the setup code, the login email and the books", async () => {
     const user = userEvent.setup();
     render(<SetupForm />);
-    fill({ setupCode: "12345678", email: "owner@example.com", password: TOO_MANY_BYTES });
-
-    await user.click(screen.getByRole("button", { name: zh.Setup.submit }));
-
-    // No round trip: the same rule the action applies already answered. The
-    // inline hint and the form's own message say the same thing, and nothing
-    // else is on screen to mislead the reader.
-    expect(completeSetupActionMock).not.toHaveBeenCalled();
-    expect(alerts().filter((text) => text !== weakPassword)).toEqual([]);
-    expect(alerts().length).toBeGreaterThan(0);
-  });
-
-  it("submits the account, and the books once the password passes", async () => {
-    const user = userEvent.setup();
-    render(<SetupForm />);
-    fill({ setupCode: "12345678", email: "owner@example.com", password: LEGAL_PASSWORD });
+    fill({ setupCode: "12345678", email: "owner@example.com" });
 
     await user.click(screen.getByRole("button", { name: zh.Setup.submit }));
 
@@ -97,7 +64,6 @@ describe("SetupForm", () => {
     expect(completeSetupActionMock).toHaveBeenCalledWith({
       setupCode: "12345678",
       email: "owner@example.com",
-      password: LEGAL_PASSWORD,
       books: [zh.Setup.sharedBookName],
     });
     await waitFor(() =>
@@ -110,7 +76,7 @@ describe("SetupForm", () => {
     const user = userEvent.setup();
     completeSetupActionMock.mockResolvedValue({ ok: false, code: "wrong_code" });
     render(<SetupForm />);
-    fill({ setupCode: "12345678", email: "owner@example.com", password: LEGAL_PASSWORD });
+    fill({ setupCode: "12345678", email: "owner@example.com" });
 
     await user.click(screen.getByRole("button", { name: zh.Setup.submit }));
 

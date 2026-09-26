@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => new Headers({ "accept-language": "zh-CN" })),
 }));
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUser } from "../../helpers/schema-setup";
 import { createSession, readSession } from "@/modules/auth/server/sessions";
@@ -24,12 +24,10 @@ import {
   verifySetupCode,
 } from "@/modules/setup/server/setup-code";
 import { hashOTP } from "@/modules/auth/domain/otp";
-import { verifyPassword } from "@/modules/auth/domain/password";
 
 /**
- * The one account and its login addresses. Every address signs in; the password
- * belongs to the account rather than to an address, and the account must keep at
- * least one address.
+ * The one account and its login addresses. Every address signs in with a code
+ * sent to it, and the account must keep at least one address.
  */
 describe("login emails", () => {
   it("resolves the account from any of its addresses", async () => {
@@ -176,7 +174,6 @@ describe("first-run setup", () => {
     const result = await createInitialAccount({
       bookNames: ["共同支出", "哞哞的"],
       email: "Owner@Example.com",
-      password: "setup-pass-1",
     });
 
     expect(await isSetupPending()).toBe(false);
@@ -202,7 +199,6 @@ describe("first-run setup", () => {
       createInitialAccount({
         bookNames: ["另一个"],
         email: "second@example.com",
-        password: "setup-pass-2",
       })
     ).rejects.toThrow(/already been completed/);
   });
@@ -293,7 +289,6 @@ describe("first-run setup", () => {
     await createInitialAccount({
       bookNames: ["共同支出"],
       email: "owner@example.com",
-      password: "setup-pass-1",
     });
 
     expect(await db.select().from(setupState)).toHaveLength(0);
@@ -301,7 +296,7 @@ describe("first-run setup", () => {
     expect(await verifySetupCode(code)).toBe("expired");
   });
 
-  it("rejects duplicate book names and a password that does not meet the policy", async () => {
+  it("rejects duplicate book names", async () => {
     const db = getTestDb();
     await db.delete(loginEmails);
     await db.delete(users);
@@ -310,67 +305,27 @@ describe("first-run setup", () => {
       createInitialAccount({
         bookNames: ["共同支出", "共同支出"],
         email: "owner@example.com",
-        password: "setup-pass-1",
       })
     ).rejects.toThrow(/unique/);
-
-    await expect(
-      createInitialAccount({
-        bookNames: ["共同支出"],
-        email: "owner@example.com",
-        password: "short",
-      })
-    ).rejects.toThrow(/8 and 128/);
-  });
-
-  /**
-   * The rules the wizard and the policy share, at the boundaries that used to be
-   * checked in only one of the two places: the 72-byte limit bcrypt imposes was
-   * missing from the form, and a password can be short enough in characters and
-   * still too long in bytes once it holds anything but ASCII.
-   */
-  it("refuses a password the shared rules refuse, naming the rule that was broken", async () => {
-    const db = getTestDb();
-    await db.delete(loginEmails);
-    await db.delete(users);
-
-    const account = { bookNames: ["共同支出"], email: "owner@example.com" };
-
-    // 100 ASCII characters: a character count alone calls this fine.
-    await expect(
-      createInitialAccount({ ...account, password: "a".repeat(99) + "1" })
-    ).rejects.toThrow(/72 UTF-8 bytes/);
-
-    // 27 characters, 77 bytes: three-byte characters are what a byte limit is
-    // for, and this one is well inside the 8–128 character window.
-    await expect(
-      createInitialAccount({ ...account, password: "测".repeat(25) + "a1" })
-    ).rejects.toThrow(/72 UTF-8 bytes/);
-
-    await expect(createInitialAccount({ ...account, password: "12345678" })).rejects.toThrow(
-      /letter and one number/
-    );
-
-    // Every refusal happened before anything was written.
     expect(await isSetupPending()).toBe(true);
   });
 
-  it("accepts a password that is exactly at the byte limit and signs in with it", async () => {
+  it("creates the account with no password: it signs in with a code, then a passkey", async () => {
     const db = getTestDb();
     await db.delete(loginEmails);
     await db.delete(users);
 
-    const password = "a".repeat(71) + "1";
-    expect(new TextEncoder().encode(password)).toHaveLength(72);
-
     const result = await createInitialAccount({
       bookNames: ["共同支出"],
-      email: "boundary@example.com",
-      password,
+      email: "owner@example.com",
     });
 
-    const user = await db.query.users.findFirst({ where: eq(users.id, result.userId) });
-    await expect(verifyPassword(password, user?.passwordHash ?? "")).resolves.toBe(true);
+    // The columns outlive the code that wrote them until a contract migration
+    // drops them; nothing may fill them in the meantime.
+    const row = await db.execute<{ password_hash: string | null }>(
+      sql`SELECT password_hash FROM users WHERE id = ${result.userId}`
+    );
+    expect(row.rows).toEqual([{ password_hash: null }]);
   });
 
   /**
@@ -382,7 +337,6 @@ describe("first-run setup", () => {
   describe("the setup action's verdicts", () => {
     const payload = {
       email: "owner@example.com",
-      password: "setup-pass-1",
       books: ["共同支出"],
     };
 
@@ -433,15 +387,15 @@ describe("first-run setup", () => {
       });
     });
 
-    it("answers a password the shared rules refuse with weak_password", async () => {
+    it("refuses a request that still carries a password, and creates nothing", async () => {
       const db = getTestDb();
       await db.delete(loginEmails);
       await db.delete(users);
       const { code } = await getOrCreateSetupCode();
 
       await expect(
-        completeSetupAction({ ...payload, setupCode: code, password: "a".repeat(99) + "1" })
-      ).resolves.toEqual({ ok: false, code: "weak_password" });
+        completeSetupAction({ ...payload, setupCode: code, password: "setup-pass-1" })
+      ).resolves.toEqual({ ok: false, code: "unexpected" });
 
       expect(await isSetupPending()).toBe(true);
     });
