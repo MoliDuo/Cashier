@@ -16,8 +16,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const translate = (key: string) => key;
-
 function SourceDocumentDialogHarness({ onConfirm }: { onConfirm: () => Promise<boolean> }) {
   const [parentOpen, setParentOpen] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(true);
@@ -27,8 +25,6 @@ function SourceDocumentDialogHarness({ onConfirm }: { onConfirm: () => Promise<b
         <DialogTitle>Bill details</DialogTitle>
         <span>Parent content</span>
         <SourceDocumentDetailConfirmDialogs
-          t={translate as never}
-          tCommon={translate as never}
           showBatchModePendingConfirm={false}
           setShowBatchModePendingConfirm={vi.fn()}
           handleSaveAndEnterBatchMode={async () => true}

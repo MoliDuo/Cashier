@@ -1,13 +1,5 @@
 "use client";
-import type { BookDto, LedgerEntry, EntryCategory } from "@/modules/ledger/contracts";
-import type {
-  PartialBatchCommandResult,
-  SourceDocument,
-  SplitSourceDocumentInput,
-  SplitSourceDocumentResultDto,
-  ApplyDateOrganizationInput,
-  ApplyDateOrganizationResultDto,
-} from "@/modules/source-document/contracts";
+import type { BookDto, EntryCategory } from "@/modules/ledger/contracts";
 import { memo, useCallback, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,14 +9,14 @@ import { useTranslations } from "next-intl";
 import { SourceDocumentViewDetails } from "./SourceDocumentViewDetails";
 import { EditableField } from "@/components/ui/editable-field";
 import { textRoleClassName } from "@/components/typography";
-import type { AddEntryData } from "@/modules/source-document/hooks/useSourceDocumentDetailMutations";
 import { LedgerEntriesBatchActionToolbar } from "@/modules/ledger/ui/batch-action-toolbar";
-import type { PendingChanges } from "@/modules/source-document/detail-types";
-import { useSourceDocumentDetailController } from "@/modules/source-document/hooks/useSourceDocumentDetailController";
+import { useSourceDocumentDetail } from "@/modules/source-document/hooks/useSourceDocumentDetail";
 import { SourceDocumentDetailFooterActions } from "./SourceDocumentDetailFooterActions";
 import { SourceDocumentDetailStatusPanels } from "./SourceDocumentDetailStatusPanels";
 import { SourceDocumentDetailConfirmDialogs } from "./SourceDocumentDetailConfirmDialogs";
-import { SourceDocumentDetailOverlays } from "./SourceDocumentDetailOverlays";
+import { SourceDocumentEditRetryDialog } from "./SourceDocumentEditRetryDialog";
+import { SourceDocumentSplitDialog } from "./SourceDocumentSplitDialog";
+import { AddLedgerEntryDialog } from "./AddLedgerEntryDialog";
 import {
   Select,
   SelectContent,
@@ -35,94 +27,35 @@ import {
 
 interface SourceDocumentDetailModalProps {
   /** The live books, so this record's own book can be changed here. */
-  books?: readonly BookDto[];
-  /**
-   * The record's own book, already labelled, when it is no longer among the live
-   * ones. It is shown as the selected option, read-only, so a retired book names
-   * itself instead of leaving the picker blank.
-   */
-  archivedBookLabel?: string;
-  onAssignBook?: (bookId: string) => void;
-  isAssigningBook?: boolean;
-  sourceDocumentId?: string;
-  sourceDocument: SourceDocument | null;
-  isLoading?: boolean;
-  loadError?: boolean;
-  onReload?: () => Promise<void>;
-  ledgerEntries: LedgerEntry[];
-  categories: EntryCategory[];
-  preferredCurrencies: string[];
-  mainCurrency: string;
+  books: readonly BookDto[];
+  id: string;
   open: boolean;
   onClose: () => void;
   onBack?: () => void;
   onExitComplete?: () => void;
-  onSaveAll?: (
-    input: { expectedVersion: number; changes: PendingChanges },
-    onCommitted?: () => void
-  ) => Promise<void>;
-  onSplit?: (
-    input: Omit<SplitSourceDocumentInput, "sourceDocumentId">
-  ) => Promise<SplitSourceDocumentResultDto>;
-  onBatchUpdate: (
-    ids: string[],
-    data: {
-      categoryId?: string | null;
-      currency?: string;
-      entryDate?: string;
-      description?: string;
-    }
-  ) => Promise<{ affectedCount: number } | undefined>;
-  onBatchDeleteEntries: (
-    ids: string[],
-    onCommitted?: (result: PartialBatchCommandResult) => void
-  ) => Promise<PartialBatchCommandResult>;
-  onAddEntry?: (data: AddEntryData) => Promise<void>;
-  onDeleteEntry?: (entryId: string, onCommitted?: () => void) => Promise<void>;
-  onDelete?: (onCommitted?: () => void) => void | Promise<void>;
-  onCancelProcessing?: () => Promise<void>;
-  isCancelling?: boolean;
-  onApplyDateOrganization?: (
-    input: Omit<ApplyDateOrganizationInput, "sourceDocumentId">
-  ) => Promise<ApplyDateOrganizationResultDto>;
-  onDismissDateOrganization?: (suggestionId: string) => Promise<unknown>;
-  isOrganizingDates?: boolean;
+  categories: EntryCategory[];
+  mainCurrency: string;
+  preferredCurrencies: string[];
+  /** Ledger timezone, so dates are named the ledger's way. */
   timeZone?: string;
 }
 
 function SourceDocumentDetailEditor({
   books,
-  archivedBookLabel,
-  onAssignBook,
-  isAssigningBook,
-  sourceDocument,
-  isLoading = false,
-  loadError = false,
-  onReload,
-  ledgerEntries,
-  categories,
-  preferredCurrencies,
-  mainCurrency,
+  id,
   open,
   onClose,
   onBack,
   onExitComplete,
-  onSaveAll,
-  onSplit,
-  onBatchUpdate,
-  onBatchDeleteEntries,
-  onAddEntry,
-  onDeleteEntry,
-  onDelete,
-  onCancelProcessing,
-  isCancelling = false,
-  onApplyDateOrganization,
-  onDismissDateOrganization,
-  isOrganizingDates = false,
+  categories,
+  mainCurrency,
+  preferredCurrencies,
   timeZone,
 }: SourceDocumentDetailModalProps) {
   const t = useTranslations("SourceDocumentDetail");
   const tCommon = useTranslations("Common");
+  const detail = useSourceDocumentDetail({ id, open, books, onClose });
+  const { sourceDocument, ledgerEntries, editor, selection, status, dialogs, actions } = detail;
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [dateAdjustmentActive, setDateAdjustmentActive] = useState(false);
   // The narrow-viewport pane toggle lives here rather than in ViewDetails so
@@ -135,24 +68,6 @@ function SourceDocumentDetailEditor({
   const discardDateDraft = useCallback(() => {
     setDateAdjustmentActive(false);
   }, []);
-  const { editor, selection, status, dialogs, actions } = useSourceDocumentDetailController({
-    sourceDocument,
-    ledgerEntries,
-    open,
-    isCancelling,
-    onClose,
-    onReload,
-    onSaveAll,
-    onSplit,
-    onBatchUpdate,
-    onBatchDeleteEntries,
-    onAddEntry,
-    onDeleteEntry,
-    onDelete,
-    onCancelProcessing,
-    t,
-    tCommon,
-  });
   const handleClose = () => {
     discardDateDraft();
     actions.handleClose();
@@ -169,7 +84,7 @@ function SourceDocumentDetailEditor({
       onClearSelection={() => selection.handleSelectAll(false)}
       onChangeCategory={actions.handleBatchCategory}
       onChangeCurrency={actions.handleBatchCurrency}
-      {...(sourceDocument?.supportedActions.includes("split_entries") && onSplit != null
+      {...(sourceDocument?.supportedActions.includes("split_entries") === true
         ? { onSplit: actions.handleOpenSplit }
         : {})}
       onDelete={actions.handleOpenBatchDelete}
@@ -242,17 +157,13 @@ function SourceDocumentDetailEditor({
               <X className="size-4" />
             </Button>
           </DialogHeader>
-          {sourceDocument != null &&
-          sourceDocument.bookId != null &&
-          onAssignBook != null &&
-          books != null &&
-          books.length > 0 ? (
+          {sourceDocument != null && sourceDocument.bookId != null && books.length > 0 ? (
             <div className="flex shrink-0 items-center justify-between border-b px-4 py-2 text-sm">
               <span>{tCommon("book")}</span>
               <Select
                 value={sourceDocument.bookId}
-                onValueChange={onAssignBook}
-                disabled={status.busy || isAssigningBook || editor.isEditMode}
+                onValueChange={detail.assignBook}
+                disabled={status.busy || detail.isAssigningBook || editor.isEditMode}
               >
                 <SelectTrigger className="w-40" aria-label={tCommon("book")}>
                   <SelectValue />
@@ -263,8 +174,10 @@ function SourceDocumentDetailEditor({
                       {book.name}
                     </SelectItem>
                   ))}
-                  {archivedBookLabel != null ? (
-                    <SelectItem value={sourceDocument.bookId}>{archivedBookLabel}</SelectItem>
+                  {detail.archivedBookLabel != null ? (
+                    <SelectItem value={sourceDocument.bookId}>
+                      {detail.archivedBookLabel}
+                    </SelectItem>
                   ) : null}
                 </SelectContent>
               </Select>
@@ -284,8 +197,8 @@ function SourceDocumentDetailEditor({
               ) : null}
               <SourceDocumentDetailStatusPanels
                 sourceDocument={sourceDocument}
-                loadError={loadError}
-                isLoading={isLoading}
+                loadError={detail.loadError}
+                isLoading={detail.isLoading}
                 isReloading={status.isReloading}
                 reloadError={status.reloadError}
                 onClose={onClose}
@@ -315,9 +228,9 @@ function SourceDocumentDetailEditor({
                   onAddEntry={actions.handleOpenAddEntry}
                   onDeleteEntry={actions.handleRequestDeleteEntry}
                   onRequestEdit={() => !dateAdjustmentActive && actions.handleEnterEditMode()}
-                  {...(onApplyDateOrganization == null ? {} : { onApplyDateOrganization })}
-                  {...(onDismissDateOrganization == null ? {} : { onDismissDateOrganization })}
-                  isOrganizingDates={isOrganizingDates}
+                  onApplyDateOrganization={detail.applyDateOrganization}
+                  onDismissDateOrganization={detail.dismissDateOrganization}
+                  isOrganizingDates={detail.isOrganizingDates}
                   dateOrganizationDisabled={editor.isEditMode || selection.isSelectionMode}
                   {...(timeZone != null ? { timeZone } : {})}
                   mobileView={mobileView}
@@ -339,10 +252,8 @@ function SourceDocumentDetailEditor({
             interactionDisabled={status.interactionDisabled}
             hasPendingChanges={editor.hasPendingChanges}
             pendingChangesCount={editor.pendingChangesCount}
-            isCancelling={isCancelling}
-            {...(onCancelProcessing != null
-              ? { onCancelProcessing: actions.handleCancelProcessing }
-              : {})}
+            isCancelling={detail.isCancelling}
+            onCancelProcessing={actions.handleCancelProcessing}
             onOpenRetryDialog={actions.handleOpenRetry}
             onRequestDelete={actions.handleRequestDelete}
             onCancelEditMode={actions.handleCancelEditMode}
@@ -355,8 +266,6 @@ function SourceDocumentDetailEditor({
         </DialogContent>
 
         <SourceDocumentDetailConfirmDialogs
-          t={t}
-          tCommon={tCommon}
           showBatchModePendingConfirm={dialogs.showBatchModePendingConfirm}
           setShowBatchModePendingConfirm={dialogs.setShowBatchModePendingConfirm}
           handleSaveAndEnterBatchMode={actions.handleSaveAndEnterBatchMode}
@@ -376,32 +285,42 @@ function SourceDocumentDetailEditor({
           handleConfirmDiscardEdits={actions.handleConfirmDiscardEdits}
         />
       </Dialog>
-      <SourceDocumentDetailOverlays
-        sourceDocument={sourceDocument}
-        showRetryDialog={dialogs.showRetryDialog}
-        setShowRetryDialog={dialogs.setShowRetryDialog}
-        onRetryPendingChange={status.setIsRetrying}
-        onRetrySuccess={() => {
-          dialogs.setShowRetryDialog(false);
-          onClose();
-        }}
-        ledgerEntries={ledgerEntries}
-        selectedIds={selection.selectedIds}
-        splitInitialDate={editor.splitInitialDate}
-        isSplitting={status.isSplitting}
-        showSplitDialog={dialogs.showSplitDialog}
-        setShowSplitDialog={dialogs.setShowSplitDialog}
-        handleSplit={actions.handleSplit}
-        showAddEntryDialog={dialogs.showAddEntryDialog}
-        onAddEntry={onAddEntry}
-        categories={categories}
-        preferredCurrencies={preferredCurrencies}
-        mainCurrency={mainCurrency}
-        isSaving={status.isSaving}
-        setShowAddEntryDialog={dialogs.setShowAddEntryDialog}
-        handleAddEntrySubmit={actions.handleAddEntrySubmit}
-        {...(timeZone != null ? { timeZone } : {})}
-      />
+      {sourceDocument != null ? (
+        <SourceDocumentEditRetryDialog
+          sourceDocument={sourceDocument}
+          open={dialogs.showRetryDialog}
+          onOpenChange={dialogs.setShowRetryDialog}
+          onPendingChange={status.setIsRetrying}
+          onSuccess={() => {
+            dialogs.setShowRetryDialog(false);
+            onClose();
+          }}
+        />
+      ) : null}
+      {dialogs.showSplitDialog ? (
+        <SourceDocumentSplitDialog
+          open
+          selectedEntries={ledgerEntries.filter((entry) =>
+            selection.selectedIds.includes(entry.id)
+          )}
+          initialDate={editor.splitInitialDate}
+          isSubmitting={status.isSplitting}
+          onOpenChange={dialogs.setShowSplitDialog}
+          onSubmit={actions.handleSplit}
+          {...(timeZone != null ? { timeZone } : {})}
+        />
+      ) : null}
+      {dialogs.showAddEntryDialog ? (
+        <AddLedgerEntryDialog
+          open
+          categories={categories}
+          preferredCurrencies={preferredCurrencies}
+          mainCurrency={mainCurrency}
+          isSubmitting={status.isSaving}
+          onOpenChange={dialogs.setShowAddEntryDialog}
+          onSubmit={actions.handleAddEntrySubmit}
+        />
+      ) : null}
     </>
   );
 }
@@ -409,6 +328,5 @@ function SourceDocumentDetailEditor({
 export const SourceDocumentDetailModal = memo(function SourceDocumentDetailModal(
   props: SourceDocumentDetailModalProps
 ) {
-  const editorKey = props.sourceDocumentId ?? props.sourceDocument?.id ?? "empty";
-  return <SourceDocumentDetailEditor key={editorKey} {...props} />;
+  return <SourceDocumentDetailEditor key={props.id} {...props} />;
 });

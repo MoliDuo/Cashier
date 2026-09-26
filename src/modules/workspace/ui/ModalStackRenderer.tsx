@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useModalStackStore } from "@/lib/store/modal-stack";
-import { SourceDocumentDetailWrapper } from "@/modules/source-document/ui/SourceDocumentDetailWrapper";
+import { SourceDocumentDetailModal } from "@/modules/source-document/ui/SourceDocumentDetailModal";
 import type { BookDto, EntryCategory } from "@/modules/ledger/contracts";
 import { closeLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 
@@ -65,6 +65,6 @@ export function ModalStackRenderer({
       ...(timeZone != null ? { timeZone } : {}),
     };
 
-    return <SourceDocumentDetailWrapper key={key} {...sharedProps} />;
+    return <SourceDocumentDetailModal key={key} {...sharedProps} />;
   });
 }

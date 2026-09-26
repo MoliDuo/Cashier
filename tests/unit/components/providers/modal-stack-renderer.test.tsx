@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModalStackRenderer } from "@/modules/workspace/ui/ModalStackRenderer";
 import { useModalStackStore } from "@/lib/store/modal-stack";
 
-vi.mock("@/modules/source-document/ui/SourceDocumentDetailWrapper", () => ({
-  SourceDocumentDetailWrapper: ({
+vi.mock("@/modules/source-document/ui/SourceDocumentDetailModal", () => ({
+  SourceDocumentDetailModal: ({
     open,
     onClose,
     onBack,
@@ -80,7 +80,7 @@ describe("ModalStackRenderer", () => {
     expect(screen.getByTestId("detail-modal")).toHaveAttribute("data-open", "true");
   });
 
-  it("keeps lower wrappers mounted while only opening the top wrapper", async () => {
+  it("keeps lower details mounted while only opening the top one", async () => {
     render(
       <ModalStackRenderer books={[]} categories={[]} mainCurrency="CNY" preferredCurrencies={[]} />
     );

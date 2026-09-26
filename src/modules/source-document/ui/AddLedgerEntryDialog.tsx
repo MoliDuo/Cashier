@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
-import type { AddEntryData } from "@/modules/source-document/hooks/useSourceDocumentDetailMutations";
+import type { AddEntryData } from "@/modules/source-document/detail-types";
 
 interface AddLedgerEntryDialogProps {
   open: boolean;

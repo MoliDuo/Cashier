@@ -1,5 +1,5 @@
 "use client";
-import type { useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface SaveAndContinueGate {
@@ -10,8 +10,6 @@ interface SaveAndContinueGate {
 }
 
 interface SourceDocumentDetailConfirmDialogsProps {
-  t: ReturnType<typeof useTranslations>;
-  tCommon: ReturnType<typeof useTranslations>;
   showBatchModePendingConfirm: boolean;
   setShowBatchModePendingConfirm: (open: boolean) => void;
   handleSaveAndEnterBatchMode: () => Promise<boolean>;
@@ -33,8 +31,6 @@ interface SourceDocumentDetailConfirmDialogsProps {
 
 /** The six confirm/discard dialogs shared across the detail modal's edit, batch, and close flows. */
 export function SourceDocumentDetailConfirmDialogs({
-  t,
-  tCommon,
   showBatchModePendingConfirm,
   setShowBatchModePendingConfirm,
   handleSaveAndEnterBatchMode,
@@ -53,6 +49,8 @@ export function SourceDocumentDetailConfirmDialogs({
   discardEditsGate,
   handleConfirmDiscardEdits,
 }: SourceDocumentDetailConfirmDialogsProps) {
+  const t = useTranslations("SourceDocumentDetail");
+  const tCommon = useTranslations("Common");
   return (
     <>
       <ConfirmDialog
