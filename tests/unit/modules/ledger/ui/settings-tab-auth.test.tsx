@@ -39,6 +39,7 @@ vi.mock("@tanstack/react-query", () => ({
     data: initialData,
     isPending: false,
   }),
+  useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("next-themes", () => ({
@@ -52,47 +53,21 @@ vi.mock("@/modules/ledger/hooks/useBooks", () => ({
   }),
 }));
 
-vi.mock("@/modules/ledger/hooks/useBookMutations", () => ({
-  useBookMutations: () => ({
-    createBook: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
-    updateBook: { mutate: vi.fn(), isPending: false },
-    reorderBooks: { mutate: vi.fn(), isPending: false },
-    archiveBook: { mutate: vi.fn(), isPending: false },
-    restoreBook: { mutate: vi.fn(), isPending: false },
-    deleteBook: { mutate: vi.fn(), isPending: false },
-  }),
-}));
-
 vi.mock("@/modules/ledger/hooks/useLedgerSettings", () => ({
-  useLedgerSettings: () => ({
-    ledger: null,
+  useLedgerSettings: ({ ledger }: { ledger: unknown }) => ({
+    ledger,
     categories: [],
     uncategorizedCount: 0,
     credentials: [],
-    updateLedgerMutation: { mutate: vi.fn(), mutateAsync: vi.fn() },
-    isPending: false,
     settingsQueryStatus: queryState.status,
-  }),
-}));
-
-vi.mock("@/modules/ledger/hooks/useCategoryMutations", () => ({
-  useCategoryMutations: () => ({
+    updateLedgerMutation: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
     saveCategories: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
-    createCategory: { mutate: vi.fn(), mutateAsync: vi.fn() },
-    updateCategory: { mutate: vi.fn(), mutateAsync: vi.fn() },
-    deleteCategory: { mutate: vi.fn(), mutateAsync: vi.fn() },
-    reorderCategories: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
     generatingCategoryIds: new Set<string>(),
     failedCategoryIds: new Set<string>(),
     retryCategoryMetadata: vi.fn(),
-  }),
-}));
-
-vi.mock("@/modules/ledger/hooks/useCredentialMutations", () => ({
-  useCredentialMutations: () => ({
-    createCredential: { mutateAsync: vi.fn() },
+    createCredential: { mutateAsync: vi.fn(), reset: vi.fn() },
     setCredentialBook: { mutateAsync: vi.fn() },
-    deleteCredential: { mutate: vi.fn() },
+    deleteCredential: { mutateAsync: vi.fn() },
   }),
 }));
 

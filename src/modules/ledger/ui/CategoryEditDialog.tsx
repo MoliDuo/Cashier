@@ -12,7 +12,6 @@ import {
 import { IconPicker } from "@/components/ui/icon-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useCategoryIconPickerMessages } from "@/modules/ledger/hooks/useCategoryIconPickerMessages";
 import type { EditSession } from "@/modules/ledger/hooks/useCategoryManagementDraft";
 
 interface CategoryEditDialogProps {
@@ -30,7 +29,6 @@ export function CategoryEditDialog({
 }: CategoryEditDialogProps) {
   const t = useTranslations("Settings");
   const common = useTranslations("Common");
-  const iconPickerMessages = useCategoryIconPickerMessages();
 
   return (
     <Dialog open={editSession != null} onOpenChange={(open) => !open && onRequestClose()}>
@@ -43,7 +41,6 @@ export function CategoryEditDialog({
             <div className="flex items-center gap-3">
               <IconPicker
                 value={editSession.draft.icon}
-                messages={iconPickerMessages}
                 onChange={(icon) =>
                   setEditSession((session) =>
                     session == null ? null : { ...session, draft: { ...session.draft, icon } }

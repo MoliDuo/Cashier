@@ -1,34 +1,28 @@
 "use client";
 import { useId, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { CATEGORY_ICON_MAP, type CommonLucideIcon } from "@/config/icons";
+import { CATEGORY_ICON_MAP, COMMON_LUCIDE_ICONS, type CommonLucideIcon } from "@/config/icons";
 import { cn } from "@/lib/utils";
 
 const PICKER_ICON_NAMES = Object.values(CATEGORY_ICON_MAP).filter(
   (iconName): iconName is CommonLucideIcon => iconName !== "Home" && iconName !== "CircleSlash"
 );
 
-export interface IconPickerProps {
+interface IconPickerProps {
   value: string | null | undefined;
   onChange: (iconName: string) => void;
-  messages: {
-    select: string;
-    selected: (name: string) => string;
-    list: string;
-    iconNames: Record<CommonLucideIcon, string>;
-  };
   disabled?: boolean;
   className?: string;
 }
 
-export function IconPicker({
-  value,
-  onChange,
-  messages,
-  disabled = false,
-  className,
-}: IconPickerProps) {
+function isCommonIcon(value: string): value is CommonLucideIcon {
+  return (COMMON_LUCIDE_ICONS as readonly string[]).includes(value);
+}
+
+export function IconPicker({ value, onChange, disabled = false, className }: IconPickerProps) {
+  const t = useTranslations("Settings");
   const [open, setOpen] = useState(false);
   const listboxId = useId();
 
@@ -36,10 +30,7 @@ export function IconPicker({
     onChange(iconName);
     setOpen(false);
   };
-  const selectedName =
-    value != null && Object.hasOwn(messages.iconNames, value)
-      ? messages.iconNames[value as CommonLucideIcon]
-      : value;
+  const selectedName = value != null && isCommonIcon(value) ? t(`iconNames.${value}`) : value;
 
   if (disabled) {
     return (
@@ -58,7 +49,9 @@ export function IconPicker({
           aria-expanded={open}
           aria-controls={listboxId}
           aria-haspopup="listbox"
-          aria-label={value == null ? messages.select : messages.selected(selectedName ?? value)}
+          aria-label={
+            value == null ? t("selectIcon") : t("selectedIcon", { name: selectedName ?? value })
+          }
           className={cn(
             "flex h-11 w-11 items-center justify-center rounded",
             "hover:bg-surface transition-colors",
@@ -73,12 +66,12 @@ export function IconPicker({
         <div
           id={listboxId}
           role="listbox"
-          aria-label={messages.list}
+          aria-label={t("icons")}
           className="grid grid-cols-6 gap-1"
         >
           {PICKER_ICON_NAMES.map((iconName) => {
             const isSelected = value === iconName;
-            const localizedName = messages.iconNames[iconName];
+            const localizedName = t(`iconNames.${iconName}`);
             return (
               <button
                 key={iconName}

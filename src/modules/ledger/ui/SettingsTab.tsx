@@ -7,8 +7,6 @@ import { AccountSettings } from "./settings/AccountSettings";
 import { BookSettings } from "./settings/BookSettings";
 import { SettingsSection } from "./settings/SettingsSection";
 import { SettingsField } from "./settings/SettingsField";
-import { useCategoryMutations } from "@/modules/ledger/hooks/useCategoryMutations";
-import { useCredentialMutations } from "@/modules/ledger/hooks/useCredentialMutations";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { useLedgerSettings } from "@/modules/ledger/hooks/useLedgerSettings";
 import {
@@ -21,7 +19,6 @@ import {
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { signOutAction } from "@/modules/auth/server-actions/sign-in";
-import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchEntryCategories } from "@/modules/ledger/queries";
@@ -55,28 +52,21 @@ export function SettingsTab({
   const { theme, setTheme } = useTheme();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [metadataPollingSession, setMetadataPollingSession] = useState(0);
-
-  // Use extracted hooks - ledger is reactive and will update with optimistic updates
   const {
-    ledger: reactiveLedger,
+    ledger: settingsLedger,
     categories,
     uncategorizedCount,
     credentials,
-    updateLedgerMutation,
-    isPending,
     settingsQueryStatus,
-  } = useLedgerSettings({ ledger, initialCategories, metadataPollingSession });
-
-  // Use reactive ledger for settings that need optimistic updates
-  const settingsLedger = reactiveLedger || ledger;
-
-  const { saveCategories, generatingCategoryIds, failedCategoryIds, retryCategoryMetadata } =
-    useCategoryMutations({
-      onMetadataGenerated: () => setMetadataPollingSession((session) => session + 1),
-    });
-
-  const { createCredential, setCredentialBook, deleteCredential } = useCredentialMutations();
+    updateLedgerMutation,
+    saveCategories,
+    generatingCategoryIds,
+    failedCategoryIds,
+    retryCategoryMetadata,
+    createCredential,
+    setCredentialBook,
+    deleteCredential,
+  } = useLedgerSettings({ ledger, initialCategories });
   // The book list is one query: the 分账 section writes it and the API-key
   // pickers read it, so a rename or reorder lands everywhere at once.
   const { books } = useBooks({ initialBooks });
@@ -190,8 +180,8 @@ export function SettingsTab({
         {...(userEmail !== undefined ? { userEmail } : {})}
         hasPassword={hasPassword}
         passwordUpdatedAt={passwordUpdatedAt}
-        credentials={credentials ?? []}
-        isPending={isPending}
+        credentials={credentials}
+        isPending={updateLedgerMutation.isPending}
         books={books ?? initialBooks}
         onCreateCredential={(input) => createCredential.mutateAsync(input)}
         onSetCredentialBook={(id, bookId) =>

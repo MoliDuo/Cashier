@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { EntryCategory, SaveEntryCategoriesInput } from "@/modules/ledger/contracts";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
 import { useLedgerId } from "./useLedgerId";
-import { categoryDraftsEqual, toCategoryDraft, type CategoryDraft } from "./category-draft-model";
-import { useCategoryEditSession } from "./useCategoryEditSession";
+import {
+  categoryDraftsEqual,
+  editDraftEqual,
+  toCategoryDraft,
+  type CategoryDraft,
+  type EditSession,
+} from "./category-draft-model";
 
 export type { CategoryDraft, EditSession } from "./category-draft-model";
 
@@ -16,7 +21,6 @@ interface UseCategoryManagementDraftOptions {
   onSaveCategories: (input: SaveEntryCategoriesInput) => Promise<EntryCategory[]>;
   onReloadCategories?: (() => Promise<EntryCategory[]>) | undefined;
   isSaving: boolean;
-  t: ReturnType<typeof useTranslations>;
 }
 
 /** The list being edited, and the list it was edited from. */
@@ -71,8 +75,8 @@ export function useCategoryManagementDraft({
   onSaveCategories,
   onReloadCategories,
   isSaving,
-  t,
 }: UseCategoryManagementDraftOptions) {
+  const t = useTranslations("Settings");
   const ledgerId = useLedgerId();
   const key = ledgerId == null ? null : draftKey(ledgerId, "categories", "ledger");
   const [restored] = useState(() =>
@@ -91,16 +95,10 @@ export function useCategoryManagementDraft({
 
   const dirty = managing && !categoryDraftsEqual(serverDraft, draftOrder);
 
-  const {
-    editSession,
-    setEditSession,
-    discardEditOpen,
-    setDiscardEditOpen,
-    editDirty,
-    requestEditClose,
-    startEditing,
-    commitEdit,
-  } = useCategoryEditSession({ setDraftOrder, setSaveError });
+  // The single-category edit dialog: its draft against the category it opened on.
+  const [editSession, setEditSession] = useState<EditSession | null>(null);
+  const [discardEditOpen, setDiscardEditOpen] = useState(false);
+  const editDirty = editSession != null && !editDraftEqual(editSession.original, editSession.draft);
 
   const hasCategoryDraft = dirty || newCategoryName.trim() !== "" || editDirty;
   const serverMoved = managing && !categoryDraftsEqual(serverDraft, incomingDraft);
@@ -180,6 +178,41 @@ export function useCategoryManagementDraft({
   const confirmDeleteCategory = () => {
     if (deleteTarget == null) return;
     setDraftOrder((current) => current.filter((category) => category.key !== deleteTarget.key));
+    setSaveError(null);
+  };
+
+  const startEditing = (category: CategoryDraft) => {
+    const draft = {
+      key: category.key,
+      name: category.name,
+      description: category.description,
+      icon: category.icon,
+    };
+    setEditSession({ original: draft, draft });
+  };
+
+  const requestEditClose = () => {
+    if (editSession == null) return;
+    if (editDirty) setDiscardEditOpen(true);
+    else setEditSession(null);
+  };
+
+  const commitEdit = () => {
+    if (editSession == null) return;
+    const updated = editSession.draft;
+    setDraftOrder((current) =>
+      current.map((category) =>
+        category.key === updated.key
+          ? {
+              ...category,
+              name: updated.name.trim(),
+              description: updated.description,
+              icon: updated.icon,
+            }
+          : category
+      )
+    );
+    setEditSession(null);
     setSaveError(null);
   };
 

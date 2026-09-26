@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowUp,
@@ -32,8 +34,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useBookMutations } from "@/modules/ledger/hooks/useBookMutations";
+import { queryKeys } from "@/lib/query-keys";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
+import {
+  archiveBookAction,
+  createBookAction,
+  deleteBookAction,
+  reorderBooksAction,
+  restoreBookAction,
+  updateBookAction,
+  type BookMutationErrorCode,
+  type BookMutationResult,
+} from "@/modules/ledger/server-actions/books";
 import { SettingsField } from "./SettingsField";
 import { SettingsSection } from "./SettingsSection";
 import type { BookDto } from "@/modules/ledger/contracts";
@@ -56,6 +68,17 @@ const TIME_ZONES = [
   "Australia/Sydney",
   "UTC",
 ] as const;
+
+const BOOK_ERROR_KEYS = {
+  name_taken: "nameTaken",
+  invalid_name: "invalidName",
+  has_records: "hasRecords",
+  has_credentials: "hasCredentials",
+  last_book: "lastBook",
+  not_found: "notFound",
+  invalid_order: "saveFailed",
+  unexpected: "saveFailed",
+} as const satisfies Record<BookMutationErrorCode, string>;
 
 interface BookSettingsProps {
   /**
@@ -81,14 +104,62 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
     ...(initialBooks !== undefined ? { initialBooks } : {}),
     includeArchived: true,
   });
-  const { createBook, updateBook, reorderBooks, archiveBook, restoreBook, deleteBook } =
-    useBookMutations();
+  const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [archiveTarget, setArchiveTarget] = useState<BookDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookDto | null>(null);
+
+  /**
+   * Every success carries the whole book list, so the cache is written directly
+   * and the switcher, the record pickers and 设置 all move together without
+   * waiting for a refetch. The archived-inclusive list seeds both cache entries:
+   * the switcher's live list is that list minus the retired rows, so the two
+   * views can never disagree about which books exist. A refusal is a toast, not
+   * a mutation success.
+   */
+  const writeBooks = (result: BookMutationResult, successMessage?: string) => {
+    if (!result.ok) {
+      toast.error(t(BOOK_ERROR_KEYS[result.code]));
+      throw new Error(result.code);
+    }
+    queryClient.setQueryData(queryKeys.booksIncludingArchived(), result.books);
+    queryClient.setQueryData(
+      queryKeys.books(),
+      result.books.filter((book) => book.archivedAt == null)
+    );
+    if (successMessage != null) toast.success(successMessage);
+  };
+  const createBook = useMutation({
+    mutationFn: (input: { name: string; timeZone: string | null }) => createBookAction(input),
+    onSuccess: (result) => writeBooks(result),
+  });
+  const updateBook = useMutation({
+    mutationFn: (input: { bookId: string; name?: string; timeZone?: string | null }) =>
+      updateBookAction(input.bookId, {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
+      }),
+    onSuccess: (result) => writeBooks(result),
+  });
+  const reorderBooks = useMutation({
+    mutationFn: (bookIds: string[]) => reorderBooksAction(bookIds),
+    onSuccess: (result) => writeBooks(result),
+  });
+  const archiveBook = useMutation({
+    mutationFn: (bookId: string) => archiveBookAction(bookId),
+    onSuccess: (result) => writeBooks(result, t("archived")),
+  });
+  const restoreBook = useMutation({
+    mutationFn: (bookId: string) => restoreBookAction(bookId),
+    onSuccess: (result) => writeBooks(result, t("restored")),
+  });
+  const deleteBook = useMutation({
+    mutationFn: (bookId: string) => deleteBookAction(bookId),
+    onSuccess: (result) => writeBooks(result, t("deleted")),
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

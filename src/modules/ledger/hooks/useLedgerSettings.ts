@@ -1,42 +1,253 @@
 "use client";
-import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
+
+import { useCallback, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import type { Ledger } from "@/modules/ledger/contracts";
-import { useLedgerSettingsMutation } from "./useLedgerSettingsMutation";
-import { useLedgerSettingsQueries } from "./useLedgerSettingsQueries";
+import { toast } from "sonner";
+import { useSmartPolling } from "@/hooks/use-smart-polling";
+import { LEDGER } from "@/lib/constants";
+import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
+import { queryKeys } from "@/lib/query-keys";
+import { omitUndefinedProperties } from "@/lib/validation";
+import type { UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
+import type {
+  CreatedServiceCredential,
+  EntryCategory,
+  EntryCategoryWithCount,
+  Ledger,
+  SaveEntryCategoriesInput,
+  ServiceCredential,
+  UpdateLedgerActionErrorCode,
+} from "@/modules/ledger/contracts";
+import { fetchEntryCategories, fetchLedger, fetchLedgerSettings } from "@/modules/ledger/queries";
+import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
+import { generateEntryCategoryMetadataAction } from "@/modules/ledger/server-actions/category-metadata";
+import {
+  createServiceCredentialAction,
+  deleteServiceCredentialAction,
+  updateServiceCredentialAction,
+} from "@/modules/ledger/server-actions/credentials";
+import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
+
+/** The settings the update action accepts, so the two cannot drift apart. */
+type UpdateLedgerData = UpdateLedgerInput["settings"];
+type QueryStatus = "pending" | "success" | "error";
 
 interface UseLedgerSettingsParams {
   ledger: Ledger;
   initialCategories: EntryCategoryWithCount[];
-  metadataPollingSession: number;
 }
 
+/** 设置's server state: the ledger, its categories and API keys, and the writes to them. */
 export function useLedgerSettings({
   ledger: initialLedger,
   initialCategories,
-  metadataPollingSession,
 }: UseLedgerSettingsParams) {
   const t = useTranslations("Settings");
-  const { ledger, categories, uncategorizedCount, credentials, settingsQueryStatus } =
-    useLedgerSettingsQueries({
-      initialLedger,
-      initialCategories,
-      metadataPollingSession,
-    });
+  const tCredentials = useTranslations("ServiceCredentials");
+  const queryClient = useQueryClient();
+  const [metadataPollingSession, setMetadataPollingSession] = useState(0);
 
-  const updateLedgerMutation = useLedgerSettingsMutation({
-    expectedUpdatedAt: ledger?.updatedAt ?? initialLedger.updatedAt,
+  const categoryMetadataPolling = useSmartPolling<EntryCategoryWithCount[]>({
+    sessionKey: metadataPollingSession,
+    isPollingActive: useCallback(
+      (data) =>
+        data?.some(
+          (category) =>
+            category.icon == null ||
+            category.icon === "" ||
+            category.description == null ||
+            category.description === ""
+        ) ?? false,
+      []
+    ),
+  });
+
+  const ledgerQuery = useQuery<Ledger | null>({
+    queryKey: queryKeys.ledger(),
+    queryFn: () => fetchLedger(),
+    initialData: initialLedger,
+    staleTime: LEDGER.STALE_TIME_MS,
+    refetchOnWindowFocus: true,
+  });
+  const ledger = ledgerQuery.data ?? initialLedger;
+
+  const categoriesQuery = useQuery<EntryCategoryWithCount[]>({
+    queryKey: queryKeys.entryCategories(),
+    queryFn: () => fetchEntryCategories(),
+    initialData: initialCategories,
+    refetchInterval: categoryMetadataPolling,
+    staleTime: LEDGER.STALE_TIME_MS,
+    refetchOnWindowFocus: true,
+  });
+
+  const settingsQuery = useQuery<{
+    uncategorizedCount: number;
+    credentials: ServiceCredential[];
+  }>({
+    queryKey: queryKeys.ledgerSettings(),
+    queryFn: () => fetchLedgerSettings(),
+    staleTime: LEDGER.STALE_TIME_MS,
+    refetchOnWindowFocus: true,
+  });
+  const statuses = [ledgerQuery.status, categoriesQuery.status, settingsQuery.status];
+  const settingsQueryStatus: QueryStatus = statuses.includes("error")
+    ? "error"
+    : statuses.includes("pending")
+      ? "pending"
+      : "success";
+
+  const translateUpdateError = (code: UpdateLedgerActionErrorCode) => {
+    switch (code) {
+      case "unsupported_currency":
+        return t("unsupportedCurrency");
+      case "validation_failed":
+        return t("validationFailed");
+      case "conflict":
+        return t("updateConflict");
+      case "unexpected":
+        return t("updateFailed");
+    }
+  };
+  const updateLedgerMutation = useLedgerMutation<Ledger, UpdateLedgerData>({
+    invalidates: (_ledger, data) =>
+      data.mainCurrency === undefined ? ["settings"] : ["settings", "documents", "stats"],
+    mutationFn: async (data) => {
+      const result = await updateLedgerSettingsAction({
+        expectedUpdatedAt: ledger.updatedAt,
+        settings: omitUndefinedProperties(data),
+      });
+      if (!result.ok) {
+        // Saved elsewhere since this page loaded: load what is there now, so
+        // the next change is made against it.
+        if (result.code === "conflict") {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.ledger(), exact: true });
+        }
+        throw new Error(translateUpdateError(result.code));
+      }
+      return result.ledger;
+    },
     successMessage: t("updateSuccess"),
-    errorMessage: t("updateFailed"),
+    errorMessage: null,
+    onSuccess: (savedLedger) => {
+      queryClient.setQueryData(queryKeys.ledger(), savedLedger);
+    },
+    onError: (error) => toast.error(error.message || t("updateFailed")),
+  });
+
+  const [generatingCategoryIds, setGeneratingCategoryIds] = useState<Set<string>>(new Set());
+  const [failedCategoryIds, setFailedCategoryIds] = useState<Set<string>>(new Set());
+  const metadataRequestIdRef = useRef(0);
+  const latestMetadataRequestRef = useRef(new Map<string, number>());
+  const pendingMetadataRequestsRef = useRef(new Map<string, number>());
+
+  const finishMetadataRequest = useCallback((categoryId: string) => {
+    const remaining = Math.max(0, (pendingMetadataRequestsRef.current.get(categoryId) ?? 1) - 1);
+    if (remaining > 0) {
+      pendingMetadataRequestsRef.current.set(categoryId, remaining);
+      return;
+    }
+    pendingMetadataRequestsRef.current.delete(categoryId);
+    setGeneratingCategoryIds((ids) => {
+      const next = new Set(ids);
+      next.delete(categoryId);
+      return next;
+    });
+  }, []);
+
+  const generateMetadata = useLedgerMutation<
+    Awaited<ReturnType<typeof generateEntryCategoryMetadataAction>>,
+    { categoryId: string; requestId: number }
+  >({
+    invalidates: ["categories"],
+    mutationFn: ({ categoryId }) => generateEntryCategoryMetadataAction(categoryId),
+    // Restart the category list's polling until every category has its metadata.
+    onSuccess: () => setMetadataPollingSession((session) => session + 1),
+    onError: (_error, { categoryId, requestId }) => {
+      if (latestMetadataRequestRef.current.get(categoryId) === requestId) {
+        setFailedCategoryIds((ids) => new Set(ids).add(categoryId));
+      }
+    },
+    onSettled: (_data, _error, variables) => {
+      if (variables != null) finishMetadataRequest(variables.categoryId);
+    },
+  });
+  const requestCategoryMetadata = useCallback(
+    (categoryId: string) => {
+      if (pendingMetadataRequestsRef.current.has(categoryId)) return;
+      const requestId = ++metadataRequestIdRef.current;
+      latestMetadataRequestRef.current.set(categoryId, requestId);
+      pendingMetadataRequestsRef.current.set(categoryId, 1);
+      setGeneratingCategoryIds((ids) => new Set(ids).add(categoryId));
+      setFailedCategoryIds((ids) => {
+        const next = new Set(ids);
+        next.delete(categoryId);
+        return next;
+      });
+      generateMetadata.mutate({ categoryId, requestId });
+    },
+    [generateMetadata]
+  );
+
+  const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>({
+    invalidates: ["categories", "stats"],
+    mutationFn: (input) => saveEntryCategoriesAction(input),
+    successMessage: t("categoriesSaved"),
+    errorMessage: t("saveCategoriesFailed"),
+    onSuccess: (saved, input) => {
+      queryClient.setQueryData(queryKeys.entryCategories(), saved);
+      for (const category of input.categories) {
+        if (category.clientId != null) requestCategoryMetadata(category.clientId);
+      }
+    },
+  });
+
+  const createCredential = useLedgerMutation<
+    CreatedServiceCredential,
+    { name: string; bookId: string }
+  >({
+    invalidates: ["credentials"],
+    mutationFn: (input) => createServiceCredentialAction(input),
+    successMessage: t("credentialCreated"),
+    errorMessage: null,
+    onError: (error) => {
+      const code = (error as Error & { code?: unknown }).code;
+      // Two different conflicts reach here: the 20-key cap and a book that is
+      // gone or archived. Reporting both as the cap hid the real reason the
+      // reader could not add a key.
+      if (code === "BOOK_UNAVAILABLE") toast.error(tCredentials("bookUnavailable"));
+      else if (code === "CONFLICT") toast.error(tCredentials("maxActive"));
+      else toast.error(t("createFailed"));
+    },
+  });
+
+  const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>({
+    invalidates: ["credentials"],
+    mutationFn: (input) => updateServiceCredentialAction(input.id, { bookId: input.bookId }),
+    successMessage: t("credentialBookChanged"),
+    errorMessage: t("credentialBookChangeFailed"),
+  });
+
+  const deleteCredential = useLedgerMutation<void, string>({
+    invalidates: ["credentials"],
+    mutationFn: (id) => deleteServiceCredentialAction(id),
+    successMessage: t("credentialDeleted"),
+    errorMessage: t("deleteFailed"),
   });
 
   return {
     ledger,
-    categories,
-    uncategorizedCount,
-    credentials,
-    updateLedgerMutation,
-    isPending: updateLedgerMutation.isPending,
+    categories: categoriesQuery.data ?? initialCategories,
+    uncategorizedCount: settingsQuery.data?.uncategorizedCount ?? 0,
+    credentials: settingsQuery.data?.credentials ?? [],
     settingsQueryStatus,
+    updateLedgerMutation,
+    saveCategories,
+    generatingCategoryIds,
+    failedCategoryIds,
+    retryCategoryMetadata: requestCategoryMetadata,
+    createCredential,
+    setCredentialBook,
+    deleteCredential,
   };
 }

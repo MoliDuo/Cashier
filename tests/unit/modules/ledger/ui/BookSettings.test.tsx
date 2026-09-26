@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,10 +9,20 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-const { getBooksAction, getBooksIncludingArchivedAction, updateBook } = vi.hoisted(() => ({
+const {
+  getBooksAction,
+  getBooksIncludingArchivedAction,
+  updateBookAction,
+  archiveBookAction,
+  toastError,
+  toastSuccess,
+} = vi.hoisted(() => ({
   getBooksAction: vi.fn(),
   getBooksIncludingArchivedAction: vi.fn(),
-  updateBook: vi.fn(),
+  updateBookAction: vi.fn(),
+  archiveBookAction: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock("@/modules/ledger/queries", () => ({
@@ -20,16 +30,16 @@ vi.mock("@/modules/ledger/queries", () => ({
   fetchBooksIncludingArchived: getBooksIncludingArchivedAction,
 }));
 
-vi.mock("@/modules/ledger/hooks/useBookMutations", () => ({
-  useBookMutations: () => ({
-    createBook: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
-    updateBook: { mutate: updateBook, isPending: false },
-    reorderBooks: { mutate: vi.fn(), isPending: false },
-    archiveBook: { mutate: vi.fn(), isPending: false },
-    restoreBook: { mutate: vi.fn(), isPending: false },
-    deleteBook: { mutate: vi.fn(), isPending: false },
-  }),
+vi.mock("@/modules/ledger/server-actions/books", () => ({
+  createBookAction: vi.fn(),
+  updateBookAction,
+  reorderBooksAction: vi.fn(),
+  archiveBookAction,
+  restoreBookAction: vi.fn(),
+  deleteBookAction: vi.fn(),
 }));
+
+vi.mock("sonner", () => ({ toast: { error: toastError, success: toastSuccess } }));
 
 import { BookSettings } from "@/modules/ledger/ui/settings/BookSettings";
 
@@ -120,7 +130,10 @@ describe("设置 book list data range", () => {
 
   it("renames a book in its own row and writes it without a dialog", async () => {
     getBooksIncludingArchivedAction.mockResolvedValue([LIVE, ARCHIVED]);
-    renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+    const renamed = { ...LIVE, name: "日常开销" };
+    updateBookAction.mockResolvedValue({ ok: true, books: [renamed, ARCHIVED] });
+    const { queryClient } = renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+    const setQueryData = vi.spyOn(queryClient, "setQueryData");
 
     // A name is one field of a book that already exists, so the row itself opens
     // for editing — nothing may cover the list to change it.
@@ -131,10 +144,50 @@ describe("设置 book list data range", () => {
     fireEvent.change(input, { target: { value: "日常开销" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    expect(updateBook).toHaveBeenCalledWith(
-      { bookId: LIVE.id, name: "日常开销" },
-      expect.anything()
+    await waitFor(() =>
+      expect(updateBookAction).toHaveBeenCalledWith(LIVE.id, { name: "日常开销" })
     );
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: "rename" })).not.toBeInTheDocument()
+    );
+    expect(screen.getByText("日常开销")).toBeInTheDocument();
+    // The answer carries the whole list: the switcher's live list is written
+    // from it too, without the archived row.
+    expect(queryClient.getQueryData(queryKeys.booksIncludingArchived())).toEqual([
+      renamed,
+      ARCHIVED,
+    ]);
+    expect(setQueryData).toHaveBeenCalledWith(queryKeys.books(), [renamed]);
+  });
+
+  it("keeps the row open on a refused name and reports why", async () => {
+    getBooksIncludingArchivedAction.mockResolvedValue([LIVE, ARCHIVED]);
+    updateBookAction.mockResolvedValue({ ok: false, code: "name_taken" });
+    renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+
+    fireEvent.click(screen.getByRole("button", { name: "rename" }));
+    const input = screen.getByRole("textbox", { name: "rename" });
+    fireEvent.change(input, { target: { value: "旧旅行账本" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("nameTaken"));
+    expect(screen.getByRole("textbox", { name: "rename" })).toHaveValue("旧旅行账本");
+  });
+
+  it("archives a book after confirmation and moves it to the archived list", async () => {
+    getBooksIncludingArchivedAction.mockResolvedValue([LIVE, ARCHIVED]);
+    const retired = { ...LIVE, archivedAt: "2026-03-01T00:00:00.000Z" };
+    archiveBookAction.mockResolvedValue({ ok: true, books: [retired, ARCHIVED] });
+    renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
+
+    fireEvent.click(screen.getByRole("button", { name: "archive" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "archive" }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("archived"));
+    expect(archiveBookAction).toHaveBeenCalledWith(LIVE.id);
+    expect(await screen.findByText("empty")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "restore" })).toHaveLength(2);
   });
 
   it("drops the draft on Escape and writes nothing", async () => {
@@ -146,7 +199,7 @@ describe("设置 book list data range", () => {
     fireEvent.change(input, { target: { value: "改到一半" } });
     fireEvent.keyDown(input, { key: "Escape" });
 
-    expect(updateBook).not.toHaveBeenCalled();
+    expect(updateBookAction).not.toHaveBeenCalled();
     expect(screen.getByText(LIVE.name)).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "rename" })).not.toBeInTheDocument();
   });
@@ -158,7 +211,7 @@ describe("设置 book list data range", () => {
     fireEvent.click(screen.getByRole("button", { name: "rename" }));
     fireEvent.keyDown(screen.getByRole("textbox", { name: "rename" }), { key: "Enter" });
 
-    expect(updateBook).not.toHaveBeenCalled();
+    expect(updateBookAction).not.toHaveBeenCalled();
   });
 
   it("keeps the list and reports a retry when a background refresh fails", async () => {

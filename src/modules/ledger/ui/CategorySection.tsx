@@ -76,7 +76,7 @@ export function CategorySection({
     cancelManagement,
     confirmDiscardManagement,
     confirmDeleteCategory,
-  } = useCategoryManagementDraft({ categories, onSaveCategories, onReloadCategories, isSaving, t });
+  } = useCategoryManagementDraft({ categories, onSaveCategories, onReloadCategories, isSaving });
 
   return (
     <SettingsSection

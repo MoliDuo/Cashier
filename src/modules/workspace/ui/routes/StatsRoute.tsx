@@ -1,6 +1,10 @@
 "use client";
+import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { StatsTabSkeleton } from "@/components/skeletons/TabSkeletons";
-import { useDrilldownNavigation } from "../../hooks/useDrilldownNavigation";
+import { useLedgerNavigation } from "../../hooks/useLedgerNavigation";
+import { buildDetailsDrilldownSearchParams } from "../../ledger-url-params";
+import { prefetchDetailsTabQuery } from "../../prefetch-ledger-tabs";
 import { StatsTab } from "../StatsTab";
 import { useLedgerWorkspace } from "../ledger-workspace-context";
 
@@ -8,14 +12,46 @@ import { useLedgerWorkspace } from "../ledger-workspace-context";
 export function StatsRoute() {
   const { ledger, recordScope, effectiveTimeZone, timeZoneReady, ledgerToday } =
     useLedgerWorkspace();
-  const { handleCategoryDrilldown, handleDateDrilldown } = useDrilldownNavigation(
-    recordScope == null ? {} : { bookId: recordScope }
+  const queryClient = useQueryClient();
+  const { navigate } = useLedgerNavigation();
+  const bookId = recordScope ?? undefined;
+
+  // 统计's way into 明细: a date range, and the category or currency that was pressed.
+  const handleCategoryDrilldown = useCallback(
+    (categoryId: string, startDate: string, endDate: string) => {
+      void prefetchDetailsTabQuery(
+        queryClient,
+        bookId,
+        { period: "custom", startDate, endDate },
+        { categoryId }
+      );
+      navigate("details", buildDetailsDrilldownSearchParams({ startDate, endDate, categoryId }));
+    },
+    [bookId, navigate, queryClient]
+  );
+
+  const handleDateDrilldown = useCallback(
+    (date: string, filters?: { currency?: string | null; categoryId?: string | null }) => {
+      const categoryId = filters?.categoryId ?? null;
+      const currency = filters?.currency ?? null;
+      void prefetchDetailsTabQuery(
+        queryClient,
+        bookId,
+        { period: "custom", startDate: date, endDate: date },
+        { categoryId, currency }
+      );
+      navigate(
+        "details",
+        buildDetailsDrilldownSearchParams({ startDate: date, endDate: date, categoryId, currency })
+      );
+    },
+    [bookId, navigate, queryClient]
   );
 
   if (!timeZoneReady) return <StatsTabSkeleton />;
   return (
     <StatsTab
-      bookId={recordScope ?? undefined}
+      bookId={bookId}
       ledger={ledger}
       onCategoryDrilldown={handleCategoryDrilldown}
       onDateDrilldown={handleDateDrilldown}
