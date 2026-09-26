@@ -155,7 +155,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   OTP 和改邮箱共用；重发不清零尝试次数和锁定。限流桶存在 Postgres，名字一律用 `rateLimitKey` 生成，
   形如 `<用途>:<HMAC>`，不含原始邮箱、IP 或 id。
 - **密钥。** 每一种摘要都用 `deriveKey` / `keyedDigest`（`src/lib/security/keys.ts`），一种用途一把密钥，
-  全部由 `AUTH_SECRET` 经 HKDF 派生。API key 的哈希在首次使用时从旧 `API_KEY_PEPPER` 惰性迁移到派生密钥。
+  全部由 `AUTH_SECRET` 经 HKDF 派生。
 - **API v1 凭证。** 192 位随机值，HMAC 存储，绑定到分账。
 - **转发的客户端地址** 默认不可信，除非明确配置了 `TRUSTED_PROXY`。
 - **日志。** 只记关联 id 和经 `logIdentifier` 标记的标识，邮箱和 IP 一律哈希。不记原始邮箱、IP、

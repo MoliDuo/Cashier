@@ -15,14 +15,11 @@ import {
   createServiceCredentialAction,
   deleteServiceCredentialAction,
 } from "@/modules/ledger/server-actions/credentials";
-import {
-  authenticateServiceCredential,
-  listServiceCredentials,
-} from "@/modules/ledger/server/service-credentials";
+import { listServiceCredentials } from "@/modules/ledger/server/service-credentials";
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { ValidationError } from "@/lib/errors";
-import { computeHash, computeLegacyHash } from "@/lib/security/service-credential-token";
+import { computeHash } from "@/lib/security/service-credential-token";
 import sharp from "sharp";
 
 async function validJpegBase64(): Promise<string> {
@@ -384,55 +381,6 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
         where: eq(sourceDocuments.id, created.sourceDocumentId),
       })
     ).toBeDefined();
-  });
-
-  it("rewrites a key hashed with the old pepper on its first use", async () => {
-    const db = getTestDb();
-    const credential = await createServiceCredentialAction({
-      name: "Legacy Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
-    });
-    const readHash = async () =>
-      (
-        await db.query.serviceCredentials.findFirst({
-          where: eq(serviceCredentials.id, credential.id),
-        })
-      )?.tokenHash;
-    process.env.API_KEY_PEPPER = "legacy-pepper";
-    try {
-      // Used a minute ago, so the lastUsedAt throttle alone would skip the write.
-      await db
-        .update(serviceCredentials)
-        .set({ tokenHash: computeLegacyHash(credential.token), lastUsedAt: new Date() })
-        .where(eq(serviceCredentials.id, credential.id));
-
-      expect(await authenticateServiceCredential(credential.token)).toMatchObject({
-        id: credential.id,
-      });
-      expect(await readHash()).toBe(computeHash(credential.token));
-    } finally {
-      delete process.env.API_KEY_PEPPER;
-    }
-    expect(await authenticateServiceCredential(credential.token)).toMatchObject({
-      id: credential.id,
-    });
-  });
-
-  it("does not find a legacy-hashed key once the old pepper is gone", async () => {
-    const db = getTestDb();
-    const credential = await createServiceCredentialAction({
-      name: "Orphaned Legacy Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
-    });
-    process.env.API_KEY_PEPPER = "legacy-pepper";
-    const legacyHash = computeLegacyHash(credential.token);
-    delete process.env.API_KEY_PEPPER;
-    await db
-      .update(serviceCredentials)
-      .set({ tokenHash: legacyHash })
-      .where(eq(serviceCredentials.id, credential.id));
-
-    expect(await authenticateServiceCredential(credential.token)).toBeNull();
   });
 
   it("throttles lastUsedAt updates to once per five minutes", async () => {

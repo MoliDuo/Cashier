@@ -2,17 +2,13 @@
  * Service Credential Token Utilities
  *
  * Generates, hashes, and authenticates service credential tokens using
- * domain-separated HMAC-SHA-256 with a configurable pepper.
+ * domain-separated HMAC-SHA-256 under a key derived from AUTH_SECRET.
  *
  * Hash format: lowercase hex
  *   HMAC-SHA-256(derived "credential" key, "credential:v1:" + token)
- *
- * Keys issued before the derived key are hashed with `API_KEY_PEPPER`;
- * `computeLegacyHash` finds those so the first use can rewrite them.
  */
 
 import crypto from "crypto";
-import { runtimeEnv } from "@/lib/env/runtime";
 import { deriveKey } from "./keys";
 
 export const DOMAIN_PREFIX = "credential:v1:";
@@ -48,20 +44,10 @@ export function prefixSuffix(token: string): { prefix: string; suffix: string } 
   };
 }
 
-function hashWith(key: crypto.BinaryLike, token: string): string {
-  const hmac = crypto.createHmac("sha256", key);
+/** The stored hash of a token. */
+export function computeHash(token: string): string {
+  const hmac = crypto.createHmac("sha256", deriveKey("credential"));
   hmac.update(DOMAIN_PREFIX);
   hmac.update(token);
   return hmac.digest("hex");
-}
-
-/** The stored hash of a token. */
-export function computeHash(token: string): string {
-  return hashWith(deriveKey("credential"), token);
-}
-
-/** The hash a key issued before the derived key was stored under, if the old pepper is set. */
-export function computeLegacyHash(token: string): string | null {
-  const pepper = runtimeEnv.legacyApiKeyPepper;
-  return pepper == null ? null : hashWith(pepper, token);
 }

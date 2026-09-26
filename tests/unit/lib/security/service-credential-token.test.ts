@@ -1,17 +1,14 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   createToken,
   prefixSuffix,
   computeHash,
-  computeLegacyHash,
   DOMAIN_PREFIX,
   DISPLAY_PREFIX_LENGTH,
   DISPLAY_SUFFIX_LENGTH,
 } from "@/lib/security/service-credential-token";
 import crypto from "crypto";
 import { deriveKey } from "@/lib/security/keys";
-
-const TEST_PEPPER = "legacy-pepper-for-testing-only";
 
 describe("computeHash", () => {
   it("produces a deterministic hex HMAC-SHA-256", () => {
@@ -47,29 +44,6 @@ describe("computeHash", () => {
 
   it("produces different hashes for different tokens", () => {
     expect(computeHash("sk_live_token_a")).not.toBe(computeHash("sk_live_token_b"));
-  });
-});
-
-describe("computeLegacyHash", () => {
-  afterEach(() => {
-    delete process.env.API_KEY_PEPPER;
-  });
-
-  it("is null without the old pepper", () => {
-    delete process.env.API_KEY_PEPPER;
-    expect(computeLegacyHash("sk_live_test")).toBeNull();
-  });
-
-  it("reproduces the hash stored under the old pepper", () => {
-    process.env.API_KEY_PEPPER = TEST_PEPPER;
-    const token = "sk_live_legacy";
-    const expected = crypto
-      .createHmac("sha256", TEST_PEPPER)
-      .update(DOMAIN_PREFIX)
-      .update(token)
-      .digest("hex");
-    expect(computeLegacyHash(token)).toBe(expected);
-    expect(computeLegacyHash(token)).not.toBe(computeHash(token));
   });
 });
 

@@ -5,7 +5,6 @@ const originalEnv = { ...process.env };
 const baseEnv = {
   NODE_ENV: "test",
   DATABASE_URL: "postgresql://cashier:cashier@localhost:5432/cashier",
-  API_KEY_PEPPER: "test-pepper",
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
   APP_URL: "http://localhost:3000",
@@ -49,7 +48,6 @@ describe("runtimeEnv", () => {
     const { runtimeEnv } = await import("@/lib/env/runtime");
 
     expect(runtimeEnv.databaseUrl).toBe("postgresql://cashier:cashier@localhost:5432/cashier");
-    expect(runtimeEnv.legacyApiKeyPepper).toBe("test-pepper");
     expect(runtimeEnv.openaiApiKey).toBe("sk-test");
     expect(runtimeEnv.openaiBaseUrl).toBe("https://openai-proxy.example/v1");
     expect(runtimeEnv.hasOpenaiBaseUrl).toBe(true);

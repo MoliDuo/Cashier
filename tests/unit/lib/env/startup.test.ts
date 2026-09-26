@@ -4,7 +4,6 @@ import { ENV_DEFAULTS, validateStartupEnv } from "@/lib/env/startup";
 const baseEnv = {
   NODE_ENV: "test",
   DATABASE_URL: "postgresql://cashier:cashier@localhost:5432/cashier",
-  API_KEY_PEPPER: "test-pepper",
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
   APP_URL: "http://localhost:3000",
@@ -158,11 +157,6 @@ describe("validateStartupEnv", () => {
         AUTH_SECRET: "",
       })
     ).toThrow(/AUTH_SECRET/);
-  });
-
-  it("does not require the old API key pepper", () => {
-    const { API_KEY_PEPPER: _api, ...env } = baseEnv;
-    expect(() => validateStartupEnv(env)).not.toThrow();
   });
 
   it("owns all app env defaults in the startup module", () => {

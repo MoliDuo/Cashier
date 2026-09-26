@@ -4,7 +4,6 @@ export interface RuntimeEnv {
   readonly appUrl: string;
   readonly databaseUrl: string;
   readonly authSecret: string;
-  readonly legacyApiKeyPepper: string | undefined;
   readonly openaiApiKey: string;
   readonly openaiBaseUrl: string;
   readonly hasOpenaiBaseUrl: boolean;
@@ -39,9 +38,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get authSecret() {
     return getStartupEnvValue("AUTH_SECRET");
-  },
-  get legacyApiKeyPepper() {
-    return getStartupEnvValue("API_KEY_PEPPER");
   },
   get openaiApiKey() {
     return getStartupEnvValue("OPENAI_API_KEY");

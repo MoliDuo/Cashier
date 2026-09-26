@@ -56,8 +56,6 @@ function booleanStringWithDefault(name: keyof typeof ENV_DEFAULTS) {
 
 const startupEnvFields = {
   DATABASE_URL: requiredPostgresUrl("DATABASE_URL"),
-  // Only read to find API keys hashed before the derived credential key.
-  API_KEY_PEPPER: z.preprocess(blankToUndefined, z.string().trim().optional()),
   OPENAI_API_KEY: requiredString("OPENAI_API_KEY"),
   OPENAI_BASE_URL: urlWithDefault("OPENAI_BASE_URL"),
   AUTH_SECRET: requiredString("AUTH_SECRET"),
