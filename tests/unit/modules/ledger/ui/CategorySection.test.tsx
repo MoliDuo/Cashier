@@ -15,6 +15,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
   applyCategoryPresetAction: applyPresetAction,
 }));
+vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => "ledger-1" }));
 vi.mock("@/modules/ledger/ui/category-assignment-context", () => ({
   useCategoryAssignment: () => ({
     job: null,
@@ -38,7 +39,9 @@ const category: EntryCategoryWithCount = {
   entryCount: 3,
 };
 
-function renderSection(props: { uncategorizedCount?: number } = {}) {
+function renderSection(
+  props: { uncategorizedCount?: number; categories?: EntryCategoryWithCount[] } = {}
+) {
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
@@ -48,16 +51,80 @@ function renderSection(props: { uncategorizedCount?: number } = {}) {
   const onSaveCategories = vi
     .fn()
     .mockResolvedValue([category, { ...category, id: "category-2", name: "Travel", sortOrder: 1 }]);
-  render(
+  const view = render(
     <CategorySection categories={[category]} onSaveCategories={onSaveCategories} {...props} />,
     { wrapper }
   );
-  return { onSaveCategories };
+  const rerender = (categories: EntryCategoryWithCount[]) =>
+    view.rerender(<CategorySection categories={categories} onSaveCategories={onSaveCategories} />);
+  return { onSaveCategories, rerender, unmount: view.unmount };
 }
 
 describe("CategorySection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  async function addTravel() {
+    fireEvent.click(await screen.findByRole("button", { name: "manageCategories" }));
+    fireEvent.change(screen.getByLabelText("newCategoryPlaceholder"), {
+      target: { value: "Travel" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "addCategory" }));
+  }
+
+  it("restores unsaved list edits after the page goes away, and discards them on request", async () => {
+    const first = renderSection();
+    await addTravel();
+    first.unmount();
+
+    const second = renderSection();
+
+    expect(await screen.findByText("Travel")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("draftRestored");
+    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+
+    expect(screen.queryByText("Travel")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "manageCategories" })).toBeInTheDocument();
+    second.unmount();
+    renderSection();
+    expect(screen.getByRole("button", { name: "manageCategories" })).toBeInTheDocument();
+  });
+
+  it("follows the server while the list is untouched", async () => {
+    const { rerender } = renderSection();
+    fireEvent.click(await screen.findByRole("button", { name: "manageCategories" }));
+
+    rerender([{ ...category, name: "Food" }]);
+
+    expect(screen.getByText("Food")).toBeInTheDocument();
+    expect(screen.queryByText("categoriesChangedElsewhere")).not.toBeInTheDocument();
+  });
+
+  it("refuses to save edits over a list that changed elsewhere and offers the latest", async () => {
+    const { onSaveCategories, rerender } = renderSection();
+    await addTravel();
+
+    rerender([{ ...category, name: "Food" }]);
+
+    expect(screen.getByText("categoriesChangedElsewhere")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "save" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "reloadCategories" }));
+
+    expect(screen.getByText("Food")).toBeInTheDocument();
+    expect(screen.queryByText("Travel")).not.toBeInTheDocument();
+    expect(onSaveCategories).not.toHaveBeenCalled();
+  });
+
+  it("asks before an explicit cancel throws the list edits away", async () => {
+    renderSection();
+    await addTravel();
+
+    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
+    fireEvent.click(await screen.findByRole("button", { name: "discard" }));
+
+    await waitFor(() => expect(screen.queryByText("Travel")).not.toBeInTheDocument());
   });
 
   it("keeps category changes in a draft and submits them atomically", async () => {

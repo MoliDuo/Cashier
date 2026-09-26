@@ -1,10 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookkeepingSettings } from "@/modules/ledger/ui/settings/BookkeepingSettings";
 import type { ComponentProps } from "react";
-import { toast } from "sonner";
-
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 
 vi.mock("next-intl", () => ({
@@ -38,125 +35,67 @@ const bookkeepingProps = (overrides: Partial<BookkeepingProps>): BookkeepingProp
   ...overrides,
 });
 
-describe("explicit settings section drafts", () => {
+describe("instant bookkeeping settings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("keeps AI changes local until Save and submits only the diff", async () => {
-    const onUpdateSettings = vi.fn().mockResolvedValue({
-      id: "ledger-1",
-      userId: "user-1",
-      settings: {
-        ...getDefaultLedger().settings,
-        aiLanguage: "zh-CN",
-        aiCustomPrompt: "Draft prompt",
-      },
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-02T00:00:00.000Z",
-    });
+  const savedLedger = (settings: Partial<BookkeepingProps["settings"]>) => ({
+    id: "ledger-1",
+    userId: "user-1",
+    settings: { ...getDefaultLedger().settings, ...settings },
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-02T00:00:00.000Z",
+  });
+
+  it("saves a switch the moment it changes, holding the fields until the save lands", async () => {
+    let resolveSave: (value: ReturnType<typeof savedLedger>) => void = () => {};
+    const onUpdateSettings = vi.fn(
+      () => new Promise<ReturnType<typeof savedLedger>>((resolve) => (resolveSave = resolve))
+    );
     render(
       <BookkeepingSettings
         {...bookkeepingProps({
-          settings: {
-            ...getDefaultLedger().settings,
-            aiLanguage: "zh-CN",
-            aiCustomPrompt: "Server prompt",
-          },
+          settings: { ...getDefaultLedger().settings, collapseEntriesDefault: false },
           onUpdateSettings,
         })}
       />
     );
 
-    const prompt = screen.getByRole("textbox", { name: "aiPrompt" });
-    fireEvent.change(prompt, { target: { value: "Draft prompt" } });
-    fireEvent.blur(prompt);
-    expect(onUpdateSettings).not.toHaveBeenCalled();
+    const toggle = screen.getByRole("switch", { name: "collapseEntries" });
+    fireEvent.click(toggle);
 
-    fireEvent.click(screen.getByRole("button", { name: "save" }));
-    await waitFor(() =>
-      expect(onUpdateSettings).toHaveBeenCalledWith({ aiCustomPrompt: "Draft prompt" })
-    );
+    expect(onUpdateSettings).toHaveBeenCalledWith({ collapseEntriesDefault: true });
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    await act(async () => resolveSave(savedLedger({ collapseEntriesDefault: true })));
+    expect(toggle).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "save" })).not.toBeInTheDocument();
   });
 
-  it("confirms before restoring the AI server snapshot on Cancel", async () => {
+  it("falls back to the saved value when the save fails", async () => {
+    const onUpdateSettings = vi.fn().mockRejectedValue(new Error("conflict"));
     render(
       <BookkeepingSettings
         {...bookkeepingProps({
-          settings: {
-            ...getDefaultLedger().settings,
-            aiLanguage: "zh-CN",
-            aiCustomPrompt: "Server prompt",
-          },
-          onUpdateSettings: () =>
-            Promise.resolve({
-              id: "ledger-1",
-              userId: "user-1",
-              settings: { ...getDefaultLedger().settings },
-              createdAt: "2026-01-01T00:00:00.000Z",
-              updatedAt: "2026-01-01T00:00:00.000Z",
-            }),
+          settings: { ...getDefaultLedger().settings, collapseEntriesDefault: false },
+          onUpdateSettings,
         })}
       />
     );
 
-    fireEvent.change(screen.getByRole("textbox", { name: "aiPrompt" }), {
-      target: { value: "Discard me" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "continueEditing" }));
-    expect(screen.getByRole("textbox", { name: "aiPrompt" })).toHaveValue("Discard me");
-    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "discard" }));
-    await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "aiPrompt" })).toHaveValue("Server prompt")
-    );
-  });
-
-  it("keeps bookkeeping switches as a draft until Save", async () => {
-    const onUpdateSettings = vi.fn().mockResolvedValue({
-      id: "ledger-1",
-      userId: "user-1",
-      settings: {
-        ...getDefaultLedger().settings,
-        mainCurrency: "CNY",
-        currencies: ["CNY"],
-        collapseEntriesDefault: true,
-      },
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-02T00:00:00.000Z",
-    });
-    render(
-      <BookkeepingSettings
-        settings={{
-          ...getDefaultLedger().settings,
-          mainCurrency: "CNY",
-          currencies: ["CNY"],
-          collapseEntriesDefault: false,
-        }}
-        categories={[]}
-        uncategorizedCount={0}
-        onUpdateSettings={onUpdateSettings}
-        onSaveCategories={() => Promise.resolve([])}
-        generatingCategoryIds={new Set()}
-        failedCategoryIds={new Set()}
-        onRetryMetadata={() => {}}
-        isSavingCategories={false}
-      />
-    );
-
     fireEvent.click(screen.getByRole("switch", { name: "collapseEntries" }));
-    expect(onUpdateSettings).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "save" }));
     await waitFor(() =>
-      expect(onUpdateSettings).toHaveBeenCalledWith({ collapseEntriesDefault: true })
+      expect(screen.getByRole("switch", { name: "collapseEntries" })).not.toBeChecked()
     );
   });
 
-  it("keeps edits without a server-update banner and reports conflict only on Save", () => {
-    const onUpdateSettings = vi.fn();
-    const { rerender } = render(
+  it("saves the prompt when the reader leaves the field, not on every keystroke", async () => {
+    const onUpdateSettings = vi
+      .fn()
+      .mockResolvedValue(savedLedger({ aiCustomPrompt: "Draft prompt" }));
+    render(
       <BookkeepingSettings
         {...bookkeepingProps({
           settings: { ...getDefaultLedger().settings, aiCustomPrompt: "Server prompt" },
@@ -164,22 +103,48 @@ describe("explicit settings section drafts", () => {
         })}
       />
     );
-    fireEvent.change(screen.getByRole("textbox", { name: "aiPrompt" }), {
-      target: { value: "Draft prompt" },
-    });
-    rerender(
+
+    const prompt = screen.getByRole("textbox", { name: "aiPrompt" });
+    fireEvent.change(prompt, { target: { value: "Draft" } });
+    fireEvent.change(prompt, { target: { value: "Draft prompt" } });
+    expect(onUpdateSettings).not.toHaveBeenCalled();
+
+    fireEvent.blur(prompt);
+    await waitFor(() =>
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aiCustomPrompt: "Draft prompt" })
+    );
+    expect(onUpdateSettings).toHaveBeenCalledOnce();
+  });
+
+  it("does not save a prompt that was left as it was", () => {
+    const onUpdateSettings = vi.fn();
+    render(
       <BookkeepingSettings
         {...bookkeepingProps({
-          settings: { ...getDefaultLedger().settings, aiCustomPrompt: "New server prompt" },
+          settings: { ...getDefaultLedger().settings, aiCustomPrompt: "Server prompt" },
           onUpdateSettings,
         })}
       />
     );
-    expect(screen.getByRole("textbox", { name: "aiPrompt" })).toHaveValue("Draft prompt");
-    expect(screen.queryByText("serverChangedWhileEditing")).not.toBeInTheDocument();
-    expect(toast.error).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "save" }));
-    expect(toast.error).toHaveBeenCalledWith("updateConflict");
+
+    const prompt = screen.getByRole("textbox", { name: "aiPrompt" });
+    fireEvent.change(prompt, { target: { value: "Server prompt" } });
+    fireEvent.blur(prompt);
+
     expect(onUpdateSettings).not.toHaveBeenCalled();
+  });
+
+  it("saves a prompt still being typed when the section goes away", () => {
+    const onUpdateSettings = vi
+      .fn()
+      .mockResolvedValue(savedLedger({ aiCustomPrompt: "Typed then left" }));
+    const { unmount } = render(<BookkeepingSettings {...bookkeepingProps({ onUpdateSettings })} />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "aiPrompt" }), {
+      target: { value: "Typed then left" },
+    });
+    unmount();
+
+    expect(onUpdateSettings).toHaveBeenCalledWith({ aiCustomPrompt: "Typed then left" });
   });
 });

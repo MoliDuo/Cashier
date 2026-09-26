@@ -5,9 +5,8 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { activeTabState, dirtyState, handleTabChangeMock, toastError } = vi.hoisted(() => ({
+const { activeTabState, handleTabChangeMock, toastError } = vi.hoisted(() => ({
   activeTabState: { current: "stream" as string },
-  dirtyState: { current: false },
   handleTabChangeMock: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -64,16 +63,6 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
   prefetchStatsTabQuery: vi.fn(),
 }));
 
-vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
-  useSettingsLeaveGuard: () => ({
-    hasDirtyChanges: dirtyState.current,
-    leaveConfirmOpen: false,
-    attemptLeave: (run: () => void) => run(),
-    confirmLeave: vi.fn(),
-    cancelLeave: vi.fn(),
-  }),
-}));
-
 import { ActiveShell } from "@/app/(protected)/_active-shell";
 import { useShellController } from "@/components/providers/shell-controller";
 
@@ -110,7 +99,6 @@ describe("ActiveShell tab refresh", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     activeTabState.current = "stream";
-    dirtyState.current = false;
   });
 
   it("refetches the tab the reader is already on rather than navigating to it", async () => {
@@ -137,17 +125,16 @@ describe("ActiveShell tab refresh", () => {
     expect(stream).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves 设置 alone while it is holding unsaved edits, which a refetch would drop", async () => {
+  it("refreshes 设置 like any other tab, since it holds nothing unsaved", async () => {
     const user = userEvent.setup();
     activeTabState.current = "settings";
-    dirtyState.current = true;
     const settings = vi.fn().mockResolvedValue("settings");
     renderShell(["ledger", "settings"], settings);
     await waitFor(() => expect(destination("settings")).toBeEnabled());
 
     await user.click(destination("settings"));
 
-    expect(settings).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(settings).toHaveBeenCalledTimes(2));
     expect(handleTabChangeMock).not.toHaveBeenCalled();
   });
 

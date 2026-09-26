@@ -65,15 +65,6 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
   prefetchStatsTabQuery: prefetchStatsTabQueryMock,
 }));
 
-vi.mock("@/modules/ledger/hooks/useSettingsLeaveGuard", () => ({
-  useSettingsLeaveGuard: () => ({
-    leaveConfirmOpen: false,
-    attemptLeave: (run: () => void) => run(),
-    confirmLeave: vi.fn(),
-    cancelLeave: vi.fn(),
-  }),
-}));
-
 import { ActiveShell } from "@/app/(protected)/_active-shell";
 import { useBookScopeStore } from "@/lib/store/book-scope";
 

@@ -26,8 +26,6 @@ import {
   prefetchStatsTabQuery,
 } from "@/modules/workspace/prefetch-ledger-tabs";
 import { useBookScopeStore } from "@/lib/store/book-scope";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useSettingsLeaveGuard } from "@/modules/ledger/hooks/useSettingsLeaveGuard";
 
 interface ActiveShellProps {
   children: React.ReactNode;
@@ -60,8 +58,6 @@ function ActiveShellInner({ children }: ActiveShellProps) {
   const t = useTranslations("Common");
   const queryClient = useQueryClient();
   const { ready, onInputIntent, onOpenInput } = useShellController();
-  const { hasDirtyChanges, leaveConfirmOpen, attemptLeave, confirmLeave, cancelLeave } =
-    useSettingsLeaveGuard();
 
   // The viewed book is the page's shared scope, published by LedgerPageClient
   // into the store, and a scope change is a client-side update with no server
@@ -85,9 +81,8 @@ function ActiveShellInner({ children }: ActiveShellProps) {
   const [refreshPending, setRefreshPending] = useState(false);
 
   const refreshCurrentTab = useCallback(async () => {
-    // A refetch would discard whatever 设置 is holding unsaved, and a refresh
-    // already under way needs no second one.
-    if (hasDirtyChanges || isRefreshing || refreshPending) return;
+    // A refresh already under way needs no second one.
+    if (isRefreshing || refreshPending) return;
     setRefreshPending(true);
     try {
       await refreshActiveTab();
@@ -96,18 +91,18 @@ function ActiveShellInner({ children }: ActiveShellProps) {
     } finally {
       setRefreshPending(false);
     }
-  }, [hasDirtyChanges, isRefreshing, refreshActiveTab, refreshPending, t]);
+  }, [isRefreshing, refreshActiveTab, refreshPending, t]);
 
-  const guardedTabChange = useCallback(
+  const changeTab = useCallback(
     (tab: LedgerTab) => {
       if (!ready) return;
       if (tab === activeTab) {
         void refreshCurrentTab();
         return;
       }
-      attemptLeave(() => handleTabChange(tab));
+      handleTabChange(tab);
     },
-    [activeTab, attemptLeave, handleTabChange, ready, refreshCurrentTab]
+    [activeTab, handleTabChange, ready, refreshCurrentTab]
   );
 
   const preloadTabCode = useCallback((tab: LedgerTab) => {
@@ -141,30 +136,16 @@ function ActiveShellInner({ children }: ActiveShellProps) {
           disabled={!ready}
           refreshing={refreshPending}
           activeTab={activeTab}
-          onTabChange={guardedTabChange}
+          onTabChange={changeTab}
           onOpenInput={onOpenInput}
           onInputIntent={onInputIntent}
           onTabIntent={preloadTab}
         />
       }
     >
-      <SwipeTabSurface
-        activeTab={activeTab}
-        onTabChange={guardedTabChange}
-        onTabIntent={preloadTab}
-      >
+      <SwipeTabSurface activeTab={activeTab} onTabChange={changeTab} onTabIntent={preloadTab}>
         {children}
       </SwipeTabSurface>
-      <ConfirmDialog
-        open={leaveConfirmOpen}
-        onOpenChange={(open) => (open ? undefined : cancelLeave())}
-        title={t("unsavedChangesTitle")}
-        description={t("unsavedChangesDescription")}
-        cancelLabel={t("continueEditing")}
-        confirmLabel={t("discardAndContinue")}
-        variant="destructive"
-        onConfirm={confirmLeave}
-      />
     </AppShell>
   );
 }

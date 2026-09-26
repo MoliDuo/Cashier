@@ -55,3 +55,31 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
     .click();
   await expect(dialog.getByText(text, { exact: true })).toHaveCount(0);
 });
+
+test("settings save as they change, with nothing to confirm on the way out", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("邮箱", { exact: true }).fill(process.env.SMOKE_EMAIL!);
+  await page.getByLabel("密码", { exact: true }).fill(process.env.SMOKE_PASSWORD!);
+  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+
+  const navigation = page.getByRole("navigation");
+  await navigation.getByRole("button", { name: "设置", exact: true }).click();
+  const prompt = page.getByRole("textbox", { name: "账本提示词", exact: true });
+  const original = await prompt.inputValue();
+  const next = `smoke prompt ${Date.now()}`;
+
+  // Leaving the field saves it; switching tabs straight after asks nothing.
+  await prompt.fill(next);
+  await page.getByRole("switch", { name: "默认折叠记录", exact: true }).focus();
+  await expect(page.getByText("设置更新成功").first()).toBeVisible();
+  await navigation.getByRole("button", { name: "流水", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await page.reload();
+  await navigation.getByRole("button", { name: "设置", exact: true }).click();
+  await expect(prompt).toHaveValue(next);
+  await prompt.fill(original);
+  await prompt.blur();
+  await expect(prompt).toBeEnabled();
+});

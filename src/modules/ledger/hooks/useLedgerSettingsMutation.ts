@@ -47,7 +47,14 @@ export function useLedgerSettingsMutation({
         expectedUpdatedAt,
         settings: omitUndefinedProperties(data),
       });
-      if (!result.ok) throw new Error(translateError(result.code));
+      if (!result.ok) {
+        // Saved elsewhere since this page loaded: load what is there now, so
+        // the next change is made against it.
+        if (result.code === "conflict") {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.ledger(), exact: true });
+        }
+        throw new Error(translateError(result.code));
+      }
       return result.ledger;
     },
     successMessage,

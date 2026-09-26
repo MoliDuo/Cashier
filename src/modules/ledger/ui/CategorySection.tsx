@@ -10,13 +10,13 @@ import type {
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DraftNotice } from "@/components/ui/draft-notice";
 import { Input } from "@/components/ui/input";
 import { useCategoryManagementDraft } from "@/modules/ledger/hooks/useCategoryManagementDraft";
 import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPresetSwitch";
 import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { SettingsSection } from "./settings/SettingsSection";
-import { toast } from "sonner";
 import { useCategoryAssignment } from "./category-assignment-context";
 
 interface CategorySectionProps {
@@ -61,6 +61,7 @@ export function CategorySection({
     discardEditOpen,
     setDiscardEditOpen,
     revisionConflict,
+    restoredFromDraft,
     saveError,
     dirty,
     displayedCategories,
@@ -229,6 +230,25 @@ export function CategorySection({
 
       {managing ? (
         <div className="space-y-3">
+          {revisionConflict ? (
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
+              role="status"
+            >
+              <span>{t("categoriesChangedElsewhere")}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSaving}
+                onClick={() => void handleReload()}
+              >
+                {t("reloadCategories")}
+              </Button>
+            </div>
+          ) : restoredFromDraft ? (
+            <DraftNotice disabled={isSaving} onDiscard={confirmDiscardManagement} />
+          ) : null}
           <div className="flex gap-2">
             <Input
               value={newCategoryName}
@@ -272,11 +292,8 @@ export function CategorySection({
             <Button
               type="button"
               size="sm"
-              disabled={!dirty || isSaving}
-              onClick={() => {
-                if (revisionConflict) toast.error(t("updateConflict"));
-                else void handleSave();
-              }}
+              disabled={!dirty || isSaving || revisionConflict}
+              onClick={() => void handleSave()}
             >
               {isSaving ? t("saving") : common("save")}
             </Button>

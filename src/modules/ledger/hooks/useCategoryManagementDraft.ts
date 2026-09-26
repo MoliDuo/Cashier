@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { useTranslations } from "next-intl";
 import type { EntryCategory, SaveEntryCategoriesInput } from "@/modules/ledger/contracts";
-import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
+import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
+import { useLedgerId } from "./useLedgerId";
 import { categoryDraftsEqual, toCategoryDraft, type CategoryDraft } from "./category-draft-model";
 import { useCategoryEditSession } from "./useCategoryEditSession";
-import { useCategoryDraftSync } from "./useCategoryDraftSync";
 
 export type { CategoryDraft, EditSession } from "./category-draft-model";
 
@@ -19,7 +19,53 @@ interface UseCategoryManagementDraftOptions {
   t: ReturnType<typeof useTranslations>;
 }
 
-/** Owns the category list's draft/server-sync state machine and save/reload flow. */
+/** The list being edited, and the list it was edited from. */
+interface StoredCategoryDraft {
+  base: CategoryDraft[];
+  order: CategoryDraft[];
+}
+
+function parseCategoryDrafts(value: unknown): CategoryDraft[] | null {
+  if (!Array.isArray(value)) return null;
+  const drafts: CategoryDraft[] = [];
+  for (const item of value) {
+    if (item == null || typeof item !== "object") return null;
+    const { key, id, clientId, name, description, icon } = item as Record<string, unknown>;
+    if (
+      typeof key !== "string" ||
+      typeof name !== "string" ||
+      typeof description !== "string" ||
+      (icon !== null && typeof icon !== "string") ||
+      (id !== undefined && typeof id !== "string") ||
+      (clientId !== undefined && typeof clientId !== "string")
+    ) {
+      return null;
+    }
+    drafts.push({
+      key,
+      name,
+      description,
+      icon: icon as string | null,
+      ...(id === undefined ? {} : { id: id as string }),
+      ...(clientId === undefined ? {} : { clientId: clientId as string }),
+    });
+  }
+  return drafts;
+}
+
+function parseStoredCategoryDraft(data: unknown): StoredCategoryDraft | null {
+  if (data == null || typeof data !== "object") return null;
+  const base = parseCategoryDrafts((data as Record<string, unknown>).base);
+  const order = parseCategoryDrafts((data as Record<string, unknown>).order);
+  return base == null || order == null ? null : { base, order };
+}
+
+/**
+ * The category list's edit session. The list saves as one batch, so its edits
+ * are a draft: kept across a reload, restored on return, and asked about only
+ * when the reader cancels them. A list that changed elsewhere since the draft
+ * began cannot be saved over; the reader reloads it instead.
+ */
 export function useCategoryManagementDraft({
   categories,
   onSaveCategories,
@@ -27,13 +73,21 @@ export function useCategoryManagementDraft({
   isSaving,
   t,
 }: UseCategoryManagementDraftOptions) {
-  const [managing, setManaging] = useState(false);
-  const [serverDraft, setServerDraft] = useState<CategoryDraft[]>([]);
-  const [draftOrder, setDraftOrder] = useState<CategoryDraft[]>([]);
+  const ledgerId = useLedgerId();
+  const key = ledgerId == null ? null : draftKey(ledgerId, "categories", "ledger");
+  const [restored] = useState(() =>
+    key == null ? null : (readDraft(key, parseStoredCategoryDraft)?.data ?? null)
+  );
+  const [restoredFromDraft, setRestoredFromDraft] = useState(restored != null);
+  const [managing, setManaging] = useState(restored != null);
+  const [serverDraft, setServerDraft] = useState<CategoryDraft[]>(restored?.base ?? []);
+  const [draftOrder, setDraftOrder] = useState<CategoryDraft[]>(restored?.order ?? []);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<CategoryDraft | null>(null);
   const [discardManagementOpen, setDiscardManagementOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveConflict, setSaveConflict] = useState(false);
+  const incomingDraft = useMemo(() => categories.map(toCategoryDraft), [categories]);
 
   const dirty = managing && !categoryDraftsEqual(serverDraft, draftOrder);
 
@@ -49,30 +103,39 @@ export function useCategoryManagementDraft({
   } = useCategoryEditSession({ setDraftOrder, setSaveError });
 
   const hasCategoryDraft = dirty || newCategoryName.trim() !== "" || editDirty;
+  const serverMoved = managing && !categoryDraftsEqual(serverDraft, incomingDraft);
 
-  const { incomingDraft, revisionConflict, setRevisionConflict, resetSyncState } =
-    useCategoryDraftSync({
-      categories,
-      managing,
-      serverDraft,
-      setServerDraft,
-      setDraftOrder,
-      hasCategoryDraft,
-    });
+  // Untouched, the list simply follows the server; touched, it is a conflict.
+  if (serverMoved && !hasCategoryDraft) {
+    setServerDraft(incomingDraft);
+    setDraftOrder(incomingDraft);
+  }
+  const revisionConflict = managing && (saveConflict || (serverMoved && hasCategoryDraft));
 
   useEffect(() => {
-    const key = "settings:categories";
-    useUnsavedChangesStore.getState().setDirty(key, hasCategoryDraft);
-    return () => useUnsavedChangesStore.getState().setDirty(key, false);
-  }, [hasCategoryDraft]);
+    if (key == null) return;
+    if (dirty) writeDraft(key, { base: serverDraft, order: draftOrder });
+    else clearDraft(key);
+  }, [dirty, draftOrder, key, serverDraft]);
 
   const displayedCategories = managing ? draftOrder : incomingDraft;
+
+  const leaveManagement = (next: CategoryDraft[]) => {
+    setServerDraft(next);
+    setDraftOrder(next);
+    setNewCategoryName("");
+    setEditSession(null);
+    setManaging(false);
+    setSaveConflict(false);
+    setSaveError(null);
+    setRestoredFromDraft(false);
+  };
 
   const enterManagement = () => {
     setServerDraft(incomingDraft);
     setDraftOrder(incomingDraft);
     setManaging(true);
-    resetSyncState();
+    setSaveConflict(false);
     setSaveError(null);
   };
 
@@ -112,14 +175,7 @@ export function useCategoryManagementDraft({
     else setManaging(false);
   };
 
-  const confirmDiscardManagement = () => {
-    setDraftOrder(serverDraft);
-    setNewCategoryName("");
-    setEditSession(null);
-    setManaging(false);
-    resetSyncState();
-    setSaveError(null);
-  };
+  const confirmDiscardManagement = () => leaveManagement(incomingDraft);
 
   const confirmDeleteCategory = () => {
     if (deleteTarget == null) return;
@@ -142,37 +198,25 @@ export function useCategoryManagementDraft({
           icon: category.icon,
         })),
       });
-      const savedDraft = saved.map(toCategoryDraft);
-      setServerDraft(savedDraft);
-      setDraftOrder(savedDraft);
-      setManaging(false);
-      resetSyncState();
+      leaveManagement(saved.map(toCategoryDraft));
     } catch (error) {
       const errorCode =
         typeof error === "object" && error != null && "code" in error
           ? (error as { code?: unknown }).code
           : undefined;
-      if (errorCode === "CONFLICT") {
-        setRevisionConflict(true);
-        setSaveError(t("updateConflict"));
-      } else {
-        setSaveError(t("saveCategoriesFailed"));
-      }
+      if (errorCode === "CONFLICT") setSaveConflict(true);
+      else setSaveError(t("saveCategoriesFailed"));
     }
   };
 
   const handleReload = async () => {
-    if (onReloadCategories == null) return;
+    if (onReloadCategories == null) {
+      leaveManagement(incomingDraft);
+      return;
+    }
     try {
       const latest = await onReloadCategories();
-      const latestDraft = latest.map(toCategoryDraft);
-      setServerDraft(latestDraft);
-      setDraftOrder(latestDraft);
-      setNewCategoryName("");
-      setEditSession(null);
-      setManaging(false);
-      resetSyncState();
-      setSaveError(null);
+      leaveManagement(latest.map(toCategoryDraft));
     } catch {
       setSaveError(t("saveCategoriesFailed"));
     }
@@ -191,6 +235,8 @@ export function useCategoryManagementDraft({
     discardEditOpen,
     setDiscardEditOpen,
     revisionConflict,
+    /** True while the list shows edits restored from an earlier visit. */
+    restoredFromDraft: restoredFromDraft && dirty,
     saveError,
     dirty,
     displayedCategories,

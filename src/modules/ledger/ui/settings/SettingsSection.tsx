@@ -4,9 +4,9 @@ import { textRoleClassName } from "@/components/typography";
 interface SettingsSectionProps {
   title: string;
   /**
-   * The buttons that act on the whole section — 保存 / 取消 — so they sit on the
-   * title row, where the section's own actions belong, instead of trailing the
-   * fields they cover.
+   * The buttons that act on the whole section — 切换预设 / 管理分类 — so they sit
+   * on the title row, where the section's own actions belong, instead of
+   * trailing the fields they cover.
    */
   actions?: ReactNode;
   children: ReactNode;

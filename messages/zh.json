@@ -288,7 +288,6 @@
     "unsavedChangesTitle": "有未保存的更改",
     "unsavedChangesDescription": "未保存的修改将丢失，是否放弃？",
     "saveAndContinue": "保存并继续",
-    "discardAndContinue": "放弃并离开",
     "continueEditing": "继续编辑",
     "book": "分账",
     "bookChangeFailed": "保存分账失败。记录可能已被其他操作修改，或该分账已归档。",
@@ -432,7 +431,6 @@
     "ledger": "账本",
     "account": "账户",
     "appearance": "外观",
-    "appearanceSaveFailed": "外观设置保存失败",
     "bookkeepingRules": "记账规则",
     "theme": "主题",
     "themeAuto": "跟随系统",
@@ -497,7 +495,7 @@
     "updateFailed": "更新失败，请稍后重试",
     "unsupportedCurrency": "所选币种暂不受汇率数据支持",
     "validationFailed": "设置内容无效，请检查后重试",
-    "updateConflict": "未保存，设置已发生变化，请取消编辑后重新修改。",
+    "updateConflict": "未保存：设置已在别处更改，已载入最新设置，请重新修改。",
     "save": "保存",
     "saving": "(保存中...)",
     "mainCurrencyMustBeEnabled": "主货币必须包含在偏好货币中。",
@@ -700,7 +698,9 @@
       "verified": "已验证"
     },
     "credentialBookChanged": "已更新密钥分账",
-    "credentialBookChangeFailed": "修改密钥分账失败"
+    "credentialBookChangeFailed": "修改密钥分账失败",
+    "categoriesChangedElsewhere": "分类已在别处更改，这些修改无法保存。",
+    "reloadCategories": "载入最新分类"
   },
   "ServiceCredentials": {
     "title": "API 密钥",

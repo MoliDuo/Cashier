@@ -21,10 +21,8 @@ import {
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { signOutAction } from "@/modules/auth/server-actions/sign-in";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { SettingsSectionActions } from "./settings/SettingsSectionActions";
-import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchEntryCategories } from "@/modules/ledger/queries";
 import { Button } from "@/components/ui/button";
@@ -42,9 +40,6 @@ interface SettingsTabProps {
   onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
-type AppearanceField = "theme";
-const appearanceFields: readonly AppearanceField[] = ["theme"];
-
 export function SettingsTab({
   ledger,
   initialCategories,
@@ -60,35 +55,7 @@ export function SettingsTab({
   const { theme, setTheme } = useTheme();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [appearanceServer, setAppearanceServer] = useState({
-    theme: theme ?? "system",
-  });
-  const [appearanceDraft, setAppearanceDraft] = useState(appearanceServer);
-  const [appearanceTouched, setAppearanceTouched] = useState<Set<AppearanceField>>(new Set());
-  const [appearanceStatus, setAppearanceStatus] = useState<"idle" | "saving" | "error">("idle");
-  const [appearanceError, setAppearanceError] = useState<string | null>(null);
-  const [appearanceServerChanged, setAppearanceServerChanged] = useState(false);
   const [metadataPollingSession, setMetadataPollingSession] = useState(0);
-  const appearanceDirty = appearanceServer.theme !== appearanceDraft.theme;
-
-  const nextAppearanceServer = { theme: theme ?? "system" };
-  if (nextAppearanceServer.theme !== appearanceServer.theme) {
-    const touchedServerFieldsChanged = appearanceFields.some(
-      (field) =>
-        appearanceTouched.has(field) && appearanceServer[field] !== nextAppearanceServer[field]
-    );
-    setAppearanceServer(nextAppearanceServer);
-    setAppearanceDraft((current) => ({
-      theme: appearanceTouched.has("theme") ? current.theme : nextAppearanceServer.theme,
-    }));
-    setAppearanceServerChanged((current) => current || touchedServerFieldsChanged);
-  }
-
-  useEffect(() => {
-    const key = "settings:appearance";
-    useUnsavedChangesStore.getState().setDirty(key, appearanceDirty);
-    return () => useUnsavedChangesStore.getState().setDirty(key, false);
-  }, [appearanceDirty]);
 
   // Use extracted hooks - ledger is reactive and will update with optimistic updates
   const {
@@ -154,30 +121,6 @@ export function SettingsTab({
     await signOutTo("/login?notice=credentials_changed");
   };
 
-  const handleSaveAppearance = async () => {
-    if (!appearanceDirty || appearanceStatus === "saving" || appearanceServerChanged) return;
-    setAppearanceStatus("saving");
-    setAppearanceError(null);
-    try {
-      setTheme(appearanceDraft.theme);
-      setAppearanceServer(appearanceDraft);
-      setAppearanceTouched(new Set());
-      setAppearanceServerChanged(false);
-      setAppearanceStatus("idle");
-    } catch {
-      setAppearanceStatus("error");
-      setAppearanceError(t("appearanceSaveFailed"));
-    }
-  };
-
-  const handleCancelAppearance = () => {
-    setAppearanceDraft(appearanceServer);
-    setAppearanceTouched(new Set());
-    setAppearanceServerChanged(false);
-    setAppearanceStatus("idle");
-    setAppearanceError(null);
-  };
-
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-4 overflow-x-clip">
       {settingsQueryStatus === "error" && (
@@ -207,30 +150,9 @@ export function SettingsTab({
           </Button>
         </div>
       )}
-      <SettingsSection
-        title={t("appearance")}
-        actions={
-          <SettingsSectionActions
-            dirty={appearanceDirty}
-            pending={appearanceStatus === "saving"}
-            error={appearanceError}
-            serverChanged={appearanceServerChanged}
-            saveDisabled={appearanceServerChanged}
-            onSave={() => void handleSaveAppearance()}
-            onCancel={handleCancelAppearance}
-          />
-        }
-      >
+      <SettingsSection title={t("appearance")}>
         <SettingsField title={t("theme")}>
-          <Select
-            value={appearanceDraft.theme}
-            onValueChange={(nextTheme) => {
-              setAppearanceDraft((current) => ({ ...current, theme: nextTheme }));
-              setAppearanceTouched((current) => new Set(current).add("theme"));
-              setAppearanceError(null);
-            }}
-            disabled={appearanceStatus === "saving"}
-          >
+          <Select value={theme ?? "system"} onValueChange={setTheme}>
             <SelectTrigger aria-label={t("theme")} className="w-full sm:w-44">
               <SelectValue />
             </SelectTrigger>

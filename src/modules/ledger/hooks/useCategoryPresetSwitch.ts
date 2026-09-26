@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { queryKeys } from "@/lib/query-keys";
-import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import {
   CATEGORY_PRESET_IDS,
   getCategoryPreset,
@@ -170,12 +169,6 @@ export function useCategoryPresetSwitch({ categories }: UseCategoryPresetSwitchO
     summary.unsetCount === 0 &&
     summary.keepCount === 0;
   const canConfirm = !isPreparing && !serverChanged && summary.unsetCount === 0 && !noChanges;
-
-  useEffect(() => {
-    const key = "settings:category-preset";
-    useUnsavedChangesStore.getState().setDirty(key, open && dirty);
-    return () => useUnsavedChangesStore.getState().setDirty(key, false);
-  }, [dirty, open]);
 
   const mutation = useLedgerMutation<ApplyCategoryPresetResult, ApplyCategoryPresetInput>({
     invalidates: ["categories", "stats", "documents"],
