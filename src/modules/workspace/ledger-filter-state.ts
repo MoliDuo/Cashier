@@ -2,11 +2,6 @@ import { type PeriodParams, type PeriodPreset, periodToDateRange } from "@/lib/p
 import type { EntryFilters } from "@/modules/ledger/filters";
 import type { LedgerAdvancedFilters } from "./initial-query-state";
 
-type LedgerFilterKeyInput = Pick<
-  EntryFilters,
-  "categoryId" | "currency" | "minAmount" | "maxAmount" | "search"
->;
-
 export function buildLedgerEntryFilters(
   periodParams: PeriodParams,
   advancedFilters: LedgerAdvancedFilters = {},
@@ -40,25 +35,6 @@ export function buildLedgerEntryFilters(
     nextFilters.search = advancedFilters.search;
   }
   return nextFilters;
-}
-
-export function buildLedgerFilterKey(filters: LedgerFilterKeyInput): string | null {
-  const parts: string[] = [];
-
-  if (filters.categoryId != null && filters.categoryId !== "") {
-    parts.push(`cat:${filters.categoryId}`);
-  }
-  if (filters.currency != null && filters.currency !== "") {
-    parts.push(`cur:${filters.currency}`);
-  }
-  if (filters.minAmount !== undefined && filters.minAmount !== null) {
-    parts.push(`min:${filters.minAmount}`);
-  }
-  if (filters.maxAmount !== undefined && filters.maxAmount !== null) {
-    parts.push(`max:${filters.maxAmount}`);
-  }
-  if (filters.search != null && filters.search !== "") parts.push(`search:${filters.search}`);
-  return parts.length > 0 ? parts.join("|") : null;
 }
 
 export function splitLedgerFilterChange(args: {

@@ -1,19 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLedgerEntryFilters,
-  buildLedgerFilterKey,
   splitLedgerFilterChange,
 } from "@/modules/workspace/ledger-filter-state";
 
 describe("ledger-filter-state", () => {
-  it("derives entry filters and filterKey from period + advanced filters", () => {
+  it("derives entry filters from period + advanced filters", () => {
     const filters = buildLedgerEntryFilters(
       { period: "custom", startDate: "2026-03-01", endDate: "2026-03-31" },
       { categoryId: "cat-1", minAmount: "20", maxAmount: "100" }
     );
 
     expect(filters.categoryId).toBe("cat-1");
-    expect(buildLedgerFilterKey(filters)).toBe("cat:cat-1|min:20|max:100");
+    expect(filters).toMatchObject({ minAmount: "20", maxAmount: "100" });
   });
 
   it("includes statuses from advanced filters in entry filters", () => {
