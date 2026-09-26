@@ -1,7 +1,6 @@
 "use client";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import type { Settings } from "@/modules/ledger/contracts";
-import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { settingsCopy } from "@/copy/settings";
 
 interface CurrencySectionProps {
   settings: Pick<Settings, "currencies" | "mainCurrency">;
@@ -33,7 +33,6 @@ function PreferredCurrenciesMenu({
   onUpdateSettings: CurrencySectionProps["onUpdateSettings"];
   disabled?: boolean;
 }) {
-  const t = useTranslations("Settings");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const filteredCurrencies = SUPPORTED_CURRENCIES.filter((currency) =>
@@ -62,13 +61,13 @@ function PreferredCurrenciesMenu({
           variant="outline"
           size="sm"
           className="w-full justify-between font-normal sm:w-64"
-          aria-label={t("preferredCurrencies")}
+          aria-label={settingsCopy.preferredCurrencies}
           disabled={disabled}
         >
           <span className="truncate">
             {initialCurrencies.length === 0
-              ? t("preferredCurrenciesNone")
-              : t("preferredCurrenciesSummary", {
+              ? settingsCopy.preferredCurrenciesNone
+              : settingsCopy.preferredCurrenciesSummary({
                   currencies: initialCurrencies.slice(0, 3).join(", "),
                   count: initialCurrencies.length,
                 })}
@@ -87,8 +86,8 @@ function PreferredCurrenciesMenu({
             name="currencySearch"
             autoComplete="off"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("preferredCurrenciesSearch")}
-            aria-label={t("preferredCurrenciesSearch")}
+            placeholder={settingsCopy.preferredCurrenciesSearch}
+            aria-label={settingsCopy.preferredCurrenciesSearch}
             className="h-10 pl-9"
           />
         </div>
@@ -109,7 +108,7 @@ function PreferredCurrenciesMenu({
                 <span>{currency}</span>
                 {isMainCurrency ? (
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {t("mainCurrencyMustBeEnabled")}
+                    {settingsCopy.mainCurrencyMustBeEnabled}
                   </span>
                 ) : null}
               </label>
@@ -117,7 +116,7 @@ function PreferredCurrenciesMenu({
           })}
           {filteredCurrencies.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-              {t("preferredCurrenciesNoResults")}
+              {settingsCopy.preferredCurrenciesNoResults}
             </p>
           ) : null}
         </div>
@@ -131,7 +130,6 @@ export function CurrencySection({
   onUpdateSettings,
   disabled = false,
 }: CurrencySectionProps) {
-  const t = useTranslations("Settings");
   const settingsCurrencies = settings.currencies;
   const mainCurrency = settings.mainCurrency;
 
@@ -149,10 +147,10 @@ export function CurrencySection({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-text">{t("mainCurrency")}</h3>
+          <h3 className="text-sm font-medium text-text">{settingsCopy.mainCurrency}</h3>
         </div>
         <Select value={mainCurrency} onValueChange={updateMainCurrency} disabled={disabled}>
-          <SelectTrigger aria-label={t("mainCurrency")} className="w-full sm:w-44">
+          <SelectTrigger aria-label={settingsCopy.mainCurrency} className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper">
@@ -169,7 +167,7 @@ export function CurrencySection({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-text">{t("preferredCurrencies")}</h3>
+          <h3 className="text-sm font-medium text-text">{settingsCopy.preferredCurrencies}</h3>
         </div>
         <PreferredCurrenciesMenu
           initialCurrencies={

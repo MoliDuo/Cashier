@@ -19,10 +19,9 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "tsc": "tsc --noEmit",
-    "validate:i18n": "tsx scripts/validate-i18n-catalogs.ts",
     "check:architecture": "depcruise src --config .dependency-cruiser.cjs",
     "check:dead-code": "knip --include files,dependencies,unlisted,unresolved,exports,types",
-    "check:static": "npm run format:check && npm run check:architecture && npm run check:dead-code && npm run lint && npm run tsc && npm run validate:i18n",
+    "check:static": "npm run format:check && npm run check:architecture && npm run check:dead-code && npm run lint && npm run tsc",
     "check": "npm run check:static && npm run test:coverage && npm run build:check",
     "build:check": "tsx scripts/run-check-build.ts && tsx scripts/check-protected-route-bundle.ts",
     "test:prepare": "tsx scripts/prepare-test-postgres.ts",
@@ -69,7 +68,6 @@
     "drizzle-orm": "^0.45.2",
     "lucide-react": "1.47.0",
     "next": "16.3.5",
-    "next-intl": "4.14.5",
     "next-themes": "^0.4.6",
     "openai": "7.20.0",
     "pg": "^8.23.0",
@@ -97,7 +95,6 @@
     "serialize-javascript@7": "7.0.4"
   },
   "devDependencies": {
-    "@formatjs/icu-messageformat-parser": "3.5.20",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testcontainers/postgresql": "12.1.0",

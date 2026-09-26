@@ -7,7 +7,6 @@ import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPrese
 
 const { applyPreset } = vi.hoisted(() => ({ applyPreset: vi.fn() }));
 
-vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
   applyCategoryPresetAction: applyPreset,

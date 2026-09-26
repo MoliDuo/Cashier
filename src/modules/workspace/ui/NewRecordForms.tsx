@@ -1,7 +1,6 @@
 "use client";
 import { useCallback } from "react";
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { safePrefetch } from "@/lib/safe-prefetch";
 import type { LedgerTab } from "@/lib/ledger-tabs";
@@ -99,9 +98,6 @@ export function NewRecordForms({
   setAiDirty,
   setQuickDirty,
 }: NewRecordFormsProps) {
-  const tSourceDocument = useTranslations("SourceDocumentInput");
-  const tQuickEntry = useTranslations("QuickEntryForm");
-
   const handleSuccess = useCallback(
     (mode: NewRecordInputMode, result: CreatedRecordResult) => {
       // Only a saved record counts as the picker's "last choice": a pick that
@@ -115,14 +111,6 @@ export function NewRecordForms({
         committedFilters,
         viewedBookId,
         savedBook,
-        messages: {
-          aiSuccess: tSourceDocument("uploadSuccess"),
-          quickSuccess: tQuickEntry("quickEntrySuccess"),
-          savedMayBeHidden: tSourceDocument("savedMayBeHidden"),
-          savedToOtherBook: (bookName: string) =>
-            tSourceDocument("savedToOtherBook", { book: bookName }),
-          viewRecord: tSourceDocument("viewRecord"),
-        },
       });
 
       if (mode === "ai") {
@@ -142,8 +130,6 @@ export function NewRecordForms({
       savedBook,
       setInputMode,
       setInputOpen,
-      tQuickEntry,
-      tSourceDocument,
       viewedBookId,
     ]
   );

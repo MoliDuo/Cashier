@@ -4,13 +4,13 @@
  */
 
 "use client";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { getHeatmapColor, formatCellAmount } from "../../lib/heatmap-colors";
 import { formatRelativeDateLabel } from "@/lib/date-utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { HeatmapLevel } from "../../types";
 import { compare } from "@/lib/money/decimal";
+import { calendarCopy } from "@/copy/controls";
 
 interface DayCellSmallProps {
   date: string;
@@ -31,18 +31,14 @@ export function DayCellSmall({
   currency,
   locale,
 }: DayCellSmallProps) {
-  const t = useTranslations("Calendar");
-  const dateLabel = formatRelativeDateLabel(date, locale, {
-    today: t("today"),
-    yesterday: t("yesterday"),
-  });
+  const dateLabel = formatRelativeDateLabel(date, locale);
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
-          aria-label={`${dateLabel}, ${count > 0 || compare(amount, "0") !== 0 ? `${t("expense")}: ${formatCellAmount(amount, currency, locale)}` : t("noConsumption")}`}
+          aria-label={`${dateLabel}, ${count > 0 || compare(amount, "0") !== 0 ? `${calendarCopy.expense}: ${formatCellAmount(amount, currency, locale)}` : calendarCopy.noConsumption}`}
           onClick={onClick}
           className={cn(
             "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-sm transition-[color,background-color,border-color,opacity] duration-[var(--motion-feedback)]",
@@ -61,12 +57,12 @@ export function DayCellSmall({
         {count > 0 || compare(amount, "0") !== 0 ? (
           <>
             <div>
-              {t("expense")}: {formatCellAmount(amount, currency, locale)}
+              {calendarCopy.expense}: {formatCellAmount(amount, currency, locale)}
             </div>
-            <div>{t("count", { count })}</div>
+            <div>{calendarCopy.count({ count })}</div>
           </>
         ) : (
-          <div className="text-muted-foreground">{t("noConsumption")}</div>
+          <div className="text-muted-foreground">{calendarCopy.noConsumption}</div>
         )}
       </TooltipContent>
     </Tooltip>

@@ -13,8 +13,9 @@ const routeKey = "/(protected)/(ledger)/stream/page";
 // The protected route is the app's largest client bundle. This reports its
 // weight rather than gating on it: two readers on an installed PWA are not the
 // audience a byte budget protects, and keeping the number honest cost more
-// prose than the number was worth.
-const maximumGzipBytes = 223_000;
+// prose than the number was worth. The copy modules count here: before they
+// replaced next-intl, the same strings arrived in the page payload instead.
+const maximumGzipBytes = 233_000;
 
 if (!fs.existsSync(manifestPath)) {
   throw new Error(`Protected-route client manifest is missing: ${manifestPath}`);

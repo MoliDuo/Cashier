@@ -1,6 +1,5 @@
 "use client";
 import { useEffect } from "react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AmountInput } from "@/components/ui/amount-input";
@@ -22,6 +21,8 @@ import { useQuickEntryFormController } from "@/modules/source-document/hooks/use
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import Link from "next/link";
+import { commonCopy } from "@/copy/common";
+import { quickEntryFormCopy } from "@/copy/source-document";
 
 interface QuickEntryFormProps {
   bookId?: string;
@@ -44,8 +45,6 @@ export function QuickEntryForm({
   onPendingChange,
   onDirtyChange,
 }: QuickEntryFormProps) {
-  const tCommon = useTranslations("Common");
-  const t = useTranslations("QuickEntryForm");
   const {
     selectedCategoryId,
     setSelectedCategoryId,
@@ -109,7 +108,7 @@ export function QuickEntryForm({
 
       {/* Item Name (optional) */}
       <Input
-        aria-label={t("itemName")}
+        aria-label={quickEntryFormCopy.itemName}
         name="itemName"
         autoComplete="off"
         value={itemName}
@@ -117,20 +116,20 @@ export function QuickEntryForm({
         onChange={(e) => setItemName(e.target.value)}
         placeholder={
           selectedCategory != null
-            ? `${t("itemNamePlaceholder")}${selectedCategory.name}`
-            : t("itemName")
+            ? `${quickEntryFormCopy.itemNamePlaceholder}${selectedCategory.name}`
+            : quickEntryFormCopy.itemName
         }
       />
 
       {/* Date Selector */}
       <div>
-        <p className="text-sm text-muted-foreground mb-2">{t("selectDate")}</p>
+        <p className="text-sm text-muted-foreground mb-2">{quickEntryFormCopy.selectDate}</p>
         <DateFilter
           value={entryDate}
           onChange={(date) => {
             if (date != null) setEntryDate(formatDateTimeForApi(date));
           }}
-          placeholder={t("selectDate")}
+          placeholder={quickEntryFormCopy.selectDate}
           size="sm"
           className="w-full"
           disabled={isPending}
@@ -139,22 +138,22 @@ export function QuickEntryForm({
 
       {/* Category Grid */}
       <div>
-        <p className="text-sm text-muted-foreground mb-2">{t("selectCategory")}</p>
+        <p className="text-sm text-muted-foreground mb-2">{quickEntryFormCopy.selectCategory}</p>
         {categories.length === 0 ? (
           <div
             role="alert"
             className="mb-2 rounded-md border border-danger/30 bg-danger/10 p-3 text-sm"
           >
-            <p>{t("noCategories")}</p>
+            <p>{quickEntryFormCopy.noCategories}</p>
             <Link href="/settings" className="mt-2 inline-flex font-medium text-primary underline">
-              {t("goToSettings")}
+              {quickEntryFormCopy.goToSettings}
             </Link>
           </div>
         ) : null}
         <div
           className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto"
           role="group"
-          aria-label={t("selectCategory")}
+          aria-label={quickEntryFormCopy.selectCategory}
         >
           {categories.map((cat) => (
             <button
@@ -177,10 +176,10 @@ export function QuickEntryForm({
       </div>
 
       <div>
-        <p className="text-sm text-muted-foreground mb-2">{t("currency")}</p>
+        <p className="text-sm text-muted-foreground mb-2">{quickEntryFormCopy.currency}</p>
         <Select value={currency} onValueChange={setCurrency} disabled={isPending}>
-          <SelectTrigger className="w-full" aria-label={t("currency")}>
-            <SelectValue placeholder={t("selectCurrency")} />
+          <SelectTrigger className="w-full" aria-label={quickEntryFormCopy.currency}>
+            <SelectValue placeholder={quickEntryFormCopy.selectCurrency} />
           </SelectTrigger>
           <SelectContent position="popper" sideOffset={4}>
             {currencyOptions.map((curr) => (
@@ -194,13 +193,13 @@ export function QuickEntryForm({
 
       {/* Amount */}
       <div>
-        <p className="mb-2 text-sm text-muted-foreground">{t("amount")}</p>
+        <p className="mb-2 text-sm text-muted-foreground">{quickEntryFormCopy.amount}</p>
         <div className="relative">
           <AmountInput
             value={amount}
             onChange={setAmount}
             disabled={isPending}
-            aria-label={t("amount")}
+            aria-label={quickEntryFormCopy.amount}
             name="amount"
             placeholder="0.00"
             className="h-12 pr-16 text-right text-lg font-semibold tabular-nums"
@@ -228,23 +227,23 @@ export function QuickEntryForm({
         {isPending ? (
           <>
             <Loader2 aria-hidden="true" className="h-4 w-4 mr-2 animate-spin" />
-            {tCommon("sending_status")}
+            {commonCopy.sendingStatus}
           </>
         ) : (
           <>
             <Send aria-hidden="true" className="h-4 w-4 mr-2" />
-            {t("record")}
+            {quickEntryFormCopy.record}
           </>
         )}
       </Button>
       {!hasValidAmount ? (
         <p id={amountErrorId} className="text-sm text-destructive">
-          {t("amountRequired")}
+          {quickEntryFormCopy.amountRequired}
         </p>
       ) : null}
       {selectedCategoryId === null && categories.length > 0 ? (
         <p id={categoryErrorId} className="text-sm text-destructive">
-          {t("categoryRequired")}
+          {quickEntryFormCopy.categoryRequired}
         </p>
       ) : null}
     </form>

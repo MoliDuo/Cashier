@@ -1,14 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-
-// The next-intl plugin pulls a native file watcher in, and a native addon
-// loaded from two worker threads at once fails to register. Nothing here needs
-// the plugin's behaviour — only the config object it is handed.
-vi.mock("next-intl/plugin", () => ({
-  default:
-    () =>
-    <T>(config: T) =>
-      config,
-}));
+import { describe, expect, it } from "vitest";
 
 describe("global security headers", () => {
   it("configures baseline browser security policies for every route", async () => {

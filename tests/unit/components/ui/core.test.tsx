@@ -1,45 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-vi.mock("next-intl", async () => {
-  const msgs = (await import("../../../../messages/zh.json")).default as unknown as Record<
-    string,
-    Record<string, string>
-  >;
-
-  return {
-    useTranslations: (namespace?: string) => {
-      return (key: string, values?: Record<string, string | number>) => {
-        const nsMessages = namespace ? msgs[namespace] : undefined;
-        let msg = nsMessages?.[key];
-        if (msg == null) {
-          for (const ns in msgs) {
-            if (msgs[ns]?.[key] != null) {
-              msg = msgs[ns][key];
-              break;
-            }
-          }
-        }
-        if (msg == null) return key;
-        if (values != null) {
-          Object.entries(values).forEach(([k, v]) => {
-            msg = (msg as string).replace(`{${k}}`, String(v));
-          });
-        }
-        return msg;
-      };
-    },
-    useLocale: () => "zh",
-    useMessages: () => msgs,
-    useTimeZone: () => "UTC",
-    useNow: () => new Date(),
-    NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
-  };
-});
-
 describe("Dialog", () => {
-  it("renders the close screen-reader text from the Common namespace", () => {
+  it("renders the shared close screen-reader text", () => {
     render(
       <Dialog open>
         <DialogTrigger />

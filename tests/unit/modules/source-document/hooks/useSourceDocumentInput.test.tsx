@@ -3,7 +3,7 @@ import type { ChangeEvent, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import zh from "../../../../../messages/zh.json";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 import { formatDateTimeForApi, parseDateString } from "@/lib/date-utils";
 import type { SourceDocumentInputProps } from "@/modules/source-document/ui/source-document-input.types";
 
@@ -71,8 +71,6 @@ vi.mock("@/modules/source-document/ui/SourceDocumentInputView", () => ({
 
 import { useSourceDocumentInput } from "@/modules/source-document/hooks/useSourceDocumentInput";
 import { SourceDocumentInput } from "@/modules/source-document/ui/SourceDocumentInput";
-
-const messages = zh.SourceDocumentInput;
 
 function createQueryClient() {
   return new QueryClient({
@@ -187,7 +185,7 @@ describe("useSourceDocumentInput", () => {
 
       await waitFor(() =>
         expect(toastErrorMock).toHaveBeenCalledWith(
-          messages.imageUnsupported.replace("{fileName}", "scan.heic")
+          sourceDocumentInputCopy.imageUnsupported({ fileName: "scan.heic" })
         )
       );
       expect(result.current.images).toHaveLength(0);
@@ -392,7 +390,9 @@ describe("useSourceDocumentInput", () => {
 
       act(() => result.current.handleSubmit());
 
-      await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(messages.createError));
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentInputCopy.createError)
+      );
       expect(onSuccess).not.toHaveBeenCalled();
       expect(result.current.text).toBe("Lunch");
       await waitFor(() => expect(result.current.isSubmitting).toBe(false));
@@ -496,7 +496,9 @@ describe("useSourceDocumentInput", () => {
 
       act(() => result.current.handleSubmit());
 
-      await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith(messages.retrySuccess));
+      await waitFor(() =>
+        expect(toastSuccessMock).toHaveBeenCalledWith(sourceDocumentInputCopy.retrySuccess)
+      );
       expect(retrySourceDocumentActionMock).toHaveBeenCalledWith(
         "source-1",
         expect.objectContaining({ text: "Original", documentDate: "2026-07-17" })
@@ -543,7 +545,9 @@ describe("SourceDocumentInput", () => {
         expect.objectContaining({ text: "Unsaved" })
       )
     );
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(messages.retryError));
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentInputCopy.retryError)
+    );
     expect(onSuccess).not.toHaveBeenCalled();
     expect(screen.getByRole("textbox", { name: "draft" })).toHaveValue("Unsaved");
     view.rerender(form("source-2"));

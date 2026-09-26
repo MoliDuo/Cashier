@@ -1,5 +1,4 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import { formatDateTimeForApi } from "@/lib/date-utils";
@@ -11,6 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy } from "@/copy/workspace";
 
 export interface BatchDateImpactSummary {
   selected: number;
@@ -43,7 +44,7 @@ interface BatchDateDialogProps {
   /** The selection moved after the preview; confirming would act on something
    * other than what was previewed. */
   selectionChanged: boolean;
-  /** An already-translated caveat about the scope, e.g. that only loaded rows
+  /** A caveat about the scope, as display text, e.g. that only loaded rows
    * are selected. */
   scopeNote?: string;
   isConfirming: boolean;
@@ -71,8 +72,6 @@ export function BatchDateDialog({
   isConfirming,
   onConfirm,
 }: BatchDateDialogProps) {
-  const t = useTranslations("BatchActions");
-  const tCommon = useTranslations("Common");
   const isPending = isConfirming || isPreviewing;
   const requestClose = (nextOpen: boolean) => {
     if (isPending) return;
@@ -87,17 +86,17 @@ export function BatchDateDialog({
         onPointerDownOutside={(event) => isPending && event.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{t("dateImpactTitle")}</DialogTitle>
+          <DialogTitle>{batchActionsCopy.dateImpactTitle}</DialogTitle>
         </DialogHeader>
         {selectionChanged ? (
-          <p className="text-sm text-muted-foreground">{t("selectionChanged")}</p>
+          <p className="text-sm text-muted-foreground">{batchActionsCopy.selectionChanged}</p>
         ) : previewFailed ? (
           <p className="text-sm text-destructive" role="alert">
-            {t("dateImpactFailed")}
+            {batchActionsCopy.dateImpactFailed}
           </p>
         ) : impact != null ? (
           <p className="text-sm text-muted-foreground">
-            {t("dateImpactDescription", {
+            {batchActionsCopy.dateImpactDescription({
               documents: impact.documents,
               entries: impact.entries,
               scope: scopeNote ?? "",
@@ -114,22 +113,22 @@ export function BatchDateDialog({
           className="w-full"
           showClear={false}
           showClearShortcut={false}
-          ariaLabel={t("setDate")}
+          ariaLabel={batchActionsCopy.setDate}
           // The field is seeded from this timezone, so it must read the day
           // back against the same one.
           {...(timeZone != null ? { timeZone } : {})}
         />
         <DialogFooter>
           <Button variant="outline" disabled={isPending} onClick={() => onOpenChange(false)}>
-            {tCommon("cancel")}
+            {commonCopy.cancel}
           </Button>
           {previewFailed ? (
             <Button disabled={isPreviewing} onClick={onRetryPreview}>
-              {t("retryImpact")}
+              {batchActionsCopy.retryImpact}
             </Button>
           ) : (
             <Button disabled={isPending || selectionChanged || value === ""} onClick={onConfirm}>
-              {tCommon("confirm")}
+              {commonCopy.confirm}
             </Button>
           )}
         </DialogFooter>

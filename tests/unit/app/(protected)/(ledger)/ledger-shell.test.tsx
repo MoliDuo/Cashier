@@ -16,15 +16,6 @@ const { activeTabState, navigateMock, routerPrefetchMock, toastError, prefetchSt
 
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
 
-vi.mock("next-intl", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next-intl")>();
-  return {
-    ...actual,
-    useTranslations: () => (key: string) => key,
-    useLocale: () => "en",
-  };
-});
-
 vi.mock("@/modules/workspace/hooks/useLedgerNavigation", () => ({
   useLedgerNavigation: () => ({
     activeTab: activeTabState.current,
@@ -59,6 +50,9 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
 }));
 
 import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
+import { ledgerPageCopy } from "@/copy/app";
+import { commonCopy } from "@/copy/common";
+import type { LedgerTab } from "@/lib/ledger-tabs";
 import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 
 const BOOK_ID = "10000000-0000-4000-8000-000000000001";
@@ -110,8 +104,8 @@ function renderShell(
 }
 
 /** The destination's own sr-only status joins its label while a refresh runs. */
-function destination(name: string) {
-  return screen.getByRole("button", { name: new RegExp(`^${name}\\b`) });
+function destination(tab: LedgerTab) {
+  return screen.getByRole("button", { name: new RegExp(`^${ledgerPageCopy[tab]}(\\s|$)`) });
 }
 
 describe("LedgerShell", () => {
@@ -165,7 +159,7 @@ describe("LedgerShell", () => {
 
     await user.click(destination("stream"));
 
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith("refreshFailed"));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(commonCopy.refreshFailed));
   });
 
   it("prefetches a hovered route for the book being viewed now", async () => {

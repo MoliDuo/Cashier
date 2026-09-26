@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -19,6 +18,8 @@ import type { ReactNode } from "react";
 import { usePeriodLabel } from "./usePeriodLabel";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy, ledgerEntriesTabCopy } from "@/copy/workspace";
 
 interface LedgerEntriesToolbarProps {
   isSelectionMode: boolean;
@@ -80,9 +81,6 @@ export function LedgerEntriesToolbar({
   readOnly = false,
   syncStatus,
 }: LedgerEntriesToolbarProps) {
-  const t = useTranslations("LedgerEntriesTab");
-  const tCommon = useTranslations("Common");
-  const tBatch = useTranslations("BatchActions");
   const locale = DISPLAY_LOCALE;
   const rangeLabel = usePeriodLabel(periodParams, timeZone);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
@@ -172,10 +170,18 @@ export function LedgerEntriesToolbar({
         disabled={readOnly || isProcessing}
         className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
         aria-label={
-          readOnly ? tCommon("readOnlyPreview") : isSelectionMode ? t("cancelSelect") : t("select")
+          readOnly
+            ? commonCopy.readOnlyPreview
+            : isSelectionMode
+              ? ledgerEntriesTabCopy.cancelSelect
+              : ledgerEntriesTabCopy.select
         }
         title={
-          readOnly ? tCommon("readOnlyPreview") : isSelectionMode ? t("cancelSelect") : t("select")
+          readOnly
+            ? commonCopy.readOnlyPreview
+            : isSelectionMode
+              ? ledgerEntriesTabCopy.cancelSelect
+              : ledgerEntriesTabCopy.select
         }
       >
         {isSelectionMode ? (
@@ -221,7 +227,7 @@ export function LedgerEntriesToolbar({
         previewFailed={dateImpactError}
         onRetryPreview={() => void previewDateImpact()}
         selectionChanged={dateSelectionSnapshot != null && !dateSelectionMatches}
-        {...(isAllSelected && hasMoreData ? { scopeNote: tBatch("loadedScope") } : {})}
+        {...(isAllSelected && hasMoreData ? { scopeNote: batchActionsCopy.loadedScope } : {})}
         isConfirming={isUpdatingDates}
         onConfirm={() => void handleConfirmDate()}
         {...(timeZone != null ? { timeZone } : {})}
@@ -230,13 +236,13 @@ export function LedgerEntriesToolbar({
         <ConfirmDialog
           open={deleteConfirmOpen}
           onOpenChange={setDeleteConfirmOpen}
-          title={tBatch("deleteTitleDocuments")}
-          description={tBatch("deleteDescriptionDocuments", {
+          title={batchActionsCopy.deleteTitleDocuments}
+          description={batchActionsCopy.deleteDescriptionDocuments({
             count: selectedCount,
-            scope: isAllSelected && hasMoreData ? tBatch("loadedScope") : "",
+            scope: isAllSelected && hasMoreData ? batchActionsCopy.loadedScope : "",
           })}
           variant="destructive"
-          confirmLabel={tCommon("delete")}
+          confirmLabel={commonCopy.delete}
           onConfirm={onDelete}
         />
       )}

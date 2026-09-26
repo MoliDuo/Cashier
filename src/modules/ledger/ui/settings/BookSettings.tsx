@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   ArrowDown,
@@ -49,6 +48,9 @@ import {
 import { SettingsField } from "./SettingsField";
 import { SettingsSection } from "./SettingsSection";
 import type { BookDto } from "@/modules/ledger/contracts";
+import { ledgerQueryErrorCopy } from "@/copy/app";
+import { commonCopy } from "@/copy/common";
+import { settingsBooksCopy } from "@/copy/settings";
 
 /**
  * The zones the picker offers — a short list rather than every IANA name, and
@@ -96,9 +98,6 @@ interface BookSettingsProps {
  * listed apart from the live ones because they are no longer part of it.
  */
 export function BookSettings({ initialBooks }: BookSettingsProps) {
-  const t = useTranslations("Settings.Books");
-  const tCommon = useTranslations("Common");
-  const tQueryError = useTranslations("LedgerQueryError");
   const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null);
   const { books, booksQuery } = useBooks({
     ...(initialBooks !== undefined ? { initialBooks } : {}),
@@ -122,7 +121,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
    */
   const writeBooks = (result: BookMutationResult, successMessage?: string) => {
     if (!result.ok) {
-      toast.error(t(BOOK_ERROR_KEYS[result.code]));
+      toast.error(settingsBooksCopy[BOOK_ERROR_KEYS[result.code]]);
       throw new Error(result.code);
     }
     queryClient.setQueryData(queryKeys.booksIncludingArchived(), result.books);
@@ -150,15 +149,15 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
   });
   const archiveBook = useMutation({
     mutationFn: (bookId: string) => archiveBookAction(bookId),
-    onSuccess: (result) => writeBooks(result, t("archived")),
+    onSuccess: (result) => writeBooks(result, settingsBooksCopy.archived),
   });
   const restoreBook = useMutation({
     mutationFn: (bookId: string) => restoreBookAction(bookId),
-    onSuccess: (result) => writeBooks(result, t("restored")),
+    onSuccess: (result) => writeBooks(result, settingsBooksCopy.restored),
   });
   const deleteBook = useMutation({
     mutationFn: (bookId: string) => deleteBookAction(bookId),
-    onSuccess: (result) => writeBooks(result, t("deleted")),
+    onSuccess: (result) => writeBooks(result, settingsBooksCopy.deleted),
   });
 
   useEffect(() => {
@@ -228,7 +227,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
 
   // 自动 resolves to the device on this screen, so the reader sees which zone a
   // null book actually means before saving anything.
-  const deviceZoneOption = deviceTimeZone ?? t("timeZoneAuto");
+  const deviceZoneOption = deviceTimeZone ?? settingsBooksCopy.timeZoneAuto;
 
   /**
    * A zone that the migration carried over from the old per-person column can be
@@ -245,7 +244,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
 
   return (
     <SettingsSection
-      title={t("title")}
+      title={settingsBooksCopy.title}
       actions={
         <Button
           type="button"
@@ -256,7 +255,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
             setIsAddOpen(true);
           }}
         >
-          {t("add")}
+          {settingsBooksCopy.add}
         </Button>
       }
     >
@@ -266,10 +265,10 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
             role="alert"
             className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
           >
-            <span>{tQueryError("description")}</span>
+            <span>{ledgerQueryErrorCopy.description}</span>
             <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
               <RefreshCw className="size-4" />
-              {tQueryError("retry")}
+              {ledgerQueryErrorCopy.retry}
             </Button>
           </div>
         ) : null}
@@ -278,16 +277,16 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
             role="alert"
             className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
           >
-            <span>{tQueryError("description")}</span>
+            <span>{ledgerQueryErrorCopy.description}</span>
             <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
               <RefreshCw className="size-4" />
-              {tQueryError("retry")}
+              {ledgerQueryErrorCopy.retry}
             </Button>
           </div>
         ) : isLoadingBooks ? (
           <ul
             role="status"
-            aria-label={tCommon("loading")}
+            aria-label={commonCopy.loading}
             className="divide-y divide-border rounded-[var(--radius)] border border-border"
           >
             {[0, 1].map((row) => (
@@ -297,7 +296,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
             ))}
           </ul>
         ) : list.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+          <p className="text-sm text-muted-foreground">{settingsBooksCopy.empty}</p>
         ) : (
           <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
             {list.map((book, index) => {
@@ -311,7 +310,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                         value={renameDraft}
                         maxLength={20}
                         autoComplete="off"
-                        aria-label={t("rename", { name: book.name })}
+                        aria-label={settingsBooksCopy.rename({ name: book.name })}
                         disabled={updateBook.isPending}
                         onChange={(event) => setRenameDraft(event.target.value)}
                         onKeyDown={(event) => {
@@ -342,8 +341,8 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={renameDraft.trim() === "" || updateBook.isPending}
-                          aria-label={tCommon("save")}
-                          title={tCommon("save")}
+                          aria-label={commonCopy.save}
+                          title={commonCopy.save}
                           onClick={() => commitRename(book)}
                         >
                           <Check className="size-4" />
@@ -353,8 +352,8 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={updateBook.isPending}
-                          aria-label={tCommon("cancel")}
-                          title={tCommon("cancel")}
+                          aria-label={commonCopy.cancel}
+                          title={commonCopy.cancel}
                           onClick={cancelRename}
                         >
                           <X className="size-4" />
@@ -367,7 +366,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={busy || index === 0}
-                          aria-label={t("moveUp", { name: book.name })}
+                          aria-label={settingsBooksCopy.moveUp({ name: book.name })}
                           onClick={() => move(index, -1)}
                         >
                           <ArrowUp className="size-4" />
@@ -377,7 +376,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={busy || index === list.length - 1}
-                          aria-label={t("moveDown", { name: book.name })}
+                          aria-label={settingsBooksCopy.moveDown({ name: book.name })}
                           onClick={() => move(index, 1)}
                         >
                           <ArrowDown className="size-4" />
@@ -387,8 +386,8 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={busy}
-                          aria-label={t("rename", { name: book.name })}
-                          title={t("rename", { name: book.name })}
+                          aria-label={settingsBooksCopy.rename({ name: book.name })}
+                          title={settingsBooksCopy.rename({ name: book.name })}
                           onClick={() => startRename(book)}
                         >
                           <Pencil className="size-4" />
@@ -398,8 +397,8 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={busy}
-                          aria-label={t("archive")}
-                          title={t("archive")}
+                          aria-label={settingsBooksCopy.archive}
+                          title={settingsBooksCopy.archive}
                           className="text-muted-foreground hover:text-danger"
                           onClick={() => setArchiveTarget(book)}
                         >
@@ -410,8 +409,8 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           variant="ghost"
                           size="icon-sm"
                           disabled={busy}
-                          aria-label={t("delete")}
-                          title={t("delete")}
+                          aria-label={settingsBooksCopy.delete}
+                          title={settingsBooksCopy.delete}
                           className="text-muted-foreground hover:text-danger"
                           onClick={() => setDeleteTarget(book)}
                         >
@@ -431,12 +430,12 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                       }
                       disabled={busy}
                     >
-                      <SelectTrigger aria-label={t("timeZone")} className="w-full">
+                      <SelectTrigger aria-label={settingsBooksCopy.timeZone} className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent position="popper">
                         <SelectItem value="auto">
-                          {t("timeZoneAutoDetected", { timeZone: deviceZoneOption })}
+                          {settingsBooksCopy.timeZoneAutoDetected({ timeZone: deviceZoneOption })}
                         </SelectItem>
                         {zoneOptionsFor(book).map((timeZone) => (
                           <SelectItem key={timeZone} value={timeZone}>
@@ -454,7 +453,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
       </div>
 
       {archived.length > 0 ? (
-        <SettingsField title={t("archivedSection")} stacked>
+        <SettingsField title={settingsBooksCopy.archivedSection} stacked>
           <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
             {archived.map((book) => (
               <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
@@ -464,7 +463,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                       {book.name}
                     </span>
                     <span className="shrink-0 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-micro font-medium text-muted-foreground">
-                      {t("archivedBadge")}
+                      {settingsBooksCopy.archivedBadge}
                     </span>
                   </div>
                   <p className="mt-0.5 text-micro text-muted-foreground">
@@ -479,7 +478,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                   onClick={() => restoreBook.mutate(book.id)}
                 >
                   <ArchiveRestore className="mr-1 size-4" />
-                  {t("restore")}
+                  {settingsBooksCopy.restore}
                 </Button>
               </li>
             ))}
@@ -490,17 +489,17 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
       <Dialog open={isAddOpen} onOpenChange={(open) => !createBook.isPending && setIsAddOpen(open)}>
         <DialogContent variant="modal">
           <DialogHeader>
-            <DialogTitle>{t("addTitle")}</DialogTitle>
-            <DialogDescription>{t("addDesc")}</DialogDescription>
+            <DialogTitle>{settingsBooksCopy.addTitle}</DialogTitle>
+            <DialogDescription>{settingsBooksCopy.addDesc}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-4">
-            <Label htmlFor="new-book-name">{t("name")}</Label>
+            <Label htmlFor="new-book-name">{settingsBooksCopy.name}</Label>
             <Input
               id="new-book-name"
               value={newName}
               maxLength={20}
               autoComplete="off"
-              placeholder={t("namePlaceholder")}
+              placeholder={settingsBooksCopy.namePlaceholder}
               disabled={createBook.isPending}
               onChange={(event) => setNewName(event.target.value)}
             />
@@ -511,7 +510,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
               onClick={() => setIsAddOpen(false)}
               disabled={createBook.isPending}
             >
-              {tCommon("cancel")}
+              {commonCopy.cancel}
             </Button>
             <Button
               disabled={newName.trim() === "" || createBook.isPending}
@@ -522,7 +521,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                 )
               }
             >
-              {t("add")}
+              {settingsBooksCopy.add}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -531,9 +530,9 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
       <ConfirmDialog
         open={archiveTarget != null}
         onOpenChange={(open) => !open && setArchiveTarget(null)}
-        title={t("archiveTitle", { name: archiveTarget?.name ?? "" })}
-        description={t("archiveDesc")}
-        confirmLabel={t("archive")}
+        title={settingsBooksCopy.archiveTitle({ name: archiveTarget?.name ?? "" })}
+        description={settingsBooksCopy.archiveDesc}
+        confirmLabel={settingsBooksCopy.archive}
         variant="destructive"
         onConfirm={() => {
           if (archiveTarget == null) return false;
@@ -546,9 +545,9 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
       <ConfirmDialog
         open={deleteTarget != null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={t("deleteTitle", { name: deleteTarget?.name ?? "" })}
-        description={t("deleteDesc")}
-        confirmLabel={t("delete")}
+        title={settingsBooksCopy.deleteTitle({ name: deleteTarget?.name ?? "" })}
+        description={settingsBooksCopy.deleteDesc}
+        confirmLabel={settingsBooksCopy.delete}
         variant="destructive"
         onConfirm={() => {
           if (deleteTarget == null) return false;

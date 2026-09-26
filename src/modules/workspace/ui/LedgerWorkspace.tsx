@@ -1,7 +1,6 @@
 "use client";
 import { useMemo, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { ledgerTabFromPathname } from "@/lib/ledger-tabs";
 import { parsePeriodFromSearchParams } from "@/lib/period-utils";
@@ -18,6 +17,7 @@ import { BookReveal } from "./BookReveal";
 import { NewRecordDialog } from "./NewRecordDialog";
 import { ModalStackGate } from "./ModalStackGate";
 import { LedgerWorkspaceContext, type LedgerWorkspaceValue } from "./ledger-workspace-context";
+import { ledgerPageCopy } from "@/copy/app";
 
 interface LedgerWorkspaceProps {
   /**
@@ -44,7 +44,6 @@ export function LedgerWorkspace({
   ledgerToday,
   children,
 }: LedgerWorkspaceProps) {
-  const t = useTranslations("LedgerPage");
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeTab = ledgerTabFromPathname(pathname);
@@ -95,7 +94,7 @@ export function LedgerWorkspace({
   if (value == null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <h1 className={textRoleClassName("pageTitle")}>{t("notFound")}</h1>
+        <h1 className={textRoleClassName("pageTitle")}>{ledgerPageCopy.notFound}</h1>
       </div>
     );
   }

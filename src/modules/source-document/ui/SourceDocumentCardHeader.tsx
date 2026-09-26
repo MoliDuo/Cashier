@@ -7,7 +7,6 @@ import type {
 import type { SupportedSourceDocumentAction } from "@/modules/source-document/lifecycle";
 import { memo, useRef } from "react";
 import { ChevronDown, CircleStop, MoreVertical, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +20,13 @@ import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
 import { ProcessingStatus } from "./processing-status";
 import { SourceDocumentCardTotal } from "./SourceDocumentCardTotal";
-import { useDiagnosticMessages } from "./use-diagnostic-messages";
+import { diagnosticLabel } from "./diagnostic-messages";
+import { commonCopy } from "@/copy/common";
+import {
+  diagnosticCodeCopy,
+  sourceDocumentActionCopy,
+  sourceDocumentCardCopy,
+} from "@/copy/source-document";
 
 interface SourceDocumentCardHeaderProps {
   sourceDocument: SourceDocument | SourceDocumentListItemDto;
@@ -79,10 +84,6 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
   onDelete,
 }: SourceDocumentCardHeaderProps) {
   const { processingStatus: status, failureKind, errorCode } = sourceDocument;
-  const t = useTranslations("SourceDocumentCard");
-  const tCommon = useTranslations("Common");
-  const tActions = useTranslations("SourceDocumentAction");
-  const diagnosticMessages = useDiagnosticMessages();
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const processingStatus = getProcessingStatus(status);
@@ -98,8 +99,8 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
   const failureLabel =
     status === "failed"
       ? failureKind === "invalid_input"
-        ? diagnosticMessages.unparsableLabel
-        : diagnosticMessages.label(errorCode ?? "processing_unavailable")
+        ? diagnosticCodeCopy.unparsableDocument
+        : diagnosticLabel(errorCode ?? "processing_unavailable")
       : null;
 
   const hasAction = (action: SupportedSourceDocumentAction) => supportedActions.includes(action);
@@ -122,7 +123,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
           type="button"
           onClick={onToggleExpanded}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color] duration-[var(--motion-feedback)]"
-          aria-label={isExpanded ? t("collapse") : t("expand")}
+          aria-label={isExpanded ? sourceDocumentCardCopy.collapse : sourceDocumentCardCopy.expand}
           aria-expanded={isExpanded}
           aria-controls={contentId}
         >
@@ -148,7 +149,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
       >
         <span className="flex min-w-0 items-center gap-2 rounded-sm group-focus-visible:outline-2 group-focus-visible:-outline-offset-2 group-focus-visible:outline-ring">
           <span className={textRoleClassName("cardTitle", "truncate")}>
-            {sourceDocument.title?.trim() || t("untitled")}
+            {sourceDocument.title?.trim() || sourceDocumentCardCopy.untitled}
           </span>
         </span>
       </button>
@@ -179,7 +180,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
                   variant="ghost"
                   size="icon-sm"
                   className="h-9 w-9 text-muted-foreground hover:text-text sm:h-8 sm:w-8"
-                  aria-label={t("moreActions")}
+                  aria-label={sourceDocumentCardCopy.moreActions}
                 >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
@@ -196,7 +197,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
                 {hasAction("retry") && onDirectRetry != null && (
                   <DropdownMenuItem onClick={onDirectRetry} disabled={isRetrying}>
                     <RefreshCw className={cn("mr-2 h-4 w-4", isRetrying && "animate-spin")} />
-                    {tActions("retry")}
+                    {sourceDocumentActionCopy.retry}
                   </DropdownMenuItem>
                 )}
                 {hasAction("edit_retry") && onEditRetry != null && (
@@ -206,14 +207,14 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
                     onFocus={onEditRetryIntent}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    {tActions("editRetry")}
+                    {sourceDocumentActionCopy.editRetry}
                   </DropdownMenuItem>
                 )}
 
                 {hasAction("cancel_processing") && onCancelProcessing != null && (
                   <DropdownMenuItem onClick={onCancelProcessing} disabled={isCancelling}>
                     <CircleStop className="mr-2 h-4 w-4" />
-                    {tActions("cancelProcessing")}
+                    {sourceDocumentActionCopy.cancelProcessing}
                   </DropdownMenuItem>
                 )}
 
@@ -222,7 +223,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
                 {onDelete != null && (
                   <DropdownMenuItem onClick={onDelete} className="text-danger focus:text-danger">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    {tCommon("delete")}
+                    {commonCopy.delete}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

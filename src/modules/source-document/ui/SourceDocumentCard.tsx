@@ -4,7 +4,6 @@ import type {
   SourceDocumentListItemDto,
 } from "@/modules/source-document/contracts";
 import { memo, useCallback, useId, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
 import { type SourceDocumentProcessingStatus } from "@/modules/source-document/contracts";
 import type { SupportedSourceDocumentAction } from "@/modules/source-document/lifecycle";
 import { EntryCardShell, type EntryCardTone } from "@/components/entry-card-shell";
@@ -13,6 +12,8 @@ import { SourceDocumentCardHeader } from "./SourceDocumentCardHeader";
 import { sortSourceDocumentEntries } from "./source-document-card.utils";
 import { SourceDocumentCardEntries } from "./SourceDocumentCardEntries";
 import { ProcessingSweep } from "./processing-sweep";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentCardCopy } from "@/copy/source-document";
 
 const cardToneByStatus: Record<SourceDocumentProcessingStatus, EntryCardTone> = {
   processing: "busy",
@@ -75,8 +76,6 @@ function SourceDocumentCardBody({
   onCancelProcessing,
 }: SourceDocumentCardProps) {
   const { processingStatus } = sourceDocument;
-  const tCommon = useTranslations("Common");
-  const tCard = useTranslations("SourceDocumentCard");
   const [localExpanded, setLocalExpanded] = useState(defaultExpanded);
   const isExpanded = expanded ?? localExpanded;
   const toggleExpanded = useCallback(() => {
@@ -100,8 +99,8 @@ function SourceDocumentCardBody({
       selectionMode={selectionMode}
       selected={isSelected}
       disabled={selectionDisabled}
-      selectionLabel={tCommon("selectItem", {
-        item: sourceDocument.title?.trim() || tCard("untitled"),
+      selectionLabel={commonCopy.selectItem({
+        item: sourceDocument.title?.trim() || sourceDocumentCardCopy.untitled,
       })}
       onToggleSelection={() => onToggleSelect?.()}
       expandable={
@@ -109,7 +108,9 @@ function SourceDocumentCardBody({
           ? {
               isExpanded,
               onToggleExpanded: toggleExpanded,
-              expandLabel: isExpanded ? tCard("collapse") : tCard("expand"),
+              expandLabel: isExpanded
+                ? sourceDocumentCardCopy.collapse
+                : sourceDocumentCardCopy.expand,
               contentId,
             }
           : undefined

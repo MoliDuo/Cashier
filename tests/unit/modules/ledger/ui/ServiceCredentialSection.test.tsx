@@ -1,21 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ServiceCredentialSection } from "@/modules/ledger/ui/ServiceCredentialSection";
+import { commonCopy } from "@/copy/common";
+import { serviceCredentialsCopy } from "@/copy/settings";
 import type { CreatedServiceCredentialDto, ServiceCredentialDto } from "@/modules/ledger/contracts";
-
-const intl = vi.hoisted(() => ({ locale: "en" }));
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    values?.date != null
-      ? `${key}:${String(values.date)}`
-      : values?.name != null
-        ? `${key}:${String(values.name)}`
-        : values?.book != null
-          ? `${key}:${String(values.book)}`
-          : key,
-  useLocale: () => intl.locale,
-}));
 
 const books = [
   {
@@ -50,10 +38,6 @@ const credentialFixture = (
 });
 
 describe("ServiceCredentialSection", () => {
-  beforeEach(() => {
-    intl.locale = "en";
-  });
-
   it("keeps the create dialog locked until the credential is authoritative", async () => {
     let resolveCreate!: (value: CreatedServiceCredentialDto) => void;
     const onCreateCredential = vi.fn(
@@ -72,15 +56,17 @@ describe("ServiceCredentialSection", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "newCredential" }));
-    fireEvent.change(screen.getByPlaceholderText("namePlaceholder"), {
+    fireEvent.click(screen.getByRole("button", { name: serviceCredentialsCopy.newCredential }));
+    fireEvent.change(screen.getByPlaceholderText(serviceCredentialsCopy.namePlaceholder), {
       target: { value: "Automation" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "confirm" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.confirm }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "cancel" })).toBeDisabled());
-    expect(screen.getByPlaceholderText("namePlaceholder")).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "confirm" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: commonCopy.cancel })).toBeDisabled()
+    );
+    expect(screen.getByPlaceholderText(serviceCredentialsCopy.namePlaceholder)).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.confirm }));
     expect(onCreateCredential).toHaveBeenCalledTimes(1);
 
     resolveCreate({
@@ -95,11 +81,13 @@ describe("ServiceCredentialSection", () => {
       lastUsedAt: null,
       deletedAt: null,
     });
-    await waitFor(() => expect(screen.getByText("createSuccessTitle")).toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: "close" })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText(serviceCredentialsCopy.createSuccessTitle)).toBeInTheDocument()
+    );
+    expect(screen.queryByRole("button", { name: commonCopy.close })).not.toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    expect(screen.getByText("createSuccessTitle")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "saved" }));
+    expect(screen.getByText(serviceCredentialsCopy.createSuccessTitle)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: serviceCredentialsCopy.saved }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
@@ -133,10 +121,18 @@ describe("ServiceCredentialSection", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "deleteButton:Automation" }));
-    expect(screen.getByText("deleteDesc:Automation")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "delete" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "delete" })).toBeDisabled());
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: serviceCredentialsCopy.deleteButton({ name: "Automation" }),
+      })
+    );
+    expect(
+      screen.getByText(serviceCredentialsCopy.deleteDesc({ name: "Automation" }))
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.delete }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: commonCopy.delete })).toBeDisabled()
+    );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(onDeleteCredential).toHaveBeenCalledTimes(1);
 
@@ -146,7 +142,6 @@ describe("ServiceCredentialSection", () => {
 
   it("formats credential dates as a full Chinese date", () => {
     const formatted = "2026年8月7日 星期五";
-    intl.locale = "zh";
     const createdAt = "2026-08-07T00:00:00.000Z";
     render(
       <ServiceCredentialSection
@@ -172,7 +167,9 @@ describe("ServiceCredentialSection", () => {
       />
     );
 
-    expect(screen.getByText(`createdAt:${formatted}`)).toBeInTheDocument();
+    expect(
+      screen.getByText(serviceCredentialsCopy.createdAt({ date: formatted }))
+    ).toBeInTheDocument();
   });
 
   it("names a key's book and lets it change", async () => {
@@ -214,7 +211,7 @@ describe("ServiceCredentialSection", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "newCredential" }));
+    fireEvent.click(screen.getByRole("button", { name: serviceCredentialsCopy.newCredential }));
     expect(screen.getByRole("combobox")).toHaveTextContent("Shared");
 
     fireEvent.click(screen.getByRole("combobox"));
@@ -222,10 +219,10 @@ describe("ServiceCredentialSection", () => {
     fireEvent.click(within(listbox).getByText("Mine"));
     expect(screen.getByRole("combobox")).toHaveTextContent("Mine");
 
-    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.cancel }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: "newCredential" }));
+    fireEvent.click(screen.getByRole("button", { name: serviceCredentialsCopy.newCredential }));
     expect(screen.getByRole("combobox")).toHaveTextContent("Shared");
   });
 
@@ -242,8 +239,7 @@ describe("ServiceCredentialSection", () => {
 
     // The picker names the archived book rather than going blank, and still
     // offers somewhere to move the key.
-    expect(screen.getByRole("combobox")).toHaveTextContent("archivedBook");
-    expect(screen.queryByText("book:error")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveTextContent(serviceCredentialsCopy.archivedBook);
 
     fireEvent.click(screen.getByRole("combobox"));
     const listbox = await screen.findByRole("listbox");

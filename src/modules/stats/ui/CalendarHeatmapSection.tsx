@@ -11,11 +11,11 @@
 
 "use client";
 import { useMemo, useCallback } from "react";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { AdaptiveHeatmap } from "./AdaptiveHeatmap";
 import { getHeatmapLegend } from "../lib/heatmap-colors";
 import type { CalendarDayData, CalendarHeatmapStats } from "../types";
+import { calendarCopy } from "@/copy/controls";
 
 interface CalendarHeatmapSectionProps {
   days: CalendarDayData[];
@@ -43,23 +43,22 @@ export function CalendarHeatmapSection({
   currency = "CNY",
   locale = "zh-CN",
 }: CalendarHeatmapSectionProps) {
-  const t = useTranslations("Calendar");
   const heatmapLevelLabel = (level: number) => {
     switch (level) {
       case 0:
-        return t("heatmapLevel0");
+        return calendarCopy.heatmapLevel0;
       case 1:
-        return t("heatmapLevel1");
+        return calendarCopy.heatmapLevel1;
       case 2:
-        return t("heatmapLevel2");
+        return calendarCopy.heatmapLevel2;
       case 3:
-        return t("heatmapLevel3");
+        return calendarCopy.heatmapLevel3;
       case 4:
-        return t("heatmapLevel4");
+        return calendarCopy.heatmapLevel4;
       case 5:
-        return t("heatmapLevel5");
+        return calendarCopy.heatmapLevel5;
       default:
-        return t("heatmapLevel0");
+        return calendarCopy.heatmapLevel0;
     }
   };
 
@@ -85,7 +84,7 @@ export function CalendarHeatmapSection({
           className
         )}
       >
-        {t("noData")}
+        {calendarCopy.noData}
       </div>
     );
   }
@@ -104,7 +103,7 @@ export function CalendarHeatmapSection({
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-2 pt-2">
-        <span className="text-xs text-muted-foreground">{t("less")}</span>
+        <span className="text-xs text-muted-foreground">{calendarCopy.less}</span>
         <div className="flex gap-1">
           {legend.map((item) => (
             <div
@@ -117,7 +116,7 @@ export function CalendarHeatmapSection({
             />
           ))}
         </div>
-        <span className="text-xs text-muted-foreground">{t("more")}</span>
+        <span className="text-xs text-muted-foreground">{calendarCopy.more}</span>
       </div>
     </div>
   );

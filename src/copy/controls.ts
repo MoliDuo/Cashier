@@ -1,0 +1,62 @@
+export const dateRangeFilterCopy = {
+  thisMonth: "本月",
+  lastMonth: "上个月",
+  customRange: "自定义区间",
+  startDate: "开始日期",
+  endDate: "结束日期",
+  all: "全部",
+};
+
+export const dateFilterCopy = {
+  selectDate: "选择日期",
+  today: "今天",
+  clear: "清除",
+  apply: "确定",
+};
+
+export const calculatorCopy = {
+  title: "计算器",
+  amountAriaLabel: "金额",
+  openCalculator: "打开计算器",
+  invalidValue: "请输入有效金额。",
+  delete: "删除",
+  calculate: "计算",
+  confirm: "确认",
+};
+
+export const calendarCopy = {
+  today: "今天",
+  yesterday: "昨天",
+  clear: "清除",
+  previousMonth: "上个月",
+  nextMonth: "下个月",
+  weekDays: ["日", "一", "二", "三", "四", "五", "六"],
+  weekDaysMon: ["一", "二", "三", "四", "五", "六", "日"],
+  currency: "货币",
+  allCurrencies: "全部货币",
+  category: "分类",
+  allCategories: "全部分类",
+  uncategorized: "未分类",
+  reset: "重置",
+  loading: "加载中…",
+  noData: "暂无数据",
+  less: "少",
+  more: "多",
+  totalExpense: "总支出",
+  count: (v: { count: string | number }) => `${v.count}笔`,
+  expense: "支出",
+  noConsumption: "无消费",
+  heatmapLevel0: "无消费",
+  heatmapLevel1: "很少",
+  heatmapLevel2: "较少",
+  heatmapLevel3: "中等",
+  heatmapLevel4: "较多",
+  heatmapLevel5: "很多",
+  year: "年",
+  month: "月",
+  dateFormat: (v: { year: string | number; month: string | number }) => `${v.year}年${v.month}月`,
+  scaleAdjusted: "已调整显示比例",
+  exceedsLimit: "（超出显示上限）",
+  productName: "商品名称",
+  notes: "备注",
+};

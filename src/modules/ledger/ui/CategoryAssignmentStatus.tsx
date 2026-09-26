@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, RefreshCw, Square, X } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { queryKeys } from "@/lib/query-keys";
@@ -14,6 +13,8 @@ import {
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentResultDialog } from "./CategoryAssignmentResultDialog";
 import { isCategoryAssignmentJobActive } from "./category-assignment-status-visibility";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface CategoryAssignmentStatusProps {
   job: CategoryReclassificationJob | null;
@@ -31,8 +32,6 @@ export function CategoryAssignmentStatus({
   onDismiss,
   onTaskRegistered,
 }: CategoryAssignmentStatusProps) {
-  const t = useTranslations("BatchActions");
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
   const [resultsOpen, setResultsOpen] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
@@ -84,27 +83,27 @@ export function CategoryAssignmentStatus({
       ? 0
       : Math.max(0, Math.ceil((Date.parse(job.nextRetryAt) - clock) / 1000));
   const label = isReadError
-    ? t("categoryJobReadFailed")
+    ? batchActionsCopy.categoryJobReadFailed
     : job == null
-      ? t("categoryJobReadFailed")
+      ? batchActionsCopy.categoryJobReadFailed
       : job.status === "pending" || job.status === "preparing"
-        ? t("categoryJobPending")
+        ? batchActionsCopy.categoryJobPending
         : job.status === "running"
-          ? t("categoryJobProgress", {
+          ? batchActionsCopy.categoryJobProgress({
               processed: job.processedCount,
               total: job.total,
               active: job.activeDocumentCount,
             })
           : job.status === "succeeded"
-            ? t("categoryJobSucceeded", {
+            ? batchActionsCopy.categoryJobSucceeded({
                 applied: job.appliedCount,
                 confirmed: job.confirmedCount,
               })
             : job.status === "partial"
-              ? t("categoryJobPartial")
+              ? batchActionsCopy.categoryJobPartial
               : job.status === "cancelled"
-                ? t("categoryJobCancelled")
-                : t("categoryJobFailed");
+                ? batchActionsCopy.categoryJobCancelled
+                : batchActionsCopy.categoryJobFailed;
   return (
     <>
       <div
@@ -115,30 +114,32 @@ export function CategoryAssignmentStatus({
         <p className={textRoleClassName("bodyMuted", "min-w-0 flex-1")}>{label}</p>
         {job?.evidenceIncomplete ? (
           <p className={textRoleClassName("meta", "basis-full text-warning")}>
-            {t("categoryEvidenceIncomplete")}
+            {batchActionsCopy.categoryEvidenceIncomplete}
           </p>
         ) : null}
         {job != null && job.retryingDocumentCount > 0 ? (
           <p className={textRoleClassName("meta", "basis-full")}>
-            {t("categoryJobRetrying", {
+            {batchActionsCopy.categoryJobRetrying({
               count: job.retryingDocumentCount,
               seconds: retrySeconds,
             })}
           </p>
         ) : null}
         {active ? (
-          <p className={textRoleClassName("meta", "basis-full")}>{t("categoryStopDescription")}</p>
+          <p className={textRoleClassName("meta", "basis-full")}>
+            {batchActionsCopy.categoryStopDescription}
+          </p>
         ) : null}
         {isReadError ? (
           <Button size="sm" variant="outline" onClick={() => void onRefresh()}>
             <RefreshCw className="h-4 w-4" />
-            {t("categoryRefreshStatus")}
+            {batchActionsCopy.categoryRefreshStatus}
           </Button>
         ) : null}
         {job != null ? (
           <Button size="sm" variant="outline" onClick={() => setResultsOpen(true)}>
             <Eye className="h-4 w-4" />
-            {t("categoryViewResults")}
+            {batchActionsCopy.categoryViewResults}
           </Button>
         ) : null}
         {active && job != null ? (
@@ -150,7 +151,7 @@ export function CategoryAssignmentStatus({
             onClick={() => cancel.mutate(job.id)}
           >
             <Square className="h-4 w-4" />
-            {t("categoryStop")}
+            {batchActionsCopy.categoryStop}
           </Button>
         ) : null}
         {canDismiss ? (
@@ -159,8 +160,8 @@ export function CategoryAssignmentStatus({
             size="sm"
             variant="outline"
             className="min-w-9 shrink-0 px-2"
-            aria-label={tCommon("close")}
-            title={t("categoryAssignmentClose")}
+            aria-label={commonCopy.close}
+            title={batchActionsCopy.categoryAssignmentClose}
             onClick={onDismiss}
           >
             <X className="h-4 w-4" />

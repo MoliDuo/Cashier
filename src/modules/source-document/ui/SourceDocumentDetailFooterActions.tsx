@@ -1,10 +1,11 @@
 "use client";
 
 import { FileText, RefreshCw, Trash2, X, Save, XCircle, Pencil } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { SourceDocument } from "@/modules/source-document/contracts";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentActionCopy, sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentDetailFooterActionsProps {
   sourceDocument: SourceDocument | null;
@@ -46,10 +47,6 @@ export function SourceDocumentDetailFooterActions({
   onEnterEditMode,
   onViewEvidence,
 }: SourceDocumentDetailFooterActionsProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
-  const tActions = useTranslations("SourceDocumentAction");
-
   return (
     <div className="z-modal-footer flex shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-surface/80 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:bg-surface2/30 sm:py-3">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -61,7 +58,7 @@ export function SourceDocumentDetailFooterActions({
               className="h-9 gap-1.5 px-3 text-muted-foreground"
               onClick={onCancelProcessing}
               disabled={interactionDisabled}
-              aria-label={tActions("cancelProcessing")}
+              aria-label={sourceDocumentActionCopy.cancelProcessing}
               // The spinner is the only sign the cancellation was taken; a
               // reader who cannot see it gets the same news from aria-busy.
               aria-busy={isCancelling || undefined}
@@ -70,7 +67,7 @@ export function SourceDocumentDetailFooterActions({
                 aria-hidden="true"
                 className={cn("h-3.5 w-3.5", isCancelling && "animate-spin")}
               />
-              <span className="hidden sm:inline">{tActions("cancelProcessing")}</span>
+              <span className="hidden sm:inline">{sourceDocumentActionCopy.cancelProcessing}</span>
             </Button>
           )}
 
@@ -82,10 +79,10 @@ export function SourceDocumentDetailFooterActions({
             className="h-9 gap-1.5 px-3 text-muted-foreground lg:hidden"
             onClick={onViewEvidence}
             disabled={interactionDisabled}
-            aria-label={t("viewEvidence")}
+            aria-label={sourceDocumentDetailCopy.viewEvidence}
           >
             <FileText aria-hidden="true" className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t("viewEvidence")}</span>
+            <span className="hidden sm:inline">{sourceDocumentDetailCopy.viewEvidence}</span>
           </Button>
         )}
 
@@ -96,10 +93,10 @@ export function SourceDocumentDetailFooterActions({
             className="h-9 px-3 gap-1.5 text-muted-foreground"
             onClick={onOpenRetryDialog}
             disabled={interactionDisabled}
-            aria-label={t("editRetry")}
+            aria-label={sourceDocumentDetailCopy.editRetry}
           >
             <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t("editRetry")}</span>
+            <span className="hidden sm:inline">{sourceDocumentDetailCopy.editRetry}</span>
           </Button>
         )}
 
@@ -108,11 +105,11 @@ export function SourceDocumentDetailFooterActions({
           size="sm"
           className="h-9 px-3 gap-1.5 text-danger border-danger/40 hover:bg-danger/10 hover:text-danger"
           onClick={onRequestDelete}
-          aria-label={tCommon("delete")}
+          aria-label={commonCopy.delete}
           disabled={interactionDisabled}
         >
           <Trash2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{tCommon("delete")}</span>
+          <span className="hidden sm:inline">{commonCopy.delete}</span>
         </Button>
       </div>
 
@@ -128,7 +125,7 @@ export function SourceDocumentDetailFooterActions({
               disabled={busy}
             >
               <X className="h-3.5 w-3.5 mr-1.5" />
-              {t("cancelEdit")}
+              {sourceDocumentDetailCopy.cancelEdit}
             </Button>
             <Button
               type="button"
@@ -139,8 +136,8 @@ export function SourceDocumentDetailFooterActions({
             >
               <Save className="h-3.5 w-3.5" />
               {hasPendingChanges
-                ? t("saveChanges", { count: pendingChangesCount })
-                : tCommon("save")}
+                ? sourceDocumentDetailCopy.saveChanges({ count: pendingChangesCount })
+                : commonCopy.save}
             </Button>
           </div>
         ) : (
@@ -153,7 +150,7 @@ export function SourceDocumentDetailFooterActions({
             disabled={interactionDisabled}
           >
             <Pencil className="h-3.5 w-3.5" />
-            {tCommon("edit")}
+            {commonCopy.edit}
           </Button>
         )}
       </div>

@@ -25,12 +25,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useTranslations } from "next-intl";
 import { formatInstantDateLabel } from "@/lib/date-utils";
 import { copyToClipboard } from "@/lib/utils";
 import { UI, DISPLAY_LOCALE } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SettingsSection } from "./settings/SettingsSection";
+import { commonCopy } from "@/copy/common";
+import { serviceCredentialsCopy, settingsBooksCopy } from "@/copy/settings";
 
 interface ServiceCredentialSectionProps {
   credentials: ServiceCredential[];
@@ -53,9 +54,6 @@ export function ServiceCredentialSection({
   onDeleteCredential,
   onCredentialDialogClose,
 }: ServiceCredentialSectionProps) {
-  const tBooks = useTranslations("Settings.Books");
-  const t = useTranslations("ServiceCredentials");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
   const firstBookId = books[0]?.id ?? "";
   const [newCredName, setNewCredName] = useState("");
@@ -106,11 +104,11 @@ export function ServiceCredentialSection({
 
     if (success) {
       setHasCopied(true);
-      toast.success(t("copied"));
+      toast.success(serviceCredentialsCopy.copied);
       return;
     }
 
-    toast.error(tCommon("error"));
+    toast.error(commonCopy.error);
   };
 
   const closeCreatedCredentialDialog = () => {
@@ -122,20 +120,20 @@ export function ServiceCredentialSection({
   // A key whose book is gone (archived behind its back) still lists, and says
   // so rather than showing an empty name or a generic error.
   const bookName = (bookId: string) =>
-    books.find((book) => book.id === bookId)?.name ?? t("archivedBook");
+    books.find((book) => book.id === bookId)?.name ?? serviceCredentialsCopy.archivedBook;
 
   return (
     <SettingsSection
-      title={t("title")}
+      title={serviceCredentialsCopy.title}
       actions={
         <Button onClick={openCreateDialog} size="sm" disabled={isCreating || isDeleting}>
-          {t("newCredential")}
+          {serviceCredentialsCopy.newCredential}
         </Button>
       }
     >
       {credentials.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-          {t("noCredentials")}
+          {serviceCredentialsCopy.noCredentials}
         </div>
       ) : (
         <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
@@ -152,11 +150,8 @@ export function ServiceCredentialSection({
                       : "******"}
                   </span>
                   <span aria-hidden> · </span>
-                  {t("createdAt", {
-                    date: formatInstantDateLabel(credential.createdAt, locale, {
-                      today: tCommon("today"),
-                      yesterday: tCommon("yesterday"),
-                    }),
+                  {serviceCredentialsCopy.createdAt({
+                    date: formatInstantDateLabel(credential.createdAt, locale),
                   })}
                 </p>
               </div>
@@ -170,7 +165,7 @@ export function ServiceCredentialSection({
                 >
                   <SelectTrigger
                     className="max-w-40"
-                    aria-label={t("changeBook", { name: credential.name })}
+                    aria-label={serviceCredentialsCopy.changeBook({ name: credential.name })}
                   >
                     <SelectValue>{bookName(credential.bookId)}</SelectValue>
                   </SelectTrigger>
@@ -188,8 +183,8 @@ export function ServiceCredentialSection({
                   size="icon-sm"
                   disabled={isCreating || isDeleting}
                   onClick={() => setCredentialToDelete(credential)}
-                  aria-label={t("deleteButton", { name: credential.name })}
-                  title={t("deleteButton", { name: credential.name })}
+                  aria-label={serviceCredentialsCopy.deleteButton({ name: credential.name })}
+                  title={serviceCredentialsCopy.deleteButton({ name: credential.name })}
                   className="text-muted-foreground hover:text-danger"
                 >
                   <Trash2 className="size-4" />
@@ -211,13 +206,13 @@ export function ServiceCredentialSection({
           onPointerDownOutside={(event) => isCreating && event.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle>{t("createTitle")}</DialogTitle>
-            <DialogDescription>{t("createDesc")}</DialogDescription>
+            <DialogTitle>{serviceCredentialsCopy.createTitle}</DialogTitle>
+            <DialogDescription>{serviceCredentialsCopy.createDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <Input
-              placeholder={t("namePlaceholder")}
-              aria-label={t("namePlaceholder")}
+              placeholder={serviceCredentialsCopy.namePlaceholder}
+              aria-label={serviceCredentialsCopy.namePlaceholder}
               name="credentialName"
               autoComplete="off"
               value={newCredName}
@@ -226,10 +221,10 @@ export function ServiceCredentialSection({
               onKeyDown={(event) => event.key === "Enter" && handleCreate()}
             />
             <div className="space-y-2">
-              <Label htmlFor="credential-book">{tCommon("book")}</Label>
+              <Label htmlFor="credential-book">{commonCopy.book}</Label>
               <Select value={newCredBookId} onValueChange={setNewCredBookId} disabled={isCreating}>
                 <SelectTrigger id="credential-book" className="w-full">
-                  <SelectValue placeholder={tBooks("namePlaceholder")} />
+                  <SelectValue placeholder={settingsBooksCopy.namePlaceholder} />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   {books.map((book) => (
@@ -239,7 +234,7 @@ export function ServiceCredentialSection({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-micro text-muted-foreground">{t("bookDesc")}</p>
+              <p className="text-micro text-muted-foreground">{serviceCredentialsCopy.bookDesc}</p>
             </div>
           </div>
           <DialogFooter>
@@ -248,13 +243,13 @@ export function ServiceCredentialSection({
               onClick={() => setIsCreateDialogOpen(false)}
               disabled={isCreating}
             >
-              {tCommon("cancel")}
+              {commonCopy.cancel}
             </Button>
             <Button
               onClick={handleCreate}
               disabled={newCredName.trim() === "" || newCredBookId === "" || isCreating}
             >
-              {tCommon("confirm")}
+              {commonCopy.confirm}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -268,8 +263,8 @@ export function ServiceCredentialSection({
           onPointerDownOutside={(event) => event.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle>{t("createSuccessTitle")}</DialogTitle>
-            <DialogDescription>{t("createSuccessDesc")}</DialogDescription>
+            <DialogTitle>{serviceCredentialsCopy.createSuccessTitle}</DialogTitle>
+            <DialogDescription>{serviceCredentialsCopy.createSuccessDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="group relative break-all rounded border bg-surface p-4 font-mono text-sm">
@@ -285,7 +280,7 @@ export function ServiceCredentialSection({
                 ) : (
                   <Copy size={14} className="mr-1" />
                 )}
-                {hasCopied ? tCommon("success") : t("copy")}
+                {hasCopied ? commonCopy.success : serviceCredentialsCopy.copy}
               </Button>
             </div>
             <Button
@@ -294,11 +289,11 @@ export function ServiceCredentialSection({
               variant={hasCopied ? "outline" : "default"}
             >
               {hasCopied ? <Check size={16} /> : <Copy size={16} />}
-              {hasCopied ? tCommon("success") : t("copyCredential")}
+              {hasCopied ? commonCopy.success : serviceCredentialsCopy.copyCredential}
             </Button>
           </div>
           <DialogFooter>
-            <Button onClick={closeCreatedCredentialDialog}>{t("saved")}</Button>
+            <Button onClick={closeCreatedCredentialDialog}>{serviceCredentialsCopy.saved}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -306,9 +301,9 @@ export function ServiceCredentialSection({
       <ConfirmDialog
         open={credentialToDelete != null}
         onOpenChange={(open) => !open && setCredentialToDelete(null)}
-        title={t("deleteTitle")}
-        description={t("deleteDesc", { name: credentialToDelete?.name ?? "" })}
-        confirmLabel={tCommon("delete")}
+        title={serviceCredentialsCopy.deleteTitle}
+        description={serviceCredentialsCopy.deleteDesc({ name: credentialToDelete?.name ?? "" })}
+        confirmLabel={commonCopy.delete}
         variant="destructive"
         onConfirm={async () => {
           if (credentialToDelete == null || isDeleting) return;

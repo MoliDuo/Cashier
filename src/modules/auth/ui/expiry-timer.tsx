@@ -1,7 +1,7 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useCountdown } from "@/hooks/use-countdown";
+import { authCopy } from "@/copy/auth";
 
 interface ExpiryTimerProps {
   expiresAt: number | null; // Unix timestamp in seconds
@@ -21,8 +21,6 @@ export function ExpiryTimer({ expiresAt, onExpired, className }: ExpiryTimerProp
         }
   );
 
-  const t = useTranslations("Auth");
-
   if (expiresAt == null) {
     return null;
   }
@@ -41,13 +39,13 @@ export function ExpiryTimer({ expiresAt, onExpired, className }: ExpiryTimerProp
             isUrgent && "text-destructive font-medium"
           )}
         >
-          {t("codeExpiresTimer", { time: `${minutes}:${seconds.toString().padStart(2, "0")}` })}
+          {authCopy.codeExpiresTimer({ time: `${minutes}:${seconds.toString().padStart(2, "0")}` })}
         </p>
       ) : (
-        <p className="text-destructive font-medium">{t("codeExpired")}</p>
+        <p className="text-destructive font-medium">{authCopy.codeExpired}</p>
       )}
       <span aria-live="polite" className="sr-only">
-        {isExpired ? t("codeExpired") : ""}
+        {isExpired ? authCopy.codeExpired : ""}
       </span>
     </div>
   );

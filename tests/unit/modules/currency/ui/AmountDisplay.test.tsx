@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { currencyCopy } from "@/copy/common";
 import { AmountDisplay } from "@/modules/currency/ui/AmountDisplay";
 
 const mockUseAmountDisplay = vi.hoisted(() => vi.fn());
@@ -10,18 +10,7 @@ vi.mock("@/modules/currency/hooks/useAmountDisplay", () => ({
 }));
 
 function renderAmountDisplay(props: Partial<React.ComponentProps<typeof AmountDisplay>> = {}) {
-  return render(
-    <NextIntlClientProvider
-      locale="zh"
-      messages={{
-        Currency: {
-          conversionUnavailable: "暂时无法换算",
-        },
-      }}
-    >
-      <AmountDisplay amount="100" currency="CNY" mainCurrency="USD" {...props} />
-    </NextIntlClientProvider>
-  );
+  return render(<AmountDisplay amount="100" currency="CNY" mainCurrency="USD" {...props} />);
 }
 
 describe("AmountDisplay", () => {
@@ -106,7 +95,7 @@ describe("AmountDisplay", () => {
     renderAmountDisplay();
 
     expect(screen.getByText(/CNY\s*100\.00/)).toBeInTheDocument();
-    expect(screen.getByText("暂时无法换算")).toBeInTheDocument();
+    expect(screen.getByText(currencyCopy.conversionUnavailable)).toBeInTheDocument();
   });
 
   it("keeps large persisted decimals intact in the DOM", () => {

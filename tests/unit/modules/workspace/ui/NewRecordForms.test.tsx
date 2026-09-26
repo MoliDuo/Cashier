@@ -22,10 +22,6 @@ vi.mock("next/dynamic", async () => {
   };
 });
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-}));
-
 vi.mock("@/lib/safe-prefetch", () => ({
   safePrefetch: vi.fn(),
 }));

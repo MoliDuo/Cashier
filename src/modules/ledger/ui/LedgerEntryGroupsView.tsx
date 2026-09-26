@@ -2,12 +2,12 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useTranslations } from "next-intl";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { EntryGroupHeader, groupSelectionState } from "@/components/EntryGroupHeader";
 import { LedgerEntryCard } from "./LedgerEntryCard";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface LedgerEntryGroupsViewProps {
   groups: readonly { title: string; items: LedgerEntry[]; total: string }[];
@@ -53,7 +53,6 @@ export function LedgerEntryGroupsView({
   onSetGroupSelection,
 }: LedgerEntryGroupsViewProps) {
   const locale = DISPLAY_LOCALE;
-  const tBatch = useTranslations("BatchActions");
   const rows = useMemo(() => flattenLedgerEntryGroups(groups), [groups]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   // The day band is the day's own checkbox while the list is selecting: the box
@@ -68,13 +67,13 @@ export function LedgerEntryGroupsView({
           disabled: disableUnselected && state === "none",
           label:
             state === "all"
-              ? tBatch("deselectDay", { date: title })
-              : tBatch("selectDay", { date: title }),
+              ? batchActionsCopy.deselectDay({ date: title })
+              : batchActionsCopy.selectDay({ date: title }),
           onToggle: () => onSetGroupSelection(entryIds, state !== "all"),
         },
       };
     },
-    [disableUnselected, onSetGroupSelection, selectedIdSet, selectionMode, tBatch]
+    [disableUnselected, onSetGroupSelection, selectedIdSet, selectionMode]
   );
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);

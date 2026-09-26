@@ -2,7 +2,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SourceDocumentInput } from "./SourceDocumentInput";
-import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSourceDocumentInput } from "@/modules/source-document/queries";
 import { queryKeys } from "@/lib/query-keys";
@@ -12,6 +11,7 @@ import {
   buildSourceDocumentRetrySeed,
   type RetrySeedSourceDocument,
 } from "./source-document-retry-seed";
+import { sourceDocumentEditRetryDialogCopy } from "@/copy/source-document";
 
 interface SourceDocumentEditRetryDialogProps {
   sourceDocument: RetrySeedSourceDocument;
@@ -32,7 +32,6 @@ function EditRetryDialogContent({
   onSuccess,
   onPendingChange,
 }: SourceDocumentEditRetryDialogProps) {
-  const t = useTranslations("SourceDocumentEditRetryDialog");
   const [sourceDocument] = useState(sourceDocumentProp);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handlePendingChange = useCallback(
@@ -92,7 +91,7 @@ function EditRetryDialogContent({
         }}
       >
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogTitle>{sourceDocumentEditRetryDialogCopy.title}</DialogTitle>
         </DialogHeader>
         <div
           className="relative min-h-0 flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6"
@@ -103,7 +102,7 @@ function EditRetryDialogContent({
           ) : !seedReady ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-3 text-center">
               <p className="text-sm text-destructive" role="alert">
-                {t("loadError")}
+                {sourceDocumentEditRetryDialogCopy.loadError}
               </p>
               <Button
                 type="button"
@@ -113,7 +112,7 @@ function EditRetryDialogContent({
                 disabled={isFetching}
               >
                 <RefreshCw className={isFetching ? "size-4 animate-spin" : "size-4"} />
-                {t("reload")}
+                {sourceDocumentEditRetryDialogCopy.reload}
               </Button>
             </div>
           ) : (

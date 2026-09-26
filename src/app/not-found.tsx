@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 import { AlertCircle, Home } from "lucide-react";
 import { textRoleClassName } from "@/components/typography";
+import { notFoundCopy } from "@/copy/app";
 
 export default function NotFound() {
-  const t = useTranslations("NotFound");
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg px-4">
       <div className="max-w-md w-full text-center">
@@ -19,14 +17,14 @@ export default function NotFound() {
             </div>
           </div>
         </div>
-        <h1 className={textRoleClassName("pageTitle", "mb-4")}>{t("title")}</h1>
-        <p className={textRoleClassName("bodyMuted", "mb-8")}>{t("description")}</p>
+        <h1 className={textRoleClassName("pageTitle", "mb-4")}>{notFoundCopy.title}</h1>
+        <p className={textRoleClassName("bodyMuted", "mb-8")}>{notFoundCopy.description}</p>
         <Link
           href="/"
           className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-primary hover:bg-primary/90 transition-colors shadow-sm"
         >
           <Home aria-hidden="true" className="w-5 h-5 mr-2" />
-          {t("backToHome")}
+          {notFoundCopy.backToHome}
         </Link>
       </div>
     </div>

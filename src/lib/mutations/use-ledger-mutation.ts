@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   invalidateLedgerQueries,
   type LedgerInvalidationGroup,
 } from "@/lib/mutations/ledger-invalidation";
+import { commonCopy } from "@/copy/common";
 
 export interface UseLedgerMutationOptions<TData, TVariables> {
   mutationFn: (variables: TVariables) => Promise<TData>;
@@ -29,7 +29,6 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
   options: UseLedgerMutationOptions<TData, TVariables>
 ) {
   const queryClient = useQueryClient();
-  const tCommon = useTranslations("Common");
   const {
     mutationFn,
     refreshMode = "wait",
@@ -61,7 +60,7 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
           console.error("[useLedgerMutation] resource invalidation failed", {
             error: invalidationError,
           });
-          toast.error(tCommon("savedRefreshFailed"));
+          toast.error(commonCopy.savedRefreshFailed);
           globalThis.setTimeout(() => {
             void invalidateLedgerQueries(queryClient, groups).catch((retryError) => {
               console.error("[useLedgerMutation] resource invalidation retry failed", {

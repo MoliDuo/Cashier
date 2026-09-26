@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { batchActionsCopy } from "@/copy/workspace";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
@@ -20,13 +21,6 @@ vi.mock("@/lib/mutations/ledger-invalidation", () => ({
   invalidateLedgerQueries: vi.fn(async () => undefined),
 }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
-vi.mock("next-intl", () => ({
-  // The counts are the message: they are what the reader is told, so the mock
-  // spells them out instead of dropping them.
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    values == null ? key : `${key}(${values.applied}/${values.confirmed}/${values.issues})`,
-  useLocale: () => "zh",
-}));
 vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
   cancelCategoryAssignmentAction: vi.fn(),
   retryCategoryAssignmentFailuresAction: vi.fn(),
@@ -73,6 +67,9 @@ const succeededJob = () =>
     activeDocumentCount: 0,
     completedAt: "2026-09-14T00:05:00.000Z",
   });
+
+/** What the reader is told about `succeededJob`: the counts are the message. */
+const DONE_9_OF_10 = batchActionsCopy.aiCategoryDone({ applied: 9, confirmed: 1, issues: 0 });
 
 /** Asks the page for a run, the way the batch toolbar does after a submit. */
 function SubmitProbe({ run }: { run: CategoryReclassificationJob }) {
@@ -127,7 +124,7 @@ describe("CategoryAssignmentProvider", () => {
     await waitForBand();
     await poll(queryClient);
 
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("aiCategoryDone(9/1/0)"));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(DONE_9_OF_10));
     // A statement of the ledger's most recent run is not news a second time.
     await poll(queryClient);
     expect(toastSuccess).toHaveBeenCalledTimes(1);
@@ -141,7 +138,7 @@ describe("CategoryAssignmentProvider", () => {
 
     fireEvent.click(screen.getByText("submit"));
 
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("aiCategoryDone(9/1/0)"));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(DONE_9_OF_10));
   });
 
   it("stays quiet about a run that ended before this page opened", async () => {

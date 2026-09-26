@@ -1,7 +1,6 @@
 "use client";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
@@ -9,6 +8,8 @@ import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { LedgerEntriesLoading } from "./LedgerEntriesLoading";
 import { LedgerEntriesUnifiedGroups } from "./UnifiedStreamGroups";
 import type { useLedgerEntriesTab } from "@/modules/workspace/hooks/useLedgerEntriesTab";
+import { commonCopy } from "@/copy/common";
+import { entryFilterPanelCopy, ledgerEntriesTabCopy } from "@/copy/workspace";
 
 interface LedgerEntriesStreamBodyProps {
   isLoading: boolean;
@@ -65,10 +66,6 @@ export function LedgerEntriesStreamBody({
   sentinelRef,
   recovery,
 }: LedgerEntriesStreamBodyProps) {
-  const t = useTranslations("LedgerEntriesTab");
-  const tCommon = useTranslations("Common");
-  const tFilter = useTranslations("EntryFilterPanel");
-
   return (
     <div className="space-y-4">
       {isLoading ? (
@@ -106,8 +103,8 @@ export function LedgerEntriesStreamBody({
                   filters.minAmount != null ||
                   filters.maxAmount != null ||
                   (filters.statuses?.length ?? 0) > 0
-                    ? tFilter("noMatchingResults")
-                    : tCommon("noRecords")}
+                    ? entryFilterPanelCopy.noMatchingResults
+                    : commonCopy.noRecords}
                 </span>
               </div>
             </div>
@@ -118,12 +115,12 @@ export function LedgerEntriesStreamBody({
             <div ref={sentinelRef} className="flex h-12 justify-center py-4" aria-live="polite">
               {isFetchNextPageError ? (
                 <Button variant="outline" size="sm" onClick={() => void fetchNextPage()}>
-                  {t("loadMoreFailed")}
+                  {ledgerEntriesTabCopy.loadMoreFailed}
                 </Button>
               ) : isFetchingNextPage ? (
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
-                  {t("loadingMore")}
+                  {ledgerEntriesTabCopy.loadingMore}
                 </span>
               ) : null}
             </div>
@@ -132,7 +129,9 @@ export function LedgerEntriesStreamBody({
           {/* End of list indicator when no more pages */}
           {!hasNextPage && streamGroups.length > 0 && (
             <div className="flex justify-center py-4">
-              <span className="text-xs text-muted-foreground">— {t("noMore")} —</span>
+              <span className="text-xs text-muted-foreground">
+                — {ledgerEntriesTabCopy.noMore} —
+              </span>
             </div>
           )}
         </>

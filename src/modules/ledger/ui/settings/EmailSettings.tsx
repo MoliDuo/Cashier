@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -27,6 +26,8 @@ import {
 } from "@/modules/auth/server-actions/login-emails";
 import type { LoginEmailErrorCode } from "@/modules/auth/server-actions/login-emails";
 import { SettingsField } from "./SettingsField";
+import { commonCopy } from "@/copy/common";
+import { settingsEmailsCopy } from "@/copy/settings";
 
 interface EmailSettingsProps {
   /** The address this session signed in with, painted until the full list arrives. */
@@ -49,8 +50,6 @@ export function EmailSettings({
   onRequireReauthentication,
   onAllSessionsEnded,
 }: EmailSettingsProps) {
-  const t = useTranslations("Settings.Emails");
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
   const key = queryKeys.loginEmails();
   const { data } = useQuery({
@@ -73,23 +72,23 @@ export function EmailSettings({
   const message = (code: LoginEmailErrorCode) => {
     switch (code) {
       case "invalid_email":
-        return t("invalid_email");
+        return settingsEmailsCopy.invalidEmail;
       case "invalid_code":
-        return t("invalid_code");
+        return settingsEmailsCopy.invalidCode;
       case "expired_code":
-        return t("expired_code");
+        return settingsEmailsCopy.expiredCode;
       case "email_in_use":
-        return t("email_in_use");
+        return settingsEmailsCopy.emailInUse;
       case "rate_limited":
-        return t("rate_limited");
+        return settingsEmailsCopy.rateLimited;
       case "locked":
-        return t("locked");
+        return settingsEmailsCopy.locked;
       case "reauth_required":
-        return t("reauth_required");
+        return settingsEmailsCopy.reauthRequired;
       case "last_email":
-        return t("lastEmail");
+        return settingsEmailsCopy.lastEmail;
       default:
-        return t("unknown");
+        return settingsEmailsCopy.unknown;
     }
   };
 
@@ -117,7 +116,7 @@ export function EmailSettings({
       }
       setSent(true);
       setCode("");
-      toast.success(t("codeSent"));
+      toast.success(settingsEmailsCopy.codeSent);
     } catch {
       const text = message("unknown");
       setError(text);
@@ -143,7 +142,7 @@ export function EmailSettings({
         return;
       }
       queryClient.setQueryData<string[]>(key, result.emails);
-      toast.success(t("added"));
+      toast.success(settingsEmailsCopy.added);
       setIsAddOpen(false);
       reset();
     } catch {
@@ -158,11 +157,11 @@ export function EmailSettings({
   return (
     <>
       <SettingsField
-        title={t("title")}
+        title={settingsEmailsCopy.title}
         stacked
         actions={
           <Button type="button" size="sm" onClick={() => setIsAddOpen(true)}>
-            {t("add")}
+            {settingsEmailsCopy.add}
           </Button>
         }
       >
@@ -175,8 +174,12 @@ export function EmailSettings({
                 variant="ghost"
                 size="icon-sm"
                 disabled={emails.length <= 1}
-                aria-label={t("remove", { email: address })}
-                title={emails.length <= 1 ? t("lastEmail") : t("remove", { email: address })}
+                aria-label={settingsEmailsCopy.remove({ email: address })}
+                title={
+                  emails.length <= 1
+                    ? settingsEmailsCopy.lastEmail
+                    : settingsEmailsCopy.remove({ email: address })
+                }
                 className="shrink-0 text-muted-foreground hover:text-danger"
                 onClick={() => setRemoveTarget(address)}
               >
@@ -190,12 +193,12 @@ export function EmailSettings({
       <Dialog open={isAddOpen} onOpenChange={(open) => !pending && setIsAddOpen(open)}>
         <DialogContent variant="modal">
           <DialogHeader>
-            <DialogTitle>{t("addTitle")}</DialogTitle>
-            <DialogDescription>{t("addDesc")}</DialogDescription>
+            <DialogTitle>{settingsEmailsCopy.addTitle}</DialogTitle>
+            <DialogDescription>{settingsEmailsCopy.addDesc}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="new-login-email">{t("newEmail")}</Label>
+              <Label htmlFor="new-login-email">{settingsEmailsCopy.newEmail}</Label>
               <Input
                 id="new-login-email"
                 type="email"
@@ -214,7 +217,7 @@ export function EmailSettings({
             </div>
             {sent ? (
               <div className="grid gap-2">
-                <Label htmlFor="login-email-code">{t("verificationCode")}</Label>
+                <Label htmlFor="login-email-code">{settingsEmailsCopy.verificationCode}</Label>
                 <Input
                   id="login-email-code"
                   name="verificationCode"
@@ -238,14 +241,14 @@ export function EmailSettings({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={pending}>
-              {tCommon("cancel")}
+              {commonCopy.cancel}
             </Button>
             <Button
               disabled={pending || email.trim() === "" || (sent && code.length !== 6)}
               onClick={() => void (sent ? verify() : requestCode())}
             >
               {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-              {sent ? t("verify") : t("sendCode")}
+              {sent ? settingsEmailsCopy.verify : settingsEmailsCopy.sendCode}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -254,9 +257,9 @@ export function EmailSettings({
       <ConfirmDialog
         open={removeTarget != null}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
-        title={t("removeTitle", { email: removeTarget ?? "" })}
-        description={t("removeDesc")}
-        confirmLabel={tCommon("delete")}
+        title={settingsEmailsCopy.removeTitle({ email: removeTarget ?? "" })}
+        description={settingsEmailsCopy.removeDesc}
+        confirmLabel={commonCopy.delete}
         variant="destructive"
         onConfirm={async () => {
           if (removeTarget == null) return false;
@@ -272,7 +275,7 @@ export function EmailSettings({
           queryClient.setQueryData<string[]>(key, result.emails);
           // Removing an address ended every session, not only this one; the
           // login screen repeats the notice after sign-out.
-          toast.success(t("sessionsEnded"));
+          toast.success(settingsEmailsCopy.sessionsEnded);
           setRemoveTarget(null);
           await onAllSessionsEnded?.();
           return true;

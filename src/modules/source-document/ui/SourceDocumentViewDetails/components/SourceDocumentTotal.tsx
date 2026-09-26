@@ -1,8 +1,9 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentTotalProps {
   totalInMainCurrency: string;
@@ -21,8 +22,6 @@ export function SourceDocumentTotal({
   staleConversionCount,
   unconvertedCount,
 }: SourceDocumentTotalProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
   const amount = formatCurrencyAmount(totalInMainCurrency, mainCurrency, locale);
 
@@ -34,11 +33,11 @@ export function SourceDocumentTotal({
       </AmountText>
       {unconvertedCount > 0 ? (
         <span className="text-xs text-warning" role="status">
-          {tCommon("incompleteAccountingProjection")}
+          {commonCopy.incompleteAccountingProjection}
         </span>
       ) : staleConversionCount > 0 ? (
         <span className="text-xs text-muted-foreground" role="status">
-          {t("pendingRecalculation")}
+          {sourceDocumentDetailCopy.pendingRecalculation}
         </span>
       ) : null}
     </div>

@@ -3,7 +3,6 @@
  */
 
 "use client";
-import { useTranslations } from "next-intl";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getHeatmapColor, formatCellAmount } from "../../lib/heatmap-colors";
@@ -11,6 +10,7 @@ import { formatCompactAmount } from "@/lib/format/currency";
 import { formatRelativeDateLabel } from "@/lib/date-utils";
 import type { HeatmapLevel } from "../../types";
 import { compare } from "@/lib/money/decimal";
+import { calendarCopy } from "@/copy/controls";
 
 interface DayCellLargeProps {
   date: string;
@@ -33,11 +33,7 @@ export function DayCellLarge({
   currency,
   locale,
 }: DayCellLargeProps) {
-  const t = useTranslations("Calendar");
-  const dateLabel = formatRelativeDateLabel(date, locale, {
-    today: t("today"),
-    yesterday: t("yesterday"),
-  });
+  const dateLabel = formatRelativeDateLabel(date, locale);
 
   return (
     <div className="relative min-w-0 overflow-visible">
@@ -45,7 +41,7 @@ export function DayCellLarge({
         <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label={`${dateLabel}, ${count > 0 || compare(amount, "0") !== 0 ? `${t("expense")}: ${formatCellAmount(amount, currency, locale)}` : t("noConsumption")}`}
+            aria-label={`${dateLabel}, ${count > 0 || compare(amount, "0") !== 0 ? `${calendarCopy.expense}: ${formatCellAmount(amount, currency, locale)}` : calendarCopy.noConsumption}`}
             onClick={onClick}
             className={cn(
               "aspect-square w-full min-w-0 overflow-hidden rounded-lg transition-[color,background-color,border-color,opacity] duration-[var(--motion-feedback)]",
@@ -81,11 +77,11 @@ export function DayCellLarge({
           <div className="font-medium">{dateLabel}</div>
           {count > 0 || compare(amount, "0") !== 0 ? (
             <div>
-              {t("expense")}: {formatCellAmount(amount, currency, locale)}
-              {count > 0 ? ` · ${t("count", { count })}` : null}
+              {calendarCopy.expense}: {formatCellAmount(amount, currency, locale)}
+              {count > 0 ? ` · ${calendarCopy.count({ count })}` : null}
             </div>
           ) : (
-            <div className="text-muted-foreground">{t("noConsumption")}</div>
+            <div className="text-muted-foreground">{calendarCopy.noConsumption}</div>
           )}
         </TooltipContent>
       </Tooltip>

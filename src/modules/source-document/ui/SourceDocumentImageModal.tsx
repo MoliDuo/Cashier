@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useRef, useState, type SetStateAction } from "react";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { storedFileReadUrl } from "../stored-file-read";
+import { sourceDocumentImageModalCopy } from "@/copy/source-document";
 
 export interface SourceDocumentModalImage {
   data: string;
@@ -31,7 +31,6 @@ export function SourceDocumentImageModal({
   open,
   onOpenChange,
 }: SourceDocumentImageModalProps) {
-  const t = useTranslations("SourceDocumentImageModal");
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -98,8 +97,11 @@ export function SourceDocumentImageModal({
   const title = !hasImages
     ? ""
     : images.length === 1
-      ? t("title")
-      : t("titleWithIndex", { current: currentIndex + 1, total: images.length });
+      ? sourceDocumentImageModalCopy.title
+      : sourceDocumentImageModalCopy.titleWithIndex({
+          current: currentIndex + 1,
+          total: images.length,
+        });
 
   if (!hasImages) return null;
 
@@ -148,7 +150,7 @@ export function SourceDocumentImageModal({
               size="icon-sm"
               onClick={() => setScale(view.scale - 0.5)}
               disabled={view.scale <= 1}
-              aria-label={t("zoomOut")}
+              aria-label={sourceDocumentImageModalCopy.zoomOut}
             >
               <Minus className="h-4 w-4" />
             </Button>
@@ -160,7 +162,7 @@ export function SourceDocumentImageModal({
               size="icon-sm"
               onClick={() => setScale(view.scale + 0.5)}
               disabled={view.scale >= 4}
-              aria-label={t("zoomIn")}
+              aria-label={sourceDocumentImageModalCopy.zoomIn}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -169,7 +171,7 @@ export function SourceDocumentImageModal({
               size="icon-sm"
               onClick={resetView}
               disabled={view.scale === 1 && view.x === 0 && view.y === 0}
-              aria-label={t("resetZoom")}
+              aria-label={sourceDocumentImageModalCopy.resetZoom}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -178,8 +180,8 @@ export function SourceDocumentImageModal({
               size="icon-sm"
               className="h-11 w-11 sm:h-9 sm:w-9"
               onClick={() => onOpenChange(false)}
-              aria-label={t("close")}
-              title={t("close")}
+              aria-label={sourceDocumentImageModalCopy.close}
+              title={sourceDocumentImageModalCopy.close}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -195,7 +197,7 @@ export function SourceDocumentImageModal({
                 className="absolute left-3 top-1/2 z-10 -translate-y-1/2"
                 onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
-                aria-label={t("previous")}
+                aria-label={sourceDocumentImageModalCopy.previous}
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
@@ -254,7 +256,7 @@ export function SourceDocumentImageModal({
             >
               <Image
                 src={currentImage == null ? "" : imageSource(currentImage)}
-                alt={t("imageAlt", { index: currentIndex + 1 })}
+                alt={sourceDocumentImageModalCopy.imageAlt({ index: currentIndex + 1 })}
                 fill
                 unoptimized
                 className="select-none object-contain"
@@ -273,7 +275,7 @@ export function SourceDocumentImageModal({
                 className="absolute right-3 top-1/2 z-10 -translate-y-1/2"
                 onClick={() => setCurrentIndex((prev) => Math.min(images.length - 1, prev + 1))}
                 disabled={currentIndex === images.length - 1}
-                aria-label={t("next")}
+                aria-label={sourceDocumentImageModalCopy.next}
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
@@ -291,12 +293,12 @@ export function SourceDocumentImageModal({
                     "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-surface",
                     currentIndex === index ? "border-primary" : "border-transparent"
                   )}
-                  aria-label={t("imageAlt", { index: index + 1 })}
+                  aria-label={sourceDocumentImageModalCopy.imageAlt({ index: index + 1 })}
                   aria-current={currentIndex === index ? "true" : undefined}
                 >
                   <Image
                     src={imageSource(image)}
-                    alt={t("imageAlt", { index: index + 1 })}
+                    alt={sourceDocumentImageModalCopy.imageAlt({ index: index + 1 })}
                     fill
                     unoptimized
                     className="object-cover"

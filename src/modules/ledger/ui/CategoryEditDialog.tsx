@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +12,8 @@ import { IconPicker } from "@/components/ui/icon-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { EditSession } from "@/modules/ledger/hooks/useCategoryManagementDraft";
+import { commonCopy } from "@/copy/common";
+import { settingsCopy } from "@/copy/settings";
 
 interface CategoryEditDialogProps {
   editSession: EditSession | null;
@@ -27,14 +28,11 @@ export function CategoryEditDialog({
   onRequestClose,
   onCommit,
 }: CategoryEditDialogProps) {
-  const t = useTranslations("Settings");
-  const common = useTranslations("Common");
-
   return (
     <Dialog open={editSession != null} onOpenChange={(open) => !open && onRequestClose()}>
       <DialogContent variant="modal">
         <DialogHeader>
-          <DialogTitle>{t("editCategoryDialog")}</DialogTitle>
+          <DialogTitle>{settingsCopy.editCategoryDialog}</DialogTitle>
         </DialogHeader>
         {editSession == null ? null : (
           <div className="space-y-4">
@@ -58,7 +56,7 @@ export function CategoryEditDialog({
                       : { ...session, draft: { ...session.draft, name: event.target.value } }
                   )
                 }
-                aria-label={t("categoryName")}
+                aria-label={settingsCopy.categoryName}
               />
             </div>
             <Textarea
@@ -75,17 +73,17 @@ export function CategoryEditDialog({
                       }
                 )
               }
-              aria-label={t("categoryDescription")}
+              aria-label={settingsCopy.categoryDescription}
               className="min-h-24 w-full"
             />
           </div>
         )}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onRequestClose}>
-            {common("cancel")}
+            {commonCopy.cancel}
           </Button>
           <Button type="button" disabled={editSession?.draft.name.trim() === ""} onClick={onCommit}>
-            {common("save")}
+            {commonCopy.save}
           </Button>
         </DialogFooter>
       </DialogContent>

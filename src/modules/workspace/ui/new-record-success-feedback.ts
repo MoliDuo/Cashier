@@ -5,17 +5,9 @@ import type { EntryFilters } from "@/modules/ledger/filters";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import { openLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 import type { LedgerTab } from "@/lib/ledger-tabs";
+import { quickEntryFormCopy, sourceDocumentInputCopy } from "@/copy/source-document";
 
 export type NewRecordInputMode = "ai" | "quick";
-
-interface NewRecordSuccessMessages {
-  aiSuccess: string;
-  quickSuccess: string;
-  savedMayBeHidden: string;
-  /** Renders the "saved into another book" warning for the given book name. */
-  savedToOtherBook: (bookName: string) => string;
-  viewRecord: string;
-}
 
 interface SavedBook {
   id: string;
@@ -31,7 +23,6 @@ interface ShowNewRecordSuccessFeedbackOptions {
   viewedBookId: string | null;
   /** The book the record went into, when it is known. */
   savedBook: SavedBook | null;
-  messages: NewRecordSuccessMessages;
 }
 
 function dateOnly(value: string): string {
@@ -85,12 +76,11 @@ export function showNewRecordSuccessFeedback({
   committedFilters,
   viewedBookId,
   savedBook,
-  messages,
 }: ShowNewRecordSuccessFeedbackOptions): void {
   if (shouldWarnNewRecordSavedToOtherBook(viewedBookId, savedBook)) {
-    toast.success(messages.savedToOtherBook(savedBook.name), {
+    toast.success(sourceDocumentInputCopy.savedToOtherBook({ book: savedBook.name }), {
       action: {
-        label: messages.viewRecord,
+        label: sourceDocumentInputCopy.viewRecord,
         onClick: () =>
           openLedgerDetail({
             type: "source-document",
@@ -102,9 +92,9 @@ export function showNewRecordSuccessFeedback({
   }
 
   if (shouldWarnNewRecordMayBeHidden(activeTab, committedFilters, result.documentDate)) {
-    toast.success(messages.savedMayBeHidden, {
+    toast.success(sourceDocumentInputCopy.savedMayBeHidden, {
       action: {
-        label: messages.viewRecord,
+        label: sourceDocumentInputCopy.viewRecord,
         onClick: () =>
           openLedgerDetail({
             type: "source-document",
@@ -115,5 +105,7 @@ export function showNewRecordSuccessFeedback({
     return;
   }
 
-  toast.success(mode === "ai" ? messages.aiSuccess : messages.quickSuccess);
+  toast.success(
+    mode === "ai" ? sourceDocumentInputCopy.uploadSuccess : quickEntryFormCopy.quickEntrySuccess
+  );
 }

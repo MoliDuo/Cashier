@@ -1,7 +1,5 @@
 import type { NextConfig } from "next";
-import createNextIntlPlugin from "next-intl/plugin";
 
-const withNextIntl = createNextIntlPlugin();
 const demoProject = process.env.CASHIER_DEMO_PROJECT;
 if (demoProject != null && !/^[a-z][a-z0-9-]{0,40}$/.test(demoProject)) {
   throw new Error("CASHIER_DEMO_PROJECT must be a lowercase Compose project name");
@@ -52,4 +50,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default nextConfig;

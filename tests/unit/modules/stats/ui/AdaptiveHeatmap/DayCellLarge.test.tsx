@@ -1,15 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { calendarCopy } from "@/copy/controls";
 import { DayCellLarge } from "@/modules/stats/ui/AdaptiveHeatmap/DayCellLarge";
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => {
-    if (key === "expense") return "Expense";
-    if (key === "noConsumption") return "No consumption";
-    return key;
-  },
-}));
 
 describe("DayCellLarge", () => {
   // The cell names its day, so it reads the clock to spot today/yesterday.
@@ -38,11 +31,11 @@ describe("DayCellLarge", () => {
     );
 
     const trigger = screen.getByRole("button", {
-      name: "2026年9月2日 星期三, Expense: $1.3万",
+      name: `2026年9月2日 星期三, ${calendarCopy.expense}: $1.3万`,
     });
     fireEvent.focus(trigger);
 
-    expect(await screen.findByText("Expense: $1.3万")).toBeVisible();
+    expect(await screen.findByText(`${calendarCopy.expense}: $1.3万`)).toBeVisible();
   });
 
   it("shows a zero net amount when the day contains offsetting entries", () => {
@@ -62,7 +55,7 @@ describe("DayCellLarge", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "2026年9月3日 星期四, Expense: $0",
+        name: `2026年9月3日 星期四, ${calendarCopy.expense}: $0`,
       })
     ).toBeVisible();
   });

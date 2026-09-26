@@ -1,6 +1,6 @@
 import { Calendar, DollarSign, RefreshCw, Scissors, Tag, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { BatchActionButton } from "@/components/batch-action-button";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface LedgerEntriesActionsProps {
   /** Every action is unavailable, either because a write is running or because
@@ -51,8 +51,6 @@ export function LedgerEntriesActions({
   onSplit,
   onDelete,
 }: LedgerEntriesActionsProps) {
-  const t = useTranslations("BatchActions");
-
   return (
     <>
       {onOpenCategory != null && (
@@ -61,10 +59,10 @@ export function LedgerEntriesActions({
           icon={Tag}
           disabled={disabled}
           loading={isChangingCategory || isReclassifying}
-          shortLabel={t("manualCategoryShort")}
+          shortLabel={batchActionsCopy.manualCategoryShort}
           onClick={onOpenCategory}
         >
-          {t("manualCategory")}
+          {batchActionsCopy.manualCategory}
         </BatchActionButton>
       )}
 
@@ -73,15 +71,15 @@ export function LedgerEntriesActions({
           variant="outline"
           icon={Calendar}
           disabled={disabled || nonCategoryDisabled}
-          shortLabel={t("setDateShort")}
+          shortLabel={batchActionsCopy.setDateShort}
           onClick={onChangeDate}
         >
-          {t("setDate")}
+          {batchActionsCopy.setDate}
         </BatchActionButton>
       )}
       {onSplit != null && (
         <BatchActionButton variant="outline" icon={Scissors} disabled={disabled} onClick={onSplit}>
-          {t("split")}
+          {batchActionsCopy.split}
         </BatchActionButton>
       )}
       {onRetry != null && (
@@ -92,7 +90,7 @@ export function LedgerEntriesActions({
           loading={isRetrying}
           onClick={onRetry}
         >
-          {t("retry")}
+          {batchActionsCopy.retry}
         </BatchActionButton>
       )}
 
@@ -102,10 +100,10 @@ export function LedgerEntriesActions({
           icon={DollarSign}
           disabled={disabled || nonCategoryDisabled}
           loading={isChangingCurrency}
-          shortLabel={t("setCurrencyShort")}
+          shortLabel={batchActionsCopy.setCurrencyShort}
           onClick={onOpenCurrency}
         >
-          {t("setCurrency")}
+          {batchActionsCopy.setCurrency}
         </BatchActionButton>
       )}
 
@@ -117,7 +115,7 @@ export function LedgerEntriesActions({
           loading={isDeleting}
           onClick={onDelete}
         >
-          {t("delete")}
+          {batchActionsCopy.delete}
         </BatchActionButton>
       )}
     </>

@@ -1,5 +1,4 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { abs, compare } from "@/lib/money/decimal";
@@ -10,6 +9,7 @@ import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsMetricStrip } from "./StatsMetricStrip";
 import { StatsSparkline } from "./StatsSparkline";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsSummaryProps {
   total: string;
@@ -38,7 +38,6 @@ export function StatsSummary({
   readOnly = false,
   isLoading = false,
 }: StatsSummaryProps) {
-  const t = useTranslations("StatsTab");
   const locale = DISPLAY_LOCALE;
 
   const delta = comparison?.amountDelta ?? "0";
@@ -55,21 +54,21 @@ export function StatsSummary({
       ? null
       : comparison.mode === "same_period"
         ? deltaComparison === 0
-          ? t("samePeriodEqual", comparisonValues)
+          ? statsTabCopy.samePeriodEqual(comparisonValues)
           : isIncrease
-            ? t("samePeriodMore", comparisonValues)
-            : t("samePeriodLess", comparisonValues)
+            ? statsTabCopy.samePeriodMore(comparisonValues)
+            : statsTabCopy.samePeriodLess(comparisonValues)
         : deltaComparison === 0
-          ? t("fullPeriodEqual", comparisonValues)
+          ? statsTabCopy.fullPeriodEqual(comparisonValues)
           : isIncrease
-            ? t("fullPeriodMore", comparisonValues)
-            : t("fullPeriodLess", comparisonValues);
+            ? statsTabCopy.fullPeriodMore(comparisonValues)
+            : statsTabCopy.fullPeriodLess(comparisonValues);
 
   return (
     <section className="space-y-4 rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
         <div className="min-w-0 space-y-1">
-          <p className={textRoleClassName("bodyMuted")}>{t("totalExpense")}</p>
+          <p className={textRoleClassName("bodyMuted")}>{statsTabCopy.totalExpense}</p>
           {isLoading ? (
             <div className="h-10 w-36 animate-pulse rounded bg-surface2" aria-hidden />
           ) : (

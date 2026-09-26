@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -18,6 +17,7 @@ import type {
   EntryCategoryWithCount,
 } from "@/modules/ledger/contracts";
 import { applyCategoryPresetAction } from "@/modules/ledger/server-actions/categories";
+import { settingsCopy } from "@/copy/settings";
 
 export type PresetMappingDraft = Record<string, number | null | undefined>;
 
@@ -128,7 +128,6 @@ interface UseCategoryPresetSwitchOptions {
 }
 
 export function useCategoryPresetSwitch({ categories }: UseCategoryPresetSwitchOptions) {
-  const t = useTranslations("Settings");
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -182,7 +181,11 @@ export function useCategoryPresetSwitch({ categories }: UseCategoryPresetSwitchO
     },
     onError: (error) => {
       setConfirmOpen(false);
-      setSaveError(errorCode(error) === "CONFLICT" ? t("updateConflict") : t("presetApplyFailed"));
+      setSaveError(
+        errorCode(error) === "CONFLICT"
+          ? settingsCopy.updateConflict
+          : settingsCopy.presetApplyFailed
+      );
     },
   });
 

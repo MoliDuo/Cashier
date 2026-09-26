@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentActionCopy } from "@/copy/source-document";
+import { batchActionsCopy } from "@/copy/workspace";
 import type { PeriodParams } from "@/lib/period-utils";
 import { queryKeys } from "@/lib/query-keys";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
@@ -23,7 +26,6 @@ const mocks = vi.hoisted(() => ({
   toastWarning: vi.fn(),
 }));
 
-vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError, warning: mocks.toastWarning },
 }));
@@ -489,7 +491,7 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
 
     act(() => result.current.selection.handleUpdateDates("2026-09-04", ["doc-1"]));
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("error"));
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(commonCopy.error));
     expect(mocks.batchUpdate).toHaveBeenCalledWith({
       sourceDocumentIds: ["doc-1"],
       data: { documentDate: "2026-09-04" },
@@ -505,7 +507,9 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
 
     act(() => result.current.selection.handleUpdateDates("2026-09-04", ["doc-1", "doc-2"]));
 
-    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith("datesUpdated"));
+    await waitFor(() =>
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(batchActionsCopy.datesUpdated({ count: 2 }))
+    );
     expect(result.current.selection.selectedIds).toEqual([]);
   });
 
@@ -526,8 +530,10 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
     expect(mocks.batchDelete).toHaveBeenCalledWith(["doc-1", "doc-2"]);
     expect(closed).toBe(false);
     expect(onCommitted).not.toHaveBeenCalled();
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("deleted");
-    expect(mocks.toastWarning).toHaveBeenCalledWith("partialResult");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(batchActionsCopy.deleted({ count: 1 }));
+    expect(mocks.toastWarning).toHaveBeenCalledWith(
+      batchActionsCopy.partialResult({ succeeded: 1, failed: 1 })
+    );
     expect(result.current.selection.selectedIds).toEqual(["doc-2"]);
   });
 
@@ -568,7 +574,7 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
       await command.promise;
     });
     await waitFor(() => expect(result.current.selection.isRetrying).toBe(false));
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("retried");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(batchActionsCopy.retried({ count: 1 }));
     expect(result.current.selection.selectedIds).toEqual([]);
   });
 });
@@ -586,7 +592,7 @@ describe("useLedgerEntriesTab single-record delete", () => {
     await act(() => result.current.actions.handleConfirmDelete());
 
     expect(mocks.deleteSourceDocument).toHaveBeenCalledWith("doc-1");
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("deleteSuccess");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(commonCopy.deleteSuccess);
     expect(mocks.toastSuccess).toHaveBeenCalledTimes(1);
     expect(result.current.dialogs.deleteConfirmOpen).toBe(false);
     expect(result.current.selection.selectedIds).toEqual([]);
@@ -597,7 +603,7 @@ describe("useLedgerEntriesTab single-record delete", () => {
       await expect(result.current.actions.handleConfirmDelete()).rejects.toThrow("delete failed");
     });
 
-    expect(mocks.toastError).toHaveBeenCalledWith("deleteFailed");
+    expect(mocks.toastError).toHaveBeenCalledWith(commonCopy.deleteFailed);
     expect(mocks.toastError).toHaveBeenCalledTimes(1);
     expect(result.current.dialogs.deleteConfirmOpen).toBe(true);
   });
@@ -613,7 +619,7 @@ describe("useLedgerEntriesTab single-record delete", () => {
     act(() => result.current.actions.handleRequestDelete(doc));
     await act(() => result.current.actions.handleConfirmDelete());
 
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("deleteSuccess");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(commonCopy.deleteSuccess);
     expect(result.current.dialogs.deleteConfirmOpen).toBe(false);
     expect(mocks.toastWarning).not.toHaveBeenCalled();
     await act(async () => refreshGate.resolve());
@@ -630,8 +636,10 @@ describe("useLedgerEntriesTab single-record delete", () => {
     act(() => result.current.actions.handleRequestDelete(doc));
     await act(() => result.current.actions.handleConfirmDelete());
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("savedRefreshFailed"));
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("deleteSuccess");
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(commonCopy.savedRefreshFailed)
+    );
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(commonCopy.deleteSuccess);
     expect(mocks.toastSuccess).toHaveBeenCalledTimes(1);
     expect(mocks.toastError).toHaveBeenCalledTimes(1);
   });
@@ -639,8 +647,8 @@ describe("useLedgerEntriesTab single-record delete", () => {
 
 describe("useLedgerEntriesTab row recovery", () => {
   it.each([
-    ["retry", "retryingIds", mocks.retry, "retrySuccess"],
-    ["cancelProcessing", "cancellingIds", mocks.cancel, "cancelSuccess"],
+    ["retry", "retryingIds", mocks.retry, sourceDocumentActionCopy.retrySuccess],
+    ["cancelProcessing", "cancellingIds", mocks.cancel, sourceDocumentActionCopy.cancelSuccess],
   ] as const)(
     "keeps %s locked until cache invalidation completes",
     async (method, pendingKey, action, successKey) => {
@@ -687,7 +695,7 @@ describe("useLedgerEntriesTab row recovery", () => {
 
     await act(() => result.current.recovery.retry({ sourceDocumentId: "doc-1" }));
 
-    expect(mocks.toastError).toHaveBeenCalledWith("retryError");
+    expect(mocks.toastError).toHaveBeenCalledWith(sourceDocumentActionCopy.retryError);
     expect(result.current.recovery.retryingIds.has("doc-1")).toBe(false);
   });
 });

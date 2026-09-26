@@ -18,6 +18,7 @@ import {
 } from "./account-security";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
+import { addLoginEmailCopy } from "@/copy/email";
 
 /**
  * Adding a login address. This is the old "change email" flow with the new
@@ -58,20 +59,12 @@ export async function sendLoginEmailCode(input: {
     const delivery = await sendEmail({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: newEmail,
-      subject: "Cashier 验证码",
+      subject: addLoginEmailCopy.subject,
       content: OTPEmail({
         otp,
         host: input.host,
         expiresInMinutes: 5,
-        copy: {
-          preview: "添加登录邮箱",
-          heading: "添加登录邮箱",
-          intro: "输入以下验证码以把这个邮箱加入登录邮箱列表。",
-          codeLabel: "验证码",
-          expiry: "验证码将在 5 分钟后失效。",
-          warning: "如果不是你发起的操作，请忽略此邮件。",
-          footer: "Cashier 账户安全",
-        },
+        copy: addLoginEmailCopy,
       }),
     });
     if (delivery !== "sent") throw new Error("Email provider did not accept the message");

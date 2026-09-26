@@ -5,7 +5,6 @@ import type {
   CreatedServiceCredentialDto,
   ServiceCredential,
 } from "@/modules/ledger/contracts";
-import { useTranslations } from "next-intl";
 import { EmailSettings } from "./EmailSettings";
 import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
@@ -14,6 +13,7 @@ import { SettingsSection } from "./SettingsSection";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { settingsAccountCopy, settingsCopy } from "@/copy/settings";
 
 interface AccountSettingsProps {
   /** The address this session signed in with, for the list's first frame. */
@@ -47,8 +47,6 @@ export function AccountSettings({
   onRequireReauthentication,
   onAllSessionsEnded,
 }: AccountSettingsProps) {
-  const t = useTranslations("Settings");
-  const ta = useTranslations("Settings.Account");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
@@ -56,7 +54,7 @@ export function AccountSettings({
     <>
       {/* 通行密钥 and API 密钥 each save on their own, so each is a card of
           its own rather than a field inside 账户, the way 分账 and 记账规则 are. */}
-      <SettingsSection title={ta("passkeySection")}>
+      <SettingsSection title={settingsAccountCopy.passkeySection}>
         <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
       </SettingsSection>
       <ServiceCredentialSection
@@ -67,7 +65,7 @@ export function AccountSettings({
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />
-      <SettingsSection title={t("account")}>
+      <SettingsSection title={settingsCopy.account}>
         <EmailSettings
           {...(userEmail !== undefined ? { userEmail } : {})}
           onRequireReauthentication={onRequireReauthentication}
@@ -76,7 +74,7 @@ export function AccountSettings({
         {/* The button sits on the heading row at every width, like 添加邮箱 and
             新建密钥, instead of dropping under its own label on a phone. */}
         <SettingsField
-          title={t("signOut")}
+          title={settingsCopy.signOut}
           stacked
           actions={
             <Button
@@ -85,7 +83,7 @@ export function AccountSettings({
               disabled={isPending || isSigningOut}
               onClick={() => setSignOutConfirmOpen(true)}
             >
-              {t("signOut")}
+              {settingsCopy.signOut}
             </Button>
           }
         />
@@ -93,9 +91,9 @@ export function AccountSettings({
       <ConfirmDialog
         open={signOutConfirmOpen}
         onOpenChange={setSignOutConfirmOpen}
-        title={t("signOutConfirmTitle")}
-        description={t("signOutConfirmDescription")}
-        confirmLabel={t("signOut")}
+        title={settingsCopy.signOutConfirmTitle}
+        description={settingsCopy.signOutConfirmDescription}
+        confirmLabel={settingsCopy.signOut}
         variant="destructive"
         onConfirm={async () => {
           if (isSigningOut) return false;

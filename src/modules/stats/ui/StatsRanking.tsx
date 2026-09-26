@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { EmptyState } from "@/components/EmptyState";
 import { textRoleClassName } from "@/components/typography";
@@ -11,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { StatsPanel } from "./StatsPanel";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { calendarCopy } from "@/copy/controls";
+import { statsTabCopy } from "@/copy/stats";
 
 /** Past this many, the tail is folded away: a ranking is read from the top. */
 const COLLAPSED_LENGTH = 6;
@@ -38,14 +39,12 @@ export function StatsRanking({
   currencySymbol = "CNY",
   onCategoryClick,
 }: StatsRankingProps) {
-  const t = useTranslations("StatsTab");
-  const tCalendar = useTranslations("Calendar");
   const locale = DISPLAY_LOCALE;
   const [expanded, setExpanded] = useState(false);
 
   if (isLoading) {
     return (
-      <StatsPanel title={t("expenseRanking")}>
+      <StatsPanel title={statsTabCopy.expenseRanking}>
         <div className="space-y-5" role="status" aria-busy="true">
           {[1, 2, 3, 4, 5].map((row) => (
             <div key={row} className="flex items-center gap-3">
@@ -64,8 +63,8 @@ export function StatsRanking({
 
   if (data.length === 0) {
     return (
-      <StatsPanel title={t("expenseRanking")}>
-        <EmptyState title={t("noStats")} description={t("noStatsDesc")} />
+      <StatsPanel title={statsTabCopy.expenseRanking}>
+        <EmptyState title={statsTabCopy.noStats} description={statsTabCopy.noStatsDesc} />
       </StatsPanel>
     );
   }
@@ -74,10 +73,10 @@ export function StatsRanking({
   const hidden = data.length - visible.length;
 
   return (
-    <StatsPanel title={t("expenseRanking")}>
+    <StatsPanel title={statsTabCopy.expenseRanking}>
       <div className="space-y-4">
         {visible.map((category) => {
-          const displayName = category.id === null ? t("uncategorized") : category.name;
+          const displayName = category.id === null ? statsTabCopy.uncategorized : category.name;
           // A refunded category has no share of what was spent. It keeps its
           // amount and its place in the order; only the bar has nothing to say.
           const hasShare = compare(category.totalConverted, "0") > 0;
@@ -89,7 +88,7 @@ export function StatsRanking({
               type="button"
               key={category.id ?? "__uncategorized__"}
               disabled={onCategoryClick == null}
-              aria-label={`${displayName}, ${amount}, ${hasShare ? share : t("noShare")}`}
+              aria-label={`${displayName}, ${amount}, ${hasShare ? share : statsTabCopy.noShare}`}
               className={cn(
                 "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 text-left",
                 onCategoryClick != null &&
@@ -108,7 +107,7 @@ export function StatsRanking({
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={textRoleClassName("bodyStrong", "truncate")}>{displayName}</span>
                   <span className={textRoleClassName("meta", "shrink-0 tabular-nums")}>
-                    {tCalendar("count", { count: category.count })}
+                    {calendarCopy.count({ count: category.count })}
                   </span>
                 </span>
                 <span className="block h-1.5 overflow-hidden rounded-full bg-surface2">
@@ -136,7 +135,9 @@ export function StatsRanking({
 
       {data.length > COLLAPSED_LENGTH ? (
         <Button variant="ghost" className="w-full" onClick={() => setExpanded(!expanded)}>
-          {expanded ? t("showFewerCategories") : t("showAllCategories", { count: hidden })}
+          {expanded
+            ? statsTabCopy.showFewerCategories
+            : statsTabCopy.showAllCategories({ count: hidden })}
         </Button>
       ) : null}
     </StatsPanel>

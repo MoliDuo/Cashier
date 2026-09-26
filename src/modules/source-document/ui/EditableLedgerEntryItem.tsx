@@ -1,7 +1,6 @@
 "use client";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { memo, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
@@ -19,6 +18,8 @@ import { amountTextClassName } from "@/modules/currency/ui/amount-text";
 import { AmountDisplay } from "@/modules/currency/ui/AmountDisplay";
 import { getCurrencyDecimals } from "@/lib/money/currency-precision";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { commonCopy } from "@/copy/common";
+import { calendarCopy } from "@/copy/controls";
 
 function parseAmount(amount: string | null | undefined): number {
   if (amount == null) return 0;
@@ -90,8 +91,6 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
   onDelete,
   trailing,
 }: EditableLedgerEntryItemProps) {
-  const t = useTranslations("Calendar");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
 
   // Merge pending changes with original data
@@ -145,7 +144,7 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
           <EditableField
             value={displayData.itemName}
             onChange={(v) => handleChange("itemName", v)}
-            placeholder={t("productName")}
+            placeholder={calendarCopy.productName}
             displayClassName="font-medium text-text text-sm"
             inputClassName={textRoleClassName("bodyStrong")}
             disabled={readOnly}
@@ -161,7 +160,7 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
                 <EditableField
                   value={displayData.description ?? ""}
                   onChange={(v) => handleChange("description", v !== "" ? v : null)}
-                  placeholder={t("notes")}
+                  placeholder={calendarCopy.notes}
                   displayClassName={textRoleClassName("provisional", "truncate")}
                   inputClassName="text-micro"
                   disabled={readOnly}
@@ -190,7 +189,7 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
             <Popover modal={true}>
               <PopoverTrigger asChild>
                 <button
-                  aria-label={t("currency")}
+                  aria-label={calendarCopy.currency}
                   className="text-xs text-muted-foreground hover:text-text transition-colors flex items-center gap-0.5"
                 >
                   {getCurrencySymbol(displayData.currency ?? "unknown", locale)}
@@ -236,8 +235,8 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
           size="icon-sm"
           className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
           onClick={onDelete}
-          aria-label={tCommon("delete")}
-          title={tCommon("delete")}
+          aria-label={commonCopy.delete}
+          title={commonCopy.delete}
         >
           <Trash2 className="h-4 w-4" />
         </Button>

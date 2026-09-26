@@ -1,6 +1,7 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SaveAndContinueGate {
   confirmOpen: boolean;
@@ -49,30 +50,28 @@ export function SourceDocumentDetailConfirmDialogs({
   discardEditsGate,
   handleConfirmDiscardEdits,
 }: SourceDocumentDetailConfirmDialogsProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
   return (
     <>
       <ConfirmDialog
         open={showBatchModePendingConfirm}
         onOpenChange={setShowBatchModePendingConfirm}
-        title={t("batchModePendingTitle")}
-        description={t("batchModePendingDescription")}
+        title={sourceDocumentDetailCopy.batchModePendingTitle}
+        description={sourceDocumentDetailCopy.batchModePendingDescription}
         onConfirm={() => setShowBatchModePendingConfirm(false)}
-        cancelLabel={tCommon("cancel")}
+        cancelLabel={commonCopy.cancel}
         onSave={handleSaveAndEnterBatchMode}
-        saveLabel={tCommon("save")}
+        saveLabel={commonCopy.save}
         onDiscard={handleDiscardAndEnterBatchMode}
-        discardLabel={t("discardChanges")}
+        discardLabel={sourceDocumentDetailCopy.discardChanges}
       />
 
       <ConfirmDialog
         open={showBatchDeleteConfirm}
         onOpenChange={setShowBatchDeleteConfirm}
-        title={t("batchDeleteTitle")}
-        description={t("batchDeleteDescription", { count: selectedCount })}
+        title={sourceDocumentDetailCopy.batchDeleteTitle}
+        description={sourceDocumentDetailCopy.batchDeleteDescription({ count: selectedCount })}
         variant="destructive"
-        confirmLabel={tCommon("delete")}
+        confirmLabel={commonCopy.delete}
         onConfirm={handleBatchDelete}
       />
 
@@ -81,10 +80,10 @@ export function SourceDocumentDetailConfirmDialogs({
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPendingDeleteEntryId(null);
         }}
-        title={t("deleteEntryTitle")}
-        description={t("deleteEntryDescription")}
+        title={sourceDocumentDetailCopy.deleteEntryTitle}
+        description={sourceDocumentDetailCopy.deleteEntryDescription}
         variant="destructive"
-        confirmLabel={tCommon("delete")}
+        confirmLabel={commonCopy.delete}
         onConfirm={async () => {
           if (pendingDeleteEntryId == null) return false;
           return handleDeleteEntry(pendingDeleteEntryId);
@@ -94,33 +93,33 @@ export function SourceDocumentDetailConfirmDialogs({
       <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
-        title={tCommon("delete")}
-        description={t("deleteConfirmDesc")}
+        title={commonCopy.delete}
+        description={sourceDocumentDetailCopy.deleteConfirmDesc}
         onConfirm={handleDeleteDocument}
         variant="destructive"
-        confirmLabel={tCommon("delete")}
+        confirmLabel={commonCopy.delete}
       />
 
       <ConfirmDialog
         open={saveAndContinueGate.confirmOpen}
         onOpenChange={saveAndContinueGate.setConfirmOpen}
-        title={t("saveBeforeActionTitle")}
-        description={t("saveBeforeActionDescription")}
+        title={sourceDocumentDetailCopy.saveBeforeActionTitle}
+        description={sourceDocumentDetailCopy.saveBeforeActionDescription}
         onConfirm={saveAndContinueGate.confirmSaveAndContinue}
-        confirmLabel={t("saveAndContinue")}
-        cancelLabel={tCommon("continueEditing")}
+        confirmLabel={sourceDocumentDetailCopy.saveAndContinue}
+        cancelLabel={commonCopy.continueEditing}
         onDiscard={saveAndContinueGate.confirmDiscardAndContinue}
-        discardLabel={t("discardChanges")}
+        discardLabel={sourceDocumentDetailCopy.discardChanges}
       />
 
       <ConfirmDialog
         open={discardEditsGate.confirmOpen}
         onOpenChange={discardEditsGate.setConfirmOpen}
-        title={t("unsavedChanges")}
-        description={t("unsavedChangesDesc")}
+        title={sourceDocumentDetailCopy.unsavedChanges}
+        description={sourceDocumentDetailCopy.unsavedChangesDesc}
         onConfirm={handleConfirmDiscardEdits}
-        cancelLabel={tCommon("continueEditing")}
-        confirmLabel={t("discardChanges")}
+        cancelLabel={commonCopy.continueEditing}
+        confirmLabel={sourceDocumentDetailCopy.discardChanges}
         variant="destructive"
       />
     </>

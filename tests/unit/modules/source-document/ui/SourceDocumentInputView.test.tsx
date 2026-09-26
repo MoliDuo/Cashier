@@ -1,7 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import zh from "../../../../../messages/zh.json";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 import type { CameraCapture } from "@/modules/source-document/hooks/useCameraCapture";
 import {
   SourceDocumentInputView,
@@ -16,10 +16,8 @@ vi.mock("@/modules/source-document/ui/SourceDocumentImageModal", () => ({
   SourceDocumentImageModal: () => null,
 }));
 
-const messages = zh.SourceDocumentInput;
-
 function uploadedImage(index: number) {
-  return messages.uploadedImage.replace("{index}", String(index));
+  return sourceDocumentInputCopy.uploadedImage({ index });
 }
 
 const camera: CameraCapture = {
@@ -81,7 +79,7 @@ describe("SourceDocumentInputView upload cancellation", () => {
     const onCancelUpload = vi.fn();
     const view = renderView({ phase: "uploading", percent: 70 }, true, onCancelUpload);
 
-    fireEvent.click(screen.getByRole("button", { name: messages.cancelUpload }));
+    fireEvent.click(screen.getByRole("button", { name: sourceDocumentInputCopy.cancelUpload }));
     expect(onCancelUpload).toHaveBeenCalledTimes(1);
 
     view.rerender(
@@ -111,15 +109,15 @@ describe("SourceDocumentInputView upload cancellation", () => {
       />
     );
 
-    expect(screen.queryByRole("button", { name: messages.cancelUpload })).toBeNull();
-    expect(screen.getByText(messages.finalizing)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: sourceDocumentInputCopy.cancelUpload })).toBeNull();
+    expect(screen.getByText(sourceDocumentInputCopy.finalizing)).toBeTruthy();
   });
 
   it("announces the cancelling phase without exposing another cancel action", () => {
     renderView({ phase: "cancelling", percent: 70 }, false);
 
-    expect(screen.getByText(messages.cancelling)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: messages.cancelUpload })).toBeNull();
+    expect(screen.getByText(sourceDocumentInputCopy.cancelling)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: sourceDocumentInputCopy.cancelUpload })).toBeNull();
   });
 });
 
@@ -233,7 +231,7 @@ describe("SourceDocumentInputView image drop zone", () => {
     fireEvent.dragEnter(form, drag);
     // The highlight is the visible half; the announcement is the half a reader
     // who cannot see it depends on, and both come from the same state.
-    expect(screen.getByRole("status")).toHaveTextContent(messages.dropImages);
+    expect(screen.getByRole("status")).toHaveTextContent(sourceDocumentInputCopy.dropImages);
     expect(form).toHaveClass("ring-1");
 
     fireEvent.dragLeave(form, drag);

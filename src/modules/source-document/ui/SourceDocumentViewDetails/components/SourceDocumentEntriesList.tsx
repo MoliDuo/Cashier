@@ -1,5 +1,4 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -7,6 +6,8 @@ import type { EntryCategory, LedgerEntryEmbeddedViewDto } from "@/modules/ledger
 import type { EntryEditData } from "@/modules/source-document/types";
 import type { EntriesPendingChanges } from "@/modules/source-document/detail-types";
 import { SelectableEditableEntryCard } from "./SelectableEditableEntryCard";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentEntriesListProps {
   entries: LedgerEntryEmbeddedViewDto[];
@@ -46,8 +47,6 @@ export function SourceDocumentEntriesList({
   pendingChanges,
   onRequestEdit,
 }: SourceDocumentEntriesListProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const hasAddEntry = !interactionDisabled && isEditMode && onAddEntry != null;
 
@@ -58,7 +57,9 @@ export function SourceDocumentEntriesList({
       <div className="divide-y">
         {entries.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-8 md:p-12 text-center border border-dashed border-border/80 rounded-2xl bg-surface2/5">
-            <p className="text-muted-foreground text-sm font-medium">{t("noEntries")}</p>
+            <p className="text-muted-foreground text-sm font-medium">
+              {sourceDocumentDetailCopy.noEntries}
+            </p>
           </div>
         ) : (
           entries.map((entry, index) => (
@@ -74,12 +75,12 @@ export function SourceDocumentEntriesList({
               <SelectableEditableEntryCard
                 entry={entry}
                 categories={categories}
-                categoryPlaceholder={t("selectCategory")}
+                categoryPlaceholder={sourceDocumentDetailCopy.selectCategory}
                 preferredCurrencies={preferredCurrencies}
                 mainCurrency={mainCurrency}
                 selectionMode={isSelectionMode}
                 selected={selectedEntryIds.includes(entry.id)}
-                selectionLabel={tCommon("selectItem", { item: entry.itemName })}
+                selectionLabel={commonCopy.selectItem({ item: entry.itemName })}
                 onEntryChange={onEntryChange}
                 onSelectEntry={onSelectEntry}
                 sourceDocumentEntryDate={displayEntryDate}
@@ -107,7 +108,7 @@ export function SourceDocumentEntriesList({
             onClick={onAddEntry}
           >
             <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-            {t("addEntryTitle")}
+            {sourceDocumentDetailCopy.addEntryTitle}
           </Button>
         ) : null}
       </div>

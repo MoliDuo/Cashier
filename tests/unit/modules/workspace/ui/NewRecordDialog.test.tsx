@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useLayoutEffect, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import zh from "../../../../../messages/zh.json";
+import { ledgerPageCopy } from "@/copy/app";
+import { commonCopy } from "@/copy/common";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { writeLastNewRecordBookId } from "@/modules/workspace/new-record-book-memory";
 import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
@@ -251,7 +252,7 @@ describe("NewRecordDialog state", () => {
     open();
     expect(screen.getByTestId("record-forms")).toHaveAttribute("data-input-mode", "ai");
 
-    fireEvent.click(screen.getByRole("button", { name: zh.LedgerPage.quickEntry }));
+    fireEvent.click(screen.getByRole("button", { name: ledgerPageCopy.quickEntry }));
 
     expect(screen.getByTestId("record-forms")).toHaveAttribute("data-input-mode", "quick");
   });
@@ -259,19 +260,19 @@ describe("NewRecordDialog state", () => {
   it("cannot be closed or switched while a form is submitting", () => {
     const { open } = renderDialog();
     open();
-    expect(screen.getByRole("button", { name: zh.Common.close })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: commonCopy.close })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "start submit" }));
 
-    expect(screen.queryByRole("button", { name: zh.Common.close })).toBeNull();
-    expect(screen.getByRole("button", { name: zh.LedgerPage.quickEntry })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: commonCopy.close })).toBeNull();
+    expect(screen.getByRole("button", { name: ledgerPageCopy.quickEntry })).toBeDisabled();
     act(() => {
       fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     });
     expect(screen.getByTestId("record-forms")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "settle submit" }));
-    fireEvent.click(screen.getByRole("button", { name: zh.Common.close }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.close }));
 
     expect(screen.queryByTestId("record-forms")).toBeNull();
   });

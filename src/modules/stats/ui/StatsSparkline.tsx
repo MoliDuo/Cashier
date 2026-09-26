@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
-import { useTranslations } from "next-intl";
 import { buildSparklineGeometry } from "@/modules/stats/lib/sparkline-path";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsSparklineProps {
   current: { date: string; total: string }[];
@@ -24,7 +24,6 @@ export function StatsSparkline({
   onExpand,
   disabled = false,
 }: StatsSparklineProps) {
-  const t = useTranslations("StatsTab");
   const geometry = useMemo(
     () =>
       buildSparklineGeometry({
@@ -39,7 +38,7 @@ export function StatsSparkline({
   const figure = (
     <svg
       role="img"
-      aria-label={t("sparklineLabel")}
+      aria-label={statsTabCopy.sparklineLabel}
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       className="h-10 w-full"
@@ -76,7 +75,7 @@ export function StatsSparkline({
     <button
       type="button"
       onClick={onExpand}
-      aria-label={t("sparklineExpand")}
+      aria-label={statsTabCopy.sparklineExpand}
       className="block w-full min-w-0 rounded-md py-2 transition-opacity duration-[var(--motion-feedback)] hover:opacity-80"
     >
       {figure}

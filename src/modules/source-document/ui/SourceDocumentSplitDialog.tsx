@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import { Loader2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
@@ -17,6 +16,8 @@ import type { LedgerEntry } from "@/modules/ledger/contracts";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentSplitDialogProps {
   open: boolean;
@@ -40,8 +41,6 @@ export function SourceDocumentSplitDialog({
   onSubmit,
   timeZone,
 }: SourceDocumentSplitDialogProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
   const [entryDate, setEntryDate] = useState(() => initialDate);
   const previewEntries = selectedEntries.slice(0, 5);
@@ -60,11 +59,11 @@ export function SourceDocumentSplitDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scissors className="size-4" />
-            {t("splitTitle")}
+            {sourceDocumentDetailCopy.splitTitle}
           </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          {t("splitDescription", { count: totalSelected })}
+          {sourceDocumentDetailCopy.splitDescription({ count: totalSelected })}
         </p>
         <ul className="divide-y rounded-lg border">
           {previewEntries.map((entry) => (
@@ -81,11 +80,11 @@ export function SourceDocumentSplitDialog({
         </ul>
         {remainingCount > 0 ? (
           <p className="text-xs text-muted-foreground">
-            {t("splitMore", { count: remainingCount })}
+            {sourceDocumentDetailCopy.splitMore({ count: remainingCount })}
           </p>
         ) : null}
         <div className="grid gap-2">
-          <Label htmlFor="split-entry-date">{t("splitDate")}</Label>
+          <Label htmlFor="split-entry-date">{sourceDocumentDetailCopy.splitDate}</Label>
           {/* The same picker every other date field uses, so 今天/昨天 and the
               month grid are learned once. */}
           <DateFilter
@@ -97,13 +96,13 @@ export function SourceDocumentSplitDialog({
             showClear={false}
             showClearShortcut={false}
             disabled={isSubmitting}
-            ariaLabel={t("splitDate")}
+            ariaLabel={sourceDocumentDetailCopy.splitDate}
             {...(timeZone != null ? { timeZone } : {})}
           />
         </div>
         <DialogFooter>
           <Button variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
-            {tCommon("cancel")}
+            {commonCopy.cancel}
           </Button>
           <Button
             disabled={isSubmitting || entryDate === ""}
@@ -114,7 +113,7 @@ export function SourceDocumentSplitDialog({
             ) : (
               <Scissors className="size-4" />
             )}
-            {t("splitTitle")}
+            {sourceDocumentDetailCopy.splitTitle}
           </Button>
         </DialogFooter>
       </DialogContent>

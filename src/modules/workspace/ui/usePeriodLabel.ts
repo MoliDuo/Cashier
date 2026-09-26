@@ -1,9 +1,9 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { formatCivilDate } from "@/lib/date-utils";
 import { periodToDateRange, type PeriodParams } from "@/lib/period-utils";
 import { resolveActivePreset } from "@/modules/ledger/entry-filter-presets";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { dateRangeFilterCopy } from "@/copy/controls";
 
 /**
  * Names the span a ledger toolbar is showing, so the row reads as "本月 ·
@@ -14,15 +14,14 @@ import { DISPLAY_LOCALE } from "@/lib/constants";
  */
 export function usePeriodLabel(periodParams: PeriodParams, timeZone?: string): string | null {
   const locale = DISPLAY_LOCALE;
-  const t = useTranslations("DateRangeFilter");
   const preset = resolveActivePreset(periodParams);
 
-  if (preset === "thisMonth") return t("thisMonth");
-  if (preset === "lastMonth") return t("lastMonth");
-  if (preset === "all") return t("all");
+  if (preset === "thisMonth") return dateRangeFilterCopy.thisMonth;
+  if (preset === "lastMonth") return dateRangeFilterCopy.lastMonth;
+  if (preset === "all") return dateRangeFilterCopy.all;
 
   const range = periodToDateRange(periodParams, timeZone);
-  if (range.startDate == null || range.endDate == null) return t("all");
+  if (range.startDate == null || range.endDate == null) return dateRangeFilterCopy.all;
 
   // The year is printed once when both ends share it, the way the rest of the
   // app writes a day rather than repeating the year on both sides.

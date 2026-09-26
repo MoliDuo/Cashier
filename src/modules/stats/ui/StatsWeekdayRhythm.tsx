@@ -1,5 +1,4 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { compare } from "@/lib/money/decimal";
@@ -7,6 +6,8 @@ import { cn } from "@/lib/utils";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsPanel } from "./StatsPanel";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { calendarCopy } from "@/copy/controls";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsWeekdayRhythmProps {
   weekdayAverages: StatsInsights["weekdayAverages"];
@@ -21,11 +22,9 @@ interface StatsWeekdayRhythmProps {
  * time in it at all. Seven bars is the whole answer.
  */
 export function StatsWeekdayRhythm({ weekdayAverages, currencySymbol }: StatsWeekdayRhythmProps) {
-  const t = useTranslations("StatsTab");
-  const tCalendar = useTranslations("Calendar");
   const locale = DISPLAY_LOCALE;
   // The key is spelled out rather than built, so the catalogue check can see it.
-  const weekdayNames = tCalendar.raw("weekDaysMon") as string[];
+  const weekdayNames = calendarCopy.weekDaysMon;
 
   const peak = weekdayAverages.reduce(
     (best, day) => (compare(day.average, best) > 0 ? day.average : best),
@@ -34,7 +33,7 @@ export function StatsWeekdayRhythm({ weekdayAverages, currencySymbol }: StatsWee
   if (compare(peak, "0") <= 0) return null;
 
   return (
-    <StatsPanel title={t("weekdayRhythm")}>
+    <StatsPanel title={statsTabCopy.weekdayRhythm}>
       <div className="grid grid-cols-7 items-end gap-1.5">
         {weekdayAverages.map((day) => {
           const name = weekdayNames[day.weekday] ?? "";
@@ -52,7 +51,7 @@ export function StatsWeekdayRhythm({ weekdayAverages, currencySymbol }: StatsWee
                   style={{ height: "100%", transform: `scaleY(${Math.max(ratio, 0.02)})` }}
                 />
                 <span className="sr-only">
-                  {t("weekdayAverage", {
+                  {statsTabCopy.weekdayAverage({
                     weekday: name,
                     amount: formatCurrencyAmount(day.average, currencySymbol, locale),
                   })}

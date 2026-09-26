@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useState } from "react";
-import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/modules/workspace/ui/AppShell";
@@ -19,6 +18,7 @@ import {
   prefetchDetailsTabQuery,
   prefetchStatsTabQuery,
 } from "@/modules/workspace/prefetch-ledger-tabs";
+import { commonCopy } from "@/copy/common";
 
 /**
  * The header and tab bar every ledger route shares. It renders outside the
@@ -27,7 +27,6 @@ import {
  * cannot race its hydration.
  */
 export function LedgerShell({ children }: { children: React.ReactNode }) {
-  const t = useTranslations("Common");
   const queryClient = useQueryClient();
   const ready = useWorkspaceStore((state) => state.ready);
   const setNewRecordOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
@@ -51,11 +50,11 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
     try {
       await refreshActiveTab();
     } catch {
-      toast.error(t("refreshFailed"));
+      toast.error(commonCopy.refreshFailed);
     } finally {
       setRefreshPending(false);
     }
-  }, [isRefreshing, refreshActiveTab, refreshPending, t]);
+  }, [isRefreshing, refreshActiveTab, refreshPending]);
 
   const changeTab = useCallback(
     (tab: LedgerTab) => {

@@ -1,13 +1,14 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import type { SourceDocument } from "@/modules/source-document/contracts";
-import { useDiagnosticMessages } from "./use-diagnostic-messages";
+import { diagnosticDescription, diagnosticLabel } from "./diagnostic-messages";
+import { commonCopy } from "@/copy/common";
+import { diagnosticCodeCopy, sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentDetailStatusPanelsProps {
   sourceDocument: SourceDocument | null;
@@ -32,10 +33,6 @@ export function SourceDocumentDetailStatusPanels({
   onClose,
   onReload,
 }: SourceDocumentDetailStatusPanelsProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
-  const diagnosticMessages = useDiagnosticMessages();
-
   return (
     <>
       {sourceDocument && reloadError ? (
@@ -43,22 +40,22 @@ export function SourceDocumentDetailStatusPanels({
           role="alert"
           className="mb-3 flex items-center justify-between gap-2 text-sm text-danger"
         >
-          <span>{t("reloadFailed")}</span>
+          <span>{sourceDocumentDetailCopy.reloadFailed}</span>
           <Button variant="outline" onClick={onReload} disabled={isReloading}>
-            {tCommon("retry")}
+            {commonCopy.retry}
           </Button>
         </div>
       ) : null}
       {loadError && !sourceDocument ? (
         <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-          <p className="text-sm font-medium text-text">{t("loadError")}</p>
+          <p className="text-sm font-medium text-text">{sourceDocumentDetailCopy.loadError}</p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={isReloading}>
-              {tCommon("close")}
+              {commonCopy.close}
             </Button>
             <Button onClick={onReload} disabled={isReloading}>
               <RefreshCw className={cn("size-4", isReloading && "animate-spin")} />
-              {tCommon("retry")}
+              {commonCopy.retry}
             </Button>
           </div>
         </div>
@@ -101,11 +98,11 @@ export function SourceDocumentDetailStatusPanels({
                 const isUnparsable = sourceDocument.failureKind === "invalid_input";
                 const failureCode = sourceDocument.errorCode ?? "processing_unavailable";
                 const title = isUnparsable
-                  ? diagnosticMessages.unparsableLabel
-                  : diagnosticMessages.label(failureCode);
+                  ? diagnosticCodeCopy.unparsableDocument
+                  : diagnosticLabel(failureCode);
                 const description = isUnparsable
-                  ? sourceDocument.failureMessage || diagnosticMessages.unparsableDescription
-                  : diagnosticMessages.description(failureCode);
+                  ? sourceDocument.failureMessage || diagnosticCodeCopy.unparsableDocumentDesc
+                  : diagnosticDescription(failureCode);
                 return (
                   <div className="flex items-start gap-2 p-2.5 rounded-lg bg-danger/5 border border-danger/10">
                     <span className="mt-1 size-2 shrink-0 rounded-full bg-danger" aria-hidden />
@@ -127,10 +124,10 @@ export function SourceDocumentDetailStatusPanels({
                 <div className="flex items-start gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10">
                   <div className="flex flex-col gap-0.5">
                     <span className={textRoleClassName("meta", "font-medium text-primary")}>
-                      {t("activeResultTitle")}
+                      {sourceDocumentDetailCopy.activeResultTitle}
                     </span>
                     <span className={textRoleClassName("micro")}>
-                      {t("activeResultDescription")}
+                      {sourceDocumentDetailCopy.activeResultDescription}
                     </span>
                     <AmountText variant="caption">
                       {sourceDocument.activeResultSummary.entryCount} ·{" "}

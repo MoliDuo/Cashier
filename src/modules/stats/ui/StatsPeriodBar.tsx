@@ -1,10 +1,10 @@
 "use client";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { type DateRangeType } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsPeriodBarProps {
   rangeType: DateRangeType;
@@ -29,16 +29,15 @@ export function StatsPeriodBar({
   label,
   readOnly = false,
 }: StatsPeriodBarProps) {
-  const t = useTranslations("StatsTab");
   const canGoNext = periodOffset < 0;
   const rangeLabel = (type: DateRangeType) => {
     switch (type) {
       case "week":
-        return t("week");
+        return statsTabCopy.week;
       case "month":
-        return t("month");
+        return statsTabCopy.month;
       case "year":
-        return t("year");
+        return statsTabCopy.year;
     }
   };
 
@@ -72,7 +71,7 @@ export function StatsPeriodBar({
           size="icon-sm"
           onClick={() => setPeriodOffset(periodOffset - 1)}
           disabled={readOnly}
-          aria-label={t("previousPeriod")}
+          aria-label={statsTabCopy.previousPeriod}
         >
           <ChevronLeft aria-hidden="true" className="h-5 w-5" />
         </Button>
@@ -84,12 +83,12 @@ export function StatsPeriodBar({
           size="icon-sm"
           onClick={() => setPeriodOffset(Math.min(0, periodOffset + 1))}
           disabled={readOnly || !canGoNext}
-          aria-label={t("nextPeriod")}
+          aria-label={statsTabCopy.nextPeriod}
         >
           <ChevronRight aria-hidden="true" className="h-5 w-5" />
         </Button>
         {periodOffset === 0 ? (
-          <span className={textRoleClassName("meta", "ml-2")}>{t("throughToday")}</span>
+          <span className={textRoleClassName("meta", "ml-2")}>{statsTabCopy.throughToday}</span>
         ) : null}
       </div>
     </div>

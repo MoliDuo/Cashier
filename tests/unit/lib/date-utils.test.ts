@@ -98,8 +98,6 @@ describe("date-utils", () => {
 });
 
 describe("formatRelativeDateLabel", () => {
-  const labels = { today: "Today", yesterday: "Yesterday" };
-
   // An absolute instant, so the assertions below hold in any runtime timezone.
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -111,34 +109,30 @@ describe("formatRelativeDateLabel", () => {
   });
 
   it("names today and yesterday", () => {
-    expect(formatRelativeDateLabel("2026-09-11", "en-US", labels)).toBe("Today");
-    expect(formatRelativeDateLabel("2026-09-10", "en-US", labels)).toBe("Yesterday");
+    expect(formatRelativeDateLabel("2026-09-11", "en-US")).toBe("今天");
+    expect(formatRelativeDateLabel("2026-09-10", "en-US")).toBe("昨天");
   });
 
   it("resolves today in the requested timezone", () => {
-    expect(formatRelativeDateLabel("2026-09-11", "en-US", labels, "UTC")).toBe("Today");
-    expect(formatRelativeDateLabel("2026-09-11", "en-US", labels, "Pacific/Kiritimati")).toBe(
-      "Yesterday"
-    );
+    expect(formatRelativeDateLabel("2026-09-11", "en-US", "UTC")).toBe("今天");
+    expect(formatRelativeDateLabel("2026-09-11", "en-US", "Pacific/Kiritimati")).toBe("昨天");
   });
 
   it("writes an older day out in full, weekday and year included", () => {
-    expect(formatRelativeDateLabel("2026-07-15", "zh", labels)).toBe("2026年7月15日 星期三");
+    expect(formatRelativeDateLabel("2026-07-15", "zh")).toBe("2026年7月15日 星期三");
   });
 
   it("labels a timestamp by the day it falls on", () => {
-    expect(formatInstantDateLabel("2026-09-11T02:00:00.000Z", "en-US", labels, "UTC")).toBe(
-      "Today"
+    expect(formatInstantDateLabel("2026-09-11T02:00:00.000Z", "en-US", "UTC")).toBe("今天");
+    expect(formatInstantDateLabel("2026-09-11T02:00:00.000Z", "en-US", "Pacific/Kiritimati")).toBe(
+      "昨天"
     );
-    expect(
-      formatInstantDateLabel("2026-09-11T02:00:00.000Z", "en-US", labels, "Pacific/Kiritimati")
-    ).toBe("Yesterday");
-    expect(formatInstantDateLabel("2026-07-15T02:00:00.000Z", "zh", labels, "UTC")).toBe(
+    expect(formatInstantDateLabel("2026-07-15T02:00:00.000Z", "zh", "UTC")).toBe(
       "2026年7月15日 星期三"
     );
   });
 
   it("returns malformed input unchanged", () => {
-    expect(formatRelativeDateLabel("not-a-date", "en-US", labels)).toBe("not-a-date");
+    expect(formatRelativeDateLabel("not-a-date", "en-US")).toBe("not-a-date");
   });
 });

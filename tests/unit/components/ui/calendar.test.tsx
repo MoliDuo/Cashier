@@ -1,15 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Calendar } from "@/components/ui/calendar";
-
-vi.mock("next-intl", () => ({
-  useTranslations: () =>
-    Object.assign(
-      (key: string, values?: Record<string, string>) =>
-        key === "dateFormat" ? `${values?.year}-${values?.month}` : key,
-      { raw: () => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] }
-    ),
-}));
+import { calendarCopy } from "@/copy/controls";
 
 describe("Calendar", () => {
   it("changes months and resets the view when the controlled value changes", () => {
@@ -18,12 +10,12 @@ describe("Calendar", () => {
       <Calendar value={new Date(2026, 0, 15)} onChange={onChange} showShortcuts={false} />
     );
 
-    expect(screen.getByText("2026-1")).toBeInTheDocument();
+    expect(screen.getByText("2026年1月")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button")[1]!);
-    expect(screen.getByText("2026-2")).toBeInTheDocument();
+    expect(screen.getByText("2026年2月")).toBeInTheDocument();
 
     rerender(<Calendar value={new Date(2026, 2, 20)} onChange={onChange} showShortcuts={false} />);
-    expect(screen.getByText("2026-3")).toBeInTheDocument();
+    expect(screen.getByText("2026年3月")).toBeInTheDocument();
   });
 
   it("uses the standard grid keyboard model and selects with Enter", async () => {
@@ -51,8 +43,8 @@ describe("Calendar", () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     render(<Calendar value={null} onChange={() => {}} minDate={tomorrow} />);
 
-    expect(screen.getByRole("button", { name: "today" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "yesterday" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: calendarCopy.today })).toBeDisabled();
+    expect(screen.getByRole("button", { name: calendarCopy.yesterday })).toBeDisabled();
   });
 
   it("delegates Escape so the owning popover can restore focus", () => {

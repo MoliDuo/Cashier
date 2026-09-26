@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type SetStateAction } from "react";
 import type { ChangeEvent, ClipboardEvent } from "react";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useIsTouchInput } from "@/hooks/use-is-touch-input";
 import {
@@ -46,6 +45,7 @@ import {
   type SourceDocumentSubmitPayload,
 } from "./source-document-submission-upload";
 import { useCameraCapture } from "./useCameraCapture";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 
 /** The whole draft, kept in memory while the page lives. */
 interface MemoryInputDraft {
@@ -111,7 +111,6 @@ function waitForPaint(): Promise<void> {
  */
 export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   const { onSuccess, onPendingChange, onDirtyChange, initialData, timeZone, bookId } = props;
-  const t = useTranslations("SourceDocumentInput");
   const [target] = useState(() =>
     props.mode === "retry"
       ? { mode: "retry" as const, sourceDocumentId: props.sourceDocumentId }
@@ -258,7 +257,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     const key = submitErrorMessageKey(error, fallback);
     if (key == null) return;
     console.error("Source document submission failed:", error);
-    toast.error(t(key));
+    toast.error(sourceDocumentInputCopy[key]);
   };
 
   const finishUpload = (signal: AbortSignal) => {
@@ -361,7 +360,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
       setMonotonicProgress({ phase: "submitting", percent: 90 });
       return editRetrySourceDocumentAction(sourceDocumentId, uploadedPayload);
     },
-    successMessage: t("retrySuccess"),
+    successMessage: sourceDocumentInputCopy.retrySuccess,
     errorMessage: null,
     onSuccess: async (_data, variables) => {
       await completeSubmit(variables.payload.documentDate, sourceDocumentId!, variables.signal);
@@ -436,7 +435,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   }, []);
 
   const appendFiles = async (files: File[]) => {
-    const tooManyImages = t("tooManyImages", { count: MAX_FILES });
+    const tooManyImages = sourceDocumentInputCopy.tooManyImages({ count: MAX_FILES });
     const remainingCapacity = Math.max(
       0,
       MAX_FILES - imageCountRef.current - pendingFileReservationsRef.current
@@ -463,11 +462,11 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
 
     const loadedImages = results.flatMap((result) => {
       if (result.kind === "too-large") {
-        toast.error(t("imageTooLarge", { fileName: result.fileName }));
+        toast.error(sourceDocumentInputCopy.imageTooLarge({ fileName: result.fileName }));
         return [];
       }
       if (result.kind === "unsupported") {
-        toast.error(t("imageUnsupported", { fileName: result.fileName }));
+        toast.error(sourceDocumentInputCopy.imageUnsupported({ fileName: result.fileName }));
         return [];
       }
       return [result.image];

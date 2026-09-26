@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { CalendarSync, Check, Pencil, X } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { DateFilter } from "@/components/ui/date-filter";
@@ -13,6 +12,7 @@ import type { ApplyDateOrganizationInput } from "../contracts";
 import { EditableLedgerEntryItem } from "./EditableLedgerEntryItem";
 import { buildSourceDocumentDetailViewModel } from "./source-document-detail-view-model";
 import { SourceDocumentTotal } from "./SourceDocumentViewDetails/components/SourceDocumentTotal";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface Props {
   suggestion: DateOrganizationSuggestion;
@@ -36,7 +36,6 @@ export function SourceDocumentDateOrganization({
   onAdjustmentStateChange,
   timeZone,
 }: Props) {
-  const t = useTranslations("SourceDocumentDetail.dateOrganization");
   const [editing, setEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [applicationError, setApplicationError] = useState(false);
@@ -139,7 +138,7 @@ export function SourceDocumentDateOrganization({
   return (
     <section
       className="overflow-hidden rounded-lg border border-info/30 bg-info/5"
-      aria-label={t("title")}
+      aria-label={sourceDocumentDetailCopy.dateOrganization.title}
     >
       {/* The box around the whole suggestion wears the same tint as the groups
           inside it, so the block reads as one suggestion rather than a white
@@ -149,18 +148,20 @@ export function SourceDocumentDateOrganization({
           {/* Marks the block as a feature, not another line of the record. Drawn
               in the title's own colour, like every other icon in the app. */}
           <CalendarSync aria-hidden="true" className="size-4 shrink-0" />
-          <span className={textRoleClassName("cardTitle", "min-w-0 truncate")}>{t("title")}</span>
+          <span className={textRoleClassName("cardTitle", "min-w-0 truncate")}>
+            {sourceDocumentDetailCopy.dateOrganization.title}
+          </span>
         </div>
         <div className="flex gap-1">
           {editing ? (
             <>
               <Button variant="ghost" size="sm" onClick={resetDraft}>
                 <X className="size-3.5" />
-                {t("cancel")}
+                {sourceDocumentDetailCopy.dateOrganization.cancel}
               </Button>
               <Button size="sm" onClick={doneAdjusting}>
                 <Check className="size-3.5" />
-                {t("done")}
+                {sourceDocumentDetailCopy.dateOrganization.done}
               </Button>
             </>
           ) : (
@@ -176,7 +177,7 @@ export function SourceDocumentDateOrganization({
                     .catch(() => setApplicationError(true));
                 }}
               >
-                {t("dismiss")}
+                {sourceDocumentDetailCopy.dateOrganization.dismiss}
               </Button>
               <Button
                 variant="outline"
@@ -188,14 +189,14 @@ export function SourceDocumentDateOrganization({
                 }}
               >
                 <Pencil className="size-3.5" />
-                {t("adjust")}
+                {sourceDocumentDetailCopy.dateOrganization.adjust}
               </Button>
               <Button
                 size="sm"
                 disabled={disabled || groups.length === 0}
                 onClick={() => void applyAll()}
               >
-                {t("applyAll")}
+                {sourceDocumentDetailCopy.dateOrganization.applyAll}
               </Button>
             </>
           )}
@@ -206,7 +207,7 @@ export function SourceDocumentDateOrganization({
           className="border-b border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger"
           role="alert"
         >
-          {t("applyFailed")}
+          {sourceDocumentDetailCopy.dateOrganization.applyFailed}
         </p>
       ) : null}
       {/* One card per date, inset from the box and spaced at the app's card gap. */}
@@ -244,7 +245,7 @@ export function SourceDocumentDateOrganization({
                     readOnly={!editing}
                     readOnlyTextClassName="font-medium"
                     hideReadOnlyIcon
-                    ariaLabel={t("groupDate")}
+                    ariaLabel={sourceDocumentDetailCopy.dateOrganization.groupDate}
                     {...(timeZone != null ? { timeZone } : {})}
                   />
                 </div>

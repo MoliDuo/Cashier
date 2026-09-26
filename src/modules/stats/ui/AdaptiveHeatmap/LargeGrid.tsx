@@ -5,7 +5,6 @@
 
 "use client";
 import { useMemo } from "react";
-import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { parseDateString } from "@/lib/date-utils";
@@ -14,6 +13,7 @@ import { getHeatmapLevel } from "../../lib/heatmap-colors";
 import { generateHeatmapDateKeys, resolveHeatmapRange } from "../../lib/heatmap-range";
 import type { CalendarDayData, CalendarHeatmapStats } from "../../types";
 import { DayCellLarge } from "./DayCellLarge";
+import { calendarCopy } from "@/copy/controls";
 
 interface LargeGridHeatmapProps {
   days: CalendarDayData[];
@@ -34,9 +34,8 @@ export function LargeGridHeatmap({
   currency,
   locale,
 }: LargeGridHeatmapProps) {
-  const t = useTranslations("Calendar");
   // The key is spelled out rather than built, so the catalogue check can see it.
-  const weekdayNames = t.raw("weekDaysMon") as string[];
+  const weekdayNames = calendarCopy.weekDaysMon;
 
   // Create a map for quick lookup
   const dayMap = useMemo(() => {

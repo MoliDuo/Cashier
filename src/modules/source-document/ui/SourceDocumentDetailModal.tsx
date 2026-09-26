@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { DraftNotice } from "@/components/ui/draft-notice";
 import { ArrowLeft, X } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { SourceDocumentViewDetails } from "./SourceDocumentViewDetails";
 import { EditableField } from "@/components/ui/editable-field";
 import { textRoleClassName } from "@/components/typography";
@@ -24,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentDetailModalProps {
   /** The live books, so this record's own book can be changed here. */
@@ -52,8 +53,6 @@ function SourceDocumentDetailEditor({
   preferredCurrencies,
   timeZone,
 }: SourceDocumentDetailModalProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
   const detail = useSourceDocumentDetail({ id, open, books, onClose });
   const { sourceDocument, ledgerEntries, editor, selection, status, dialogs, actions } = detail;
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -129,8 +128,8 @@ function SourceDocumentDetailEditor({
                   })
                 }
                 disabled={status.busy}
-                aria-label={tCommon("back")}
-                title={tCommon("back")}
+                aria-label={commonCopy.back}
+                title={commonCopy.back}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
@@ -139,7 +138,7 @@ function SourceDocumentDetailEditor({
               <EditableField
                 value={editor.displayTitle}
                 onChange={(v) => editor.handleSourceDocChange({ title: v })}
-                placeholder={t("untitled")}
+                placeholder={sourceDocumentDetailCopy.untitled}
                 displayClassName={textRoleClassName("sectionTitle", "truncate")}
                 inputClassName={textRoleClassName("sectionTitle")}
                 disabled={status.busy || !editor.isEditMode}
@@ -151,21 +150,21 @@ function SourceDocumentDetailEditor({
               size="icon-sm"
               onClick={handleClose}
               disabled={status.busy}
-              aria-label={tCommon("close")}
-              title={tCommon("close")}
+              aria-label={commonCopy.close}
+              title={commonCopy.close}
             >
               <X className="size-4" />
             </Button>
           </DialogHeader>
           {sourceDocument != null && sourceDocument.bookId != null && books.length > 0 ? (
             <div className="flex shrink-0 items-center justify-between border-b px-4 py-2 text-sm">
-              <span>{tCommon("book")}</span>
+              <span>{commonCopy.book}</span>
               <Select
                 value={sourceDocument.bookId}
                 onValueChange={detail.assignBook}
                 disabled={status.busy || detail.isAssigningBook || editor.isEditMode}
               >
-                <SelectTrigger className="w-40" aria-label={tCommon("book")}>
+                <SelectTrigger className="w-40" aria-label={commonCopy.book}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="popper">

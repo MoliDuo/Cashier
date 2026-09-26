@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { LEDGER, QUERY } from "@/lib/constants";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
@@ -51,6 +50,8 @@ import { splitSourceDocumentAction } from "@/modules/source-document/server-acti
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import type { EntryEditData } from "@/modules/source-document/types";
 import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentActionCopy, sourceDocumentDetailCopy } from "@/copy/source-document";
 
 const NO_ENTRIES: LedgerEntry[] = [];
 
@@ -111,9 +112,6 @@ export function useSourceDocumentDetail({
   books,
   onClose,
 }: UseSourceDocumentDetailOptions) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
-  const tActions = useTranslations("SourceDocumentAction");
   const queryClient = useQueryClient();
   const ledgerId = useLedgerId();
 
@@ -252,8 +250,8 @@ export function useSourceDocumentDetail({
     invalidates: ["documents", "stats"],
     mutationFn: () => deleteSourceDocumentAction(id),
     refreshMode: "background",
-    successMessage: tCommon("deleteSuccess"),
-    errorMessage: tCommon("deleteFailed"),
+    successMessage: commonCopy.deleteSuccess,
+    errorMessage: commonCopy.deleteFailed,
     onSuccess: (_result, onCommitted) => {
       onCommitted?.();
       onClose();
@@ -262,14 +260,14 @@ export function useSourceDocumentDetail({
   const cancelMutation = useLedgerMutation<unknown, void>({
     invalidates: ["documents", "stats"],
     mutationFn: () => cancelSourceDocumentProcessingAction(id),
-    successMessage: tActions("cancelSuccess"),
-    errorMessage: tActions("cancelError"),
+    successMessage: sourceDocumentActionCopy.cancelSuccess,
+    errorMessage: sourceDocumentActionCopy.cancelError,
     onSuccess: onClose,
   });
   const assignBookMutation = useLedgerMutation({
     invalidates: ["documents", "stats"],
     // An archived target says so instead of snapping the picker back silently.
-    errorMessage: tCommon("bookChangeFailed"),
+    errorMessage: commonCopy.bookChangeFailed,
     mutationFn: (bookId: string) =>
       assignSourceDocumentBookAction({ sourceDocumentId: id, bookId }),
     onSuccess: async () => {
@@ -422,11 +420,11 @@ export function useSourceDocumentDetail({
     if (busy) return false;
     const expectedVersion = baseVersionRef.current ?? version;
     if (hasVersionConflict) {
-      toast.error(t("saveConflict"));
+      toast.error(sourceDocumentDetailCopy.saveConflict);
       return false;
     }
     if (expectedVersion == null) {
-      toast.error(t("saveAllFailed"));
+      toast.error(sourceDocumentDetailCopy.saveAllFailed);
       return false;
     }
     setIsSaving(true);
@@ -437,13 +435,17 @@ export function useSourceDocumentDetail({
         onCommitted: leaveEditing,
       });
       leaveEditing();
-      toast.success(t("saveAllSuccess", { count: countPendingChanges(pendingChanges) }));
+      toast.success(
+        sourceDocumentDetailCopy.saveAllSuccess({ count: countPendingChanges(pendingChanges) })
+      );
       return true;
     } catch (error) {
       // A stale save keeps the edits like any failure, but says they were made
       // on outdated data rather than that the save itself failed.
       toast.error(
-        error instanceof SourceDocumentStaleCommandError ? t("saveConflict") : t("saveAllFailed")
+        error instanceof SourceDocumentStaleCommandError
+          ? sourceDocumentDetailCopy.saveConflict
+          : sourceDocumentDetailCopy.saveAllFailed
       );
       return false;
     } finally {
@@ -506,11 +508,11 @@ export function useSourceDocumentDetail({
         patch,
       });
       if (result.affectedCount > 0) {
-        toast.success(t("batchUpdateSuccess", { count: result.affectedCount }));
+        toast.success(sourceDocumentDetailCopy.batchUpdateSuccess({ count: result.affectedCount }));
       }
       selection.clearSelection();
     } catch {
-      toast.error(t("batchUpdateError"));
+      toast.error(sourceDocumentDetailCopy.batchUpdateError);
     } finally {
       setIsSaving(false);
     }
@@ -530,15 +532,17 @@ export function useSourceDocumentDetail({
       if (unresolved.length === 0) selection.clearSelection();
       else selection.retainSelection(unresolved);
       if (result.succeeded.length > 0) {
-        toast.success(t("batchDeleteSuccess", { count: result.succeeded.length }));
+        toast.success(
+          sourceDocumentDetailCopy.batchDeleteSuccess({ count: result.succeeded.length })
+        );
       }
       if (unresolved.length > 0) {
-        toast.error(t("batchDeletePartial", { count: unresolved.length }));
+        toast.error(sourceDocumentDetailCopy.batchDeletePartial({ count: unresolved.length }));
       }
       if (unresolved.length === 0) setShowBatchDeleteConfirm(false);
       return unresolved.length === 0;
     } catch {
-      toast.error(t("batchDeleteError"));
+      toast.error(sourceDocumentDetailCopy.batchDeleteError);
       return false;
     } finally {
       setIsSaving(false);
@@ -552,7 +556,7 @@ export function useSourceDocumentDetail({
   const openSplit = () => {
     if (busy || selection.selectedIds.length === 0) return;
     if (selection.selectedIds.length >= ledgerEntries.length) {
-      toast.error(t("splitKeepOne"));
+      toast.error(sourceDocumentDetailCopy.splitKeepOne);
       return;
     }
     setShowSplitDialog(true);
@@ -568,16 +572,16 @@ export function useSourceDocumentDetail({
       });
       setShowSplitDialog(false);
       selection.clearSelection();
-      toast.success(t("splitSuccess", { count: result.movedEntryCount }), {
+      toast.success(sourceDocumentDetailCopy.splitSuccess({ count: result.movedEntryCount }), {
         id: feedbackToastId,
         action: {
-          label: t("viewSplitBill"),
+          label: sourceDocumentDetailCopy.viewSplitBill,
           onClick: () =>
             openLedgerDetail({ type: "source-document", id: result.splitSourceDocumentId }),
         },
       });
     } catch {
-      toast.error(t("splitFailed"));
+      toast.error(sourceDocumentDetailCopy.splitFailed);
     } finally {
       setIsSplitting(false);
     }
@@ -588,10 +592,13 @@ export function useSourceDocumentDetail({
     setIsSaving(true);
     try {
       await addEntryMutation.mutateAsync(data);
-      toast.success(t("addEntrySuccess"), { id: feedbackToastId, action: null });
+      toast.success(sourceDocumentDetailCopy.addEntrySuccess, {
+        id: feedbackToastId,
+        action: null,
+      });
       return true;
     } catch {
-      toast.error(t("addEntryError"));
+      toast.error(sourceDocumentDetailCopy.addEntryError);
       return false;
     } finally {
       setIsSaving(false);
@@ -606,10 +613,10 @@ export function useSourceDocumentDetail({
         entryId,
         onCommitted: () => setPendingDeleteEntryId(null),
       });
-      toast.success(tCommon("deleteSuccess"), { id: feedbackToastId, action: null });
+      toast.success(commonCopy.deleteSuccess, { id: feedbackToastId, action: null });
       return true;
     } catch {
-      toast.error(tCommon("deleteFailed"));
+      toast.error(commonCopy.deleteFailed);
       return false;
     } finally {
       setIsSaving(false);
@@ -699,7 +706,7 @@ export function useSourceDocumentDetail({
     archivedBookLabel:
       archivedRecordBook == null
         ? null
-        : tCommon("archivedBookOption", { name: archivedRecordBook.name }),
+        : commonCopy.archivedBookOption({ name: archivedRecordBook.name }),
     isAssigningBook: assignBookMutation.isPending,
     assignBook: (bookId: string) => assignBookMutation.mutate(bookId),
     applyDateOrganization: dateOrganizationMutation.mutateAsync,

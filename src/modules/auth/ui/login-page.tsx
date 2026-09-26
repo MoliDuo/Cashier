@@ -3,12 +3,12 @@
 import Image from "next/image";
 import { KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTranslations } from "next-intl";
 import { useLoginFlow } from "../hooks/use-login-flow";
 import { EmailStep } from "./email-step";
 import { OtpStep } from "./otp-step";
 import { useSearchParams } from "next/navigation";
 import { textRoleClassName } from "@/components/typography";
+import { authCopy } from "@/copy/auth";
 
 export function AuthLoginPage({
   emailAuthEnabled = false,
@@ -19,15 +19,14 @@ export function AuthLoginPage({
   devAuthAvailable?: boolean;
   accountMissing?: boolean;
 }) {
-  const t = useTranslations("Auth");
   const searchParams = useSearchParams();
   const flow = useLoginFlow({ isDevAuthAvailable: devAuthAvailable });
   const notice = searchParams.get("notice");
   const noticeMessage =
     notice === "reauth_required"
-      ? t("reauthRequiredNotice")
+      ? authCopy.reauthRequiredNotice
       : notice === "credentials_changed"
-        ? t("credentialsChangedNotice")
+        ? authCopy.credentialsChangedNotice
         : null;
 
   return (
@@ -44,14 +43,14 @@ export function AuthLoginPage({
           <h1 className={textRoleClassName("pageTitle")}>
             <span translate="no">Cashier</span>
           </h1>
-          <p className={textRoleClassName("bodyMuted", "mt-2")}>{t("productTagline")}</p>
+          <p className={textRoleClassName("bodyMuted", "mt-2")}>{authCopy.productTagline}</p>
         </div>
 
         <div className="rounded-lg border border-border bg-surface p-6 shadow-none">
           {accountMissing ? (
             <div role="status" className="mb-5 rounded-md bg-surface2 p-3">
-              <p className={textRoleClassName("bodyStrong")}>{t("noAccountTitle")}</p>
-              <p className={textRoleClassName("bodyMuted", "mt-1")}>{t("noAccountDesc")}</p>
+              <p className={textRoleClassName("bodyStrong")}>{authCopy.noAccountTitle}</p>
+              <p className={textRoleClassName("bodyMuted", "mt-1")}>{authCopy.noAccountDesc}</p>
               <pre className="mt-2 overflow-x-auto text-xs text-text">
                 <code translate="no">
                   {"npm run account:create -- --email you@example.com\n"}
@@ -74,12 +73,12 @@ export function AuthLoginPage({
                 onClick={() => void flow.handlePasskeyLogin()}
               >
                 <KeyRound aria-hidden="true" className="size-4" />
-                {t("passkeySignIn")}
+                {authCopy.passkeySignIn}
               </Button>
               {emailAuthEnabled ? (
                 <div className="mt-5 flex items-center gap-3" aria-hidden="true">
                   <span className="h-px flex-1 bg-border" />
-                  <span className={textRoleClassName("meta")}>{t("orDivider")}</span>
+                  <span className={textRoleClassName("meta")}>{authCopy.orDivider}</span>
                   <span className="h-px flex-1 bg-border" />
                 </div>
               ) : null}
@@ -89,12 +88,12 @@ export function AuthLoginPage({
             <>
               <div className="mb-5">
                 <h2 className={textRoleClassName("sectionTitle")}>
-                  {flow.step === "email" ? t("emailLoginTitle") : t("verifyCode")}
+                  {flow.step === "email" ? authCopy.emailLoginTitle : authCopy.verifyCode}
                 </h2>
                 <p className={textRoleClassName("bodyMuted", "mt-1")}>
                   {flow.step === "email"
-                    ? t("emailLoginDesc")
-                    : t("verifyCodeDesc", { email: flow.email })}
+                    ? authCopy.emailLoginDesc
+                    : authCopy.verifyCodeDesc({ email: flow.email })}
                 </p>
               </div>
               {flow.step === "email" ? (
@@ -125,7 +124,7 @@ export function AuthLoginPage({
             </>
           ) : (
             <>
-              <p className={textRoleClassName("bodyMuted")}>{t("emailAuthNotConfigured")}</p>
+              <p className={textRoleClassName("bodyMuted")}>{authCopy.emailAuthNotConfigured}</p>
               {flow.error != null ? (
                 <p
                   role="alert"
@@ -140,7 +139,7 @@ export function AuthLoginPage({
 
         {flow.isDevAuthAvailable ? (
           <div className="mt-4 rounded-md border border-dashed border-border bg-surface2/60 p-3 text-center">
-            <p className={textRoleClassName("meta")}>{t("devSignInDesc")}</p>
+            <p className={textRoleClassName("meta")}>{authCopy.devSignInDesc}</p>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
@@ -148,7 +147,7 @@ export function AuthLoginPage({
                 disabled={flow.isLoading}
                 className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-surface2 disabled:opacity-50"
               >
-                {t("devSignIn")}
+                {authCopy.devSignIn}
               </button>
             </div>
           </div>

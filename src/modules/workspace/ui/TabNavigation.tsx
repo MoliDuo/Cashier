@@ -1,8 +1,9 @@
 "use client";
 import { BarChart3, ListChecks, Plus, ReceiptText, RefreshCw, Settings } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { LedgerTab } from "@/lib/ledger-tabs";
+import { ledgerPageCopy } from "@/copy/app";
+import { commonCopy } from "@/copy/common";
 
 interface TabNavigationProps {
   disabled?: boolean;
@@ -36,24 +37,22 @@ export function TabNavigation({
   onInputIntent,
   onTabIntent,
 }: TabNavigationProps) {
-  const t = useTranslations("LedgerPage");
-  const tCommon = useTranslations("Common");
   const labelFor = (tab: LedgerTab) => {
     switch (tab) {
       case "stream":
-        return t("stream");
+        return ledgerPageCopy.stream;
       case "details":
-        return t("details");
+        return ledgerPageCopy.details;
       case "stats":
-        return t("stats");
+        return ledgerPageCopy.stats;
       case "settings":
-        return t("settings");
+        return ledgerPageCopy.settings;
     }
   };
 
   return (
     <nav
-      aria-label={t("navigation")}
+      aria-label={ledgerPageCopy.navigation}
       className="grid h-full w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] items-stretch"
     >
       {TAB_CONFIG.slice(0, 2).map(({ value, icon: Icon }) => (
@@ -63,10 +62,10 @@ export function TabNavigation({
           active={activeTab === value}
           icon={Icon}
           label={labelFor(value)}
-          disabledTitle={tCommon("loading")}
-          refreshTitle={tCommon("refresh")}
+          disabledTitle={commonCopy.loading}
+          refreshTitle={commonCopy.refresh}
           refreshing={refreshing && activeTab === value}
-          refreshingLabel={tCommon("refreshing")}
+          refreshingLabel={commonCopy.refreshing}
           onClick={() => onTabChange(value)}
           onIntent={
             onTabIntent != null && value !== activeTab ? () => onTabIntent(value) : undefined
@@ -82,7 +81,7 @@ export function TabNavigation({
         onPointerDown={onInputIntent}
         onFocus={onInputIntent}
         className="m-auto inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-bg active:scale-[0.98]"
-        aria-label={t("newRecord")}
+        aria-label={ledgerPageCopy.newRecord}
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -94,10 +93,10 @@ export function TabNavigation({
           active={activeTab === value}
           icon={Icon}
           label={labelFor(value)}
-          disabledTitle={tCommon("loading")}
-          refreshTitle={tCommon("refresh")}
+          disabledTitle={commonCopy.loading}
+          refreshTitle={commonCopy.refresh}
           refreshing={refreshing && activeTab === value}
-          refreshingLabel={tCommon("refreshing")}
+          refreshingLabel={commonCopy.refreshing}
           onClick={() => onTabChange(value)}
           onIntent={
             onTabIntent != null && value !== activeTab ? () => onTabIntent(value) : undefined

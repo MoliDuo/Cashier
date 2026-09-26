@@ -17,33 +17,18 @@ import {
 } from "./otp-rate-limit";
 import { generateOTP, getResendCooldown } from "@/modules/auth/domain/otp";
 import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
+import { signInCodeEmailCopy } from "@/copy/email";
 
-type OTPAuthEmailMessages = {
-  otpPreview: string;
-  otpHeading: string;
-  otpIntro: string;
-  otpCodeLabel: string;
-  otpExpiry: string;
-  otpWarning: string;
-  otpFooter: string;
-};
-
-async function getOTPEmailCopy(host: string, otp: string, expiresInMinutes: number) {
-  const messages = (await import("../../../../messages/zh.json")).default as {
-    AuthEmail: OTPAuthEmailMessages;
-  };
-  const t = messages.AuthEmail;
+function otpEmailCopy(host: string, expiresInMinutes: number) {
+  const copy = signInCodeEmailCopy;
   return {
-    subject: "Cashier 验证码",
-    copy: {
-      preview: t.otpPreview,
-      heading: t.otpHeading.replace("{host}", host),
-      intro: t.otpIntro,
-      codeLabel: t.otpCodeLabel,
-      expiry: t.otpExpiry.replace("{minutes}", String(expiresInMinutes)),
-      warning: t.otpWarning,
-      footer: t.otpFooter,
-    },
+    preview: copy.preview,
+    heading: copy.heading({ host }),
+    intro: copy.intro,
+    codeLabel: copy.codeLabel,
+    expiry: copy.expiry({ minutes: expiresInMinutes }),
+    warning: copy.warning,
+    footer: copy.footer,
   };
 }
 
@@ -110,12 +95,16 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
     expiresAt = token.expiresAt;
     tokenHash = token.tokenHash;
     const expiresInMinutes = Math.ceil(OTP_EXPIRES_SECONDS / 60);
-    const { subject, copy } = await getOTPEmailCopy(params.host, otp, expiresInMinutes);
     const delivery = await sendEmail({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: normalizedEmail,
-      subject,
-      content: OTPEmail({ otp, host: params.host, expiresInMinutes, copy }),
+      subject: signInCodeEmailCopy.subject,
+      content: OTPEmail({
+        otp,
+        host: params.host,
+        expiresInMinutes,
+        copy: otpEmailCopy(params.host, expiresInMinutes),
+      }),
     });
     if (delivery === "not_configured") {
       throw new AppError("Email login is not configured", "EMAIL_NOT_CONFIGURED", 503);

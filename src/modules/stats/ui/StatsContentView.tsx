@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { BarChart3, Grid3X3 } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import type { DateRangeType } from "@/lib/date-utils";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
@@ -16,6 +15,8 @@ import { StatsRanking } from "./StatsRanking";
 import { StatsSummary } from "./StatsSummary";
 import { StatsWeekdayRhythm } from "./StatsWeekdayRhythm";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { commonCopy } from "@/copy/common";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsContentViewProps {
   rangeType: DateRangeType;
@@ -62,16 +63,14 @@ export function StatsContentView({
   onDateDrilldown,
   readOnly = false,
 }: StatsContentViewProps) {
-  const t = useTranslations("StatsTab");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
   const currencySymbol = stats?.summary.currency ?? fallbackCurrency;
   const periodLabel =
     contentRangeType === "week"
-      ? t("lastWeek")
+      ? statsTabCopy.lastWeek
       : contentRangeType === "month"
-        ? t("lastMonth")
-        : t("lastYear");
+        ? statsTabCopy.lastMonth
+        : statsTabCopy.lastYear;
 
   // Derived once here rather than in each panel: they are all reading the same
   // payload, and three copies of the walk would be three chances to disagree.
@@ -90,10 +89,10 @@ export function StatsContentView({
           role="alert"
           className="flex flex-col items-center gap-3 rounded-lg border border-danger/30 bg-danger/5 px-4 py-8 text-center"
         >
-          <p className="text-sm text-foreground">{t("loadFailed")}</p>
+          <p className="text-sm text-foreground">{statsTabCopy.loadFailed}</p>
           {onRetry != null ? (
             <Button variant="outline" size="sm" onClick={onRetry}>
-              {t("retry")}
+              {statsTabCopy.retry}
             </Button>
           ) : null}
         </div>
@@ -112,7 +111,7 @@ export function StatsContentView({
         className="h-7 px-2"
       >
         <Grid3X3 aria-hidden="true" className="mr-1 h-4 w-4" />
-        {t("heatmap")}
+        {statsTabCopy.heatmap}
       </Button>
       <Button
         variant={chartView === "trend" ? "default" : "ghost"}
@@ -123,7 +122,7 @@ export function StatsContentView({
         className="h-7 px-2"
       >
         <BarChart3 aria-hidden="true" className="mr-1 h-4 w-4" />
-        {t("trend")}
+        {statsTabCopy.trend}
       </Button>
     </div>
   );
@@ -135,10 +134,10 @@ export function StatsContentView({
           role="alert"
           className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm"
         >
-          <span className="text-danger">{t("loadFailed")}</span>
+          <span className="text-danger">{statsTabCopy.loadFailed}</span>
           {onRetry != null ? (
             <Button variant="outline" size="sm" onClick={onRetry}>
-              {t("retry")}
+              {statsTabCopy.retry}
             </Button>
           ) : null}
         </div>
@@ -183,7 +182,7 @@ export function StatsContentView({
           role="status"
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
         >
-          {tCommon("incompleteAccountingProjection")}
+          {commonCopy.incompleteAccountingProjection}
         </div>
       ) : null}
 
@@ -196,7 +195,7 @@ export function StatsContentView({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
         <div className="min-w-0 lg:col-span-7">
           <StatsPanel
-            title={chartView === "trend" ? t("expenseTrend") : t("dailyHeatmap")}
+            title={chartView === "trend" ? statsTabCopy.expenseTrend : statsTabCopy.dailyHeatmap}
             actions={viewSwitch}
           >
             {stats == null ? (

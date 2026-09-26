@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
@@ -10,6 +9,7 @@ import { BatchCategoryDialog } from "./BatchCategoryDialog";
 import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
 import { BatchSetCategoryDialog } from "./BatchSetCategoryDialog";
 import { LedgerEntriesActions } from "./LedgerEntriesActions";
+import { batchActionsCopy } from "@/copy/workspace";
 
 export interface LedgerEntriesBatchActionToolbarProps {
   selectedCount: number;
@@ -101,7 +101,6 @@ export function LedgerEntriesBatchActionToolbar({
   isProcessing: externallyProcessing = false,
   className,
 }: LedgerEntriesBatchActionToolbarProps) {
-  const t = useTranslations("BatchActions");
   const [internalChangingCategory, setInternalChangingCategory] = useState(false);
   const [internalChangingCurrency, setInternalChangingCurrency] = useState(false);
   // The band owns both pickers: the choice is one list, and every surface that
@@ -194,15 +193,21 @@ export function LedgerEntriesBatchActionToolbar({
           // The box's own name, because the label next to it also carries the
           // loaded-scope note, which is not part of what the control is.
           aria-label={
-            isAllSelected ? t("deselectAll") : t("selectAllLoadedCount", { loaded: loadedCount })
+            isAllSelected
+              ? batchActionsCopy.deselectAll
+              : batchActionsCopy.selectAllLoadedCount({ loaded: loadedCount })
           }
           className="h-4 w-4"
         />
         <span className={textRoleClassName("bodyStrong", "whitespace-nowrap")}>
-          {isAllSelected ? t("deselectAll") : t("selectAllLoadedCount", { loaded: loadedCount })}
+          {isAllSelected
+            ? batchActionsCopy.deselectAll
+            : batchActionsCopy.selectAllLoadedCount({ loaded: loadedCount })}
         </span>
         {isAllSelected && hasMoreData ? (
-          <span className="whitespace-nowrap text-xs text-muted-foreground">{t("loadedOnly")}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            {batchActionsCopy.loadedOnly}
+          </span>
         ) : null}
       </label>
 
@@ -231,9 +236,11 @@ export function LedgerEntriesBatchActionToolbar({
       ) : null}
 
       <div className={textRoleClassName("meta", "basis-full space-y-0.5")} aria-live="polite">
-        <p>{t("selectedLoadedCount", { selected: selectedCount, loaded: loadedCount })}</p>
-        {hasMoreData ? <p>{t("unloadedExcluded")}</p> : null}
-        {selectedCount > 100 ? <p>{t("nonCategoryBatchLimit")}</p> : null}
+        <p>
+          {batchActionsCopy.selectedLoadedCount({ selected: selectedCount, loaded: loadedCount })}
+        </p>
+        {hasMoreData ? <p>{batchActionsCopy.unloadedExcluded}</p> : null}
+        {selectedCount > 100 ? <p>{batchActionsCopy.nonCategoryBatchLimit}</p> : null}
       </div>
 
       {onChangeCategory != null && confirmsCategory ? (

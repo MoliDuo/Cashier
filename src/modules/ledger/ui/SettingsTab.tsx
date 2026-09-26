@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { signOutAction } from "@/modules/auth/server-actions/sign-in";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,6 +24,8 @@ import { fetchEntryCategories } from "@/modules/ledger/queries";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import type { BookDto } from "@/modules/ledger/contracts";
+import { ledgerQueryErrorCopy } from "@/copy/app";
+import { settingsCopy } from "@/copy/settings";
 
 interface SettingsTabProps {
   ledger: Ledger;
@@ -43,8 +44,6 @@ export function SettingsTab({
   onGoToDetails,
 }: SettingsTabProps) {
   const pathname = usePathname();
-  const t = useTranslations("Settings");
-  const tQueryError = useTranslations("LedgerQueryError");
   const { theme, setTheme } = useTheme();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -72,15 +71,14 @@ export function SettingsTab({
     return latest;
   };
 
-  // Theme key mapping for translations
   const themeLabel = (themeName: "system" | "light" | "dark") => {
     switch (themeName) {
       case "system":
-        return t("themeAuto");
+        return settingsCopy.themeAuto;
       case "light":
-        return t("themeLight");
+        return settingsCopy.themeLight;
       case "dark":
-        return t("themeDark");
+        return settingsCopy.themeDark;
     }
   };
   const signOutTo = async (callbackUrl: string) => {
@@ -114,7 +112,7 @@ export function SettingsTab({
           role="alert"
           className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
         >
-          <span>{tQueryError("description")}</span>
+          <span>{ledgerQueryErrorCopy.description}</span>
           <Button
             type="button"
             variant="outline"
@@ -132,14 +130,14 @@ export function SettingsTab({
             }}
           >
             <RefreshCw className="size-4" />
-            {tQueryError("retry")}
+            {ledgerQueryErrorCopy.retry}
           </Button>
         </div>
       )}
-      <SettingsSection title={t("appearance")}>
-        <SettingsField title={t("theme")}>
+      <SettingsSection title={settingsCopy.appearance}>
+        <SettingsField title={settingsCopy.theme}>
           <Select value={theme ?? "system"} onValueChange={setTheme}>
-            <SelectTrigger aria-label={t("theme")} className="w-full sm:w-44">
+            <SelectTrigger aria-label={settingsCopy.theme} className="w-full sm:w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -1,6 +1,5 @@
 "use client";
 import type { ReactNode } from "react";
-import { useTranslations } from "next-intl";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,8 @@ import { DateFilter } from "@/components/ui/date-filter";
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { SourceDocPendingChanges } from "@/modules/source-document/detail-types";
 import { SourceDocumentTotal } from "./SourceDocumentTotal";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentSummaryHeaderProps {
   displayEntryDate: string;
@@ -52,9 +53,6 @@ export function SourceDocumentSummaryHeader({
   onToggleSelectionMode,
   selectionToolbar,
 }: SourceDocumentSummaryHeaderProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
-
   // The total's right inset matches the entry rows' `px-3` so the two line up;
   // the left keeps its own tighter inset for the select control.
   return (
@@ -69,8 +67,16 @@ export function SourceDocumentSummaryHeader({
             size="icon"
             onClick={onToggleSelectionMode}
             className="shrink-0 h-8 w-8"
-            aria-label={isSelectionMode ? t("cancelSelect") : t("select")}
-            title={isSelectionMode ? t("cancelSelect") : t("select")}
+            aria-label={
+              isSelectionMode
+                ? sourceDocumentDetailCopy.cancelSelect
+                : sourceDocumentDetailCopy.select
+            }
+            title={
+              isSelectionMode
+                ? sourceDocumentDetailCopy.cancelSelect
+                : sourceDocumentDetailCopy.select
+            }
           >
             {isSelectionMode ? (
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
@@ -90,7 +96,7 @@ export function SourceDocumentSummaryHeader({
               that carries a conversion caveat. */}
           <div className="flex min-w-0 items-center gap-2 sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-[55%] sm:-translate-x-1/2 sm:-translate-y-1/2">
             {/* The bar carries no visible label; name the date for screen readers. */}
-            <span className="sr-only">{t("transactionTime")}</span>
+            <span className="sr-only">{sourceDocumentDetailCopy.transactionTime}</span>
             <DateFilter
               value={displayEntryDate}
               onChange={(date) => {
@@ -110,7 +116,7 @@ export function SourceDocumentSummaryHeader({
                 variant="error"
                 className="h-5 shrink-0 rounded-full px-1.5 text-xs font-medium"
               >
-                {tCommon("error")}
+                {commonCopy.error}
               </Badge>
             )}
           </div>

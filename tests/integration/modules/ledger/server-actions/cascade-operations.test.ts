@@ -11,7 +11,7 @@ import { sql } from "drizzle-orm";
  * Test cases are designed from BUSINESS expectations, not implementation details.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { getTestDb } from "tests/setup";
 import { ledgers, ledgerEntries, entryCategories, sourceDocuments } from "@/persistence";
 import {
@@ -26,8 +26,6 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 import { eq } from "drizzle-orm";
-
-vi.mock("next-intl/server", () => ({ getLocale: vi.fn().mockResolvedValue("zh") }));
 
 // Import actions
 import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";

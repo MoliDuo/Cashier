@@ -6,7 +6,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
-import { useTranslations } from "next-intl";
 import {
   formatDateTimeForApi,
   formatRelativeDateLabel,
@@ -14,6 +13,7 @@ import {
   parseDateString,
 } from "@/lib/date-utils";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { dateFilterCopy } from "@/copy/controls";
 
 interface DateFilterProps {
   /** Selected date */
@@ -78,8 +78,6 @@ export function DateFilter({
   timeZone,
   ariaLabel,
 }: DateFilterProps) {
-  const t = useTranslations("DateFilter");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
   const [open, setOpen] = React.useState(false);
 
@@ -93,17 +91,7 @@ export function DateFilter({
 
   // The field paints its value the way the rest of the app writes a day.
   const dateLabel =
-    civilDateString == null
-      ? null
-      : formatRelativeDateLabel(
-          civilDateString,
-          locale,
-          {
-            today: tCommon("today"),
-            yesterday: tCommon("yesterday"),
-          },
-          timeZone
-        );
+    civilDateString == null ? null : formatRelativeDateLabel(civilDateString, locale, timeZone);
 
   const dateValue = React.useMemo(
     () => (civilDateString == null ? null : parseDateString(civilDateString)),
@@ -159,7 +147,7 @@ export function DateFilter({
           >
             <CalendarIcon className={cn("mr-2 shrink-0", isSmall ? "h-3.5 w-3.5" : "h-4 w-4")} />
             <span className={cn(truncate ? "truncate" : "whitespace-nowrap", "flex-1")}>
-              {dateLabel ?? placeholder ?? t("selectDate")}
+              {dateLabel ?? placeholder ?? dateFilterCopy.selectDate}
             </span>
             <ChevronDown
               className={cn("ml-auto opacity-50 shrink-0", isSmall ? "h-3.5 w-3.5" : "h-4 w-4")}
@@ -170,7 +158,7 @@ export function DateFilter({
           <button
             type="button"
             onClick={handleClear}
-            aria-label={t("clear")}
+            aria-label={dateFilterCopy.clear}
             className={cn(
               "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-sm opacity-60 hover:bg-accent hover:opacity-100",
               isSmall ? "size-7" : "size-8"

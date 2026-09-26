@@ -5,10 +5,10 @@ import {
   formatDateTimeForApi,
   formatRelativeDateLabel,
 } from "@/lib/date-utils";
-import { useTranslations } from "next-intl";
 import { formatCompactCurrencyAmount, formatCurrencyAmount } from "@/lib/format/currency";
 import { buildChartPoints } from "@/modules/stats/lib/chart-points";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { statsChartCopy, statsTabCopy } from "@/copy/stats";
 
 interface StatsChartProps {
   data: { date: string; total: string }[];
@@ -33,9 +33,6 @@ export function StatsChart({
   currencySymbol = "CNY",
 }: StatsChartProps) {
   const locale = DISPLAY_LOCALE;
-  const t = useTranslations("StatsChart");
-  const tTab = useTranslations("StatsTab");
-  const tCommon = useTranslations("Common");
   // The queried range is already truncated to the ledger-timezone today by the
   // stats state; do not re-clamp with the browser clock here.
   const chartPoints = useMemo(() => {
@@ -106,7 +103,7 @@ export function StatsChart({
   if (chartPoints.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
-        {t("noData")}
+        {statsChartCopy.noData}
       </div>
     );
   }
@@ -139,13 +136,13 @@ export function StatsChart({
       {previousValues.length > 1 ? (
         <div className="absolute left-12 top-0 flex items-center gap-1.5 text-micro text-muted-foreground">
           <span aria-hidden="true" className="h-px w-4 border-t border-dashed border-current" />
-          {tTab("sparklinePrevious")}
+          {statsTabCopy.sparklinePrevious}
         </div>
       ) : null}
       {/* Outlier indicator */}
       {hasOutliers && (
         <div className="absolute top-0 right-2 text-micro text-muted-foreground bg-surface2/50 px-2 py-0.5 rounded-full">
-          {t("scaleAdjusted")}
+          {statsChartCopy.scaleAdjusted}
         </div>
       )}
       {/* The period's own daily average, so a point reads as above or below par. */}
@@ -157,7 +154,7 @@ export function StatsChart({
         >
           <div className="border-t border-dashed border-primary/50" />
           <span className="absolute right-0 -top-4 rounded bg-surface px-1 text-micro text-primary">
-            {tTab("dailyAverageLine")}
+            {statsTabCopy.dailyAverageLine}
           </span>
         </div>
       ) : null}
@@ -178,7 +175,7 @@ export function StatsChart({
         {/* SVG for line only - stretched horizontally */}
         <svg
           role="img"
-          aria-label={tTab("expenseTrend")}
+          aria-label={statsTabCopy.expenseTrend}
           className="absolute inset-0 w-full h-full overflow-visible"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
@@ -249,10 +246,7 @@ export function StatsChart({
           const displayDate =
             rangeType === "year"
               ? p.fullDate // YYYY-MM format
-              : formatRelativeDateLabel(p.fullDate, locale, {
-                  today: tCommon("today"),
-                  yesterday: tCommon("yesterday"),
-                });
+              : formatRelativeDateLabel(p.fullDate, locale);
 
           const isHovered = hoveredPoint?.dataset === chartPoints && hoveredPoint.index === i;
 
@@ -268,7 +262,7 @@ export function StatsChart({
               {/* Data Point */}
               <button
                 type="button"
-                aria-label={`${displayDate}, ${t("expense")}: ${formatAmount(p.total)}`}
+                aria-label={`${displayDate}, ${statsChartCopy.expense}: ${formatAmount(p.total)}`}
                 aria-current={isHovered ? "true" : undefined}
                 onMouseEnter={() => setHoveredPoint({ index: i, dataset: chartPoints })}
                 onMouseLeave={() => setHoveredPoint(null)}
@@ -293,8 +287,8 @@ export function StatsChart({
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-popover text-popover-foreground text-xs rounded shadow-lg border whitespace-nowrap z-tooltip pointer-events-none">
                   <div className="font-medium">{displayDate}</div>
                   <div className={isCapped ? "text-danger" : ""}>
-                    {t("expense")}: {formatAmount(p.total)}
-                    {isCapped && t("exceedsLimit")}
+                    {statsChartCopy.expense}: {formatAmount(p.total)}
+                    {isCapped && statsChartCopy.exceedsLimit}
                   </div>
                 </div>
               )}

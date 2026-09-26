@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { KeyRound, Loader2 } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { useEnrollFlow } from "../hooks/use-enroll-flow";
+import { enrollCopy } from "@/copy/auth";
 
 export function EnrollPasskeyPage({ token }: { token: string | null }) {
-  const t = useTranslations("Enroll");
   const flow = useEnrollFlow(token);
 
   return (
@@ -16,8 +15,8 @@ export function EnrollPasskeyPage({ token }: { token: string | null }) {
       <div className="w-full max-w-md rounded-lg border border-border bg-surface p-6">
         {flow.linkValid ? (
           <>
-            <h1 className={textRoleClassName("pageTitle")}>{t("title")}</h1>
-            <p className={textRoleClassName("bodyMuted", "mt-2")}>{t("description")}</p>
+            <h1 className={textRoleClassName("pageTitle")}>{enrollCopy.title}</h1>
+            <p className={textRoleClassName("bodyMuted", "mt-2")}>{enrollCopy.description}</p>
             {flow.passkeySupported ? (
               <Button
                 type="button"
@@ -30,10 +29,10 @@ export function EnrollPasskeyPage({ token }: { token: string | null }) {
                 ) : (
                   <KeyRound aria-hidden="true" className="size-4" />
                 )}
-                {t("submit")}
+                {enrollCopy.submit}
               </Button>
             ) : (
-              <p className={textRoleClassName("body", "mt-6")}>{t("unsupported")}</p>
+              <p className={textRoleClassName("body", "mt-6")}>{enrollCopy.unsupported}</p>
             )}
             {flow.error != null ? (
               <p
@@ -46,10 +45,10 @@ export function EnrollPasskeyPage({ token }: { token: string | null }) {
           </>
         ) : (
           <>
-            <h1 className={textRoleClassName("pageTitle")}>{t("invalidLinkTitle")}</h1>
-            <p className={textRoleClassName("bodyMuted", "mt-2")}>{t("invalidLinkDesc")}</p>
+            <h1 className={textRoleClassName("pageTitle")}>{enrollCopy.invalidLinkTitle}</h1>
+            <p className={textRoleClassName("bodyMuted", "mt-2")}>{enrollCopy.invalidLinkDesc}</p>
             <Button asChild variant="outline" className="mt-6 min-h-11 w-full">
-              <Link href="/login">{t("backToLogin")}</Link>
+              <Link href="/login">{enrollCopy.backToLogin}</Link>
             </Button>
           </>
         )}

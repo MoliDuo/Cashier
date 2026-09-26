@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { isCancelledCeremony, usePasskeySupport } from "./use-passkey-support";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
@@ -15,6 +14,7 @@ import {
   startPasskeySignInAction,
   type SignInActionResult,
 } from "@/modules/auth/server-actions/sign-in";
+import { authCopy } from "@/copy/auth";
 
 type LoginStep = "email" | "otp";
 
@@ -22,65 +22,58 @@ interface LoginFlowOptions {
   isDevAuthAvailable?: boolean;
 }
 
-type AuthTranslator = ReturnType<typeof useTranslations<"Auth">>;
-
 /** Where to land after signing in; anything not a same-site path becomes "/". */
 function sanitizeCallbackUrl(value: string | null): string {
   return value != null && value.startsWith("/") && !value.startsWith("//") ? value : "/";
 }
 
-function getSignInErrorMessage(
-  result: Extract<SignInActionResult, { ok: false }>,
-  t: AuthTranslator
-): string {
+function getSignInErrorMessage(result: Extract<SignInActionResult, { ok: false }>): string {
   switch (result.code) {
     case AUTH_ERROR_CODES.REGISTRATION_DISABLED:
-      return t("registrationDisabledDesc");
+      return authCopy.registrationDisabledDesc;
     case AUTH_ERROR_CODES.OTP_INVALID:
-      return t("verifyFailed");
+      return authCopy.verifyFailed;
     case AUTH_ERROR_CODES.OTP_EXPIRED:
-      return t("codeExpiredMessage");
+      return authCopy.codeExpiredMessage;
     case AUTH_ERROR_CODES.OTP_LOCKED:
-      return t("otpLockedDesc");
+      return authCopy.otpLockedDesc;
     case AUTH_ERROR_CODES.OTP_RATE_LIMITED:
     case AUTH_ERROR_CODES.PASSKEY_RATE_LIMITED:
-      return t("rateLimitedDesc");
+      return authCopy.rateLimitedDesc;
     case AUTH_ERROR_CODES.AUTH_RATE_LIMIT_UNAVAILABLE:
-      return t("rateLimitUnavailableDesc");
+      return authCopy.rateLimitUnavailableDesc;
     case "unexpected":
-      return t("unexpectedError");
+      return authCopy.unexpectedError;
     default:
-      return t("errorDesc");
+      return authCopy.errorDesc;
   }
 }
 
 function getSendOTPErrorMessage(
   result: Extract<SendOTPActionResult, { ok: false }>,
-  t: AuthTranslator,
   fallbackKey: "sendCodeFailed" | "resendFailed"
 ): string {
   switch (result.code) {
     case "rate_limited":
-      return t("rateLimitedDesc");
+      return authCopy.rateLimitedDesc;
     case "rate_limit_unavailable":
-      return t("rateLimitUnavailableDesc");
+      return authCopy.rateLimitUnavailableDesc;
     case "config_error":
-      return t("errorConfigurationDesc");
+      return authCopy.errorConfigurationDesc;
     case "invalid_email":
-      return t("invalidEmailFormat");
+      return authCopy.invalidEmailFormat;
     case "email_not_configured":
-      return t("emailAuthNotConfigured");
+      return authCopy.emailAuthNotConfigured;
     case "email_send_failed":
-      return t("emailSendFailed");
+      return authCopy.emailSendFailed;
     case "unexpected":
-      return t("unexpectedError");
+      return authCopy.unexpectedError;
     default:
-      return t(fallbackKey);
+      return authCopy[fallbackKey];
   }
 }
 
 export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = {}) {
-  const t = useTranslations("Auth");
   const router = useRouter();
   const passkeySupported = usePasskeySupport();
   const callbackUrl = sanitizeCallbackUrl(useSearchParams().get("callbackUrl"));
@@ -111,7 +104,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
       return true;
     }
     if (result.code === AUTH_ERROR_CODES.OTP_EXPIRED) setOtpExpired(true);
-    setError(getSignInErrorMessage(result, t));
+    setError(getSignInErrorMessage(result));
     setIsLoading(false);
     return false;
   };
@@ -126,14 +119,14 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     try {
       const result = await sendOTPAction(submittedEmail);
       if (!result.ok) {
-        setError(getSendOTPErrorMessage(result, t, "sendCodeFailed"));
+        setError(getSendOTPErrorMessage(result, "sendCodeFailed"));
         return;
       }
       setOtpExpiry(result.expiresAt, result.canResendAt);
       setOtp("");
       setStep("otp");
     } catch {
-      setError(t("unexpectedError"));
+      setError(authCopy.unexpectedError);
     } finally {
       setIsLoading(false);
     }
@@ -141,11 +134,11 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
 
   const handleVerifyOTP = async () => {
     if (otpExpired) {
-      setError(t("verifyExpired"));
+      setError(authCopy.verifyExpired);
       return;
     }
     if (!/^\d{6}$/.test(otp)) {
-      setError(t("invalidCode"));
+      setError(authCopy.invalidCode);
       return;
     }
     setIsLoading(true);
@@ -153,7 +146,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     try {
       finishSignIn(await signInWithOtpAction(email, otp));
     } catch {
-      setError(t("unexpectedError"));
+      setError(authCopy.unexpectedError);
       setIsLoading(false);
     }
   };
@@ -165,14 +158,14 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     try {
       const result = await sendOTPAction(email);
       if (!result.ok) {
-        setError(getSendOTPErrorMessage(result, t, "resendFailed"));
+        setError(getSendOTPErrorMessage(result, "resendFailed"));
         return;
       }
       setOtpExpiry(result.expiresAt, result.canResendAt);
       setOtp("");
       setError(null);
     } catch {
-      setError(t("resendFailed"));
+      setError(authCopy.resendFailed);
     } finally {
       setResendPending(false);
     }
@@ -201,7 +194,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
       try {
         response = await startAuthentication({ optionsJSON: start.options });
       } catch (error) {
-        if (!isCancelledCeremony(error)) setError(t("passkeyFailed"));
+        if (!isCancelledCeremony(error)) setError(authCopy.passkeyFailed);
         setIsLoading(false);
         return;
       }
@@ -209,13 +202,13 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
       // An unknown passkey and a bad signature both come back as invalid
       // credentials, which for a passkey is not about any email address.
       if (!result.ok && result.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS) {
-        setError(t("passkeyFailed"));
+        setError(authCopy.passkeyFailed);
         setIsLoading(false);
         return;
       }
       finishSignIn(result);
     } catch {
-      setError(t("unexpectedError"));
+      setError(authCopy.unexpectedError);
       setIsLoading(false);
     }
   };
@@ -227,7 +220,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     try {
       finishSignIn(await devSignInAction());
     } catch {
-      setError(t("devSignInFailed"));
+      setError(authCopy.devSignInFailed);
       setIsLoading(false);
     }
   };
@@ -253,7 +246,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     handleChangeEmail,
     handleOTPExpired: () => {
       setOtpExpired(true);
-      setError(t("verifyExpired"));
+      setError(authCopy.verifyExpired);
     },
     handlePasskeyLogin,
     handleDevSignIn,

@@ -2,42 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CalculatorInput } from "@/components/ui/calculator-input";
 
-vi.mock("next-intl", async () => {
-  const msgs = (await import("../../../../messages/zh.json")).default as unknown as Record<
-    string,
-    Record<string, string>
-  >;
-
-  return {
-    useTranslations: (namespace?: string) => {
-      return (key: string, values?: Record<string, string | number>) => {
-        const nsMessages = namespace ? msgs[namespace] : undefined;
-        let msg = nsMessages?.[key];
-        if (msg == null) {
-          for (const ns in msgs) {
-            if (msgs[ns]?.[key] != null) {
-              msg = msgs[ns][key];
-              break;
-            }
-          }
-        }
-        if (msg == null) return key;
-        if (values != null) {
-          Object.entries(values).forEach(([k, v]) => {
-            msg = (msg as string).replace(`{${k}}`, String(v));
-          });
-        }
-        return msg;
-      };
-    },
-    useLocale: () => "zh",
-    useMessages: () => msgs,
-    useTimeZone: () => "UTC",
-    useNow: () => new Date(),
-    NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
-  };
-});
-
 describe("CalculatorInput", () => {
   it("initializes a new inline draft from the latest controlled value", () => {
     const { rerender } = render(<CalculatorInput value={12} onChange={() => {}} />);

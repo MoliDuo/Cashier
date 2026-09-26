@@ -1,10 +1,10 @@
 "use client";
 import * as React from "react";
-import { useTranslations } from "next-intl";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
+import { commonCopy } from "@/copy/common";
 
 const DialogDepthContext = React.createContext(0);
 
@@ -78,7 +78,6 @@ const DialogContent = React.forwardRef<
     },
     ref
   ) => {
-    const tCommon = useTranslations("Common");
     const depth = React.useContext(DialogDepthContext) - 1;
     return (
       <DialogPortal>
@@ -119,7 +118,7 @@ const DialogContent = React.forwardRef<
           {hideCloseButton ? null : (
             <DialogPrimitive.Close className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground sm:right-4 sm:top-4 sm:size-8">
               <X className="h-4 w-4" />
-              <span className="sr-only">{tCommon("close")}</span>
+              <span className="sr-only">{commonCopy.close}</span>
             </DialogPrimitive.Close>
           )}
         </DialogPrimitive.Content>

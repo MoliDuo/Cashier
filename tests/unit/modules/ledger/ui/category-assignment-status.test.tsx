@@ -2,17 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy } from "@/copy/workspace";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentStatus } from "@/modules/ledger/ui/CategoryAssignmentStatus";
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    values == null
-      ? key
-      : `${key}:${Object.entries(values)
-          .map(([name, value]) => `${name}=${value}`)
-          .join(",")}`,
-}));
 vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
   cancelCategoryAssignmentAction: vi.fn(),
   retryCategoryAssignmentFailuresAction: vi.fn(),
@@ -84,26 +78,32 @@ describe("CategoryAssignmentStatus", () => {
     renderStatus();
 
     expect(
-      screen.getByText("categoryJobProgress:processed=4,total=10,active=2")
+      screen.getByText(batchActionsCopy.categoryJobProgress({ processed: 4, total: 10, active: 2 }))
     ).toBeInTheDocument();
-    expect(screen.getByText("categoryJobRetrying:count=1,seconds=5")).toBeInTheDocument();
-    expect(screen.getByText("categoryStopDescription")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /categoryStop/ })).toBeEnabled();
+    expect(
+      screen.getByText(batchActionsCopy.categoryJobRetrying({ count: 1, seconds: 5 }))
+    ).toBeInTheDocument();
+    expect(screen.getByText(batchActionsCopy.categoryStopDescription)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: batchActionsCopy.categoryStop })).toBeEnabled();
   });
 
   it("keeps a read failure separate from the last known server job", () => {
     renderStatus({ isReadError: true });
 
-    expect(screen.getByText("categoryJobReadFailed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /categoryRefreshStatus/ })).toBeEnabled();
-    expect(screen.queryByText("categoryJobFailed")).not.toBeInTheDocument();
+    expect(screen.getByText(batchActionsCopy.categoryJobReadFailed)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: batchActionsCopy.categoryRefreshStatus })
+    ).toBeEnabled();
+    expect(screen.queryByText(batchActionsCopy.categoryJobFailed)).not.toBeInTheDocument();
   });
 
   it("offers latest-content categorization for conflicts", () => {
     renderStatus({ job: job({ status: "partial", conflictCount: 1 }) });
 
-    fireEvent.click(screen.getByRole("button", { name: /categoryViewResults/ }));
-    expect(screen.getByRole("button", { name: /categoryRetryLatest/ })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: batchActionsCopy.categoryViewResults }));
+    expect(
+      screen.getByRole("button", { name: batchActionsCopy.categoryRetryLatest })
+    ).toBeEnabled();
   });
 
   it("hands the run a retry restarted back to the page", async () => {
@@ -115,9 +115,9 @@ describe("CategoryAssignmentStatus", () => {
       job: job({ status: "partial", conflictCount: 1 }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /categoryViewResults/ }));
+    fireEvent.click(screen.getByRole("button", { name: batchActionsCopy.categoryViewResults }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /categoryRetryLatest/ }));
+      fireEvent.click(screen.getByRole("button", { name: batchActionsCopy.categoryRetryLatest }));
       await vi.advanceTimersByTimeAsync(0);
     });
 
@@ -130,7 +130,7 @@ describe("CategoryAssignmentStatus", () => {
     const onDismiss = vi.fn();
     renderStatus({ job: job({ status: "succeeded", processedCount: 10 }), onDismiss });
 
-    fireEvent.click(screen.getByRole("button", { name: "close" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.close }));
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
@@ -138,22 +138,24 @@ describe("CategoryAssignmentStatus", () => {
   it("offers no close control while the run is still moving", () => {
     renderStatus({ onDismiss: vi.fn() });
 
-    expect(screen.queryByRole("button", { name: "close" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /categoryStop/ })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: commonCopy.close })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: batchActionsCopy.categoryStop })).toBeEnabled();
   });
 
   it("keeps the close control off a read failure that is still polling", () => {
     renderStatus({ isReadError: true, onDismiss: vi.fn() });
 
-    expect(screen.queryByRole("button", { name: "close" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /categoryRefreshStatus/ })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: commonCopy.close })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: batchActionsCopy.categoryRefreshStatus })
+    ).toBeEnabled();
   });
 
   it("lets a read failure with no run to report be closed", () => {
     const onDismiss = vi.fn();
     renderStatus({ isReadError: true, job: null, onDismiss });
 
-    fireEvent.click(screen.getByRole("button", { name: "close" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.close }));
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });

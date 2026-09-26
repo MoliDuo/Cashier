@@ -2,10 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-}));
+import { commonCopy } from "@/copy/common";
 
 vi.mock("@/components/ui/button", () => ({
   Button: ({
@@ -46,7 +43,7 @@ describe("ConfirmDialog", () => {
         onOpenChange={onOpenChange}
       />
     );
-    const button = screen.getByRole("button", { name: "confirm" });
+    const button = screen.getByRole("button", { name: commonCopy.confirm });
     fireEvent.click(button);
     fireEvent.click(button);
     expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
@@ -69,8 +66,10 @@ describe("ConfirmDialog", () => {
         onOpenChange={onOpenChange}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: "confirm" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "confirm" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.confirm }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: commonCopy.confirm })).toBeEnabled()
+    );
     expect(onOpenChange).not.toHaveBeenCalled();
   });
   it("stays open and disables its action until an async confirmation succeeds", async () => {
@@ -91,7 +90,7 @@ describe("ConfirmDialog", () => {
       />
     );
 
-    const confirmButton = screen.getByRole("button", { name: "confirm" });
+    const confirmButton = screen.getByRole("button", { name: commonCopy.confirm });
     fireEvent.click(confirmButton);
     await waitFor(() => expect(confirmButton).toBeDisabled());
     expect(onOpenChange).not.toHaveBeenCalled();
@@ -114,7 +113,7 @@ describe("ConfirmDialog", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "save" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.save }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onOpenChange).not.toHaveBeenCalled();

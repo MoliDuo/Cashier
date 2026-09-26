@@ -1,10 +1,10 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsMetricStripProps {
   insights: StatsInsights;
@@ -22,17 +22,16 @@ export function StatsMetricStrip({
   dailyAverage,
   currencySymbol,
 }: StatsMetricStripProps) {
-  const t = useTranslations("StatsTab");
   const locale = DISPLAY_LOCALE;
   const money = (amount: string) => formatCurrencyAmount(amount, currencySymbol, locale);
 
   const metrics: { label: string; value: React.ReactNode }[] = [
     {
-      label: t("averageDaily"),
+      label: statsTabCopy.averageDaily,
       value: <AmountText variant="summary">{money(dailyAverage)}</AmountText>,
     },
     {
-      label: t("entries"),
+      label: statsTabCopy.entries,
       value: (
         <span className={textRoleClassName("bodyStrong", "tabular-nums")}>
           {insights.entryCount}
@@ -40,7 +39,7 @@ export function StatsMetricStrip({
       ),
     },
     {
-      label: t("averageEntry"),
+      label: statsTabCopy.averageEntry,
       value:
         insights.averageEntry == null ? (
           <span className={textRoleClassName("bodyStrong")}>—</span>
@@ -49,10 +48,13 @@ export function StatsMetricStrip({
         ),
     },
     {
-      label: t("recordedDays"),
+      label: statsTabCopy.recordedDays,
       value: (
         <span className={textRoleClassName("bodyStrong", "tabular-nums")}>
-          {t("recordedDaysValue", { active: insights.activeDays, total: insights.periodDays })}
+          {statsTabCopy.recordedDaysValue({
+            active: insights.activeDays,
+            total: insights.periodDays,
+          })}
         </span>
       ),
     },

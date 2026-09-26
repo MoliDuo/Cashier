@@ -1,5 +1,6 @@
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentCardCopy } from "@/copy/source-document";
 
 type ProcessingStatusType = "processing" | "completed" | "error" | "cancelled";
 
@@ -18,17 +19,14 @@ interface ProcessingStatusProps {
  * name a reason.
  */
 export function ProcessingStatus({ status, label, className }: ProcessingStatusProps) {
-  const t = useTranslations("SourceDocumentCard");
-  const tCommon = useTranslations("Common");
-
   const stateLabel =
     status === "processing"
-      ? t("processing")
+      ? sourceDocumentCardCopy.processing
       : status === "completed"
-        ? t("completed")
+        ? sourceDocumentCardCopy.completed
         : status === "cancelled"
-          ? t("cancelled")
-          : tCommon("error");
+          ? sourceDocumentCardCopy.cancelled
+          : commonCopy.error;
 
   const isFailure = status === "error";
   const displayLabel = isFailure ? (label ?? stateLabel) : stateLabel;

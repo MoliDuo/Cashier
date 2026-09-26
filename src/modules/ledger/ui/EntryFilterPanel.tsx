@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TOOLBAR_CONTROL_CLASS } from "@/components/toolbar-control";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import type { PeriodParams, PeriodPreset } from "@/lib/period-utils";
 import { useEntryFilterDraft } from "./EntryFilterPanel/hooks/useEntryFilterDraft";
 import { EntryFilterContent } from "./EntryFilterPanel/components/EntryFilterContent";
 import type { EntryFilters } from "@/modules/ledger/filters";
+import { entryFilterPanelCopy } from "@/copy/workspace";
 
 export type { EntryFilters } from "@/modules/ledger/filters";
 
@@ -46,8 +46,6 @@ export function EntryFilterPanel({
   showStatus = true,
   className,
 }: EntryFilterPanelProps) {
-  const t = useTranslations("EntryFilterPanel");
-
   const draft = useEntryFilterDraft({
     filters,
     onFiltersChange,
@@ -67,13 +65,15 @@ export function EntryFilterPanel({
       )}
       onClick={() => handleOpenChange(true)}
       aria-label={
-        activeFilterCount > 0 ? t("activeFilterCount", { count: activeFilterCount }) : t("filter")
+        activeFilterCount > 0
+          ? entryFilterPanelCopy.activeFilterCount({ count: activeFilterCount })
+          : entryFilterPanelCopy.filter
       }
       aria-haspopup="dialog"
       aria-expanded={open}
     >
       <SlidersHorizontal aria-hidden="true" />
-      <span>{t("filter")}</span>
+      <span>{entryFilterPanelCopy.filter}</span>
       {activeFilterCount > 0 && (
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-micro font-medium text-primary">
           {activeFilterCount}
@@ -106,7 +106,7 @@ export function EntryFilterPanel({
           aria-describedby={undefined}
         >
           <DialogHeader className="border-b border-border px-4 py-3 pr-12">
-            <DialogTitle className="text-sm font-medium">{t("filter")}</DialogTitle>
+            <DialogTitle className="text-sm font-medium">{entryFilterPanelCopy.filter}</DialogTitle>
           </DialogHeader>
           {filterContent}
         </DialogContent>

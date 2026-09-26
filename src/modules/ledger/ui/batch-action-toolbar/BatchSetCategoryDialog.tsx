@@ -1,7 +1,6 @@
 "use client";
 
 import { CircleSlash } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,6 +15,7 @@ import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { isConfirmableBatchCategoryPick, resolveBatchCategoryPick } from "./batch-category-pick";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface BatchSetCategoryDialogProps {
   open: boolean;
@@ -59,7 +59,6 @@ export function BatchSetCategoryDialog({
   isConfirming,
   onConfirm,
 }: BatchSetCategoryDialogProps) {
-  const t = useTranslations("BatchActions");
   const pick = resolveBatchCategoryPick({ categoryIds: pickedCategoryIds, clearPicked });
   const confirmable = isConfirmableBatchCategoryPick(pick);
   const pickedName =
@@ -70,11 +69,11 @@ export function BatchSetCategoryDialog({
   const summary = (() => {
     switch (pick.kind) {
       case "clear":
-        return t("categoryPickClear", { count: selectedCount });
+        return batchActionsCopy.categoryPickClear({ count: selectedCount });
       case "assign":
-        return t("categoryPickAssign", { count: selectedCount, name: pickedName });
+        return batchActionsCopy.categoryPickAssign({ count: selectedCount, name: pickedName });
       case "ai":
-        return t("categoryPickAi", {
+        return batchActionsCopy.categoryPickAi({
           entryCount: selectedCount,
           categoryCount: pick.categoryIds.length,
         });
@@ -84,12 +83,12 @@ export function BatchSetCategoryDialog({
   })();
   const confirmLabel =
     pick.kind === "assign"
-      ? t("categoryAssignConfirm", { name: pickedName })
+      ? batchActionsCopy.categoryAssignConfirm({ name: pickedName })
       : pick.kind === "ai"
-        ? t("categoryAiConfirm", { count: selectedCount })
+        ? batchActionsCopy.categoryAiConfirm({ count: selectedCount })
         : pick.kind === "clear"
-          ? t("categoryClearConfirm", { count: selectedCount })
-          : t("confirm");
+          ? batchActionsCopy.categoryClearConfirm({ count: selectedCount })
+          : batchActionsCopy.confirm;
 
   return (
     <Dialog
@@ -111,12 +110,12 @@ export function BatchSetCategoryDialog({
         }}
       >
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <DialogTitle>{t("manualCategory")}</DialogTitle>
+          <DialogTitle>{batchActionsCopy.manualCategory}</DialogTitle>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 subtle-scrollbar sm:p-6">
           <p className={textRoleClassName("bodyMuted")}>
-            {t("categoryPickDescription", { count: selectedCount })}
+            {batchActionsCopy.categoryPickDescription({ count: selectedCount })}
           </p>
           <div className="my-3 flex flex-wrap gap-2">
             <Button
@@ -129,7 +128,7 @@ export function BatchSetCategoryDialog({
               }
               onClick={() => categories.forEach((category) => onTogglePick(category.id, true))}
             >
-              {t("categorySelectAllCandidates")}
+              {batchActionsCopy.categorySelectAllCandidates}
             </Button>
             <Button
               type="button"
@@ -138,7 +137,7 @@ export function BatchSetCategoryDialog({
               disabled={isConfirming || pickedCategoryIds.length === 0}
               onClick={() => pickedCategoryIds.forEach((id) => onTogglePick(id, false))}
             >
-              {t("categoryClearCandidates")}
+              {batchActionsCopy.categoryClearCandidates}
             </Button>
           </div>
           <div className="divide-y divide-border">
@@ -186,19 +185,21 @@ export function BatchSetCategoryDialog({
               onCheckedChange={(next) => onTogglePick(null, next === true)}
             />
             <CircleSlash aria-hidden="true" className="h-4 w-4 opacity-50" />
-            <span className="min-w-0 flex-1">{t("categoryClearChoice")}</span>
+            <span className="min-w-0 flex-1">{batchActionsCopy.categoryClearChoice}</span>
           </label>
           {pick.kind === "ai" ? (
             <p className={textRoleClassName("bodyMuted", "mt-3")}>
-              {t("categoryAiStrictDescription")}
+              {batchActionsCopy.categoryAiStrictDescription}
             </p>
           ) : null}
         </div>
 
         <DialogFooter className="shrink-0 gap-2 border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:items-center sm:justify-between sm:space-x-0 sm:px-6 sm:py-4">
           <p className={textRoleClassName("meta")} aria-live="polite">
-            {summary || t("categorySelectionRequired")}
-            {selectionChanged ? `${summary === "" ? "" : " "}${t("selectionMoved")}` : ""}
+            {summary || batchActionsCopy.categorySelectionRequired}
+            {selectionChanged
+              ? `${summary === "" ? "" : " "}${batchActionsCopy.selectionMoved}`
+              : ""}
           </p>
           <Button
             type="button"

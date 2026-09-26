@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   useCategoryAssignmentJob,
@@ -9,6 +8,7 @@ import {
 } from "@/modules/ledger/hooks/useCategoryAssignmentJob";
 import { CategoryAssignmentStatus } from "./CategoryAssignmentStatus";
 import { CategoryAssignmentContext } from "./category-assignment-context";
+import { batchActionsCopy } from "@/copy/workspace";
 
 /**
  * Follows the ledger's assignment run above the tabs, so a run survives tab
@@ -69,7 +69,6 @@ function CategoryAssignmentNoticeReporter({
   notice: CategoryAssignmentNotice;
   onConsumed: (jobId: string) => void;
 }) {
-  const tBatch = useTranslations("BatchActions");
   const reportedRef = useRef(false);
   useEffect(() => {
     if (reportedRef.current) return;
@@ -77,16 +76,16 @@ function CategoryAssignmentNoticeReporter({
     const { job } = notice;
     if (job.status === "succeeded") {
       toast.success(
-        tBatch("aiCategoryDone", {
+        batchActionsCopy.aiCategoryDone({
           applied: job.appliedCount,
           confirmed: job.confirmedCount,
           issues: job.failedCount + job.conflictCount + job.skippedCount,
         })
       );
     } else {
-      toast.error(tBatch("aiCategoryFailed"));
+      toast.error(batchActionsCopy.aiCategoryFailed);
     }
     onConsumed(notice.jobId);
-  }, [notice, onConsumed, tBatch]);
+  }, [notice, onConsumed]);
   return null;
 }

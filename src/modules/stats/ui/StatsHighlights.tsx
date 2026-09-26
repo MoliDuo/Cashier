@@ -1,5 +1,4 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { textRoleClassName } from "@/components/typography";
 import { formatCivilDate } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
@@ -7,6 +6,7 @@ import { AmountText } from "@/modules/currency/ui/amount-text";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsPanel } from "./StatsPanel";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { statsTabCopy } from "@/copy/stats";
 
 interface StatsHighlightsProps {
   insights: StatsInsights;
@@ -29,18 +29,17 @@ export function StatsHighlights({
   periodLabel,
   onDateDrilldown,
 }: StatsHighlightsProps) {
-  const t = useTranslations("StatsTab");
   const locale = DISPLAY_LOCALE;
   const { busiestDay, longestStreak, topMover } = insights;
 
   if (busiestDay == null && longestStreak === 0 && topMover == null) return null;
 
   return (
-    <StatsPanel title={t("highlights")}>
+    <StatsPanel title={statsTabCopy.highlights}>
       <dl className="space-y-3">
         {busiestDay != null ? (
           <div className="flex items-baseline justify-between gap-3">
-            <dt className={textRoleClassName("bodyMuted")}>{t("busiestDay")}</dt>
+            <dt className={textRoleClassName("bodyMuted")}>{statsTabCopy.busiestDay}</dt>
             <dd className="flex min-w-0 items-baseline gap-2">
               {onDateDrilldown == null ? (
                 <span className={textRoleClassName("meta")}>
@@ -67,9 +66,9 @@ export function StatsHighlights({
 
         {longestStreak > 0 ? (
           <div className="flex items-baseline justify-between gap-3">
-            <dt className={textRoleClassName("bodyMuted")}>{t("recordingStreak")}</dt>
+            <dt className={textRoleClassName("bodyMuted")}>{statsTabCopy.recordingStreak}</dt>
             <dd className={textRoleClassName("bodyStrong", "tabular-nums")}>
-              {t("streakDays", { days: longestStreak })}
+              {statsTabCopy.streakDays({ days: longestStreak })}
             </dd>
           </div>
         ) : null}
@@ -79,8 +78,8 @@ export function StatsHighlights({
         <p className={textRoleClassName("bodyMuted", "border-t border-border pt-3")}>
           {/* Both keys are spelled out so the catalogue check can find them. */}
           {topMover.direction === "up"
-            ? t("topMoverUp", moverValues(topMover, periodLabel, currencySymbol, locale))
-            : t("topMoverDown", moverValues(topMover, periodLabel, currencySymbol, locale))}
+            ? statsTabCopy.topMoverUp(moverValues(topMover, periodLabel, currencySymbol, locale))
+            : statsTabCopy.topMoverDown(moverValues(topMover, periodLabel, currencySymbol, locale))}
         </p>
       ) : null}
     </StatsPanel>

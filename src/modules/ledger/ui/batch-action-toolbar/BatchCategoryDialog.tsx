@@ -1,11 +1,11 @@
 "use client";
 
 import { CircleSlash } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface BatchCategoryDialogProps {
   open: boolean;
@@ -34,7 +34,6 @@ export function BatchCategoryDialog({
   categories,
   onSelect,
 }: BatchCategoryDialogProps) {
-  const t = useTranslations("BatchActions");
   const choose = (categoryId: string | null) => {
     onSelect(categoryId);
     onOpenChange(false);
@@ -44,7 +43,7 @@ export function BatchCategoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent variant="modal" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{t("manualCategory")}</DialogTitle>
+          <DialogTitle>{batchActionsCopy.manualCategory}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto subtle-scrollbar">
           <button
@@ -53,7 +52,7 @@ export function BatchCategoryDialog({
             className={cn(OPTION_CLASS, "text-muted-foreground")}
           >
             <CircleSlash aria-hidden="true" className="h-4 w-4 opacity-50" />
-            <span className="min-w-0 flex-1 truncate">{t("uncategorized")}</span>
+            <span className="min-w-0 flex-1 truncate">{batchActionsCopy.uncategorized}</span>
           </button>
           {categories.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
           {categories.map((category) => (

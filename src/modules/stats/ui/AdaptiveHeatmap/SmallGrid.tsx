@@ -5,7 +5,6 @@
 
 "use client";
 import { useEffect, useMemo, useRef } from "react";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { formatDateTimeForApi as formatDate, parseDateString as parseDate } from "@/lib/date-utils";
 import { getHeatmapLevel } from "../../lib/heatmap-colors";
@@ -13,6 +12,7 @@ import { resolveHeatmapRange } from "../../lib/heatmap-range";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { CalendarDayData, CalendarHeatmapStats } from "../../types";
 import { DayCellSmall } from "./DayCellSmall";
+import { statsTabCopy } from "@/copy/stats";
 
 interface SmallGridHeatmapProps {
   days: CalendarDayData[];
@@ -33,7 +33,6 @@ export function SmallGridHeatmap({
   currency,
   locale,
 }: SmallGridHeatmapProps) {
-  const t = useTranslations("StatsTab");
   // Create a map for quick lookup
   const dayMap = useMemo(() => {
     const map = new Map<string, CalendarDayData>();
@@ -113,7 +112,7 @@ export function SmallGridHeatmap({
     <div
       ref={scrollRef}
       role="region"
-      aria-label={t("dailyHeatmap")}
+      aria-label={statsTabCopy.dailyHeatmap}
       tabIndex={0}
       className={cn("w-full overflow-x-auto pb-2", className)}
     >

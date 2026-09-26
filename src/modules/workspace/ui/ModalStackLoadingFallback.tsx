@@ -1,8 +1,8 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useModalStackStore } from "@/lib/store/modal-stack";
+import { commonCopy } from "@/copy/common";
 
 function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded bg-surface2", className)} />;
@@ -11,7 +11,6 @@ function Skeleton({ className }: { className?: string }) {
 export function ModalStackLoadingFallback() {
   const item = useModalStackStore((state) => state.stack.at(-1));
   const closeAll = useModalStackStore((state) => state.closeAll);
-  const tCommon = useTranslations("Common");
   if (item == null) return null;
 
   const isSourceDocument = item.type === "source-document";
@@ -26,7 +25,7 @@ export function ModalStackLoadingFallback() {
         )}
         aria-describedby={undefined}
       >
-        <DialogTitle className="sr-only">{tCommon("loading")}</DialogTitle>
+        <DialogTitle className="sr-only">{commonCopy.loading}</DialogTitle>
         {isSourceDocument ? (
           <>
             <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-5">

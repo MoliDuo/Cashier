@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { LedgerTab } from "@/lib/ledger-tabs";
@@ -18,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ledgerPageCopy } from "@/copy/app";
+import { bookPickerCopy, commonCopy } from "@/copy/common";
 
 interface NewRecordDialogProps {
   /** The book being viewed, or null for 总账. */
@@ -48,11 +49,8 @@ export function NewRecordDialog({
   preferredCurrencies,
   deviceTimeZone,
 }: NewRecordDialogProps) {
-  const t = useTranslations("LedgerPage");
-  const tCommon = useTranslations("Common");
   // The dialog opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
-  const tBookPicker = useTranslations("BookPicker");
   // The shell's + button opens it from outside the page, so the open flag is shared.
   const isOpen = useWorkspaceStore((state) => state.newRecordOpen);
   const setInputOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
@@ -109,16 +107,16 @@ export function NewRecordDialog({
         }}
       >
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <DialogTitle>{t("newRecord")}</DialogTitle>
+          <DialogTitle>{ledgerPageCopy.newRecord}</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-none sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <label htmlFor="record-book" className="text-sm">
-              {tCommon("book")}
+              {commonCopy.book}
             </label>
             <Select value={selectedBookId} onValueChange={setBookId} disabled={isSubmitting}>
               <SelectTrigger id="record-book" className="w-40">
-                <SelectValue placeholder={tBookPicker("namePlaceholder")} />
+                <SelectValue placeholder={bookPickerCopy.namePlaceholder} />
               </SelectTrigger>
               <SelectContent position="popper">
                 {books.map((book) => (
@@ -142,7 +140,7 @@ export function NewRecordDialog({
                   : "text-muted-foreground hover:text-text"
               )}
             >
-              {t("aiParse")}
+              {ledgerPageCopy.aiParse}
             </button>
             <button
               type="button"
@@ -156,7 +154,7 @@ export function NewRecordDialog({
                   : "text-muted-foreground hover:text-text"
               )}
             >
-              {t("quickEntry")}
+              {ledgerPageCopy.quickEntry}
             </button>
           </div>
 

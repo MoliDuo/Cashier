@@ -8,10 +8,6 @@ const { mutate, useLedgerMutationMock } = vi.hoisted(() => ({
   useLedgerMutationMock: vi.fn(),
 }));
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-}));
-
 vi.mock("@/lib/mutations/use-ledger-mutation", () => ({
   useLedgerMutation: (...args: unknown[]) => {
     useLedgerMutationMock(...args);

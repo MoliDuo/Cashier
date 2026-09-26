@@ -16,7 +16,6 @@ import {
   type InfiniteData,
   type QueryClient,
 } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { useSelection } from "@/hooks/use-selection";
@@ -49,6 +48,9 @@ import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-st
 import { buildLedgerEntryFilters } from "@/modules/workspace/ledger-filter-state";
 import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentActionCopy } from "@/copy/source-document";
+import { batchActionsCopy } from "@/copy/workspace";
 
 type StreamPage = Awaited<ReturnType<typeof fetchStreamPage>>;
 
@@ -121,9 +123,6 @@ export function useLedgerEntriesTab({
   advancedFilters,
   timeZone,
 }: UseLedgerEntriesTabOptions) {
-  const tCommon = useTranslations("Common");
-  const tBatch = useTranslations("BatchActions");
-  const tActions = useTranslations("SourceDocumentAction");
   const queryClient = useQueryClient();
 
   // --- The stream -----------------------------------------------------------
@@ -294,7 +293,7 @@ export function useLedgerEntriesTab({
     if (result.succeeded.length > 0) toast.success(successLabel);
     if (unresolved.length > 0) {
       toast.warning(
-        tBatch("partialResult", {
+        batchActionsCopy.partialResult({
           succeeded: result.succeeded.length,
           failed: result.failed.length,
         })
@@ -314,10 +313,10 @@ export function useLedgerEntriesTab({
         data: { documentDate: entryDate },
       }),
     onSuccess: (result) => {
-      toast.success(tBatch("datesUpdated", { count: result.updatedCount }));
+      toast.success(batchActionsCopy.datesUpdated({ count: result.updatedCount }));
       clearSelection();
     },
-    onError: () => toast.error(tCommon("error")),
+    onError: () => toast.error(commonCopy.error),
   });
 
   const batchDelete = useLedgerMutation<
@@ -329,9 +328,9 @@ export function useLedgerEntriesTab({
     mutationFn: ({ ids }) => batchDeleteSourceDocumentsAction(ids),
     onSuccess: (result, { onCommitted }) => {
       if (result.failed.length === 0) onCommitted();
-      settleBatchResult(result, tBatch("deleted", { count: result.succeeded.length }));
+      settleBatchResult(result, batchActionsCopy.deleted({ count: result.succeeded.length }));
     },
-    onError: () => toast.error(tCommon("deleteFailed")),
+    onError: () => toast.error(commonCopy.deleteFailed),
   });
 
   const batchRetry = useLedgerMutation<PartialBatchCommandResult, string[]>({
@@ -339,8 +338,8 @@ export function useLedgerEntriesTab({
     invalidates: ["documents", "stats"],
     mutationFn: (ids) => batchRetrySourceDocumentsAction(ids),
     onSuccess: (result) =>
-      settleBatchResult(result, tBatch("retried", { count: result.succeeded.length })),
-    onError: () => toast.error(tCommon("error")),
+      settleBatchResult(result, batchActionsCopy.retried({ count: result.succeeded.length })),
+    onError: () => toast.error(commonCopy.error),
   });
 
   const isBatchPending =
@@ -376,14 +375,14 @@ export function useLedgerEntriesTab({
   const retryMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
     invalidates: ["documents", "stats"],
     mutationFn: ({ sourceDocumentId }) => retrySourceDocumentAction(sourceDocumentId),
-    successMessage: tActions("retrySuccess"),
-    errorMessage: tActions("retryError"),
+    successMessage: sourceDocumentActionCopy.retrySuccess,
+    errorMessage: sourceDocumentActionCopy.retryError,
   });
   const cancelMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
     invalidates: ["documents", "stats"],
     mutationFn: ({ sourceDocumentId }) => cancelSourceDocumentProcessingAction(sourceDocumentId),
-    successMessage: tActions("cancelSuccess"),
-    errorMessage: tActions("cancelError"),
+    successMessage: sourceDocumentActionCopy.cancelSuccess,
+    errorMessage: sourceDocumentActionCopy.cancelError,
   });
   const retryMutationRef = useRef(retryMutation.mutateAsync);
   const cancelMutationRef = useRef(cancelMutation.mutateAsync);
@@ -454,8 +453,8 @@ export function useLedgerEntriesTab({
     mutationFn: async (id) => {
       await deleteSourceDocumentAction(id);
     },
-    successMessage: tCommon("deleteSuccess"),
-    errorMessage: tCommon("deleteFailed"),
+    successMessage: commonCopy.deleteSuccess,
+    errorMessage: commonCopy.deleteFailed,
     onSuccess: () => {
       setDeleteConfirm((prev) => ({ ...prev, open: false }));
       clearSelection();

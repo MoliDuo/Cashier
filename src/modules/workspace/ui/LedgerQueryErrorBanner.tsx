@@ -1,7 +1,7 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { ledgerQueryErrorCopy } from "@/copy/app";
 
 interface LedgerQueryErrorBannerProps {
   onRetry: () => void;
@@ -9,8 +9,9 @@ interface LedgerQueryErrorBannerProps {
 }
 
 export function LedgerQueryErrorBanner({ onRetry, empty = false }: LedgerQueryErrorBannerProps) {
-  const t = useTranslations("LedgerQueryError");
-  const description = empty ? t("emptyDescription") : t("description");
+  const description = empty
+    ? ledgerQueryErrorCopy.emptyDescription
+    : ledgerQueryErrorCopy.description;
 
   return (
     <div
@@ -31,7 +32,7 @@ export function LedgerQueryErrorBanner({ onRetry, empty = false }: LedgerQueryEr
         className={empty ? "h-8 px-3 text-xs" : "ml-auto h-7 px-2 text-xs"}
         onClick={onRetry}
       >
-        {t("retry")}
+        {ledgerQueryErrorCopy.retry}
       </Button>
     </div>
   );

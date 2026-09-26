@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { FileText, ImagePlay, Maximize2 } from "lucide-react";
 import type { SourceDocument } from "@/modules/source-document/contracts";
@@ -8,14 +7,13 @@ import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
 import { storedFileReadUrl } from "../../../stored-file-read";
 import { SourceDocumentImageModal } from "../../SourceDocumentImageModal";
+import { sourceDocumentCardCopy, sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentRawEvidenceProps {
   sourceDocument: SourceDocument;
 }
 
 export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawEvidenceProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCard = useTranslations("SourceDocumentCard");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -30,11 +28,14 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 px-3 py-2.5">
           <div className={textRoleClassName("meta", "flex items-center gap-2 font-semibold")}>
             <FileText className="h-3 w-3 text-primary/70" />
-            {t("rawEvidence")}
+            {sourceDocumentDetailCopy.rawEvidence}
             {(hasImages || hasRawText) && (
               <span className={textRoleClassName("meta", "font-normal")}>
                 (
-                {[hasImages && `${files.length} ${tCard("image")}`, hasRawText && t("rawContent")]
+                {[
+                  hasImages && `${files.length} ${sourceDocumentCardCopy.image}`,
+                  hasRawText && sourceDocumentDetailCopy.rawContent,
+                ]
                   .filter(Boolean)
                   .join(", ")}
                 )
@@ -46,7 +47,7 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
         <div className="space-y-4 px-3 pb-3 pt-3">
           {!hasImages && !hasRawText ? (
             <p className={textRoleClassName("bodyMuted", "px-3 py-6 text-center")}>
-              {t("noEvidence")}
+              {sourceDocumentDetailCopy.noEvidence}
             </p>
           ) : null}
           {hasImages && (
@@ -55,7 +56,7 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
                 className={textRoleClassName("meta", "mb-2 flex items-center gap-1.5 font-medium")}
               >
                 <ImagePlay className="h-3 w-3 text-primary/60" />
-                {tCard("image")}
+                {sourceDocumentCardCopy.image}
               </h3>
               {files[selectedImageIndex] == null ? null : (
                 <>
@@ -64,11 +65,11 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
                     data-testid="source-document-image-stage"
                     className="group relative flex aspect-[4/3] min-h-64 w-full items-start justify-center overflow-y-auto rounded-md border border-border/60 bg-surface2/70 transition-[border-color,background-color] duration-[var(--motion-feedback)]"
                     onClick={() => setViewerIndex(selectedImageIndex)}
-                    aria-label={tCard("imageAlt", { index: selectedImageIndex + 1 })}
+                    aria-label={sourceDocumentCardCopy.imageAlt({ index: selectedImageIndex + 1 })}
                   >
                     <Image
                       src={storedFileReadUrl(files[selectedImageIndex].id)}
-                      alt={tCard("imageAlt", { index: selectedImageIndex + 1 })}
+                      alt={sourceDocumentCardCopy.imageAlt({ index: selectedImageIndex + 1 })}
                       width={1200}
                       height={2400}
                       className="h-auto w-full object-contain p-2"
@@ -81,7 +82,7 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
                     <div
                       role="group"
                       className="mt-2 flex gap-2 overflow-x-auto pb-1"
-                      aria-label={tCard("image")}
+                      aria-label={sourceDocumentCardCopy.image}
                     >
                       {files.map((file, index) => {
                         return (
@@ -95,7 +96,7 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
                                 : "border-border opacity-75"
                             )}
                             onClick={() => setActiveImageIndex(index)}
-                            aria-label={tCard("imageAlt", { index: index + 1 })}
+                            aria-label={sourceDocumentCardCopy.imageAlt({ index: index + 1 })}
                             aria-current={selectedImageIndex === index ? "true" : undefined}
                           >
                             <Image
@@ -116,7 +117,9 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
 
           {hasRawText && (
             <div>
-              <h3 className={textRoleClassName("meta", "mb-2 font-medium")}>{t("rawContent")}</h3>
+              <h3 className={textRoleClassName("meta", "mb-2 font-medium")}>
+                {sourceDocumentDetailCopy.rawContent}
+              </h3>
               <div className="whitespace-pre-wrap break-words rounded-lg border border-border/40 bg-surface/50 p-3 text-sm leading-relaxed text-text/70">
                 {sourceDocument.text}
               </div>

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { AmountDisplay } from "@/modules/currency/ui/AmountDisplay";
 
 import { memo } from "react";
-import { useTranslations } from "next-intl";
+import { commonCopy } from "@/copy/common";
 
 interface LedgerEntryCardProps {
   ledgerEntry: LedgerEntry;
@@ -30,14 +30,12 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
   selectionDisabled = false,
   onToggleSelect,
 }: LedgerEntryCardProps) {
-  const t = useTranslations("Common");
-
   return (
     <SelectableCardSurface
       selectionMode={selectionMode}
       selected={isSelected}
       disabled={selectionDisabled}
-      selectionLabel={t("selectItem", { item: ledgerEntry.itemName })}
+      selectionLabel={commonCopy.selectItem({ item: ledgerEntry.itemName })}
       onToggleSelection={() => onToggleSelect?.(ledgerEntry.id)}
     >
       <EntryCardShell

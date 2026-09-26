@@ -29,7 +29,7 @@ interface ConfirmDialogProps {
   discardLabel?: string;
 }
 
-import { useTranslations } from "next-intl";
+import { commonCopy } from "@/copy/common";
 
 export const ConfirmDialog = memo(function ConfirmDialog({
   title,
@@ -46,7 +46,6 @@ export const ConfirmDialog = memo(function ConfirmDialog({
   onDiscard,
   discardLabel,
 }: ConfirmDialogProps) {
-  const t = useTranslations("Common");
   const [isPending, setIsPending] = useState(false);
   const [internalOpen, setInternalOpen] = useState(false);
   const pendingRef = useRef(false);
@@ -54,10 +53,10 @@ export const ConfirmDialog = memo(function ConfirmDialog({
     setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
   };
-  const displayConfirmLabel = confirmLabel ?? t("confirm");
-  const displayCancelLabel = cancelLabel ?? t("cancel");
-  const displaySaveLabel = saveLabel ?? t("save");
-  const displayDiscardLabel = discardLabel ?? t("discard");
+  const displayConfirmLabel = confirmLabel ?? commonCopy.confirm;
+  const displayCancelLabel = cancelLabel ?? commonCopy.cancel;
+  const displaySaveLabel = saveLabel ?? commonCopy.save;
+  const displayDiscardLabel = discardLabel ?? commonCopy.discard;
 
   // Check if we're using the three-button layout (for unsaved changes dialog)
   const hasThreeButtonLayout = onSave != null || onDiscard != null;

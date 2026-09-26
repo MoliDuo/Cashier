@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowDown, ArrowUp, CircleSlash, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
 import type {
   EntryCategory,
   EntryCategoryWithCount,
@@ -18,6 +17,8 @@ import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { SettingsSection } from "./settings/SettingsSection";
 import { useCategoryAssignment } from "./category-assignment-context";
+import { commonCopy } from "@/copy/common";
+import { settingsCopy } from "@/copy/settings";
 
 interface CategorySectionProps {
   /** Carries `entryCount`; the preset dialog sums it for its impact summary. */
@@ -43,8 +44,6 @@ export function CategorySection({
   isSaving = false,
   onGoToDetails,
 }: CategorySectionProps) {
-  const t = useTranslations("Settings");
-  const common = useTranslations("Common");
   const preset = useCategoryPresetSwitch({ categories });
   const { isActive: categoryAssignmentActive } = useCategoryAssignment();
 
@@ -80,7 +79,7 @@ export function CategorySection({
 
   return (
     <SettingsSection
-      title={t("categories")}
+      title={settingsCopy.categories}
       actions={
         managing ? null : (
           <div className="flex shrink-0 flex-wrap gap-2">
@@ -90,7 +89,7 @@ export function CategorySection({
               disabled={isSaving || preset.isPending || categoryAssignmentActive}
               onClick={preset.openDialog}
             >
-              {t("switchPreset")}
+              {settingsCopy.switchPreset}
             </Button>
             <Button
               type="button"
@@ -98,7 +97,7 @@ export function CategorySection({
               disabled={categoryAssignmentActive}
               onClick={enterManagement}
             >
-              {t("manageCategories")}
+              {settingsCopy.manageCategories}
             </Button>
           </div>
         )
@@ -109,9 +108,9 @@ export function CategorySection({
           className="border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
           role="status"
         >
-          <p>{t("categoryAssignmentActive")}</p>
+          <p>{settingsCopy.categoryAssignmentActive}</p>
           <Button asChild size="sm" variant="outline" className="mt-2">
-            <a href="#category-assignment-status">{t("categoryAssignmentViewTask")}</a>
+            <a href="#category-assignment-status">{settingsCopy.categoryAssignmentViewTask}</a>
           </Button>
         </div>
       ) : null}
@@ -130,12 +129,12 @@ export function CategorySection({
                 <span className="min-w-0 truncate text-sm font-medium">{category.name}</span>
                 {category.entryCount == null ? null : (
                   <span className="text-micro text-muted-foreground">
-                    {t("categoryItemCount", { count: category.entryCount })}
+                    {settingsCopy.categoryItemCount({ count: category.entryCount })}
                   </span>
                 )}
                 {category.id != null && generatingCategoryIds.has(category.id) ? (
                   <span className="text-micro text-muted-foreground">
-                    {t("generatingMetadata")}
+                    {settingsCopy.generatingMetadata}
                   </span>
                 ) : null}
                 {category.id != null &&
@@ -149,7 +148,7 @@ export function CategorySection({
                     className="min-h-11 px-2 text-micro text-danger"
                   >
                     <RefreshCw className="h-3 w-3" />
-                    {t("retryMetadata")}
+                    {settingsCopy.retryMetadata}
                   </Button>
                 ) : null}
               </div>
@@ -165,7 +164,7 @@ export function CategorySection({
                   size="icon-sm"
                   disabled={index === 0 || isSaving}
                   onClick={() => move(index, -1)}
-                  aria-label={t("moveCategoryUp", { name: category.name })}
+                  aria-label={settingsCopy.moveCategoryUp({ name: category.name })}
                 >
                   <ArrowUp className="h-4 w-4" />
                 </Button>
@@ -175,7 +174,7 @@ export function CategorySection({
                   size="icon-sm"
                   disabled={index === displayedCategories.length - 1 || isSaving}
                   onClick={() => move(index, 1)}
-                  aria-label={t("moveCategoryDown", { name: category.name })}
+                  aria-label={settingsCopy.moveCategoryDown({ name: category.name })}
                 >
                   <ArrowDown className="h-4 w-4" />
                 </Button>
@@ -185,7 +184,7 @@ export function CategorySection({
                   size="icon-sm"
                   disabled={isSaving}
                   onClick={() => startEditing(category)}
-                  aria-label={t("editCategory", { name: category.name })}
+                  aria-label={settingsCopy.editCategory({ name: category.name })}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -196,7 +195,7 @@ export function CategorySection({
                   className="text-muted-foreground hover:text-danger"
                   disabled={isSaving}
                   onClick={() => setDeleteTarget(category)}
-                  aria-label={t("deleteCategory", { name: category.name })}
+                  aria-label={settingsCopy.deleteCategory({ name: category.name })}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -217,10 +216,12 @@ export function CategorySection({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="min-w-0 truncate text-sm font-medium">{t("uncategorized")}</span>
+              <span className="min-w-0 truncate text-sm font-medium">
+                {settingsCopy.uncategorized}
+              </span>
               {uncategorizedCount > 0 ? (
                 <span className="text-micro text-warning/80">
-                  {t("categoryItemCount", { count: uncategorizedCount })}
+                  {settingsCopy.categoryItemCount({ count: uncategorizedCount })}
                 </span>
               ) : null}
             </div>
@@ -235,7 +236,7 @@ export function CategorySection({
               className="flex flex-wrap items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
               role="status"
             >
-              <span>{t("categoriesChangedElsewhere")}</span>
+              <span>{settingsCopy.categoriesChangedElsewhere}</span>
               <Button
                 type="button"
                 variant="outline"
@@ -243,7 +244,7 @@ export function CategorySection({
                 disabled={isSaving}
                 onClick={() => void handleReload()}
               >
-                {t("reloadCategories")}
+                {settingsCopy.reloadCategories}
               </Button>
             </div>
           ) : restoredFromDraft ? (
@@ -262,8 +263,8 @@ export function CategorySection({
                 }
               }}
               disabled={isSaving}
-              aria-label={t("newCategoryPlaceholder")}
-              placeholder={t("newCategoryPlaceholder")}
+              aria-label={settingsCopy.newCategoryPlaceholder}
+              placeholder={settingsCopy.newCategoryPlaceholder}
             />
             <Button
               type="button"
@@ -271,7 +272,7 @@ export function CategorySection({
               onClick={createCategory}
               disabled={newCategoryName.trim() === "" || isSaving}
             >
-              {t("addCategory")}
+              {settingsCopy.addCategory}
             </Button>
           </div>
           {saveError == null ? null : (
@@ -287,7 +288,7 @@ export function CategorySection({
               disabled={isSaving}
               onClick={cancelManagement}
             >
-              {common("cancel")}
+              {commonCopy.cancel}
             </Button>
             <Button
               type="button"
@@ -295,7 +296,7 @@ export function CategorySection({
               disabled={!dirty || isSaving || revisionConflict}
               onClick={() => void handleSave()}
             >
-              {isSaving ? t("saving") : common("save")}
+              {isSaving ? settingsCopy.saving : commonCopy.save}
             </Button>
           </div>
         </div>
@@ -313,8 +314,8 @@ export function CategorySection({
       <ConfirmDialog
         open={deleteTarget != null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={t("deleteCategoryDialog")}
-        description={t("deleteCategoryDescription", { name: deleteTarget?.name ?? "" })}
+        title={settingsCopy.deleteCategoryDialog}
+        description={settingsCopy.deleteCategoryDescription({ name: deleteTarget?.name ?? "" })}
         variant="destructive"
         onConfirm={confirmDeleteCategory}
       />
@@ -322,10 +323,10 @@ export function CategorySection({
       <ConfirmDialog
         open={discardManagementOpen}
         onOpenChange={setDiscardManagementOpen}
-        title={t("discardCategoryChangesTitle")}
-        description={t("discardCategoryChangesDescription")}
+        title={settingsCopy.discardCategoryChangesTitle}
+        description={settingsCopy.discardCategoryChangesDescription}
         variant="destructive"
-        confirmLabel={common("discard")}
+        confirmLabel={commonCopy.discard}
         onConfirm={async () => {
           confirmDiscardManagement();
           await handleReload();
@@ -335,10 +336,10 @@ export function CategorySection({
       <ConfirmDialog
         open={discardEditOpen}
         onOpenChange={setDiscardEditOpen}
-        title={t("discardCategoryEditTitle")}
-        description={t("discardCategoryEditDescription")}
+        title={settingsCopy.discardCategoryEditTitle}
+        description={settingsCopy.discardCategoryEditDescription}
         variant="destructive"
-        confirmLabel={common("discard")}
+        confirmLabel={commonCopy.discard}
         onConfirm={() => setEditSession(null)}
       />
     </SettingsSection>

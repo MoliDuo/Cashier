@@ -1,5 +1,4 @@
 import type { Ledger } from "@/modules/ledger/contracts";
-import { useTranslations } from "next-intl";
 import { type PeriodParams } from "@/lib/period-utils";
 import { type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
@@ -8,6 +7,7 @@ import { LedgerEntriesToolbar } from "./LedgerEntriesToolbar";
 import { LedgerEntriesStreamBody } from "./LedgerEntriesStreamBody";
 import { LedgerEntriesOverlays, preloadEditRetryDialog } from "./LedgerEntriesOverlays";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
+import { commonCopy } from "@/copy/common";
 
 interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -29,7 +29,6 @@ export function LedgerEntriesTab({
   collapseEntriesDefault = false,
   timeZone,
 }: LedgerEntriesTabProps) {
-  const tCommon = useTranslations("Common");
   const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const { filters, stream, selection, recovery, dialogs, actions } = useLedgerEntriesTab({
     bookId,
@@ -72,7 +71,7 @@ export function LedgerEntriesTab({
           role="status"
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
         >
-          {tCommon("incompleteAccountingProjection")}
+          {commonCopy.incompleteAccountingProjection}
         </div>
       ) : null}
 

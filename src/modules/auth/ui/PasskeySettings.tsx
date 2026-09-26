@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
@@ -32,6 +31,8 @@ import { fetchPasskeys } from "@/modules/auth/queries";
 import { isCancelledCeremony, usePasskeySupport } from "@/modules/auth/hooks/use-passkey-support";
 import { PASSKEY_NAME_MAX_LENGTH } from "@/modules/auth/constants";
 import type { PasskeySummary } from "@/modules/auth/contracts";
+import { commonCopy } from "@/copy/common";
+import { settingsPasskeysCopy } from "@/copy/settings";
 
 interface PasskeySettingsProps {
   onRequireReauthentication?: () => void | Promise<void>;
@@ -43,8 +44,6 @@ interface PasskeySettingsProps {
  * last one can still go, because a login email always remains.
  */
 export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsProps) {
-  const t = useTranslations("Settings.Passkeys");
-  const tCommon = useTranslations("Common");
   const locale = DISPLAY_LOCALE;
   const queryClient = useQueryClient();
   const key = queryKeys.passkeys();
@@ -65,25 +64,21 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
   const message = (code: PasskeyActionErrorCode) => {
     switch (code) {
       case "expired":
-        return t("expired");
+        return settingsPasskeysCopy.expired;
       case "invalid":
-        return t("invalid");
+        return settingsPasskeysCopy.invalid;
       case "duplicate":
-        return t("duplicate");
+        return settingsPasskeysCopy.duplicate;
       case "not_found":
-        return t("notFound");
+        return settingsPasskeysCopy.notFound;
       case "reauth_required":
-        return t("reauthRequired");
+        return settingsPasskeysCopy.reauthRequired;
       default:
-        return t("unknown");
+        return settingsPasskeysCopy.unknown;
     }
   };
 
-  const dateLabel = (instant: string) =>
-    formatInstantDateLabel(instant, locale, {
-      today: tCommon("today"),
-      yesterday: tCommon("yesterday"),
-    });
+  const dateLabel = (instant: string) => formatInstantDateLabel(instant, locale);
 
   const fail = async (code: PasskeyActionErrorCode) => {
     if (code === "reauth_required") {
@@ -127,7 +122,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
         ...current,
         result.passkey,
       ]);
-      toast.success(t("added"));
+      toast.success(settingsPasskeysCopy.added);
       setIsAddOpen(false);
       setName("");
     } catch {
@@ -153,7 +148,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
           passkey.id === renameTarget.id ? { ...passkey, name: renamed } : passkey
         )
       );
-      toast.success(t("renamed"));
+      toast.success(settingsPasskeysCopy.renamed);
       setRenameTarget(null);
     } catch {
       await fail("unexpected");
@@ -167,7 +162,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="min-w-0 text-sm text-muted-foreground">
-            {supported ? t("description") : t("unsupported")}
+            {supported ? settingsPasskeysCopy.description : settingsPasskeysCopy.unsupported}
           </p>
           <Button
             type="button"
@@ -175,12 +170,12 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
             className="shrink-0"
             disabled={!supported}
             onClick={() => {
-              setName(t("defaultName"));
+              setName(settingsPasskeysCopy.defaultName);
               setError(null);
               setIsAddOpen(true);
             }}
           >
-            {t("add")}
+            {settingsPasskeysCopy.add}
           </Button>
         </div>
         {passkeys.length > 0 ? (
@@ -191,8 +186,8 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
                   <p className="truncate text-sm text-text">{passkey.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {passkey.lastUsedAt == null
-                      ? t("createdAt", { date: dateLabel(passkey.createdAt) })
-                      : t("lastUsedAt", { date: dateLabel(passkey.lastUsedAt) })}
+                      ? settingsPasskeysCopy.createdAt({ date: dateLabel(passkey.createdAt) })
+                      : settingsPasskeysCopy.lastUsedAt({ date: dateLabel(passkey.lastUsedAt) })}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -200,8 +195,8 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={t("rename", { name: passkey.name })}
-                    title={t("rename", { name: passkey.name })}
+                    aria-label={settingsPasskeysCopy.rename({ name: passkey.name })}
+                    title={settingsPasskeysCopy.rename({ name: passkey.name })}
                     className="text-muted-foreground"
                     onClick={() => {
                       setRenameValue(passkey.name);
@@ -215,8 +210,8 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={t("delete", { name: passkey.name })}
-                    title={t("delete", { name: passkey.name })}
+                    aria-label={settingsPasskeysCopy.delete({ name: passkey.name })}
+                    title={settingsPasskeysCopy.delete({ name: passkey.name })}
                     className="text-muted-foreground hover:text-danger"
                     onClick={() => setDeleteTarget(passkey)}
                   >
@@ -228,7 +223,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
           </ul>
         ) : isListPending ? null : (
           <p className="rounded-[var(--radius)] border border-dashed border-border p-3 text-sm text-muted-foreground">
-            {t("empty")}
+            {settingsPasskeysCopy.empty}
           </p>
         )}
       </div>
@@ -236,12 +231,12 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
       <Dialog open={isAddOpen} onOpenChange={(open) => !pending && setIsAddOpen(open)}>
         <DialogContent variant="modal">
           <DialogHeader>
-            <DialogTitle>{t("addTitle")}</DialogTitle>
-            <DialogDescription>{t("addDesc")}</DialogDescription>
+            <DialogTitle>{settingsPasskeysCopy.addTitle}</DialogTitle>
+            <DialogDescription>{settingsPasskeysCopy.addDesc}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="new-passkey-name">{t("name")}</Label>
+              <Label htmlFor="new-passkey-name">{settingsPasskeysCopy.name}</Label>
               <Input
                 id="new-passkey-name"
                 name="passkeyName"
@@ -263,11 +258,11 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={pending}>
-              {tCommon("cancel")}
+              {commonCopy.cancel}
             </Button>
             <Button disabled={pending || name.trim() === ""} onClick={() => void register()}>
               {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-              {t("create")}
+              {settingsPasskeysCopy.create}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -279,12 +274,12 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
       >
         <DialogContent variant="modal">
           <DialogHeader>
-            <DialogTitle>{t("renameTitle")}</DialogTitle>
-            <DialogDescription>{t("renameDesc")}</DialogDescription>
+            <DialogTitle>{settingsPasskeysCopy.renameTitle}</DialogTitle>
+            <DialogDescription>{settingsPasskeysCopy.renameDesc}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="rename-passkey-name">{t("name")}</Label>
+              <Label htmlFor="rename-passkey-name">{settingsPasskeysCopy.name}</Label>
               <Input
                 id="rename-passkey-name"
                 name="passkeyName"
@@ -306,11 +301,11 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameTarget(null)} disabled={pending}>
-              {tCommon("cancel")}
+              {commonCopy.cancel}
             </Button>
             <Button disabled={pending || renameValue.trim() === ""} onClick={() => void rename()}>
               {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-              {tCommon("save")}
+              {commonCopy.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -319,9 +314,13 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
       <ConfirmDialog
         open={deleteTarget != null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={t("deleteTitle", { name: deleteTarget?.name ?? "" })}
-        description={passkeys.length <= 1 ? t("deleteLastDesc") : t("deleteDesc")}
-        confirmLabel={tCommon("delete")}
+        title={settingsPasskeysCopy.deleteTitle({ name: deleteTarget?.name ?? "" })}
+        description={
+          passkeys.length <= 1
+            ? settingsPasskeysCopy.deleteLastDesc
+            : settingsPasskeysCopy.deleteDesc
+        }
+        confirmLabel={commonCopy.delete}
         variant="destructive"
         onConfirm={async () => {
           if (deleteTarget == null) return false;
@@ -339,7 +338,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
           queryClient.setQueryData<PasskeySummary[]>(key, (current = []) =>
             current.filter((passkey) => passkey.id !== target.id)
           );
-          toast.success(t("deleted"));
+          toast.success(settingsPasskeysCopy.deleted);
           setDeleteTarget(null);
           return true;
         }}

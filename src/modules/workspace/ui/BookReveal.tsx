@@ -1,12 +1,12 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { usePullReveal } from "@/modules/workspace/hooks/usePullReveal";
 import { revealRows } from "@/modules/workspace/pull-reveal";
 import { useBookRevealStore } from "@/lib/store/book-reveal";
 import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
+import { bookScopeCopy } from "@/copy/common";
 
 interface BookRevealProps {
   books: readonly BookDto[];
@@ -31,7 +31,6 @@ interface BookRevealProps {
  * nothing inside is reachable by tab or by a screen reader.
  */
 export function BookReveal({ books, scope, onScopeChange }: BookRevealProps) {
-  const t = useTranslations("BookScope");
   const open = useBookRevealStore((state) => state.open);
   const setOpen = useBookRevealStore((state) => state.setOpen);
   const { height, dragging, closeAfterPick } = usePullReveal({
@@ -41,7 +40,7 @@ export function BookReveal({ books, scope, onScopeChange }: BookRevealProps) {
   });
 
   const options: readonly { scope: RecordScope; label: string }[] = [
-    { scope: null, label: t("all") },
+    { scope: null, label: bookScopeCopy.all },
     ...books.map((book) => ({ scope: book.id as RecordScope, label: book.name })),
   ];
 
@@ -62,7 +61,7 @@ export function BookReveal({ books, scope, onScopeChange }: BookRevealProps) {
         <div
           className="flex h-9 items-stretch gap-1 rounded-lg bg-surface2 p-1"
           role="group"
-          aria-label={t("label")}
+          aria-label={bookScopeCopy.label}
         >
           {options.map((option) => (
             <button

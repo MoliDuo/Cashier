@@ -1,6 +1,5 @@
 "use client";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +12,8 @@ import { textRoleClassName } from "@/components/typography";
 import { fetchCategoryAssignmentResults } from "@/modules/ledger/queries";
 import { queryKeys } from "@/lib/query-keys";
 import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface CategoryAssignmentResultDialogProps {
   job: CategoryReclassificationJob;
@@ -29,50 +30,48 @@ export function CategoryAssignmentResultDialog({
   onRetryFailed,
   onRetryLatest,
 }: CategoryAssignmentResultDialogProps) {
-  const t = useTranslations("BatchActions");
-  const common = useTranslations("Common");
   const outcomeLabel = (outcome: string | null) => {
     switch (outcome) {
       case "applied":
-        return t("categoryOutcomeApplied");
+        return batchActionsCopy.categoryOutcomeApplied;
       case "confirmed":
-        return t("categoryOutcomeConfirmed");
+        return batchActionsCopy.categoryOutcomeConfirmed;
       case "conflict":
-        return t("categoryOutcomeConflict");
+        return batchActionsCopy.categoryOutcomeConflict;
       case "skipped":
-        return t("categoryOutcomeSkipped");
+        return batchActionsCopy.categoryOutcomeSkipped;
       case "cancelled":
-        return t("categoryOutcomeCancelled");
+        return batchActionsCopy.categoryOutcomeCancelled;
       default:
-        return t("categoryOutcomeFailed");
+        return batchActionsCopy.categoryOutcomeFailed;
     }
   };
   const errorLabel = (errorCode: string) => {
     switch (errorCode) {
       case "ai_timeout":
-        return t("categoryErrorAiTimeout");
+        return batchActionsCopy.categoryErrorAiTimeout;
       case "ai_rate_limited":
-        return t("categoryErrorAiRateLimited");
+        return batchActionsCopy.categoryErrorAiRateLimited;
       case "ai_provider_unavailable":
-        return t("categoryErrorAiUnavailable");
+        return batchActionsCopy.categoryErrorAiUnavailable;
       case "ai_configuration_invalid":
-        return t("categoryErrorAiConfiguration");
+        return batchActionsCopy.categoryErrorAiConfiguration;
       case "ai_schema_invalid":
-        return t("categoryErrorAiSchema");
+        return batchActionsCopy.categoryErrorAiSchema;
       case "storage_unavailable":
-        return t("categoryErrorStorage");
+        return batchActionsCopy.categoryErrorStorage;
       case "document_changed":
-        return t("categoryErrorDocumentChanged");
+        return batchActionsCopy.categoryErrorDocumentChanged;
       case "document_unavailable":
-        return t("categoryErrorDocumentUnavailable");
+        return batchActionsCopy.categoryErrorDocumentUnavailable;
       case "category_changed":
-        return t("categoryErrorCategoryChanged");
+        return batchActionsCopy.categoryErrorCategoryChanged;
       case "selection_upload_expired":
-        return t("categoryErrorUploadExpired");
+        return batchActionsCopy.categoryErrorUploadExpired;
       case "upgrade_interrupted":
-        return t("categoryErrorUpgradeInterrupted");
+        return batchActionsCopy.categoryErrorUpgradeInterrupted;
       default:
-        return t("categoryErrorUnknown");
+        return batchActionsCopy.categoryErrorUnknown;
     }
   };
   const results = useInfiniteQuery({
@@ -96,19 +95,21 @@ export function CategoryAssignmentResultDialog({
         className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-2xl sm:rounded-lg"
       >
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <DialogTitle>{t("categoryResultsTitle")}</DialogTitle>
+          <DialogTitle>{batchActionsCopy.categoryResultsTitle}</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           {job.evidenceIncomplete ? (
             <p className={textRoleClassName("bodyMuted", "mb-3 text-warning")} role="status">
-              {t("categoryEvidenceIncomplete")}
+              {batchActionsCopy.categoryEvidenceIncomplete}
             </p>
           ) : null}
           {results.isError ? (
             <div className="space-y-3" role="alert">
-              <p className={textRoleClassName("bodyMuted")}>{t("categoryJobReadFailed")}</p>
+              <p className={textRoleClassName("bodyMuted")}>
+                {batchActionsCopy.categoryJobReadFailed}
+              </p>
               <Button variant="outline" onClick={() => void results.refetch()}>
-                {common("refresh")}
+                {commonCopy.refresh}
               </Button>
             </div>
           ) : (
@@ -116,12 +117,12 @@ export function CategoryAssignmentResultDialog({
               {items.map((item) => (
                 <div key={item.ledgerEntryId} className="space-y-1 py-3">
                   <div className={textRoleClassName("bodyStrong")}>
-                    {item.itemName ?? t("categoryEntryDeleted")}
+                    {item.itemName ?? batchActionsCopy.categoryEntryDeleted}
                   </div>
                   <p className={textRoleClassName("meta")}>
-                    {(item.originalCategoryName ?? t("uncategorized")) +
+                    {(item.originalCategoryName ?? batchActionsCopy.uncategorized) +
                       " -> " +
-                      (item.targetCategoryName ?? t("uncategorized"))}
+                      (item.targetCategoryName ?? batchActionsCopy.uncategorized)}
                   </p>
                   <p className={textRoleClassName("meta")}>
                     {outcomeLabel(item.outcome)}
@@ -136,7 +137,7 @@ export function CategoryAssignmentResultDialog({
                   disabled={results.isFetchingNextPage}
                   onClick={() => void results.fetchNextPage()}
                 >
-                  {common("loadMore")}
+                  {commonCopy.loadMore}
                 </Button>
               ) : null}
             </div>
@@ -145,15 +146,15 @@ export function CategoryAssignmentResultDialog({
         <DialogFooter className="shrink-0 gap-2 border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:py-4">
           {job.canRetryFailed && onRetryFailed != null ? (
             <Button variant="outline" onClick={onRetryFailed}>
-              {t("categoryRetryFailed")}
+              {batchActionsCopy.categoryRetryFailed}
             </Button>
           ) : null}
           {job.conflictCount > 0 && onRetryLatest != null ? (
             <Button variant="outline" onClick={onRetryLatest}>
-              {t("categoryRetryLatest")}
+              {batchActionsCopy.categoryRetryLatest}
             </Button>
           ) : null}
-          <Button onClick={() => onOpenChange(false)}>{common("close")}</Button>
+          <Button onClick={() => onOpenChange(false)}>{commonCopy.close}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

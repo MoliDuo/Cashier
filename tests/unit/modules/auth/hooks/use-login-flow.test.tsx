@@ -40,15 +40,11 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
-vi.mock("next-intl", () => ({
-  useLocale: () => "zh",
-  useTranslations: () => (key: string) => key,
-}));
-
 vi.mock("@/modules/auth/server-actions/send-otp", () => ({
   sendOTPAction: sendOTPActionMock,
 }));
 
+import { authCopy } from "@/copy/auth";
 import { useLoginFlow } from "@/modules/auth/hooks/use-login-flow";
 
 function createEmailSubmitEvent(email: string): React.FormEvent<HTMLFormElement> {
@@ -81,7 +77,7 @@ describe("useLoginFlow OTP sending", () => {
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
 
     expect(result.current.step).toBe("email");
-    expect(result.current.error).toBe("rateLimitedDesc");
+    expect(result.current.error).toBe(authCopy.rateLimitedDesc);
     expect(result.current.isLoading).toBe(false);
   });
 
@@ -145,7 +141,7 @@ describe("useLoginFlow OTP sending", () => {
 
     expect(sendOTPActionMock).toHaveBeenCalledWith("autofill@example.com");
     expect(result.current.email).toBe("autofill@example.com");
-    expect(result.current.error).toBe("emailSendFailed");
+    expect(result.current.error).toBe(authCopy.emailSendFailed);
   });
 
   async function reachCodeStep() {
@@ -167,7 +163,7 @@ describe("useLoginFlow OTP sending", () => {
     await act(() => result.current.handleVerifyOTP());
 
     expect(otpSignInMock).not.toHaveBeenCalled();
-    expect(result.current.error).toBe("invalidCode");
+    expect(result.current.error).toBe(authCopy.invalidCode);
   });
 
   it("shows the failure and stays on the page for a rejected code", async () => {
@@ -180,7 +176,7 @@ describe("useLoginFlow OTP sending", () => {
     expect(otpSignInMock).toHaveBeenCalledWith("smoke@example.com", "000000");
     expect(pushMock).not.toHaveBeenCalled();
     expect(refreshMock).not.toHaveBeenCalled();
-    expect(result.current.error).toBe("verifyFailed");
+    expect(result.current.error).toBe(authCopy.verifyFailed);
     expect(result.current.step).toBe("otp");
     expect(result.current.isLoading).toBe(false);
   });
@@ -193,7 +189,7 @@ describe("useLoginFlow OTP sending", () => {
     await act(() => result.current.handleVerifyOTP());
 
     expect(result.current.otpExpired).toBe(true);
-    expect(result.current.error).toBe("codeExpiredMessage");
+    expect(result.current.error).toBe(authCopy.codeExpiredMessage);
   });
 
   it("lands on the callback page once the code is accepted", async () => {
@@ -276,7 +272,7 @@ describe("useLoginFlow passkey sign-in", () => {
       await result.current.handlePasskeyLogin();
     });
 
-    expect(result.current.error).toBe("passkeyFailed");
+    expect(result.current.error).toBe(authCopy.passkeyFailed);
     expect(pushMock).not.toHaveBeenCalled();
   });
 
@@ -288,7 +284,7 @@ describe("useLoginFlow passkey sign-in", () => {
       await result.current.handlePasskeyLogin();
     });
 
-    expect(result.current.error).toBe("rateLimitedDesc");
+    expect(result.current.error).toBe(authCopy.rateLimitedDesc);
     expect(startAuthenticationMock).not.toHaveBeenCalled();
   });
 });

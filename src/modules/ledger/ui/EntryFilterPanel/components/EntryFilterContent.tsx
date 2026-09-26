@@ -1,5 +1,4 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { AmountInput } from "@/components/ui/amount-input";
 import {
@@ -20,6 +19,9 @@ import {
 } from "@/modules/ledger/entry-filter-presets";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import type { EntryFilters } from "@/modules/ledger/filters";
+import { dateRangeFilterCopy } from "@/copy/controls";
+import { settingsCopy } from "@/copy/settings";
+import { entryFilterPanelCopy } from "@/copy/workspace";
 
 const STATUS_OPTIONS: SourceDocumentProcessingStatus[] = [
   "processing",
@@ -61,32 +63,28 @@ export function EntryFilterContent({
   showCurrency,
   showStatus,
 }: EntryFilterContentProps) {
-  const t = useTranslations("EntryFilterPanel");
-  const tDateRange = useTranslations("DateRangeFilter");
-  const tSettings = useTranslations("Settings");
-
   const statusLabel = (status: SourceDocumentProcessingStatus) => {
     switch (status) {
       case "processing":
-        return t("statusProcessing");
+        return entryFilterPanelCopy.statusProcessing;
       case "completed":
-        return t("statusCompleted");
+        return entryFilterPanelCopy.statusCompleted;
       case "failed":
-        return t("statusFailed");
+        return entryFilterPanelCopy.statusFailed;
       case "cancelled":
-        return t("statusCancelled");
+        return entryFilterPanelCopy.statusCancelled;
     }
   };
   const presetLabel = (preset: EntryFilterPreset) => {
     switch (preset) {
       case "thisMonth":
-        return tDateRange("thisMonth");
+        return dateRangeFilterCopy.thisMonth;
       case "lastMonth":
-        return tDateRange("lastMonth");
+        return dateRangeFilterCopy.lastMonth;
       case "all":
-        return tDateRange("all");
+        return dateRangeFilterCopy.all;
       case "custom":
-        return tDateRange("customRange");
+        return dateRangeFilterCopy.customRange;
     }
   };
 
@@ -106,15 +104,15 @@ export function EntryFilterContent({
               search: event.target.value === "" ? null : event.target.value,
             }))
           }
-          placeholder={t("searchPlaceholder")}
-          aria-label={t("searchPlaceholder")}
+          placeholder={entryFilterPanelCopy.searchPlaceholder}
+          aria-label={entryFilterPanelCopy.searchPlaceholder}
         />
 
         <div className="space-y-2">
           <div
             className="flex gap-1 rounded-lg bg-surface2 p-1"
             role="group"
-            aria-label={t("dateRange")}
+            aria-label={entryFilterPanelCopy.dateRange}
           >
             {ENTRY_FILTER_PRESETS.map((preset) => {
               const isActive = displayPreset === preset;
@@ -146,7 +144,7 @@ export function EntryFilterContent({
                 size="sm"
                 className="h-9 flex-1"
                 showClear={false}
-                ariaLabel={tDateRange("startDate")}
+                ariaLabel={dateRangeFilterCopy.startDate}
                 {...(timeZone != null ? { timeZone } : {})}
               />
               <span className="text-sm text-muted-foreground">-</span>
@@ -156,7 +154,7 @@ export function EntryFilterContent({
                 size="sm"
                 className="h-9 flex-1"
                 showClear={false}
-                ariaLabel={tDateRange("endDate")}
+                ariaLabel={dateRangeFilterCopy.endDate}
                 {...(timeZone != null ? { timeZone } : {})}
               />
             </div>
@@ -173,12 +171,12 @@ export function EntryFilterContent({
               }))
             }
           >
-            <SelectTrigger aria-label={t("category")} className="w-full">
-              <SelectValue placeholder={t("allCategories")} />
+            <SelectTrigger aria-label={entryFilterPanelCopy.category} className="w-full">
+              <SelectValue placeholder={entryFilterPanelCopy.allCategories} />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
-              <SelectItem value="__all__">{t("allCategories")}</SelectItem>
-              <SelectItem value="__uncategorized__">{tSettings("uncategorized")}</SelectItem>
+              <SelectItem value="__all__">{entryFilterPanelCopy.allCategories}</SelectItem>
+              <SelectItem value="__uncategorized__">{settingsCopy.uncategorized}</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   <CategoryIcon iconName={cat.icon} className="w-4 h-4 mr-2 inline-block" />
@@ -199,11 +197,11 @@ export function EntryFilterContent({
               }))
             }
           >
-            <SelectTrigger aria-label={t("currency")} className="w-full">
-              <SelectValue placeholder={t("allCurrencies")} />
+            <SelectTrigger aria-label={entryFilterPanelCopy.currency} className="w-full">
+              <SelectValue placeholder={entryFilterPanelCopy.allCurrencies} />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
-              <SelectItem value="__all__">{t("allCurrencies")}</SelectItem>
+              <SelectItem value="__all__">{entryFilterPanelCopy.allCurrencies}</SelectItem>
               {preferredCurrencies.map((curr) => (
                 <SelectItem key={curr} value={curr}>
                   {curr}
@@ -215,8 +213,8 @@ export function EntryFilterContent({
 
         <div className="flex items-center gap-2">
           <AmountInput
-            placeholder={t("minAmount")}
-            aria-label={t("minAmount")}
+            placeholder={entryFilterPanelCopy.minAmount}
+            aria-label={entryFilterPanelCopy.minAmount}
             name="minAmount"
             value={tempFilters.minAmount ?? ""}
             allowNegative
@@ -230,8 +228,8 @@ export function EntryFilterContent({
           />
           <span className="text-sm text-muted-foreground">-</span>
           <AmountInput
-            placeholder={t("maxAmount")}
-            aria-label={t("maxAmount")}
+            placeholder={entryFilterPanelCopy.maxAmount}
+            aria-label={entryFilterPanelCopy.maxAmount}
             name="maxAmount"
             value={tempFilters.maxAmount ?? ""}
             allowNegative
@@ -249,7 +247,11 @@ export function EntryFilterContent({
           // A chosen status is outlined the way a chosen card is. Toggling a
           // chip off is how the status filter is cleared, so there is still no
           // 全部状态 control restating the empty state.
-          <div className="flex flex-wrap gap-2" role="group" aria-label={t("status")}>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label={entryFilterPanelCopy.status}
+          >
             {STATUS_OPTIONS.map((status) => {
               const isSelected = tempFilters.statuses?.includes(status) ?? false;
               return (
@@ -275,10 +277,10 @@ export function EntryFilterContent({
 
       <div className="flex gap-2 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Button variant="ghost" size="sm" className="flex-1" onClick={handleReset}>
-          {t("reset")}
+          {entryFilterPanelCopy.reset}
         </Button>
         <Button size="sm" className="flex-1" onClick={handleApply}>
-          {t("apply")}
+          {entryFilterPanelCopy.apply}
         </Button>
       </div>
     </div>

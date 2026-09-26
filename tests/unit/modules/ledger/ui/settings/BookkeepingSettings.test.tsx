@@ -3,10 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookkeepingSettings } from "@/modules/ledger/ui/settings/BookkeepingSettings";
 import type { ComponentProps } from "react";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-}));
+import { commonCopy } from "@/copy/common";
+import { settingsCopy } from "@/copy/settings";
 
 vi.mock("@/modules/ledger/ui/CurrencySection", () => ({
   CurrencySection: () => <div>currency-section</div>,
@@ -62,7 +60,7 @@ describe("instant bookkeeping settings", () => {
       />
     );
 
-    const toggle = screen.getByRole("switch", { name: "collapseEntries" });
+    const toggle = screen.getByRole("switch", { name: settingsCopy.collapseEntries });
     fireEvent.click(toggle);
 
     expect(onUpdateSettings).toHaveBeenCalledWith({ collapseEntriesDefault: true });
@@ -70,7 +68,7 @@ describe("instant bookkeeping settings", () => {
     expect(toggle).toBeDisabled();
     await act(async () => resolveSave(savedLedger({ collapseEntriesDefault: true })));
     expect(toggle).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "save" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: commonCopy.save })).not.toBeInTheDocument();
   });
 
   it("falls back to the saved value when the save fails", async () => {
@@ -84,10 +82,10 @@ describe("instant bookkeeping settings", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("switch", { name: "collapseEntries" }));
+    fireEvent.click(screen.getByRole("switch", { name: settingsCopy.collapseEntries }));
 
     await waitFor(() =>
-      expect(screen.getByRole("switch", { name: "collapseEntries" })).not.toBeChecked()
+      expect(screen.getByRole("switch", { name: settingsCopy.collapseEntries })).not.toBeChecked()
     );
   });
 
@@ -104,7 +102,7 @@ describe("instant bookkeeping settings", () => {
       />
     );
 
-    const prompt = screen.getByRole("textbox", { name: "aiPrompt" });
+    const prompt = screen.getByRole("textbox", { name: settingsCopy.aiPrompt });
     fireEvent.change(prompt, { target: { value: "Draft" } });
     fireEvent.change(prompt, { target: { value: "Draft prompt" } });
     expect(onUpdateSettings).not.toHaveBeenCalled();
@@ -127,7 +125,7 @@ describe("instant bookkeeping settings", () => {
       />
     );
 
-    const prompt = screen.getByRole("textbox", { name: "aiPrompt" });
+    const prompt = screen.getByRole("textbox", { name: settingsCopy.aiPrompt });
     fireEvent.change(prompt, { target: { value: "Server prompt" } });
     fireEvent.blur(prompt);
 
@@ -140,7 +138,7 @@ describe("instant bookkeeping settings", () => {
       .mockResolvedValue(savedLedger({ aiCustomPrompt: "Typed then left" }));
     const { unmount } = render(<BookkeepingSettings {...bookkeepingProps({ onUpdateSettings })} />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "aiPrompt" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: settingsCopy.aiPrompt }), {
       target: { value: "Typed then left" },
     });
     unmount();

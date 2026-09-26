@@ -2,15 +2,8 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expectTextRole } from "tests/helpers/class-tables";
 import { DateFilter } from "@/components/ui/date-filter";
-
-vi.mock("next-intl", () => ({
-  // The calendar behind the picker reads its weekday row with `raw`.
-  useTranslations: () =>
-    Object.assign((key: string) => key, {
-      raw: () => ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
-    }),
-  useLocale: () => "zh-CN",
-}));
+import { commonCopy } from "@/copy/common";
+import { calendarCopy, dateFilterCopy } from "@/copy/controls";
 
 describe("DateFilter", () => {
   afterEach(() => {
@@ -24,7 +17,7 @@ describe("DateFilter", () => {
 
     render(<DateFilter value="2026-09-11" onChange={() => {}} readOnly />);
 
-    expect(screen.getByText("today")).toBeInTheDocument();
+    expect(screen.getByText(commonCopy.today)).toBeInTheDocument();
   });
 
   it("renders a date-only string without shifting it to the previous day", () => {
@@ -37,7 +30,7 @@ describe("DateFilter", () => {
     const onChange = vi.fn();
     render(<DateFilter value="2026-07-28" onChange={onChange} />);
 
-    const clear = screen.getByRole("button", { name: "clear" });
+    const clear = screen.getByRole("button", { name: dateFilterCopy.clear });
     expect(clear).toHaveAttribute("type", "button");
     fireEvent.click(clear);
 
@@ -51,7 +44,7 @@ describe("DateFilter", () => {
     // non-functional, instead of omitting it entirely.
     render(<DateFilter value="2026-07-28" onChange={() => {}} disabled />);
 
-    expect(screen.queryByRole("button", { name: "clear" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: dateFilterCopy.clear })).not.toBeInTheDocument();
   });
 
   it("renders plain text without picker chrome when read-only", () => {
@@ -104,13 +97,13 @@ describe("DateFilter", () => {
   it("falls back to the interactive picker when read-only has no value", () => {
     render(<DateFilter value={null} onChange={() => {}} readOnly />);
 
-    expect(screen.getByRole("button", { name: "selectDate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: dateFilterCopy.selectDate })).toBeInTheDocument();
   });
 
   it("offers the calendar's clear shortcut unless the field says otherwise", () => {
     const { unmount } = render(<DateFilter value="2026-07-28" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "2026年7月28日 星期二" }));
-    expect(screen.getByText("clear")).toBeInTheDocument();
+    expect(screen.getByText(calendarCopy.clear)).toBeInTheDocument();
     unmount();
 
     // A field that can never be empty hides both clear affordances.
@@ -123,8 +116,8 @@ describe("DateFilter", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "2026年7月28日 星期二" }));
-    expect(screen.getByText("today")).toBeInTheDocument();
-    expect(screen.queryByText("clear")).not.toBeInTheDocument();
+    expect(screen.getByText(calendarCopy.today)).toBeInTheDocument();
+    expect(screen.queryByText(calendarCopy.clear)).not.toBeInTheDocument();
   });
 
   it("names today against the ledger timezone, not the device's", () => {
@@ -137,6 +130,6 @@ describe("DateFilter", () => {
       <DateFilter value="2026-09-09" onChange={() => {}} readOnly timeZone="Pacific/Kiritimati" />
     );
 
-    expect(screen.getByText("yesterday")).toBeInTheDocument();
+    expect(screen.getByText(commonCopy.yesterday)).toBeInTheDocument();
   });
 });

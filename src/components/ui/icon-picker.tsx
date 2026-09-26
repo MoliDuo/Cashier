@@ -1,10 +1,10 @@
 "use client";
 import { useId, useState } from "react";
-import { useTranslations } from "next-intl";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { CATEGORY_ICON_MAP, COMMON_LUCIDE_ICONS, type CommonLucideIcon } from "@/config/icons";
 import { cn } from "@/lib/utils";
+import { settingsCopy } from "@/copy/settings";
 
 const PICKER_ICON_NAMES = Object.values(CATEGORY_ICON_MAP).filter(
   (iconName): iconName is CommonLucideIcon => iconName !== "Home" && iconName !== "CircleSlash"
@@ -22,7 +22,6 @@ function isCommonIcon(value: string): value is CommonLucideIcon {
 }
 
 export function IconPicker({ value, onChange, disabled = false, className }: IconPickerProps) {
-  const t = useTranslations("Settings");
   const [open, setOpen] = useState(false);
   const listboxId = useId();
 
@@ -30,7 +29,7 @@ export function IconPicker({ value, onChange, disabled = false, className }: Ico
     onChange(iconName);
     setOpen(false);
   };
-  const selectedName = value != null && isCommonIcon(value) ? t(`iconNames.${value}`) : value;
+  const selectedName = value != null && isCommonIcon(value) ? settingsCopy.iconNames[value] : value;
 
   if (disabled) {
     return (
@@ -50,7 +49,9 @@ export function IconPicker({ value, onChange, disabled = false, className }: Ico
           aria-controls={listboxId}
           aria-haspopup="listbox"
           aria-label={
-            value == null ? t("selectIcon") : t("selectedIcon", { name: selectedName ?? value })
+            value == null
+              ? settingsCopy.selectIcon
+              : settingsCopy.selectedIcon({ name: selectedName ?? value })
           }
           className={cn(
             "flex h-11 w-11 items-center justify-center rounded",
@@ -66,12 +67,12 @@ export function IconPicker({ value, onChange, disabled = false, className }: Ico
         <div
           id={listboxId}
           role="listbox"
-          aria-label={t("icons")}
+          aria-label={settingsCopy.icons}
           className="grid grid-cols-6 gap-1"
         >
           {PICKER_ICON_NAMES.map((iconName) => {
             const isSelected = value === iconName;
-            const localizedName = t(`iconNames.${iconName}`);
+            const localizedName = settingsCopy.iconNames[iconName];
             return (
               <button
                 key={iconName}

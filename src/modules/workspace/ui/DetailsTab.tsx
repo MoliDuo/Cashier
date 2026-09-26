@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -25,6 +24,8 @@ import type { LedgerAdvancedFilters } from "../initial-query-state";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import { usePeriodLabel } from "./usePeriodLabel";
+import { commonCopy } from "@/copy/common";
+import { detailsTabCopy, entryFilterPanelCopy } from "@/copy/workspace";
 
 interface DetailsTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -48,9 +49,6 @@ export function DetailsTab({
   advancedFilters,
   timeZone,
 }: DetailsTabProps) {
-  const t = useTranslations("DetailsTab");
-  const tCommon = useTranslations("Common");
-  const tFilter = useTranslations("EntryFilterPanel");
   const { sentinelRef, ...tab } = useDetailsTab({
     bookId,
     categories,
@@ -119,7 +117,7 @@ export function DetailsTab({
           onClick={tab.toggleSelectionMode}
           disabled={tab.isPending}
           className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
-          aria-label={tab.isSelectionMode ? t("cancelSelect") : t("select")}
+          aria-label={tab.isSelectionMode ? detailsTabCopy.cancelSelect : detailsTabCopy.select}
         >
           {tab.isSelectionMode ? (
             <ArrowLeft className="h-4 w-4" />
@@ -147,7 +145,7 @@ export function DetailsTab({
           role="status"
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
         >
-          {tCommon("incompleteAccountingProjection")}
+          {commonCopy.incompleteAccountingProjection}
         </div>
       ) : null}
       <div className="space-y-4">
@@ -179,27 +177,27 @@ export function DetailsTab({
                 advancedFilters.currency != null ||
                 advancedFilters.minAmount != null ||
                 advancedFilters.maxAmount != null
-                  ? tFilter("noMatchingResults")
-                  : tCommon("noRecords")
+                  ? entryFilterPanelCopy.noMatchingResults
+                  : commonCopy.noRecords
               }
             />
           ) : null}
           <div ref={sentinelRef} className="h-1" />
           {tab.isFetchingNextPage ? (
             <div className="flex justify-center py-4">
-              <span className="text-sm text-muted-foreground">{tCommon("loading")}</span>
+              <span className="text-sm text-muted-foreground">{commonCopy.loading}</span>
             </div>
           ) : null}
           {tab.isFetchNextPageError ? (
             <div className="flex justify-center py-4">
               <Button variant="outline" size="sm" onClick={() => void tab.fetchNextPage()}>
-                {t("loadMoreFailed")}
+                {detailsTabCopy.loadMoreFailed}
               </Button>
             </div>
           ) : null}
           {!tab.hasNextPage && entries.length > 0 ? (
             <div className="flex justify-center py-4">
-              <span className="text-xs text-muted-foreground">— {t("noMore")} —</span>
+              <span className="text-xs text-muted-foreground">— {detailsTabCopy.noMore} —</span>
             </div>
           ) : null}
         </div>
@@ -207,10 +205,10 @@ export function DetailsTab({
         <ConfirmDialog
           open={tab.deleteDialogOpen}
           onOpenChange={tab.setDeleteDialogOpen}
-          title={t("deleteSelectedTitle")}
-          description={t("deleteSelectedDescription", { count: tab.selectedIds.length })}
+          title={detailsTabCopy.deleteSelectedTitle}
+          description={detailsTabCopy.deleteSelectedDescription({ count: tab.selectedIds.length })}
           variant="destructive"
-          confirmLabel={tCommon("delete")}
+          confirmLabel={commonCopy.delete}
           onConfirm={async () => {
             const result = await tab.remove.mutateAsync();
             return result.failed.length === 0;

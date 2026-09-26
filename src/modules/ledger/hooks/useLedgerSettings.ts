@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useSmartPolling } from "@/hooks/use-smart-polling";
 import { LEDGER } from "@/lib/constants";
@@ -28,6 +27,7 @@ import {
   updateServiceCredentialAction,
 } from "@/modules/ledger/server-actions/credentials";
 import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/update";
+import { serviceCredentialsCopy, settingsCopy } from "@/copy/settings";
 
 /** The settings the update action accepts, so the two cannot drift apart. */
 type UpdateLedgerData = UpdateLedgerInput["settings"];
@@ -43,8 +43,6 @@ export function useLedgerSettings({
   ledger: initialLedger,
   initialCategories,
 }: UseLedgerSettingsParams) {
-  const t = useTranslations("Settings");
-  const tCredentials = useTranslations("ServiceCredentials");
   const queryClient = useQueryClient();
   const [metadataPollingSession, setMetadataPollingSession] = useState(0);
 
@@ -100,13 +98,13 @@ export function useLedgerSettings({
   const translateUpdateError = (code: UpdateLedgerActionErrorCode) => {
     switch (code) {
       case "unsupported_currency":
-        return t("unsupportedCurrency");
+        return settingsCopy.unsupportedCurrency;
       case "validation_failed":
-        return t("validationFailed");
+        return settingsCopy.validationFailed;
       case "conflict":
-        return t("updateConflict");
+        return settingsCopy.updateConflict;
       case "unexpected":
-        return t("updateFailed");
+        return settingsCopy.updateFailed;
     }
   };
   const updateLedgerMutation = useLedgerMutation<Ledger, UpdateLedgerData>({
@@ -127,12 +125,12 @@ export function useLedgerSettings({
       }
       return result.ledger;
     },
-    successMessage: t("updateSuccess"),
+    successMessage: settingsCopy.updateSuccess,
     errorMessage: null,
     onSuccess: (savedLedger) => {
       queryClient.setQueryData(queryKeys.ledger(), savedLedger);
     },
-    onError: (error) => toast.error(error.message || t("updateFailed")),
+    onError: (error) => toast.error(error.message || settingsCopy.updateFailed),
   });
 
   const [generatingCategoryIds, setGeneratingCategoryIds] = useState<Set<string>>(new Set());
@@ -192,8 +190,8 @@ export function useLedgerSettings({
   const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>({
     invalidates: ["categories", "stats"],
     mutationFn: (input) => saveEntryCategoriesAction(input),
-    successMessage: t("categoriesSaved"),
-    errorMessage: t("saveCategoriesFailed"),
+    successMessage: settingsCopy.categoriesSaved,
+    errorMessage: settingsCopy.saveCategoriesFailed,
     onSuccess: (saved, input) => {
       queryClient.setQueryData(queryKeys.entryCategories(), saved);
       for (const category of input.categories) {
@@ -208,31 +206,31 @@ export function useLedgerSettings({
   >({
     invalidates: ["credentials"],
     mutationFn: (input) => createServiceCredentialAction(input),
-    successMessage: t("credentialCreated"),
+    successMessage: settingsCopy.credentialCreated,
     errorMessage: null,
     onError: (error) => {
       const code = (error as Error & { code?: unknown }).code;
       // Two different conflicts reach here: the 20-key cap and a book that is
       // gone or archived. Reporting both as the cap hid the real reason the
       // reader could not add a key.
-      if (code === "BOOK_UNAVAILABLE") toast.error(tCredentials("bookUnavailable"));
-      else if (code === "CONFLICT") toast.error(tCredentials("maxActive"));
-      else toast.error(t("createFailed"));
+      if (code === "BOOK_UNAVAILABLE") toast.error(serviceCredentialsCopy.bookUnavailable);
+      else if (code === "CONFLICT") toast.error(serviceCredentialsCopy.maxActive);
+      else toast.error(settingsCopy.createFailed);
     },
   });
 
   const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>({
     invalidates: ["credentials"],
     mutationFn: (input) => updateServiceCredentialAction(input.id, { bookId: input.bookId }),
-    successMessage: t("credentialBookChanged"),
-    errorMessage: t("credentialBookChangeFailed"),
+    successMessage: settingsCopy.credentialBookChanged,
+    errorMessage: settingsCopy.credentialBookChangeFailed,
   });
 
   const deleteCredential = useLedgerMutation<void, string>({
     invalidates: ["credentials"],
     mutationFn: (id) => deleteServiceCredentialAction(id),
-    successMessage: t("credentialDeleted"),
-    errorMessage: t("deleteFailed"),
+    successMessage: settingsCopy.credentialDeleted,
+    errorMessage: settingsCopy.deleteFailed,
   });
 
   return {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +23,8 @@ import {
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import type { AddEntryData } from "@/modules/source-document/detail-types";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface AddLedgerEntryDialogProps {
   open: boolean;
@@ -44,8 +45,6 @@ export function AddLedgerEntryDialog({
   onOpenChange,
   onSubmit,
 }: AddLedgerEntryDialogProps) {
-  const t = useTranslations("SourceDocumentDetail");
-  const tCommon = useTranslations("Common");
   const [itemName, setItemName] = useState("");
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
@@ -92,12 +91,12 @@ export function AddLedgerEntryDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="size-4" />
-            {t("addEntryTitle")}
+            {sourceDocumentDetailCopy.addEntryTitle}
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="add-entry-name">{t("addEntryName")}</Label>
+            <Label htmlFor="add-entry-name">{sourceDocumentDetailCopy.addEntryName}</Label>
             <Input
               id="add-entry-name"
               name="itemName"
@@ -105,12 +104,12 @@ export function AddLedgerEntryDialog({
               value={itemName}
               disabled={isSubmitting}
               autoFocus
-              placeholder={t("addEntryNamePlaceholder")}
+              placeholder={sourceDocumentDetailCopy.addEntryNamePlaceholder}
               onChange={(event) => setItemName(event.target.value)}
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="add-entry-amount">{t("addEntryAmount")}</Label>
+            <Label htmlFor="add-entry-amount">{sourceDocumentDetailCopy.addEntryAmount}</Label>
             <AmountInput
               id="add-entry-amount"
               name="amount"
@@ -122,10 +121,13 @@ export function AddLedgerEntryDialog({
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label>{t("addEntryCategory")}</Label>
+              <Label>{sourceDocumentDetailCopy.addEntryCategory}</Label>
               <Select value={categoryId} onValueChange={setCategoryId} disabled={isSubmitting}>
-                <SelectTrigger aria-label={t("addEntryCategory")} className="w-full">
-                  <SelectValue placeholder={t("addEntryNoCategory")} />
+                <SelectTrigger
+                  aria-label={sourceDocumentDetailCopy.addEntryCategory}
+                  className="w-full"
+                >
+                  <SelectValue placeholder={sourceDocumentDetailCopy.addEntryNoCategory} />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
@@ -137,9 +139,12 @@ export function AddLedgerEntryDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>{t("addEntryCurrency")}</Label>
+              <Label>{sourceDocumentDetailCopy.addEntryCurrency}</Label>
               <Select value={currency} onValueChange={setCurrency} disabled={isSubmitting}>
-                <SelectTrigger aria-label={t("addEntryCurrency")} className="w-full">
+                <SelectTrigger
+                  aria-label={sourceDocumentDetailCopy.addEntryCurrency}
+                  className="w-full"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -155,7 +160,7 @@ export function AddLedgerEntryDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
-            {tCommon("cancel")}
+            {commonCopy.cancel}
           </Button>
           <Button disabled={!canSubmit || isSubmitting} onClick={handleSubmit}>
             {isSubmitting ? (
@@ -163,7 +168,7 @@ export function AddLedgerEntryDialog({
             ) : (
               <Plus aria-hidden="true" className="size-4" />
             )}
-            {t("addEntryTitle")}
+            {sourceDocumentDetailCopy.addEntryTitle}
           </Button>
         </DialogFooter>
       </DialogContent>

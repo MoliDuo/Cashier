@@ -1,6 +1,5 @@
 "use client";
 import * as React from "react";
-import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Delete, Check, Equal, Calculator } from "lucide-react";
@@ -11,6 +10,7 @@ import {
   digitsToMinorUnitDisplay,
   useCalculatorState,
 } from "./use-calculator-state";
+import { calculatorCopy } from "@/copy/controls";
 
 interface CalculatorInputProps {
   value: number;
@@ -37,8 +37,7 @@ export function CalculatorInput({
   preserveDirection = false,
   maxDecimals = 2,
 }: CalculatorInputProps) {
-  const t = useTranslations("Calculator");
-  const ariaLabel = externalAriaLabel ?? t("amountAriaLabel");
+  const ariaLabel = externalAriaLabel ?? calculatorCopy.amountAriaLabel;
   const [mode, setMode] = React.useState<EditMode>("display");
   const [inputValue, setInputValue] = React.useState<string>("");
   const [inputError, setInputError] = React.useState<string | null>(null);
@@ -55,14 +54,14 @@ export function CalculatorInput({
         (!allowNegative && nextValue < 0) ||
         (preserveDirection && (value < 0 ? nextValue >= 0 : nextValue < 0))
       ) {
-        setInputError(t("invalidValue"));
+        setInputError(calculatorCopy.invalidValue);
         return;
       }
       onChange(nextValue);
       setInputError(null);
       setMode("display");
     },
-    onInvalid: () => setInputError(t("invalidValue")),
+    onInvalid: () => setInputError(calculatorCopy.invalidValue),
   });
 
   // Focus input when entering input mode
@@ -97,18 +96,9 @@ export function CalculatorInput({
       return true;
     }
 
-    setInputError(t("invalidValue"));
+    setInputError(calculatorCopy.invalidValue);
     return false;
-  }, [
-    allowNegative,
-    inlineInputMode,
-    inputValue,
-    maxDecimals,
-    onChange,
-    preserveDirection,
-    t,
-    value,
-  ]);
+  }, [allowNegative, inlineInputMode, inputValue, maxDecimals, onChange, preserveDirection, value]);
 
   React.useEffect(() => {
     if (mode !== "input") return;
@@ -241,8 +231,8 @@ export function CalculatorInput({
             type="button"
             onClick={handleOpenCalculator}
             className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
-            title={t("openCalculator")}
-            aria-label={t("openCalculator")}
+            title={calculatorCopy.openCalculator}
+            aria-label={calculatorCopy.openCalculator}
           >
             <Calculator className="h-4 w-4" />
           </button>
@@ -266,7 +256,7 @@ export function CalculatorInput({
         onKeyDown={calculator.handleKeyDown}
       >
         <VisuallyHidden.Root>
-          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogTitle>{calculatorCopy.title}</DialogTitle>
         </VisuallyHidden.Root>
 
         {/* Expression Display */}
@@ -303,7 +293,7 @@ export function CalculatorInput({
           <button
             type="button"
             onClick={calculator.handleDelete}
-            aria-label={t("delete")}
+            aria-label={calculatorCopy.delete}
             className={cn(functionBtn, "col-span-2")}
           >
             <Delete aria-hidden="true" className="h-5 w-5 mx-auto" />
@@ -381,7 +371,7 @@ export function CalculatorInput({
             <button
               type="button"
               onClick={calculator.handleEquals}
-              aria-label={t("calculate")}
+              aria-label={calculatorCopy.calculate}
               className={confirmBtn}
             >
               <Equal aria-hidden="true" className="h-5 w-5 mx-auto" />
@@ -390,7 +380,7 @@ export function CalculatorInput({
             <button
               type="button"
               onClick={calculator.handleConfirm}
-              aria-label={t("confirm")}
+              aria-label={calculatorCopy.confirm}
               className={confirmBtn}
             >
               <Check aria-hidden="true" className="h-5 w-5 mx-auto" />

@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -22,6 +21,8 @@ import { textRoleClassName } from "@/components/typography";
 import { getCategoryPreset, type CategoryPresetId } from "@/config/category-presets";
 import type { CategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPresetSwitch";
 import { cn } from "@/lib/utils";
+import { commonCopy } from "@/copy/common";
+import { settingsCopy } from "@/copy/settings";
 
 const PRESET_ORDER: readonly CategoryPresetId[] = ["default", "concise"];
 /** Radix Select needs a non-empty value; `""` also makes it show the placeholder. */
@@ -34,24 +35,22 @@ interface CategoryPresetDialogProps {
 }
 
 export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDialogProps) {
-  const t = useTranslations("Settings");
-  const common = useTranslations("Common");
   const { summary } = preset;
   const isPending = preset.isPending || preset.isPreparing;
 
   // Literal keys only: the i18n validator rejects `t()` fed a lookup result.
   const presetLabel = (id: CategoryPresetId) =>
-    id === "default" ? t("presetOptionDefault") : t("presetOptionConcise");
+    id === "default" ? settingsCopy.presetOptionDefault : settingsCopy.presetOptionConcise;
   const presetDescription = (id: CategoryPresetId) =>
-    id === "default" ? t("presetOptionDefaultDesc") : t("presetOptionConciseDesc");
+    id === "default" ? settingsCopy.presetOptionDefaultDesc : settingsCopy.presetOptionConciseDesc;
 
   const summaryLines = [
-    t("presetSummary", { count: summary.directCount, entries: summary.entryCount }),
+    settingsCopy.presetSummary({ count: summary.directCount, entries: summary.entryCount }),
   ];
   if (summary.unsetCount > 0) {
-    summaryLines.push(t("presetSummaryUnset", { count: summary.unsetCount }));
+    summaryLines.push(settingsCopy.presetSummaryUnset({ count: summary.unsetCount }));
   }
-  if (summary.directCount === 0) summaryLines.push(t("presetSummaryNone"));
+  if (summary.directCount === 0) summaryLines.push(settingsCopy.presetSummaryNone);
 
   return (
     <Dialog
@@ -73,11 +72,11 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
         }}
       >
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <DialogTitle>{t("presetDialogTitle")}</DialogTitle>
+          <DialogTitle>{settingsCopy.presetDialogTitle}</DialogTitle>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
-          <div role="radiogroup" aria-label={t("presetDialogTitle")} className="space-y-3">
+          <div role="radiogroup" aria-label={settingsCopy.presetDialogTitle} className="space-y-3">
             {PRESET_ORDER.map((presetId) => {
               const selected = preset.presetId === presetId;
               return (
@@ -131,7 +130,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
           </div>
 
           <div className="space-y-2">
-            <h4 className={textRoleClassName("cardTitle")}>{t("presetMappingTitle")}</h4>
+            <h4 className={textRoleClassName("cardTitle")}>{settingsCopy.presetMappingTitle}</h4>
             {preset.categories.map((category) => {
               const mapping = preset.mappings[category.id];
               const value =
@@ -149,16 +148,18 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                     <div className="flex items-baseline gap-2">
                       <span className="min-w-0 truncate text-sm text-text">{category.name}</span>
                       {preset.isSuggestedMapping(category.id) ? (
-                        <span className={textRoleClassName("micro")}>{t("presetSuggested")}</span>
+                        <span className={textRoleClassName("micro")}>
+                          {settingsCopy.presetSuggested}
+                        </span>
                       ) : null}
                     </div>
                     <span className={cn("shrink-0", textRoleClassName("meta"))}>
-                      {t("categoryItemCount", { count: category.entryCount ?? 0 })}
+                      {settingsCopy.categoryItemCount({ count: category.entryCount ?? 0 })}
                     </span>
                     {category.description == null || category.description === "" ? null : (
                       <details className={textRoleClassName("meta")}>
                         <summary className="flex min-h-11 cursor-pointer items-center">
-                          {t("presetExpandDescription")}
+                          {settingsCopy.presetExpandDescription}
                         </summary>
                         <p className="text-muted-foreground">{category.description}</p>
                       </details>
@@ -172,10 +173,10 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                     }
                   >
                     <SelectTrigger aria-label={category.name} className="w-full shrink-0 sm:w-44">
-                      <SelectValue placeholder={t("presetMappingUnset")} />
+                      <SelectValue placeholder={settingsCopy.presetMappingUnset} />
                     </SelectTrigger>
                     <SelectContent position="popper">
-                      <SelectItem value={KEEP_VALUE}>{t("presetMappingKeep")}</SelectItem>
+                      <SelectItem value={KEEP_VALUE}>{settingsCopy.presetMappingKeep}</SelectItem>
                       {preset.preset.map((target, index) => (
                         <SelectItem key={target.name} value={String(index)}>
                           <span className="inline-flex items-center gap-2">
@@ -191,11 +192,15 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
             })}
           </div>
           <div className="space-y-2">
-            <h4 className={textRoleClassName("cardTitle")}>{t("presetFinalStructure")}</h4>
-            <p className={textRoleClassName("bodyMuted")}>{t("presetWholeCategoryDescription")}</p>
-            <p className={textRoleClassName("bodyMuted")}>{t("presetUncategorizedDescription")}</p>
-            <p className={textRoleClassName("bodyMuted")}>{t("presetAfterDescription")}</p>
-            <p className={textRoleClassName("bodyMuted")}>{t("presetMergeIrreversible")}</p>
+            <h4 className={textRoleClassName("cardTitle")}>{settingsCopy.presetFinalStructure}</h4>
+            <p className={textRoleClassName("bodyMuted")}>
+              {settingsCopy.presetWholeCategoryDescription}
+            </p>
+            <p className={textRoleClassName("bodyMuted")}>
+              {settingsCopy.presetUncategorizedDescription}
+            </p>
+            <p className={textRoleClassName("bodyMuted")}>{settingsCopy.presetAfterDescription}</p>
+            <p className={textRoleClassName("bodyMuted")}>{settingsCopy.presetMergeIrreversible}</p>
             <p className={textRoleClassName("bodyStrong")}>
               {[
                 ...preset.preset.map((category) => category.name),
@@ -205,7 +210,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
               ].join(" · ")}
             </p>
             <p className={textRoleClassName("meta")}>
-              {t("presetImpactPreview", {
+              {settingsCopy.presetImpactPreview({
                 entries: summary.entryCount,
                 merged: summary.mergedCount,
                 created: summary.createdCount,
@@ -216,10 +221,10 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
           {preset.serverChanged ? (
             <div className="flex flex-wrap items-center gap-2 border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
               <p className="min-w-0 flex-1" role="alert">
-                {t("presetDraftChanged")}
+                {settingsCopy.presetDraftChanged}
               </p>
               <Button type="button" size="sm" variant="outline" onClick={preset.reloadCategories}>
-                {t("presetReloadCategories")}
+                {settingsCopy.presetReloadCategories}
               </Button>
             </div>
           ) : null}
@@ -228,7 +233,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
               className="border border-success/30 bg-success/10 p-3 text-sm text-success"
               role="status"
             >
-              {t("presetResultSummary", {
+              {settingsCopy.presetResultSummary({
                 entries: preset.result.movedEntryCount,
                 created: preset.result.createdCategoryCount,
                 removed: preset.result.removedCategoryCount,
@@ -258,7 +263,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
               disabled={isPending}
               onClick={preset.closeDialog}
             >
-              {preset.result == null ? common("cancel") : common("close")}
+              {preset.result == null ? commonCopy.cancel : commonCopy.close}
             </Button>
             {preset.result == null ? (
               <Button
@@ -267,10 +272,10 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                 onClick={() => preset.setConfirmOpen(true)}
               >
                 {preset.noChanges
-                  ? t("presetNoChanges")
+                  ? settingsCopy.presetNoChanges
                   : isPending
-                    ? t("presetApplying")
-                    : t("presetApply")}
+                    ? settingsCopy.presetApplying
+                    : settingsCopy.presetApply}
               </Button>
             ) : onGoToDetails == null ? null : (
               <Button
@@ -279,7 +284,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                   onGoToDetails(preset.result!.categories.map((category) => category.id))
                 }
               >
-                {t("presetGoToDetails")}
+                {settingsCopy.presetGoToDetails}
               </Button>
             )}
           </div>
@@ -289,22 +294,22 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
       <ConfirmDialog
         open={preset.confirmOpen}
         onOpenChange={preset.setConfirmOpen}
-        title={t("presetConfirmTitle", { preset: presetLabel(preset.presetId) })}
-        description={t("presetConfirmDescription", {
+        title={settingsCopy.presetConfirmTitle({ preset: presetLabel(preset.presetId) })}
+        description={settingsCopy.presetConfirmDescription({
           entries: summary.entryCount,
           merged: summary.mergedCount,
           created: summary.createdCount,
           retained: summary.keepCount,
         })}
-        confirmLabel={t("presetApply")}
+        confirmLabel={settingsCopy.presetApply}
         onConfirm={preset.confirm}
       />
       <ConfirmDialog
         open={preset.discardOpen}
         onOpenChange={preset.setDiscardOpen}
-        title={common("unsavedChangesTitle")}
-        description={common("unsavedChangesDescription")}
-        confirmLabel={common("discard")}
+        title={commonCopy.unsavedChangesTitle}
+        description={commonCopy.unsavedChangesDescription}
+        confirmLabel={commonCopy.discard}
         variant="destructive"
         onConfirm={preset.confirmDiscard}
       />

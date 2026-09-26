@@ -2,11 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 import { SourceDocumentDetailConfirmDialogs } from "@/modules/source-document/ui/SourceDocumentDetailConfirmDialogs";
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-}));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -58,14 +56,20 @@ describe("source-document dialog control flows", () => {
     const confirmation = deferred<boolean>();
     render(<SourceDocumentDialogHarness onConfirm={() => confirmation.promise} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "saveAndContinue" }));
-    expect(screen.getByRole("button", { name: "saveAndContinue" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "continueEditing" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "discardChanges" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue }));
+    expect(
+      screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue })
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: commonCopy.continueEditing })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: sourceDocumentDetailCopy.discardChanges })
+    ).toBeDisabled();
 
     confirmation.resolve(true);
     await waitFor(() =>
-      expect(screen.queryByText("saveBeforeActionTitle")).not.toBeInTheDocument()
+      expect(
+        screen.queryByText(sourceDocumentDetailCopy.saveBeforeActionTitle)
+      ).not.toBeInTheDocument()
     );
     expect(screen.getByText("Parent content")).toBeInTheDocument();
   });
@@ -73,19 +77,21 @@ describe("source-document dialog control flows", () => {
   it("keeps the confirmation open when the action returns false", async () => {
     render(<SourceDocumentDialogHarness onConfirm={async () => false} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "saveAndContinue" }));
+    fireEvent.click(screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "saveAndContinue" })).not.toBeDisabled()
+      expect(
+        screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue })
+      ).not.toBeDisabled()
     );
-    expect(screen.getByText("saveBeforeActionTitle")).toBeInTheDocument();
+    expect(screen.getByText(sourceDocumentDetailCopy.saveBeforeActionTitle)).toBeInTheDocument();
   });
 
   it("closes only the nested confirmation when cancelled", async () => {
     render(<SourceDocumentDialogHarness onConfirm={async () => true} />);
     expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "continueEditing" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.continueEditing }));
 
     await waitFor(() => expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1));
     expect(screen.getByText("Parent content")).toBeInTheDocument();

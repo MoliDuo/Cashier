@@ -2,8 +2,9 @@ import { EntryGroupHeader, groupSelectionState } from "@/components/EntryGroupHe
 import { formatRelativeDateLabel } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
-import { useTranslations } from "next-intl";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { sourceDocumentCardCopy } from "@/copy/source-document";
+import { batchActionsCopy } from "@/copy/workspace";
 
 export interface UnifiedGroupHeaderSelection {
   /** The day's own cards, in list order. */
@@ -26,18 +27,10 @@ export function UnifiedGroupHeader({
   selection?: UnifiedGroupHeaderSelection | undefined;
 }) {
   const locale = DISPLAY_LOCALE;
-  const t = useTranslations("SourceDocumentCard");
-  const tBatch = useTranslations("BatchActions");
-  const tCommon = useTranslations("Common");
   const dateLabel =
     group.dateProvenance === "unknown"
-      ? t("dateUnknown")
-      : formatRelativeDateLabel(
-          group.date,
-          locale,
-          { today: tCommon("today"), yesterday: tCommon("yesterday") },
-          timeZone
-        );
+      ? sourceDocumentCardCopy.dateUnknown
+      : formatRelativeDateLabel(group.date, locale, timeZone);
   const state =
     selection == null ? null : groupSelectionState(selection.ids, selection.selectedIdSet);
 
@@ -53,8 +46,8 @@ export function UnifiedGroupHeader({
               disabled: selection.disabled && state === "none",
               label:
                 state === "all"
-                  ? tBatch("deselectDay", { date: dateLabel })
-                  : tBatch("selectDay", { date: dateLabel }),
+                  ? batchActionsCopy.deselectDay({ date: dateLabel })
+                  : batchActionsCopy.selectDay({ date: dateLabel }),
               onToggle: () => selection.onSelectMany(selection.ids, state !== "all"),
             },
           })}

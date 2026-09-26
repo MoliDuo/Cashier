@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
@@ -36,6 +35,8 @@ import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/r
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 import type { LedgerAdvancedFilters } from "../initial-query-state";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy, detailsTabCopy } from "@/copy/workspace";
 
 /** One pick is written through as-is up to this many entries; more start a run. */
 const DIRECT_ASSIGNMENT_LIMIT = 100;
@@ -112,9 +113,6 @@ export function useDetailsTab({
   advancedFilters,
   timeZone,
 }: UseDetailsTabOptions) {
-  const t = useTranslations("DetailsTab");
-  const tBatch = useTranslations("BatchActions");
-  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
 
   // --- The entries ----------------------------------------------------------
@@ -189,14 +187,13 @@ export function useDetailsTab({
 
   // Entries arrive newest first, so the days keep the order they were read in.
   const groupedItems = useMemo(() => {
-    const labels = { today: t("today"), yesterday: t("yesterday") };
     const groups = new Map<string, EntryDateGroup>();
     for (const entry of entries) {
       const dateStr = entryDate(entry);
       let group = groups.get(dateStr);
       if (group == null) {
         group = {
-          title: formatRelativeDateLabel(dateStr, DISPLAY_LOCALE, labels, timeZone),
+          title: formatRelativeDateLabel(dateStr, DISPLAY_LOCALE, timeZone),
           timestamp: parseDateString(dateStr).getTime(),
           items: [],
           total: "0",
@@ -207,7 +204,7 @@ export function useDetailsTab({
       group.total = addDecimal(group.total, entry.convertedAmount ?? "0");
     }
     return Array.from(groups.values());
-  }, [entries, t, timeZone]);
+  }, [entries, timeZone]);
 
   // --- The selection --------------------------------------------------------
 
@@ -257,10 +254,10 @@ export function useDetailsTab({
     invalidates: ["documents", "stats"],
     mutationFn: (data) =>
       batchUpdateLedgerEntriesAction(sourceDocumentIdsFor(selectedIds), selectedIds, data),
-    errorMessage: tCommon("error"),
+    errorMessage: commonCopy.error,
     onSuccess: (result) => {
       if (result.affectedCount > 0)
-        toast.success(t("batchUpdated", { count: result.affectedCount }));
+        toast.success(detailsTabCopy.batchUpdated({ count: result.affectedCount }));
       clearSelection();
     },
   });
@@ -273,15 +270,16 @@ export function useDetailsTab({
     invalidates: ["documents", "stats"],
     mutationFn: () =>
       batchDeleteLedgerEntriesAction(sourceDocumentIdsFor(selectedIds), selectedIds),
-    errorMessage: tCommon("deleteFailed"),
+    errorMessage: commonCopy.deleteFailed,
     onSuccess: (result) => {
       const unresolved = result.failed.map((item) => item.id);
       if (unresolved.length === 0) setDeleteDialogOpen(false);
       if (unresolved.length > 0) selection.retainSelection(unresolved);
       else clearSelection();
       if (result.succeeded.length > 0)
-        toast.success(t("batchDeleted", { count: result.succeeded.length }));
-      if (unresolved.length > 0) toast.warning(t("batchUnresolved", { count: unresolved.length }));
+        toast.success(detailsTabCopy.batchDeleted({ count: result.succeeded.length }));
+      if (unresolved.length > 0)
+        toast.warning(detailsTabCopy.batchUnresolved({ count: unresolved.length }));
     },
   });
 
@@ -373,9 +371,9 @@ export function useDetailsTab({
         selectedDate
       );
     },
-    errorMessage: tBatch("selectionChanged"),
+    errorMessage: batchActionsCopy.selectionChanged,
     onSuccess: (result) => {
-      toast.success(tBatch("datesUpdated", { count: result.impact.affectedEntryCount }));
+      toast.success(batchActionsCopy.datesUpdated({ count: result.impact.affectedEntryCount }));
       clearSelection();
       setDateDialogVisibility(false);
     },
@@ -447,19 +445,19 @@ export function useDetailsTab({
     refreshMode: "background",
     invalidates: ["documents", "stats"],
     mutationFn: (input) => startCategoryAssignmentAction(input),
-    errorMessage: tBatch("aiCategoryFailed"),
+    errorMessage: batchActionsCopy.aiCategoryFailed,
     onSuccess: (job) => {
       // Hand the run to the page before it can finish: a run whose first answer
       // already reports it over still has to say so, once, to this reader.
       registerSubmittedJob(job);
-      toast.success(tBatch("aiCategoryRunning"));
+      toast.success(batchActionsCopy.aiCategoryRunning);
       clearSelection();
       categoryRequestKeyRef.current = null;
       setCategoryDialogVisibility(false);
     },
     onError: (error) => {
       if (error instanceof Error && error.message.includes("CONFLICT")) {
-        toast.error(tBatch("aiCategoryBusy"));
+        toast.error(batchActionsCopy.aiCategoryBusy);
       }
     },
   });
@@ -480,7 +478,7 @@ export function useDetailsTab({
     const snapshot = categorySnapshot;
     if (snapshot == null || snapshot.ledgerEntryIds.length === 0) return;
     if (categorySelectionChanged) {
-      toast.error(tBatch("selectionMoved"));
+      toast.error(batchActionsCopy.selectionMoved);
       return;
     }
 
@@ -500,7 +498,9 @@ export function useDetailsTab({
     }
     if (pick.kind === "ai" || pick.kind === "assign" || pick.kind === "clear") {
       if (snapshot.ledgerEntryIds.length > CATEGORY_ASSIGNMENT_MAX_ENTRIES) {
-        toast.error(tBatch("categorySelectionTooLarge", { max: CATEGORY_ASSIGNMENT_MAX_ENTRIES }));
+        toast.error(
+          batchActionsCopy.categorySelectionTooLarge({ max: CATEGORY_ASSIGNMENT_MAX_ENTRIES })
+        );
         return;
       }
       startCategoryRun({
@@ -522,7 +522,6 @@ export function useDetailsTab({
     pickedCategoryIds,
     setCategoryDialogVisibility,
     startCategoryRun,
-    tBatch,
   ]);
 
   const isPending =

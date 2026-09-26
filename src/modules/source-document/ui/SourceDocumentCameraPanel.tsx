@@ -1,13 +1,14 @@
 "use client";
 
 import type { RefObject } from "react";
-import { useTranslations } from "next-intl";
 import { Camera, ChevronUp, RefreshCw, SwitchCamera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { cn } from "@/lib/utils";
 import type { CameraStatus } from "../hooks/useCameraCapture";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 
 interface SourceDocumentCameraPanelProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -45,12 +46,12 @@ export function SourceDocumentCameraPanel({
   onCollapse,
   onRetry,
 }: SourceDocumentCameraPanelProps) {
-  const t = useTranslations("SourceDocumentInput");
-  const tCommon = useTranslations("Common");
   if (status === "insecure" || status === "unsupported") {
     return (
       <p role="status" className={textRoleClassName("meta")}>
-        {status === "insecure" ? t("cameraInsecure") : t("cameraUnsupported")}
+        {status === "insecure"
+          ? sourceDocumentInputCopy.cameraInsecure
+          : sourceDocumentInputCopy.cameraUnsupported}
       </p>
     );
   }
@@ -59,7 +60,7 @@ export function SourceDocumentCameraPanel({
     return (
       <Button type="button" variant="outline" size="sm" onClick={onOpen}>
         <Camera className="h-4 w-4" />
-        {t("openCamera")}
+        {sourceDocumentInputCopy.openCamera}
       </Button>
     );
   }
@@ -67,10 +68,12 @@ export function SourceDocumentCameraPanel({
   if (status === "unavailable") {
     return (
       <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className={textRoleClassName("meta", "min-w-0")}>{t("cameraUnavailable")}</span>
+        <span className={textRoleClassName("meta", "min-w-0")}>
+          {sourceDocumentInputCopy.cameraUnavailable}
+        </span>
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>
           <RefreshCw className="h-4 w-4" />
-          {tCommon("retry")}
+          {commonCopy.retry}
         </Button>
       </div>
     );
@@ -80,7 +83,7 @@ export function SourceDocumentCameraPanel({
   const isFull = remaining <= 0;
 
   return (
-    <div role="group" aria-label={t("cameraPreview")} className="space-y-2">
+    <div role="group" aria-label={sourceDocumentInputCopy.cameraPreview} className="space-y-2">
       <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-surface2">
         <video
           ref={videoRef}
@@ -97,7 +100,7 @@ export function SourceDocumentCameraPanel({
         {isReady ? null : (
           <div role="status" className="absolute inset-0 flex items-center justify-center">
             <RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="sr-only">{t("cameraStarting")}</span>
+            <span className="sr-only">{sourceDocumentInputCopy.cameraStarting}</span>
           </div>
         )}
       </div>
@@ -108,11 +111,11 @@ export function SourceDocumentCameraPanel({
           variant="ghost"
           size="sm"
           onClick={onCollapse}
-          aria-label={t("collapseCamera")}
-          title={t("collapseCamera")}
+          aria-label={sourceDocumentInputCopy.collapseCamera}
+          title={sourceDocumentInputCopy.collapseCamera}
         >
           <ChevronUp className="h-4 w-4" />
-          {t("collapseCamera")}
+          {sourceDocumentInputCopy.collapseCamera}
         </Button>
         {canSwitch ? (
           <Button
@@ -123,19 +126,23 @@ export function SourceDocumentCameraPanel({
             disabled={!isReady}
           >
             <SwitchCamera className="h-4 w-4" />
-            {t("switchCamera")}
+            {sourceDocumentInputCopy.switchCamera}
           </Button>
         ) : null}
-        <span {...(isFull ? { title: t("tooManyImages", { count: MAX_FILES }) } : {})}>
+        <span
+          {...(isFull
+            ? { title: sourceDocumentInputCopy.tooManyImages({ count: MAX_FILES }) }
+            : {})}
+        >
           <Button
             type="button"
             size="sm"
             onClick={onCapture}
             disabled={!isReady || isFull || isBusy}
-            aria-label={t("capturePhoto")}
+            aria-label={sourceDocumentInputCopy.capturePhoto}
           >
             <Camera className="h-4 w-4" />
-            {t("capturePhoto")}
+            {sourceDocumentInputCopy.capturePhoto}
           </Button>
         </span>
       </div>

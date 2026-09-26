@@ -1,7 +1,6 @@
 "use client";
 import Image from "next/image";
 import type { ChangeEvent, ClipboardEvent, RefObject } from "react";
-import { useTranslations } from "next-intl";
 import { Camera, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
@@ -16,6 +15,8 @@ import {
   type SourceDocumentModalImage,
 } from "./SourceDocumentImageModal";
 import type { SourceDocumentSubmissionProgress } from "../hooks/source-document-submission-upload";
+import { commonCopy } from "@/copy/common";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 
 const imageActionButtonClassName =
   "absolute right-0 top-0 z-10 flex h-7 w-7 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full text-white transition-opacity after:absolute after:h-11 after:w-11 after:content-[''] opacity-100 focus-visible:opacity-100 [@media(any-hover:hover)]:opacity-0 [@media(any-hover:hover)]:group-hover:opacity-100";
@@ -86,8 +87,6 @@ export function SourceDocumentInputView({
   onImageOpen,
   onImageClose,
 }: SourceDocumentInputViewProps) {
-  const t = useTranslations("SourceDocumentInput");
-  const tCommon = useTranslations("Common");
   const drop = useFileDropZone({ enabled: isDropEnabled, onFiles: onAddImageFiles });
   const showsViewfinder =
     isCameraAvailable &&
@@ -103,14 +102,14 @@ export function SourceDocumentInputView({
     >
       {drop.isDragging ? (
         <p role="status" className={textRoleClassName("meta")}>
-          {t("dropImages")}
+          {sourceDocumentInputCopy.dropImages}
         </p>
       ) : null}
 
       <DateFilter
         value={entryDate}
         onChange={(date) => onEntryDateChange(date ?? new Date())}
-        placeholder={t("entryDate")}
+        placeholder={sourceDocumentInputCopy.entryDate}
         size="sm"
         className="w-full"
         disabled={isPending}
@@ -136,7 +135,7 @@ export function SourceDocumentInputView({
       {images.length > 0 && (
         <div className="grid grid-cols-4 gap-2">
           {images.map((image, index) => {
-            const imageLabel = t("uploadedImage", { index: index + 1 });
+            const imageLabel = sourceDocumentInputCopy.uploadedImage({ index: index + 1 });
             return (
               <div key={`${image.data}-${index}`} className="group relative">
                 <button
@@ -151,8 +150,8 @@ export function SourceDocumentInputView({
                 <button
                   onClick={() => onRemoveImage(index)}
                   type="button"
-                  aria-label={tCommon("delete")}
-                  title={tCommon("delete")}
+                  aria-label={commonCopy.delete}
+                  title={commonCopy.delete}
                   className={`${imageActionButtonClassName} bg-danger text-xs`}
                   disabled={isPending}
                 >
@@ -168,8 +167,8 @@ export function SourceDocumentInputView({
         value={text}
         onChange={(event) => onTextChange(event.target.value)}
         onPaste={onTextareaPaste}
-        placeholder={t("placeholder")}
-        aria-label={t("placeholder")}
+        placeholder={sourceDocumentInputCopy.placeholder}
+        aria-label={sourceDocumentInputCopy.placeholder}
         className="resize-none"
         rows={5}
         autoFocus={!showsViewfinder}
@@ -185,7 +184,7 @@ export function SourceDocumentInputView({
       ) : isPreparingImages ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
           <RefreshCw className="h-4 w-4 animate-spin" />
-          {t("preparing")}
+          {sourceDocumentInputCopy.preparing}
         </div>
       ) : null}
 
@@ -196,7 +195,7 @@ export function SourceDocumentInputView({
           onChange={onFileInputChange}
           accept="image/jpeg,image/png,image/gif,image/webp"
           multiple
-          aria-label={t("image")}
+          aria-label={sourceDocumentInputCopy.image}
           className="hidden"
         />
         <Button
@@ -207,7 +206,7 @@ export function SourceDocumentInputView({
           disabled={isPending}
         >
           <Camera className="mr-2 h-4 w-4" />
-          {t("image")}
+          {sourceDocumentInputCopy.image}
         </Button>
         <div className="flex-1" />
         <Button
@@ -217,16 +216,16 @@ export function SourceDocumentInputView({
           className="flex-1 sm:flex-initial"
         >
           {isSubmitting ? (
-            tCommon("sending_status")
+            commonCopy.sendingStatus
           ) : mode === "retry" ? (
             <>
               <RefreshCw className="mr-2 h-4 w-4" />
-              {tCommon("retry")}
+              {commonCopy.retry}
             </>
           ) : (
             <>
               <Send className="mr-2 h-4 w-4" />
-              {t("send")}
+              {sourceDocumentInputCopy.send}
             </>
           )}
         </Button>
@@ -255,19 +254,18 @@ function SubmissionProgress({
   canCancel: boolean;
   onCancel: () => void;
 }) {
-  const t = useTranslations("SourceDocumentInput");
   const percent = progress.percent;
   const isIndeterminate = progress.phase === "submitting";
   const phaseLabel =
     progress.phase === "preparing" || progress.phase === "planning"
-      ? t("preparing")
+      ? sourceDocumentInputCopy.preparing
       : progress.phase === "uploading"
-        ? t("uploading")
+        ? sourceDocumentInputCopy.uploading
         : progress.phase === "finalizing"
-          ? t("finalizing")
+          ? sourceDocumentInputCopy.finalizing
           : progress.phase === "cancelling"
-            ? t("cancelling")
-            : t("submitting");
+            ? sourceDocumentInputCopy.cancelling
+            : sourceDocumentInputCopy.submitting;
 
   return (
     <div className="space-y-2" role="status" aria-live="polite">
@@ -277,7 +275,7 @@ function SubmissionProgress({
           {isIndeterminate ? null : <span className="tabular-nums">{percent}%</span>}
           {canCancel ? (
             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-              {t("cancelUpload")}
+              {sourceDocumentInputCopy.cancelUpload}
             </Button>
           ) : null}
         </div>

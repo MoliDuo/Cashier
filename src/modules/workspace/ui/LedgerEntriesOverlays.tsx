@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
+import { commonCopy } from "@/copy/common";
+import { ledgerEntriesTabCopy } from "@/copy/workspace";
 
 const loadEditRetryDialog = () =>
   import("@/modules/source-document/ui/SourceDocumentEditRetryDialog");
@@ -32,17 +33,15 @@ export function LedgerEntriesOverlays({
   retrySourceDocument,
   onRetryDialogOpenChange,
 }: LedgerEntriesOverlaysProps) {
-  const t = useTranslations("LedgerEntriesTab");
-  const tCommon = useTranslations("Common");
   return (
     <>
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={onDeleteConfirmOpenChange}
-        title={t("deleteConfirmTitle")}
-        description={t("deleteConfirmDesc")}
+        title={ledgerEntriesTabCopy.deleteConfirmTitle}
+        description={ledgerEntriesTabCopy.deleteConfirmDesc}
         onConfirm={onDeleteConfirm}
-        confirmLabel={tCommon("delete")}
+        confirmLabel={commonCopy.delete}
         variant="destructive"
       />
 

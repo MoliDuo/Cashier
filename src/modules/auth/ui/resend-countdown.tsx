@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useCountdown } from "@/hooks/use-countdown";
+import { authCopy } from "@/copy/auth";
 
 interface ResendCountdownProps {
   canResendAt: number | null; // Unix timestamp in seconds
@@ -24,7 +24,6 @@ export function ResendCountdown({ canResendAt, onResend, disabled = false }: Res
     }
   };
 
-  const t = useTranslations("Auth");
   const isDisabled = disabled || isLoading || remaining > 0;
 
   return (
@@ -36,7 +35,7 @@ export function ResendCountdown({ canResendAt, onResend, disabled = false }: Res
       className="text-sm"
     >
       {isLoading && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
-      {remaining > 0 ? t("resendIn", { seconds: remaining }) : t("resend")}
+      {remaining > 0 ? authCopy.resendIn({ seconds: remaining }) : authCopy.resend}
     </Button>
   );
 }

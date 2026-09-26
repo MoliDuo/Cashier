@@ -1,9 +1,9 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { cn } from "@/lib/utils";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface BatchCurrencyDialogProps {
   open: boolean;
@@ -28,7 +28,6 @@ export function BatchCurrencyDialog({
   preferredCurrencies,
   onSelect,
 }: BatchCurrencyDialogProps) {
-  const t = useTranslations("BatchActions");
   const currencyList = [
     ...preferredCurrencies.filter((currency) =>
       SUPPORTED_CURRENCIES.includes(currency as (typeof SUPPORTED_CURRENCIES)[number])
@@ -40,7 +39,7 @@ export function BatchCurrencyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent variant="modal" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{t("setCurrency")}</DialogTitle>
+          <DialogTitle>{batchActionsCopy.setCurrency}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto subtle-scrollbar">
           {currencyList.map((currency) => (

@@ -3,7 +3,6 @@ import type { LedgerEntryEmbeddedViewDto, EntryCategory } from "@/modules/ledger
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import { type ReactNode, useMemo, memo } from "react";
 import { ArrowLeft } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { EntryEditData } from "@/modules/source-document/types";
@@ -17,6 +16,7 @@ import type {
 } from "@/modules/source-document/detail-types";
 import { SourceDocumentDateOrganization } from "./SourceDocumentDateOrganization";
 import type { ApplyDateOrganizationInput } from "../contracts";
+import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentViewDetailsProps {
   sourceDocument: SourceDocument;
@@ -94,7 +94,6 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
   timeZone,
   selectionToolbar,
 }: SourceDocumentViewDetailsProps): ReactNode {
-  const t = useTranslations("SourceDocumentDetail");
   const displayEntryDate =
     pendingChanges.sourceDoc.documentDate ?? sourceDocument.documentDate ?? "";
   // Entry/date fields are editable only while in edit mode (and never during a mutation).
@@ -205,7 +204,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
             onClick={() => onMobileViewChange("details")}
           >
             <ArrowLeft className="size-4" />
-            {t("backToDetails")}
+            {sourceDocumentDetailCopy.backToDetails}
           </Button>
         ) : null}
         <SourceDocumentRawEvidence sourceDocument={sourceDocument} />

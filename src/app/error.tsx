@@ -2,9 +2,9 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCcw } from "lucide-react";
-import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { textRoleClassName } from "@/components/typography";
+import { errorCopy } from "@/copy/app";
 
 export default function Error({
   error,
@@ -12,8 +12,6 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const t = useTranslations("Error");
-
   useEffect(() => {
     // Log the error to an error reporting service
     console.error(error);
@@ -27,13 +25,13 @@ export default function Error({
         </div>
 
         <div className="space-y-2">
-          <h1 className={textRoleClassName("pageTitle")}>{t("title")}</h1>
+          <h1 className={textRoleClassName("pageTitle")}>{errorCopy.title}</h1>
           <p className={textRoleClassName("bodyMuted")}>
-            {t("description", { message: t("title") })}
+            {errorCopy.description({ message: errorCopy.title })}
           </p>
           {error.digest != null && (
             <p className={textRoleClassName("meta", "font-mono bg-surface2 p-2 rounded mt-4")}>
-              {t("errorId", { id: error.digest })}
+              {errorCopy.errorId({ id: error.digest })}
             </p>
           )}
         </div>
@@ -41,10 +39,10 @@ export default function Error({
         <div className="flex flex-col sm:flex-row gap-3">
           <Button className="flex-1 gap-2 h-11" onClick={() => window.location.reload()}>
             <RefreshCcw aria-hidden="true" className="w-4 h-4" />
-            {t("retry")}
+            {errorCopy.retry}
           </Button>
           <Button asChild variant="outline" className="flex-1 h-11">
-            <Link href="/">{t("goHome")}</Link>
+            <Link href="/">{errorCopy.goHome}</Link>
           </Button>
         </div>
       </div>

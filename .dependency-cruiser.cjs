@@ -79,6 +79,13 @@ module.exports = {
       to: onto([moduleAt("src/modules"), serverFlows]),
     },
     {
+      name: "copy-is-a-leaf",
+      comment: "src/copy holds plain copy; it may only read types from src/config.",
+      severity: "error",
+      from: { path: "^src/copy/" },
+      to: { pathNot: ["^src/copy/", "^src/config/"] },
+    },
+    {
       name: "modules-not-workspace",
       comment: "Domain modules must not depend on workspace orchestration.",
       severity: "error",

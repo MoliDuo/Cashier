@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { startRegistration } from "@simplewebauthn/browser";
 import { isCancelledCeremony, usePasskeySupport } from "./use-passkey-support";
 import {
@@ -10,13 +9,13 @@ import {
   startEnrollmentAction,
   type EnrollActionErrorCode,
 } from "@/modules/auth/server-actions/enroll";
+import { enrollCopy } from "@/copy/auth";
 
 /**
  * Adds the account's passkey from an `account:enroll` link and signs in with
  * it. `token` is null when the page already knows the link cannot be used.
  */
 export function useEnrollFlow(token: string | null) {
-  const t = useTranslations("Enroll");
   const router = useRouter();
   const passkeySupported = usePasskeySupport();
   const [linkValid, setLinkValid] = useState(token != null);
@@ -29,22 +28,22 @@ export function useEnrollFlow(token: string | null) {
         setLinkValid(false);
         return;
       case "duplicate":
-        setError(t("duplicate"));
+        setError(enrollCopy.duplicate);
         return;
       case "expired":
-        setError(t("expired"));
+        setError(enrollCopy.expired);
         return;
       case "rate_limited":
-        setError(t("rateLimited"));
+        setError(enrollCopy.rateLimited);
         return;
       case "rate_limit_unavailable":
-        setError(t("rateLimitUnavailable"));
+        setError(enrollCopy.rateLimitUnavailable);
         return;
       case "invalid":
-        setError(t("failed"));
+        setError(enrollCopy.failed);
         return;
       default:
-        setError(t("unexpected"));
+        setError(enrollCopy.unexpected);
     }
   };
 
@@ -62,14 +61,14 @@ export function useEnrollFlow(token: string | null) {
       try {
         response = await startRegistration({ optionsJSON: start.options });
       } catch (ceremonyError) {
-        if (!isCancelledCeremony(ceremonyError)) setError(t("failed"));
+        if (!isCancelledCeremony(ceremonyError)) setError(enrollCopy.failed);
         return;
       }
       const result = await finishEnrollmentAction(
         token,
         start.challengeId,
         response,
-        t("passkeyName")
+        enrollCopy.passkeyName
       );
       if (!result.ok) {
         fail(result.code);
@@ -78,7 +77,7 @@ export function useEnrollFlow(token: string | null) {
       router.replace("/");
       router.refresh();
     } catch {
-      setError(t("unexpected"));
+      setError(enrollCopy.unexpected);
     } finally {
       setPending(false);
     }

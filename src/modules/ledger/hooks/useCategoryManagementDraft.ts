@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
 import type { EntryCategory, SaveEntryCategoriesInput } from "@/modules/ledger/contracts";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
@@ -13,6 +12,7 @@ import {
   type CategoryDraft,
   type EditSession,
 } from "./category-draft-model";
+import { settingsCopy } from "@/copy/settings";
 
 export type { CategoryDraft, EditSession } from "./category-draft-model";
 
@@ -76,7 +76,6 @@ export function useCategoryManagementDraft({
   onReloadCategories,
   isSaving,
 }: UseCategoryManagementDraftOptions) {
-  const t = useTranslations("Settings");
   const ledgerId = useLedgerId();
   const key = ledgerId == null ? null : draftKey(ledgerId, "categories", "ledger");
   const [restored] = useState(() =>
@@ -238,7 +237,7 @@ export function useCategoryManagementDraft({
           ? (error as { code?: unknown }).code
           : undefined;
       if (errorCode === "CONFLICT") setSaveConflict(true);
-      else setSaveError(t("saveCategoriesFailed"));
+      else setSaveError(settingsCopy.saveCategoriesFailed);
     }
   };
 
@@ -251,7 +250,7 @@ export function useCategoryManagementDraft({
       const latest = await onReloadCategories();
       leaveManagement(latest.map(toCategoryDraft));
     } catch {
-      setSaveError(t("saveCategoriesFailed"));
+      setSaveError(settingsCopy.saveCategoriesFailed);
     }
   };
 

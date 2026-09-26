@@ -1,10 +1,10 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { OTPInput } from "./otp-input";
 import { ResendCountdown } from "./resend-countdown";
 import { ExpiryTimer } from "./expiry-timer";
+import { authCopy } from "@/copy/auth";
 
 interface OtpStepProps {
   otp: string;
@@ -35,8 +35,6 @@ export function OtpStep({
   resendPending,
   otpExpired,
 }: OtpStepProps) {
-  const t = useTranslations("Auth");
-
   return (
     <form
       className="space-y-6"
@@ -48,14 +46,16 @@ export function OtpStep({
       <div className="space-y-4">
         <div className="space-y-2">
           <span id="otp-code-label" className="text-sm font-medium text-text">
-            {t("enterCode")}
+            {authCopy.enterCode}
           </span>
           <div role="group" aria-labelledby="otp-code-label">
             <OTPInput
               value={otp}
               onChange={onOtpChange}
               disabled={isLoading || resendPending}
-              getDigitLabel={(position, length) => t("otpDigitLabel", { index: position, length })}
+              getDigitLabel={(position, length) =>
+                authCopy.otpDigitLabel({ index: position, length })
+              }
             />
           </div>
         </div>
@@ -74,10 +74,10 @@ export function OtpStep({
         {isLoading ? (
           <>
             <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
-            {t("verifying")}
+            {authCopy.verifying}
           </>
         ) : (
-          t("verify")
+          authCopy.verify
         )}
       </Button>
       <div className="flex items-center justify-between pt-4 border-t">
@@ -89,7 +89,7 @@ export function OtpStep({
           className="text-sm"
         >
           <ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />
-          {t("changeEmail")}
+          {authCopy.changeEmail}
         </Button>
         <ResendCountdown
           canResendAt={canResendAt}
@@ -99,7 +99,7 @@ export function OtpStep({
       </div>
       {resendPending ? (
         <p className="text-center text-sm text-muted-foreground" aria-live="polite">
-          {t("resendInProgress")}
+          {authCopy.resendInProgress}
         </p>
       ) : null}
     </form>

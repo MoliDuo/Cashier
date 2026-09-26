@@ -1,10 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { EntriesToolbarShell } from "@/modules/workspace/ui/EntriesToolbarShell";
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-}));
 
 describe("EntriesToolbarShell", () => {
   it("carries the browsing controls with the range and its total", () => {

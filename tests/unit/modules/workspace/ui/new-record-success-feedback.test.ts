@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { quickEntryFormCopy, sourceDocumentInputCopy } from "@/copy/source-document";
 import { useModalStackStore } from "@/lib/store/modal-stack";
 
 const toastSuccessMock = vi.hoisted(() => vi.fn());
@@ -12,14 +13,6 @@ import {
   shouldWarnNewRecordSavedToOtherBook,
   showNewRecordSuccessFeedback,
 } from "@/modules/workspace/ui/new-record-success-feedback";
-
-const messages = {
-  aiSuccess: "AI saved",
-  quickSuccess: "Quick saved",
-  savedMayBeHidden: "Saved but hidden",
-  savedToOtherBook: (bookName: string) => `Saved to ${bookName} but not visible`,
-  viewRecord: "View record",
-};
 
 const viewedBookId = "book-viewed";
 const viewedBook = { id: viewedBookId, name: "Daily" };
@@ -39,14 +32,13 @@ describe("new record success feedback", () => {
       committedFilters: {},
       viewedBookId,
       savedBook: viewedBook,
-      messages,
     });
 
     expect(toastSuccessMock).toHaveBeenCalledTimes(1);
     expect(toastSuccessMock).toHaveBeenCalledWith(
-      "Saved but hidden",
+      sourceDocumentInputCopy.savedMayBeHidden,
       expect.objectContaining({
-        action: expect.objectContaining({ label: "View record" }),
+        action: expect.objectContaining({ label: sourceDocumentInputCopy.viewRecord }),
       })
     );
 
@@ -83,11 +75,10 @@ describe("new record success feedback", () => {
       },
       viewedBookId,
       savedBook: viewedBook,
-      messages,
     });
 
     expect(toastSuccessMock).toHaveBeenCalledOnce();
-    expect(toastSuccessMock).toHaveBeenCalledWith("Quick saved");
+    expect(toastSuccessMock).toHaveBeenCalledWith(quickEntryFormCopy.quickEntrySuccess);
   });
 
   it("names the book and warns that it is out of view when saved elsewhere", () => {
@@ -101,14 +92,13 @@ describe("new record success feedback", () => {
       },
       viewedBookId,
       savedBook: { id: "book-other", name: "Travel" },
-      messages,
     });
 
     expect(toastSuccessMock).toHaveBeenCalledOnce();
     expect(toastSuccessMock).toHaveBeenCalledWith(
-      "Saved to Travel but not visible",
+      sourceDocumentInputCopy.savedToOtherBook({ book: "Travel" }),
       expect.objectContaining({
-        action: expect.objectContaining({ label: "View record" }),
+        action: expect.objectContaining({ label: sourceDocumentInputCopy.viewRecord }),
       })
     );
   });
@@ -127,9 +117,8 @@ describe("new record success feedback", () => {
       committedFilters: {},
       viewedBookId: null,
       savedBook: { id: "book-2", name: "Travel" },
-      messages,
     });
-    expect(toastSuccessMock).toHaveBeenCalledWith("AI saved");
+    expect(toastSuccessMock).toHaveBeenCalledWith(sourceDocumentInputCopy.uploadSuccess);
   });
 
   it("warns for narrowing filters and dates outside the committed range", () => {

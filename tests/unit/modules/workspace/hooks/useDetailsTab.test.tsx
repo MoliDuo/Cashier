@@ -2,6 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
+import { commonCopy } from "@/copy/common";
+import { batchActionsCopy } from "@/copy/workspace";
 import type { ActiveLedgerEntryDto } from "@/modules/ledger/contracts";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { useDetailsTab } from "@/modules/workspace/hooks/useDetailsTab";
@@ -28,13 +31,6 @@ const {
   fetchLedgerSummaryMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
-}));
-
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-  useLocale: () => "zh",
-  useMessages: () => ({}),
-  NextIntlClientProvider: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 
 vi.mock("sonner", () => ({
@@ -400,7 +396,7 @@ describe("useDetailsTab", () => {
     );
 
     expect(result.current.selectedIds).toEqual(["entry-1"]);
-    expect(toastErrorMock).toHaveBeenCalledWith("error");
+    expect(toastErrorMock).toHaveBeenCalledWith(commonCopy.error);
   });
 
   it("keeps the date dialog and selection when confirmation fails", async () => {
@@ -459,7 +455,7 @@ describe("useDetailsTab", () => {
     });
     expect(result.current.selectedIds).toEqual([]);
     expect(result.current.categoryDialogOpen).toBe(false);
-    expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryRunning");
+    expect(toastSuccessMock).toHaveBeenCalledWith(batchActionsCopy.aiCategoryRunning);
   });
 
   it("writes one picked category straight through instead of asking the model", async () => {
@@ -524,7 +520,7 @@ describe("useDetailsTab", () => {
     expect(result.current.categorySelectionChanged).toBe(true);
     expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
     expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith("selectionMoved");
+    expect(toastErrorMock).toHaveBeenCalledWith(batchActionsCopy.selectionMoved);
   });
 
   it("writes a single pick straight through at the direct limit", async () => {
@@ -581,7 +577,9 @@ describe("useDetailsTab", () => {
     });
 
     expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith("categorySelectionTooLarge");
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      batchActionsCopy.categorySelectionTooLarge({ max: CATEGORY_ASSIGNMENT_MAX_ENTRIES })
+    );
     expect(result.current.categoryDialogOpen).toBe(true);
   });
 
@@ -635,7 +633,11 @@ describe("useDetailsTab", () => {
     await waitFor(() =>
       expect(queryClient.getQueryData(runQueryKey)).toMatchObject({ status: "succeeded" })
     );
-    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("aiCategoryDone"));
+    await waitFor(() =>
+      expect(toastSuccessMock).toHaveBeenCalledWith(
+        batchActionsCopy.aiCategoryDone({ applied: 1, confirmed: 0, issues: 0 })
+      )
+    );
   });
 
   it("ignores a date preview that lands after the dialog was reopened", async () => {

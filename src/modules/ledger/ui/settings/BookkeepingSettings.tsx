@@ -7,7 +7,6 @@ import type {
   SaveEntryCategoriesInput,
   Settings,
 } from "@/modules/ledger/contracts";
-import { useTranslations } from "next-intl";
 import { CurrencySection } from "../CurrencySection";
 import { CategorySection } from "../CategorySection";
 import { SettingsField } from "./SettingsField";
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { AI_LANGUAGES } from "@/config/languages";
 import { useEffect, useRef, useState } from "react";
+import { settingsCopy } from "@/copy/settings";
 
 interface BookkeepingSettingsProps {
   settings: Settings;
@@ -51,7 +51,6 @@ export function BookkeepingSettings({
   isSavingCategories,
   onGoToDetails,
 }: BookkeepingSettingsProps) {
-  const t = useTranslations("Settings");
   // Every change is saved as it is made. The field shows the value on its way
   // to the server until the answer lands, and the fields stay disabled while it
   // is in flight so each save is made against the version the last one wrote.
@@ -85,22 +84,22 @@ export function BookkeepingSettings({
 
   return (
     <>
-      <SettingsSection title={t("bookkeepingRules")}>
-        <SettingsField title={t("collapseEntries")}>
+      <SettingsSection title={settingsCopy.bookkeepingRules}>
+        <SettingsField title={settingsCopy.collapseEntries}>
           <Switch
-            aria-label={t("collapseEntries")}
+            aria-label={settingsCopy.collapseEntries}
             checked={shown.collapseEntriesDefault}
             onCheckedChange={(checked) => void save({ collapseEntriesDefault: checked })}
             disabled={saving}
           />
         </SettingsField>
-        <SettingsField title={t("aiLanguage")}>
+        <SettingsField title={settingsCopy.aiLanguage}>
           <Select
             value={shown.aiLanguage}
             onValueChange={(value) => void save({ aiLanguage: value })}
             disabled={saving}
           >
-            <SelectTrigger aria-label={t("aiLanguage")} className="w-full sm:w-44">
+            <SelectTrigger aria-label={settingsCopy.aiLanguage} className="w-full sm:w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper">
@@ -112,7 +111,7 @@ export function BookkeepingSettings({
             </SelectContent>
           </Select>
         </SettingsField>
-        <SettingsField title={t("aiPrompt")} stacked>
+        <SettingsField title={settingsCopy.aiPrompt} stacked>
           <Textarea
             value={prompt ?? shown.aiCustomPrompt}
             name="aiCustomPrompt"
@@ -120,7 +119,7 @@ export function BookkeepingSettings({
             onChange={(event) => setPrompt(event.target.value)}
             onBlur={() => flushPrompt.current()}
             readOnly={saving}
-            aria-label={t("aiPrompt")}
+            aria-label={settingsCopy.aiPrompt}
             maxLength={4000}
             className="min-h-[100px] w-full resize-y"
           />

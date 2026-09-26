@@ -12,6 +12,7 @@ import {
   endOfDay,
   parseISO,
 } from "date-fns";
+import { commonCopy } from "@/copy/common";
 
 const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
@@ -234,14 +235,11 @@ export function isValidTimeZone(timeZone: string): boolean {
 /**
  * The app's one label for a "YYYY-MM-DD" day: Today / Yesterday when the day is
  * one of those in the viewer's timezone, otherwise the full written date —
- * "2026年9月10日 星期四", "Thursday, September 10, 2026". The today/yesterday
- * words come from the caller so each feature reads them from its own catalog.
- * Malformed input is returned unchanged.
+ * "2026年9月10日 星期四". Malformed input is returned unchanged.
  */
 export function formatRelativeDateLabel(
   dateString: string,
   locale: string,
-  labels: { today: string; yesterday: string },
   timeZone?: string
 ): string {
   const date = parseDateString(dateString);
@@ -253,8 +251,8 @@ export function formatRelativeDateLabel(
   yesterday.setDate(today.getDate() - 1);
 
   const key = localDateKey(date);
-  if (key === localDateKey(today)) return labels.today;
-  if (key === localDateKey(yesterday)) return labels.yesterday;
+  if (key === localDateKey(today)) return commonCopy.today;
+  if (key === localDateKey(yesterday)) return commonCopy.yesterday;
   return formatFullDate(date, locale);
 }
 
@@ -265,12 +263,11 @@ export function formatRelativeDateLabel(
 export function formatInstantDateLabel(
   instant: string | Date,
   locale: string,
-  labels: { today: string; yesterday: string },
   timeZone?: string
 ): string {
   const date = typeof instant === "string" ? parseISO(instant) : instant;
   if (isNaN(date.getTime())) return typeof instant === "string" ? instant : "";
-  return formatRelativeDateLabel(formatDateKeyInTimeZone(date, timeZone), locale, labels, timeZone);
+  return formatRelativeDateLabel(formatDateKeyInTimeZone(date, timeZone), locale, timeZone);
 }
 
 /** A day written out in full, weekday and year included, weekday trailing. */

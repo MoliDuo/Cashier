@@ -1,9 +1,9 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { useAmountDisplay } from "@/modules/currency/hooks/useAmountDisplay";
 import { AmountText, type AmountVariant } from "./amount-text";
 import { DISPLAY_LOCALE } from "@/lib/constants";
+import { currencyCopy } from "@/copy/common";
 
 interface AmountDisplayProps {
   amount: string;
@@ -27,7 +27,6 @@ export function AmountDisplay({
   showOriginal = true,
 }: AmountDisplayProps) {
   const locale = DISPLAY_LOCALE;
-  const t = useTranslations("Currency");
   const { displayAmount, isDifferentCurrency, originalCurrency, status } = useAmountDisplay({
     amount,
     currency,
@@ -57,7 +56,7 @@ export function AmountDisplay({
       ) : null}
       {status === "error" ? (
         <span className="text-xs font-normal text-muted-foreground">
-          {t("conversionUnavailable")}
+          {currencyCopy.conversionUnavailable}
         </span>
       ) : null}
     </div>

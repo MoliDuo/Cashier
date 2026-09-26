@@ -1,8 +1,8 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
+import { authCopy } from "@/copy/auth";
 
 interface EmailStepProps {
   callbackUrl: string;
@@ -21,20 +21,18 @@ export function EmailStep({
   onEmailChange,
   onSubmit,
 }: EmailStepProps) {
-  const t = useTranslations("Auth");
-
   return (
     <div className="space-y-4">
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium text-text">
-            {t("email")}
+            {authCopy.email}
           </label>
           <Input
             id="email"
             name="email"
             type="email"
-            placeholder={t("emailPlaceholder")}
+            placeholder={authCopy.emailPlaceholder}
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             required
@@ -53,10 +51,10 @@ export function EmailStep({
           {isLoading ? (
             <>
               <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
-              {t("sending")}
+              {authCopy.sending}
             </>
           ) : (
-            t("sendVerificationCode")
+            authCopy.sendVerificationCode
           )}
         </Button>
       </form>

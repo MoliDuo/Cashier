@@ -2,15 +2,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { commonCopy } from "@/copy/common";
+import { settingsCopy } from "@/copy/settings";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import { CategorySection } from "@/modules/ledger/ui/CategorySection";
 
 const { applyPresetAction } = vi.hoisted(() => ({ applyPresetAction: vi.fn() }));
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-  useLocale: () => "zh",
-}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/modules/ledger/server-actions/categories", () => ({
   applyCategoryPresetAction: applyPresetAction,
@@ -67,11 +65,11 @@ describe("CategorySection", () => {
   });
 
   async function addTravel() {
-    fireEvent.click(await screen.findByRole("button", { name: "manageCategories" }));
-    fireEvent.change(screen.getByLabelText("newCategoryPlaceholder"), {
+    fireEvent.click(await screen.findByRole("button", { name: settingsCopy.manageCategories }));
+    fireEvent.change(screen.getByLabelText(settingsCopy.newCategoryPlaceholder), {
       target: { value: "Travel" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "addCategory" }));
+    fireEvent.click(screen.getByRole("button", { name: settingsCopy.addCategory }));
   }
 
   it("restores unsaved list edits after the page goes away, and discards them on request", async () => {
@@ -82,24 +80,24 @@ describe("CategorySection", () => {
     const second = renderSection();
 
     expect(await screen.findByText("Travel")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("draftRestored");
-    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+    expect(screen.getByRole("status")).toHaveTextContent(commonCopy.draftRestored);
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.discard }));
 
     expect(screen.queryByText("Travel")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "manageCategories" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: settingsCopy.manageCategories })).toBeInTheDocument();
     second.unmount();
     renderSection();
-    expect(screen.getByRole("button", { name: "manageCategories" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: settingsCopy.manageCategories })).toBeInTheDocument();
   });
 
   it("follows the server while the list is untouched", async () => {
     const { rerender } = renderSection();
-    fireEvent.click(await screen.findByRole("button", { name: "manageCategories" }));
+    fireEvent.click(await screen.findByRole("button", { name: settingsCopy.manageCategories }));
 
     rerender([{ ...category, name: "Food" }]);
 
     expect(screen.getByText("Food")).toBeInTheDocument();
-    expect(screen.queryByText("categoriesChangedElsewhere")).not.toBeInTheDocument();
+    expect(screen.queryByText(settingsCopy.categoriesChangedElsewhere)).not.toBeInTheDocument();
   });
 
   it("refuses to save edits over a list that changed elsewhere and offers the latest", async () => {
@@ -108,9 +106,9 @@ describe("CategorySection", () => {
 
     rerender([{ ...category, name: "Food" }]);
 
-    expect(screen.getByText("categoriesChangedElsewhere")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "save" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "reloadCategories" }));
+    expect(screen.getByText(settingsCopy.categoriesChangedElsewhere)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: commonCopy.save })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: settingsCopy.reloadCategories }));
 
     expect(screen.getByText("Food")).toBeInTheDocument();
     expect(screen.queryByText("Travel")).not.toBeInTheDocument();
@@ -121,8 +119,8 @@ describe("CategorySection", () => {
     renderSection();
     await addTravel();
 
-    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
-    fireEvent.click(await screen.findByRole("button", { name: "discard" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.cancel }));
+    fireEvent.click(await screen.findByRole("button", { name: commonCopy.discard }));
 
     await waitFor(() => expect(screen.queryByText("Travel")).not.toBeInTheDocument());
   });
@@ -130,14 +128,14 @@ describe("CategorySection", () => {
   it("keeps category changes in a draft and submits them atomically", async () => {
     const { onSaveCategories } = renderSection();
 
-    fireEvent.click(await screen.findByRole("button", { name: "manageCategories" }));
-    fireEvent.change(screen.getByLabelText("newCategoryPlaceholder"), {
+    fireEvent.click(await screen.findByRole("button", { name: settingsCopy.manageCategories }));
+    fireEvent.change(screen.getByLabelText(settingsCopy.newCategoryPlaceholder), {
       target: { value: "Travel" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "addCategory" }));
+    fireEvent.click(screen.getByRole("button", { name: settingsCopy.addCategory }));
 
     expect(onSaveCategories).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "save" }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.save }));
     await waitFor(() => expect(onSaveCategories).toHaveBeenCalledOnce());
     expect(onSaveCategories).toHaveBeenCalledWith({
       expectedRevision: expect.stringMatching(/^[0-9a-f]{64}$/),
@@ -169,22 +167,24 @@ describe("CategorySection", () => {
     });
     renderSection();
 
-    fireEvent.click(await screen.findByRole("button", { name: "switchPreset" }));
+    fireEvent.click(await screen.findByRole("button", { name: settingsCopy.switchPreset }));
 
     // "Meals" is not a category in either preset, so nothing is preselected and
     // the switch cannot be confirmed until the user picks a destination.
-    const apply = await screen.findByRole("button", { name: "presetApply" });
+    const apply = await screen.findByRole("button", { name: settingsCopy.presetApply });
     expect(apply).toBeDisabled();
-    expect(screen.getByText("presetSummaryNone")).toBeTruthy();
+    expect(screen.getByText(settingsCopy.presetSummaryNone)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("radio", { name: /presetOptionConcise/ }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: new RegExp(settingsCopy.presetOptionConcise) })
+    );
     fireEvent.click(screen.getByRole("combobox", { name: "Meals" }));
     fireEvent.click(await screen.findByRole("option", { name: /吃喝/ }));
 
     await waitFor(() => expect(apply).toBeEnabled());
     fireEvent.click(apply);
     // The confirm step is a second dialog with its own equally labelled button.
-    const confirmButtons = await screen.findAllByRole("button", { name: "presetApply" });
+    const confirmButtons = await screen.findAllByRole("button", { name: settingsCopy.presetApply });
     fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
 
     await waitFor(() => expect(applyPresetAction).toHaveBeenCalledOnce());
@@ -199,15 +199,15 @@ describe("CategorySection", () => {
     renderSection({ uncategorizedCount: 2 });
 
     const row = await screen.findByTestId("uncategorized-row");
-    expect(row).toHaveTextContent("uncategorized");
-    expect(row).toHaveTextContent("categoryItemCount");
+    expect(row).toHaveTextContent(settingsCopy.uncategorized);
+    expect(row).toHaveTextContent(settingsCopy.categoryItemCount({ count: 2 }));
 
     // Below the last category, and out of reach of the editor: managing the
     // list adds no control to it, because there is no category behind it.
     const list = row.parentElement!;
     expect(list.lastElementChild).toBe(row);
 
-    fireEvent.click(screen.getByRole("button", { name: "manageCategories" }));
+    fireEvent.click(screen.getByRole("button", { name: settingsCopy.manageCategories }));
 
     expect(screen.getByTestId("uncategorized-row")).toBe(list.lastElementChild);
     expect(within(row).queryAllByRole("button")).toHaveLength(0);

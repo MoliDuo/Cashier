@@ -18,7 +18,7 @@ import {
   format,
   isToday,
 } from "date-fns";
-import { useTranslations } from "next-intl";
+import { calendarCopy } from "@/copy/controls";
 
 interface CalendarProps {
   value?: Date | null;
@@ -83,7 +83,6 @@ function CalendarView({
   className: string | undefined;
   onEscape: (() => void) | undefined;
 }) {
-  const t = useTranslations("Calendar");
   const [viewDate, setViewDate] = React.useState(value || new Date());
   const [focusedDate, setFocusedDate] = React.useState(value || new Date());
   const gridRef = React.useRef<HTMLDivElement>(null);
@@ -130,7 +129,7 @@ function CalendarView({
   };
 
   // Week day headers (starting from Sunday)
-  const weekDays = t.raw("weekDays") as string[];
+  const weekDays = calendarCopy.weekDays;
 
   const isDateDisabled = (date: Date) => {
     if (minDate && date < startOfDay(minDate)) return true;
@@ -208,7 +207,7 @@ function CalendarView({
             onClick={handleToday}
             disabled={isDateDisabled(today)}
           >
-            {t("today")}
+            {calendarCopy.today}
           </Button>
           <Button
             type="button"
@@ -218,7 +217,7 @@ function CalendarView({
             onClick={handleYesterday}
             disabled={isDateDisabled(yesterday)}
           >
-            {t("yesterday")}
+            {calendarCopy.yesterday}
           </Button>
           {showClearShortcut ? (
             <Button
@@ -228,7 +227,7 @@ function CalendarView({
               className="min-h-11 text-xs text-muted-foreground"
               onClick={handleClear}
             >
-              {t("clear")}
+              {calendarCopy.clear}
             </Button>
           ) : null}
         </div>
@@ -242,12 +241,12 @@ function CalendarView({
           size="icon"
           className="size-11"
           onClick={handlePrevMonth}
-          aria-label={t("previousMonth")}
+          aria-label={calendarCopy.previousMonth}
         >
           <ChevronLeft aria-hidden="true" className="h-4 w-4" />
         </Button>
         <div className="font-semibold text-sm">
-          {t("dateFormat", {
+          {calendarCopy.dateFormat({
             year: format(viewDate, "yyyy"),
             month: format(viewDate, "M"),
           })}
@@ -258,7 +257,7 @@ function CalendarView({
           size="icon"
           className="size-11"
           onClick={handleNextMonth}
-          aria-label={t("nextMonth")}
+          aria-label={calendarCopy.nextMonth}
         >
           <ChevronRight aria-hidden="true" className="h-4 w-4" />
         </Button>
