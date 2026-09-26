@@ -18,8 +18,8 @@ const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
   ],
 }));
 
-vi.mock("next-auth/react", () => ({
-  signOut: vi.fn(),
+vi.mock("@/modules/auth/server-actions/sign-in", () => ({
+  signOutAction: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({

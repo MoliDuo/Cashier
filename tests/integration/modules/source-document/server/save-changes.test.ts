@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../../../helpers/session";
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import * as exchangeRates from "@/modules/currency/server/exchange-rates";
@@ -16,16 +17,11 @@ import {
   createSourceDocumentData,
 } from "../../../../helpers/factories";
 
-vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
 describe("saveSourceDocumentChangesAction", () => {
   const userId = "00000000-0000-0000-0000-000000000000";
-  beforeEach(() =>
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-      user: { id: userId },
-      expires: new Date(Date.now() + 1000).toISOString(),
-    })
-  );
+  beforeEach(() => vi.mocked(getCurrentSession).mockResolvedValue(testSession(userId)));
 
   async function seed() {
     const db = getTestDb();

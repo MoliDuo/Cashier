@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { getLiveLedger } from "./server/live-ledger";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 
@@ -7,9 +7,9 @@ import { NotFoundError, UnauthorizedError } from "@/lib/errors";
  * names a ledger: there is only one, so it is always read here.
  */
 export async function requireLedgerAccess() {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId == null || userId === "") throw new UnauthorizedError();
+  const session = await getCurrentSession();
+  if (session == null) throw new UnauthorizedError();
+  const userId = session.userId;
   const ledger = await getLiveLedger(userId);
   if (ledger == null) throw new NotFoundError("Ledger");
   return { userId, ledger };

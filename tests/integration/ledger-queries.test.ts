@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../helpers/session";
 import { POST } from "@/app/api/ledger-queries/route";
 import { getTestDb } from "../setup";
 import { ledgers, sourceDocuments } from "@/persistence";
@@ -10,7 +11,7 @@ import {
   ensureTestLedgerBooks,
 } from "../helpers/schema-setup";
 
-vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
 function request(query: string, args: unknown[]) {
   return new Request("http://localhost/api/ledger-queries", {
@@ -23,9 +24,7 @@ function request(query: string, args: unknown[]) {
 describe("session ledger query transport", () => {
   const userId = "00000000-0000-0000-0000-000000000000";
   beforeEach(() => {
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-      user: { id: userId },
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession(userId));
   });
 
   it("returns private scoped detail and refuses a caller without the live ledger", async () => {
@@ -51,14 +50,12 @@ describe("session ledger query transport", () => {
     expect(unknownDocument.status).toBe(200);
     expect(await unknownDocument.json()).toBeNull();
 
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-      user: { id: crypto.randomUUID() },
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession(crypto.randomUUID()));
     expect((await POST(request("detail", [document.id]))).status).toBe(404);
   });
 
   it("requires a session and validates query envelopes", async () => {
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue(null);
+    vi.mocked(getCurrentSession).mockResolvedValue(null);
     expect((await POST(request("detail", [crypto.randomUUID()]))).status).toBe(401);
     expect((await POST(request("delete", [crypto.randomUUID()]))).status).toBe(400);
     expect((await POST(request("detail", ["invalid", "invalid"]))).status).toBe(400);

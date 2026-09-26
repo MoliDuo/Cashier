@@ -1,12 +1,6 @@
 export interface AuthenticatedPrincipal {
   id: string;
   email: string | null;
-  authVersion: number;
-  /**
-   * OTP-only: the verified token is claimed but not yet consumed. The
-   * interactive sign-in orchestrator consumes it only after cross-module
-   * completion (live ledger validation) succeeds, and releases it on failure.
-   */
 }
 
 export type PasswordMutationActionErrorCode =

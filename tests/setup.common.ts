@@ -28,28 +28,17 @@ export async function flushAfterCallbacks(timeoutMs = 2500): Promise<void> {
 
 afterEach(() => flushAfterCallbacks());
 
-vi.mock("@/auth", () => ({
-  auth: (...args: unknown[]) => {
-    if (args.length === 1 && typeof args[0] === "function") {
-      const handler = args[0] as (req: unknown, ctx: unknown) => unknown;
-      return async (req: { auth?: unknown }, ctx: unknown) => {
-        req.auth = req.auth ?? {
-          user: {
-            id: "00000000-0000-0000-0000-000000000000",
-            email: "test@example.com",
-          },
-        };
-        return handler(req, ctx);
-      };
-    }
-    return Promise.resolve({
-      user: {
-        id: "00000000-0000-0000-0000-000000000000",
-        email: "test@example.com",
-      },
-    });
-  },
-}));
+// Server code reads the session through getCurrentSession, which needs a
+// request's cookies; tests stand in a signed-in session and override it per
+// test with vi.mocked(getCurrentSession).
+vi.mock("@/modules/auth/server/current-session", async () => {
+  const { testSession } = await import("./helpers/session");
+  return {
+    getCurrentSession: vi.fn(async () => testSession()),
+    startSession: vi.fn(async () => {}),
+    endSession: vi.fn(async () => {}),
+  };
+});
 
 vi.mock("next-intl", async () => {
   const actual = await vi.importActual("react");

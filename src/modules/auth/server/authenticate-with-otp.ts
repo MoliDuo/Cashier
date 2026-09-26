@@ -134,6 +134,5 @@ export async function authenticateWithOTP(params: {
   return {
     id: user.id,
     email: user.email,
-    authVersion: user.authVersion,
   };
 }

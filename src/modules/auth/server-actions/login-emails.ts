@@ -2,9 +2,8 @@
 
 import crypto from "node:crypto";
 import { headers } from "next/headers";
-import { auth } from "@/auth";
-import { requireRecentAuth } from "@/lib/auth-actions";
-import { ConflictError, RateLimitError, UnauthorizedError, ValidationError } from "@/lib/errors";
+import { requireAuth, requireRecentAuth } from "@/modules/auth/server/session-guards";
+import { ConflictError, RateLimitError, ValidationError } from "@/lib/errors";
 import { AppError } from "@/lib/errors";
 import { normalizeEmail } from "@/lib/utils/email";
 import { logger } from "@/lib/logger";
@@ -34,13 +33,6 @@ export type LoginEmailsActionResult =
 export type RemoveLoginEmailActionResult =
   { ok: true; emails: string[] } | { ok: false; code: LoginEmailErrorCode };
 
-async function requireUserId(): Promise<string> {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId == null || userId === "") throw new UnauthorizedError();
-  return userId;
-}
-
 function mapError(error: unknown): LoginEmailErrorCode {
   if (error instanceof AppError && error.code === AUTH_ERROR_CODES.REAUTHENTICATION_REQUIRED) {
     return "reauth_required";
@@ -67,7 +59,7 @@ function mapError(error: unknown): LoginEmailErrorCode {
 
 /** The account's login addresses, for the 设置 list. */
 export const listLoginEmailsAction = async (): Promise<string[]> => {
-  const userId = await requireUserId();
+  const userId = await requireAuth();
   return (await listLoginEmails(userId)).map((row) => row.email);
 };
 
@@ -103,7 +95,7 @@ export async function verifyLoginEmailCodeAction(
   otp: string
 ): Promise<LoginEmailsActionResult> {
   try {
-    const userId = await requireUserId();
+    const userId = await requireAuth();
     const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
     await verifyLoginEmailCode(userId, newEmail, otp);
     const emails = (await listLoginEmails(userId)).map((row) => row.email);

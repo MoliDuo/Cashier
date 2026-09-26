@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/reclassification";
 import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
@@ -19,7 +20,7 @@ import { flushAfterCallbacks } from "../../setup.common";
 
 const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
 
-vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 vi.mock("@/lib/ai/openai-client", () => ({
   getOpenAIClient: () => ({ generateContent }),
 }));
@@ -80,15 +81,9 @@ async function submitSelection(
 
 describe("submitSelection", () => {
   beforeEach(() => {
-    vi.mocked(
-      auth as unknown as () => Promise<{
-        user: { id: string; email: string };
-        expires: string;
-      } | null>
-    ).mockResolvedValue({
-      user: { id: userId, email: "reclassify@example.com" },
-      expires: new Date(Date.now() + 3_600_000).toISOString(),
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(
+      testSession(userId, { email: "reclassify@example.com" })
+    );
     vi.clearAllMocks();
   });
 

@@ -6,18 +6,18 @@ import { getTestDb } from "tests/setup";
 import { ledgers, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
 
-vi.mock("@/auth", () => ({ auth: vi.fn() }));
-import { auth } from "@/auth";
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 
 describe("source-document delete tolerance", () => {
   let ledgerId = "";
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-      user: { id: TEST_USER_ID, email: "test@example.com" },
-      expires: new Date(Date.now() + 3600 * 1000).toISOString(),
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(
+      testSession(TEST_USER_ID, { email: "test@example.com" })
+    );
     const db = getTestDb();
     await db.delete(ledgers);
     ({ ledgerId } = await createTestUserWithLedger(

@@ -96,7 +96,6 @@ describe("password authentication", () => {
       email: "owner@example.com",
       passwordHash,
       passwordUpdatedAt: new Date(),
-      authVersion: 1,
     };
     findUserByEmailMock.mockImplementation(async (email: string) =>
       email === account.email ? account : null
@@ -132,7 +131,6 @@ describe("password authentication", () => {
       email: "owner@example.com",
       passwordHash,
       passwordUpdatedAt: new Date(),
-      authVersion: 2,
     });
 
     await authenticateWithPassword({
@@ -231,7 +229,6 @@ describe("password authentication", () => {
       email: "owner@example.com",
       passwordHash,
       passwordUpdatedAt: new Date(),
-      authVersion: 1,
     });
 
     await Promise.allSettled(

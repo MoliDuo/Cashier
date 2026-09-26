@@ -4,26 +4,21 @@ import { ledgers, loginEmails, users } from "@/persistence";
 import { randomUUID } from "node:crypto";
 import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 
-// Override the global auth mock for specific tests
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
-}));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 import { requireLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 function mockSession(userId = TEST_USER_ID, email = "test@example.com") {
-  vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-    user: { id: userId, email },
-    expires: new Date(Date.now() + 3600 * 1000).toISOString(),
-  });
+  vi.mocked(getCurrentSession).mockResolvedValue(testSession(userId, { email }));
 }
 
 function mockNoSession() {
-  vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue(null);
+  vi.mocked(getCurrentSession).mockResolvedValue(null);
 }
 
 describe("requireLedgerAccess", () => {

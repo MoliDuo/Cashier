@@ -32,9 +32,9 @@ interface AccountSettingsProps {
   onCredentialDialogClose: () => void;
   onSignOut: () => void | Promise<void>;
   onRequireReauthentication: () => void | Promise<void>;
-  /** A password change bumps auth_version, so the session must sign in again. */
+  /** A password change ends every session, so this one must sign in again. */
   onCredentialsChanged: () => void | Promise<void>;
-  /** Removing a login email bumps auth_version, so every session signs in again. */
+  /** Removing a login email ends every session, so each one signs in again. */
   onAllSessionsEnded: () => void | Promise<void>;
 }
 

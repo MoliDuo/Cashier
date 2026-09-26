@@ -32,6 +32,10 @@ with `vi.mock` of the concrete module rather than injected fakes.
 ## Runtime boundaries
 
 - Authenticate every server action and authorize the target ledger before reading or mutating data.
+- Sessions are rows in `sessions`; the `cashier_session` cookie carries a random token whose keyed
+  digest is stored. Read the session with `getCurrentSession`, guard with `requireAuth`,
+  `requireRecentAuth` or `withAuth` (`src/modules/auth/server/session-guards.ts`), and end sessions
+  by deleting rows. The proxy only checks that the cookie is present.
 - Treat forwarded client addresses as untrusted unless `TRUSTED_PROXY` is explicitly configured.
 - Log correlation IDs and identifiers tagged by logIdentifier; email and IP identifiers are hashed. Do not log raw email addresses, IP addresses,
   bearer tokens, OTP values, image contents, or provider payloads.

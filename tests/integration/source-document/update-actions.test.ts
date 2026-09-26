@@ -23,26 +23,18 @@ async function convertedAmountsById(ledgerId: string) {
   );
 }
 
-// Mock auth module
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
-}));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 
 describe("Source Document Update Actions", () => {
   const testUserId = "00000000-0000-0000-0000-000000000000";
 
   beforeEach(() => {
-    vi.mocked(
-      auth as unknown as () => Promise<{
-        user: { id: string; email: string };
-        expires: string;
-      } | null>
-    ).mockResolvedValue({
-      user: { id: testUserId, email: "test@example.com" },
-      expires: new Date(Date.now() + 3600 * 1000).toISOString(),
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(
+      testSession(testUserId, { email: "test@example.com" })
+    );
   });
 
   describe("batchUpdateSourceDocumentsAction", () => {

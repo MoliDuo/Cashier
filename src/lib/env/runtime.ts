@@ -1,6 +1,7 @@
 import { getStartupEnvValue } from "./startup";
 
 export interface RuntimeEnv {
+  readonly appUrl: string;
   readonly databaseUrl: string;
   readonly authSecret: string;
   readonly legacyApiKeyPepper: string | undefined;
@@ -30,6 +31,9 @@ function hasExplicitValue(name: string): boolean {
 
 // Use getters so tests can override process.env without reloading every consumer.
 export const runtimeEnv: RuntimeEnv = {
+  get appUrl() {
+    return getStartupEnvValue("APP_URL");
+  },
   get databaseUrl() {
     return getStartupEnvValue("DATABASE_URL");
   },

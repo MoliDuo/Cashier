@@ -24,7 +24,7 @@ adminUrl.href = postgres.databaseUrl;
 const databaseName = `smoke_${randomUUID().replaceAll("-", "")}`;
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
-// Next.js needs its port before it starts, because APP_URL and AUTH_URL carry
+// Next.js needs its port before it starts, because APP_URL carries
 // it, and it only binds after a build that takes a minute. A port the kernel
 // handed out and took back sits in the ephemeral range, where any outbound
 // connection in that minute (the build's own, Postgres clients) can claim it and
@@ -75,8 +75,6 @@ const env = {
   NODE_ENV: "production",
   DATABASE_URL: databaseUrl.toString(),
   APP_URL: baseURL,
-  AUTH_URL: baseURL,
-  AUTH_TRUST_HOST: "true",
   AUTH_SECRET: randomUUID(),
   AUTH_RESEND_KEY: "",
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",

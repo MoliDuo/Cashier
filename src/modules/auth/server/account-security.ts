@@ -5,6 +5,7 @@ import { emailChangeChallenges, loginEmails, users } from "@/persistence";
 import { verificationChallenges } from "@/modules/auth/domain/verification-challenge";
 import { getLockoutExpiration, getMaxAttempts } from "@/modules/auth/domain/otp";
 import { carriedFailures, recordedFailure } from "./challenge-failures";
+import { deleteUserSessions } from "./sessions";
 
 export async function getPasswordHash(userId: string): Promise<string | null | undefined> {
   const user = await db.query.users.findFirst({
@@ -19,17 +20,20 @@ export async function setInitialPasswordHash(input: {
   passwordHash: string;
   passwordUpdatedAt: Date;
 }): Promise<boolean> {
-  const updated = await db
-    .update(users)
-    .set({
-      passwordHash: input.passwordHash,
-      passwordUpdatedAt: input.passwordUpdatedAt,
-      authVersion: sql`${users.authVersion} + 1`,
-      updatedAt: input.passwordUpdatedAt,
-    })
-    .where(and(eq(users.id, input.userId), isNull(users.passwordHash)))
-    .returning({ id: users.id });
-  return updated.length === 1;
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(users)
+      .set({
+        passwordHash: input.passwordHash,
+        passwordUpdatedAt: input.passwordUpdatedAt,
+        updatedAt: input.passwordUpdatedAt,
+      })
+      .where(and(eq(users.id, input.userId), isNull(users.passwordHash)))
+      .returning({ id: users.id });
+    if (updated.length !== 1) return false;
+    await deleteUserSessions(input.userId, tx);
+    return true;
+  });
 }
 
 export async function replacePasswordHash(input: {
@@ -38,17 +42,20 @@ export async function replacePasswordHash(input: {
   passwordHash: string;
   passwordUpdatedAt: Date;
 }): Promise<boolean> {
-  const updated = await db
-    .update(users)
-    .set({
-      passwordHash: input.passwordHash,
-      passwordUpdatedAt: input.passwordUpdatedAt,
-      authVersion: sql`${users.authVersion} + 1`,
-      updatedAt: input.passwordUpdatedAt,
-    })
-    .where(and(eq(users.id, input.userId), eq(users.passwordHash, input.expectedPasswordHash)))
-    .returning({ id: users.id });
-  return updated.length === 1;
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(users)
+      .set({
+        passwordHash: input.passwordHash,
+        passwordUpdatedAt: input.passwordUpdatedAt,
+        updatedAt: input.passwordUpdatedAt,
+      })
+      .where(and(eq(users.id, input.userId), eq(users.passwordHash, input.expectedPasswordHash)))
+      .returning({ id: users.id });
+    if (updated.length !== 1) return false;
+    await deleteUserSessions(input.userId, tx);
+    return true;
+  });
 }
 
 /**
@@ -215,10 +222,8 @@ export async function removeLoginEmail(input: {
     await tx.delete(loginEmails).where(eq(loginEmails.id, target.id));
     // Removing an address must end every session that was opened with it; the
     // account's other addresses sign in again with the password or an OTP.
-    await tx
-      .update(users)
-      .set({ authVersion: sql`${users.authVersion} + 1`, updatedAt: input.now })
-      .where(eq(users.id, input.userId));
+    await tx.update(users).set({ updatedAt: input.now }).where(eq(users.id, input.userId));
+    await deleteUserSessions(input.userId, tx);
     return "removed" as const;
   });
 }

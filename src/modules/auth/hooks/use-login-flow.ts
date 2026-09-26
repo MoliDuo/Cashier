@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, type SignInResponse } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import { sendOTPAction } from "@/modules/auth/server-actions/send-otp";
 import type { SendOTPActionResult } from "@/modules/auth/server-actions/send-otp";
+import {
+  devSignInAction,
+  signInWithOtpAction,
+  signInWithPasswordAction,
+  type SignInActionResult,
+} from "@/modules/auth/server-actions/sign-in";
 
 export type LoginMode = "password" | "otp";
 type LoginStep = "email" | "otp";
@@ -22,10 +27,10 @@ function sanitizeCallbackUrl(value: string | null): string {
 }
 
 function getSignInErrorMessage(
-  result: SignInResponse | undefined,
+  result: Extract<SignInActionResult, { ok: false }>,
   t: (key: string, values?: Record<string, string | number>) => string
 ): string {
-  switch (result?.code) {
+  switch (result.code) {
     case AUTH_ERROR_CODES.INVALID_CREDENTIALS:
       return t("invalidCredentials");
     case AUTH_ERROR_CODES.REGISTRATION_DISABLED:
@@ -43,8 +48,10 @@ function getSignInErrorMessage(
     case AUTH_ERROR_CODES.PASSWORD_RATE_LIMIT_UNAVAILABLE:
     case AUTH_ERROR_CODES.AUTH_RATE_LIMIT_UNAVAILABLE:
       return t("rateLimitUnavailableDesc");
+    case "unexpected":
+      return t("unexpectedError");
     default:
-      return result?.error != null ? t("errorDesc") : t("unexpectedError");
+      return t("errorDesc");
   }
 }
 
@@ -110,14 +117,14 @@ export function useLoginFlow(
     setStep("email");
   };
 
-  const finishSignIn = (result: SignInResponse | undefined) => {
-    if (result?.ok && result.error == null) {
+  const finishSignIn = (result: SignInActionResult) => {
+    if (result.ok) {
       setPassword("");
       router.push(callbackUrl);
       router.refresh();
       return true;
     }
-    if (result?.code === AUTH_ERROR_CODES.OTP_EXPIRED) setOtpExpired(true);
+    if (result.code === AUTH_ERROR_CODES.OTP_EXPIRED) setOtpExpired(true);
     setPassword("");
     setError(getSignInErrorMessage(result, t));
     setIsLoading(false);
@@ -136,14 +143,7 @@ export function useLoginFlow(
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(
-        await signIn("password", {
-          email: submittedEmail,
-          password: submittedPassword,
-          redirect: false,
-          callbackUrl,
-        })
-      );
+      finishSignIn(await signInWithPasswordAction(submittedEmail, submittedPassword));
     } catch {
       setPassword("");
       setError(t("unexpectedError"));
@@ -187,7 +187,7 @@ export function useLoginFlow(
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await signIn("otp", { email, otp, redirect: false, callbackUrl }));
+      finishSignIn(await signInWithOtpAction(email, otp));
     } catch {
       setError(t("unexpectedError"));
       setIsLoading(false);
@@ -226,7 +226,7 @@ export function useLoginFlow(
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await signIn("dev", { redirect: false, callbackUrl }));
+      finishSignIn(await devSignInAction());
     } catch {
       setError(t("devSignInFailed"));
       setIsLoading(false);

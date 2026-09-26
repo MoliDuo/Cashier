@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
-import { signOut } from "next-auth/react";
+import { signOutAction } from "@/modules/auth/server-actions/sign-in";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { SettingsSectionActions } from "./settings/SettingsSectionActions";
@@ -130,18 +130,18 @@ export function SettingsTab({
         return t("themeDark");
     }
   };
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/login" });
-  };
-
   const signOutTo = async (callbackUrl: string) => {
     try {
-      await signOut({ callbackUrl });
-    } catch {
+      await signOutAction();
+    } finally {
       // A full page load, not a client-side push: the old session's cached
       // ledger data must not survive into the login page.
       window.location.assign(callbackUrl);
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOutTo("/login");
   };
 
   const handleRequireReauthentication = async () => {
@@ -261,7 +261,7 @@ export function SettingsTab({
         {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
 
-      {/* Removing a login email bumps auth_version server-side, so every device
+      {/* Removing a login email deletes every session server-side, so every device
           was signed out, not only this one; EmailSettings announces that before
           leaving and then reuses the same credentials-changed sign-out. */}
       <AccountSettings

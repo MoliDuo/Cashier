@@ -16,22 +16,17 @@ import { sql, type InferSelectModel } from "drizzle-orm";
  * login addresses live in `login_emails`, and what used to be "whose records
  * these are" is now the `book_id` on each record.
  */
-export const users = pgTable(
-  "users",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    passwordHash: text("password_hash"),
-    passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
-    authVersion: integer("auth_version").notNull().default(1),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-  },
-  (table) => [check("ck_users_auth_version_positive", sql`${table.authVersion} > 0`)]
-);
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  passwordHash: text("password_hash"),
+  passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
 
 export type User = InferSelectModel<typeof users>;
 
@@ -91,6 +86,33 @@ export const setupState = pgTable(
 );
 
 export type SetupState = InferSelectModel<typeof setupState>;
+
+/**
+ * A signed-in browser. The cookie carries a random token; only its keyed digest
+ * is stored, so a leaked table cannot be replayed. Signing out, or anything that
+ * must end every session, deletes rows.
+ */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    authenticatedAt: timestamp("authenticated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_sessions_token_hash").on(table.tokenHash),
+    index("idx_sessions_user_id").on(table.userId),
+    index("idx_sessions_expires_at").on(table.expiresAt),
+  ]
+);
 
 export const otpTokens = pgTable(
   "otp_tokens",

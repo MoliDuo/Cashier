@@ -44,8 +44,6 @@ export function createDemoEnvironment(environment = process.env) {
     CASHIER_DEMO_MODE: "true",
     DATABASE_URL: `postgresql://cashier:cashier-local-only@127.0.0.1:${postgresPort}/cashier_demo`,
     APP_URL: appUrl,
-    AUTH_URL: appUrl,
-    AUTH_TRUST_HOST: "true",
     AUTH_SECRET: "cashier-demo-only-auth-secret",
     AUTH_RESEND_KEY: "",
     OPENAI_API_KEY: "demo-unused",

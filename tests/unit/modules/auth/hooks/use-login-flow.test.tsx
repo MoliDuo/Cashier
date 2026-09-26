@@ -1,16 +1,26 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sendOTPActionMock, signInMock, pushMock, refreshMock, searchParams } = vi.hoisted(() => ({
+const {
+  sendOTPActionMock,
+  passwordSignInMock,
+  devSignInMock,
+  pushMock,
+  refreshMock,
+  searchParams,
+} = vi.hoisted(() => ({
   sendOTPActionMock: vi.fn(),
-  signInMock: vi.fn(),
+  passwordSignInMock: vi.fn(),
+  devSignInMock: vi.fn(),
   pushMock: vi.fn(),
   refreshMock: vi.fn(),
   searchParams: { value: "" },
 }));
 
-vi.mock("next-auth/react", () => ({
-  signIn: signInMock,
+vi.mock("@/modules/auth/server-actions/sign-in", () => ({
+  signInWithPasswordAction: passwordSignInMock,
+  signInWithOtpAction: vi.fn(),
+  devSignInAction: devSignInMock,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -133,7 +143,7 @@ describe("useLoginFlow OTP sending", () => {
   });
 
   it("submits browser-filled password fields even when React state is empty", async () => {
-    signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin" });
+    passwordSignInMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
     const { result } = renderHook(() => useLoginFlow(t));
 
     await act(() =>
@@ -142,22 +152,13 @@ describe("useLoginFlow OTP sending", () => {
       )
     );
 
-    expect(signInMock).toHaveBeenCalledWith("password", {
-      email: "autofill@example.com",
-      password: "autofilled-password",
-      redirect: false,
-      callbackUrl: "/",
-    });
+    expect(passwordSignInMock).toHaveBeenCalledWith("autofill@example.com", "autofilled-password");
     expect(result.current.email).toBe("autofill@example.com");
     expect(result.current.password).toBe("");
   });
 
-  it("treats an HTTP-success authentication error as a rejected login", async () => {
-    signInMock.mockResolvedValue({
-      ok: true,
-      error: "CredentialsSignin",
-      code: "invalid_credentials",
-    });
+  it("shows the failure and stays on the page for a rejected login", async () => {
+    passwordSignInMock.mockResolvedValue({ ok: false, code: "invalid_credentials" });
     const { result } = renderHook(() => useLoginFlow(t));
     await act(() =>
       result.current.handlePasswordLogin(
@@ -172,15 +173,13 @@ describe("useLoginFlow OTP sending", () => {
   });
 
   it("signs in as the single dev account", async () => {
-    signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin" });
+    devSignInMock.mockResolvedValue({ ok: true });
     const { result } = renderHook(() => useLoginFlow(t, { isDevAuthAvailable: true }));
 
     await act(() => result.current.handleDevSignIn());
 
-    expect(signInMock).toHaveBeenCalledWith("dev", {
-      redirect: false,
-      callbackUrl: "/",
-    });
+    expect(devSignInMock).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith("/");
   });
 
   it("ignores the development sign-in when the entry is unavailable", async () => {
@@ -188,6 +187,6 @@ describe("useLoginFlow OTP sending", () => {
 
     await act(() => result.current.handleDevSignIn());
 
-    expect(signInMock).not.toHaveBeenCalled();
+    expect(devSignInMock).not.toHaveBeenCalled();
   });
 });

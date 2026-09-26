@@ -16,22 +16,19 @@ import { ensureTestLedgerBooks } from "../../helpers/schema-setup";
 import { insertExchangeRates } from "../../helpers/exchange-rates";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
-// Mock auth
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
-}));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 import { createQuickEntryAction } from "@/modules/source-document/server-actions/quick-entry";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 const TEST_RATE_DATE = "2026-02-04";
 
 function mockSession(userId = TEST_USER_ID) {
-  vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-    user: { id: userId, email: "test@example.com" },
-    expires: new Date(Date.now() + 3600 * 1000).toISOString(),
-  });
+  vi.mocked(getCurrentSession).mockResolvedValue(
+    testSession(userId, { email: "test@example.com" })
+  );
 }
 
 describe("createQuickEntryAction", () => {

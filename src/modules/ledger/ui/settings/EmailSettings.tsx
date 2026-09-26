@@ -32,7 +32,7 @@ interface EmailSettingsProps {
   /** The address this session signed in with, painted until the full list arrives. */
   userEmail?: string;
   onRequireReauthentication?: () => void | Promise<void>;
-  /** Removing an address bumps auth_version, so every session has to sign in again. */
+  /** Removing an address ends every session, so this browser has to sign in again. */
   onAllSessionsEnded?: () => void | Promise<void>;
 }
 
@@ -270,8 +270,8 @@ export function EmailSettings({
             return false;
           }
           queryClient.setQueryData<string[]>(key, result.emails);
-          // Removing an address bumps auth_version, so every session was ended,
-          // not only this one; the login screen repeats the notice after sign-out.
+          // Removing an address ended every session, not only this one; the
+          // login screen repeats the notice after sign-out.
           toast.success(t("sessionsEnded"));
           setRemoveTarget(null);
           await onAllSessionsEnded?.();

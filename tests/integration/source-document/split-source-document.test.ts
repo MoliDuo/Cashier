@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
 import {
   ledgerEntries,
@@ -21,7 +22,7 @@ import { listStreamPage } from "@/modules/source-document/server/list-stream-pag
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 
-vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
 describe("splitSourceDocumentAction", () => {
   it("converts moved entries at the split document's day and returns the next split baseline", async () => {
@@ -50,10 +51,9 @@ describe("splitSourceDocumentAction", () => {
 
   const userId = "00000000-0000-0000-0000-000000000000";
   beforeEach(() => {
-    vi.mocked(auth as unknown as () => Promise<unknown>).mockResolvedValue({
-      user: { id: userId, email: "split@example.com" },
-      expires: new Date(Date.now() + 3_600_000).toISOString(),
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(
+      testSession(userId, { email: "split@example.com" })
+    );
   });
 
   async function seed(entryCount = 3) {

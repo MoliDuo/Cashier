@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
 import { isValidUuid } from "@/lib/validation";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
@@ -23,19 +23,15 @@ export interface AuthenticatedHomeContext {
 }
 
 /**
- * Request-scoped cached helper that resolves auth, home ledger, and
+ * Request-scoped cached helper that resolves the session, home ledger, and
  * ledger access in a single pass. Returns the consolidated context
- * so callers never need to call auth(), getLiveLedger(), or
+ * so callers never need to call getCurrentSession(), getLiveLedger(), or
  * requireLedgerAccess() separately within the same render tree.
  */
 export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHomeContext> => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId == null || userId === "") {
-    throw new UnauthorizedError();
-  }
-
-  const validSession = session!;
+  const session = await getCurrentSession();
+  if (session == null) throw new UnauthorizedError();
+  const userId = session.userId;
 
   const ledger = await getLiveLedger(userId);
   if (ledger == null) throw new UnauthorizedError("Shared ledger is unavailable");
@@ -51,9 +47,9 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
     session: {
       user: {
         id: userId,
-        email: validSession.user?.email ?? null,
-        hasPassword: validSession.user?.hasPassword ?? false,
-        passwordUpdatedAt: validSession.user?.passwordUpdatedAt ?? null,
+        email: session.email,
+        hasPassword: session.hasPassword,
+        passwordUpdatedAt: session.passwordUpdatedAt?.toISOString() ?? null,
       },
     },
   };

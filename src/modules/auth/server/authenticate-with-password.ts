@@ -119,6 +119,5 @@ export async function authenticateWithPassword(params: {
   return {
     id: user.id,
     email: user.email,
-    authVersion: user.authVersion,
   };
 }

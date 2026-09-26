@@ -1,125 +1,94 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
-
-vi.mock("next-auth", () => ({
-  default: () => ({
-    auth: (
-      cb: (req: NextRequest & { auth: unknown }) => Promise<Response | void> | Response | void
-    ) => cb,
-  }),
-}));
-
-vi.mock("../../src/auth.config", () => ({
-  authConfig: {},
-}));
-
+import { describe, it, expect } from "vitest";
+import { NextRequest } from "next/server";
 import proxy from "@/proxy";
+import { SESSION_COOKIE_NAME } from "@/modules/auth/constants";
 
-describe("Proxy Logic", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+function createRequest(path: string, sessionToken?: string, origin = "http://localhost:3000") {
+  const headers = new Headers();
+  if (sessionToken != null) headers.set("cookie", `${SESSION_COOKIE_NAME}=${sessionToken}`);
+  return new NextRequest(new URL(path, origin), { headers });
+}
 
-  function createRequest(path: string, auth: unknown = null) {
-    const url = new URL(path, "http://localhost:3000");
-    const req = new NextRequest(url) as NextRequest & { auth?: unknown };
-    req.auth = auth;
-    return req;
-  }
-
-  const invokeProxy = (req: NextRequest) =>
-    (proxy as unknown as (req: NextRequest) => Promise<NextResponse>)(req);
-
-  describe("Public Routes", () => {
-    it("lets public pages through without authentication", async () => {
+describe("proxy", () => {
+  describe("public routes", () => {
+    it("lets public pages through without a session", () => {
       for (const path of ["/login", "/s/some-share-id"]) {
-        expect((await invokeProxy(createRequest(path))).status).toBe(200);
+        expect(proxy(createRequest(path)).status).toBe(200);
       }
     });
 
-    it("should allow access to /api/auth/* without authentication", async () => {
-      const req = createRequest("/api/auth/session");
-      const res = await invokeProxy(req);
-      expect(res.status).toBe(200);
+    it("no longer has an /api/auth exemption", () => {
+      expect(proxy(createRequest("/api/auth/session")).status).toBe(401);
     });
   });
 
-  describe("Retired locale prefixes", () => {
+  describe("retired locale prefixes", () => {
     // A bookmark or an installed shortcut from the bilingual era still points
     // at /zh/..., so the prefix is stripped rather than 404'd.
     it.each([
       ["/zh/login", "/login"],
       ["/en/ledgers/ledger-1", "/ledgers/ledger-1"],
       ["/zh", "/"],
-    ])("redirects %s to %s", async (from, to) => {
-      const res = await invokeProxy(createRequest(from));
+    ])("redirects %s to %s", (from, to) => {
+      const res = proxy(createRequest(from));
 
       expect(res.status).toBe(307);
       expect(new URL(res.headers.get("location")!).pathname).toBe(to);
     });
 
-    it("leaves a path that merely starts with those letters alone", async () => {
-      expect((await invokeProxy(createRequest("/zhuanzhang"))).status).toBe(200);
+    it("leaves a path that merely starts with those letters alone", () => {
+      expect(proxy(createRequest("/zhuanzhang")).status).toBe(200);
     });
   });
 
-  describe("Protected Page Routes", () => {
-    it("leaves page authorization to the protected layouts", async () => {
-      for (const request of [
-        createRequest("/dashboard"),
-        createRequest("/dashboard", { user: { id: "user1" } }),
-      ]) {
-        expect((await invokeProxy(request)).status).toBe(200);
-      }
+  describe("pages", () => {
+    it("leaves page authorization to the protected layouts", () => {
+      expect(proxy(createRequest("/dashboard")).status).toBe(200);
+      expect(proxy(createRequest("/dashboard", "token")).status).toBe(200);
+    });
+
+    it("pushes the session cookie's expiry out on a page load", () => {
+      const res = proxy(createRequest("/", "token", "https://cashier.example"));
+      const cookie = res.cookies.get(SESSION_COOKIE_NAME);
+
+      expect(cookie?.value).toBe("token");
+      expect(cookie?.httpOnly).toBe(true);
+      expect(cookie?.secure).toBe(true);
+      expect(cookie?.maxAge).toBe(14 * 24 * 60 * 60);
+    });
+
+    it("sets no cookie for a browser that has none", () => {
+      expect(proxy(createRequest("/")).cookies.get(SESSION_COOKIE_NAME)).toBeUndefined();
     });
   });
 
-  describe("Protected API Routes", () => {
-    it.each(["/api/auth-admin", "/api/authentication"])(
-      "does not treat %s as an Auth.js endpoint",
-      async (path) => {
-        const res = await invokeProxy(createRequest(path));
-        expect(res.status).toBe(401);
-      }
-    );
-
-    it("should return 401 for unauthenticated access to /api/protected", async () => {
-      const req = createRequest("/api/protected");
-      const res = await invokeProxy(req);
+  describe("API routes", () => {
+    it("returns 401 without a session cookie", async () => {
+      const res = proxy(createRequest("/api/protected"));
 
       expect(res.status).toBe(401);
-      const data = await res.json();
-      expect(data).toEqual({ error: "Unauthorized" });
+      expect(await res.json()).toEqual({ error: "Unauthorized" });
     });
 
-    it("should allow authenticated access to /api/protected", async () => {
-      const req = createRequest("/api/protected", { user: { id: "user1" } });
-      const res = await invokeProxy(req);
-
-      expect(res.status).toBe(200);
+    it("lets a request with a session cookie through for the route to check", () => {
+      expect(proxy(createRequest("/api/protected", "token")).status).toBe(200);
     });
 
-    it("leaves the cron route to authenticate its own bearer secret", async () => {
-      const res = await invokeProxy(createRequest("/api/cron/daily"));
-      expect(res.status).toBe(200);
+    it("leaves the cron route and API v1 to authenticate themselves", () => {
+      expect(proxy(createRequest("/api/cron/daily")).status).toBe(200);
+      expect(proxy(createRequest("/api/v1/documents")).status).toBe(200);
     });
 
-    it("does not treat a path that merely starts with cron as the cron route", async () => {
-      const res = await invokeProxy(createRequest("/api/cronjobs"));
-      expect(res.status).toBe(401);
+    it("does not treat a path that merely starts with cron as the cron route", () => {
+      expect(proxy(createRequest("/api/cronjobs")).status).toBe(401);
     });
 
-    it("does not let a dot bypass API authentication", async () => {
-      const res = await invokeProxy(createRequest("/api/private/file.json"));
-      expect(res.status).toBe(401);
+    it("does not let a dot bypass API authentication", () => {
+      expect(proxy(createRequest("/api/private/file.json")).status).toBe(401);
     });
   });
 
-  describe("Static Assets", () => {
-    it("should skip proxy for _next paths", async () => {
-      const req = createRequest("/_next/static/chunk.js");
-      const res = await invokeProxy(req);
-      expect(res.status).toBe(200);
-    });
+  it("skips _next paths", () => {
+    expect(proxy(createRequest("/_next/static/chunk.js")).status).toBe(200);
   });
 });

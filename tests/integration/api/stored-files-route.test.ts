@@ -5,10 +5,13 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUserWithLedger } from "../../helpers/schema-setup";
 import { sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
-import * as authModule from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 import { AppError } from "@/lib/errors";
 
 const { downloadMock } = vi.hoisted(() => ({ downloadMock: vi.fn() }));
+
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
 vi.mock("@/lib/storage/s3", () => ({
   getS3Storage: () => ({
@@ -60,6 +63,7 @@ describe("GET /api/stored-files/[fileId]", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     downloadMock.mockReset();
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession());
   });
 
   it("serves trusted bytes without exposing the R2 key", async () => {
@@ -84,9 +88,7 @@ describe("GET /api/stored-files/[fileId]", () => {
     const { file } = await createLinkedStoredFile(ledgerId);
     // There is one account, so file reads are scoped by "does the account
     // exist", not by which user created the record.
-    vi.spyOn(authModule, "auth").mockResolvedValue({
-      user: { id: crypto.randomUUID() },
-    } as never);
+    vi.mocked(getCurrentSession).mockResolvedValue(testSession(crypto.randomUUID()));
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
 
@@ -140,7 +142,7 @@ describe("GET /api/stored-files/[fileId]", () => {
   });
 
   it("returns 401 without authentication", async () => {
-    vi.spyOn(authModule, "auth").mockResolvedValue(null as never);
+    vi.mocked(getCurrentSession).mockResolvedValue(null);
     const response = await GET(request(), {
       params: Promise.resolve({ fileId: crypto.randomUUID() }),
     });

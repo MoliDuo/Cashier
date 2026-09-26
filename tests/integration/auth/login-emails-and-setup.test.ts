@@ -7,6 +7,7 @@ vi.mock("next/headers", () => ({
 import { eq } from "drizzle-orm";
 import { getTestDb } from "../../setup";
 import { createTestUser } from "../../helpers/schema-setup";
+import { createSession, readSession } from "@/modules/auth/server/sessions";
 import { findUserByEmail, findUserById, listLoginEmails } from "@/modules/auth/server/users";
 import {
   createEmailChangeChallenge,
@@ -132,7 +133,7 @@ describe("login emails", () => {
     await db
       .insert(loginEmails)
       .values({ userId, email: "second@example.com", emailVerified: new Date() });
-    const before = (await db.query.users.findFirst({ where: eq(users.id, userId) }))!.authVersion;
+    const { token } = await createSession(userId);
 
     const removed = await removeLoginEmail({
       userId,
@@ -142,8 +143,7 @@ describe("login emails", () => {
     expect(removed).toBe("removed");
     expect(await findUserByEmail("second@example.com")).toBeNull();
     // A session opened with the removed address must not survive the removal.
-    const after = (await db.query.users.findFirst({ where: eq(users.id, userId) }))!.authVersion;
-    expect(after).toBe(before + 1);
+    expect(await readSession(token)).toBeNull();
 
     expect(
       await removeLoginEmail({

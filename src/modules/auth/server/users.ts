@@ -12,7 +12,6 @@ export interface UserAccount {
   email: string;
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
-  authVersion: number;
 }
 
 export interface LoginEmail {
@@ -24,14 +23,12 @@ const accountColumns = {
   id: true,
   passwordHash: true,
   passwordUpdatedAt: true,
-  authVersion: true,
 } as const;
 
 type AccountRow = {
   id: string;
   passwordHash: string | null;
   passwordUpdatedAt: Date | null;
-  authVersion: number;
 };
 
 /**
@@ -56,7 +53,6 @@ function toAccount(row: AccountRow, email: string): UserAccount {
     email,
     passwordHash: row.passwordHash,
     passwordUpdatedAt: row.passwordUpdatedAt,
-    authVersion: row.authVersion,
   };
 }
 
@@ -67,7 +63,6 @@ export async function findUserByEmail(email: string): Promise<UserAccount | null
       id: users.id,
       passwordHash: users.passwordHash,
       passwordUpdatedAt: users.passwordUpdatedAt,
-      authVersion: users.authVersion,
       loginEmail: loginEmails.email,
     })
     .from(loginEmails)

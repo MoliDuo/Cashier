@@ -2,7 +2,8 @@ import { saveSourceDocumentChangesAction } from "@/modules/source-document/serve
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { getCurrentSession } from "@/modules/auth/server/current-session";
+import { testSession } from "../../helpers/session";
 import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
 import { saveEntryCategories } from "@/modules/ledger/server/categories";
 import {
@@ -20,23 +21,15 @@ import {
 } from "../../helpers/schema-setup";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
-}));
+vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 
 describe("saveEntryCategoriesAction", () => {
   const userId = "00000000-0000-0000-0000-000000000000";
 
   beforeEach(() => {
-    vi.mocked(
-      auth as unknown as () => Promise<{
-        user: { id: string; email: string };
-        expires: string;
-      } | null>
-    ).mockResolvedValue({
-      user: { id: userId, email: "category-save@example.com" },
-      expires: new Date(Date.now() + 3_600_000).toISOString(),
-    });
+    vi.mocked(getCurrentSession).mockResolvedValue(
+      testSession(userId, { email: "category-save@example.com" })
+    );
   });
 
   it("commits additions, edits, deletions, and ordering in one transaction", async () => {
@@ -195,7 +188,7 @@ describe("saveEntryCategoriesAction", () => {
   });
 
   it("requires authentication before saving a collection", async () => {
-    vi.mocked(auth as unknown as () => Promise<null>).mockResolvedValueOnce(null);
+    vi.mocked(getCurrentSession).mockResolvedValueOnce(null);
     await expect(
       saveEntryCategoriesAction({
         expectedRevision: await computeCategoryCollectionRevision([]),

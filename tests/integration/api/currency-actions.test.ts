@@ -7,9 +7,10 @@ import { insertExchangeRates } from "../../helpers/exchange-rates";
 
 const LEDGER_ID = "10000000-0000-4000-8000-000000000001";
 
-vi.mock("@/auth", () => ({
-  auth: vi.fn().mockResolvedValue({ user: { id: "00000000-0000-0000-0000-000000000000" } }),
-}));
+vi.mock("@/modules/auth/server/current-session", async () => {
+  const { testSession } = await import("../../helpers/session");
+  return { getCurrentSession: vi.fn(async () => testSession()) };
+});
 
 async function insertRates(date: string, rates: Record<string, number>) {
   await insertExchangeRates(date, rates);

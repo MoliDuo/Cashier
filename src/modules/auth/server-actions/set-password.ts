@@ -1,6 +1,6 @@
 "use server";
 
-import { requireRecentAuth } from "@/lib/auth-actions";
+import { requireRecentAuth } from "@/modules/auth/server/session-guards";
 import { parsePasswordMutationInput } from "@/modules/auth/contract-schemas";
 import { setPassword } from "@/modules/auth/server/set-password";
 import { logError } from "@/lib/error-handlers";

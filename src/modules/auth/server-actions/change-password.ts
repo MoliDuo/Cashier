@@ -1,6 +1,6 @@
 "use server";
 
-import { withAuth } from "@/lib/auth-actions";
+import { withAuth } from "@/modules/auth/server/session-guards";
 import { parsePasswordMutationInput } from "@/modules/auth/contract-schemas";
 import { changePassword } from "@/modules/auth/server/change-password";
 import { logError } from "@/lib/error-handlers";

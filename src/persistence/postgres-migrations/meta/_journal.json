@@ -106,6 +106,13 @@
       "when": 1790355121310,
       "tag": "0014_drop_soft_delete_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790388482890,
+      "tag": "0015_sessions",
+      "breakpoints": true
     }
   ]
 }

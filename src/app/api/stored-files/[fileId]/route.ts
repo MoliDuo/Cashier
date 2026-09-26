@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth-actions";
+import { requireAuth } from "@/modules/auth/server/session-guards";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handlers";
