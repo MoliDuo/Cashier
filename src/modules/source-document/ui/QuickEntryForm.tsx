@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { Loader2, Send } from "lucide-react";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { DateFilter } from "@/components/ui/date-filter";
+import { DraftNotice } from "@/components/ui/draft-notice";
 import { useQuickEntryFormController } from "@/modules/source-document/hooks/useQuickEntryFormController";
 import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
@@ -60,6 +61,8 @@ export function QuickEntryForm({
     mutation,
     handleSubmit,
     isDirty,
+    restoredFromDraft,
+    discardDraft,
   } = useQuickEntryFormController({
     ...(bookId == null ? {} : { bookId }),
     categories,
@@ -102,6 +105,8 @@ export function QuickEntryForm({
         handleSubmit();
       }}
     >
+      {restoredFromDraft ? <DraftNotice disabled={isPending} onDiscard={discardDraft} /> : null}
+
       {/* Item Name (optional) */}
       <Input
         aria-label={t("itemName")}

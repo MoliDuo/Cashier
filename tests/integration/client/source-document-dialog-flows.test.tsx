@@ -49,13 +49,8 @@ function SourceDocumentDialogHarness({ onConfirm }: { onConfirm: () => Promise<b
             confirmSaveAndContinue: onConfirm,
             confirmDiscardAndContinue: async () => true,
           }}
-          unsavedGuard={
-            {
-              confirmOpen: false,
-              setConfirmOpen: vi.fn(),
-            } as never
-          }
-          handleDiscardAndClose={vi.fn()}
+          discardEditsGate={{ confirmOpen: false, setConfirmOpen: vi.fn() }}
+          handleConfirmDiscardEdits={vi.fn()}
         />
       </DialogContent>
     </Dialog>

@@ -59,6 +59,8 @@ vi.mock("@/components/ui/confirm-dialog", () => ({
     ) : null,
 }));
 
+vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => "ledger-1" }));
+
 vi.mock("@/components/ui/editable-field", () => ({
   EditableField: () => null,
 }));
@@ -227,7 +229,10 @@ function renderModal(onSaveAll = vi.fn(async () => undefined)) {
 }
 
 describe("SourceDocumentDetailModal batch mode", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
 
   it("keeps the editor mounted when deletion refreshes its data to null", () => {
     const save = vi.fn(async () => undefined);
@@ -404,29 +409,48 @@ describe("SourceDocumentDetailModal batch mode", () => {
     expect(screen.queryByText("add-entry-dialog")).not.toBeInTheDocument();
   });
 
-  it("requires confirmation before closing with unsaved changes", () => {
+  it("closes at once and restores the unsaved edits on the next opening", () => {
     const onClose = vi.fn();
-    render(modal(undefined, sourceDocument, { onClose }));
+    const first = render(modal(undefined, sourceDocument, { onClose }));
     fireEvent.click(screen.getByText("edit"));
     fireEvent.click(screen.getByText("change-draft"));
     fireEvent.click(screen.getByText("dialog-close"));
 
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByText("unsavedChanges")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("confirm-discard"));
     expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByText("unsavedChanges")).not.toBeInTheDocument();
+    first.unmount();
+
+    render(modal(undefined, sourceDocument));
+    expect(screen.getByText("editing")).toBeInTheDocument();
+    expect(screen.getByText("draftRestored")).toBeInTheDocument();
+    expect(screen.getByText("saveChanges")).toBeEnabled();
   });
 
-  it("requires confirmation before closing with an adjusted date suggestion draft", () => {
+  it("flags a draft made on an older version and saves it against that version", async () => {
+    const first = render(modal(undefined, sourceDocument));
+    fireEvent.click(screen.getByText("edit"));
+    fireEvent.click(screen.getByText("change-draft"));
+    first.unmount();
+
+    const onSaveAll = vi.fn(async () => undefined);
+    render(modal(onSaveAll, { ...sourceDocument, version: 2 }));
+    expect(screen.getByText("draftOutdated")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("saveChanges"));
+    expect(toastErrorMock).toHaveBeenCalledWith("saveConflict");
+    expect(onSaveAll).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("discard"));
+    expect(screen.getByText("viewing")).toBeInTheDocument();
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it("closes without asking while a date suggestion is being adjusted", () => {
     const onClose = vi.fn();
     render(modal(undefined, sourceDocument, { onClose }));
     fireEvent.click(screen.getByText("begin-date-adjustment"));
     fireEvent.click(screen.getByText("change-date-draft"));
     fireEvent.click(screen.getByText("dialog-close"));
 
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByText("unsavedChanges")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("confirm-discard"));
     expect(onClose).toHaveBeenCalledOnce();
   });
 

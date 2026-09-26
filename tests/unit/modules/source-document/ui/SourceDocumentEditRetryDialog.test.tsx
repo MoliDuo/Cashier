@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fetchSourceDocumentInputMock } = vi.hoisted(() => ({
@@ -10,15 +10,8 @@ vi.mock("@/modules/source-document/queries", () => ({
   fetchSourceDocumentInput: fetchSourceDocumentInputMock,
 }));
 vi.mock("@/modules/source-document/ui/SourceDocumentInput", () => ({
-  SourceDocumentInput: ({
-    onDirtyChange,
-    onPendingChange,
-  }: {
-    onDirtyChange: (dirty: boolean) => void;
-    onPendingChange: (pending: boolean) => void;
-  }) => (
+  SourceDocumentInput: ({ onPendingChange }: { onPendingChange: (pending: boolean) => void }) => (
     <div data-testid="retry-input">
-      <button onClick={() => onDirtyChange(true)}>edit</button>
       <button onClick={() => onPendingChange(true)}>submit</button>
       <button onClick={() => onPendingChange(false)}>settle</button>
     </div>
@@ -26,7 +19,6 @@ vi.mock("@/modules/source-document/ui/SourceDocumentInput", () => ({
 }));
 
 import { SourceDocumentEditRetryDialog } from "@/modules/source-document/ui/SourceDocumentEditRetryDialog";
-import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 function renderDialog() {
   const queryClient = new QueryClient({
@@ -51,7 +43,6 @@ function renderDialog() {
 describe("SourceDocumentEditRetryDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useUnsavedChangesStore.setState({ dirtyKeys: new Set(), leaveGuards: new Map() });
     fetchSourceDocumentInputMock.mockRejectedValue(new Error("unavailable"));
   });
 
@@ -66,42 +57,28 @@ describe("SourceDocumentEditRetryDialog", () => {
     await waitFor(() => expect(screen.getByTestId("retry-input")).toBeInTheDocument());
   });
 
-  it("registers only open content and protects global navigation while dirty or submitting", () => {
-    const queryClient = new QueryClient();
+  it("closes without asking, but not while the retry is submitting", async () => {
+    fetchSourceDocumentInputMock.mockResolvedValue({ text: "receipt", files: [] });
     const onOpenChange = vi.fn();
-    const props = {
-      ledgerId: "ledger-1",
-      sourceDocument: { id: "source-1", text: "Original" },
-      onOpenChange,
-    };
-    const form = (open: boolean) => (
+    const queryClient = new QueryClient();
+    render(
       <QueryClientProvider client={queryClient}>
-        <SourceDocumentEditRetryDialog {...props} open={open} />
         <SourceDocumentEditRetryDialog
-          {...props}
-          sourceDocument={{ ...props.sourceDocument, id: "closed-source" }}
-          open={false}
+          sourceDocument={{ id: "source-1", text: "Original" }}
+          open
+          onOpenChange={onOpenChange}
         />
       </QueryClientProvider>
     );
-    const view = render(form(true));
-    fireEvent.click(screen.getByRole("button", { name: "edit" }));
-    const store = useUnsavedChangesStore.getState;
-    const key = "source-document-retry-navigation";
-    expect(store().dirtyKeys.has(key)).toBe(true);
-    const leave = vi.fn();
+    await screen.findByTestId("retry-input");
+
     fireEvent.click(screen.getByRole("button", { name: "submit" }));
-    act(() => store().getLeaveGuard(key)?.requestLeave(leave));
-    expect(screen.queryByRole("dialog", { name: "放弃更改？" })).not.toBeInTheDocument();
-    expect(leave).not.toHaveBeenCalled();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalled();
+
     fireEvent.click(screen.getByRole("button", { name: "settle" }));
-    act(() => store().getLeaveGuard(key)?.requestLeave(leave));
-    expect(screen.getByRole("dialog", { name: "放弃更改？" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "放弃并离开" }));
-    expect(leave).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     expect(onOpenChange).toHaveBeenCalledWith(false);
-    view.rerender(form(false));
-    expect(store().getLeaveGuard(key)).toBeNull();
-    expect(store().dirtyKeys.has(key)).toBe(false);
+    expect(screen.queryByRole("dialog", { name: "放弃更改？" })).not.toBeInTheDocument();
   });
 });

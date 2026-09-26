@@ -1,13 +1,11 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
-import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SourceDocumentInput } from "./SourceDocumentInput";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSourceDocumentInput } from "@/modules/source-document/queries";
 import { queryKeys } from "@/lib/query-keys";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import {
@@ -37,12 +35,6 @@ function EditRetryDialogContent({
   const t = useTranslations("SourceDocumentEditRetryDialog");
   const [sourceDocument] = useState(sourceDocumentProp);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const { confirmOpen, setConfirmOpen, requestLeave, resolveLeave } = useUnsavedChangesGuard({
-    key: "source-document-retry-navigation",
-    hasUnsavedChanges: isDirty,
-    isBlocked: isSubmitting,
-  });
   const handlePendingChange = useCallback(
     (pending: boolean) => {
       setIsSubmitting(pending);
@@ -51,13 +43,10 @@ function EditRetryDialogContent({
     [onPendingChange]
   );
 
+  // Closing keeps what was typed: the form stores it as a draft for this
+  // record and restores it the next time the dialog opens.
   const requestClose = () => {
-    if (isSubmitting) return;
-    if (isDirty) {
-      requestLeave(null);
-      return;
-    }
-    onOpenChange(false);
+    if (!isSubmitting) onOpenChange(false);
   };
 
   const hasStoredFiles = (sourceDocument.files?.length ?? 0) > 0;
@@ -96,16 +85,10 @@ function EditRetryDialogContent({
         aria-describedby={undefined}
         hideCloseButton={isSubmitting}
         onEscapeKeyDown={(event) => {
-          if (isSubmitting || isDirty) {
-            event.preventDefault();
-            if (!isSubmitting) requestClose();
-          }
+          if (isSubmitting) event.preventDefault();
         }}
         onPointerDownOutside={(event) => {
-          if (isSubmitting || isDirty) {
-            event.preventDefault();
-            if (!isSubmitting) requestClose();
-          }
+          if (isSubmitting) event.preventDefault();
         }}
       >
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
@@ -140,7 +123,6 @@ function EditRetryDialogContent({
                 sourceDocumentId={sourceDocument.id}
                 initialData={initialData}
                 onPendingChange={handlePendingChange}
-                onDirtyChange={setIsDirty}
                 onSuccess={() => {
                   onOpenChange(false);
                   onSuccess?.();
@@ -150,22 +132,6 @@ function EditRetryDialogContent({
           )}
         </div>
       </DialogContent>
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={t("unsavedTitle")}
-        description={t("unsavedDescription")}
-        cancelLabel={t("continueEditing")}
-        confirmLabel={t("discardAndLeave")}
-        variant="destructive"
-        onConfirm={() => {
-          if (isSubmitting) return false;
-          setIsDirty(false);
-          const leave = resolveLeave();
-          onOpenChange(false);
-          leave?.();
-        }}
-      />
     </Dialog>
   );
 }

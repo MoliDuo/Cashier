@@ -101,13 +101,14 @@ with `vi.mock` of the concrete module rather than injected fakes.
   client entrypoints.
 - Tabs own their query loading and error states. Statistics retain the last successful data with
   its corresponding period while refreshing. Same-generation Stream refreshes retain loaded pages.
-- Create and retry drafts use distinct typed inputs. Retry keeps the original draft version for
-  conflict detection and shares the unsaved-changes guard for close, history navigation, and pending
-  submission. Server refreshes must not silently advance that baseline.
-- The client instrumentation entrypoint installs the history traversal listener before hydration;
-  the active ledger hook registers and releases its handler. Registering a later `popstate` listener
-  cannot reliably stop the router from unmounting a dirty editor first. Dialog exit completion uses
-  Radix's close-focus lifecycle, not CSS animation events that may never fire.
+- Unsaved input is kept, never guarded. `src/lib/drafts.ts` stores a draft per record in
+  localStorage under `draft:<ledgerId>:<kind>:<id>` (JSON-safe fields only; picked images stay in
+  memory for the life of the page). Closing a form, a detail sheet, or leaving through browser
+  history never asks; the next opening restores the draft with a notice and a discard action. A
+  draft of an existing record keeps the version it was made on, so a changed record still refuses
+  it as a conflict. Only an explicit cancel of an edit session confirms before discarding. Browser
+  history is never intercepted. Dialog exit completion uses Radix's close-focus lifecycle, not CSS
+  animation events that may never fire.
 
 ### Design baseline
 

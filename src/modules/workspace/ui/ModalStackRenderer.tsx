@@ -3,8 +3,6 @@ import { useModalStackStore } from "@/lib/store/modal-stack";
 import { SourceDocumentDetailWrapper } from "@/modules/source-document/ui/SourceDocumentDetailWrapper";
 import type { BookDto, EntryCategory } from "@/modules/ledger/contracts";
 import { closeLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
-import { ledgerDetailLeaveGuardKey } from "@/lib/navigation/ledger-detail-key";
-import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 export interface ModalStackRendererProps {
   /** The live books, so an open record can be moved between them. */
@@ -31,14 +29,6 @@ export function ModalStackRenderer({
   const open = closingKey !== itemKey;
   const startExit = () => {
     setClosingKey(itemKey);
-  };
-  const requestBack = () => {
-    const guardKey = ledgerDetailLeaveGuardKey(item.type, item.id);
-    const guards = useUnsavedChangesStore.getState();
-    const guard =
-      guards.getLeaveGuard("source-document-retry-navigation") ?? guards.getLeaveGuard(guardKey);
-    if (guard == null) startExit();
-    else guard.requestLeave(startExit);
   };
   const onExitComplete = () => {
     const current = useModalStackStore.getState().stack.at(-1);
@@ -68,7 +58,7 @@ export function ModalStackRenderer({
       open: isTop && open,
       onClose: isTop ? startExit : () => {},
       ...(isTop && closingKey === key ? { onExitComplete } : {}),
-      ...(isTop && stack.length > 1 ? { onBack: requestBack } : {}),
+      ...(isTop && stack.length > 1 ? { onBack: startExit } : {}),
       categories,
       mainCurrency,
       preferredCurrencies,

@@ -6,15 +6,7 @@ interface CashierHistoryMetadata {
   cashier?: {
     ledgerNavigation: true;
     kind: LedgerNavigationKind;
-    sequence: number;
   };
-}
-
-function currentSequence(): number {
-  const cashier = (window.history.state as CashierHistoryMetadata | null)?.cashier;
-  return cashier?.ledgerNavigation === true && Number.isInteger(cashier.sequence)
-    ? cashier.sequence
-    : 0;
 }
 
 function currentCustomHistoryState(): Record<string, unknown> {
@@ -30,15 +22,15 @@ function currentCustomHistoryState(): Record<string, unknown> {
   return customState;
 }
 
+/** Writes a ledger URL, marking the entry so a detail sheet knows it pushed it. */
 export function writeLedgerHistory(
   method: "push" | "replace",
   url: string,
   kind: LedgerNavigationKind
 ): void {
-  const sequence = method === "push" ? currentSequence() + 1 : currentSequence();
   const state: Record<string, unknown> & CashierHistoryMetadata = {
     ...currentCustomHistoryState(),
-    cashier: { ledgerNavigation: true, kind, sequence },
+    cashier: { ledgerNavigation: true, kind },
   };
   if (method === "push") window.history.pushState(state, "", url);
   else window.history.replaceState(state, "", url);

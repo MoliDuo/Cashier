@@ -15,7 +15,6 @@ import { LedgerQueryErrorBanner } from "@/modules/workspace/ui/LedgerQueryErrorB
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { textRoleClassName } from "@/components/typography";
 import { LedgerTabPanels } from "./LedgerTabPanels";
 import { NewRecordDialog } from "./NewRecordDialog";
@@ -62,7 +61,6 @@ export function LedgerPageClient({
   passwordUpdatedAt,
 }: LedgerPageClientProps) {
   const t = useTranslations("LedgerPage");
-  const tCommon = useTranslations("Common");
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { books } = useBooks({
@@ -100,9 +98,6 @@ export function LedgerPageClient({
     setQuickDirty,
     isInputSubmitting,
     handleDialogOpenChange,
-    discardConfirmOpen,
-    setDiscardConfirmOpen,
-    confirmDiscard,
   } = newRecordDialog;
 
   const {
@@ -221,16 +216,6 @@ export function LedgerPageClient({
           setAiDirty={setAiDirty}
           setQuickDirty={setQuickDirty}
           deviceTimeZone={deviceTimeZone}
-        />
-
-        <ConfirmDialog
-          open={discardConfirmOpen}
-          onOpenChange={setDiscardConfirmOpen}
-          title={tCommon("unsavedChangesTitle")}
-          description={tCommon("unsavedChangesDescription")}
-          confirmLabel={tCommon("discard")}
-          variant="destructive"
-          onConfirm={confirmDiscard}
         />
 
         <ModalStackGate

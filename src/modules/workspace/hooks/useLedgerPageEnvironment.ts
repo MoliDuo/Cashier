@@ -7,7 +7,6 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { fetchEntryCategories, fetchLedger } from "@/modules/ledger/queries";
 import type { EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
 import { useShellController } from "@/components/providers/shell-controller";
-import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import type { BookDto } from "@/modules/ledger/contracts";
@@ -40,7 +39,7 @@ interface UseLedgerPageEnvironmentOptions {
 
 /**
  * Owns the ledger/categories queries, device-vs-fixed timezone resolution, and the
- * page-level side effects (unsaved-changes beforeunload guard, shell-controller wiring)
+ * page-level side effects (the device-zone cookie, shell-controller wiring)
  * that every ledger page tab depends on.
  */
 export function useLedgerPageEnvironment({
@@ -111,18 +110,6 @@ export function useLedgerPageEnvironment({
     if (deviceTimeZone == null) return;
     writeDeviceTimeZoneCookie(deviceTimeZone);
   }, [deviceTimeZone]);
-
-  const dirtyChangeCount = useUnsavedChangesStore((state) => state.dirtyKeys.size);
-
-  useEffect(() => {
-    if (dirtyChangeCount === 0) return;
-    const preventUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", preventUnload);
-    return () => window.removeEventListener("beforeunload", preventUnload);
-  }, [dirtyChangeCount]);
 
   // Wire the real new-record handler into the shell once this component mounts.
   const { registerInputIntent, registerOpenInput } = useShellController();

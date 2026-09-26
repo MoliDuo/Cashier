@@ -114,6 +114,10 @@ export function usePendingChanges({ sourceDocument, ledgerEntries }: UsePendingC
     setPendingChanges({ sourceDoc: {}, entries: {} });
   }, []);
 
+  const restoreChanges = useCallback((changes: PendingChanges) => {
+    setPendingChanges(changes);
+  }, []);
+
   return {
     pendingChanges,
     hasPendingChanges,
@@ -122,5 +126,6 @@ export function usePendingChanges({ sourceDocument, ledgerEntries }: UsePendingC
     handleEntryChange,
     discardAllChanges: resetChanges,
     resetChanges,
+    restoreChanges,
   };
 }

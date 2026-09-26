@@ -15,7 +15,7 @@ describe("ledger-url-navigation", () => {
 
     expect(url).toBe("/ledgers/ledger-1?tab=details&period=thisMonth");
     expect(historySpy).toHaveBeenCalledWith(
-      { cashier: { ledgerNavigation: true, kind: "filter", sequence: 0 } },
+      { cashier: { ledgerNavigation: true, kind: "filter" } },
       "",
       url
     );
@@ -28,7 +28,7 @@ describe("ledger-url-navigation", () => {
         _N: true,
         __PRIVATE_NEXTJS_INTERNALS_TREE: ["next-router-tree"],
         unrelatedCustomState: "keep",
-        cashier: { ledgerNavigation: true, kind: "filter", sequence: 0 },
+        cashier: { ledgerNavigation: true, kind: "filter" },
       },
       "",
       "/ledgers/ledger-1?tab=stream"
@@ -42,7 +42,7 @@ describe("ledger-url-navigation", () => {
     expect(historySpy).toHaveBeenCalledWith(
       {
         unrelatedCustomState: "keep",
-        cashier: { ledgerNavigation: true, kind: "tab", sequence: 1 },
+        cashier: { ledgerNavigation: true, kind: "tab" },
       },
       "",
       url
@@ -54,7 +54,7 @@ describe("ledger-url-navigation", () => {
       {
         __NA: true,
         __PRIVATE_NEXTJS_INTERNALS_TREE: ["next-router-tree"],
-        cashier: { ledgerNavigation: true, kind: "detail", sequence: 4 },
+        cashier: { ledgerNavigation: true, kind: "detail" },
         unrelatedCustomState: "keep",
       },
       "",
@@ -69,7 +69,7 @@ describe("ledger-url-navigation", () => {
 
     expect(historySpy).toHaveBeenCalledWith(
       {
-        cashier: { ledgerNavigation: true, kind: "filter", sequence: 4 },
+        cashier: { ledgerNavigation: true, kind: "filter" },
         unrelatedCustomState: "keep",
       },
       "",

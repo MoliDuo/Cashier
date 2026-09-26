@@ -54,7 +54,7 @@ export function closeLedgerDetail(): void {
       : setDetailParams({ type: previous.type, id: previous.id });
   const detail = new URLSearchParams(window.location.search);
   const state = window.history.state as {
-    cashier?: { ledgerNavigation?: boolean; kind?: string; sequence?: number };
+    cashier?: { ledgerNavigation?: boolean; kind?: string };
   } | null;
   if (
     current != null &&

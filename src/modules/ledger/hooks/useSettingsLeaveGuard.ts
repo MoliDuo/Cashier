@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useUnsavedChangesStore, type UnsavedChangesLeaveGuard } from "@/lib/store/unsaved-changes";
+import { useUnsavedChangesStore } from "@/lib/store/unsaved-changes";
 
 export function useSettingsLeaveGuard() {
   const hasDirtyChanges = useUnsavedChangesStore((state) =>
@@ -37,17 +37,6 @@ export function useSettingsLeaveGuard() {
     continueNavigationRef.current = null;
     setLeaveConfirmOpen(false);
   }, []);
-
-  useEffect(() => {
-    const key = "settings-navigation";
-    if (!hasDirtyChanges) {
-      useUnsavedChangesStore.getState().registerLeaveGuard(key, null);
-      return;
-    }
-    const guard: UnsavedChangesLeaveGuard = { requestLeave };
-    useUnsavedChangesStore.getState().registerLeaveGuard(key, guard);
-    return () => useUnsavedChangesStore.getState().registerLeaveGuard(key, null);
-  }, [hasDirtyChanges, requestLeave]);
 
   useEffect(() => {
     if (!hasDirtyChanges) return;

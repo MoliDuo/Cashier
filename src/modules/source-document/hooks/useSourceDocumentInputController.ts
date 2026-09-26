@@ -12,6 +12,8 @@ import { useSourceDocumentSubmitMutations } from "./useSourceDocumentSubmitMutat
 import { useCameraCapture } from "./useCameraCapture";
 import { useIsTouchInput } from "@/hooks/use-is-touch-input";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
+import { draftKey } from "@/lib/drafts";
+import { useLedgerId } from "@/modules/ledger/hooks/useLedgerId";
 
 type UseSourceDocumentInputControllerOptions = SourceDocumentInputProps & {
   messages: SourceDocumentInputControllerMessages;
@@ -34,9 +36,16 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
   const compressionAbortRef = useRef<AbortController | null>(null);
   const [pendingFileCount, setPendingFileCount] = useState(0);
   const imageCountRef = useRef(0);
+  const ledgerId = useLedgerId();
   const draft = useSourceDocumentInputDraft({
     ...(initialData != null ? { initialData } : {}),
     ...(timeZone != null ? { timeZone } : {}),
+    draftKey:
+      ledgerId == null
+        ? null
+        : target.mode === "retry"
+          ? draftKey(ledgerId, "retry", target.sourceDocumentId)
+          : draftKey(ledgerId, "new-record-ai", "new"),
   });
   const submitMutations = useSourceDocumentSubmitMutations({
     ...(options.bookId == null ? {} : { bookId: options.bookId }),
@@ -171,6 +180,8 @@ export function useSourceDocumentInputController(options: UseSourceDocumentInput
     canCancelUpload: submitMutations.canCancel,
     canSubmit: draft.canSubmit && pendingFileCount === 0,
     isDirty: draft.isDirty || pendingFileCount > 0,
+    restoredFromDraft: draft.restoredFromDraft,
+    discardDraft: draft.discardDraft,
     remainingImageSlots: Math.max(0, MAX_FILES - draft.images.length - pendingFileCount),
     isTouchInput,
     camera,

@@ -19,6 +19,9 @@ vi.mock("@/lib/mutations/use-ledger-mutation", () => ({
   },
 }));
 
+const ledger = vi.hoisted(() => ({ id: null as string | null }));
+vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => ledger.id }));
+
 const categories = [
   {
     id: "cat-1",
@@ -32,6 +35,8 @@ describe("useQuickEntryFormController", () => {
     vi.setSystemTime(new Date("2026-07-27T16:30:00.000Z"));
     mutate.mockReset();
     useLedgerMutationMock.mockReset();
+    ledger.id = null;
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -133,5 +138,29 @@ describe("useQuickEntryFormController", () => {
       sourceDocumentId: "source-quick",
       documentDate: "2026-07-28",
     });
+  });
+
+  it("keeps an unsent entry as a draft and restores it on the next opening", () => {
+    ledger.id = "ledger-1";
+    const first = renderHook(() =>
+      useQuickEntryFormController({ categories, mainCurrency: "CNY", timeZone: "Asia/Shanghai" })
+    );
+    act(() => {
+      first.result.current.setSelectedCategoryId("cat-1");
+      first.result.current.setAmount("12.5");
+    });
+    first.unmount();
+
+    const second = renderHook(() =>
+      useQuickEntryFormController({ categories, mainCurrency: "CNY", timeZone: "Asia/Shanghai" })
+    );
+    expect(second.result.current.selectedCategoryId).toBe("cat-1");
+    expect(second.result.current.amount).toBe("12.5");
+    expect(second.result.current.restoredFromDraft).toBe(true);
+
+    act(() => second.result.current.discardDraft());
+    expect(second.result.current.amount).toBe("");
+    expect(second.result.current.restoredFromDraft).toBe(false);
+    expect(window.localStorage.length).toBe(0);
   });
 });

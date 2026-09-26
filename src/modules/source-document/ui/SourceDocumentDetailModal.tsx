@@ -11,6 +11,7 @@ import type {
 import { memo, useCallback, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { DraftNotice } from "@/components/ui/draft-notice";
 import { ArrowLeft, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { SourceDocumentViewDetails } from "./SourceDocumentViewDetails";
@@ -124,7 +125,6 @@ function SourceDocumentDetailEditor({
   const tCommon = useTranslations("Common");
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [dateAdjustmentActive, setDateAdjustmentActive] = useState(false);
-  const [dateDraftDirty, setDateDraftDirty] = useState(false);
   // The narrow-viewport pane toggle lives here rather than in ViewDetails so
   // the footer's "view evidence" button can drive it.
   const [mobileView, setMobileView] = useState<"details" | "evidence">("details");
@@ -134,15 +134,12 @@ function SourceDocumentDetailEditor({
       (sourceDocument.text != null && sourceDocument.text.trim() !== ""));
   const discardDateDraft = useCallback(() => {
     setDateAdjustmentActive(false);
-    setDateDraftDirty(false);
   }, []);
   const { editor, selection, status, dialogs, actions } = useSourceDocumentDetailController({
     sourceDocument,
     ledgerEntries,
     open,
     isCancelling,
-    externalUnsaved: dateDraftDirty,
-    onDiscardExternalUnsaved: discardDateDraft,
     onClose,
     onReload,
     onSaveAll,
@@ -157,7 +154,7 @@ function SourceDocumentDetailEditor({
     tCommon,
   });
   const handleClose = () => {
-    if (!dateDraftDirty) discardDateDraft();
+    discardDateDraft();
     actions.handleClose();
   };
   // Selection takes over the entries card's header row instead of adding a bar
@@ -276,6 +273,15 @@ function SourceDocumentDetailEditor({
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:flex lg:flex-col lg:overflow-hidden">
             <div className="shrink-0">
+              {status.restoredDraft != null ? (
+                <div className="mb-3">
+                  <DraftNotice
+                    outdated={status.restoredDraft.outdated}
+                    disabled={status.busy}
+                    onDiscard={actions.handleDiscardDraft}
+                  />
+                </div>
+              ) : null}
               <SourceDocumentDetailStatusPanels
                 sourceDocument={sourceDocument}
                 loadError={loadError}
@@ -318,7 +324,6 @@ function SourceDocumentDetailEditor({
                   onMobileViewChange={setMobileView}
                   onDateAdjustmentStateChange={(active, dirty) => {
                     setDateAdjustmentActive(active || dirty);
-                    setDateDraftDirty(dirty);
                   }}
                   {...(selectionToolbar != null ? { selectionToolbar } : {})}
                 />
@@ -367,8 +372,8 @@ function SourceDocumentDetailEditor({
           setShowDeleteConfirm={dialogs.setShowDeleteConfirm}
           handleDeleteDocument={actions.handleDeleteDocument}
           saveAndContinueGate={dialogs.saveAndContinueGate}
-          unsavedGuard={dialogs.unsavedGuard}
-          handleDiscardAndClose={actions.handleDiscardAndClose}
+          discardEditsGate={dialogs.discardEditsGate}
+          handleConfirmDiscardEdits={actions.handleConfirmDiscardEdits}
         />
       </Dialog>
       <SourceDocumentDetailOverlays

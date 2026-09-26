@@ -14,8 +14,6 @@ export interface UseSourceDocumentDetailControllerOptions {
   ledgerEntries: LedgerEntry[];
   open: boolean;
   isCancelling: boolean;
-  externalUnsaved: boolean;
-  onDiscardExternalUnsaved: () => void;
   onClose: () => void;
   onReload?: (() => Promise<void>) | undefined;
   onSaveAll?:

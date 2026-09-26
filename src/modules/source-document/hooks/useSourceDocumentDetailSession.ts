@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
-import { ledgerDetailLeaveGuardKey } from "@/lib/navigation/ledger-detail-key";
+import { useConfirmGate } from "@/hooks/use-confirm-gate";
+import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
+import { useLedgerId } from "@/modules/ledger/hooks/useLedgerId";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import type { PendingChanges } from "@/modules/source-document/detail-types";
@@ -17,8 +18,6 @@ interface UseSourceDocumentDetailSessionOptions {
   ledgerEntries: LedgerEntry[];
   open: boolean;
   externalPending: boolean;
-  externalUnsaved: boolean;
-  onDiscardExternalUnsaved: () => void;
   onClose: () => void;
   onReload?: (() => Promise<void>) | undefined;
   onSaveAll?:
@@ -31,13 +30,27 @@ interface UseSourceDocumentDetailSessionOptions {
   t: ReturnType<typeof useTranslations>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** A stored edit is only trusted when every field is a plain value. */
+function parsePendingChanges(data: unknown): PendingChanges | null {
+  if (!isRecord(data) || !isRecord(data.sourceDoc) || !isRecord(data.entries)) return null;
+  const isValue = (value: unknown) =>
+    value === null || ["string", "number", "boolean"].includes(typeof value);
+  if (!Object.values(data.sourceDoc).every((value) => typeof value === "string")) return null;
+  for (const entry of Object.values(data.entries)) {
+    if (!isRecord(entry) || !Object.values(entry).every(isValue)) return null;
+  }
+  return data as unknown as PendingChanges;
+}
+
 export function useSourceDocumentDetailSession({
   sourceDocument,
   ledgerEntries,
   open,
   externalPending,
-  externalUnsaved,
-  onDiscardExternalUnsaved,
   onClose,
   onReload,
   onSaveAll,
@@ -46,11 +59,55 @@ export function useSourceDocumentDetailSession({
 }: UseSourceDocumentDetailSessionOptions) {
   const pending = usePendingChanges({ sourceDocument, ledgerEntries });
   const [isEditMode, setIsEditMode] = useState(false);
+  const ledgerId = useLedgerId();
+  const key =
+    ledgerId == null || sourceDocument == null
+      ? null
+      : draftKey(ledgerId, "source-document", sourceDocument.id);
+  // Unsaved edits outlive the sheet: closing it keeps them for this record, and
+  // the next opening restores them in edit mode against the version they were
+  // made on, so a changed record still refuses them as a conflict.
+  const [restoredKey, setRestoredKey] = useState<string | null>(null);
+  const [draftBaseVersion, setDraftBaseVersion] = useState<number | null>(null);
+  if (open && key != null && restoredKey !== key) {
+    setRestoredKey(key);
+    const draft = readDraft(key, parsePendingChanges);
+    const baseVersion = draft?.basis == null ? NaN : Number(draft.basis);
+    if (draft != null && Number.isInteger(baseVersion)) {
+      pending.restoreChanges(draft.data);
+      setDraftBaseVersion(baseVersion);
+      setIsEditMode(true);
+    }
+  }
   const revision = useSourceDocumentRevisionGuard({
     hasPendingChanges: pending.hasPendingChanges,
     isEditing: isEditMode,
     version: sourceDocument?.version,
+    restoredBaseVersion: draftBaseVersion,
   });
+  const draftOutdated =
+    pending.hasPendingChanges &&
+    draftBaseVersion != null &&
+    sourceDocument != null &&
+    draftBaseVersion !== sourceDocument.version;
+
+  useEffect(() => {
+    if (!open || key == null || restoredKey !== key) return;
+    if (!pending.hasPendingChanges) {
+      clearDraft(key);
+      return;
+    }
+    const baseVersion = revision.baseVersionRef.current ?? sourceDocument?.version;
+    writeDraft(key, pending.pendingChanges, baseVersion == null ? null : String(baseVersion));
+  }, [
+    key,
+    open,
+    pending.hasPendingChanges,
+    pending.pendingChanges,
+    restoredKey,
+    revision.baseVersionRef,
+    sourceDocument?.version,
+  ]);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -60,34 +117,29 @@ export function useSourceDocumentDetailSession({
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (!open) setIsEditMode(false);
+    if (!open) {
+      setIsEditMode(false);
+      setRestoredKey(null);
+      setDraftBaseVersion(null);
+      pending.resetChanges();
+    }
   }
 
   const busy =
     isSaving || isDeleting || isRetrying || isSplitting || isReloading || externalPending;
   const interactionDisabled = busy || sourceDocument == null;
-  const unsavedGuard = useUnsavedChangesGuard({
-    key: ledgerDetailLeaveGuardKey("source-document", sourceDocument?.id ?? ""),
-    hasUnsavedChanges: sourceDocument?.id != null && (pending.hasPendingChanges || externalUnsaved),
-  });
+  const discardEditsGate = useConfirmGate<() => void>();
 
   const handleRequestLeave = useCallback(
     (continueNavigation: () => void) => {
-      if (busy) return;
-      if (pending.hasPendingChanges || externalUnsaved) {
-        unsavedGuard.requestLeave(continueNavigation);
-      } else {
-        continueNavigation();
-      }
+      if (!busy) continueNavigation();
     },
-    [busy, externalUnsaved, pending.hasPendingChanges, unsavedGuard]
+    [busy]
   );
 
   const handleClose = useCallback(() => {
-    if (busy) return;
-    if (pending.hasPendingChanges || externalUnsaved) unsavedGuard.requestLeave(null);
-    else onClose();
-  }, [busy, externalUnsaved, onClose, pending.hasPendingChanges, unsavedGuard]);
+    if (!busy) onClose();
+  }, [busy, onClose]);
 
   const handleSaveAll = useCallback(async (): Promise<boolean> => {
     if (busy) return false;
@@ -104,6 +156,7 @@ export function useSourceDocumentDetailSession({
     try {
       const committed = () => {
         pending.discardAllChanges();
+        setDraftBaseVersion(null);
         setIsEditMode(false);
       };
       await onSaveAll(
@@ -137,6 +190,7 @@ export function useSourceDocumentDetailSession({
     try {
       await onReload();
       pending.discardAllChanges();
+      setDraftBaseVersion(null);
       clearSelection();
       return true;
     } catch {
@@ -154,24 +208,28 @@ export function useSourceDocumentDetailSession({
     if (busy) return;
     const cancel = () => {
       pending.discardAllChanges();
+      setDraftBaseVersion(null);
       setIsEditMode(false);
       void handleReload();
     };
-    if (pending.hasPendingChanges) unsavedGuard.requestLeave(cancel);
+    if (pending.hasPendingChanges) discardEditsGate.requestConfirmation(cancel);
     else cancel();
-  }, [busy, pending, unsavedGuard, handleReload]);
+  }, [busy, discardEditsGate, pending, handleReload]);
   const handleEditSave = useCallback(async () => {
     const saved = await handleSaveAll();
     if (saved) setIsEditMode(false);
     return saved;
   }, [handleSaveAll]);
-  const handleDiscardAndClose = useCallback(() => {
+  const handleConfirmDiscardEdits = useCallback(() => {
+    discardEditsGate.resolveConfirmation()?.();
+  }, [discardEditsGate]);
+  /** Drops a restored draft without leaving the sheet. */
+  const handleDiscardDraft = useCallback(() => {
+    if (busy) return;
     pending.discardAllChanges();
-    onDiscardExternalUnsaved();
-    const continueNavigation = unsavedGuard.resolveLeave();
-    if (continueNavigation != null) continueNavigation();
-    else onClose();
-  }, [onClose, onDiscardExternalUnsaved, pending, unsavedGuard]);
+    setDraftBaseVersion(null);
+    setIsEditMode(false);
+  }, [busy, pending]);
 
   return {
     pending,
@@ -190,7 +248,11 @@ export function useSourceDocumentDetailSession({
     setIsSplitting,
     isReloading,
     reloadError,
-    unsavedGuard,
+    discardEditsGate,
+    /** Set while the sheet shows edits restored from an earlier visit. */
+    restoredDraft:
+      draftBaseVersion != null && pending.hasPendingChanges ? { outdated: draftOutdated } : null,
+    handleDiscardDraft,
     handleClose,
     handleRequestLeave,
     handleSaveAll,
@@ -198,6 +260,6 @@ export function useSourceDocumentDetailSession({
     handleEnterEditMode,
     handleCancelEditMode,
     handleEditSave,
-    handleDiscardAndClose,
+    handleConfirmDiscardEdits,
   };
 }

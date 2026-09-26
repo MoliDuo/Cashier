@@ -1,7 +1,6 @@
 "use client";
 import type { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 interface SaveAndContinueGate {
   confirmOpen: boolean;
@@ -28,8 +27,8 @@ interface SourceDocumentDetailConfirmDialogsProps {
   setShowDeleteConfirm: (open: boolean) => void;
   handleDeleteDocument: (onCommitted?: () => void) => Promise<void>;
   saveAndContinueGate: SaveAndContinueGate;
-  unsavedGuard: ReturnType<typeof useUnsavedChangesGuard>;
-  handleDiscardAndClose: () => void;
+  discardEditsGate: { confirmOpen: boolean; setConfirmOpen: (open: boolean) => void };
+  handleConfirmDiscardEdits: () => void;
 }
 
 /** The six confirm/discard dialogs shared across the detail modal's edit, batch, and close flows. */
@@ -51,8 +50,8 @@ export function SourceDocumentDetailConfirmDialogs({
   setShowDeleteConfirm,
   handleDeleteDocument,
   saveAndContinueGate,
-  unsavedGuard,
-  handleDiscardAndClose,
+  discardEditsGate,
+  handleConfirmDiscardEdits,
 }: SourceDocumentDetailConfirmDialogsProps) {
   return (
     <>
@@ -117,11 +116,11 @@ export function SourceDocumentDetailConfirmDialogs({
       />
 
       <ConfirmDialog
-        open={unsavedGuard.confirmOpen}
-        onOpenChange={unsavedGuard.setConfirmOpen}
+        open={discardEditsGate.confirmOpen}
+        onOpenChange={discardEditsGate.setConfirmOpen}
         title={t("unsavedChanges")}
         description={t("unsavedChangesDesc")}
-        onConfirm={handleDiscardAndClose}
+        onConfirm={handleConfirmDiscardEdits}
         cancelLabel={tCommon("continueEditing")}
         confirmLabel={t("discardChanges")}
         variant="destructive"

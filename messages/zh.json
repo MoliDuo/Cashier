@@ -292,7 +292,9 @@
     "continueEditing": "继续编辑",
     "book": "分账",
     "bookChangeFailed": "保存分账失败。记录可能已被其他操作修改，或该分账已归档。",
-    "archivedBookOption": "{name}（已归档）"
+    "archivedBookOption": "{name}（已归档）",
+    "draftRestored": "有未保存的修改",
+    "draftOutdated": "草稿基于旧版本，保存前请核对"
   },
   "SourceDocumentInput": {
     "placeholder": "输入消费记录，例如：午饭 35 元… (支持粘贴图片)",
@@ -335,10 +337,7 @@
     "title": "编辑重试",
     "loadError": "无法加载原始凭证。",
     "reload": "重新加载",
-    "unsavedTitle": "放弃更改？",
-    "unsavedDescription": "重试草稿将会丢失。",
-    "continueEditing": "继续编辑",
-    "discardAndLeave": "放弃并离开"
+    "continueEditing": "继续编辑"
   },
   "SourceDocumentDetail": {
     "title": "账单详情",
