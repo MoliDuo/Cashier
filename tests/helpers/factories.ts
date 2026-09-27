@@ -8,6 +8,7 @@ export function createLedgerData(
     mainCurrency: string;
     collapseEntriesDefault: boolean;
     aiCustomPrompt: string;
+    timeZone: string;
     createdAt: Date;
     updatedAt: Date;
   }> = {}
@@ -19,6 +20,7 @@ export function createLedgerData(
     mainCurrency: "CNY",
     collapseEntriesDefault: false,
     aiCustomPrompt: "",
+    timeZone: "Asia/Shanghai",
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

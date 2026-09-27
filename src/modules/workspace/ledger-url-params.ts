@@ -1,6 +1,6 @@
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import { DECIMAL_STRING_PATTERN, normalize as normalizeDecimal } from "@/lib/money/decimal";
-import { isValidDateString } from "@/lib/date-utils";
+import { periodQuery } from "./period-url-params";
 
 /**
  * The filters 流水 and 明细 carry in their URLs. Each route owns its own query
@@ -72,11 +72,8 @@ export interface LedgerFilterParams {
 type SearchParamsLike = Pick<URLSearchParams, "get" | "toString">;
 type SearchParamsStringLike = Pick<URLSearchParams, "toString">;
 
-/** Every query key 流水 and 明细 read their filters from. */
+/** Every query key 流水 and 明细 read their filters from; the period has its own. */
 export const LEDGER_FILTER_KEYS = [
-  "period",
-  "startDate",
-  "endDate",
   "categoryId",
   "currency",
   "minAmount",
@@ -86,9 +83,6 @@ export const LEDGER_FILTER_KEYS = [
 ] as const;
 
 export interface LedgerUrlUpdate {
-  period?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
   categoryId?: string | null;
   currency?: string | null;
   minAmount?: string | null;
@@ -97,44 +91,14 @@ export interface LedgerUrlUpdate {
   search?: string | null;
 }
 
-/**
- * Drops a custom period that cannot be read — a missing or reversed bound — so
- * the page falls back to its default period instead of an empty one. Returns
- * null when the query is already canonical.
- */
-export function normalizeLedgerFilterSearchParams(
-  current: SearchParamsLike
-): URLSearchParams | null {
-  const params = createMutableSearchParams(current);
-  if (params.get("period") !== "custom") return null;
-  const start = params.get("startDate");
-  const end = params.get("endDate");
-  if (
-    start != null &&
-    end != null &&
-    isValidDateString(start) &&
-    isValidDateString(end) &&
-    start <= end
-  ) {
-    return null;
-  }
-  params.delete("period");
-  params.delete("startDate");
-  params.delete("endDate");
-  return params;
-}
-
-/** The 明细 query a drilldown lands on: a date range, and optionally a category or currency. */
+/** The 明细 query a drilldown lands on: two days, and optionally a category or currency. */
 export function buildDetailsDrilldownSearchParams(input: {
   startDate: string;
   endDate: string;
   categoryId?: string | null;
   currency?: string | null;
 }): URLSearchParams {
-  const params = new URLSearchParams();
-  params.set("period", "custom");
-  params.set("startDate", input.startDate);
-  params.set("endDate", input.endDate);
+  const params = periodQuery({ range: "custom", from: input.startDate, to: input.endDate });
   if (input.categoryId != null && input.categoryId !== "") {
     params.set("categoryId", input.categoryId);
   }
@@ -203,23 +167,6 @@ export function updateLedgerSearchParams(
   updates: LedgerUrlUpdate
 ): URLSearchParams {
   const params = createMutableSearchParams(searchParams);
-
-  if ("period" in updates) {
-    setOrDeleteStringParam(params, "period", updates.period);
-
-    if (updates.period !== "custom") {
-      params.delete("startDate");
-      params.delete("endDate");
-    }
-  }
-
-  if (
-    updates.period === "custom" ||
-    (!("period" in updates) && ("startDate" in updates || "endDate" in updates))
-  ) {
-    if ("startDate" in updates) setOrDeleteStringParam(params, "startDate", updates.startDate);
-    if ("endDate" in updates) setOrDeleteStringParam(params, "endDate", updates.endDate);
-  }
 
   if ("categoryId" in updates) setOrDeleteStringParam(params, "categoryId", updates.categoryId);
   if ("currency" in updates) setOrDeleteStringParam(params, "currency", updates.currency);

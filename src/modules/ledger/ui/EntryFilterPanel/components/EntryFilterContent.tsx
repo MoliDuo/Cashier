@@ -12,14 +12,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { DateFilter } from "@/components/ui/date-filter";
-import {
-  ENTRY_FILTER_PRESETS,
-  type EntryFilterPreset,
-} from "@/modules/ledger/entry-filter-presets";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import type { EntryFilters } from "@/modules/ledger/filters";
-import { dateRangeFilterCopy } from "@/copy/controls";
 import { settingsCopy } from "@/copy/settings";
 import { entryFilterPanelCopy } from "@/copy/workspace";
 
@@ -33,15 +27,11 @@ const STATUS_OPTIONS: SourceDocumentProcessingStatus[] = [
 interface EntryFilterContentProps {
   tempFilters: EntryFilters;
   setTempFilters: (updater: (prev: EntryFilters) => EntryFilters) => void;
-  displayPreset: EntryFilterPreset;
-  handleDatePreset: (preset: EntryFilterPreset) => void;
-  setTempFilterDate: (field: "startDate" | "endDate", date: Date | null) => void;
   handleApply: () => void;
   handleReset: () => void;
   toggleStatus: (status: SourceDocumentProcessingStatus) => void;
   categories: EntryCategory[];
   preferredCurrencies: string[];
-  timeZone?: string | undefined;
   showCategory: boolean;
   showCurrency: boolean;
   showStatus: boolean;
@@ -50,15 +40,11 @@ interface EntryFilterContentProps {
 export function EntryFilterContent({
   tempFilters,
   setTempFilters,
-  displayPreset,
-  handleDatePreset,
-  setTempFilterDate,
   handleApply,
   handleReset,
   toggleStatus,
   categories,
   preferredCurrencies,
-  timeZone,
   showCategory,
   showCurrency,
   showStatus,
@@ -75,19 +61,6 @@ export function EntryFilterContent({
         return entryFilterPanelCopy.statusCancelled;
     }
   };
-  const presetLabel = (preset: EntryFilterPreset) => {
-    switch (preset) {
-      case "thisMonth":
-        return dateRangeFilterCopy.thisMonth;
-      case "lastMonth":
-        return dateRangeFilterCopy.lastMonth;
-      case "all":
-        return dateRangeFilterCopy.all;
-      case "custom":
-        return dateRangeFilterCopy.customRange;
-    }
-  };
-
   // The footer stays put while the sections scroll, so the primary action is
   // never something the user has to scroll to find.
   return (
@@ -107,59 +80,6 @@ export function EntryFilterContent({
           placeholder={entryFilterPanelCopy.searchPlaceholder}
           aria-label={entryFilterPanelCopy.searchPlaceholder}
         />
-
-        <div className="space-y-2">
-          <div
-            className="flex gap-1 rounded-lg bg-surface2 p-1"
-            role="group"
-            aria-label={entryFilterPanelCopy.dateRange}
-          >
-            {ENTRY_FILTER_PRESETS.map((preset) => {
-              const isActive = displayPreset === preset;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  aria-pressed={isActive}
-                  className={cn(
-                    "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors duration-[var(--motion-feedback)]",
-                    isActive
-                      ? "bg-surface text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-text"
-                  )}
-                  onClick={() => handleDatePreset(preset)}
-                >
-                  {presetLabel(preset)}
-                </button>
-              );
-            })}
-          </div>
-          {/* The two fields only say something when the range is hand-picked;
-              while a preset is active they would restate the preset. */}
-          {displayPreset === "custom" ? (
-            <div className="flex items-center gap-2">
-              <DateFilter
-                {...(tempFilters.startDate != null ? { value: tempFilters.startDate } : {})}
-                onChange={(date) => setTempFilterDate("startDate", date)}
-                size="sm"
-                className="h-9 flex-1"
-                showClear={false}
-                ariaLabel={dateRangeFilterCopy.startDate}
-                {...(timeZone != null ? { timeZone } : {})}
-              />
-              <span className="text-sm text-muted-foreground">-</span>
-              <DateFilter
-                {...(tempFilters.endDate != null ? { value: tempFilters.endDate } : {})}
-                onChange={(date) => setTempFilterDate("endDate", date)}
-                size="sm"
-                className="h-9 flex-1"
-                showClear={false}
-                ariaLabel={dateRangeFilterCopy.endDate}
-                {...(timeZone != null ? { timeZone } : {})}
-              />
-            </div>
-          ) : null}
-        </div>
 
         {showCategory && (
           <Select

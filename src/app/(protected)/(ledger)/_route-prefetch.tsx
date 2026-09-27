@@ -3,9 +3,8 @@ import { HydrationBoundary, type DehydratedState } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
-import { readStatsSearchParams } from "@/modules/workspace/stats-url-params";
+import { readPeriodParams } from "@/modules/workspace/period-url-params";
 import {
   getLedgerRouteBootstrap,
   loadLedgerView,
@@ -49,13 +48,10 @@ export async function RoutePrefetch({
       tab,
       ledgerDto,
       scope: view,
+      period: readPeriodParams(params),
       ...(tab === "stream" || tab === "details"
-        ? {
-            periodParams: parsePeriodFromSearchParams(params),
-            advancedFilters: readLedgerFilterParams(params),
-          }
+        ? { advancedFilters: readLedgerFilterParams(params) }
         : {}),
-      ...(tab === "stats" ? { statsState: readStatsSearchParams(params) } : {}),
     });
   } catch (error) {
     logger.error(

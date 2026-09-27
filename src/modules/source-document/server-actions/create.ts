@@ -17,19 +17,16 @@ import { sourceDocumentFingerprint } from "@/modules/source-document/source-docu
  */
 export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
-    { ledgerId, userId },
+    { ledgerId, userId, ledger },
     input: CreateSourceDocumentInputContract,
     clientSubmissionId: string
   ): Promise<CreateSourceDocumentResponseDto> => {
     const validated = createSourceDocumentInputSchema.parse(input);
     const validatedClientSubmissionId = clientSubmissionIdSchema.parse(clientSubmissionId);
     const payload = omitUndefinedProperties(validated);
-    // The book is what owns the date zone: the record belongs to it, so a record
-    // filed into 哞哞的 is dated in that book's zone. The request's own zone is
-    // only a fallback for a book that has none — it is where the reader happened
-    // to be, not where the record belongs. Resolved before the write, never in it.
+    // Resolved before the write, never in it. The ledger's zone dates the
+    // record; where the reader happened to be does not.
     const book = await resolveRecordBook(ledgerId, validated.bookId);
-    const timezone = book.timeZone ?? payload.timezone;
     const result = await createAndQueueSourceDocument({
       ledgerId,
       bookId: book.id,
@@ -39,7 +36,7 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
         storedFileIds: payload.storedFileIds ?? [],
       },
       ...(payload.documentDate == null ? {} : { documentDate: payload.documentDate }),
-      ...(timezone == null ? {} : { timezone }),
+      timeZone: ledger.settings.timeZone,
       idempotency: {
         principalType: "user",
         principalId: userId,

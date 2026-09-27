@@ -1,5 +1,5 @@
 import "server-only";
-import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import { getCategoryName } from "@/modules/ledger/server/categories";
 import type { QuickEntryResponseDto } from "@/modules/source-document/contracts";
@@ -8,10 +8,10 @@ import { createManualDocument } from "./projections/writes";
 import type { LedgerSettings } from "@/modules/ledger/contracts";
 
 export interface CreateQuickEntryPayload {
-  /** The book the record is filed under; also decides its default date zone. */
+  /** The book the record is filed under. */
   bookId: string;
-  /** The zone the record dates by; null means the server's date decides. */
-  timeZone?: string | null;
+  /** The ledger's zone, which names the day a record without one gets. */
+  timeZone: string;
   categoryId: string;
   amount: string;
   currency?: string;
@@ -63,13 +63,9 @@ export async function createQuickEntry(
 ): Promise<QuickEntryResponseDto> {
   const mainCurrency = ledger.settings.mainCurrency;
   const entryCurrency = payload.currency ?? mainCurrency;
-  // An explicit entryDate wins; without one the payload's zone — the book's,
-  // falling back to the device that asked — dates the record, and a request
-  // with neither falls back to the server date.
-  const entryDate =
-    payload.entryDate ??
-    getDateInTimezone(payload.timeZone ?? undefined) ??
-    formatDateTimeForApi(new Date());
+  // An explicit entryDate wins; without one the record is dated today in the
+  // ledger's zone.
+  const entryDate = payload.entryDate ?? ledgerToday(payload.timeZone);
 
   const [categoryName] = await Promise.all([
     getCategoryName(ledgerId, payload.categoryId),

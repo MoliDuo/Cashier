@@ -8,14 +8,13 @@ import {
   batchDateImpactSummary,
   LedgerEntriesBatchActionToolbar,
 } from "@/modules/ledger/ui/batch-action-toolbar";
-import type { PeriodParams, PeriodPreset } from "@/lib/period-utils";
+import type { Period } from "@/modules/ledger/domain/period";
 import { cn } from "@/lib/utils";
 import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
-import type { ReactNode } from "react";
-import { usePeriodLabel } from "./usePeriodLabel";
+import { PeriodBar } from "./PeriodBar";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { commonCopy } from "@/copy/common";
@@ -46,13 +45,14 @@ interface LedgerEntriesToolbarProps {
   isDeleting?: boolean;
   isProcessing?: boolean;
   filters: EntryFilters;
-  onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
-  periodParams: PeriodParams;
+  onFiltersChange: (filters: EntryFilters) => void;
+  period: Period;
+  /** Today in the ledger's zone, which the period is counted from. */
+  today: string;
+  onPeriodChange: (period: Period) => void;
   mainCurrency: string;
   filteredTotal?: string;
   timeZone?: string;
-  readOnly?: boolean;
-  syncStatus?: ReactNode;
 }
 
 export function LedgerEntriesToolbar({
@@ -77,15 +77,14 @@ export function LedgerEntriesToolbar({
   isProcessing: externallyProcessing = false,
   filters,
   onFiltersChange,
-  periodParams,
+  period,
+  today,
+  onPeriodChange,
   mainCurrency,
   filteredTotal,
   timeZone,
-  readOnly = false,
-  syncStatus,
 }: LedgerEntriesToolbarProps) {
   const locale = DISPLAY_LOCALE;
-  const rangeLabel = usePeriodLabel(periodParams, timeZone);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
     () => getDateInTimezone(timeZone) ?? formatDateTimeForApi(new Date()) ?? ""
@@ -158,8 +157,6 @@ export function LedgerEntriesToolbar({
 
   return (
     <EntriesToolbarShell
-      syncStatus={syncStatus}
-      {...(!isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
       totalLabel={
         !isSelectionMode && filteredTotal !== undefined
           ? formatCurrencyAmount(filteredTotal, mainCurrency, locale)
@@ -170,22 +167,12 @@ export function LedgerEntriesToolbar({
         variant="ghost"
         size="icon"
         onClick={onToggleSelectionMode}
-        disabled={readOnly || isProcessing}
+        disabled={isProcessing}
         className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
         aria-label={
-          readOnly
-            ? commonCopy.readOnlyPreview
-            : isSelectionMode
-              ? ledgerEntriesTabCopy.cancelSelect
-              : ledgerEntriesTabCopy.select
+          isSelectionMode ? ledgerEntriesTabCopy.cancelSelect : ledgerEntriesTabCopy.select
         }
-        title={
-          readOnly
-            ? commonCopy.readOnlyPreview
-            : isSelectionMode
-              ? ledgerEntriesTabCopy.cancelSelect
-              : ledgerEntriesTabCopy.select
-        }
+        title={isSelectionMode ? ledgerEntriesTabCopy.cancelSelect : ledgerEntriesTabCopy.select}
       >
         {isSelectionMode ? (
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
@@ -211,15 +198,21 @@ export function LedgerEntriesToolbar({
       )}
 
       {!isSelectionMode && (
-        <EntryFilterPanel
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          periodParams={periodParams}
-          showCategory={false}
-          showCurrency={false}
-          className="w-auto"
-          {...(timeZone != null ? { timeZone } : {})}
-        />
+        <>
+          <PeriodBar
+            period={period}
+            today={today}
+            onChange={onPeriodChange}
+            {...(timeZone != null ? { timeZone } : {})}
+          />
+          <EntryFilterPanel
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            showCategory={false}
+            showCurrency={false}
+            className="w-auto"
+          />
+        </>
       )}
       <BatchDateDialog
         open={dateDialogOpen}

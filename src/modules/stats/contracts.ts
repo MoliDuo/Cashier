@@ -22,6 +22,8 @@ type EnhancedCategoryStatDto = {
 export type StatsComparisonMode = "same_period" | "full_period";
 
 export interface EnhancedStatsDto {
+  /** The days these figures cover, as the server resolved the period. */
+  range: { from: string; to: string };
   unconvertedCount: number;
   summary: {
     total: string;

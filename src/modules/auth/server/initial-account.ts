@@ -66,7 +66,6 @@ export async function createInitialAccount(
       bookNames.map((name, index) => ({
         ledgerId: ledger.id,
         name,
-        timeZone: null,
         sortOrder: index + 1,
       }))
     );

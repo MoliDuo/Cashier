@@ -29,6 +29,7 @@ import {
 } from "./evidence";
 import { loadAttemptProcessingContext } from "./context";
 import { getLedgerSettings } from "@/modules/ledger/server/settings";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import {
   ensureExchangeRates,
   formatExchangeRateDate,
@@ -159,7 +160,10 @@ export async function processAttempt(
     }
     return { processingStatus: "failed" };
   }
-  const { fallbackDate } = getEntryFallbackDate(attempt.requestedDate);
+  const { fallbackDate } = getEntryFallbackDate(
+    attempt.requestedDate,
+    ledgerToday(ledgerSettings?.timeZone ?? "UTC")
+  );
   const validEntries = output.ledgerEntries.filter(
     (entry) => compare(entry.amount, "0") > 0 || entry.isAdjustment === true
   );

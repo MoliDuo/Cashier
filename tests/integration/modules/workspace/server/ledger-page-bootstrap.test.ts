@@ -6,7 +6,7 @@ import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
 } from "tests/helpers/schema-setup";
-import { books, entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
+import { books, entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import {
   getLedgerRouteBootstrap,
   getLedgerShellBootstrap,
@@ -14,11 +14,9 @@ import {
 } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { resolveAuthenticatedHome } from "@/modules/workspace/server/resolve-authenticated-home";
-import { addPeriod, parseDateString } from "@/lib/date-utils";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import type { PeriodParams } from "@/lib/period-utils";
-import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
-import type { StatsUrlState } from "@/modules/workspace/stats-url-params";
+import type { Period } from "@/modules/ledger/domain/period";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 
 const request = vi.hoisted(() => ({
   cookies: {} as Record<string, string>,
@@ -49,13 +47,10 @@ vi.mock("@/modules/ledger/server/books", async (importOriginal) => {
 
 interface PageInput {
   tab: LedgerTab;
-  periodParams?: PeriodParams;
+  period?: Period;
   advancedFilters?: LedgerAdvancedFilters;
-  statsState?: StatsUrlState;
   /** The book the scope cookie names. */
   bookId?: string;
-  /** The zone the device cookie names; omitted for a first visit. */
-  deviceTimeZone?: string;
 }
 
 /**
@@ -63,10 +58,7 @@ interface PageInput {
  * first screen, composed the way the ledger layout and page compose them.
  */
 async function loadPage(input: PageInput) {
-  request.cookies = {
-    ...(input.bookId == null ? {} : { CASHIER_BOOK_SCOPE: input.bookId }),
-    ...(input.deviceTimeZone == null ? {} : { CASHIER_TIME_ZONE: input.deviceTimeZone }),
-  };
+  request.cookies = input.bookId == null ? {} : { CASHIER_BOOK_SCOPE: input.bookId };
   const view = await loadLedgerView();
   const { ledgerDto } = await resolveAuthenticatedHome();
   const [shell, route] = await Promise.all([
@@ -75,9 +67,8 @@ async function loadPage(input: PageInput) {
       tab: input.tab,
       ledgerDto,
       scope: view,
-      ...(input.periodParams === undefined ? {} : { periodParams: input.periodParams }),
+      ...(input.period === undefined ? {} : { period: input.period }),
       ...(input.advancedFilters === undefined ? {} : { advancedFilters: input.advancedFilters }),
-      ...(input.statsState === undefined ? {} : { statsState: input.statsState }),
     }),
   ]);
   return { view, shell, route };
@@ -136,8 +127,8 @@ describe("ledger page bootstrap", () => {
     return document!.id;
   }
 
-  async function setBookZone(id: string, timeZone: string | null) {
-    await getTestDb().update(books).set({ timeZone }).where(eq(books.id, id));
+  async function setLedgerZone(timeZone: string) {
+    await getTestDb().update(ledgers).set({ timeZone }).where(eq(ledgers.id, ledgerId));
   }
 
   beforeEach(async () => {
@@ -164,7 +155,7 @@ describe("ledger page bootstrap", () => {
   });
 
   it("dehydrates the ledger, its live books and its categories for the shell", async () => {
-    const { shell, view } = await loadPage({ tab: "stream", deviceTimeZone: "Asia/Shanghai" });
+    const { shell, view } = await loadPage({ tab: "stream" });
 
     expect(query(shell, "ledger")?.state.data).toMatchObject({ id: ledgerId });
     expect(
@@ -174,21 +165,19 @@ describe("ledger page bootstrap", () => {
       expect.objectContaining({ name: "吃喝" }),
     ]);
     expect(view.books).toHaveLength(2);
-    expect(shell.queries.some((candidate) => candidate.queryKey[0] === "ledgers")).toBe(false);
   });
 
-  it("prefetches the device's month of the stream, its total and the refresh baseline", async () => {
+  it("prefetches the ledger's month of the stream, its total and the refresh baseline", async () => {
     await seedDocument({ title: "October lunch", date: "2026-10-01", amounts: ["30.00"] });
     await seedDocument({ title: "September lunch", date: "2026-09-30", amounts: ["20.00"] });
 
-    // 16:30 UTC on the 30th is already October in Shanghai, where the
-    // deployment's UTC would still say September.
-    const { view, route } = await loadPage({ tab: "stream", deviceTimeZone: "Asia/Shanghai" });
+    // 16:30 UTC on the 30th is already October in Shanghai, the ledger's zone,
+    // where the deployment's UTC would still say September.
+    const { view, route } = await loadPage({ tab: "stream" });
 
     expect(view.ledgerToday).toBe("2026-10-01");
     expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
-      startDate: "2026-10-01",
-      endDate: "2026-10-31",
+      period: "month:0",
     });
     expect(streamTitles(route)).toEqual(["October lunch"]);
     expect(query(route, "ledger", "source-documents", "stream-total")?.state.data).toMatchObject({
@@ -202,14 +191,32 @@ describe("ledger page bootstrap", () => {
     expect(query(route, "ledger", "enhanced-stats")).toBeUndefined();
   });
 
+  it("dates every book by the ledger's one zone", async () => {
+    await setLedgerZone("Europe/London");
+    await seedDocument({ title: "Ours", date: "2026-09-20", amounts: ["10.00"] });
+    await seedDocument({
+      title: "Hers",
+      date: "2026-09-20",
+      amounts: ["10.00"],
+      book: otherBookId,
+    });
+
+    const { view, route } = await loadPage({ tab: "stream", bookId: otherBookId });
+
+    // London is still in September, so this month is September for every book.
+    expect(view.bookId).toBe(otherBookId);
+    expect(view.ledgerToday).toBe("2026-09-30");
+    expect(streamTitles(route)).toEqual(["Hers"]);
+  });
+
   it("applies the amount, status and search filters to the stream and its total", async () => {
+    await setLedgerZone("Europe/London");
     await seedDocument({ title: "coffee beans", date: "2026-09-10", amounts: ["50.00"] });
     await seedDocument({ title: "coffee cup", date: "2026-09-11", amounts: ["5.00"] });
     await seedDocument({ title: "tea", date: "2026-09-12", amounts: ["60.00"] });
 
     const { route } = await loadPage({
       tab: "stream",
-      deviceTimeZone: "Europe/London",
       advancedFilters: {
         minAmount: "20",
         maxAmount: "100",
@@ -224,66 +231,6 @@ describe("ledger page bootstrap", () => {
     });
   });
 
-  it("reads no dates at all when neither the book nor the request names a zone", async () => {
-    await seedDocument({ title: "September lunch", date: "2026-09-30", amounts: ["20.00"] });
-
-    for (const deviceTimeZone of [undefined, "Not/AZone"]) {
-      const { view, shell, route } = await loadPage({
-        tab: "stream",
-        ...(deviceTimeZone == null ? {} : { deviceTimeZone }),
-      });
-
-      // A first visit, or a cookie the runtime cannot format with: dating the
-      // prefetch by the deployment's zone could fetch a month the tab never
-      // asks for, so the dated reads are left to the client.
-      expect(view.ledgerToday).toBeUndefined();
-      expect(route.queries).toEqual([]);
-      expect(query(shell, "ledger", "books")).toBeDefined();
-      expect(query(shell, "ledger", "categories")).toBeDefined();
-    }
-  });
-
-  it("dates 总账 by the device and does not inherit a book's fixed zone", async () => {
-    await setBookZone(bookId, "Asia/Shanghai");
-
-    const { view, route } = await loadPage({ tab: "stream", deviceTimeZone: "Europe/London" });
-
-    expect(view.bookId).toBeNull();
-    expect(view.ledgerToday).toBe("2026-09-30");
-    expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
-      startDate: "2026-09-01",
-      endDate: "2026-09-30",
-    });
-  });
-
-  it("lets a viewed book's fixed zone beat the device zone across the month boundary", async () => {
-    await setBookZone(otherBookId, "Europe/London");
-    await seedDocument({ title: "Ours", date: "2026-09-20", amounts: ["10.00"] });
-    await seedDocument({
-      title: "Hers",
-      date: "2026-09-20",
-      amounts: ["10.00"],
-      book: otherBookId,
-    });
-
-    const { view, route } = await loadPage({
-      tab: "stream",
-      deviceTimeZone: "Asia/Shanghai",
-      bookId: otherBookId,
-    });
-
-    // Shanghai is already into October; the book the page is narrowed to is
-    // not, and the book is the authority for its own records.
-    expect(view.bookId).toBe(otherBookId);
-    expect(view.ledgerToday).toBe("2026-09-30");
-    expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
-      bookId: otherBookId,
-      startDate: "2026-09-01",
-      endDate: "2026-09-30",
-    });
-    expect(streamTitles(route)).toEqual(["Hers"]);
-  });
-
   it("prefetches the details summary and entries with the advanced filters", async () => {
     await seedDocument({
       title: "Groceries",
@@ -293,8 +240,7 @@ describe("ledger page bootstrap", () => {
 
     const { route } = await loadPage({
       tab: "details",
-      deviceTimeZone: "Europe/London",
-      periodParams: { period: "custom", startDate: "2026-09-01", endDate: "2026-09-30" },
+      period: { range: "custom", from: "2026-09-01", to: "2026-09-30" },
       advancedFilters: { minAmount: "20", maxAmount: "100" },
     });
 
@@ -306,29 +252,16 @@ describe("ledger page bootstrap", () => {
   });
 
   it("prefetches stats under the key the stats tab asks for, for the remembered book", async () => {
-    const { view, route } = await loadPage({
-      tab: "stats",
-      deviceTimeZone: "Europe/London",
-      bookId,
-      statsState: { range: "year", offset: -2, view: "trend" },
-    });
+    const period: Period = { range: "year", offset: -2 };
+    const { view, route } = await loadPage({ tab: "stats", bookId, period });
 
-    const expected = buildStatsQueryDescriptor({
-      bookId,
-      currentDate: addPeriod(parseDateString("2026-09-30"), "year", -2),
-      mainCurrency: "CNY",
-      rangeType: "year",
-      currentPeriod: false,
-    });
+    const expected = buildStatsQueryDescriptor({ bookId, period, mainCurrency: "CNY" });
     const stats = query(route, "ledger", "enhanced-stats");
     expect(view.bookId).toBe(bookId);
     expect(stats?.queryKey).toEqual(expected.queryKey);
-    expect(stats?.queryKey[2]).toMatchObject({
-      bookId,
-      rangeType: "year",
-      startDate: "2024-01-01",
-    });
     expect(stats?.state.status).toBe("success");
+    // Two years before 2026-10-01 in Shanghai.
+    expect(stats?.state.data).toMatchObject({ range: { from: "2024-01-01", to: "2024-12-31" } });
   });
 
   it("prefetches 总账 when the remembered book is no longer live", async () => {
@@ -337,11 +270,7 @@ describe("ledger page bootstrap", () => {
       .set({ archivedAt: new Date() })
       .where(eq(books.id, otherBookId));
 
-    const { view, route } = await loadPage({
-      tab: "stats",
-      deviceTimeZone: "Europe/London",
-      bookId: otherBookId,
-    });
+    const { view, route } = await loadPage({ tab: "stats", bookId: otherBookId });
 
     expect(view.bookId).toBeNull();
     expect(query(route, "ledger", "enhanced-stats")?.queryKey[2]).toMatchObject({ bookId: null });
@@ -354,21 +283,18 @@ describe("ledger page bootstrap", () => {
     expect(route.queries[0]?.state.status).toBe("success");
   });
 
-  it("keeps the remembered book and leaves dated reads to the client when the books fail", async () => {
+  it("keeps the remembered book when the books fail", async () => {
     request.failBooks = true;
 
-    const { view, shell, route } = await loadPage({
-      tab: "stream",
-      deviceTimeZone: "Europe/London",
-      bookId: otherBookId,
-    });
+    const { view, shell, route } = await loadPage({ tab: "stream", bookId: otherBookId });
 
     // A list that failed is not evidence the book is gone; losing it would
     // quietly reset the reader to 总账.
     expect(view.bookId).toBe(otherBookId);
     expect(view.books).toBeNull();
-    expect(view.ledgerToday).toBeUndefined();
-    expect(route.queries).toEqual([]);
+    expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
+      bookId: otherBookId,
+    });
     expect(query(shell, "ledger", "books")).toBeUndefined();
     expect(query(shell, "ledger", "categories")).toBeDefined();
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -26,13 +26,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { queryKeys } from "@/lib/query-keys";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import {
@@ -51,25 +44,6 @@ import type { BookDto } from "@/modules/ledger/contracts";
 import { ledgerQueryErrorCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
 import { settingsBooksCopy } from "@/copy/settings";
-
-/**
- * The zones the picker offers — a short list rather than every IANA name, and
- * 自动 covers "wherever this device is". A book's zone dates the uploads that
- * arrive through its own API keys.
- */
-const TIME_ZONES = [
-  "Asia/Shanghai",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Europe/London",
-  "Europe/Paris",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "Australia/Sydney",
-  "UTC",
-] as const;
 
 const BOOK_ERROR_KEYS = {
   name_taken: "nameTaken",
@@ -93,12 +67,11 @@ interface BookSettingsProps {
 }
 
 /**
- * 分账: reorder, add, rename, archive, restore, delete and set a zone. The
+ * 分账: reorder, add, rename, archive, restore and delete. The
  * order here is the order of the pull-down switcher, and the archived books are
  * listed apart from the live ones because they are no longer part of it.
  */
 export function BookSettings({ initialBooks }: BookSettingsProps) {
-  const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null);
   const { books, booksQuery } = useBooks({
     ...(initialBooks !== undefined ? { initialBooks } : {}),
     includeArchived: true,
@@ -132,15 +105,12 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
     if (successMessage != null) toast.success(successMessage);
   };
   const createBook = useMutation({
-    mutationFn: (input: { name: string; timeZone: string | null }) => createBookAction(input),
+    mutationFn: (input: { name: string }) => createBookAction(input),
     onSuccess: (result) => writeBooks(result),
   });
   const updateBook = useMutation({
-    mutationFn: (input: { bookId: string; name?: string; timeZone?: string | null }) =>
-      updateBookAction(input.bookId, {
-        ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
-      }),
+    mutationFn: (input: { bookId: string; name: string }) =>
+      updateBookAction(input.bookId, { name: input.name }),
     onSuccess: (result) => writeBooks(result),
   });
   const reorderBooks = useMutation({
@@ -159,17 +129,6 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
     mutationFn: (bookId: string) => deleteBookAction(bookId),
     onSuccess: (result) => writeBooks(result, settingsBooksCopy.deleted),
   });
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        setDeviceTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || null);
-      } catch {
-        setDeviceTimeZone(null);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const all = books ?? [];
   const list = all.filter((book) => book.archivedAt == null);
@@ -211,7 +170,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
 
   /**
    * A name is one field of a book that already exists, so it is written the
-   * moment it is committed, the way the zone and the order above already are.
+   * moment it is committed, the way the order above already is.
    * A refusal — a taken name, a name the server trims to nothing — is a toast
    * from the mutation, and the row stays open on the rejected draft so it can
    * be corrected instead of retyped.
@@ -223,23 +182,6 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
       return;
     }
     updateBook.mutate({ bookId: book.id, name }, { onSuccess: cancelRename });
-  };
-
-  // 自动 resolves to the device on this screen, so the reader sees which zone a
-  // null book actually means before saving anything.
-  const deviceZoneOption = deviceTimeZone ?? settingsBooksCopy.timeZoneAuto;
-
-  /**
-   * A zone that the migration carried over from the old per-person column can be
-   * any IANA name, not one of the eleven offered here. Without the extra option
-   * the picker would render the empty placeholder and silently invite the reader
-   * to overwrite a zone they never chose.
-   */
-  const zoneOptionsFor = (book: BookDto) => {
-    const zone = book.timeZone;
-    return zone != null && !(TIME_ZONES as readonly string[]).includes(zone)
-      ? [zone, ...TIME_ZONES]
-      : TIME_ZONES;
   };
 
   return (
@@ -330,9 +272,6 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                     ) : (
                       <span className="truncate text-sm font-medium text-text">{book.name}</span>
                     )}
-                    <p className="mt-0.5 text-micro text-muted-foreground">
-                      {book.timeZone ?? deviceZoneOption}
-                    </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     {renaming ? (
@@ -420,32 +359,6 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                       </>
                     )}
                   </div>
-                  <div className="w-full sm:w-56">
-                    <Select
-                      value={book.timeZone ?? "auto"}
-                      onValueChange={(value) =>
-                        updateBook.mutate({
-                          bookId: book.id,
-                          timeZone: value === "auto" ? null : value,
-                        })
-                      }
-                      disabled={busy}
-                    >
-                      <SelectTrigger aria-label={settingsBooksCopy.timeZone} className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectItem value="auto">
-                          {settingsBooksCopy.timeZoneAutoDetected({ timeZone: deviceZoneOption })}
-                        </SelectItem>
-                        {zoneOptionsFor(book).map((timeZone) => (
-                          <SelectItem key={timeZone} value={timeZone}>
-                            {timeZone}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </li>
               );
             })}
@@ -467,9 +380,6 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                       {settingsBooksCopy.archivedBadge}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-micro text-muted-foreground">
-                    {book.timeZone ?? deviceZoneOption}
-                  </p>
                 </div>
                 <Button
                   type="button"
@@ -517,7 +427,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
               disabled={newName.trim() === "" || createBook.isPending}
               onClick={() =>
                 createBook.mutate(
-                  { name: newName.trim(), timeZone: null },
+                  { name: newName.trim() },
                   { onSuccess: () => setIsAddOpen(false) }
                 )
               }

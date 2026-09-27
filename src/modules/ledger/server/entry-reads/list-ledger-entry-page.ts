@@ -131,6 +131,7 @@ export async function listLedgerEntryPage({
                       ledgerId: true,
                       title: true,
                       documentDate: true,
+                      effectiveDate: true,
                       createdAt: true,
                       updatedAt: true,
                     },

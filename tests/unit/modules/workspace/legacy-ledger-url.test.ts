@@ -17,7 +17,7 @@ describe("legacyLedgerHref", () => {
       href(
         "tab=details&detailsPeriod=custom&detailsStartDate=2026-01-01&detailsEndDate=2026-01-31&detailsCategoryId=c1&streamSearch=coffee"
       )
-    ).toBe("/details?period=custom&startDate=2026-01-01&endDate=2026-01-31&categoryId=c1");
+    ).toBe("/details?categoryId=c1&period=custom&startDate=2026-01-01&endDate=2026-01-31");
     expect(href("tab=stream&streamSearch=coffee&streamStatuses=failed")).toBe(
       "/stream?statuses=failed&search=coffee"
     );

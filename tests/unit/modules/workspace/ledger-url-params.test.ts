@@ -4,26 +4,15 @@ import {
   parseStatusesParam,
   formatStatusesParam,
   buildDetailsDrilldownSearchParams,
-  normalizeLedgerFilterSearchParams,
   readLedgerFilterParams,
   updateLedgerSearchParams,
 } from "@/modules/workspace/ledger-url-params";
 import { pushLedgerUrl, replaceLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
+import { normalizePeriodSearchParams } from "@/modules/workspace/period-url-params";
 
 describe("ledger-url-params", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("clears startDate and endDate when switching to non-custom period", () => {
-    const params = updateLedgerSearchParams(
-      new URLSearchParams("period=custom&startDate=2024-01-01&endDate=2024-01-31"),
-      { period: "week" }
-    );
-
-    expect(params.get("period")).toBe("week");
-    expect(params.get("startDate")).toBeNull();
-    expect(params.get("endDate")).toBeNull();
   });
 
   it("treats __uncategorized__ as a real category filter while clearing empty params", () => {
@@ -137,25 +126,6 @@ describe("ledger-url-params", () => {
     expect(pushState).not.toHaveBeenCalled();
   });
 
-  it("drops a custom period with a missing or reversed bound", () => {
-    expect(
-      normalizeLedgerFilterSearchParams(
-        new URLSearchParams("period=custom&startDate=2026-02-01&categoryId=c1")
-      )?.toString()
-    ).toBe("categoryId=c1");
-    expect(
-      normalizeLedgerFilterSearchParams(
-        new URLSearchParams("period=custom&startDate=2026-02-02&endDate=2026-02-01")
-      )?.toString()
-    ).toBe("");
-    expect(
-      normalizeLedgerFilterSearchParams(
-        new URLSearchParams("period=custom&startDate=2026-02-01&endDate=2026-02-02")
-      )
-    ).toBeNull();
-    expect(normalizeLedgerFilterSearchParams(new URLSearchParams("period=week"))).toBeNull();
-  });
-
   it("builds a drilldown query from nothing but the range and what was pressed", () => {
     expect(
       buildDetailsDrilldownSearchParams({
@@ -164,7 +134,7 @@ describe("ledger-url-params", () => {
         categoryId: "c1",
         currency: null,
       }).toString()
-    ).toBe("period=custom&startDate=2026-02-01&endDate=2026-02-28&categoryId=c1");
+    ).toBe("range=custom&from=2026-02-01&to=2026-02-28&categoryId=c1");
   });
 
   describe("parseStatusesParam", () => {
@@ -223,26 +193,20 @@ describe("ledger-url-params", () => {
 
     it("preserves existing statuses when not in updates", () => {
       const params = updateLedgerSearchParams(new URLSearchParams("statuses=processing,failed"), {
-        period: "all",
+        search: "tea",
       });
 
       expect(params.get("statuses")).toBe("processing,failed");
     });
 
     it("sets statuses together with other params in one update", () => {
-      const params = updateLedgerSearchParams(
-        new URLSearchParams("period=thisMonth&minAmount=10"),
-        {
-          period: "all",
-          minAmount: null,
-          maxAmount: null,
-          statuses: ["cancelled", "failed", "failed"],
-        }
-      );
+      const params = updateLedgerSearchParams(new URLSearchParams("range=all&minAmount=10"), {
+        minAmount: null,
+        maxAmount: null,
+        statuses: ["cancelled", "failed", "failed"],
+      });
 
-      expect(params.get("period")).toBe("all");
-      expect(params.get("startDate")).toBeNull();
-      expect(params.get("endDate")).toBeNull();
+      expect(params.get("range")).toBe("all");
       expect(params.get("minAmount")).toBeNull();
       expect(params.get("maxAmount")).toBeNull();
       expect(params.get("statuses")).toBe("failed,cancelled");
@@ -269,7 +233,7 @@ describe("ledger-url-params", () => {
       // parameter is read as 总账 and the parameter is not even cleaned up.
       expect(readLedgerFilterParams(new URLSearchParams("bookId=nonsense"))).toBeDefined();
       expect(
-        normalizeLedgerFilterSearchParams(new URLSearchParams(`bookId=${"1".repeat(36)}`))
+        normalizePeriodSearchParams(new URLSearchParams(`bookId=${"1".repeat(36)}`))
       ).toBeNull();
     });
   });

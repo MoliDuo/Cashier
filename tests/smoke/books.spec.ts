@@ -135,11 +135,13 @@ test("@demo manages books and the book each API key writes to", async ({ page })
     .getByRole("button", { name: "设置", exact: true })
     .click();
 
-  // 分账 section: the three seeded books, each with its zone. 总账 is a view
-  // over all of them, so nothing here marks a default any more.
+  // 分账 section: the three seeded books. 总账 is a view over all of them, so
+  // nothing here marks a default any more, and the ledger has one zone for all.
   await expect(page.getByRole("heading", { name: "分账", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "上移 梁梁", exact: true })).toBeVisible();
-  await expect(page.getByText("Asia/Shanghai", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "时区", exact: true })).toHaveText(
+    "Asia/Shanghai"
+  );
   await expect(bookRow(page, "共同支出").getByText("合计", { exact: true })).toHaveCount(0);
   // The former 总账 default is an ordinary book: nothing stops retiring it
   // (it is not clicked, the demo workspace is shared).

@@ -32,6 +32,7 @@ function card(
     failureKind: null,
     failureMessage: null,
     documentDate: "2026-07-15",
+    effectiveDate: "2026-07-15",
     createdAt: "2026-07-15T00:00:00.000Z",
     updatedAt: "2026-07-15T00:00:00.000Z",
     hasImages: false,
@@ -46,7 +47,6 @@ function groupsOf(ids: string[]): UnifiedStreamGroup[] {
   return [
     {
       date: "2026-07-15",
-      dateProvenance: "transaction",
       total: "0",
       unconvertedCount: 0,
       currencyTotals: {},
@@ -54,7 +54,6 @@ function groupsOf(ids: string[]): UnifiedStreamGroup[] {
         sourceDocument: card(id),
         ledgerEntries: [],
         effectiveDate: "2026-07-15",
-        dateProvenance: "transaction",
       })),
     },
   ];

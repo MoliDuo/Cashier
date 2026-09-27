@@ -46,7 +46,6 @@ afterEach(() => {
 function largeGroup(count: number): UnifiedStreamGroup {
   return {
     date: "2026-07-15",
-    dateProvenance: "transaction",
     total: "0",
     unconvertedCount: 0,
     currencyTotals: {},
@@ -60,7 +59,6 @@ function largeGroup(count: number): UnifiedStreamGroup {
       },
       ledgerEntries: [],
       effectiveDate: "2026-07-15",
-      dateProvenance: "transaction" as const,
     })),
   } as unknown as UnifiedStreamGroup;
 }
@@ -70,7 +68,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
     cardProps.mockClear();
     const group: UnifiedStreamGroup = {
       date: "2026-07-15",
-      dateProvenance: "transaction",
       total: "12",
       unconvertedCount: 0,
       currencyTotals: {},
@@ -84,7 +81,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
           } as any,
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
-          dateProvenance: "transaction",
         },
       ],
     };
@@ -108,7 +104,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
   it("renders the date alone for a submission-date group", () => {
     const group = {
       date: "2026-07-15",
-      dateProvenance: "submitted" as const,
       total: "0",
       unconvertedCount: 0,
       currencyTotals: {},
@@ -117,7 +112,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
           sourceDocument: { id: "document-1", ledgerId: "ledger-1", status: "processing" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
-          dateProvenance: "submitted" as const,
         },
       ],
     } as unknown as UnifiedStreamGroup;
@@ -142,7 +136,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
   it("passes the ledger collapse preference to cards", () => {
     const group = {
       date: "2026-07-15",
-      dateProvenance: "transaction" as const,
       total: "0",
       unconvertedCount: 0,
       currencyTotals: {},
@@ -151,7 +144,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
           sourceDocument: { id: "document-1", status: "completed" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
-          dateProvenance: "transaction" as const,
         },
       ],
     } as unknown as UnifiedStreamGroup;
@@ -174,7 +166,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
   it("disables only unselected stream cards at the selection limit", () => {
     const group = {
       date: "2026-07-15",
-      dateProvenance: "transaction" as const,
       total: "0",
       unconvertedCount: 0,
       currencyTotals: {},
@@ -183,13 +174,11 @@ describe("LedgerEntriesUnifiedGroups", () => {
           sourceDocument: { id: "document-1", ledgerId: "ledger-1", status: "completed" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
-          dateProvenance: "transaction" as const,
         },
         {
           sourceDocument: { id: "document-2", ledgerId: "ledger-1", status: "completed" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
-          dateProvenance: "transaction" as const,
         },
       ],
     } as unknown as UnifiedStreamGroup;
@@ -221,18 +210,15 @@ describe("LedgerEntriesUnifiedGroups", () => {
       sourceDocument: { id: "document-1", ledgerId: "ledger-1", status: "completed" },
       ledgerEntries: [],
       effectiveDate: "2026-07-15",
-      dateProvenance: "transaction" as const,
     };
     const secondItem = {
       sourceDocument: { id: "document-2", ledgerId: "ledger-1", status: "completed" },
       ledgerEntries: [],
       effectiveDate: "2026-07-15",
-      dateProvenance: "transaction" as const,
     };
     const groups = [
       {
         date: "2026-07-15",
-        dateProvenance: "transaction" as const,
         total: "0",
         unconvertedCount: 0,
         currencyTotals: {},
@@ -282,7 +268,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
     const groups = [
       {
         date: "2026-07-15",
-        dateProvenance: "transaction" as const,
         total: "0",
         unconvertedCount: 0,
         currencyTotals: {},
@@ -296,7 +281,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
             },
             ledgerEntries: [],
             effectiveDate: "2026-07-15",
-            dateProvenance: "transaction" as const,
           },
           {
             sourceDocument: {
@@ -307,7 +291,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
             },
             ledgerEntries: [],
             effectiveDate: "2026-07-15",
-            dateProvenance: "transaction" as const,
           },
         ],
       },

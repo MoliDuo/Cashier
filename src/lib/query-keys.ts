@@ -36,25 +36,11 @@ export const queryKeys = {
   book: (bookId: string) => ["ledger", "book", bookId] as const,
 
   // === Source Documents ===
-  sourceDocumentStream: (filters?: {
-    bookId?: string | null | undefined;
-    startDate?: string | null | undefined;
-    endDate?: string | null | undefined;
-    minAmount?: string | null | undefined;
-    maxAmount?: string | null | undefined;
-    statuses?: string | null | undefined;
-    search?: string | null | undefined;
-  }) => ["ledger", "source-documents", "stream", normalizeQueryParams(filters)] as const,
+  sourceDocumentStream: (filters?: StreamKeyFilters) =>
+    ["ledger", "source-documents", "stream", normalizeQueryParams(filters)] as const,
   sourceDocumentStreamPrefix: () => ["ledger", "source-documents", "stream"] as const,
-  sourceDocumentStreamTotal: (filters?: {
-    bookId?: string | null | undefined;
-    startDate?: string | null | undefined;
-    endDate?: string | null | undefined;
-    minAmount?: string | null | undefined;
-    maxAmount?: string | null | undefined;
-    statuses?: string | null | undefined;
-    search?: string | null | undefined;
-  }) => ["ledger", "source-documents", "stream-total", normalizeQueryParams(filters)] as const,
+  sourceDocumentStreamTotal: (filters?: StreamKeyFilters) =>
+    ["ledger", "source-documents", "stream-total", normalizeQueryParams(filters)] as const,
   sourceDocumentStreamTotalPrefix: () => ["ledger", "source-documents", "stream-total"] as const,
   sourceDocument: (documentId: string) =>
     ["ledger", "source-document", documentId, "detail"] as const,
@@ -75,12 +61,8 @@ export const queryKeys = {
   summaryPrefix: () => ["ledger", "summary"] as const,
   enhancedStats: (params?: {
     bookId?: string | null | undefined;
-    startDate?: string | null | undefined;
-    endDate?: string | null | undefined;
-    compareStartDate?: string | null | undefined;
-    compareEndDate?: string | null | undefined;
-    rangeType?: string | null | undefined;
-    comparisonMode?: string | null | undefined;
+    /** The period's key: its days are resolved by the server, not named here. */
+    period?: string | null | undefined;
     mainCurrency?: string | null | undefined;
   }) => ["ledger", "enhanced-stats", normalizeQueryParams(params)] as const,
   enhancedStatsPrefix: () => ["ledger", "enhanced-stats"] as const,
@@ -91,6 +73,18 @@ export const queryKeys = {
 } as const;
 
 type QueryKeyParams = Readonly<Record<string, unknown>>;
+
+type StreamKeyFilters = {
+  bookId?: string | null | undefined;
+  /** The period's key: its days are resolved by the server, not named here. */
+  period?: string | null | undefined;
+  categoryId?: string | null | undefined;
+  currency?: string | null | undefined;
+  minAmount?: string | null | undefined;
+  maxAmount?: string | null | undefined;
+  statuses?: string | null | undefined;
+  search?: string | null | undefined;
+};
 
 function normalizeQueryParams(params?: QueryKeyParams | null): Readonly<Record<string, unknown>> {
   if (params == null) return {};

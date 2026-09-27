@@ -6,6 +6,8 @@ export interface LedgerSettings {
   mainCurrency: string;
   collapseEntriesDefault: boolean;
   aiCustomPrompt: string;
+  /** The IANA zone every day in the ledger is read in. */
+  timeZone: string;
 }
 
 export type LedgerDto = {
@@ -26,7 +28,6 @@ export type BookDto = {
   id: string;
   ledgerId: string;
   name: string;
-  timeZone: string | null;
   sortOrder: number;
   /** Set while the book is retired; the switcher hides those rows. */
   archivedAt: string | null;
@@ -175,6 +176,8 @@ export type SourceDocumentReferenceDto = {
   ledgerId: string;
   title: string | null;
   documentDate: string | null;
+  /** The day the record counts on, as the server keeps it. */
+  effectiveDate: string;
   createdAt: string;
   updatedAt: string;
   hasImages?: boolean;

@@ -2,12 +2,19 @@
 
 import { toast } from "sonner";
 import type { EntryFilters } from "@/modules/ledger/filters";
+import type { CivilRange } from "@/modules/ledger/domain/period";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import { openLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { quickEntryFormCopy, sourceDocumentInputCopy } from "@/copy/source-document";
 
 export type NewRecordInputMode = "ai" | "quick";
+
+/** What 流水 is showing: its filters, and the days its period covers (null for all). */
+export interface CommittedView {
+  filters: EntryFilters;
+  range: CivilRange | null;
+}
 
 interface SavedBook {
   id: string;
@@ -18,7 +25,7 @@ interface ShowNewRecordSuccessFeedbackOptions {
   mode: NewRecordInputMode;
   result: CreatedRecordResult;
   activeTab: LedgerTab;
-  committedFilters: EntryFilters;
+  committedView: CommittedView;
   /** The book being viewed, or null for 总账. */
   viewedBookId: string | null;
   /** The book the record went into, when it is known. */
@@ -42,10 +49,11 @@ export function shouldWarnNewRecordSavedToOtherBook(
 
 export function shouldWarnNewRecordMayBeHidden(
   activeTab: LedgerTab,
-  committedFilters: EntryFilters,
+  committedView: CommittedView,
   entryDate: string
 ): boolean {
   if (activeTab !== "stream") return true;
+  const committedFilters = committedView.filters;
 
   if (
     (committedFilters.search != null && committedFilters.search !== "") ||
@@ -59,21 +67,15 @@ export function shouldWarnNewRecordMayBeHidden(
   }
 
   const submittedDate = dateOnly(entryDate);
-  if (committedFilters.startDate != null && submittedDate < dateOnly(committedFilters.startDate)) {
-    return true;
-  }
-  if (committedFilters.endDate != null && submittedDate > dateOnly(committedFilters.endDate)) {
-    return true;
-  }
-
-  return false;
+  const range = committedView.range;
+  return range != null && (submittedDate < range.from || submittedDate > range.to);
 }
 
 export function showNewRecordSuccessFeedback({
   mode,
   result,
   activeTab,
-  committedFilters,
+  committedView,
   viewedBookId,
   savedBook,
 }: ShowNewRecordSuccessFeedbackOptions): void {
@@ -91,7 +93,7 @@ export function showNewRecordSuccessFeedback({
     return;
   }
 
-  if (shouldWarnNewRecordMayBeHidden(activeTab, committedFilters, result.documentDate)) {
+  if (shouldWarnNewRecordMayBeHidden(activeTab, committedView, result.documentDate)) {
     toast.success(sourceDocumentInputCopy.savedMayBeHidden, {
       action: {
         label: sourceDocumentInputCopy.viewRecord,

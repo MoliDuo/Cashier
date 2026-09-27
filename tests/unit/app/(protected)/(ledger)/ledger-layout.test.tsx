@@ -84,9 +84,7 @@ const view = {
   books: [],
   categories: Promise.resolve([]),
   rememberedBookId: BOOK_B,
-  deviceTimeZone: "Europe/London",
   bookId: BOOK_B,
-  fixedTimeZone: "Europe/London",
   ledgerToday: "2026-09-26",
 };
 
@@ -104,13 +102,10 @@ describe("ledger layout", () => {
     expect(find(tree, WorkspaceStoreProvider).props.initialBookId).toBe(BOOK_B);
   });
 
-  it("hands the workspace the device zone and today's date", async () => {
+  it("hands the workspace today in the ledger's zone", async () => {
     const data = await renderShellData(await LedgerLayout({ children: null }));
 
-    expect(find(data, LedgerWorkspace).props).toMatchObject({
-      initialDeviceTimeZone: "Europe/London",
-      ledgerToday: "2026-09-26",
-    });
+    expect(find(data, LedgerWorkspace).props).toMatchObject({ ledgerToday: "2026-09-26" });
   });
 
   it("still renders the workspace when the shell bootstrap fails", async () => {
@@ -168,7 +163,7 @@ describe("RoutePrefetch", () => {
       expect.objectContaining({
         tab: "details",
         scope: expect.objectContaining({ bookId: BOOK_B, ledgerToday: "2026-09-26" }),
-        periodParams: { period: "lastMonth" },
+        period: { range: "month", offset: -1 },
         advancedFilters: expect.objectContaining({ categoryId: "c1", search: "tea" }),
       })
     );
@@ -182,7 +177,7 @@ describe("RoutePrefetch", () => {
     });
 
     expect(getLedgerRouteBootstrapMock).toHaveBeenCalledWith(
-      expect.objectContaining({ statsState: { range: "year", offset: -1, view: "heatmap" } })
+      expect.objectContaining({ period: { range: "year", offset: -1 } })
     );
   });
 

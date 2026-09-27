@@ -25,6 +25,11 @@ interface SourceDocumentSummaryDto {
   failureKind: AttemptFailureKind | null;
   failureMessage: string | null;
   documentDate: string | null;
+  /**
+   * The day the record counts on, as the server keeps it: its own date, or its
+   * creation day. Lists group by it, so no client has to work it out.
+   */
+  effectiveDate: string;
   createdAt: string;
   updatedAt: string;
   supportedActions: SupportedSourceDocumentAction[];

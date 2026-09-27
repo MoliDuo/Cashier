@@ -3,10 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
 
-vi.mock("@/components/ui/date-filter", () => ({
-  DateFilter: () => <button type="button">date</button>,
-}));
-
 // The panel is one dialog at every width, so nothing inside it exists until the
 // trigger opens it — the same way it works in the app.
 async function openPanel() {
@@ -15,40 +11,41 @@ async function openPanel() {
 }
 
 describe("EntryFilterPanel", () => {
-  it("counts narrowing filters but not the period", () => {
+  it("counts the filters that narrow the list", () => {
     const view = render(
       <EntryFilterPanel
         filters={{}}
-        periodParams={{ period: "thisMonth" }}
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
       />
     );
-    expect(screen.getByRole("button", { name: "筛选" })).toBeInTheDocument();
-
-    view.rerender(
-      <EntryFilterPanel
-        filters={{}}
-        periodParams={{ period: "all" }}
-        onFiltersChange={vi.fn()}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    // A period is a view, not a narrowing, so it lights no badge.
     expect(screen.getByRole("button", { name: "筛选" })).toBeInTheDocument();
 
     view.rerender(
       <EntryFilterPanel
         filters={{ search: "咖啡" }}
-        periodParams={{ period: "all" }}
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
       />
     );
     expect(screen.getByRole("button", { name: "已启用 1 个筛选" })).toBeInTheDocument();
+  });
+
+  it("leaves the period to its own bar", async () => {
+    render(
+      <EntryFilterPanel
+        filters={{}}
+        onFiltersChange={vi.fn()}
+        showCategory={false}
+        showCurrency={false}
+      />
+    );
+    await openPanel();
+
+    expect(screen.queryByRole("button", { name: "本月" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "全部" })).not.toBeInTheDocument();
   });
 
   it("opens a dialog and applies the shared draft", async () => {
@@ -61,7 +58,6 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
       />
     );
 
@@ -84,7 +80,6 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
       />
     );
 
@@ -104,58 +99,11 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
       />
     );
 
     expect(screen.getByRole("button", { name: "筛选" })).toHaveAttribute("aria-haspopup", "dialog");
     expect(container.querySelector(".lucide-chevron-down")).toBeNull();
-  });
-
-  it("offers the four date presets and no other windows", async () => {
-    render(
-      <EntryFilterPanel
-        filters={{}}
-        periodParams={{ period: "thisMonth" }}
-        onFiltersChange={vi.fn()}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    await openPanel();
-
-    const group = screen.getByRole("group", { name: "时间范围" });
-    expect(group).toBeInTheDocument();
-    for (const label of ["本月", "上个月", "全部", "自定义区间"]) {
-      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("button", { name: "过去7天" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "最近30天" })).not.toBeInTheDocument();
-  });
-
-  it("shows the start and end fields only for a hand-picked range", async () => {
-    const view = render(
-      <EntryFilterPanel
-        filters={{}}
-        periodParams={{ period: "thisMonth" }}
-        onFiltersChange={vi.fn()}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    await openPanel();
-    expect(screen.queryAllByRole("button", { name: "date" })).toHaveLength(0);
-
-    view.rerender(
-      <EntryFilterPanel
-        filters={{}}
-        periodParams={{ period: "custom", startDate: "2026-09-01", endDate: "2026-09-10" }}
-        onFiltersChange={vi.fn()}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    expect(screen.getAllByRole("button", { name: "date" })).toHaveLength(2);
   });
 
   it("offers every processing status as one chip", async () => {
@@ -165,7 +113,6 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={vi.fn()}
         showCategory={false}
         showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
       />
     );
     await openPanel();
@@ -191,7 +138,6 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
       />
     );
     await openPanel();
@@ -214,7 +160,6 @@ describe("EntryFilterPanel", () => {
         onFiltersChange={onFiltersChange}
         showCategory={false}
         showCurrency={false}
-        periodParams={{ period: "thisMonth" }}
       />
     );
     await openPanel();
@@ -225,74 +170,5 @@ describe("EntryFilterPanel", () => {
     await user.click(screen.getByRole("button", { name: "应用筛选" }));
 
     expect(onFiltersChange.mock.calls[0]?.[0].statuses).toEqual([]);
-  });
-
-  it("submits filters only once after selecting a date preset", async () => {
-    const user = userEvent.setup();
-    const onFiltersChange = vi.fn();
-
-    render(
-      <EntryFilterPanel
-        filters={{ categoryId: "cat-1" }}
-        onFiltersChange={onFiltersChange}
-        periodParams={{ period: "thisMonth" }}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    await openPanel();
-
-    await user.click(screen.getByRole("button", { name: "本月" }));
-    await user.click(screen.getByRole("button", { name: "应用筛选" }));
-
-    expect(onFiltersChange).toHaveBeenCalledTimes(1);
-    expect(onFiltersChange).toHaveBeenCalledWith(
-      expect.objectContaining({ categoryId: "cat-1" }),
-      "thisMonth"
-    );
-  });
-
-  it("submits a hand-picked range as a custom period", async () => {
-    const user = userEvent.setup();
-    const onFiltersChange = vi.fn();
-
-    render(
-      <EntryFilterPanel
-        filters={{}}
-        periodParams={{ period: "thisMonth" }}
-        onFiltersChange={onFiltersChange}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    await openPanel();
-
-    await user.click(screen.getByRole("button", { name: "自定义区间" }));
-    await user.click(screen.getByRole("button", { name: "应用筛选" }));
-
-    expect(onFiltersChange).toHaveBeenCalledTimes(1);
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.anything(), "custom");
-  });
-
-  it("submits last month as a named period", async () => {
-    const user = userEvent.setup();
-    const onFiltersChange = vi.fn();
-
-    render(
-      <EntryFilterPanel
-        filters={{}}
-        periodParams={{ period: "thisMonth" }}
-        onFiltersChange={onFiltersChange}
-        showCategory={false}
-        showCurrency={false}
-      />
-    );
-    await openPanel();
-
-    await user.click(screen.getByRole("button", { name: "上个月" }));
-    await user.click(screen.getByRole("button", { name: "应用筛选" }));
-
-    expect(onFiltersChange).toHaveBeenCalledTimes(1);
-    expect(onFiltersChange).toHaveBeenCalledWith(expect.anything(), "lastMonth");
   });
 });

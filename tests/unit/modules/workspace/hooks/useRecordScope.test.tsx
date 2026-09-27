@@ -12,7 +12,6 @@ const liveBook: BookDto = {
   id: BOOK_LIVE,
   ledgerId: "ledger-1",
   name: "共同支出",
-  timeZone: null,
   sortOrder: 1,
   archivedAt: null,
 };

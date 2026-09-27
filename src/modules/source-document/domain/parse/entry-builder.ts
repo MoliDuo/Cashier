@@ -1,4 +1,3 @@
-import { formatDateTimeForApi } from "@/lib/date-utils";
 import { compare } from "@/lib/money/decimal";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import type { CategoryInfo, ParsedLedgerEntry } from "@/lib/ai/types";
@@ -104,10 +103,13 @@ export interface DateFallbackResult {
 }
 
 /**
- * Get fallback date for entries
+ * The day entries fall back to: the record's own, or today in the ledger's
+ * zone, which the caller names so this stays free of any clock or zone.
  */
-export function getEntryFallbackDate(docEntryDate: string | null): DateFallbackResult {
-  const todayDate = formatDateTimeForApi(new Date())!;
+export function getEntryFallbackDate(
+  docEntryDate: string | null,
+  todayDate: string
+): DateFallbackResult {
   const fallbackDate = docEntryDate ?? todayDate;
 
   return { todayDate, fallbackDate };

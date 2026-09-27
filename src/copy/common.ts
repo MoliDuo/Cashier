@@ -22,7 +22,6 @@ export const commonCopy = {
   edit: "编辑",
   loadMore: "加载更多",
   discard: "放弃",
-  readOnlyPreview: "只读预览",
   refresh: "刷新",
   refreshFailed: "刷新失败，请重试",
   refreshing: "刷新中…",

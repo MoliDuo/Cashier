@@ -5,11 +5,10 @@ import { cn } from "@/lib/utils";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
-import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { readLastNewRecordBookId } from "../new-record-book-memory";
 import { useWorkspaceStore } from "../store";
 import { NewRecordForms } from "./NewRecordForms";
-import type { NewRecordInputMode } from "./new-record-success-feedback";
+import type { CommittedView, NewRecordInputMode } from "./new-record-success-feedback";
 import {
   Select,
   SelectContent,
@@ -26,12 +25,12 @@ interface NewRecordDialogProps {
   /** The live books, for the record's book picker. */
   books: readonly BookDto[];
   activeTab: LedgerTab;
-  committedFilters: EntryFilters;
+  committedView: CommittedView;
   categories: EntryCategoryWithCount[];
   mainCurrency: string;
   preferredCurrencies: string[];
-  /** The device's zone, used when the picked book has none of its own. */
-  deviceTimeZone?: string | undefined;
+  /** The ledger's zone, which dates a new record by default. */
+  timeZone: string;
 }
 
 /**
@@ -43,11 +42,11 @@ export function NewRecordDialog({
   scope,
   books,
   activeTab,
-  committedFilters,
+  committedView,
   categories,
   mainCurrency,
   preferredCurrencies,
-  deviceTimeZone,
+  timeZone,
 }: NewRecordDialogProps) {
   // The dialog opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
@@ -87,9 +86,6 @@ export function NewRecordDialog({
   // always agree with what the select shows.
   const selectedBook = books.find((book) => book.id === bookId) ?? books[0] ?? null;
   const selectedBookId = selectedBook?.id ?? "";
-  // The book owns the record's date zone: the picked book's zone decides the
-  // default day, and only a book without one falls back to the device.
-  const recordTimeZone = selectedBook?.timeZone ?? deviceTimeZone;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -163,7 +159,7 @@ export function NewRecordDialog({
               viewedBookId={scope}
               savedBook={selectedBook}
               activeTab={activeTab}
-              committedFilters={committedFilters}
+              committedView={committedView}
               inputMode={inputMode}
               categories={categories}
               mainCurrency={mainCurrency}
@@ -176,7 +172,7 @@ export function NewRecordDialog({
               setQuickPending={setQuickPending}
               setAiDirty={setAiDirty}
               setQuickDirty={setQuickDirty}
-              {...(recordTimeZone != null ? { timeZone: recordTimeZone } : {})}
+              timeZone={timeZone}
             />
           </div>
         </div>

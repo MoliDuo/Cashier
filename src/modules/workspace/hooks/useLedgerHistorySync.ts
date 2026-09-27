@@ -7,7 +7,7 @@ import {
   readLedgerDetailParam,
 } from "@/lib/navigation/ledger-detail-navigation";
 import { useModalStackStore } from "@/lib/store/modal-stack";
-import { normalizeLedgerFilterSearchParams } from "../ledger-url-params";
+import { normalizePeriodSearchParams } from "../period-url-params";
 import { normalizeStatsSearchParams } from "../stats-url-params";
 import { replaceLedgerUrl } from "../ledger-url-navigation";
 import { useWorkspaceStore } from "../store";
@@ -36,7 +36,7 @@ export function useLedgerHistorySync({
         ? normalizeStatsSearchParams(searchParams)
         : activeTab === "settings"
           ? null
-          : normalizeLedgerFilterSearchParams(searchParams);
+          : normalizePeriodSearchParams(searchParams);
     if (next != null) replaceLedgerUrl(pathname, next);
   }, [activeTab, pathname, searchParams]);
 

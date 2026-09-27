@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 import { safePrefetch } from "@/lib/safe-prefetch";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
-import type { EntryFilters } from "@/modules/ledger/filters";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import { writeLastNewRecordBookId } from "../new-record-book-memory";
 import {
   showNewRecordSuccessFeedback,
+  type CommittedView,
   type NewRecordInputMode,
 } from "./new-record-success-feedback";
 
@@ -62,7 +62,7 @@ interface NewRecordFormsProps {
   /** The book the record goes into, when it is resolvable in the live list. */
   savedBook: { id: string; name: string } | null;
   activeTab: LedgerTab;
-  committedFilters: EntryFilters;
+  committedView: CommittedView;
   inputMode: NewRecordInputMode;
   categories: EntryCategoryWithCount[];
   mainCurrency: string;
@@ -83,7 +83,7 @@ export function NewRecordForms({
   viewedBookId,
   savedBook,
   activeTab,
-  committedFilters,
+  committedView,
   inputMode,
   categories,
   mainCurrency,
@@ -108,7 +108,7 @@ export function NewRecordForms({
         mode,
         result,
         activeTab,
-        committedFilters,
+        committedView,
         viewedBookId,
         savedBook,
       });
@@ -125,7 +125,7 @@ export function NewRecordForms({
     [
       activeTab,
       aiDirty,
-      committedFilters,
+      committedView,
       quickDirty,
       savedBook,
       setInputMode,

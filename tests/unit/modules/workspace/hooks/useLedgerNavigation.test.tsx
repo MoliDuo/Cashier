@@ -6,10 +6,12 @@ import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/s
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }));
 const pathname = vi.hoisted(() => ({ current: "/stream" }));
+const search = vi.hoisted(() => ({ current: "" }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
   usePathname: () => pathname.current,
+  useSearchParams: () => new URLSearchParams(search.current),
 }));
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -26,6 +28,7 @@ function useHarness() {
 describe("useLedgerNavigation", () => {
   beforeEach(() => {
     pathname.current = "/stream";
+    search.current = "";
     window.history.replaceState({}, "", "/stream");
   });
 
@@ -39,17 +42,28 @@ describe("useLedgerNavigation", () => {
     expect(result.current.navigation.activeTab).toBe("stats");
   });
 
-  it("returns to a tab on the query it was left with", () => {
+  it("returns to a tab on the filters it was left with, under the current period", () => {
+    search.current = "range=year";
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.remember("details", "period=lastMonth&categoryId=c1"));
+    act(() => result.current.remember("details", "offset=-1&categoryId=c1"));
 
-    expect(result.current.navigation.hrefFor("details")).toBe(
-      "/details?period=lastMonth&categoryId=c1"
-    );
+    // The period is one for the whole ledger, so it comes from the route being
+    // left; the filters are 明细's own.
+    expect(result.current.navigation.hrefFor("details")).toBe("/details?categoryId=c1&range=year");
     act(() => result.current.navigation.navigate("details"));
-    expect(router.push).toHaveBeenCalledWith("/details?period=lastMonth&categoryId=c1", {
+    expect(router.push).toHaveBeenCalledWith("/details?categoryId=c1&range=year", {
       scroll: false,
     });
+  });
+
+  it("does not carry a period to or from 设置", () => {
+    pathname.current = "/settings";
+    search.current = "";
+    const { result } = renderHook(useHarness, { wrapper });
+    act(() => result.current.remember("details", "offset=-1"));
+
+    expect(result.current.navigation.hrefFor("details")).toBe("/details?offset=-1");
+    expect(result.current.navigation.hrefFor("settings")).toBe("/settings");
   });
 
   it("goes to an explicit query instead of the remembered one", () => {

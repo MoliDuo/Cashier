@@ -1,6 +1,6 @@
 {
-  "id": "a68b2436-0fb7-4657-bac3-4c610108f846",
-  "prevId": "7ce5b98f-dea0-4fe3-86e4-0522054f3d7d",
+  "id": "6a4ed38d-8853-4f39-a242-1a93d3cc7f0e",
+  "prevId": "a68b2436-0fb7-4657-bac3-4c610108f846",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1281,6 +1281,13 @@
           "notNull": true,
           "default": "''"
         },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Asia/Shanghai'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1317,6 +1324,10 @@
         "ck_ledgers_ai_custom_prompt_length": {
           "name": "ck_ledgers_ai_custom_prompt_length",
           "value": "length(\"ledgers\".\"ai_custom_prompt\") <= 4000"
+        },
+        "ck_ledgers_time_zone_length": {
+          "name": "ck_ledgers_time_zone_length",
+          "value": "length(\"ledgers\".\"time_zone\") BETWEEN 1 AND 50"
         }
       },
       "isRLSEnabled": false

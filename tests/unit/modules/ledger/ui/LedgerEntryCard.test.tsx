@@ -26,6 +26,7 @@ const ledgerEntry: LedgerEntry = {
     ledgerId: "ledger-1",
     title: "Lunch",
     documentDate: "2026-09-11",
+    effectiveDate: "2026-09-11",
     createdAt: "2026-09-11T00:00:00.000Z",
     updatedAt: "2026-09-11T00:00:00.000Z",
   },

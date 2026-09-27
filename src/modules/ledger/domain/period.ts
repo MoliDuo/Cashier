@@ -1,0 +1,211 @@
+/**
+ * The one period model every ledger view reads by: a calendar week, month or
+ * year counted back from the current one, everything, or two named days.
+ *
+ * It is plain civil-date arithmetic on "YYYY-MM-DD" strings, done in UTC so no
+ * runtime zone can shift a day. "Today" is always passed in — the server takes
+ * it in the ledger's zone — so the same period means the same days wherever it
+ * is resolved.
+ */
+
+export const CALENDAR_RANGES = ["week", "month", "year"] as const;
+export type CalendarRange = (typeof CALENDAR_RANGES)[number];
+export type PeriodRange = CalendarRange | "all" | "custom";
+
+export type Period =
+  | { range: CalendarRange; offset: number }
+  | { range: "all" }
+  | { range: "custom"; from: string; to: string };
+
+export interface CivilRange {
+  from: string;
+  to: string;
+}
+
+export const DEFAULT_PERIOD: Period = { range: "month", offset: 0 };
+
+/**
+ * A read as the browser sends it: its days named by a period, which the server
+ * turns into dates in the ledger's zone, instead of dates of its own.
+ */
+export type PeriodQuery<T> = Omit<T, "startDate" | "endDate"> & { period: Period };
+
+/** How far back a calendar period can be stepped: ten years of each kind. */
+export const MIN_PERIOD_OFFSET: Readonly<Record<CalendarRange, number>> = {
+  week: -521,
+  month: -119,
+  year: -9,
+};
+
+/** The longest span one read may cover. */
+export const MAX_PERIOD_DAYS = 3660;
+
+const CIVIL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DAY_MS = 86_400_000;
+
+function toUtc(civil: string): Date {
+  const match = CIVIL_DATE.exec(civil);
+  if (match == null) throw new RangeError(`Invalid civil date: ${civil}`);
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+}
+
+function fromUtc(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export function isCivilDate(value: unknown): value is string {
+  if (typeof value !== "string" || !CIVIL_DATE.test(value)) return false;
+  return fromUtc(toUtc(value)) === value;
+}
+
+export function addCivilDays(civil: string, days: number): string {
+  return fromUtc(new Date(toUtc(civil).getTime() + days * DAY_MS));
+}
+
+/** Whole days from `from` to `to`; zero for the same day. */
+export function civilDaysBetween(from: string, to: string): number {
+  return Math.round((toUtc(to).getTime() - toUtc(from).getTime()) / DAY_MS);
+}
+
+/** The calendar week (Monday first), month or year that holds `day`. */
+export function calendarRangeOf(range: CalendarRange, day: string): CivilRange {
+  const date = toUtc(day);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  switch (range) {
+    case "week": {
+      const sinceMonday = (date.getUTCDay() + 6) % 7;
+      const from = addCivilDays(day, -sinceMonday);
+      return { from, to: addCivilDays(from, 6) };
+    }
+    case "month":
+      return {
+        from: fromUtc(new Date(Date.UTC(year, month, 1))),
+        to: fromUtc(new Date(Date.UTC(year, month + 1, 0))),
+      };
+    case "year":
+      return {
+        from: fromUtc(new Date(Date.UTC(year, 0, 1))),
+        to: fromUtc(new Date(Date.UTC(year, 11, 31))),
+      };
+  }
+}
+
+/** The first day of the calendar period `offset` steps from the one holding `today`. */
+function shiftedAnchor(range: CalendarRange, today: string, offset: number): string {
+  const start = calendarRangeOf(range, today).from;
+  if (range === "week") return addCivilDays(start, offset * 7);
+  const date = toUtc(start);
+  return range === "month"
+    ? fromUtc(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1)))
+    : fromUtc(new Date(Date.UTC(date.getUTCFullYear() + offset, 0, 1)));
+}
+
+/** The days a period covers, whole; `null` for everything. */
+export function resolvePeriod(period: Period, today: string): CivilRange | null {
+  switch (period.range) {
+    case "all":
+      return null;
+    case "custom":
+      return { from: period.from, to: period.to };
+    default:
+      return calendarRangeOf(period.range, shiftedAnchor(period.range, today, period.offset));
+  }
+}
+
+/** A period one step earlier or later; only calendar periods can step. */
+export function stepPeriod(period: Period, step: number): Period {
+  if (period.range === "all" || period.range === "custom") return period;
+  const offset = Math.min(0, Math.max(MIN_PERIOD_OFFSET[period.range], period.offset + step));
+  return { range: period.range, offset };
+}
+
+export interface ComparisonWindow {
+  range: CivilRange;
+  compareRange: CivilRange;
+  /** "same_period" when the current period is cut at today and so is the one before it. */
+  mode: "same_period" | "full_period";
+}
+
+/**
+ * What 统计 reads for a period and what it sets it against. The current
+ * calendar period ends today, and the one before it is cut after the same
+ * number of days, so a half-month is not measured against a whole one. A named
+ * range is compared with the same number of days just before it. Everything is
+ * read from `earliest` (the first dated record) to today.
+ */
+export function resolveComparison(
+  period: Period,
+  today: string,
+  earliest: string | null = null
+): ComparisonWindow {
+  if (period.range === "all") {
+    const floor = addCivilDays(today, -(MAX_PERIOD_DAYS - 1));
+    const from = earliest == null || earliest > today ? today : earliest < floor ? floor : earliest;
+    return { range: { from, to: today }, ...previousWindow({ from, to: today }) };
+  }
+  if (period.range === "custom") {
+    const range = { from: period.from, to: period.to };
+    return { range, ...previousWindow(range) };
+  }
+  const whole = resolvePeriod(period, today)!;
+  const previous = calendarRangeOf(
+    period.range,
+    shiftedAnchor(period.range, today, period.offset - 1)
+  );
+  if (period.offset !== 0) {
+    return { range: whole, compareRange: previous, mode: "full_period" };
+  }
+  const elapsed = civilDaysBetween(whole.from, today);
+  const previousEnd = addCivilDays(previous.from, elapsed);
+  return {
+    range: { from: whole.from, to: today },
+    compareRange: {
+      from: previous.from,
+      to: previousEnd < previous.to ? previousEnd : previous.to,
+    },
+    mode: "same_period",
+  };
+}
+
+function previousWindow(range: CivilRange): Pick<ComparisonWindow, "compareRange" | "mode"> {
+  const days = civilDaysBetween(range.from, range.to) + 1;
+  return {
+    compareRange: { from: addCivilDays(range.from, -days), to: addCivilDays(range.from, -1) },
+    mode: "full_period",
+  };
+}
+
+/** Reads a period from its URL-shaped fields, falling back to this month. */
+export function parsePeriod(fields: {
+  range?: string | null | undefined;
+  offset?: string | number | null | undefined;
+  from?: string | null | undefined;
+  to?: string | null | undefined;
+}): Period {
+  const range = fields.range ?? "month";
+  if (range === "all") return { range: "all" };
+  if (range === "custom") {
+    return isCivilDate(fields.from) && isCivilDate(fields.to) && fields.from <= fields.to
+      ? { range: "custom", from: fields.from, to: fields.to }
+      : DEFAULT_PERIOD;
+  }
+  if (!(CALENDAR_RANGES as readonly string[]).includes(range)) return DEFAULT_PERIOD;
+  const calendar = range as CalendarRange;
+  const offset = Number(fields.offset ?? 0);
+  return Number.isInteger(offset) && offset <= 0
+    ? { range: calendar, offset: Math.max(MIN_PERIOD_OFFSET[calendar], offset) }
+    : { range: calendar, offset: 0 };
+}
+
+/** A stable string for a period, for query keys and comparisons. */
+export function periodKey(period: Period): string {
+  switch (period.range) {
+    case "all":
+      return "all";
+    case "custom":
+      return `custom:${period.from}:${period.to}`;
+    default:
+      return `${period.range}:${period.offset}`;
+  }
+}

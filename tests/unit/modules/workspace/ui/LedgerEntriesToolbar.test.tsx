@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { PeriodParams } from "@/lib/period-utils";
+import type { Period } from "@/modules/ledger/domain/period";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { LedgerEntriesToolbar } from "@/modules/workspace/ui/LedgerEntriesToolbar";
 
-const defaultPeriodParams: PeriodParams = { period: "thisMonth" };
+const defaultPeriod: Period = { range: "month", offset: 0 };
 
 const defaultProps = {
   isSelectionMode: false,
@@ -17,29 +17,39 @@ const defaultProps = {
   onClearSelection: vi.fn(),
   filters: {} as const,
   onFiltersChange: vi.fn(),
-  periodParams: defaultPeriodParams,
+  period: defaultPeriod,
+  today: "2026-09-27",
+  onPeriodChange: vi.fn(),
   mainCurrency: "CNY",
   filteredTotal: "123.45",
 };
 
 describe("LedgerEntriesToolbar", () => {
-  it("names the span the total covers", () => {
+  it("names the period beside its total", () => {
     render(<LedgerEntriesToolbar {...defaultProps} />);
 
-    expect(screen.getByText("本月")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "区间：2026年9月" })).toBeInTheDocument();
     expect(screen.getByText("¥123.45")).toBeInTheDocument();
   });
 
-  it("prints the two days of a range the panel cannot name", () => {
+  it("steps to the previous month and cannot step past this one", () => {
+    const onPeriodChange = vi.fn();
+    render(<LedgerEntriesToolbar {...defaultProps} onPeriodChange={onPeriodChange} />);
+
+    expect(screen.getByRole("button", { name: "下一期" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "上一期" }));
+    expect(onPeriodChange).toHaveBeenCalledWith({ range: "month", offset: -1 });
+  });
+
+  it("prints both days of a named range", () => {
     render(
       <LedgerEntriesToolbar
         {...defaultProps}
-        periodParams={{ period: "custom", startDate: "2026-09-01", endDate: "2026-09-10" }}
+        period={{ range: "custom", from: "2026-09-01", to: "2026-09-10" }}
       />
     );
 
-    expect(screen.getByText(/9月1日/)).toBeInTheDocument();
-    expect(screen.getByText(/9月10日/)).toBeInTheDocument();
+    expect(screen.getByText("2026年9月1日 – 9月10日")).toBeInTheDocument();
   });
 
   it("shows selection controls instead of totals and filters while selecting", () => {

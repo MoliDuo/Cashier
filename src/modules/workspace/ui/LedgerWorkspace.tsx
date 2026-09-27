@@ -2,16 +2,19 @@
 import { useMemo, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { LedgerTimeZoneProvider } from "@/lib/ledger-time-zone";
 import { ledgerTabFromPathname } from "@/lib/ledger-tabs";
-import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import { textRoleClassName } from "@/components/typography";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { useLedgerHistorySync } from "../hooks/useLedgerHistorySync";
 import { useLedgerPageEnvironment } from "../hooks/useLedgerPageEnvironment";
 import { useRecordScope } from "../hooks/useRecordScope";
+import { resolvePeriod } from "@/modules/ledger/domain/period";
 import { buildLedgerEntryFilters } from "../ledger-filter-state";
 import { readLedgerFilterParams } from "../ledger-url-params";
+import { readPeriodParams } from "../period-url-params";
+import { useLedgerToday } from "../hooks/useLedgerToday";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import { BookReveal } from "./BookReveal";
 import { NewRecordDialog } from "./NewRecordDialog";
@@ -20,15 +23,13 @@ import { LedgerWorkspaceContext, type LedgerWorkspaceValue } from "./ledger-work
 import { ledgerPageCopy } from "@/copy/app";
 
 interface LedgerWorkspaceProps {
-  /**
-   * The device zone the server read from this browser's cookie. The routes date
-   * by it when the viewed book has no zone of its own, so a page that arrives
-   * without one mounts its date queries only after the browser has answered.
-   */
-  initialDeviceTimeZone: string | null;
+  /** Today in the ledger's zone as the server dated it, so the first render agrees. */
   ledgerToday?: string | undefined;
   children: ReactNode;
 }
+
+/** Only before the ledger itself has loaded; the ledger always names its zone. */
+const DEFAULT_TIME_ZONE = "Asia/Shanghai";
 
 function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded bg-surface2", className)} />;
@@ -39,11 +40,7 @@ function Skeleton({ className }: { className?: string }) {
  * new-record dialog, the detail sheets and the queries every route reads.
  * The route itself arrives as `children`.
  */
-export function LedgerWorkspace({
-  initialDeviceTimeZone,
-  ledgerToday,
-  children,
-}: LedgerWorkspaceProps) {
+export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeTab = ledgerTabFromPathname(pathname);
@@ -58,21 +55,18 @@ export function LedgerWorkspace({
     categoriesHaveNoData,
     mainCurrency,
     preferredCurrencies,
-    effectiveTimeZone,
-    deviceTimeZone,
-    timeZoneReady,
-  } = useLedgerPageEnvironment({ scope: recordScope, initialDeviceTimeZone });
+  } = useLedgerPageEnvironment();
+  const timeZone = ledger?.settings.timeZone ?? DEFAULT_TIME_ZONE;
+  const today = useLedgerToday(timeZone, ledgerToday);
 
-  // A new record is checked against the filters 流水 is showing, to say when it
-  // will not appear there.
-  const committedFilters = useMemo(
-    () =>
-      buildLedgerEntryFilters(
-        parsePeriodFromSearchParams(searchParams),
-        readLedgerFilterParams(searchParams),
-        effectiveTimeZone
-      ),
-    [effectiveTimeZone, searchParams]
+  // A new record is checked against what 流水 is showing, to say when it will
+  // not appear there.
+  const committedView = useMemo(
+    () => ({
+      filters: buildLedgerEntryFilters(readLedgerFilterParams(searchParams)),
+      range: resolvePeriod(readPeriodParams(searchParams), today),
+    }),
+    [searchParams, today]
   );
 
   const value = useMemo<LedgerWorkspaceValue | null>(
@@ -84,11 +78,10 @@ export function LedgerWorkspace({
             books: books ?? [],
             categories,
             recordScope,
-            effectiveTimeZone,
-            timeZoneReady,
-            ledgerToday,
+            timeZone,
+            today,
           },
-    [books, categories, effectiveTimeZone, ledger, ledgerToday, recordScope, timeZoneReady]
+    [books, categories, ledger, recordScope, timeZone, today]
   );
 
   if (value == null) {
@@ -103,53 +96,55 @@ export function LedgerWorkspace({
 
   return (
     <LedgerWorkspaceContext.Provider value={value}>
-      <CategoryAssignmentProvider>
-        {categoriesQuery.isError ? (
-          <LedgerQueryErrorBanner
-            empty={categoriesHaveNoData}
-            onRetry={() => void categoriesQuery.refetch()}
-          />
-        ) : null}
-        {categoriesQuery.isPending && categoriesHaveNoData ? (
-          <div className="space-y-3 px-2 py-4" role="status" aria-busy="true">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ) : null}
-
-        <div
-          className={categoriesHaveNoData ? "hidden" : undefined}
-          aria-hidden={categoriesHaveNoData || undefined}
-        >
-          {carriesBookSwitch ? (
-            <BookReveal
-              books={value.books}
-              scope={recordScope}
-              onScopeChange={onRecordScopeChange}
+      <LedgerTimeZoneProvider timeZone={timeZone}>
+        <CategoryAssignmentProvider>
+          {categoriesQuery.isError ? (
+            <LedgerQueryErrorBanner
+              empty={categoriesHaveNoData}
+              onRetry={() => void categoriesQuery.refetch()}
             />
           ) : null}
-          <div className="mt-0 min-w-0 max-w-full overflow-x-clip">{children}</div>
-        </div>
+          {categoriesQuery.isPending && categoriesHaveNoData ? (
+            <div className="space-y-3 px-2 py-4" role="status" aria-busy="true">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : null}
 
-        <NewRecordDialog
-          scope={recordScope}
-          books={value.books}
-          activeTab={activeTab}
-          committedFilters={committedFilters}
-          categories={categories}
-          mainCurrency={mainCurrency}
-          preferredCurrencies={preferredCurrencies}
-          deviceTimeZone={deviceTimeZone}
-        />
+          <div
+            className={categoriesHaveNoData ? "hidden" : undefined}
+            aria-hidden={categoriesHaveNoData || undefined}
+          >
+            {carriesBookSwitch ? (
+              <BookReveal
+                books={value.books}
+                scope={recordScope}
+                onScopeChange={onRecordScopeChange}
+              />
+            ) : null}
+            <div className="mt-0 min-w-0 max-w-full overflow-x-clip">{children}</div>
+          </div>
 
-        <ModalStackGate
-          books={value.books}
-          categories={categories}
-          mainCurrency={mainCurrency}
-          preferredCurrencies={preferredCurrencies}
-          {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
-        />
-      </CategoryAssignmentProvider>
+          <NewRecordDialog
+            scope={recordScope}
+            books={value.books}
+            activeTab={activeTab}
+            committedView={committedView}
+            categories={categories}
+            mainCurrency={mainCurrency}
+            preferredCurrencies={preferredCurrencies}
+            timeZone={timeZone}
+          />
+
+          <ModalStackGate
+            books={value.books}
+            categories={categories}
+            mainCurrency={mainCurrency}
+            preferredCurrencies={preferredCurrencies}
+            timeZone={timeZone}
+          />
+        </CategoryAssignmentProvider>
+      </LedgerTimeZoneProvider>
     </LedgerWorkspaceContext.Provider>
   );
 }

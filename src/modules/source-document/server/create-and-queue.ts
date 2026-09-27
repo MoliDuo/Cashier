@@ -1,6 +1,6 @@
 import "server-only";
 import { ValidationError } from "@/lib/errors";
-import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
 import { discardUnusedFiles } from "@/server/stored-files/uploads";
 import { scheduleProcessingAfter } from "@/server/processing/schedule";
@@ -22,15 +22,16 @@ export interface CreateAndQueueSourceDocumentInput {
     | { kind: "stored"; text?: string; storedFileIds: string[] }
     | { kind: "inline"; images: PreparedInlineImage[] };
   documentDate?: string;
-  timezone?: string;
+  /** The ledger's zone, which names the day a record without one gets. */
+  timeZone: string;
   idempotency?: SourceDocumentIdempotencyInput;
   /** Correlates the processing `after()` with the request that queued it. */
   requestId?: string;
 }
 
-function resolveDocumentDate(documentDate?: string, timezone?: string): string {
+function resolveDocumentDate(documentDate: string | undefined, timeZone: string): string {
   if (documentDate != null && documentDate !== "") return documentDate;
-  return getDateInTimezone(timezone) ?? formatDateTimeForApi(new Date());
+  return ledgerToday(timeZone);
 }
 
 export async function createAndQueueSourceDocument(
@@ -58,7 +59,7 @@ export async function createAndQueueSourceDocument(
 
   let storedImageIds: string[] = [];
   try {
-    const resolvedDate = resolveDocumentDate(input.documentDate, input.timezone);
+    const resolvedDate = resolveDocumentDate(input.documentDate, input.timeZone);
     if (inlineImages.length > 0) {
       storedImageIds = (await prepareInlineImages(inlineImages, input.ledgerId)).storedFileIds;
     }

@@ -11,14 +11,10 @@ export interface LedgerWorkspaceValue {
   categories: EntryCategoryWithCount[];
   /** The book being viewed, or null for 总账. */
   recordScope: RecordScope;
-  effectiveTimeZone: string | undefined;
-  /**
-   * False while the reader's zone is still unknown. The date-driven routes then
-   * show their skeleton instead of mounting a query for the wrong day.
-   */
-  timeZoneReady: boolean;
-  /** Today in the page's zone as the server dated it, when it could. */
-  ledgerToday: string | undefined;
+  /** The ledger's zone: every day on every route is named in it. */
+  timeZone: string;
+  /** Today in that zone, kept current across midnight. */
+  today: string;
 }
 
 export const LedgerWorkspaceContext = createContext<LedgerWorkspaceValue | null>(null);

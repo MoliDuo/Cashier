@@ -36,6 +36,7 @@ describe("createAndQueueSourceDocument", () => {
     const created = await createAndQueueSourceDocument({
       ledgerId,
       bookId: await testBookId(db, ledgerId),
+      timeZone: "Asia/Shanghai",
       input: { kind: "inline", images: [await inlineImage()] },
     });
 
@@ -54,6 +55,7 @@ describe("createAndQueueSourceDocument", () => {
       createAndQueueSourceDocument({
         ledgerId,
         bookId: crypto.randomUUID(),
+        timeZone: "Asia/Shanghai",
         input: { kind: "inline", images: [await inlineImage()] },
       })
     ).rejects.toThrow();

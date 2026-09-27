@@ -82,7 +82,6 @@ function createBook(overrides: Partial<BookDto>): BookDto {
     id: BOOK_A,
     ledgerId,
     name: "Daily",
-    timeZone: "Asia/Shanghai",
     sortOrder: 0,
     archivedAt: null,
     ...overrides,
@@ -94,7 +93,6 @@ const defaultBooks: BookDto[] = [
   createBook({
     id: BOOK_B,
     name: "Travel",
-    timeZone: "America/Los_Angeles",
     sortOrder: 1,
   }),
 ];
@@ -113,11 +111,11 @@ function renderDialog(overrides: Partial<DialogProps> = {}) {
     scope: null,
     books: defaultBooks,
     activeTab: "stream",
-    committedFilters: {},
+    committedView: { filters: {}, range: null },
     categories: [],
     mainCurrency: "CNY",
     preferredCurrencies: [],
-    deviceTimeZone: "Europe/Berlin",
+    timeZone: "Europe/Berlin",
     ...overrides,
   };
   const tree = (isOpen: boolean, extra: Partial<DialogProps> = {}) => (
@@ -166,7 +164,7 @@ describe("NewRecordDialog book picker", () => {
     expect(formsAttrs()).toMatchObject({ bookId: BOOK_B, viewedBookId: BOOK_B });
   });
 
-  it("gives the forms the picked book's zone, not the viewed book's", () => {
+  it("dates every record in the ledger's zone, whichever book is picked", () => {
     const { open } = renderDialog({ scope: BOOK_B });
     open();
 
@@ -175,16 +173,8 @@ describe("NewRecordDialog book picker", () => {
     expect(formsAttrs()).toMatchObject({
       bookId: BOOK_A,
       viewedBookId: BOOK_B,
-      timeZone: "Asia/Shanghai",
+      timeZone: "Europe/Berlin",
     });
-  });
-
-  it("falls back to the device zone for a book without its own zone", () => {
-    const books = [createBook({ timeZone: null }), defaultBooks[1]!];
-    const { open } = renderDialog({ books });
-    open();
-
-    expect(formsAttrs().timeZone).toBe("Europe/Berlin");
   });
 
   it("opens on the last saved book when it is still live", () => {
@@ -192,11 +182,7 @@ describe("NewRecordDialog book picker", () => {
     const { open } = renderDialog({});
     open();
 
-    expect(formsAttrs()).toMatchObject({
-      bookId: BOOK_B,
-      savedBook: `${BOOK_B}:Travel`,
-      timeZone: "America/Los_Angeles",
-    });
+    expect(formsAttrs()).toMatchObject({ bookId: BOOK_B, savedBook: `${BOOK_B}:Travel` });
   });
 
   it("falls back to the first book when the remembered book is gone", () => {
@@ -236,11 +222,7 @@ describe("NewRecordDialog book picker", () => {
 
     rerender(true, { books: defaultBooks });
 
-    expect(formsAttrs()).toMatchObject({
-      bookId: BOOK_A,
-      savedBook: `${BOOK_A}:Daily`,
-      timeZone: "Asia/Shanghai",
-    });
+    expect(formsAttrs()).toMatchObject({ bookId: BOOK_A, savedBook: `${BOOK_A}:Daily` });
   });
 });
 

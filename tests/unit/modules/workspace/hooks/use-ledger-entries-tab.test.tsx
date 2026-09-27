@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 import { commonCopy } from "@/copy/common";
 import { sourceDocumentActionCopy } from "@/copy/source-document";
 import { batchActionsCopy } from "@/copy/workspace";
-import type { PeriodParams } from "@/lib/period-utils";
+import type { Period } from "@/modules/ledger/domain/period";
 import { queryKeys } from "@/lib/query-keys";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 
 const mocks = vi.hoisted(() => ({
@@ -58,8 +58,8 @@ vi.mock("@/modules/workspace/server-actions/date-impact", () => ({
 
 const { useLedgerEntriesTab } = await import("@/modules/workspace/hooks/useLedgerEntriesTab");
 
-const ALL_TIME: PeriodParams = { period: "all" };
-const JULY: PeriodParams = { period: "custom", startDate: "2026-07-01", endDate: "2026-07-31" };
+const ALL_TIME: Period = { range: "all" };
+const JULY: Period = { range: "custom", from: "2026-07-01", to: "2026-07-31" };
 const NO_FILTERS: LedgerAdvancedFilters = {};
 
 function newClient(gcTime = 0) {
@@ -77,18 +77,17 @@ function deferred<T = void>() {
 }
 
 function renderTab(
-  options: { periodParams?: PeriodParams; advancedFilters?: LedgerAdvancedFilters } = {},
+  options: { period?: Period; advancedFilters?: LedgerAdvancedFilters } = {},
   client = newClient()
 ) {
-  const periodParams = options.periodParams ?? ALL_TIME;
+  const period = options.period ?? ALL_TIME;
   const advancedFilters = options.advancedFilters ?? NO_FILTERS;
   function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
-  return renderHook(
-    () => useLedgerEntriesTab({ mainCurrency: "CNY", periodParams, advancedFilters }),
-    { wrapper: Wrapper }
-  );
+  return renderHook(() => useLedgerEntriesTab({ mainCurrency: "CNY", period, advancedFilters }), {
+    wrapper: Wrapper,
+  });
 }
 
 function makeItem(id: string, overrides: Record<string, unknown> = {}) {
@@ -173,7 +172,7 @@ describe("useLedgerEntriesTab stream", () => {
     const { result } = renderTab();
 
     await waitFor(() => expect(result.current.stream.isLoading).toBe(false));
-    expect(mocks.fetchStreamPage).toHaveBeenCalledWith({ limit: 20 });
+    expect(mocks.fetchStreamPage).toHaveBeenCalledWith({ period: ALL_TIME, limit: 20 });
     expect(renderedIds(result)).toEqual(["doc-1", "doc-2"]);
     expect(result.current.stream.hasNextPage).toBe(true);
     await waitFor(() => expect(result.current.stream.filteredTotal).toBe("12.00"));
@@ -181,7 +180,11 @@ describe("useLedgerEntriesTab stream", () => {
 
     act(() => void result.current.stream.fetchNextPage());
     await waitFor(() => expect(result.current.stream.hasNextPage).toBe(false));
-    expect(mocks.fetchStreamPage).toHaveBeenCalledWith({ cursor: "next-page-cursor", limit: 20 });
+    expect(mocks.fetchStreamPage).toHaveBeenCalledWith({
+      period: ALL_TIME,
+      cursor: "next-page-cursor",
+      limit: 20,
+    });
     expect(renderedIds(result)).toEqual(["doc-1", "doc-2", "doc-3"]);
   });
 
@@ -215,13 +218,12 @@ describe("useLedgerEntriesTab stream", () => {
 
   it("narrows the page and total queries to the period and filters", async () => {
     renderTab({
-      periodParams: JULY,
+      period: JULY,
       advancedFilters: { minAmount: "10", maxAmount: "100", statuses: ["processing", "failed"] },
     });
 
     const expected = {
-      startDate: "2026-07-01",
-      endDate: "2026-07-31",
+      period: JULY,
       minAmount: "10",
       maxAmount: "100",
       // Statuses are sorted for stable cache keys.
@@ -243,7 +245,11 @@ describe("useLedgerEntriesTab stream", () => {
     const { result } = renderTab({ advancedFilters: { search: "latte" } });
 
     await waitFor(() => expect(result.current.stream.isLoading).toBe(false));
-    expect(mocks.fetchStreamPage).toHaveBeenCalledWith({ search: "latte", limit: 20 });
+    expect(mocks.fetchStreamPage).toHaveBeenCalledWith({
+      period: ALL_TIME,
+      search: "latte",
+      limit: 20,
+    });
     const rendered = result.current.stream.groups[0]?.items[0];
     expect(rendered?.sourceDocument.title).toBe("Server page title");
     expect(rendered?.ledgerEntries.map((entry) => entry.id)).toEqual(["entry-latte"]);
@@ -407,7 +413,9 @@ describe("useLedgerEntriesTab stream", () => {
     expect(mocks.fetchStreamPage).toHaveBeenCalledTimes(2);
     expect(reset).not.toHaveBeenCalled();
     expect(
-      client.getQueryData<{ pages: unknown[] }>(buildStreamQueryDescriptor({}).queryKey)?.pages
+      client.getQueryData<{ pages: unknown[] }>(
+        buildStreamQueryDescriptor({ period: ALL_TIME }).queryKey
+      )?.pages
     ).toHaveLength(2);
   });
 

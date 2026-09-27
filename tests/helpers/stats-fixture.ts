@@ -10,6 +10,7 @@ export function buildEnhancedStatsFixture(
   overrides: Partial<EnhancedStatsDto> = {}
 ): EnhancedStatsDto {
   return {
+    range: { from: "2026-08-01", to: "2026-08-06" },
     unconvertedCount: 0,
     summary: {
       total: "120",

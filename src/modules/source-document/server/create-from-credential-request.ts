@@ -1,7 +1,8 @@
 import "server-only";
 import { createHash } from "crypto";
 import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
-import { getBook } from "@/modules/ledger/server/books";
+import { getLedgerSettings } from "@/modules/ledger/server/settings";
+import { NotFoundError } from "@/lib/errors";
 import type { SourceDocumentSubmissionContract } from "@/modules/source-document/server/submissions";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
@@ -39,17 +40,16 @@ export async function createSourceDocumentFromCredentialRequest(input: {
   payload: PreparedApiV1SourceDocumentInput;
 }): Promise<SourceDocumentSubmissionContract> {
   const { credential, payload } = input;
-  // The key's book owns the date zone: an upload through 梁梁的 is dated in that
-  // book's day rather than the server's, and a book with no zone of its own
-  // falls back to the server date.
-  const book = await getBook(credential.ledgerId, credential.bookId);
+  // An upload without a day of its own is dated today in the ledger's zone.
+  const settings = await getLedgerSettings(credential.ledgerId);
+  if (settings == null) throw new NotFoundError("Ledger");
 
   const result = await createAndQueueSourceDocument({
     ledgerId: credential.ledgerId,
     bookId: credential.bookId,
     input: { kind: "inline", images: payload.images },
     ...(payload.entryDate == null ? {} : { documentDate: payload.entryDate }),
-    ...(book?.timeZone == null ? {} : { timezone: book.timeZone }),
+    timeZone: settings.timeZone,
     ...(input.idempotencyKey == null
       ? {}
       : {

@@ -128,7 +128,6 @@ export const batchActionsCopy = {
 export const entryFilterPanelCopy = {
   filter: "筛选",
   activeFilterCount: (v: { count: string | number }) => `已启用 ${v.count} 个筛选`,
-  dateRange: "时间范围",
   category: "类别",
   currency: "货币",
   minAmount: "最小金额",

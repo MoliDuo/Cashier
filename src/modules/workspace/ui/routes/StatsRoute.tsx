@@ -1,7 +1,6 @@
 "use client";
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { StatsTabSkeleton } from "@/components/skeletons/TabSkeletons";
 import { useLedgerNavigation } from "../../hooks/useLedgerNavigation";
 import { buildDetailsDrilldownSearchParams } from "../../ledger-url-params";
 import { prefetchDetailsTabQuery } from "../../prefetch-ledger-tabs";
@@ -10,8 +9,7 @@ import { useLedgerWorkspace } from "../ledger-workspace-context";
 
 /** 统计: totals over a period, each of which drills down into 明细. */
 export function StatsRoute() {
-  const { ledger, recordScope, effectiveTimeZone, timeZoneReady, ledgerToday } =
-    useLedgerWorkspace();
+  const { ledger, recordScope, timeZone, today } = useLedgerWorkspace();
   const queryClient = useQueryClient();
   const { navigate } = useLedgerNavigation();
   const bookId = recordScope ?? undefined;
@@ -22,7 +20,7 @@ export function StatsRoute() {
       void prefetchDetailsTabQuery(
         queryClient,
         bookId,
-        { period: "custom", startDate, endDate },
+        { range: "custom", from: startDate, to: endDate },
         { categoryId }
       );
       navigate("details", buildDetailsDrilldownSearchParams({ startDate, endDate, categoryId }));
@@ -37,7 +35,7 @@ export function StatsRoute() {
       void prefetchDetailsTabQuery(
         queryClient,
         bookId,
-        { period: "custom", startDate: date, endDate: date },
+        { range: "custom", from: date, to: date },
         { categoryId, currency }
       );
       navigate(
@@ -48,15 +46,14 @@ export function StatsRoute() {
     [bookId, navigate, queryClient]
   );
 
-  if (!timeZoneReady) return <StatsTabSkeleton />;
   return (
     <StatsTab
       bookId={bookId}
       ledger={ledger}
+      today={today}
+      timeZone={timeZone}
       onCategoryDrilldown={handleCategoryDrilldown}
       onDateDrilldown={handleDateDrilldown}
-      {...(ledgerToday !== undefined ? { ledgerToday } : {})}
-      {...(effectiveTimeZone != null ? { timeZone: effectiveTimeZone } : {})}
     />
   );
 }

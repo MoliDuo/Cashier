@@ -23,6 +23,19 @@ interface AggregatedRow {
   unconvertedCount: number;
 }
 
+/** The first day any record in the scope is dated, so 全部 knows where to start. */
+export async function findEarliestEffectiveDate(
+  ledgerId: string,
+  bookId?: string
+): Promise<string | null> {
+  const result = await db.execute<{ earliest: string | null }>(sql`
+    SELECT min(effective_date)::text AS earliest FROM source_documents
+    WHERE ledger_id = ${ledgerId}
+    ${bookId == null ? sql`` : sql`AND book_id = ${bookId}`}
+  `);
+  return result.rows[0]?.earliest ?? null;
+}
+
 async function fetchAggregatedRows(
   ledgerId: string,
   current: { from: string; to: string },

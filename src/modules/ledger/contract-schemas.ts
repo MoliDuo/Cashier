@@ -54,12 +54,24 @@ const optionalSearchSchema = z.preprocess(
   z.string().max(MAX_SEARCH_LENGTH).optional()
 );
 export const UNCATEGORIZED_SENTINEL = "__uncategorized__";
-/** An IANA zone name, or null for "use this device's zone". */
-export const nullableTimeZoneSchema = z
+/** An IANA zone name this runtime can format with. */
+export const timeZoneSchema = z
   .string()
+  .min(1)
   .max(50)
-  .refine(isValidTimeZone, "Invalid IANA time zone")
-  .nullable();
+  .refine(isValidTimeZone, "Invalid IANA time zone");
+/** A period as the browser sends it; the server reads it in the ledger's zone. */
+export const periodInputSchema = z.discriminatedUnion("range", [
+  z
+    .object({ range: z.enum(["week", "month", "year"]), offset: z.number().int().min(-521).max(0) })
+    .strict(),
+  z.object({ range: z.literal("all") }).strict(),
+  z
+    .object({ range: z.literal("custom"), from: dateStringSchema, to: dateStringSchema })
+    .strict()
+    .refine((value) => value.from <= value.to, { message: "Invalid date range", path: ["to"] }),
+]);
+
 const categoryFilterSchema = z.union([uuidSchema, z.literal(UNCATEGORIZED_SENTINEL)]).optional();
 
 function parseLedgerContract<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -78,6 +90,7 @@ const updateLedgerInputSchema = nonEmptyStrictObjectSchema({
     mainCurrency: optionalCurrencyCodeSchema,
     collapseEntriesDefault: z.boolean().optional(),
     aiCustomPrompt: z.string().max(4000).optional(),
+    timeZone: timeZoneSchema.optional(),
   }),
 });
 
@@ -198,14 +211,8 @@ const updateServiceCredentialInputSchema = strictObjectSchema({
 
 /** Book names are short labels, not descriptions: 1–20 characters, trimmed. */
 const bookNameSchema = z.string().trim().min(1).max(20);
-const createBookInputSchema = strictObjectSchema({
-  name: bookNameSchema,
-  timeZone: nullableTimeZoneSchema.optional(),
-});
-const updateBookInputSchema = nonEmptyStrictObjectSchema({
-  name: bookNameSchema.optional(),
-  timeZone: nullableTimeZoneSchema.optional(),
-});
+const createBookInputSchema = strictObjectSchema({ name: bookNameSchema });
+const updateBookInputSchema = strictObjectSchema({ name: bookNameSchema });
 const reorderBooksInputSchema = z.preprocess(
   (value) => (Array.isArray(value) ? [...new Set(value)] : value),
   z.array(uuidSchema).min(1).max(100)

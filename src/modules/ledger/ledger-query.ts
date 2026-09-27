@@ -1,4 +1,3 @@
-import { type PeriodParams, periodToDateRange } from "@/lib/period-utils";
 import { canonicalizeSourceDocumentProcessingStatuses } from "@/modules/source-document/types";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import type { LedgerEntryFilterParams } from "./filters";
@@ -14,12 +13,6 @@ export interface LedgerAdvancedFilters {
 
 export interface LedgerQuery extends LedgerEntryFilterParams {
   statuses?: SourceDocumentProcessingStatus[];
-}
-
-interface DetailsInitialQueryState {
-  startDateStr: string | null;
-  endDateStr: string | null;
-  filterKey: string | null;
 }
 
 function nonBlank(value: string | null | undefined): string | null {
@@ -70,17 +63,4 @@ export function buildDetailsFilterKey(filters: LedgerAdvancedFilters): string | 
   if (normalized.maxAmount != null) parts.push(`max:${normalized.maxAmount}`);
   if (normalized.search != null) parts.push(`search:${normalized.search}`);
   return parts.length === 0 ? null : parts.join("|");
-}
-
-export function getDetailsInitialQueryState(
-  periodParams: PeriodParams,
-  advancedFilters: LedgerAdvancedFilters = {},
-  timeZone?: string
-): DetailsInitialQueryState {
-  const dateRange = periodToDateRange(periodParams, timeZone);
-  return {
-    startDateStr: dateRange.startDate ?? null,
-    endDateStr: dateRange.endDate ?? null,
-    filterKey: buildDetailsFilterKey(advancedFilters),
-  };
 }

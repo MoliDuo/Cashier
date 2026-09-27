@@ -58,7 +58,6 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.s3AccessKeyId).toBe("test-access-key");
     expect(runtimeEnv.s3SecretAccessKey).toBe("test-secret-key");
     expect(runtimeEnv.trustedProxy).toBe("platform");
-    expect(runtimeEnv.timeZone).toBe("UTC");
     expect(runtimeEnv.aiModel).toBe("custom-model");
   });
 

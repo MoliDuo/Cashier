@@ -46,7 +46,6 @@ const LIVE: BookDto = {
   id: "book-1",
   ledgerId: LEDGER_ID,
   name: "共同支出",
-  timeZone: null,
   sortOrder: 1,
   archivedAt: null,
 };
@@ -55,7 +54,6 @@ const ARCHIVED: BookDto = {
   id: "book-2",
   ledgerId: LEDGER_ID,
   name: "旧旅行账本",
-  timeZone: null,
   sortOrder: 2,
   archivedAt: "2026-02-01T00:00:00.000Z",
 };

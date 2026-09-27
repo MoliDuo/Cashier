@@ -2,14 +2,10 @@ import type {
   LedgerStatsQueryInput,
   ListLedgerEntriesInput,
 } from "@/modules/ledger/contract-schemas";
-import {
-  buildDetailsFilterKey,
-  getDetailsInitialQueryState,
-  type LedgerAdvancedFilters,
-} from "@/modules/ledger/ledger-query";
+import { buildDetailsFilterKey, type LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
+import { periodKey, type Period, type PeriodQuery } from "@/modules/ledger/domain/period";
 import { normalizeSearchTerm } from "@/lib/search";
 import { queryKeys } from "@/lib/query-keys";
-import type { PeriodParams } from "@/lib/period-utils";
 
 const DETAILS_PAGE_LIMIT = 50;
 
@@ -26,28 +22,26 @@ function normalizeAdvancedFilters(filters: LedgerAdvancedFilters = {}): LedgerAd
 }
 
 interface DetailsQueryDescriptor {
-  startDateStr: string | null;
-  endDateStr: string | null;
   filterKey: string | null;
   summaryQueryKey: readonly unknown[];
   entriesQueryKey: readonly unknown[];
   /** The 汇总 read's own input: every caller hands it over as it stands. */
-  summaryInput: LedgerStatsQueryInput;
-  getEntriesInput: (pageParam?: string) => ListLedgerEntriesInput;
+  summaryInput: PeriodQuery<LedgerStatsQueryInput>;
+  getEntriesInput: (pageParam?: string) => PeriodQuery<ListLedgerEntriesInput>;
 }
 
 export function buildDetailsQueryDescriptor(input: {
   bookId?: string;
-  periodParams: PeriodParams;
+  period: Period;
   advancedFilters?: LedgerAdvancedFilters | undefined;
-  timeZone?: string | undefined;
   mainCurrency: string;
 }): DetailsQueryDescriptor {
   const filters = normalizeAdvancedFilters(input.advancedFilters);
-  const state = getDetailsInitialQueryState(input.periodParams, filters, input.timeZone);
   const filterKey = buildDetailsFilterKey(filters);
+  const period = periodKey(input.period);
   const detailsFilters = {
     ...(input.bookId == null ? {} : { bookId: input.bookId }),
+    period: input.period,
     ...(filters.categoryId != null ? { categoryId: filters.categoryId } : {}),
     ...(filters.currency != null ? { currency: filters.currency } : {}),
     ...(filters.minAmount != null ? { minAmount: filters.minAmount } : {}),
@@ -56,32 +50,22 @@ export function buildDetailsQueryDescriptor(input: {
   };
 
   return {
-    startDateStr: state.startDateStr,
-    endDateStr: state.endDateStr,
     filterKey,
     summaryQueryKey: queryKeys.summary({
       bookId: input.bookId,
-      startDate: state.startDateStr,
-      endDate: state.endDateStr,
+      period,
       currency: input.mainCurrency,
       filter: filterKey,
     }),
     entriesQueryKey: queryKeys.ledgerEntries({
       bookId: input.bookId,
       mode: "infinite",
-      startDate: state.startDateStr,
-      endDate: state.endDateStr,
+      period,
       filter: filterKey,
     }),
-    summaryInput: {
-      ...detailsFilters,
-      ...(state.startDateStr != null ? { startDate: state.startDateStr } : {}),
-      ...(state.endDateStr != null ? { endDate: state.endDateStr } : {}),
-    },
+    summaryInput: detailsFilters,
     getEntriesInput: (pageParam) => ({
       ...detailsFilters,
-      ...(state.startDateStr != null ? { startDate: state.startDateStr } : {}),
-      ...(state.endDateStr != null ? { endDate: state.endDateStr } : {}),
       ...(pageParam != null ? { cursor: pageParam } : {}),
       limit: DETAILS_PAGE_LIMIT,
     }),

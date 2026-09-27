@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AI_LANGUAGES } from "@/config/languages";
+import { LEDGER_TIME_ZONES } from "@/config/time-zones";
 import { useEffect, useRef, useState } from "react";
 import { settingsCopy } from "@/copy/settings";
 
@@ -82,6 +83,10 @@ export function BookkeepingSettings({
   };
   useEffect(() => () => flushPrompt.current(), []);
 
+  const timeZones = (LEDGER_TIME_ZONES as readonly string[]).includes(shown.timeZone)
+    ? LEDGER_TIME_ZONES
+    : [shown.timeZone, ...LEDGER_TIME_ZONES];
+
   return (
     <>
       <SettingsSection title={settingsCopy.bookkeepingRules}>
@@ -95,6 +100,24 @@ export function BookkeepingSettings({
             onCheckedChange={(checked) => void save({ collapseEntriesDefault: checked })}
             disabled={saving}
           />
+        </SettingsField>
+        <SettingsField title={settingsCopy.timeZone} description={settingsCopy.timeZoneDesc}>
+          <Select
+            value={shown.timeZone}
+            onValueChange={(value) => void save({ timeZone: value })}
+            disabled={saving}
+          >
+            <SelectTrigger aria-label={settingsCopy.timeZone} className="w-full sm:w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {timeZones.map((zone) => (
+                <SelectItem key={zone} value={zone}>
+                  {zone}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </SettingsField>
         <SettingsField title={settingsCopy.aiLanguage}>
           <Select

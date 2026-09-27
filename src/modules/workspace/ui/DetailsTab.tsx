@@ -10,7 +10,7 @@ import {
   batchDateImpactSummary,
   LedgerEntriesBatchActionToolbar,
 } from "@/modules/ledger/ui/batch-action-toolbar";
-import type { PeriodParams } from "@/lib/period-utils";
+import type { Period } from "@/modules/ledger/domain/period";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
 import { DISPLAY_LOCALE } from "@/lib/constants";
@@ -20,10 +20,10 @@ import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/EmptyState";
 import { useDetailsTab } from "../hooks/useDetailsTab";
-import type { LedgerAdvancedFilters } from "../initial-query-state";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
-import { usePeriodLabel } from "./usePeriodLabel";
+import { PeriodBar } from "./PeriodBar";
 import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { commonCopy } from "@/copy/common";
 import { detailsTabCopy, entryFilterPanelCopy } from "@/copy/workspace";
@@ -33,7 +33,9 @@ interface DetailsTabProps {
   bookId?: string | undefined;
   categories: EntryCategory[];
   ledger?: Ledger;
-  periodParams: PeriodParams;
+  period: Period;
+  today: string;
+  onPeriodChange: (period: Period) => void;
   filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters) => void;
   advancedFilters: LedgerAdvancedFilters;
@@ -44,7 +46,9 @@ export function DetailsTab({
   bookId,
   categories,
   ledger,
-  periodParams,
+  period,
+  today,
+  onPeriodChange,
   filters,
   onFiltersChange,
   advancedFilters,
@@ -54,11 +58,10 @@ export function DetailsTab({
     bookId,
     categories,
     ledger,
-    periodParams,
+    period,
     advancedFilters,
     timeZone,
   });
-  const rangeLabel = usePeriodLabel(periodParams, timeZone);
   const { entries, monthStats } = tab;
 
   if (tab.queryStatus === "error" && !tab.queryHasData) {
@@ -68,7 +71,6 @@ export function DetailsTab({
     <>
       {tab.queryStatus === "error" && <LedgerQueryErrorBanner empty={false} onRetry={tab.retry} />}
       <EntriesToolbarShell
-        {...(!tab.isSelectionMode && rangeLabel != null ? { rangeLabel } : {})}
         {...(!tab.isSelectionMode && monthStats.mainTotal != null
           ? {
               totalLabel: formatCurrencyAmount(
@@ -127,15 +129,21 @@ export function DetailsTab({
           )}
         </Button>
         {!tab.isSelectionMode ? (
-          <EntryFilterPanel
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            periodParams={periodParams}
-            categories={categories}
-            preferredCurrencies={ledger?.settings.currencies ?? []}
-            showStatus={false}
-            {...(timeZone != null ? { timeZone } : {})}
-          />
+          <>
+            <PeriodBar
+              period={period}
+              today={today}
+              onChange={onPeriodChange}
+              {...(timeZone != null ? { timeZone } : {})}
+            />
+            <EntryFilterPanel
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              categories={categories}
+              preferredCurrencies={ledger?.settings.currencies ?? []}
+              showStatus={false}
+            />
+          </>
         ) : null}
       </EntriesToolbarShell>
       {monthStats.unconvertedCount > 0 ? (

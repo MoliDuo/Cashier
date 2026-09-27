@@ -61,7 +61,7 @@ interface DemoFixture {
   user: { id: string; email: string };
   ledger: { id: string; mainCurrency: string; preferredCurrencies: string[]; aiLanguage: string };
   exchangeRates?: Record<string, string>;
-  books: Array<{ id: string; name: string; timeZone: string | null; sortOrder: number }>;
+  books: Array<{ id: string; name: string; sortOrder: number }>;
   categories: Array<{
     id: string;
     name: string;

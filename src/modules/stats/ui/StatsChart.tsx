@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useLedgerTimeZone } from "@/lib/ledger-time-zone";
 import {
   type DateRangeType,
   formatDateTimeForApi,
@@ -33,6 +34,7 @@ export function StatsChart({
   currencySymbol = "CNY",
 }: StatsChartProps) {
   const locale = DISPLAY_LOCALE;
+  const timeZone = useLedgerTimeZone();
   // The queried range is already truncated to the ledger-timezone today by the
   // stats state; do not re-clamp with the browser clock here.
   const chartPoints = useMemo(() => {
@@ -246,7 +248,7 @@ export function StatsChart({
           const displayDate =
             rangeType === "year"
               ? p.fullDate // YYYY-MM format
-              : formatRelativeDateLabel(p.fullDate, locale);
+              : formatRelativeDateLabel(p.fullDate, locale, timeZone);
 
           const isHovered = hoveredPoint?.dataset === chartPoints && hoveredPoint.index === i;
 

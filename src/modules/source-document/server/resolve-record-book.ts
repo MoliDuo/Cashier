@@ -12,14 +12,14 @@ import { ValidationError } from "@/lib/errors";
 export async function resolveRecordBook(
   ledgerId: string,
   requestedBookId: string | null | undefined
-): Promise<{ id: string; timeZone: string | null }> {
+): Promise<{ id: string }> {
   if (requestedBookId != null) {
     const requested = await getBook(ledgerId, requestedBookId);
     if (requested == null) throw new ValidationError("Unknown book");
-    return { id: requested.id, timeZone: requested.timeZone };
+    return { id: requested.id };
   }
   const live = await listBooks(ledgerId);
   const fallback = live[0] ?? null;
   if (fallback == null) throw new ValidationError("A book is required");
-  return { id: fallback.id, timeZone: fallback.timeZone };
+  return { id: fallback.id };
 }

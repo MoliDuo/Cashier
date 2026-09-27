@@ -1,9 +1,6 @@
 "use client";
 import * as React from "react";
-import { periodToDateRange, type PeriodParams, type PeriodPreset } from "@/lib/period-utils";
-import { formatDateTimeForApi } from "@/lib/date-utils";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
-import { resolveActivePreset, type EntryFilterPreset } from "@/modules/ledger/entry-filter-presets";
 import type { EntryFilters } from "@/modules/ledger/filters";
 import { compare, DECIMAL_STRING_PATTERN } from "@/lib/money/decimal";
 
@@ -29,8 +26,7 @@ function normalizeAmountRange(filters: EntryFilters): EntryFilters {
 
 interface UseEntryFilterDraftOptions {
   filters: EntryFilters;
-  onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
-  periodParams: PeriodParams;
+  onFiltersChange: (filters: EntryFilters) => void;
   showCategory: boolean;
   showCurrency: boolean;
   showStatus: boolean;
@@ -40,7 +36,6 @@ interface UseEntryFilterDraftOptions {
 export function useEntryFilterDraft({
   filters,
   onFiltersChange,
-  periodParams,
   showCategory,
   showCurrency,
   showStatus,
@@ -49,7 +44,6 @@ export function useEntryFilterDraft({
 
   // Internal state for editing before applying - initialized from filters when dialog opens
   const [tempFilters, setTempFilters] = React.useState<EntryFilters>(filters);
-  const [tempPeriod, setTempPeriod] = React.useState<EntryFilterPreset | null>(null);
 
   // Reset temp filters when the dialog opens (not using useEffect to sync with external filters)
   const handleOpenChange = (isOpen: boolean) => {
@@ -57,17 +51,11 @@ export function useEntryFilterDraft({
     if (isOpen) {
       // Initialize draft state from current filters when opening
       setTempFilters(filters);
-      setTempPeriod(null);
     }
   };
 
-  // Which date range the ledger is on, and which one the draft is on: the panel
-  // paints the draft so a preset click is visible before it is applied.
-  const activePreset = resolveActivePreset(periodParams);
-  const displayPreset = tempPeriod ?? activePreset;
-
-  // The period is printed beside the total, so it is not counted as a filter:
-  // looking at 全部 or 上个月 is a view, not a narrowing.
+  // The period has a bar of its own beside the filter, so only what narrows
+  // the list is counted here.
   const activeFilterCount = [
     filters.search != null && filters.search.trim() !== "",
     showStatus && (filters.statuses?.length ?? 0) > 0,
@@ -77,67 +65,21 @@ export function useEntryFilterDraft({
     filters.maxAmount !== undefined && filters.maxAmount !== null,
   ].filter((x): x is true => x === true).length;
 
-  const handleDatePreset = (preset: EntryFilterPreset) => {
-    let newFilters = { ...tempFilters };
-
-    if (preset === "all") {
-      delete newFilters.startDate;
-      delete newFilters.endDate;
-    } else if (preset !== "custom") {
-      // Delegates to the same date-range math the server and the URL layer
-      // use (period-utils.ts), instead of a second, drifting implementation.
-      const range = periodToDateRange({ period: preset });
-      newFilters = {
-        ...newFilters,
-        ...(range.startDate != null ? { startDate: range.startDate } : {}),
-        ...(range.endDate != null ? { endDate: range.endDate } : {}),
-      };
-    }
-
-    setTempFilters(newFilters);
-    setTempPeriod(preset);
-  };
-
-  const setTempFilterDate = (field: "startDate" | "endDate", date: Date | null) => {
-    setTempFilters((prev) => {
-      const next: EntryFilters = { ...prev };
-      if (field === "startDate") {
-        if (date == null) {
-          delete next.startDate;
-        } else {
-          next.startDate = formatDateTimeForApi(date);
-        }
-      } else if (date == null) {
-        delete next.endDate;
-      } else {
-        next.endDate = formatDateTimeForApi(date);
-      }
-      return next;
-    });
-    setTempPeriod("custom");
-  };
-
   const handleApply = () => {
     const normalizedFilters = normalizeAmountRange(tempFilters);
-    if (tempPeriod == null) onFiltersChange(normalizedFilters);
-    else onFiltersChange(normalizedFilters, tempPeriod);
+    onFiltersChange(normalizedFilters);
     setOpen(false);
   };
 
   const handleReset = () => {
-    const now = new Date();
-    const defaultFilters: EntryFilters = {
-      startDate: formatDateTimeForApi(new Date(now.getFullYear(), now.getMonth(), 1)),
-      endDate: formatDateTimeForApi(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    setTempFilters({
       categoryId: null,
       currency: null,
       minAmount: null,
       maxAmount: null,
       statuses: [],
       search: null,
-    };
-    setTempFilters(defaultFilters);
-    setTempPeriod("thisMonth");
+    });
   };
 
   const toggleStatus = (status: SourceDocumentProcessingStatus) => {
@@ -157,12 +99,7 @@ export function useEntryFilterDraft({
     handleOpenChange,
     tempFilters,
     setTempFilters,
-    tempPeriod,
     activeFilterCount,
-    activePreset,
-    displayPreset,
-    handleDatePreset,
-    setTempFilterDate,
     handleApply,
     handleReset,
     toggleStatus,

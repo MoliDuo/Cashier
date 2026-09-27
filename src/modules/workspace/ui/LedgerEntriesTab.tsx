@@ -1,7 +1,7 @@
 import type { Ledger } from "@/modules/ledger/contracts";
-import { type PeriodParams } from "@/lib/period-utils";
+import type { Period } from "@/modules/ledger/domain/period";
 import { type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
-import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { useLedgerEntriesTab } from "@/modules/workspace/hooks/useLedgerEntriesTab";
 import { LedgerEntriesToolbar } from "./LedgerEntriesToolbar";
 import { LedgerEntriesStreamBody } from "./LedgerEntriesStreamBody";
@@ -13,7 +13,9 @@ interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
   ledger?: Ledger;
-  periodParams: PeriodParams;
+  period: Period;
+  today: string;
+  onPeriodChange: (period: Period) => void;
   onFiltersChange: (filters: EntryFilters) => void;
   advancedFilters?: LedgerAdvancedFilters;
   collapseEntriesDefault?: boolean;
@@ -23,7 +25,9 @@ interface LedgerEntriesTabProps {
 export function LedgerEntriesTab({
   bookId,
   ledger,
-  periodParams,
+  period,
+  today,
+  onPeriodChange,
   onFiltersChange,
   advancedFilters,
   collapseEntriesDefault = false,
@@ -33,9 +37,8 @@ export function LedgerEntriesTab({
   const { filters, stream, selection, recovery, dialogs, actions } = useLedgerEntriesTab({
     bookId,
     mainCurrency,
-    periodParams,
+    period,
     advancedFilters,
-    timeZone,
   });
 
   return (
@@ -62,7 +65,9 @@ export function LedgerEntriesTab({
         isProcessing={selection.isBatchPending}
         filters={filters}
         onFiltersChange={onFiltersChange}
-        periodParams={periodParams}
+        period={period}
+        today={today}
+        onPeriodChange={onPeriodChange}
         mainCurrency={mainCurrency}
         {...(stream.filteredTotal === undefined ? {} : { filteredTotal: stream.filteredTotal })}
         {...(timeZone != null ? { timeZone } : {})}

@@ -61,7 +61,7 @@ const baseProps = {
   savedBook: { id: BOOK_ID, name: "Travel" } as { id: string; name: string } | null,
   ledgerId: "ledger-1",
   activeTab: "stream" as const,
-  committedFilters: {},
+  committedView: { filters: {}, range: null },
   inputMode: "quick" as const,
   categories: [],
   mainCurrency: "CNY",

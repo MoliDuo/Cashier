@@ -61,12 +61,7 @@ async function LedgerShellData({
 
   return (
     <HydrationBoundary state={state}>
-      <LedgerWorkspace
-        initialDeviceTimeZone={view.deviceTimeZone}
-        {...(view.ledgerToday !== undefined ? { ledgerToday: view.ledgerToday } : {})}
-      >
-        {children}
-      </LedgerWorkspace>
+      <LedgerWorkspace ledgerToday={view.ledgerToday}>{children}</LedgerWorkspace>
     </HydrationBoundary>
   );
 }

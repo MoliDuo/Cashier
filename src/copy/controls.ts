@@ -1,12 +1,3 @@
-export const dateRangeFilterCopy = {
-  thisMonth: "本月",
-  lastMonth: "上个月",
-  customRange: "自定义区间",
-  startDate: "开始日期",
-  endDate: "结束日期",
-  all: "全部",
-};
-
 export const dateFilterCopy = {
   selectDate: "选择日期",
   clear: "清除",
@@ -46,4 +37,19 @@ export const calendarCopy = {
   dateFormat: (v: { year: string | number; month: string | number }) => `${v.year}年${v.month}月`,
   productName: "商品名称",
   addNote: "添加备注",
+};
+
+export const periodBarCopy = {
+  label: "区间",
+  choose: "选择区间",
+  previous: "上一期",
+  next: "下一期",
+  week: "周",
+  month: "月",
+  year: "年",
+  all: "全部",
+  custom: "自定义",
+  apply: "应用",
+  from: "开始日期",
+  to: "结束日期",
 };

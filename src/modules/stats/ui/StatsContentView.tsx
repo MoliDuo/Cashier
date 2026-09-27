@@ -1,16 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { BarChart3, Grid3X3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DateRangeType } from "@/lib/date-utils";
+import { parseDateString, type DateRangeType } from "@/lib/date-utils";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import { deriveStatsInsights } from "@/modules/stats/lib/derived-insights";
 import { CalendarHeatmapSection } from "./CalendarHeatmapSection";
 import { StatsChart } from "./StatsChart";
 import { StatsHighlights } from "./StatsHighlights";
 import { StatsPanel } from "./StatsPanel";
-import { StatsPeriodBar } from "./StatsPeriodBar";
 import { StatsRanking } from "./StatsRanking";
 import { StatsSummary } from "./StatsSummary";
 import { StatsWeekdayRhythm } from "./StatsWeekdayRhythm";
@@ -18,17 +17,17 @@ import { DISPLAY_LOCALE } from "@/lib/constants";
 import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { statsTabCopy } from "@/copy/stats";
 
+/** How finely the charts read the days: by day for a week or a month, by month beyond. */
+export type StatsScale = DateRangeType;
+
 interface StatsContentViewProps {
-  rangeType: DateRangeType;
-  contentRangeType: DateRangeType;
-  onRangeTypeChange: (rangeType: DateRangeType) => void;
-  periodOffset: number;
-  onPeriodOffsetChange: (offset: number) => void;
-  label: string;
-  startDate: Date;
-  endDate: Date;
-  startDateStr: string;
-  endDateStr: string;
+  /** The period control, owned by the route that owns the URL. */
+  periodBar: ReactNode;
+  /** The days the figures cover. */
+  range: { from: string; to: string };
+  scale: StatsScale;
+  /** What the figures are set against, e.g. 上月; null hides the comparison. */
+  comparisonLabel: string | null;
   stats: EnhancedStatsDto | undefined;
   isLoading?: boolean;
   isError?: boolean;
@@ -38,20 +37,13 @@ interface StatsContentViewProps {
   fallbackCurrency?: string;
   onCategoryDrilldown?: (categoryId: string, startDate: string, endDate: string) => void;
   onDateDrilldown?: (date: string) => void;
-  readOnly?: boolean;
 }
 
 export function StatsContentView({
-  rangeType,
-  contentRangeType,
-  onRangeTypeChange,
-  periodOffset,
-  onPeriodOffsetChange,
-  label,
-  startDate,
-  endDate,
-  startDateStr,
-  endDateStr,
+  periodBar,
+  range,
+  scale,
+  comparisonLabel,
   stats,
   isLoading = false,
   isError = false,
@@ -61,16 +53,14 @@ export function StatsContentView({
   fallbackCurrency = "CNY",
   onCategoryDrilldown,
   onDateDrilldown,
-  readOnly = false,
 }: StatsContentViewProps) {
   const locale = DISPLAY_LOCALE;
   const currencySymbol = stats?.summary.currency ?? fallbackCurrency;
-  const periodLabel =
-    contentRangeType === "week"
-      ? statsTabCopy.lastWeek
-      : contentRangeType === "month"
-        ? statsTabCopy.lastMonth
-        : statsTabCopy.lastYear;
+  const periodLabel = comparisonLabel ?? "";
+  const startDateStr = range.from;
+  const endDateStr = range.to;
+  const startDate = parseDateString(startDateStr);
+  const endDate = parseDateString(endDateStr);
 
   // Derived once here rather than in each panel: they are all reading the same
   // payload, and three copies of the walk would be three chances to disagree.
@@ -78,8 +68,11 @@ export function StatsContentView({
     () =>
       stats == null
         ? null
-        : deriveStatsInsights(stats, { startDate: startDateStr, endDate: endDateStr }),
-    [endDateStr, startDateStr, stats]
+        : withoutComparison(
+            deriveStatsInsights(stats, { startDate: startDateStr, endDate: endDateStr }),
+            comparisonLabel == null
+          ),
+    [comparisonLabel, endDateStr, startDateStr, stats]
   );
 
   if (isError && stats == null) {
@@ -106,7 +99,6 @@ export function StatsContentView({
         variant={chartView === "heatmap" ? "default" : "ghost"}
         size="sm"
         onClick={() => onChartViewChange("heatmap")}
-        disabled={readOnly}
         aria-pressed={chartView === "heatmap"}
         className="h-7 px-2"
       >
@@ -117,7 +109,6 @@ export function StatsContentView({
         variant={chartView === "trend" ? "default" : "ghost"}
         size="sm"
         onClick={() => onChartViewChange("trend")}
-        disabled={readOnly}
         aria-pressed={chartView === "trend"}
         className="h-7 px-2"
       >
@@ -143,20 +134,13 @@ export function StatsContentView({
         </div>
       ) : null}
 
-      <StatsPeriodBar
-        rangeType={rangeType}
-        setRangeType={onRangeTypeChange}
-        periodOffset={periodOffset}
-        setPeriodOffset={onPeriodOffsetChange}
-        label={label}
-        readOnly={readOnly}
-      />
+      {periodBar}
 
       <StatsSummary
         total={stats?.summary.total ?? "0"}
         dailyAverage={stats?.summary.dailyAverage ?? "0"}
         currencySymbol={currencySymbol}
-        comparison={stats?.summary.comparison}
+        comparison={comparisonLabel == null ? undefined : stats?.summary.comparison}
         periodLabel={periodLabel}
         insights={
           insights ?? {
@@ -173,7 +157,6 @@ export function StatsContentView({
         chart={stats?.chart ?? []}
         previousChart={stats?.previousChart ?? []}
         onExpandTrend={chartView === "trend" ? undefined : () => onChartViewChange("trend")}
-        readOnly={readOnly}
         isLoading={isLoading && stats == null}
       />
 
@@ -205,7 +188,7 @@ export function StatsContentView({
                 data={stats.chart}
                 previousData={stats.previousChart}
                 dailyAverage={stats.summary.dailyAverage}
-                rangeType={contentRangeType}
+                rangeType={scale}
                 startDate={startDate}
                 endDate={endDate}
                 isLoading={isLoading && stats == null}
@@ -246,7 +229,7 @@ export function StatsContentView({
             />
           ) : null}
 
-          {insights != null && contentRangeType !== "week" ? (
+          {insights != null && scale !== "week" ? (
             <StatsWeekdayRhythm
               weekdayAverages={insights.weekdayAverages}
               currencySymbol={currencySymbol}
@@ -256,4 +239,9 @@ export function StatsContentView({
       </div>
     </div>
   );
+}
+
+/** Without a comparison there is no "more than last time" to point out. */
+function withoutComparison<T extends { topMover: unknown }>(insights: T, hide: boolean): T {
+  return hide ? { ...insights, topMover: null } : insights;
 }

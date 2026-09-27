@@ -35,6 +35,8 @@ export const ledgers = pgTable(
     mainCurrency: varchar("main_currency", { length: 3 }).notNull().default("CNY"),
     collapseEntriesDefault: boolean("collapse_entries_default").notNull().default(false),
     aiCustomPrompt: text("ai_custom_prompt").notNull().default(""),
+    /** The zone every day in the ledger is read in: "today", periods, record dates. */
+    timeZone: text("time_zone").notNull().default("Asia/Shanghai"),
     createdAt: rowTimestamp("created_at"),
     updatedAt: rowTimestamp("updated_at"),
   },
@@ -49,6 +51,7 @@ export const ledgers = pgTable(
     ),
     check("ck_ledgers_ai_language_length", sql`length(${table.aiLanguage}) BETWEEN 2 AND 35`),
     check("ck_ledgers_ai_custom_prompt_length", sql`length(${table.aiCustomPrompt}) <= 4000`),
+    check("ck_ledgers_time_zone_length", sql`length(${table.timeZone}) BETWEEN 1 AND 50`),
   ]
 );
 
@@ -57,9 +60,8 @@ export type Ledger = InferSelectModel<typeof ledgers>;
 /**
  * A 分账: the bucket every record belongs to. Reading all of them together is
  * 总账, which is a view over every book rather than a designated one, so no row
- * here is special. `time_zone` null means "no zone of this book's own": a
- * record entered in the web app is then dated in the device's zone, while one
- * uploaded through an API key — which has no device — is dated in the server's.
+ * here is special. `time_zone` is retired: the ledger's zone dates every book,
+ * and the column stays only until the release that drops it.
  */
 export const books = pgTable(
   "books",

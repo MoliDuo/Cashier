@@ -39,7 +39,8 @@ function renderStatsTab(bookId?: string) {
       <StatsTab
         {...(bookId == null ? {} : { bookId })}
         ledger={ledgerFixture}
-        ledgerToday="2026-08-24"
+        today="2026-08-24"
+        timeZone="Asia/Shanghai"
       />
     </QueryClientProvider>
   );
@@ -65,7 +66,12 @@ describe("StatsTab", () => {
 
     rerender(
       <QueryClientProvider client={queryClient}>
-        <StatsTab bookId="book-2" ledger={ledgerFixture} ledgerToday="2026-08-24" />
+        <StatsTab
+          bookId="book-2"
+          ledger={ledgerFixture}
+          today="2026-08-24"
+          timeZone="Asia/Shanghai"
+        />
       </QueryClientProvider>
     );
     await waitFor(() =>
@@ -82,7 +88,12 @@ describe("StatsTab", () => {
     vi.mocked(fetchEnhancedStats).mockImplementation(() => new Promise<EnhancedStatsDto>(() => {}));
     rerender(
       <QueryClientProvider client={queryClient}>
-        <StatsTab bookId="book-2" ledger={ledgerFixture} ledgerToday="2026-08-24" />
+        <StatsTab
+          bookId="book-2"
+          ledger={ledgerFixture}
+          today="2026-08-24"
+          timeZone="Asia/Shanghai"
+        />
       </QueryClientProvider>
     );
 
@@ -100,5 +111,14 @@ describe("StatsTab", () => {
     renderStatsTab();
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+  });
+
+  it("asks for the period in the URL and leaves its days to the server", async () => {
+    searchParamsState.current = new URLSearchParams("range=week&offset=-1");
+    renderStatsTab();
+
+    await waitFor(() =>
+      expect(fetchEnhancedStats).toHaveBeenCalledWith({ period: { range: "week", offset: -1 } })
+    );
   });
 });

@@ -50,6 +50,7 @@ export async function seedLedger(
     mainCurrency?: string;
     preferredCurrencies?: string[];
     aiLanguage?: string;
+    timeZone?: string;
     at?: Date;
   } = {}
 ): Promise<string> {
@@ -64,6 +65,7 @@ export async function seedLedger(
         ? {}
         : { preferredCurrencies: input.preferredCurrencies }),
       ...(input.aiLanguage == null ? {} : { aiLanguage: input.aiLanguage }),
+      ...(input.timeZone == null ? {} : { timeZone: input.timeZone }),
       createdAt: at,
       updatedAt: at,
     })
@@ -74,7 +76,6 @@ export async function seedLedger(
 export interface SeedBook {
   id?: string;
   name: string;
-  timeZone?: string | null;
   /** Defaults to the book's 1-based place in the list. */
   sortOrder?: number;
 }
@@ -93,7 +94,6 @@ export async function seedBooks(
       id: spec.id ?? crypto.randomUUID(),
       ledgerId,
       name: spec.name,
-      timeZone: spec.timeZone ?? null,
       sortOrder: spec.sortOrder ?? index + 1,
       createdAt,
       updatedAt: createdAt,

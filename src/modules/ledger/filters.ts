@@ -7,9 +7,8 @@ import type { SourceDocumentProcessingStatus } from "@/modules/source-document/t
  */
 export type RecordScope = string | null;
 
+/** What the filter dialog narrows a list by; its days are the period's, not these. */
 export interface EntryFilters {
-  startDate?: string;
-  endDate?: string;
   categoryId?: string | null;
   currency?: string | null;
   minAmount?: string | null;

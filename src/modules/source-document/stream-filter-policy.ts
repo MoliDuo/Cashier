@@ -2,30 +2,11 @@ import { compare } from "@/lib/money/decimal";
 import { normalizeSearchTerm } from "@/lib/search";
 import type { SourceDocumentListItemDto } from "./contracts";
 
-export interface StreamFilterPolicy {
-  startDate?: string | null;
-  endDate?: string | null;
+/** The entry filters a stream card's rows are narrowed by, as the stream SQL applies them. */
+interface StreamFilterPolicy {
   minAmount?: string | null;
   maxAmount?: string | null;
-  statuses?: readonly string[] | string | null;
   search?: string | null;
-}
-
-export function getStreamEffectiveDate(item: {
-  documentDate?: string | null;
-  createdAt: string;
-}): string {
-  if (item.documentDate != null && item.documentDate !== "") return item.documentDate;
-  return item.createdAt.slice(0, 10);
-}
-
-function normalizedStatuses(statuses: StreamFilterPolicy["statuses"]): readonly string[] {
-  if (typeof statuses !== "string") return statuses ?? [];
-  if (statuses === "") return [];
-  return statuses
-    .split(",")
-    .map((status: string) => status.trim())
-    .filter(Boolean);
 }
 
 function normalizedSearch(search: StreamFilterPolicy["search"]): string | undefined {
@@ -80,37 +61,4 @@ export function filterStreamEntries(
   const resolvedEntries = entries ?? [];
   if (!hasStreamEntryFilters(filters)) return resolvedEntries;
   return resolvedEntries.filter((entry) => matchesStreamEntry(entry, filters));
-}
-
-export function matchesStreamDocument(
-  item: SourceDocumentListItemDto,
-  filters: StreamFilterPolicy
-): boolean {
-  const statuses = normalizedStatuses(filters.statuses);
-  if (
-    statuses.length > 0 &&
-    (item.processingStatus == null || !statuses.includes(item.processingStatus))
-  )
-    return false;
-
-  const effectiveDate = getStreamEffectiveDate(item);
-  if (filters.startDate != null && filters.startDate !== "" && effectiveDate < filters.startDate) {
-    return false;
-  }
-  if (filters.endDate != null && filters.endDate !== "" && effectiveDate > filters.endDate) {
-    return false;
-  }
-
-  if (!hasStreamEntryFilters(filters)) return true;
-  return filterStreamEntries(item.ledgerEntries ?? [], filters).length > 0;
-}
-
-export function projectStreamDocument(
-  item: SourceDocumentListItemDto,
-  filters: StreamFilterPolicy
-): SourceDocumentListItemDto {
-  return {
-    ...item,
-    ledgerEntries: filterStreamEntries(item.ledgerEntries ?? [], filters),
-  };
 }

@@ -15,7 +15,7 @@ import {
 } from "@/lib/date-utils";
 import { add as addDecimal } from "@/lib/money/decimal";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
-import type { PeriodParams } from "@/lib/period-utils";
+import { periodKey, type Period } from "@/modules/ledger/domain/period";
 import type {
   ActiveLedgerEntryDto,
   CategoryAssignmentMode,
@@ -34,7 +34,7 @@ import {
 import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/category-assignment";
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
-import type { LedgerAdvancedFilters } from "../initial-query-state";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { commonCopy } from "@/copy/common";
 import { batchActionsCopy, detailsTabCopy } from "@/copy/workspace";
 
@@ -82,19 +82,12 @@ function selectionMatches(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
-function entryDate(entry: ActiveLedgerEntryDto): string {
-  if (entry.sourceDocument.documentDate != null && entry.sourceDocument.documentDate !== "") {
-    return entry.sourceDocument.documentDate;
-  }
-  return formatDateTimeForApi(new Date(entry.createdAt));
-}
-
 interface UseDetailsTabOptions {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
   categories: readonly EntryCategory[];
   ledger?: Ledger | undefined;
-  periodParams: PeriodParams;
+  period: Period;
   advancedFilters: LedgerAdvancedFilters;
   timeZone?: string | undefined;
 }
@@ -109,7 +102,7 @@ export function useDetailsTab({
   bookId,
   categories,
   ledger,
-  periodParams,
+  period,
   advancedFilters,
   timeZone,
 }: UseDetailsTabOptions) {
@@ -122,12 +115,11 @@ export function useDetailsTab({
     () =>
       buildDetailsQueryDescriptor({
         ...(bookId == null ? {} : { bookId }),
-        periodParams,
+        period,
         advancedFilters,
-        ...(timeZone !== undefined ? { timeZone } : {}),
         mainCurrency,
       }),
-    [advancedFilters, bookId, mainCurrency, periodParams, timeZone]
+    [advancedFilters, bookId, mainCurrency, period]
   );
 
   const summaryQuery = useQuery({
@@ -189,7 +181,7 @@ export function useDetailsTab({
   const groupedItems = useMemo(() => {
     const groups = new Map<string, EntryDateGroup>();
     for (const entry of entries) {
-      const dateStr = entryDate(entry);
+      const dateStr = entry.sourceDocument.effectiveDate;
       let group = groups.get(dateStr);
       if (group == null) {
         group = {
@@ -212,11 +204,11 @@ export function useDetailsTab({
     () =>
       JSON.stringify({
         tab: "details",
-        period: periodParams,
+        period: periodKey(period),
         filters: advancedFilters,
         bookId,
       }),
-    [advancedFilters, bookId, periodParams]
+    [advancedFilters, bookId, period]
   );
   const allIds = useMemo(() => entries.map((entry) => entry.id), [entries]);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);

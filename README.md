@@ -107,13 +107,13 @@ npm run account:enroll -- --email you@example.com
 
 ### 应用与 AI
 
-| 变量              | 必需 | 默认值                      | 说明                           |
-| ----------------- | ---- | --------------------------- | ------------------------------ |
-| `APP_URL`         | 否   | `http://localhost:3000`     | 用户访问 Cashier 的公开地址。  |
-| `OPENAI_API_KEY`  | 是   | 无                          | OpenAI 或兼容服务的 API 密钥。 |
-| `OPENAI_BASE_URL` | 否   | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址。       |
-| `AI_MODEL`        | 否   | `gpt-4o`                    | 用于票据解析和分类的模型名。   |
-| `TZ`              | 否   | `Asia/Shanghai`             | 服务端默认时区。               |
+| 变量              | 必需 | 默认值                      | 说明                                                         |
+| ----------------- | ---- | --------------------------- | ------------------------------------------------------------ |
+| `APP_URL`         | 否   | `http://localhost:3000`     | 用户访问 Cashier 的公开地址。                                |
+| `OPENAI_API_KEY`  | 是   | 无                          | OpenAI 或兼容服务的 API 密钥。                               |
+| `OPENAI_BASE_URL` | 否   | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址。                                     |
+| `AI_MODEL`        | 否   | `gpt-4o`                    | 用于票据解析和分类的模型名。                                 |
+| `TZ`              | 否   | `Asia/Shanghai`             | 服务端进程的时区。账本的日期按设置里的时区计算，不受它影响。 |
 
 使用其他 OpenAI 兼容服务时，同时修改 `OPENAI_BASE_URL` 和 `AI_MODEL`。
 

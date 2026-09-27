@@ -24,7 +24,6 @@ import {
   openLedgerDetail,
   openLedgerEntrySourceDocument,
 } from "@/lib/navigation/ledger-detail-navigation";
-import type { PeriodParams } from "@/lib/period-utils";
 import { queryKeys } from "@/lib/query-keys";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
@@ -44,7 +43,8 @@ import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/
 import { retrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
 import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import { buildUnifiedStreamGroups } from "@/modules/source-document/stream-grouping";
-import type { LedgerAdvancedFilters } from "@/modules/workspace/initial-query-state";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
+import { periodKey, type Period } from "@/modules/ledger/domain/period";
 import { buildLedgerEntryFilters } from "@/modules/workspace/ledger-filter-state";
 import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
@@ -106,9 +106,8 @@ interface UseLedgerEntriesTabOptions {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
   mainCurrency: string;
-  periodParams: PeriodParams;
+  period: Period;
   advancedFilters?: LedgerAdvancedFilters | undefined;
-  timeZone?: string | undefined;
 }
 
 /**
@@ -119,38 +118,25 @@ interface UseLedgerEntriesTabOptions {
 export function useLedgerEntriesTab({
   bookId,
   mainCurrency,
-  periodParams,
+  period,
   advancedFilters,
-  timeZone,
 }: UseLedgerEntriesTabOptions) {
   const queryClient = useQueryClient();
 
   // --- The stream -----------------------------------------------------------
 
-  const filters = useMemo(
-    () => buildLedgerEntryFilters(periodParams, advancedFilters, timeZone),
-    [periodParams, advancedFilters, timeZone]
-  );
+  const filters = useMemo(() => buildLedgerEntryFilters(advancedFilters), [advancedFilters]);
   const queryDescriptor = useMemo(
     () =>
       buildStreamQueryDescriptor({
         ...(bookId == null ? {} : { bookId }),
-        startDate: filters.startDate,
-        endDate: filters.endDate,
+        period,
         minAmount: filters.minAmount,
         maxAmount: filters.maxAmount,
         statuses: filters.statuses,
         search: filters.search,
       }),
-    [
-      bookId,
-      filters.endDate,
-      filters.maxAmount,
-      filters.minAmount,
-      filters.search,
-      filters.statuses,
-      filters.startDate,
-    ]
+    [bookId, filters.maxAmount, filters.minAmount, filters.search, filters.statuses, period]
   );
   const streamPageKey = queryDescriptor.queryKey;
 
@@ -251,8 +237,8 @@ export function useLedgerEntriesTab({
     [streamGroups]
   );
   const queryFingerprint = useMemo(
-    () => JSON.stringify({ tab: "stream", period: periodParams, filters: advancedFilters }),
-    [advancedFilters, periodParams]
+    () => JSON.stringify({ tab: "stream", period: periodKey(period), filters: advancedFilters }),
+    [advancedFilters, period]
   );
   const {
     isSelectionMode,

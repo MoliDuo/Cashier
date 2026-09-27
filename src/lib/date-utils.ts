@@ -1,17 +1,4 @@
-import {
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  addWeeks,
-  addMonths,
-  addYears,
-  startOfDay,
-  endOfDay,
-  parseISO,
-} from "date-fns";
+import { parseISO } from "date-fns";
 import { commonCopy } from "@/copy/common";
 
 const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
@@ -30,68 +17,6 @@ function getDateTimeFormatter(
 }
 
 export type DateRangeType = "week" | "month" | "year";
-
-export interface DateRange {
-  startDate: Date;
-  endDate: Date;
-}
-
-export function getStartOfWeek(date: Date): Date {
-  return startOfWeek(date, { weekStartsOn: 1 });
-}
-
-export function getEndOfWeek(date: Date): Date {
-  return endOfWeek(date, { weekStartsOn: 1 });
-}
-
-export function getStartOfMonth(date: Date): Date {
-  return startOfMonth(date);
-}
-
-export function getEndOfMonth(date: Date): Date {
-  return endOfMonth(date);
-}
-
-export function getStartOfYear(date: Date): Date {
-  return startOfYear(date);
-}
-
-export function getEndOfYear(date: Date): Date {
-  return endOfYear(date);
-}
-
-export function getDateRange(date: Date, type: DateRangeType): DateRange {
-  let start: Date;
-  let end: Date;
-
-  switch (type) {
-    case "week":
-      start = getStartOfWeek(date);
-      end = getEndOfWeek(date);
-      break;
-    case "month":
-      start = getStartOfMonth(date);
-      end = getEndOfMonth(date);
-      break;
-    case "year":
-      start = getStartOfYear(date);
-      end = getEndOfYear(date);
-      break;
-  }
-
-  return { startDate: start, endDate: end };
-}
-
-export function addPeriod(date: Date, type: DateRangeType, amount: number): Date {
-  switch (type) {
-    case "week":
-      return addWeeks(date, amount);
-    case "month":
-      return addMonths(date, amount);
-    case "year":
-      return addYears(date, amount);
-  }
-}
 
 /**
  * Format date to yyyy-MM-dd string using LOCAL time (not UTC).
@@ -140,38 +65,6 @@ export function formatCivilDate(
   }
 
   return getDateTimeFormatter(locale, { ...options, timeZone: "UTC" }).format(date);
-}
-
-/**
- * Parse a date string as the START of day (00:00:00.000).
- * Used by backend to construct query conditions for startDate parameters.
- *
- * Uses date-fns for reliable parsing and day boundary calculation.
- */
-export function parseDateRangeStart(dateStr: string | null | undefined): Date | null {
-  if (dateStr == null || dateStr === "") return null;
-
-  // parseISO handles both "yyyy-MM-dd" and full ISO strings
-  const parsed = parseISO(dateStr);
-  if (isNaN(parsed.getTime())) return null;
-
-  return startOfDay(parsed);
-}
-
-/**
- * Parse a date string as the END of day (23:59:59.999).
- * Used by backend to construct query conditions for endDate parameters.
- *
- * Uses date-fns for reliable parsing and day boundary calculation.
- */
-export function parseDateRangeEnd(dateStr: string | null | undefined): Date | null {
-  if (dateStr == null || dateStr === "") return null;
-
-  // parseISO handles both "yyyy-MM-dd" and full ISO strings
-  const parsed = parseISO(dateStr);
-  if (isNaN(parsed.getTime())) return null;
-
-  return endOfDay(parsed);
 }
 
 /**
@@ -271,7 +164,7 @@ export function formatInstantDateLabel(
 }
 
 /** A day written out in full, weekday and year included, weekday trailing. */
-export function formatFullDate(date: Date, locale: string): string {
+function formatFullDate(date: Date, locale: string): string {
   const day = getDateTimeFormatter(locale, {
     year: "numeric",
     month: "long",
@@ -282,7 +175,7 @@ export function formatFullDate(date: Date, locale: string): string {
 }
 
 /** The calendar day an instant falls on, as "YYYY-MM-DD", in `timeZone`. */
-export function formatDateKeyInTimeZone(date: Date, timeZone?: string): string {
+function formatDateKeyInTimeZone(date: Date, timeZone?: string): string {
   try {
     return getDateTimeFormatter(
       "sv-SE",

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
-import {
-  getStreamEffectiveDate,
-  matchesStreamDocument,
-  projectStreamDocument,
-} from "@/modules/source-document/stream-filter-policy";
+import { filterStreamEntries } from "@/modules/source-document/stream-filter-policy";
 
 function makeItem(overrides: Partial<SourceDocumentListItemDto> = {}): SourceDocumentListItemDto {
   return {
@@ -17,6 +13,7 @@ function makeItem(overrides: Partial<SourceDocumentListItemDto> = {}): SourceDoc
     failureKind: null,
     failureMessage: null,
     documentDate: "2026-08-05",
+    effectiveDate: "2026-08-05",
     createdAt: "2026-08-06T00:00:00.000Z",
     updatedAt: "2026-08-06T00:00:00.000Z",
     hasImages: false,
@@ -51,60 +48,28 @@ function makeEntry(
 
 describe("stream filter policy", () => {
   it("matches search only against entry name and description", () => {
-    const item = makeItem({
-      title: "Coffee",
-      ledgerEntries: [makeEntry({ itemName: "Tea", description: "Afternoon drink" })],
-    });
+    const entries = [makeEntry({ itemName: "Tea", description: "Afternoon drink" })];
 
-    expect(matchesStreamDocument(item, { search: "coffee" })).toBe(false);
-    expect(matchesStreamDocument(item, { search: "afternoon" })).toBe(true);
+    expect(filterStreamEntries(entries, { search: "coffee" })).toHaveLength(0);
+    expect(filterStreamEntries(entries, { search: "afternoon" })).toHaveLength(1);
   });
 
   it("requires one entry to satisfy all amount bounds", () => {
-    const item = makeItem({
-      ledgerEntries: [
-        makeEntry({
-          id: "00000000-0000-4000-8000-000000000004",
-          amount: "5.00",
-          convertedAmount: "5.00",
-        }),
-        makeEntry({
-          id: "00000000-0000-4000-8000-000000000005",
-          amount: "100.00",
-          convertedAmount: "100.00",
-        }),
-      ],
-    });
+    const entries = [
+      makeEntry({ id: "00000000-0000-4000-8000-000000000004", convertedAmount: "5.00" }),
+      makeEntry({ id: "00000000-0000-4000-8000-000000000005", convertedAmount: "100.00" }),
+    ];
 
-    expect(matchesStreamDocument(item, { minAmount: "10", maxAmount: "90" })).toBe(false);
-  });
-
-  it("excludes empty-entry documents from amount and search windows", () => {
-    const item = makeItem({ ledgerEntries: [] });
-
-    expect(matchesStreamDocument(item, { minAmount: "1" })).toBe(false);
-    expect(matchesStreamDocument(item, { search: "latte" })).toBe(false);
+    expect(filterStreamEntries(entries, { minAmount: "10", maxAmount: "90" })).toHaveLength(0);
   });
 
   it("does not match amount windows with unconverted entries", () => {
-    const item = makeItem({
-      ledgerEntries: [makeEntry({ amount: "1.00", convertedAmount: null })],
-    });
+    const entries = [makeEntry({ amount: "1.00", convertedAmount: null })];
 
-    expect(matchesStreamDocument(item, { minAmount: "1" })).toBe(false);
+    expect(filterStreamEntries(entries, { minAmount: "1" })).toHaveLength(0);
   });
 
-  it("uses entryDate and then the UTC created-at date as the effective date", () => {
-    expect(getStreamEffectiveDate(makeItem({ documentDate: "2026-08-01" }))).toBe("2026-08-01");
-    expect(
-      getStreamEffectiveDate({
-        documentDate: null,
-        createdAt: "2026-08-06T23:00:00.000Z",
-      })
-    ).toBe("2026-08-06");
-  });
-
-  it("projects only matching entries without changing canonical input", () => {
+  it("keeps every entry when nothing narrows them, without changing the input", () => {
     const item = makeItem({
       ledgerEntries: [
         makeEntry({ itemName: "Latte" }),
@@ -112,10 +77,8 @@ describe("stream filter policy", () => {
       ],
     });
 
-    const projected = projectStreamDocument(item, { search: "latte" });
-
-    expect(projected.ledgerEntries).toHaveLength(1);
-    expect(projected.ledgerEntries?.[0]?.itemName).toBe("Latte");
+    expect(filterStreamEntries(item.ledgerEntries, {})).toHaveLength(2);
+    expect(filterStreamEntries(item.ledgerEntries, { search: "latte" })).toHaveLength(1);
     expect(item.ledgerEntries).toHaveLength(2);
   });
 });

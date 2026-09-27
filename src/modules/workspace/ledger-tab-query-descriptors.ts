@@ -3,15 +3,9 @@ import {
   type SourceDocumentProcessingStatus,
 } from "@/modules/source-document/types";
 import type { GetStreamTotalInput, ListStreamPageInput } from "@/modules/source-document/contracts";
-import type { GetEnhancedStatsInput } from "@/modules/stats/contract-schemas";
+import { periodKey, type Period, type PeriodQuery } from "@/modules/ledger/domain/period";
 import { normalizeSearchTerm } from "@/lib/search";
 import { queryKeys } from "@/lib/query-keys";
-import type { DateRangeType } from "@/lib/date-utils";
-import {
-  DEFAULT_STATS_RANGE_TYPE,
-  getStatsInitialQueryState,
-  type StatsInitialQueryState,
-} from "./initial-query-state";
 
 const STREAM_PAGE_LIMIT = 20;
 
@@ -21,14 +15,13 @@ export interface StreamQueryDescriptor {
   queryKey: readonly unknown[];
   totalQueryKey: readonly unknown[];
   filterSignature: string;
-  getPageInput: (pageParam?: string) => ListStreamPageInput;
-  totalInput: GetStreamTotalInput;
+  getPageInput: (pageParam?: string) => PeriodQuery<ListStreamPageInput>;
+  totalInput: PeriodQuery<GetStreamTotalInput>;
 }
 
 export function buildStreamQueryDescriptor(input: {
   bookId?: string;
-  startDate?: string | null | undefined;
-  endDate?: string | null | undefined;
+  period: Period;
   minAmount?: string | null | undefined;
   maxAmount?: string | null | undefined;
   statuses?: readonly SourceDocumentProcessingStatus[] | null | undefined;
@@ -41,8 +34,7 @@ export function buildStreamQueryDescriptor(input: {
   const search = normalizeSearchTerm(input.search) ?? null;
   const baseInput = {
     ...(input.bookId == null ? {} : { bookId: input.bookId }),
-    ...(input.startDate != null && input.startDate !== "" ? { startDate: input.startDate } : {}),
-    ...(input.endDate != null && input.endDate !== "" ? { endDate: input.endDate } : {}),
+    period: input.period,
     ...(input.minAmount != null ? { minAmount: input.minAmount } : {}),
     ...(input.maxAmount != null ? { maxAmount: input.maxAmount } : {}),
     ...(canonicalStatuses != null ? { statuses: canonicalStatuses } : {}),
@@ -50,8 +42,7 @@ export function buildStreamQueryDescriptor(input: {
   };
   const keyFilters = {
     bookId: input.bookId ?? null,
-    startDate: input.startDate ?? null,
-    endDate: input.endDate ?? null,
+    period: periodKey(input.period),
     minAmount: input.minAmount ?? null,
     maxAmount: input.maxAmount ?? null,
     statuses: statusesKey,
@@ -71,50 +62,31 @@ export function buildStreamQueryDescriptor(input: {
   };
 }
 
+/** 统计's read: a book and a period, whose days and comparison the server resolves. */
+export interface StatsQueryInput {
+  bookId?: string;
+  period: Period;
+}
+
 export interface StatsQueryDescriptor {
-  state: StatsInitialQueryState;
   queryKey: readonly unknown[];
-  input: GetEnhancedStatsInput;
+  input: StatsQueryInput;
 }
 
 export function buildStatsQueryDescriptor(input: {
   bookId?: string;
-  currentDate: Date;
+  period: Period;
   mainCurrency: string;
-  rangeType?: DateRangeType | undefined;
-  currentPeriod?: boolean | undefined;
 }): StatsQueryDescriptor {
-  const statsOptions =
-    input.currentPeriod === undefined ? {} : { currentPeriod: input.currentPeriod };
-  const state = getStatsInitialQueryState(
-    input.currentDate,
-    input.rangeType ?? DEFAULT_STATS_RANGE_TYPE,
-    statsOptions
-  );
-
   return {
-    state,
     queryKey: queryKeys.enhancedStats({
       bookId: input.bookId ?? null,
-      startDate: state.startDateStr,
-      endDate: state.endDateStr,
-      compareStartDate: state.prevDateStartStr,
-      compareEndDate: state.prevDateEndStr,
-      rangeType: state.rangeType,
-      comparisonMode: state.mode,
+      period: periodKey(input.period),
       mainCurrency: input.mainCurrency,
     }),
     input: {
       ...(input.bookId == null ? {} : { bookId: input.bookId }),
-      queryRange: {
-        from: state.startDateStr,
-        to: state.endDateStr,
-      },
-      compareRange: {
-        from: state.prevDateStartStr,
-        to: state.prevDateEndStr,
-      },
-      comparisonMode: state.mode,
+      period: input.period,
     },
   };
 }

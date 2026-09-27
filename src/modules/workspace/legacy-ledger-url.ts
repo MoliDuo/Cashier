@@ -19,7 +19,8 @@ export function legacyLedgerHref(searchParams: Pick<URLSearchParams, "get">): st
   const params = new URLSearchParams();
 
   if (tab === "stream" || tab === "details") {
-    for (const key of LEDGER_FILTER_KEYS) {
+    // The old period names are carried as they were; the route reads them.
+    for (const key of [...LEDGER_FILTER_KEYS, "period", "startDate", "endDate"]) {
       const value = searchParams.get(`${tab}${key[0]!.toUpperCase()}${key.slice(1)}`);
       if (value != null && value !== "") params.set(key, value);
     }

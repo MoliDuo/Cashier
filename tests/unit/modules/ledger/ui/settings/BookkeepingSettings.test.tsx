@@ -145,4 +145,18 @@ describe("instant bookkeeping settings", () => {
 
     expect(onUpdateSettings).toHaveBeenCalledWith({ aiCustomPrompt: "Typed then left" });
   });
+
+  it("offers the ledger's own zone even when it is not one of the listed ones", () => {
+    render(
+      <BookkeepingSettings
+        {...bookkeepingProps({
+          settings: { ...getDefaultLedger().settings, timeZone: "Pacific/Auckland" },
+        })}
+      />
+    );
+
+    expect(screen.getByRole("combobox", { name: settingsCopy.timeZone })).toHaveTextContent(
+      "Pacific/Auckland"
+    );
+  });
 });

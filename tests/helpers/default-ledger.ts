@@ -24,6 +24,7 @@ const defaultLedger = {
     mainCurrency: "CNY",
     collapseEntriesDefault: false,
     aiCustomPrompt: "",
+    timeZone: "Asia/Shanghai",
   },
   categories: seedCategories(getCategoryPreset("default")),
 };

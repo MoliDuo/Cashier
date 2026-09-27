@@ -82,10 +82,7 @@ export const createBookAction = withLedgerAccess(
   (ledgerId: string, data: CreateBookInput): Promise<BookMutationResult> =>
     runBookMutation(async () => {
       const validated = parseCreateBookInput(data);
-      const created = await createBook(ledgerId, {
-        name: validated.name,
-        timeZone: validated.timeZone ?? null,
-      });
+      const created = await createBook(ledgerId, { name: validated.name });
       return {
         book: created,
         books: await listBooksIncludingArchived(ledgerId),
@@ -98,10 +95,7 @@ export const updateBookAction = withLedgerAccess(
     runBookMutation(async () => {
       const validatedId = parseBookId(bookId);
       const validated = parseUpdateBookInput(data);
-      const updated = await updateBook(ledgerId, validatedId, {
-        ...(validated.name === undefined ? {} : { name: validated.name }),
-        ...(validated.timeZone === undefined ? {} : { timeZone: validated.timeZone }),
-      });
+      const updated = await updateBook(ledgerId, validatedId, { name: validated.name });
       if (updated == null) throw new AppError("Book not found", "NOT_FOUND", 404);
       return {
         book: updated,

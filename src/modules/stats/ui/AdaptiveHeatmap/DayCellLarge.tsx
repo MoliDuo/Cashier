@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { getHeatmapColor, formatCellAmount } from "../../lib/heatmap-colors";
 import { formatCompactAmount } from "@/lib/format/currency";
 import { formatRelativeDateLabel } from "@/lib/date-utils";
+import { useLedgerTimeZone } from "@/lib/ledger-time-zone";
 import type { HeatmapLevel } from "../../types";
 import { compare } from "@/lib/money/decimal";
 import { calendarCopy } from "@/copy/controls";
@@ -33,7 +34,8 @@ export function DayCellLarge({
   currency,
   locale,
 }: DayCellLargeProps) {
-  const dateLabel = formatRelativeDateLabel(date, locale);
+  const timeZone = useLedgerTimeZone();
+  const dateLabel = formatRelativeDateLabel(date, locale, timeZone);
 
   return (
     <div className="relative min-w-0 overflow-visible">

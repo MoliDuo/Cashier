@@ -1,5 +1,4 @@
 export const statsTabCopy = {
-  throughToday: "截至今日",
   expenseTrend: "支出趋势",
   expenseRanking: "支出排行",
   dailyHeatmap: "每日热力图",
@@ -7,15 +6,13 @@ export const statsTabCopy = {
   heatmap: "热力",
   averageDaily: "日均支出",
   totalExpense: "总支出",
-  month: "月",
-  week: "周",
-  year: "年",
   noStats: "暂无统计",
   noStatsDesc: "记录几笔账后，这里会显示钱花在哪里。",
   uncategorized: "未分类",
   lastWeek: "上周",
   lastMonth: "上月",
   lastYear: "去年",
+  previousSpan: "前一段时间",
   samePeriodMore: (v: {
     period: string | number;
     amount: string | number;
@@ -40,8 +37,6 @@ export const statsTabCopy = {
   fullPeriodEqual: (v: { period: string | number }) => `与${v.period}持平`,
   loadFailed: "统计数据加载失败，请重试。",
   retry: "重试",
-  previousPeriod: "上一周期",
-  nextPeriod: "下一周期",
   entries: "笔数",
   averageEntry: "单笔均值",
   recordedDays: "记账天数",

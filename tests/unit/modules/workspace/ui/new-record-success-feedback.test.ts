@@ -29,7 +29,7 @@ describe("new record success feedback", () => {
       mode: "ai",
       result: { sourceDocumentId: "source-1", documentDate: "2026-07-17" },
       activeTab: "stats",
-      committedFilters: {},
+      committedView: { filters: {}, range: null },
       viewedBookId,
       savedBook: viewedBook,
     });
@@ -69,10 +69,7 @@ describe("new record success feedback", () => {
       mode: "quick",
       result: { sourceDocumentId: "source-2", documentDate: "2026-07-17" },
       activeTab: "stream",
-      committedFilters: {
-        startDate: "2026-07-01",
-        endDate: "2026-07-31",
-      },
+      committedView: { filters: {}, range: { from: "2026-07-01", to: "2026-07-31" } },
       viewedBookId,
       savedBook: viewedBook,
     });
@@ -86,10 +83,7 @@ describe("new record success feedback", () => {
       mode: "quick",
       result: { sourceDocumentId: "source-3", documentDate: "2026-07-17" },
       activeTab: "stream",
-      committedFilters: {
-        startDate: "2026-07-01",
-        endDate: "2026-07-31",
-      },
+      committedView: { filters: {}, range: { from: "2026-07-01", to: "2026-07-31" } },
       viewedBookId,
       savedBook: { id: "book-other", name: "Travel" },
     });
@@ -114,7 +108,7 @@ describe("new record success feedback", () => {
       mode: "ai",
       result: { sourceDocumentId: "source-4", documentDate: "2026-07-17" },
       activeTab: "stream",
-      committedFilters: {},
+      committedView: { filters: {}, range: null },
       viewedBookId: null,
       savedBook: { id: "book-2", name: "Travel" },
     });
@@ -123,12 +117,16 @@ describe("new record success feedback", () => {
 
   it("warns for narrowing filters and dates outside the committed range", () => {
     expect(
-      shouldWarnNewRecordMayBeHidden("stream", { statuses: ["processing"] }, "2026-07-17")
+      shouldWarnNewRecordMayBeHidden(
+        "stream",
+        { filters: { statuses: ["processing"] }, range: null },
+        "2026-07-17"
+      )
     ).toBe(true);
     expect(
       shouldWarnNewRecordMayBeHidden(
         "stream",
-        { startDate: "2026-07-18", endDate: "2026-07-31" },
+        { filters: {}, range: { from: "2026-07-18", to: "2026-07-31" } },
         "2026-07-17"
       )
     ).toBe(true);

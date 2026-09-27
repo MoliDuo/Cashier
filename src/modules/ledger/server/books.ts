@@ -19,7 +19,7 @@ export type DeleteBookResult =
 
 /**
  * A 分账. Reading every book together is 总账, a view over all of them rather
- * than a designated one. `timeZone` null means the device's zone. `archivedAt`
+ * than a designated one. `archivedAt`
  * set means the book is retired: its records still count in 总账, but it is no
  * longer offered as a target for new ones.
  */
@@ -28,7 +28,6 @@ function toBook(row: BookRow): BookDto {
     id: row.id,
     ledgerId: row.ledgerId,
     name: row.name,
-    timeZone: row.timeZone,
     sortOrder: row.sortOrder,
     archivedAt: row.archivedAt?.toISOString() ?? null,
   };
@@ -150,10 +149,7 @@ export async function getBookIncludingArchived(
   return row == null ? null : toBook(row);
 }
 
-export async function createBook(
-  ledgerId: string,
-  input: { name: string; timeZone: string | null }
-): Promise<BookDto> {
+export async function createBook(ledgerId: string, input: { name: string }): Promise<BookDto> {
   return db.transaction(async (tx) => {
     const next = await tx
       .select({ sortOrder: sql<number | null>`max(${books.sortOrder})` })
@@ -165,7 +161,6 @@ export async function createBook(
       .values({
         ledgerId,
         name: input.name,
-        timeZone: input.timeZone,
         sortOrder: next,
       })
       .onConflictDoNothing()
@@ -179,13 +174,12 @@ export async function createBook(
 export async function updateBook(
   ledgerId: string,
   bookId: string,
-  input: { name?: string; timeZone?: string | null }
+  input: { name: string }
 ): Promise<BookDto | null> {
   const updated = await db
     .update(books)
     .set({
-      ...(input.name === undefined ? {} : { name: input.name }),
-      ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
+      name: input.name,
       updatedAt: new Date(),
     })
     .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNull(books.archivedAt)))

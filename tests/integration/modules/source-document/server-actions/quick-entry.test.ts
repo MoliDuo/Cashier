@@ -296,24 +296,30 @@ describe("createQuickEntryAction", () => {
       return document?.documentDate;
     }
 
-    it("uses the member's own zone when the book has none", async () => {
-      await expect(
-        filedDate({ categoryId, amount: "100", timezone: "Asia/Shanghai" })
-      ).resolves.toBe("2026-03-21");
+    it("dates it in the ledger's zone, whatever zone the request came from", async () => {
+      // The ledger starts in Shanghai.
       await expect(
         filedDate({ categoryId, amount: "100", timezone: "Europe/Paris" })
+      ).resolves.toBe("2026-03-21");
+
+      await getTestDb()
+        .update(ledgers)
+        .set({ timeZone: "Europe/Paris" })
+        .where(eq(ledgers.id, ledgerId));
+      await expect(
+        filedDate({ categoryId, amount: "100", timezone: "Asia/Shanghai" })
       ).resolves.toBe("2026-03-20");
     });
 
-    it("lets the book's zone win over the member's", async () => {
+    it("dates every book by the same zone", async () => {
       const [book] = await getTestDb()
         .insert(books)
-        .values({ ledgerId, name: "Travel", sortOrder: 2, timeZone: "Asia/Shanghai" })
+        .values({ ledgerId, name: "Travel", sortOrder: 2 })
         .returning({ id: books.id });
 
-      await expect(
-        filedDate({ categoryId, amount: "100", bookId: book!.id, timezone: "Europe/Paris" })
-      ).resolves.toBe("2026-03-21");
+      await expect(filedDate({ categoryId, amount: "100", bookId: book!.id })).resolves.toBe(
+        "2026-03-21"
+      );
     });
   });
 });

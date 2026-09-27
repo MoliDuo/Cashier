@@ -258,38 +258,34 @@ describe("SourceDocument Actions", () => {
       return { bookId: document?.bookId, date: attempt?.requestedDate };
     }
 
-    async function zonedBook(timeZone: string | null): Promise<string> {
+    it("files the record into the chosen book and dates it in the ledger's zone", async () => {
       const [book] = await getTestDb()
         .insert(books)
-        .values({ ledgerId: testLedgerId, name: "哞哞的", sortOrder: 2, timeZone })
+        .values({ ledgerId: testLedgerId, name: "哞哞的", sortOrder: 2 })
         .returning({ id: books.id });
-      return book!.id;
-    }
+      const bookId = book!.id;
+      await getTestDb()
+        .update(ledgers)
+        .set({ timeZone: "Asia/Singapore" })
+        .where(eq(ledgers.id, testLedgerId));
 
-    it("files the record into the chosen book and dates it in that book's zone", async () => {
-      const bookId = await zonedBook("Asia/Singapore");
-
-      // The book owns the date: the request's zone is only the device the
-      // reader happened to use.
+      // The request's zone is only the device the reader happened to use.
       await expect(
         createdDate({ text: "Lunch 12", bookId, timezone: "Europe/Paris" })
       ).resolves.toEqual({ bookId, date: "2026-03-21" });
-      await expect(createdDate({ text: "Lunch 13", bookId })).resolves.toEqual({
-        bookId,
-        date: "2026-03-21",
-      });
     });
 
-    it("falls back to the request's zone when the book has none of its own", async () => {
+    it("follows the ledger's zone when it changes", async () => {
       const bookId = await testBookId(getTestDb(), testLedgerId);
+      await getTestDb()
+        .update(ledgers)
+        .set({ timeZone: "Europe/Paris" })
+        .where(eq(ledgers.id, testLedgerId));
 
-      await expect(createdDate({ text: "Lunch 12", timezone: "Europe/Paris" })).resolves.toEqual({
+      await expect(createdDate({ text: "Lunch 12", timezone: "Asia/Singapore" })).resolves.toEqual({
         bookId,
         date: "2026-03-20",
       });
-      await expect(
-        createdDate({ text: "Lunch 13", timezone: "Asia/Singapore" })
-      ).resolves.toMatchObject({ date: "2026-03-21" });
     });
   });
 

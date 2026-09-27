@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TOOLBAR_CONTROL_CLASS } from "@/components/toolbar-control";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
-import type { PeriodParams, PeriodPreset } from "@/lib/period-utils";
 import { useEntryFilterDraft } from "./EntryFilterPanel/hooks/useEntryFilterDraft";
 import { EntryFilterContent } from "./EntryFilterPanel/components/EntryFilterContent";
 import type { EntryFilters } from "@/modules/ledger/filters";
@@ -15,12 +14,9 @@ export type { EntryFilters } from "@/modules/ledger/filters";
 
 interface EntryFilterPanelProps {
   filters: EntryFilters;
-  onFiltersChange: (filters: EntryFilters, requestedPeriod?: PeriodPreset) => void;
-  periodParams: PeriodParams;
+  onFiltersChange: (filters: EntryFilters) => void;
   categories?: EntryCategory[];
   preferredCurrencies?: string[];
-  /** Ledger timezone: the date fields' 今天/昨天 must name the ledger's day. */
-  timeZone?: string;
   showCategory?: boolean;
   showCurrency?: boolean;
   showStatus?: boolean;
@@ -37,10 +33,8 @@ interface EntryFilterPanelProps {
 export function EntryFilterPanel({
   filters,
   onFiltersChange,
-  periodParams,
   categories = [],
   preferredCurrencies = [],
-  timeZone,
   showCategory = true,
   showCurrency = true,
   showStatus = true,
@@ -49,7 +43,6 @@ export function EntryFilterPanel({
   const draft = useEntryFilterDraft({
     filters,
     onFiltersChange,
-    periodParams,
     showCategory,
     showCurrency,
     showStatus,
@@ -87,7 +80,6 @@ export function EntryFilterPanel({
       {...draft}
       categories={categories}
       preferredCurrencies={preferredCurrencies}
-      timeZone={timeZone}
       showCategory={showCategory}
       showCurrency={showCurrency}
       showStatus={showStatus}

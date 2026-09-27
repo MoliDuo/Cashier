@@ -10,34 +10,22 @@ import { add } from "@/lib/money/decimal";
  * server order and are grouped consecutively by effective date.
  */
 
-export type DateProvenance = "transaction" | "submitted" | "unknown";
-
 interface UnifiedStreamItem {
   sourceDocument: SourceDocumentListItemDto;
   ledgerEntries: SourceDocumentLedgerEntryDto[];
-  /** Effective group date in yyyy-MM-dd, or the sentinel "date_unknown". */
+  /** The day the record counts on, as the server keeps it (yyyy-MM-dd). */
   effectiveDate: string;
-  /** Where `effectiveDate` came from — the UI must use this to label the date. */
-  dateProvenance: DateProvenance;
 }
 
 export interface UnifiedStreamGroup {
   /** Effective date key shared by items in this group. */
   date: string;
-  /** Provenance of the first item's effective date (groups are homogeneous). */
-  dateProvenance: DateProvenance;
   /** Sum of active ledger-entry amounts across accounting-valid items in this group. */
   total: string;
   unconvertedCount: number;
   currencyTotals: Record<string, string>;
   items: UnifiedStreamItem[];
 }
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const DATE_UNKNOWN = "date_unknown";
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -66,28 +54,6 @@ function addEntries(
 }
 
 // ---------------------------------------------------------------------------
-// Effective date
-// ---------------------------------------------------------------------------
-
-/** Derive the date a card groups under. Never invents the current date. */
-export function getEffectiveDate(sourceDocument: {
-  documentDate?: string | null;
-  createdAt?: string;
-}): { date: string; provenance: DateProvenance } {
-  if (sourceDocument.documentDate != null && sourceDocument.documentDate.trim() !== "") {
-    return { date: sourceDocument.documentDate, provenance: "transaction" };
-  }
-  const createdAt = sourceDocument.createdAt;
-  if (createdAt != null && createdAt !== "") {
-    const date = createdAt.slice(0, 10);
-    if (date.length === 10) {
-      return { date, provenance: "submitted" };
-    }
-  }
-  return { date: DATE_UNKNOWN, provenance: "unknown" };
-}
-
-// ---------------------------------------------------------------------------
 // Build
 // ---------------------------------------------------------------------------
 
@@ -102,12 +68,10 @@ export function buildUnifiedStreamGroups(
   const groups: UnifiedStreamGroup[] = [];
   for (const sourceDocument of items) {
     const entries = sourceDocument.ledgerEntries ?? [];
-    const { date, provenance } = getEffectiveDate(sourceDocument);
     const item: UnifiedStreamItem = {
       sourceDocument,
       ledgerEntries: entries,
-      effectiveDate: date,
-      dateProvenance: provenance,
+      effectiveDate: sourceDocument.effectiveDate,
     };
     const lastGroup = groups.at(-1);
     let group: UnifiedStreamGroup;
@@ -117,7 +81,6 @@ export function buildUnifiedStreamGroups(
     } else {
       group = {
         date: item.effectiveDate,
-        dateProvenance: item.dateProvenance,
         total: "0",
         unconvertedCount: 0,
         currencyTotals: {},

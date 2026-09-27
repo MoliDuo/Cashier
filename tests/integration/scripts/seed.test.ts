@@ -28,7 +28,7 @@ describe("seed", () => {
     const at = new Date("2026-03-04T12:00:00.000Z");
     const userId = await seedUser(db, { email: "seed@example.com", at });
     const ledgerId = await seedLedger(db, { mainCurrency: "USD", at });
-    const books = await seedBooks(db, ledgerId, ["共同支出", { name: "旅行", timeZone: "UTC" }]);
+    const books = await seedBooks(db, ledgerId, ["共同支出", "旅行"]);
     const categories = await seedCategories(db, ledgerId, [{ name: "Food", icon: "Utensils" }]);
     const documentId = await seedSourceDocument(db, {
       ledgerId,

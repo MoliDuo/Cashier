@@ -12,7 +12,7 @@ type DateFields = { createdAt: Date; updatedAt: Date };
 type EntryCategoryRow = Omit<EntryCategoryDto, "createdAt" | "updatedAt"> & DateFields;
 type SourceDocumentRow = Pick<
   SourceDocumentReferenceDto,
-  "id" | "ledgerId" | "title" | "documentDate"
+  "id" | "ledgerId" | "title" | "documentDate" | "effectiveDate"
 > &
   DateFields & {
     version: number;
@@ -48,7 +48,14 @@ function mapEntryCategoryDto(category: EntryCategoryRow): EntryCategoryDto {
 function mapSourceDocumentReferenceDto(
   doc: Pick<
     SourceDocumentRow,
-    "id" | "version" | "ledgerId" | "title" | "documentDate" | "createdAt" | "updatedAt"
+    | "id"
+    | "version"
+    | "ledgerId"
+    | "title"
+    | "documentDate"
+    | "effectiveDate"
+    | "createdAt"
+    | "updatedAt"
   >
 ): SourceDocumentReferenceDto {
   return {
@@ -57,6 +64,7 @@ function mapSourceDocumentReferenceDto(
     ledgerId: doc.ledgerId,
     title: doc.title,
     documentDate: doc.documentDate,
+    effectiveDate: doc.effectiveDate,
     createdAt: toIso(doc.createdAt)!,
     updatedAt: toIso(doc.updatedAt)!,
     hasImages: false,

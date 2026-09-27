@@ -3,49 +3,35 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { QUERY } from "@/lib/constants";
 import { queryKeys } from "@/lib/query-keys";
-import type { PeriodParams } from "@/lib/period-utils";
-import type { Ledger } from "@/modules/ledger/contracts";
-import type { LedgerAdvancedFilters } from "./initial-query-state";
-import { addPeriod, getDateInTimezone, parseDateString } from "@/lib/date-utils";
-import { runtimeEnv } from "@/lib/env/runtime";
-import { getDeviceTimeZone } from "@/lib/time-zone-cookie";
-import type { StatsUrlState } from "./stats-url-params";
-import type { BookDto } from "@/modules/ledger/contracts";
-
-/**
- * The zone the viewed book is read in, hydrated alongside the ledger. On 总账,
- * and for a book without a zone of its own, it is this device's zone — exactly
- * as the tab will date it; only a browser that cannot name its zone falls back
- * to the deployment's. Prefetching must use the same zone the tab will, so a
- * prefetched page is not a different day from the one it lands in.
- */
-function scopeTimeZone(queryClient: QueryClient, bookId?: string) {
-  const books = queryClient.getQueryData<readonly BookDto[]>(queryKeys.books());
-  const book = bookId == null ? null : books?.find((row) => row.id === bookId);
-  return book?.timeZone ?? getDeviceTimeZone() ?? runtimeEnv.timeZone;
-}
+import type { Ledger, LedgerEntryPageDto } from "@/modules/ledger/contracts";
+import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
+import type { Period } from "@/modules/ledger/domain/period";
 import { fetchLedgerEntries, fetchLedgerSummary } from "@/modules/ledger/queries";
-import type { LedgerEntryPageDto } from "@/modules/ledger/contracts";
 import { fetchEnhancedStats } from "@/modules/stats/queries";
 import {
   buildDetailsQueryDescriptor,
   buildStatsQueryDescriptor,
 } from "./ledger-tab-query-descriptors";
 
+function mainCurrencyOf(queryClient: QueryClient): string {
+  return queryClient.getQueryData<Ledger>(queryKeys.ledger())?.settings.mainCurrency ?? "CNY";
+}
+
+/**
+ * 明细's first page, fetched ahead of a tap. The keys name the period rather
+ * than its days, so a prefetch lands on exactly the query the tab mounts.
+ */
 export async function prefetchDetailsTabQuery(
   queryClient: QueryClient,
   bookId: string | undefined,
-  periodParams: PeriodParams,
+  period: Period,
   advancedFilters: LedgerAdvancedFilters
 ) {
-  const ledger = queryClient.getQueryData<Ledger>(queryKeys.ledger());
-  const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
   const descriptor = buildDetailsQueryDescriptor({
     ...(bookId == null ? {} : { bookId }),
-    periodParams,
+    period,
     advancedFilters,
-    timeZone: scopeTimeZone(queryClient, bookId),
-    mainCurrency,
+    mainCurrency: mainCurrencyOf(queryClient),
   });
 
   await Promise.all([
@@ -67,19 +53,12 @@ export async function prefetchDetailsTabQuery(
 export async function prefetchStatsTabQuery(
   queryClient: QueryClient,
   bookId: string | undefined,
-  statsState: StatsUrlState = { range: "month", offset: 0, view: "heatmap" }
+  period: Period
 ) {
-  const ledger = queryClient.getQueryData<Ledger>(queryKeys.ledger());
-  const mainCurrency = ledger?.settings.mainCurrency ?? "CNY";
-  const fixedTimeZone = scopeTimeZone(queryClient, bookId);
-  const zonedToday = getDateInTimezone(fixedTimeZone);
-  const initialDate = zonedToday != null ? parseDateString(zonedToday) : new Date();
   const descriptor = buildStatsQueryDescriptor({
     ...(bookId == null ? {} : { bookId }),
-    currentDate: addPeriod(initialDate, statsState.range, statsState.offset),
-    mainCurrency,
-    rangeType: statsState.range,
-    currentPeriod: statsState.offset === 0,
+    period,
+    mainCurrency: mainCurrencyOf(queryClient),
   });
 
   await queryClient.prefetchQuery({

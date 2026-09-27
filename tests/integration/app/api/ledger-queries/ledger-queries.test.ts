@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
 import { POST } from "@/app/api/ledger-queries/route";
 import { getTestDb } from "tests/setup";
-import { ledgers, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { createLedgerData, createSourceDocumentData } from "tests/helpers/factories";
 import {
   activateTestSourceDocumentProjection,
@@ -205,5 +205,86 @@ describe("session ledger query transport", () => {
     vi.mocked(getCurrentSession).mockResolvedValue(null);
     expect((await POST(request("login-emails", []))).status).toBe(401);
     expect((await POST(request("passkeys", []))).status).toBe(401);
+  });
+
+  describe("periods", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** A ledger in Shanghai with one record on each side of the month boundary. */
+    async function seedAcrossMonths() {
+      const db = getTestDb();
+      const ledger = createLedgerData({ timeZone: "Asia/Shanghai" });
+      await db.insert(ledgers).values(ledger);
+      await ensureTestLedgerBooks(db, ledger.id);
+      for (const [title, date] of [
+        ["September", "2026-09-30"],
+        ["October", "2026-10-01"],
+      ] as const) {
+        const [document] = await db
+          .insert(sourceDocuments)
+          .values({
+            ledgerId: ledger.id,
+            title,
+            documentDate: date,
+            bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledger.id} ORDER BY sort_order LIMIT 1)`,
+          })
+          .returning({ id: sourceDocuments.id });
+        await db.insert(ledgerEntries).values({
+          ledgerId: ledger.id,
+          sourceDocumentId: document!.id,
+          amount: "10.00",
+          currency: "CNY",
+          itemName: title,
+        });
+        await activateTestSourceDocumentProjection(db, document!.id, { parsed: true });
+      }
+      // 16:30 UTC on the 30th is already the 1st of October in Shanghai.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-30T16:30:00Z"));
+      return ledger;
+    }
+
+    it("reads this month in the ledger's zone, not the server's", async () => {
+      await seedAcrossMonths();
+      const period = { range: "month", offset: 0 };
+
+      const stream = await (await POST(request("stream", [{ period }]))).json();
+      expect(stream.items.map((item: { title: string }) => item.title)).toEqual(["October"]);
+      expect(stream.items[0]).toMatchObject({ effectiveDate: "2026-10-01" });
+
+      const entries = await (await POST(request("entries", [{ period }]))).json();
+      expect(entries.items.map((item: { itemName: string }) => item.itemName)).toEqual(["October"]);
+
+      const previous = await (
+        await POST(request("summary", [{ period: { range: "month", offset: -1 } }]))
+      ).json();
+      expect(previous).toMatchObject({ convertedTotal: expect.objectContaining({ total: "10" }) });
+    });
+
+    it("resolves 统计's period and says which days it covers", async () => {
+      await seedAcrossMonths();
+
+      const month = await (
+        await POST(request("stats", [{ period: { range: "month", offset: 0 } }]))
+      ).json();
+      expect(month.range).toEqual({ from: "2026-10-01", to: "2026-10-01" });
+
+      const all = await (await POST(request("stats", [{ period: { range: "all" } }]))).json();
+      expect(all.range).toEqual({ from: "2026-09-30", to: "2026-10-01" });
+      expect(all.summary.total).toBe("20");
+    });
+
+    it("refuses a period it cannot read", async () => {
+      await seedAcrossMonths();
+      for (const period of [
+        { range: "month", offset: 1 },
+        { range: "custom", from: "2026-09-10", to: "2026-09-01" },
+        { range: "decade" },
+      ]) {
+        expect((await POST(request("stream", [{ period }]))).status).toBe(400);
+      }
+    });
   });
 });

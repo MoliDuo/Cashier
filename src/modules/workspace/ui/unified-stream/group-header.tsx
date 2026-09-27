@@ -3,7 +3,6 @@ import { formatRelativeDateLabel } from "@/lib/date-utils";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
 import { DISPLAY_LOCALE } from "@/lib/constants";
-import { sourceDocumentCardCopy } from "@/copy/source-document";
 import { batchActionsCopy } from "@/copy/workspace";
 
 export interface UnifiedGroupHeaderSelection {
@@ -27,10 +26,7 @@ export function UnifiedGroupHeader({
   selection?: UnifiedGroupHeaderSelection | undefined;
 }) {
   const locale = DISPLAY_LOCALE;
-  const dateLabel =
-    group.dateProvenance === "unknown"
-      ? sourceDocumentCardCopy.dateUnknown
-      : formatRelativeDateLabel(group.date, locale, timeZone);
+  const dateLabel = formatRelativeDateLabel(group.date, locale, timeZone);
   const state =
     selection == null ? null : groupSelectionState(selection.ids, selection.selectedIdSet);
 

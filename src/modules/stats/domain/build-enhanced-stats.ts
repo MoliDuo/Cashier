@@ -146,6 +146,7 @@ export function buildEnhancedStatsDto({
   }));
 
   return {
+    range: { from: queryRange.from, to: queryRange.to },
     unconvertedCount,
     summary: {
       total: current.total.toFixed(),

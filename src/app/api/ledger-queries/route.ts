@@ -13,8 +13,9 @@ import {
   streamPageInputSchema,
   streamTotalInputSchema,
 } from "@/modules/source-document/contract-schemas";
-import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
-import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
+import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
+import { calculateLedgerStats } from "@/modules/ledger/server/stats";
+import { withResolvedPeriod, withResolvedStatsPeriod } from "@/modules/ledger/server/query-period";
 import { getLedgerAction } from "@/modules/ledger/server/get-ledger";
 import {
   getBookAction,
@@ -28,7 +29,10 @@ import {
   getCategoryAssignmentJobAction,
 } from "@/modules/ledger/server/get-category-assignment-job";
 import { scheduleCategoryAssignmentRecoveryAfter } from "@/server/category-assignment/schedule";
-import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
+import {
+  findEarliestEffectiveDate,
+  queryEnhancedStats,
+} from "@/modules/stats/server/enhanced-stats-query";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { convertCurrency } from "@/modules/currency/server/convert-currency";
 import { requireAuth } from "@/modules/auth/server/session-guards";
@@ -83,15 +87,22 @@ export async function POST(request: Request) {
     const input = payload.args[0];
     let result: unknown;
     switch (payload.query) {
-      case "stats":
-        result = await getEnhancedStats(parseEnhancedStatsInput(input));
+      case "stats": {
+        const { ledger } = await requireLedgerAccess();
+        const resolved = await withResolvedStatsPeriod(input, ledger.settings.timeZone, (bookId) =>
+          findEarliestEffectiveDate(ledger.id, bookId)
+        );
+        result = await queryEnhancedStats(ledger.id, parseEnhancedStatsInput(resolved));
         break;
+      }
       case "detail":
         result = await getSourceDocumentDetailAction(sourceDocumentIdSchema.parse(input));
         break;
       case "stream": {
-        const parsed = streamPageInputSchema.parse(input);
         const { ledger } = await requireLedgerAccess();
+        const parsed = streamPageInputSchema.parse(
+          withResolvedPeriod(input, ledger.settings.timeZone)
+        );
         result = await listStreamPage(ledger.id, {
           ...omitUndefinedProperties(parsed),
           limit: parsed.limit,
@@ -100,8 +111,10 @@ export async function POST(request: Request) {
         break;
       }
       case "total": {
-        const parsed = omitUndefinedProperties(streamTotalInputSchema.parse(input));
         const { ledger } = await requireLedgerAccess();
+        const parsed = omitUndefinedProperties(
+          streamTotalInputSchema.parse(withResolvedPeriod(input, ledger.settings.timeZone))
+        );
         result = await getStreamTotal(ledger.id, parsed);
         break;
       }
@@ -135,9 +148,14 @@ export async function POST(request: Request) {
         noArgumentsSchema.parse(payload.args);
         result = await listPasskeys(await requireAuth());
         break;
-      case "entries":
-        result = await getLedgerEntriesAction(input);
+      case "entries": {
+        const { ledger } = await requireLedgerAccess();
+        result = await listLedgerEntries(
+          ledger.id,
+          withResolvedPeriod(input, ledger.settings.timeZone)
+        );
         break;
+      }
       case "ledger":
         noArgumentsSchema.parse(payload.args);
         result = await getLedgerAction();
@@ -157,9 +175,14 @@ export async function POST(request: Request) {
         noArgumentsSchema.parse(payload.args);
         result = await getEntryCategoriesAction();
         break;
-      case "summary":
-        result = await getLedgerStatsAction(input ?? {});
+      case "summary": {
+        const { ledger } = await requireLedgerAccess();
+        result = await calculateLedgerStats(
+          ledger.id,
+          withResolvedPeriod(input ?? {}, ledger.settings.timeZone)
+        );
         break;
+      }
       case "settings":
         noArgumentsSchema.parse(payload.args);
         result = await getLedgerSettingsAction();

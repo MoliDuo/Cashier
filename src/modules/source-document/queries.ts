@@ -1,4 +1,5 @@
 import { postLedgerQuery } from "@/lib/queries/post-ledger-query";
+import type { PeriodQuery } from "@/modules/ledger/domain/period";
 import type {
   GetStreamTotalInput,
   ListStreamPageInput,
@@ -16,10 +17,10 @@ export const fetchSourceDocumentDetail = (id: string) =>
 export const fetchSourceDocumentInput = (id: string) =>
   postLedgerQuery<SourceDocumentInputDto>("source-document-input", [id]);
 
-export const fetchStreamPage = (input: ListStreamPageInput) =>
+export const fetchStreamPage = (input: PeriodQuery<ListStreamPageInput>) =>
   postLedgerQuery<StreamPage>("stream", [input]);
 
-export const fetchStreamTotal = (input: GetStreamTotalInput) =>
+export const fetchStreamTotal = (input: PeriodQuery<GetStreamTotalInput>) =>
   postLedgerQuery<StreamTotalDto>("total", [input]);
 
 export const fetchStreamRefresh = (input: LedgerRefreshRequest) =>

@@ -66,7 +66,7 @@ type DetailsTabOptions = Parameters<typeof useDetailsTab>[0];
 
 const baseOptions: DetailsTabOptions = {
   categories: [],
-  periodParams: { period: "all" },
+  period: { range: "all" },
   advancedFilters: {},
 };
 
@@ -116,6 +116,7 @@ function entry(
       ledgerId: "ledger-1",
       title: null,
       documentDate: date,
+      effectiveDate: date ?? "2026-09-04",
       createdAt: "2026-09-04T00:00:00.000Z",
       updatedAt: "2026-09-04T00:00:00.000Z",
     },

@@ -5,16 +5,10 @@ import { StatsContentView } from "@/modules/stats/ui/StatsContentView";
 import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
 
 const baseProps = {
-  rangeType: "month" as const,
-  contentRangeType: "month" as const,
-  onRangeTypeChange: () => {},
-  periodOffset: 0,
-  onPeriodOffsetChange: () => {},
-  label: "2026年8月",
-  startDate: new Date(2026, 7, 1),
-  endDate: new Date(2026, 7, 6),
-  startDateStr: "2026-08-01",
-  endDateStr: "2026-08-06",
+  periodBar: <div>period bar</div>,
+  range: { from: "2026-08-01", to: "2026-08-06" },
+  scale: "month" as const,
+  comparisonLabel: "上月",
   stats: undefined,
   chartView: "heatmap" as const,
   onChartViewChange: () => {},
@@ -74,18 +68,15 @@ describe("StatsContentView", () => {
     expect(heatmapButton).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("keeps comparison copy bound to the committed content range", () => {
-    render(
-      <StatsContentView
-        {...baseProps}
-        rangeType="week"
-        contentRangeType="year"
-        stats={statsFixture}
-      />
+  it("names the comparison it was given, and hides it when there is none", () => {
+    const { rerender } = render(
+      <StatsContentView {...baseProps} comparisonLabel="去年" stats={statsFixture} />
     );
-
     expect(screen.getByText(/去年/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "周" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("period bar")).toBeInTheDocument();
+
+    rerender(<StatsContentView {...baseProps} comparisonLabel={null} stats={statsFixture} />);
+    expect(screen.queryByText(/较.*同期/)).not.toBeInTheDocument();
   });
 
   it("shows the ranking beside the chosen view rather than behind it", () => {
@@ -105,12 +96,10 @@ describe("StatsContentView", () => {
         stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
       },
     });
-    const { rerender } = render(
-      <StatsContentView {...baseProps} contentRangeType="week" stats={stats} />
-    );
+    const { rerender } = render(<StatsContentView {...baseProps} scale="week" stats={stats} />);
     expect(screen.queryByRole("heading", { name: "星期节律" })).not.toBeInTheDocument();
 
-    rerender(<StatsContentView {...baseProps} contentRangeType="month" stats={stats} />);
+    rerender(<StatsContentView {...baseProps} scale="month" stats={stats} />);
     expect(screen.getByRole("heading", { name: "星期节律" })).toBeVisible();
   });
 });

@@ -8,7 +8,6 @@ export const sourceDocumentCardCopy = {
   processing: "处理中",
   completed: "已完成",
   cancelled: "已取消",
-  dateUnknown: "日期未知",
 };
 
 export const sourceDocumentInputCopy = {

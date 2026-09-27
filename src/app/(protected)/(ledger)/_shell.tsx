@@ -11,9 +11,8 @@ import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigati
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { parsePeriodFromSearchParams } from "@/lib/period-utils";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
-import { readStatsSearchParams } from "@/modules/workspace/stats-url-params";
+import { readPeriodParams } from "@/modules/workspace/period-url-params";
 import {
   prefetchDetailsTabQuery,
   prefetchStatsTabQuery,
@@ -33,7 +32,6 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
   // The viewed book changes on the client with no server render behind it, so
   // the hover prefetch reads it live from the store.
   const bookId = useWorkspaceStore((state) => state.bookId) ?? undefined;
-  const routeQueries = useWorkspaceStore((state) => state.routeQueries);
   const { activeTab, hrefFor, navigate, prefetch } = useLedgerNavigation();
   useTabScrollRestoration(activeTab);
 
@@ -70,20 +68,21 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
 
   const preloadTab = useCallback(
     (tab: LedgerTab) => {
-      prefetch(hrefFor(tab));
-      const query = new URLSearchParams(routeQueries[tab] ?? "");
+      const href = hrefFor(tab);
+      prefetch(href);
+      const query = new URLSearchParams(href.split("?")[1] ?? "");
       if (tab === "details") {
         void prefetchDetailsTabQuery(
           queryClient,
           bookId,
-          parsePeriodFromSearchParams(query),
+          readPeriodParams(query),
           readLedgerFilterParams(query)
         );
       } else if (tab === "stats") {
-        void prefetchStatsTabQuery(queryClient, bookId, readStatsSearchParams(query));
+        void prefetchStatsTabQuery(queryClient, bookId, readPeriodParams(query));
       }
     },
-    [bookId, hrefFor, prefetch, queryClient, routeQueries]
+    [bookId, hrefFor, prefetch, queryClient]
   );
 
   const openInput = useCallback(() => setNewRecordOpen(true), [setNewRecordOpen]);

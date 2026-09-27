@@ -164,12 +164,12 @@ describe("entry-builder", () => {
   });
 
   it("uses the document entry date when present and today otherwise", () => {
-    expect(getEntryFallbackDate("2026-03-20")).toEqual({
+    expect(getEntryFallbackDate("2026-03-20", "2026-03-23")).toEqual({
       todayDate: "2026-03-23",
       fallbackDate: "2026-03-20",
     });
 
-    expect(getEntryFallbackDate(null)).toEqual({
+    expect(getEntryFallbackDate(null, "2026-03-23")).toEqual({
       todayDate: "2026-03-23",
       fallbackDate: "2026-03-23",
     });

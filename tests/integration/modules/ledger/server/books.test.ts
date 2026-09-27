@@ -35,14 +35,13 @@ describe("books", () => {
     const firstBookId = await testBookId(db, ledgerId);
     const created = await createBook(ledgerId, {
       name: "梁梁的",
-      timeZone: "Asia/Shanghai",
     });
     return { db, ledgerId, firstBookId, secondBookId: created.id };
   }
 
   it("lists books in switcher order and appends new ones at the end", async () => {
     const { ledgerId, firstBookId } = await fixture();
-    const third = await createBook(ledgerId, { name: "哞哞的", timeZone: null });
+    const third = await createBook(ledgerId, { name: "哞哞的" });
 
     const listed = await listBooks(ledgerId);
     expect(listed.map((book) => book.id)).toEqual([firstBookId, expect.any(String), third.id]);
@@ -67,7 +66,7 @@ describe("books", () => {
 
   it("archives a book that holds records, even the former 总账 default", async () => {
     const { db, ledgerId, firstBookId } = await fixture();
-    const holding = await createBook(ledgerId, { name: "哞哞的", timeZone: null });
+    const holding = await createBook(ledgerId, { name: "哞哞的" });
     await createTestSourceDocument(db, ledgerId);
     await db
       .update(sourceDocuments)
@@ -90,7 +89,7 @@ describe("books", () => {
     const withArchived = await listBooks(ledgerId, { includeArchived: true });
     expect(withArchived.find((book) => book.id === firstBookId)?.archivedAt).not.toBeNull();
     // The name is free again once the book is archived.
-    const reused = await createBook(ledgerId, { name: "共同支出", timeZone: null });
+    const reused = await createBook(ledgerId, { name: "共同支出" });
     expect(reused.id).not.toBe(firstBookId);
     // ...and the retired book can be resolved by id, so the detail page can name it.
     expect((await getBookIncludingArchived(ledgerId, firstBookId))?.name).toBe("共同支出");
@@ -144,7 +143,7 @@ describe("books", () => {
     const { db, ledgerId, secondBookId } = await fixture();
 
     // An empty, unkeyed book is removable for good.
-    const third = await createBook(ledgerId, { name: "第三个", timeZone: null });
+    const third = await createBook(ledgerId, { name: "第三个" });
     expect(await deleteBook(ledgerId, third.id)).toEqual({ status: "deleted" });
     expect(await getBookIncludingArchived(ledgerId, third.id)).toBeNull();
 
@@ -157,7 +156,6 @@ describe("books", () => {
     // A record points at the book, so it blocks a delete too.
     const holding = await createBook(ledgerId, {
       name: "有记录的",
-      timeZone: null,
     });
     await createTestSourceDocument(db, ledgerId);
     await db
@@ -197,7 +195,7 @@ describe("books", () => {
     });
 
     // While it is retired another book takes its name, so restoring collides.
-    await createBook(ledgerId, { name: "梁梁的", timeZone: null });
+    await createBook(ledgerId, { name: "梁梁的" });
     await expect(restoreBook(ledgerId, secondBookId)).rejects.toMatchObject({
       code: "BOOK_NAME_TAKEN",
     });
@@ -213,7 +211,7 @@ describe("books", () => {
   it("refuses a name another live book already uses", async () => {
     const { ledgerId } = await fixture();
 
-    await expect(createBook(ledgerId, { name: "共同支出", timeZone: null })).rejects.toMatchObject({
+    await expect(createBook(ledgerId, { name: "共同支出" })).rejects.toMatchObject({
       code: "BOOK_NAME_TAKEN",
     });
   });

@@ -1,46 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  addPeriod,
   formatCivilDate,
   formatDateTimeForApi,
   formatInstantDateLabel,
   formatRelativeDateLabel,
-  getDateRange,
   isValidDateString,
-  parseDateRangeEnd,
-  parseDateRangeStart,
   parseDateString,
 } from "@/lib/date-utils";
 
 describe("date-utils", () => {
-  it("derives complete calendar ranges", () => {
-    const cases = [
-      ["week", "2026-02-02", "2026-02-08"],
-      ["month", "2026-02-01", "2026-02-28"],
-      ["year", "2026-01-01", "2026-12-31"],
-    ] as const;
-
-    for (const [period, expectedStart, expectedEnd] of cases) {
-      const { startDate, endDate } = getDateRange(new Date(2026, 1, 4), period);
-      expect(formatDateTimeForApi(startDate)).toBe(expectedStart);
-      expect(formatDateTimeForApi(endDate)).toBe(expectedEnd);
-    }
-  });
-
-  it("moves dates by positive and negative calendar periods", () => {
-    const date = new Date(2026, 1, 4);
-    const cases = [
-      ["week", 2, "2026-02-18"],
-      ["month", 1, "2026-03-04"],
-      ["month", -1, "2026-01-04"],
-      ["year", 1, "2027-02-04"],
-    ] as const;
-
-    for (const [period, amount, expected] of cases) {
-      expect(formatDateTimeForApi(addPeriod(date, period, amount))).toBe(expected);
-    }
-  });
-
   it("formats API dates from local calendar fields", () => {
     expect(formatDateTimeForApi(new Date(2026, 0, 5))).toBe("2026-01-05");
     expect(formatDateTimeForApi(undefined)).toBeUndefined();
@@ -68,23 +36,6 @@ describe("date-utils", () => {
   it("rejects malformed and impossible civil dates", () => {
     for (const value of ["2026-7-28", "2026-02-30"]) {
       expect(() => formatCivilDate(value, "en-US", {})).toThrow(RangeError);
-    }
-  });
-
-  it("parses query boundaries at the start and end of the local day", () => {
-    const start = parseDateRangeStart("2026-02-04T15:30:00Z");
-    const end = parseDateRangeEnd("2026-02-04");
-
-    expect(start).not.toBeNull();
-    expect([start!.getHours(), start!.getMinutes(), start!.getSeconds()]).toEqual([0, 0, 0]);
-    expect(end).not.toBeNull();
-    expect([end!.getHours(), end!.getMinutes(), end!.getSeconds()]).toEqual([23, 59, 59]);
-  });
-
-  it("returns null for missing or invalid query boundaries", () => {
-    for (const value of [null, undefined, "not-a-date"]) {
-      expect(parseDateRangeStart(value)).toBeNull();
-      expect(parseDateRangeEnd(value)).toBeNull();
     }
   });
 

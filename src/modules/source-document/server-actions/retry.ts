@@ -6,7 +6,7 @@ import {
   retrySourceDocumentInputSchema,
   type RetrySourceDocumentInputContract,
 } from "@/modules/source-document/contract-schemas";
-import { omitUndefinedProperties } from "@/lib/validation";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 
@@ -43,17 +43,18 @@ export const retrySourceDocumentAction = withSourceDocumentLedgerAccess(
  */
 export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
-    { ledgerId },
+    { ledgerId, ledger },
     sourceDocumentId: string,
     input: RetrySourceDocumentInputContract
   ): Promise<RetrySourceDocumentResponseDto> => {
     const validatedSourceDocumentId = parseSourceDocumentId(sourceDocumentId);
     const parsedInput = retrySourceDocumentInputSchema.parse(input);
-    const validatedInput: RetrySourceDocumentInputContract = {
+    // A retry sent without a day is dated today in the ledger's zone, like a
+    // new record; the record never falls back to its UTC creation day.
+    const validatedInput = {
       text: parsedInput.text,
       storedFileIds: parsedInput.storedFileIds,
-      documentDate: parsedInput.documentDate,
-      ...omitUndefinedProperties({ timezone: parsedInput.timezone }),
+      documentDate: parsedInput.documentDate ?? ledgerToday(ledger.settings.timeZone),
     };
 
     const result = await retrySourceDocument({
