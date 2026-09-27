@@ -503,6 +503,7 @@ export function useLedgerEntriesTab({
       isAllSelected,
       isSelectionLimitReached,
       hasMoreData: hasNextPage || allSourceDocumentIds.length > selectableCount,
+      loadedCount: allSourceDocumentIds.length,
       queryFingerprint,
       selectedIds,
       selectedEntryIds,

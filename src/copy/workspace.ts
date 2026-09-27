@@ -66,7 +66,11 @@ export const batchActionsCopy = {
   selectedLoadedCount: (v: { selected: string | number; loaded: string | number }) =>
     `已选 ${v.selected} / 已加载 ${v.loaded} 条`,
   unloadedExcluded: "尚未加载的明细不在本次选择中",
-  nonCategoryBatchLimit: "日期、币种和删除每次最多处理 100 条；分类可处理当前全部选择。",
+  batchLimit: (v: { actions: string | number }) => `${v.actions}每次最多处理 100 条。`,
+  categoryBatchUnlimited: "分类可处理当前全部选择。",
+  batchLimitDate: "日期",
+  batchLimitCurrency: "币种",
+  batchLimitDelete: "删除",
   categoryAssignConfirm: (v: { name: string | number }) => `设为「${v.name}」`,
   categoryAiConfirm: (v: { count: string | number }) => `AI 分类 ${v.count} 条明细`,
   categoryClearConfirm: (v: { count: string | number }) => `清空 ${v.count} 条分类`,

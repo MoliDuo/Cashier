@@ -45,6 +45,7 @@ export function LedgerEntriesTab({
         isAllSelected={selection.isAllSelected}
         hasMoreData={selection.hasMoreData}
         selectedCount={selection.selectedIds.length}
+        loadedCount={selection.loadedCount}
         queryFingerprint={selection.queryFingerprint}
         selectedSourceDocumentIds={selection.selectedIds}
         selectedEntryIds={selection.selectedEntryIds}

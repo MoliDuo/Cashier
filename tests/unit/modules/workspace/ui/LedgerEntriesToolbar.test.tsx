@@ -10,6 +10,7 @@ const defaultProps = {
   isSelectionMode: false,
   isAllSelected: false,
   selectedCount: 0,
+  loadedCount: 5,
   queryFingerprint: "query-1",
   onToggleSelectionMode: vi.fn(),
   onSelectAll: vi.fn(),
@@ -44,11 +45,29 @@ describe("LedgerEntriesToolbar", () => {
   it("shows selection controls instead of totals and filters while selecting", () => {
     render(<LedgerEntriesToolbar {...defaultProps} isSelectionMode={true} selectedCount={3} />);
 
-    expect(screen.getByText("全选已加载的 3 条")).toBeInTheDocument();
+    expect(screen.getByText("全选已加载的 5 条")).toBeInTheDocument();
+    expect(screen.getByText("已选 3 / 已加载 5 条")).toBeInTheDocument();
     expect(screen.queryByText(/已选择/)).not.toBeInTheDocument();
     expect(screen.getByTitle("取消")).toBeInTheDocument();
     expect(screen.queryByText("¥123.45")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "筛选" })).not.toBeInTheDocument();
+  });
+
+  it("names only the stream's own actions in the 100-row note", () => {
+    render(
+      <LedgerEntriesToolbar
+        {...defaultProps}
+        isSelectionMode={true}
+        selectedCount={101}
+        loadedCount={120}
+        onUpdateDates={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("日期、删除每次最多处理 100 条。")).toBeInTheDocument();
+    expect(screen.queryByText(/分类/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/币种/)).not.toBeInTheDocument();
   });
 
   it("offers select all before anything is selected", () => {

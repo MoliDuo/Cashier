@@ -26,6 +26,8 @@ interface LedgerEntriesToolbarProps {
   isAllSelected: boolean;
   hasMoreData?: boolean;
   selectedCount: number;
+  /** How many records the stream has loaded, which select-all takes in. */
+  loadedCount: number;
   selectedSourceDocumentIds?: string[];
   selectedEntryIds?: string[];
   queryFingerprint: string;
@@ -58,6 +60,7 @@ export function LedgerEntriesToolbar({
   isAllSelected,
   hasMoreData = false,
   selectedCount,
+  loadedCount,
   selectedSourceDocumentIds = [],
   selectedEntryIds = [],
   queryFingerprint,
@@ -195,6 +198,7 @@ export function LedgerEntriesToolbar({
         <LedgerEntriesBatchActionToolbar
           className="min-w-0 flex-1"
           selectedCount={selectedCount}
+          loadedCount={loadedCount}
           isAllSelected={isAllSelected}
           hasMoreData={hasMoreData}
           onSelectAll={onSelectAll}

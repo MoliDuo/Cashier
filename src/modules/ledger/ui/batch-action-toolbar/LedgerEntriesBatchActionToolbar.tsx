@@ -142,6 +142,13 @@ export function LedgerEntriesBatchActionToolbar({
     onSplit != null ||
     onDelete != null;
 
+  // Only the actions this surface offers are named in the 100-row note.
+  const limitedActions = [
+    onChangeDate != null ? batchActionsCopy.batchLimitDate : null,
+    onChangeCurrency != null ? batchActionsCopy.batchLimitCurrency : null,
+    onDelete != null ? batchActionsCopy.batchLimitDelete : null,
+  ].filter((label): label is string => label != null);
+
   const handleChangeCategory = useCallback(
     async (categoryId: string | null) => {
       if (!onChangeCategory) return;
@@ -240,7 +247,12 @@ export function LedgerEntriesBatchActionToolbar({
           {batchActionsCopy.selectedLoadedCount({ selected: selectedCount, loaded: loadedCount })}
         </p>
         {hasMoreData ? <p>{batchActionsCopy.unloadedExcluded}</p> : null}
-        {selectedCount > 100 ? <p>{batchActionsCopy.nonCategoryBatchLimit}</p> : null}
+        {selectedCount > 100 && limitedActions.length > 0 ? (
+          <p>
+            {batchActionsCopy.batchLimit({ actions: limitedActions.join("、") })}
+            {onChangeCategory != null ? batchActionsCopy.categoryBatchUnlimited : null}
+          </p>
+        ) : null}
       </div>
 
       {onChangeCategory != null && confirmsCategory ? (

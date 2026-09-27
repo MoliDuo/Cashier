@@ -78,6 +78,7 @@ function SourceDocumentDetailEditor({
   const selectionToolbar = selection.isSelectionMode ? (
     <LedgerEntriesBatchActionToolbar
       selectedCount={selection.selectedIds.length}
+      loadedCount={ledgerEntries.length}
       isAllSelected={selection.isAllSelected}
       onSelectAll={() => selection.handleSelectAll(true)}
       onClearSelection={() => selection.handleSelectAll(false)}
