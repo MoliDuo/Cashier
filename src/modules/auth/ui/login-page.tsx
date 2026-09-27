@@ -51,7 +51,7 @@ export function AuthLoginPage({
             <div role="status" className="mb-5 rounded-md bg-surface2 p-3">
               <p className={textRoleClassName("bodyStrong")}>{authCopy.noAccountTitle}</p>
               <p className={textRoleClassName("bodyMuted", "mt-1")}>{authCopy.noAccountDesc}</p>
-              <pre className="mt-2 overflow-x-auto text-xs text-text">
+              <pre className={textRoleClassName("meta", "mt-2 overflow-x-auto text-text")}>
                 <code translate="no">
                   {"npm run account:create -- --email you@example.com\n"}
                   {"npm run account:enroll -- --email you@example.com"}
@@ -60,7 +60,10 @@ export function AuthLoginPage({
             </div>
           ) : null}
           {noticeMessage != null ? (
-            <p role="status" className="mb-5 rounded-md bg-surface2 p-3 text-sm text-text">
+            <p
+              role="status"
+              className={textRoleClassName("body", "mb-5 rounded-md bg-surface2 p-3")}
+            >
               {noticeMessage}
             </p>
           ) : null}
@@ -132,7 +135,10 @@ export function AuthLoginPage({
               {flow.error != null ? (
                 <p
                   role="alert"
-                  className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                  className={textRoleClassName(
+                    "body",
+                    "mt-4 rounded-md bg-destructive/10 p-3 text-destructive"
+                  )}
                 >
                   {flow.error}
                 </p>
@@ -149,7 +155,10 @@ export function AuthLoginPage({
                 type="button"
                 onClick={() => flow.handleDevSignIn()}
                 disabled={flow.isLoading}
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-surface2 disabled:opacity-50"
+                className={textRoleClassName(
+                  "bodyStrong",
+                  "inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 transition-colors hover:bg-surface2 disabled:opacity-50"
+                )}
               >
                 {authCopy.devSignIn}
               </button>

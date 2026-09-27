@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { OTPInput } from "./otp-input";
@@ -45,7 +46,7 @@ export function OtpStep({
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <span id="otp-code-label" className="text-sm font-medium text-text">
+          <span id="otp-code-label" className={textRoleClassName("bodyStrong")}>
             {authCopy.enterCode}
           </span>
           <div role="group" aria-labelledby="otp-code-label">
@@ -62,7 +63,10 @@ export function OtpStep({
         <ExpiryTimer expiresAt={expiresAt} onExpired={onExpired} className="text-center" />
       </div>
       {error != null && (
-        <div role="alert" className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+        <div
+          role="alert"
+          className={textRoleClassName("body", "p-3 rounded-lg bg-destructive/10 text-destructive")}
+        >
           {error}
         </div>
       )}
@@ -86,7 +90,6 @@ export function OtpStep({
           variant="ghost"
           onClick={onChangeEmail}
           disabled={isLoading || resendPending}
-          className="text-sm"
         >
           <ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />
           {authCopy.changeEmail}
@@ -98,7 +101,7 @@ export function OtpStep({
         />
       </div>
       {resendPending ? (
-        <p className="text-center text-sm text-muted-foreground" aria-live="polite">
+        <p className={textRoleClassName("bodyMuted", "text-center")} aria-live="polite">
           {authCopy.resendInProgress}
         </p>
       ) : null}

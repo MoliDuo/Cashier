@@ -6,6 +6,7 @@ import type {
   EntryCategoryWithCount,
   SaveEntryCategoriesInput,
 } from "@/modules/ledger/contracts";
+import { textRoleClassName } from "@/components/typography";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -105,7 +106,10 @@ export function CategorySection({
     >
       {categoryAssignmentActive ? (
         <div
-          className="border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
+          className={textRoleClassName(
+            "body",
+            "border border-warning/30 bg-warning/10 p-3 text-warning"
+          )}
           role="status"
         >
           <p>{settingsCopy.categoryAssignmentActive}</p>
@@ -126,7 +130,9 @@ export function CategorySection({
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 truncate text-sm font-medium">{category.name}</span>
+                <span className={textRoleClassName("bodyStrong", "min-w-0 truncate")}>
+                  {category.name}
+                </span>
                 {category.entryCount == null ? null : (
                   <span className="text-micro text-muted-foreground">
                     {settingsCopy.categoryItemCount({ count: category.entryCount })}
@@ -153,7 +159,7 @@ export function CategorySection({
                 ) : null}
               </div>
               {category.description !== "" ? (
-                <p className="truncate text-xs text-muted-foreground">{category.description}</p>
+                <p className={textRoleClassName("meta", "truncate")}>{category.description}</p>
               ) : null}
             </div>
             {managing ? (
@@ -216,7 +222,7 @@ export function CategorySection({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="min-w-0 truncate text-sm font-medium">
+              <span className={textRoleClassName("bodyStrong", "min-w-0 truncate")}>
                 {settingsCopy.uncategorized}
               </span>
               {uncategorizedCount > 0 ? (
@@ -233,7 +239,10 @@ export function CategorySection({
         <div className="space-y-3">
           {revisionConflict ? (
             <div
-              className="flex flex-wrap items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
+              className={textRoleClassName(
+                "body",
+                "flex flex-wrap items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-3 text-warning"
+              )}
               role="status"
             >
               <span>{settingsCopy.categoriesChangedElsewhere}</span>
@@ -276,7 +285,11 @@ export function CategorySection({
             </Button>
           </div>
           {saveError == null ? null : (
-            <p role="alert" aria-live="polite" className="text-sm text-destructive">
+            <p
+              role="alert"
+              aria-live="polite"
+              className={textRoleClassName("body", "text-destructive")}
+            >
               {saveError}
             </p>
           )}

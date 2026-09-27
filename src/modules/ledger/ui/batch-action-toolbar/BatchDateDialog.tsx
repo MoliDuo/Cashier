@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import { formatDateTimeForApi } from "@/lib/date-utils";
@@ -85,11 +86,11 @@ export function BatchDateDialog({
           <DialogTitle>{batchActionsCopy.dateImpactTitle}</DialogTitle>
         </DialogHeader>
         {previewFailed ? (
-          <p className="text-sm text-destructive" role="alert">
+          <p className={textRoleClassName("body", "text-destructive")} role="alert">
             {batchActionsCopy.dateImpactFailed}
           </p>
         ) : impact != null ? (
-          <p className="text-sm text-muted-foreground">
+          <p className={textRoleClassName("bodyMuted")}>
             {batchActionsCopy.dateImpactDescription({
               documents: impact.documents,
               entries: impact.entries,

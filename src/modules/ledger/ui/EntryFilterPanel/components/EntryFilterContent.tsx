@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { AmountInput } from "@/components/ui/amount-input";
 import {
@@ -146,7 +147,7 @@ export function EntryFilterContent({
             }
             className="min-w-0 flex-1"
           />
-          <span className="text-sm text-muted-foreground">-</span>
+          <span className={textRoleClassName("bodyMuted")}>-</span>
           <AmountInput
             placeholder={entryFilterPanelCopy.maxAmount}
             aria-label={entryFilterPanelCopy.maxAmount}
@@ -181,7 +182,10 @@ export function EntryFilterContent({
                   aria-pressed={isSelected}
                   onClick={() => toggleStatus(status)}
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm transition-colors duration-[var(--motion-feedback)]",
+                    textRoleClassName(
+                      "body",
+                      "rounded-full border px-3 py-1.5 transition-colors duration-[var(--motion-feedback)]"
+                    ),
                     isSelected
                       ? "border-primary bg-primary/5 font-medium text-primary ring-1 ring-primary/20"
                       : "border-border text-muted-foreground hover:border-primary/50 hover:text-text"

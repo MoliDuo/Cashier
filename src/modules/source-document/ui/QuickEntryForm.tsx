@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AmountInput } from "@/components/ui/amount-input";
@@ -148,18 +149,23 @@ export function QuickEntryForm({
           </Select>
         </div>
         {showAmountError ? (
-          <p id={amountErrorId} className="mt-1.5 text-sm text-destructive">
+          <p id={amountErrorId} className={textRoleClassName("body", "mt-1.5 text-destructive")}>
             {quickEntryFormCopy.amountRequired}
           </p>
         ) : null}
       </div>
 
       <div>
-        <p className="mb-2 text-sm text-muted-foreground">{quickEntryFormCopy.selectCategory}</p>
+        <p className={textRoleClassName("bodyMuted", "mb-2")}>
+          {quickEntryFormCopy.selectCategory}
+        </p>
         {categories.length === 0 ? (
           <div
             role="alert"
-            className="mb-2 rounded-md border border-danger/30 bg-danger/10 p-3 text-sm"
+            className={textRoleClassName(
+              "body",
+              "mb-2 rounded-md border border-danger/30 bg-danger/10 p-3"
+            )}
           >
             <p>{quickEntryFormCopy.noCategories}</p>
             <Link href="/settings" className="mt-2 inline-flex font-medium text-primary underline">
@@ -188,19 +194,23 @@ export function QuickEntryForm({
               )}
             >
               <CategoryIcon iconName={cat.icon} className="h-5 w-5" />
-              <span className="w-full truncate text-center text-xs">{cat.name}</span>
+              <span
+                className={textRoleClassName("meta", "w-full truncate text-center text-inherit")}
+              >
+                {cat.name}
+              </span>
             </button>
           ))}
         </div>
         {showCategoryError ? (
-          <p id={categoryErrorId} className="mt-1.5 text-sm text-destructive">
+          <p id={categoryErrorId} className={textRoleClassName("body", "mt-1.5 text-destructive")}>
             {quickEntryFormCopy.categoryRequired}
           </p>
         ) : null}
       </div>
 
       <div>
-        <p className="mb-2 text-sm text-muted-foreground">{quickEntryFormCopy.selectDate}</p>
+        <p className={textRoleClassName("bodyMuted", "mb-2")}>{quickEntryFormCopy.selectDate}</p>
         <DateFilter
           value={entryDate}
           onChange={(date) => {

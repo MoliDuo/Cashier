@@ -3,6 +3,7 @@
  */
 
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getHeatmapColor, formatCellAmount } from "../../lib/heatmap-colors";
@@ -56,7 +57,10 @@ export function DayCellLarge({
             }}
           >
             <span
-              className="max-w-full truncate px-0.5 text-xs font-normal tabular-nums"
+              className={textRoleClassName(
+                "meta",
+                "max-w-full truncate px-0.5 font-normal tabular-nums"
+              )}
               style={{ color: `var(--heatmap-text-${level >= 4 ? "high" : "low"})` }}
             >
               {dayNumber}

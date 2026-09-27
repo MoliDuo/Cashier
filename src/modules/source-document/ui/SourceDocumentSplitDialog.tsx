@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Scissors } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import {
@@ -62,14 +63,17 @@ export function SourceDocumentSplitDialog({
             {sourceDocumentDetailCopy.splitTitle}
           </DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
+        <p className={textRoleClassName("bodyMuted")}>
           {sourceDocumentDetailCopy.splitDescription({ count: totalSelected })}
         </p>
         <ul className="divide-y rounded-lg border">
           {previewEntries.map((entry) => (
             <li
               key={entry.id}
-              className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              className={textRoleClassName(
+                "body",
+                "flex items-center justify-between gap-3 px-3 py-2"
+              )}
             >
               <span className="min-w-0 truncate">{entry.itemName}</span>
               <span className="shrink-0 tabular-nums text-muted-foreground">
@@ -79,7 +83,7 @@ export function SourceDocumentSplitDialog({
           ))}
         </ul>
         {remainingCount > 0 ? (
-          <p className="text-xs text-muted-foreground">
+          <p className={textRoleClassName("meta")}>
             {sourceDocumentDetailCopy.splitMore({ count: remainingCount })}
           </p>
         ) : null}

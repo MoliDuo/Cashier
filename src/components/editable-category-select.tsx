@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { Check, ChevronDown, CircleSlash } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,7 @@ export function EditableCategorySelect({
     return (
       <span
         className={cn(
-          "inline-flex min-h-11 items-center gap-1 rounded px-3 py-1 text-sm",
+          textRoleClassName("body", "inline-flex min-h-11 items-center gap-1 rounded px-3 py-1"),
           "bg-primary/10 text-primary",
           className
         )}
@@ -92,7 +93,7 @@ export function EditableCategorySelect({
           aria-haspopup="listbox"
           aria-label={iconOnly ? (selectedCategory?.name ?? placeholder) : undefined}
           className={cn(
-            "inline-flex min-h-11 items-center gap-1 rounded px-3 py-1 text-sm",
+            textRoleClassName("body", "inline-flex min-h-11 items-center gap-1 rounded px-3 py-1"),
             "cursor-pointer transition-colors",
             iconOnly
               ? "w-8 shrink-0 justify-center gap-0 px-0"
@@ -136,7 +137,10 @@ export function EditableCategorySelect({
               aria-selected={value === category.id}
               onClick={() => handleSelect(category.id)}
               className={cn(
-                "flex min-h-11 w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                textRoleClassName(
+                  "body",
+                  "flex min-h-11 w-full items-center gap-2 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground"
+                ),
                 value === category.id ? "bg-accent text-accent-foreground" : "text-text"
               )}
             >

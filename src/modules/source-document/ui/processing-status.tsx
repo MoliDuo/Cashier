@@ -1,3 +1,4 @@
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { commonCopy } from "@/copy/common";
 import { sourceDocumentCardCopy } from "@/copy/source-document";
@@ -43,7 +44,7 @@ export function ProcessingStatus({ status, label, className }: ProcessingStatusP
       ) : (
         <span
           className={cn(
-            "max-w-32 truncate text-xs font-medium sm:max-w-48",
+            textRoleClassName("meta", "max-w-32 truncate font-medium sm:max-w-48"),
             isFailure && "text-danger",
             status === "processing" && "text-primary",
             status === "cancelled" && "text-muted-foreground"

@@ -21,7 +21,10 @@ export default function NotFound() {
         <p className={textRoleClassName("bodyMuted", "mb-8")}>{notFoundCopy.description}</p>
         <Link
           href="/"
-          className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-primary hover:bg-primary/90 transition-colors shadow-sm"
+          className={textRoleClassName(
+            "sectionTitle",
+            "inline-flex items-center justify-center px-6 py-3 border border-transparent font-medium rounded-lg text-white bg-primary hover:bg-primary/90 transition-colors shadow-sm"
+          )}
         >
           <Home aria-hidden="true" className="w-5 h-5 mr-2" />
           {notFoundCopy.backToHome}

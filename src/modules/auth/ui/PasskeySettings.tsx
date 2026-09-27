@@ -5,6 +5,7 @@ import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/SettingsSection";
 import { Input } from "@/components/ui/input";
@@ -237,7 +238,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
                     </Button>
                   </div>
                   {error != null ? (
-                    <p role="alert" className="text-sm text-destructive">
+                    <p role="alert" className={textRoleClassName("body", "text-destructive")}>
                       {error}
                     </p>
                   ) : null}
@@ -245,8 +246,8 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
               ) : (
                 <li key={passkey.id} className="flex items-center justify-between gap-2 p-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-text">{passkey.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={textRoleClassName("body", "truncate")}>{passkey.name}</p>
+                    <p className={textRoleClassName("meta")}>
                       {passkey.lastUsedAt == null
                         ? settingsPasskeysCopy.createdAt({ date: dateLabel(passkey.createdAt) })
                         : settingsPasskeysCopy.lastUsedAt({ date: dateLabel(passkey.lastUsedAt) })}
@@ -285,7 +286,12 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
             )}
           </ul>
         ) : isListPending ? null : (
-          <p className="rounded-[var(--radius)] border border-dashed border-border p-3 text-sm text-muted-foreground">
+          <p
+            className={textRoleClassName(
+              "bodyMuted",
+              "rounded-[var(--radius)] border border-dashed border-border p-3"
+            )}
+          >
             {settingsPasskeysCopy.empty}
           </p>
         )}
@@ -314,7 +320,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
               />
             </div>
             {error != null ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={textRoleClassName("body", "text-destructive")}>
                 {error}
               </p>
             ) : null}

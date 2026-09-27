@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { DISPLAY_LOCALE } from "@/lib/constants";
@@ -32,11 +33,11 @@ export function SourceDocumentTotal({
         {amount}
       </AmountText>
       {unconvertedCount > 0 ? (
-        <span className="text-xs text-warning" role="status">
+        <span className={textRoleClassName("meta", "text-warning")} role="status">
           {commonCopy.incompleteAccountingProjection}
         </span>
       ) : staleConversionCount > 0 ? (
-        <span className="text-xs text-muted-foreground" role="status">
+        <span className={textRoleClassName("meta")} role="status">
           {sourceDocumentDetailCopy.pendingRecalculation}
         </span>
       ) : null}

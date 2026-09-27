@@ -1,5 +1,6 @@
 "use client";
 import { useMemo } from "react";
+import { textRoleClassName } from "@/components/typography";
 import { buildSparklineGeometry } from "@/modules/stats/lib/sparkline-path";
 import { ChevronRight } from "lucide-react";
 import { statsTabCopy } from "@/copy/stats";
@@ -80,7 +81,10 @@ export function StatsSparkline({
           <button
             type="button"
             onClick={onExpand}
-            className="inline-flex items-center gap-0.5 rounded-md px-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+            className={textRoleClassName(
+              "meta",
+              "inline-flex items-center gap-0.5 rounded-md px-1 font-medium text-primary transition-colors hover:text-primary/80"
+            )}
           >
             {statsTabCopy.sparklineExpand}
             <ChevronRight aria-hidden="true" className="size-3.5" />

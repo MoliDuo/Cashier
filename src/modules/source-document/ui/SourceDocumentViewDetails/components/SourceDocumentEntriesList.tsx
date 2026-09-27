@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -56,7 +57,7 @@ export function SourceDocumentEntriesList({
   return (
     <div className="min-w-0 divide-y">
       {entries.length === 0 ? (
-        <p className="p-8 text-center text-sm text-muted-foreground">
+        <p className={textRoleClassName("bodyMuted", "p-8 text-center")}>
           {sourceDocumentDetailCopy.noEntries}
         </p>
       ) : (

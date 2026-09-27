@@ -38,6 +38,17 @@ const textSizeMessage =
   "Text sizes come from the frozen scale in globals.css, not text-[…] values.";
 const mutedMessage = "Use text-muted-foreground rather than the duplicate text-muted token.";
 
+// Feature code takes its prose sizes from the roles in `@/components/typography`;
+// only the primitives and the role table itself spell the sizes out. A variant
+// prefix (`sm:text-xs`) is still a raw size; a longer token (`text-xsomething`) is not.
+const rawTextSize = "/(?<![\\w-])text-(?:xs|sm|base|lg)(?![-\\w])/";
+const rawTextSizeMessage =
+  "Use a role from @/components/typography (textRoleClassName) instead of a raw text-xs/sm/base/lg size.";
+const rawTextSizeSyntax = [
+  { selector: `Literal[value=${rawTextSize}]`, message: rawTextSizeMessage },
+  { selector: `TemplateElement[value.cooked=${rawTextSize}]`, message: rawTextSizeMessage },
+];
+
 const architectureSyntax = [
   { selector: `${loggedIdentifier}:not(${logIdentifierCall})`, message: identifierMessage },
   {
@@ -100,6 +111,25 @@ export default defineConfig([
     files: ["src/**/*.{ts,tsx,mts,mjs}"],
     rules: {
       "no-restricted-syntax": ["error", ...architectureSyntax, sourceDocumentWrite],
+    },
+  },
+  {
+    files: ["src/modules/**/ui/**/*.{ts,tsx}", "src/app/**/*.{ts,tsx}", "src/components/*.tsx"],
+    // The amount table is the second class table beside the role table; it
+    // keeps its own sizes so retuning a prose role cannot move an amount.
+    ignores: [
+      "src/components/ui/**",
+      "src/components/skeletons/**",
+      "src/components/typography.ts",
+      "src/modules/currency/ui/amount-text.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...architectureSyntax,
+        sourceDocumentWrite,
+        ...rawTextSizeSyntax,
+      ],
     },
   },
   {

@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleSlash } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -16,8 +17,10 @@ interface BatchCategoryDialogProps {
 }
 
 /** One row of the list, shared by every option so the targets all match. */
-const OPTION_CLASS =
-  "flex min-h-11 w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-text transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none";
+const OPTION_CLASS = textRoleClassName(
+  "body",
+  "flex min-h-11 w-full items-center gap-2 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none"
+);
 
 /**
  * The one way to set the category of a selection. A dialog rather than the

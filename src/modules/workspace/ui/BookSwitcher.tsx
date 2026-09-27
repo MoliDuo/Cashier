@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -49,7 +50,10 @@ export function BookSwitcher({ disabled = false }: BookSwitcherProps) {
         <button
           type="button"
           aria-label={`${bookScopeCopy.label}：${label}`}
-          className="inline-flex h-9 min-w-0 max-w-[12rem] items-center gap-1 rounded-md px-2 text-sm font-medium text-text transition-colors hover:bg-surface2 disabled:opacity-60"
+          className={textRoleClassName(
+            "bodyStrong",
+            "inline-flex h-9 min-w-0 max-w-[12rem] items-center gap-1 rounded-md px-2 transition-colors hover:bg-surface2 disabled:opacity-60"
+          )}
         >
           <span className="truncate">{label}</span>
           <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />

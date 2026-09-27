@@ -103,11 +103,43 @@ describe("typography rules", () => {
 
   it.each([
     ["the muted foreground token", 'cn("text-muted-foreground text-muted-foreground/60");'],
-    ["a scale size", 'cn("text-sm text-micro");'],
+    ["a scale size", 'cn("text-2xl text-micro");'],
     ["a comment", "// text-[13px] and text-muted\nnull;"],
     ["a longer class name", 'cn("my-text-muted");'],
   ])("allows %s", async (_label, code) => {
     expect(await restrictedSyntax(`export const x = ${code}`, component)).toEqual([]);
+  });
+
+  describe("raw text size", () => {
+    it.each([
+      ["a raw size in a class attribute", '<p className="mt-1 text-sm text-destructive" />'],
+      ["a raw size behind a variant", 'cn("px-2 sm:text-xs");'],
+      ["a raw size in a template", "cn(`${base} text-base`);"],
+    ])("reports %s in feature code", async (_label, code) => {
+      for (const file of [component, "src/app/probe/page.tsx", "src/components/probe.tsx"]) {
+        expect(await restrictedSyntax(`export const x = ${code}`, file)).toEqual([
+          expect.stringContaining("@/components/typography"),
+        ]);
+      }
+    });
+
+    it.each([
+      ["a role", 'textRoleClassName("body", "mt-1 text-destructive");'],
+      ["a longer token", 'cn("text-xsomething my-text-sm");'],
+      ["a comment", "// text-sm\nnull;"],
+    ])("allows %s in feature code", async (_label, code) => {
+      expect(await restrictedSyntax(`export const x = ${code}`, component)).toEqual([]);
+    });
+
+    it.each([
+      "src/components/ui/probe.tsx",
+      "src/components/skeletons/probe.tsx",
+      "src/components/typography.ts",
+      "src/modules/currency/ui/amount-text.tsx",
+      "src/modules/demo/server/probe.ts",
+    ])("allows a raw size in %s", async (file) => {
+      expect(await restrictedSyntax('export const x = cn("text-sm text-lg");', file)).toEqual([]);
+    });
   });
 });
 

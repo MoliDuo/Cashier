@@ -1,5 +1,6 @@
 "use client";
 import { BarChart3, Plus, ReceiptText } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { NAVIGATION_TABS, type LedgerTab } from "@/lib/ledger-tabs";
 import { ledgerPageCopy } from "@/copy/app";
@@ -117,7 +118,10 @@ function NavButton({
         "relative inline-flex min-w-0 items-center justify-center font-medium transition-colors",
         variant === "bottom"
           ? "h-full flex-col gap-0.5 px-1 text-micro"
-          : "gap-1.5 px-3 text-sm after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent",
+          : textRoleClassName(
+              "body",
+              "gap-1.5 px-3 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent"
+            ),
         disabled
           ? "cursor-not-allowed text-muted-foreground/60"
           : active

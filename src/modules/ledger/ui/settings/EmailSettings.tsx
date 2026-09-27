@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -168,7 +169,7 @@ export function EmailSettings({
         <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
           {emails.map((address) => (
             <li key={address} className="flex items-center justify-between gap-2 p-3">
-              <span className="min-w-0 truncate text-sm text-text">{address}</span>
+              <span className={textRoleClassName("body", "min-w-0 truncate")}>{address}</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -234,7 +235,7 @@ export function EmailSettings({
               </div>
             ) : null}
             {error != null ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={textRoleClassName("body", "text-destructive")}>
                 {error}
               </p>
             ) : null}

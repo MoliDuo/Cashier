@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -73,7 +74,7 @@ export function PeriodBar({
         variant="ghost"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className="h-8 min-w-0 gap-1 px-2 text-sm font-medium tabular-nums"
+        className="h-8 min-w-0 gap-1 px-2 tabular-nums"
         aria-label={`${periodBarCopy.label}：${label}`}
         aria-haspopup="dialog"
       >
@@ -154,7 +155,10 @@ function PeriodDialog({
                   aria-pressed={active}
                   onClick={() => choose(range)}
                   className={cn(
-                    "min-h-9 flex-1 rounded-md px-2 text-sm font-medium transition-colors duration-[var(--motion-feedback)]",
+                    textRoleClassName(
+                      "bodyStrong",
+                      "min-h-9 flex-1 rounded-md px-2 transition-colors duration-[var(--motion-feedback)]"
+                    ),
                     active
                       ? "bg-surface text-primary shadow-sm"
                       : "text-muted-foreground hover:text-text"

@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import type { EntryCategoryWithCount, Ledger } from "@/modules/ledger/contracts";
 import { usePathname } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -110,7 +111,10 @@ export function SettingsTab({
       {settingsQueryStatus === "error" && (
         <div
           role="alert"
-          className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
+          className={textRoleClassName(
+            "body",
+            "flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2"
+          )}
         >
           <span>{ledgerQueryErrorCopy.description}</span>
           <Button

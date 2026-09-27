@@ -1,5 +1,6 @@
 "use client";
 
+import { textRoleClassName } from "@/components/typography";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { cn } from "@/lib/utils";
@@ -50,7 +51,10 @@ export function BatchCurrencyDialog({
               // the codes anyone actually books in are found without reading
               // every one of them.
               className={cn(
-                "flex min-h-11 w-full items-center rounded-sm px-2 py-2 text-left text-sm text-text transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none",
+                textRoleClassName(
+                  "body",
+                  "flex min-h-11 w-full items-center rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none"
+                ),
                 preferredCurrencies.includes(currency) && "font-medium"
               )}
               onClick={() => {

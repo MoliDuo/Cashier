@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -214,7 +215,10 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
         {booksRefreshFailed ? (
           <div
             role="alert"
-            className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
+            className={textRoleClassName(
+              "body",
+              "flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2"
+            )}
           >
             <span>{ledgerQueryErrorCopy.description}</span>
             <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
@@ -226,7 +230,10 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
         {booksLoadFailed ? (
           <div
             role="alert"
-            className="flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
+            className={textRoleClassName(
+              "body",
+              "flex flex-wrap items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2"
+            )}
           >
             <span>{ledgerQueryErrorCopy.description}</span>
             <Button type="button" variant="outline" size="sm" onClick={retryBooks}>
@@ -247,7 +254,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
             ))}
           </ul>
         ) : list.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{settingsBooksCopy.empty}</p>
+          <p className={textRoleClassName("bodyMuted")}>{settingsBooksCopy.empty}</p>
         ) : (
           <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
             {list.map((book, index) => {
@@ -278,7 +285,9 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                         className="h-8"
                       />
                     ) : (
-                      <span className="truncate text-sm font-medium text-text">{book.name}</span>
+                      <span className={textRoleClassName("bodyStrong", "truncate")}>
+                        {book.name}
+                      </span>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -381,7 +390,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
               <li key={book.id} className="flex flex-wrap items-center gap-2 p-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-muted-foreground">
+                    <span className={textRoleClassName("bodyMuted", "truncate font-medium")}>
                       {book.name}
                     </span>
                     <span className="shrink-0 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-micro font-medium text-muted-foreground">

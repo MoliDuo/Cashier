@@ -212,7 +212,7 @@ export function LedgerEntriesBatchActionToolbar({
           {isAllSelected ? batchActionsCopy.deselectAll : selectAllLabel}
         </span>
         {isAllSelected && hasMoreData ? (
-          <span className="whitespace-nowrap text-xs text-muted-foreground">
+          <span className={textRoleClassName("meta", "whitespace-nowrap")}>
             {batchActionsCopy.loadedOnly}
           </span>
         ) : null}

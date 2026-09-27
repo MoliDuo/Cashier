@@ -60,7 +60,7 @@ export const LedgerEntryItem = memo(function LedgerEntryItem({
     >
       {/* Left: Icon + Name */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="h-8 w-8 flex items-center justify-center bg-surface2 rounded-full text-lg shrink-0">
+        <div className="h-8 w-8 flex items-center justify-center bg-surface2 rounded-full shrink-0">
           <CategoryIcon iconName={ledgerEntry.category?.icon ?? null} className="w-4 h-4" />
         </div>
 

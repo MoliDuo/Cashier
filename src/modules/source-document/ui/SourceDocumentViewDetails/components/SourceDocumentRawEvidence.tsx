@@ -120,7 +120,12 @@ export function SourceDocumentRawEvidence({ sourceDocument }: SourceDocumentRawE
               <h3 className={textRoleClassName("meta", "mb-2 font-medium")}>
                 {sourceDocumentDetailCopy.rawContent}
               </h3>
-              <div className="whitespace-pre-wrap break-words rounded-lg border border-border/40 bg-surface/50 p-3 text-sm leading-relaxed text-text/70">
+              <div
+                className={textRoleClassName(
+                  "body",
+                  "whitespace-pre-wrap break-words rounded-lg border border-border/40 bg-surface/50 p-3 leading-relaxed text-text/70"
+                )}
+              >
                 {sourceDocument.text}
               </div>
             </div>

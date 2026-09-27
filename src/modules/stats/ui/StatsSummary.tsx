@@ -79,7 +79,10 @@ export function StatsSummary({
           {!isLoading && comparisonText != null ? (
             <p
               className={cn(
-                "inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                textRoleClassName(
+                  "meta",
+                  "inline-flex w-fit items-center rounded-full px-2 py-0.5 font-medium"
+                ),
                 isIncrease
                   ? "bg-destructive/10 text-destructive"
                   : isDecrease

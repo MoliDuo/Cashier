@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { BarChart3, Grid3X3 } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { parseDateString, type DateRangeType } from "@/lib/date-utils";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
@@ -82,7 +83,7 @@ export function StatsContentView({
           role="alert"
           className="flex flex-col items-center gap-3 rounded-lg border border-danger/30 bg-danger/5 px-4 py-8 text-center"
         >
-          <p className="text-sm text-foreground">{statsTabCopy.loadFailed}</p>
+          <p className={textRoleClassName("body")}>{statsTabCopy.loadFailed}</p>
           {onRetry != null ? (
             <Button variant="outline" size="sm" onClick={onRetry}>
               {statsTabCopy.retry}
@@ -123,7 +124,10 @@ export function StatsContentView({
       {isError ? (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm"
+          className={textRoleClassName(
+            "body",
+            "flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2"
+          )}
         >
           <span className="text-danger">{statsTabCopy.loadFailed}</span>
           {onRetry != null ? (

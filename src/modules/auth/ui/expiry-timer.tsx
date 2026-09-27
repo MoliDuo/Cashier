@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { useCountdown } from "@/hooks/use-countdown";
 import { authCopy } from "@/copy/auth";
@@ -31,7 +32,7 @@ export function ExpiryTimer({ expiresAt, onExpired, className }: ExpiryTimerProp
   const isUrgent = remaining > 0 && remaining <= 60;
 
   return (
-    <div className={cn("text-sm", className)}>
+    <div className={textRoleClassName("body", className)}>
       {!isExpired ? (
         <p
           className={cn(

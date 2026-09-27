@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { useAmountDisplay } from "@/modules/currency/hooks/useAmountDisplay";
 import { AmountText, type AmountVariant } from "./amount-text";
@@ -55,7 +56,7 @@ export function AmountDisplay({
         </AmountText>
       ) : null}
       {status === "error" ? (
-        <span className="text-xs font-normal text-muted-foreground">
+        <span className={textRoleClassName("meta", "font-normal")}>
           {currencyCopy.conversionUnavailable}
         </span>
       ) : null}

@@ -37,7 +37,10 @@ export function EnrollPasskeyPage({ token }: { token: string | null }) {
             {flow.error != null ? (
               <p
                 role="alert"
-                className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                className={textRoleClassName(
+                  "body",
+                  "mt-4 rounded-md bg-destructive/10 p-3 text-destructive"
+                )}
               >
                 {flow.error}
               </p>

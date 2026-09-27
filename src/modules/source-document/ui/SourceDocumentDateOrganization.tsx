@@ -204,7 +204,10 @@ export function SourceDocumentDateOrganization({
       </header>
       {applicationError ? (
         <p
-          className="border-b border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger"
+          className={textRoleClassName(
+            "meta",
+            "border-b border-danger/20 bg-danger/5 px-3 py-2 text-danger"
+          )}
           role="alert"
         >
           {sourceDocumentDetailCopy.dateOrganization.applyFailed}

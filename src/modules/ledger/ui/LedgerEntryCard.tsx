@@ -73,7 +73,7 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
           >
             <div className="flex items-center justify-between">
               <div className="flex min-w-0 flex-1 items-center gap-3 mr-3">
-                <div className="h-8 w-8 flex items-center justify-center bg-surface2 rounded-full text-lg text-text shrink-0">
+                <div className="h-8 w-8 flex items-center justify-center bg-surface2 rounded-full text-text shrink-0">
                   <CategoryIcon
                     {...(ledgerEntry.category?.icon !== undefined
                       ? { iconName: ledgerEntry.category.icon }

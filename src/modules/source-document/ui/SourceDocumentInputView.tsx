@@ -159,7 +159,7 @@ export function SourceDocumentInputView({
                   type="button"
                   aria-label={commonCopy.delete}
                   title={commonCopy.delete}
-                  className={`${imageActionButtonClassName} bg-danger text-xs`}
+                  className={`${imageActionButtonClassName} bg-danger`}
                   disabled={isPending}
                 >
                   <X className="h-2.5 w-2.5" />
@@ -211,7 +211,7 @@ export function SourceDocumentInputView({
           onCancel={onCancelUpload}
         />
       ) : isPreparingImages ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+        <div className={textRoleClassName("bodyMuted", "flex items-center gap-2")} role="status">
           <RefreshCw className="h-4 w-4 animate-spin" />
           {sourceDocumentInputCopy.preparing}
         </div>
@@ -278,7 +278,7 @@ function SubmissionProgress({
 
   return (
     <div className="space-y-2" role="status" aria-live="polite">
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className={textRoleClassName("bodyMuted", "flex items-center justify-between")}>
         <span>{phaseLabel}</span>
         <div className="flex items-center gap-2">
           {isIndeterminate ? null : <span className="tabular-nums">{percent}%</span>}

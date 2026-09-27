@@ -2,6 +2,7 @@
 import { useCallback, useRef, useState, type SetStateAction } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Minus, Plus, RotateCcw, X } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -154,7 +155,10 @@ export function SourceDocumentImageModal({
             >
               <Minus className="h-4 w-4" />
             </Button>
-            <span className="min-w-12 text-center text-sm tabular-nums" aria-live="polite">
+            <span
+              className={textRoleClassName("body", "min-w-12 text-center tabular-nums")}
+              aria-live="polite"
+            >
               {view.scale.toFixed(1)}×
             </span>
             <Button

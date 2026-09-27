@@ -7,6 +7,7 @@ import type {
   CreatedServiceCredentialDto,
 } from "@/modules/ledger/contracts";
 import { toast } from "sonner";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -132,7 +133,12 @@ export function ServiceCredentialSection({
       }
     >
       {credentials.length === 0 ? (
-        <div className="rounded-[var(--radius)] border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+        <div
+          className={textRoleClassName(
+            "bodyMuted",
+            "rounded-[var(--radius)] border border-dashed border-border py-8 text-center"
+          )}
+        >
           {serviceCredentialsCopy.noCredentials}
         </div>
       ) : (
@@ -140,7 +146,7 @@ export function ServiceCredentialSection({
           {credentials.map((credential) => (
             <li key={credential.id} className="flex items-center gap-3 p-3">
               <div className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-text">
+                <span className={textRoleClassName("bodyStrong", "block truncate")}>
                   {credential.name}
                 </span>
                 <p className="mt-0.5 truncate text-micro">
@@ -267,7 +273,12 @@ export function ServiceCredentialSection({
             <DialogDescription>{serviceCredentialsCopy.createSuccessDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="break-all rounded border bg-surface p-4 font-mono text-sm">
+            <div
+              className={textRoleClassName(
+                "body",
+                "break-all rounded border bg-surface p-4 font-mono"
+              )}
+            >
               {createdCredential?.token}
             </div>
             <Button

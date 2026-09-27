@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { textRoleClassName } from "@/components/typography";
 import { metadataCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
 
@@ -39,7 +40,10 @@ export default function RootLayout({
       <body className="antialiased" style={{ backgroundColor: "var(--bg)" }}>
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[300] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:text-text focus:shadow-modal"
+          className={textRoleClassName(
+            "body",
+            "sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[300] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow-modal"
+          )}
         >
           {commonCopy.skipToContent}
         </a>

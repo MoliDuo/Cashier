@@ -97,7 +97,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                       className="mt-1 size-4 accent-primary"
                     />
                     <span className="min-w-0">
-                      <span className="block text-sm font-medium text-text">
+                      <span className={textRoleClassName("bodyStrong", "block")}>
                         {presetLabel(presetId)}
                       </span>
                       <span className={cn("mt-0.5 block", textRoleClassName("bodyMuted"))}>
@@ -146,7 +146,9 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="min-w-0 truncate text-sm text-text">{category.name}</span>
+                      <span className={textRoleClassName("body", "min-w-0 truncate")}>
+                        {category.name}
+                      </span>
                       {preset.isSuggestedMapping(category.id) ? (
                         <span className={textRoleClassName("micro")}>
                           {settingsCopy.presetSuggested}
@@ -219,7 +221,12 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
             </p>
           </div>
           {preset.serverChanged ? (
-            <div className="flex flex-wrap items-center gap-2 border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            <div
+              className={textRoleClassName(
+                "body",
+                "flex flex-wrap items-center gap-2 border border-warning/30 bg-warning/10 p-3 text-warning"
+              )}
+            >
               <p className="min-w-0 flex-1" role="alert">
                 {settingsCopy.presetDraftChanged}
               </p>
@@ -230,7 +237,10 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
           ) : null}
           {preset.result == null ? null : (
             <div
-              className="border border-success/30 bg-success/10 p-3 text-sm text-success"
+              className={textRoleClassName(
+                "body",
+                "border border-success/30 bg-success/10 p-3 text-success"
+              )}
               role="status"
             >
               {settingsCopy.presetResultSummary({
@@ -251,7 +261,7 @@ export function CategoryPresetDialog({ preset, onGoToDetails }: CategoryPresetDi
               </p>
             ))}
             {preset.saveError == null ? null : (
-              <p className="text-sm text-destructive" role="alert">
+              <p className={textRoleClassName("body", "text-destructive")} role="alert">
                 {preset.saveError}
               </p>
             )}

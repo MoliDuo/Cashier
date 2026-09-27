@@ -35,7 +35,7 @@ export function SourceDocumentDetailStatusPanels({
     <>
       {loadError && !sourceDocument ? (
         <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-          <p className="text-sm font-medium text-text">{sourceDocumentDetailCopy.loadError}</p>
+          <p className={textRoleClassName("bodyStrong")}>{sourceDocumentDetailCopy.loadError}</p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={isReloading}>
               {commonCopy.close}

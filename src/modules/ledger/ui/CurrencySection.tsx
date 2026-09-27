@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import type { Settings } from "@/modules/ledger/contracts";
 import { useState } from "react";
@@ -98,7 +99,10 @@ function PreferredCurrenciesMenu({
             return (
               <label
                 key={currency}
-                className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-surface2"
+                className={textRoleClassName(
+                  "body",
+                  "flex min-h-10 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-surface2"
+                )}
               >
                 <Checkbox
                   checked={isSelected}
@@ -107,7 +111,7 @@ function PreferredCurrenciesMenu({
                 />
                 <span>{currency}</span>
                 {isMainCurrency ? (
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className={textRoleClassName("meta", "ml-auto")}>
                     {settingsCopy.mainCurrencyMustBeEnabled}
                   </span>
                 ) : null}
@@ -115,7 +119,7 @@ function PreferredCurrenciesMenu({
             );
           })}
           {filteredCurrencies.length === 0 ? (
-            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+            <p className={textRoleClassName("bodyMuted", "px-2 py-6 text-center")}>
               {settingsCopy.preferredCurrenciesNoResults}
             </p>
           ) : null}
@@ -147,7 +151,7 @@ export function CurrencySection({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-text">{settingsCopy.mainCurrency}</h3>
+          <h3 className={textRoleClassName("bodyStrong")}>{settingsCopy.mainCurrency}</h3>
         </div>
         <Select value={mainCurrency} onValueChange={updateMainCurrency} disabled={disabled}>
           <SelectTrigger aria-label={settingsCopy.mainCurrency} className="w-full sm:w-44">
@@ -167,7 +171,7 @@ export function CurrencySection({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-text">{settingsCopy.preferredCurrencies}</h3>
+          <h3 className={textRoleClassName("bodyStrong")}>{settingsCopy.preferredCurrencies}</h3>
         </div>
         <PreferredCurrenciesMenu
           initialCurrencies={

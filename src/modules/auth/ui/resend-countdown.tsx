@@ -27,13 +27,7 @@ export function ResendCountdown({ canResendAt, onResend, disabled = false }: Res
   const isDisabled = disabled || isLoading || remaining > 0;
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      disabled={isDisabled}
-      onClick={handleResend}
-      className="text-sm"
-    >
+    <Button type="button" variant="ghost" disabled={isDisabled} onClick={handleResend}>
       {isLoading && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
       {remaining > 0 ? authCopy.resendIn({ seconds: remaining }) : authCopy.resend}
     </Button>

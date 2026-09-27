@@ -1,5 +1,6 @@
 "use client";
 import { SlidersHorizontal } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TOOLBAR_CONTROL_CLASS } from "@/components/toolbar-control";
@@ -98,7 +99,9 @@ export function EntryFilterPanel({
           aria-describedby={undefined}
         >
           <DialogHeader className="border-b border-border px-4 py-3 pr-12">
-            <DialogTitle className="text-sm font-medium">{entryFilterPanelCopy.filter}</DialogTitle>
+            <DialogTitle className={textRoleClassName("bodyStrong")}>
+              {entryFilterPanelCopy.filter}
+            </DialogTitle>
           </DialogHeader>
           {filterContent}
         </DialogContent>

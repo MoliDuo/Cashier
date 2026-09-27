@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocumentListItemDto } from "@/modules/source-document/contracts";
 import { Loader2 } from "lucide-react";
@@ -120,7 +121,7 @@ export function LedgerEntriesStreamBody({
                   {ledgerEntriesTabCopy.loadMoreFailed}
                 </Button>
               ) : isFetchingNextPage ? (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className={textRoleClassName("meta", "flex items-center gap-1.5")}>
                   <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                   {ledgerEntriesTabCopy.loadingMore}
                 </span>
@@ -131,9 +132,7 @@ export function LedgerEntriesStreamBody({
           {/* End of list indicator when no more pages */}
           {!hasNextPage && streamGroups.length > 0 && (
             <div className="flex justify-center py-4">
-              <span className="text-xs text-muted-foreground">
-                — {ledgerEntriesTabCopy.noMore} —
-              </span>
+              <span className={textRoleClassName("meta")}>— {ledgerEntriesTabCopy.noMore} —</span>
             </div>
           )}
         </>

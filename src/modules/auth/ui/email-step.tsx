@@ -1,4 +1,5 @@
 "use client";
+import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
@@ -31,7 +32,7 @@ export function EmailStep({
     <div className="space-y-4">
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium text-text">
+          <label htmlFor="email" className={textRoleClassName("bodyStrong")}>
             {authCopy.email}
           </label>
           <Input
@@ -49,7 +50,13 @@ export function EmailStep({
           />
         </div>
         {error != null && (
-          <div role="alert" className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          <div
+            role="alert"
+            className={textRoleClassName(
+              "body",
+              "p-3 rounded-lg bg-destructive/10 text-destructive"
+            )}
+          >
             {error}
           </div>
         )}

@@ -11,6 +11,7 @@
 
 "use client";
 import { useMemo, useCallback } from "react";
+import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { AdaptiveHeatmap } from "./AdaptiveHeatmap";
 import { getHeatmapLegend } from "../lib/heatmap-colors";
@@ -81,7 +82,10 @@ export function CalendarHeatmapSection({
     return (
       <div
         className={cn(
-          "h-[200px] flex items-center justify-center text-muted-foreground text-sm bg-surface rounded-lg",
+          textRoleClassName(
+            "bodyMuted",
+            "h-[200px] flex items-center justify-center bg-surface rounded-lg"
+          ),
           className
         )}
       >
@@ -104,7 +108,7 @@ export function CalendarHeatmapSection({
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-2 pt-2">
-        <span className="text-xs text-muted-foreground">{calendarCopy.less}</span>
+        <span className={textRoleClassName("meta")}>{calendarCopy.less}</span>
         <div className="flex gap-1">
           {legend.map((item) => (
             <div
@@ -117,9 +121,9 @@ export function CalendarHeatmapSection({
             />
           ))}
         </div>
-        <span className="text-xs text-muted-foreground">{calendarCopy.more}</span>
+        <span className={textRoleClassName("meta")}>{calendarCopy.more}</span>
       </div>
-      <p className="text-center text-xs text-muted-foreground">{statsTabCopy.heatmapHint}</p>
+      <p className={textRoleClassName("meta", "text-center")}>{statsTabCopy.heatmapHint}</p>
     </div>
   );
 }

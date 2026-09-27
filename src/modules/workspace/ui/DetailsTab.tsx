@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ListChecks } from "lucide-react";
+import { textRoleClassName } from "@/components/typography";
 import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -182,7 +183,7 @@ export function DetailsTab({
           <div ref={sentinelRef} className="h-1" />
           {tab.isFetchingNextPage ? (
             <div className="flex justify-center py-4">
-              <span className="text-sm text-muted-foreground">{commonCopy.loading}</span>
+              <span className={textRoleClassName("bodyMuted")}>{commonCopy.loading}</span>
             </div>
           ) : null}
           {tab.isFetchNextPageError ? (
@@ -194,7 +195,7 @@ export function DetailsTab({
           ) : null}
           {!tab.hasNextPage && entries.length > 0 ? (
             <div className="flex justify-center py-4">
-              <span className="text-xs text-muted-foreground">— {detailsTabCopy.noMore} —</span>
+              <span className={textRoleClassName("meta")}>— {detailsTabCopy.noMore} —</span>
             </div>
           ) : null}
         </div>

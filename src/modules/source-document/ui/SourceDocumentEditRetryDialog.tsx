@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
+import { textRoleClassName } from "@/components/typography";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SourceDocumentInput } from "./SourceDocumentInput";
 import { useQuery } from "@tanstack/react-query";
@@ -101,7 +102,7 @@ function EditRetryDialogContent({
             <EditRetryDialogSkeleton />
           ) : !seedReady ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-3 text-center">
-              <p className="text-sm text-destructive" role="alert">
+              <p className={textRoleClassName("body", "text-destructive")} role="alert">
                 {sourceDocumentEditRetryDialogCopy.loadError}
               </p>
               <Button

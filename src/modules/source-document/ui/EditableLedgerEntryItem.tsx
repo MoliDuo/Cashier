@@ -150,7 +150,7 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
             value={displayData.itemName}
             onChange={(v) => handleChange("itemName", v)}
             placeholder={calendarCopy.productName}
-            displayClassName="font-medium text-text text-sm"
+            displayClassName={textRoleClassName("bodyStrong")}
             inputClassName={textRoleClassName("bodyStrong")}
             disabled={readOnly}
           />
@@ -197,7 +197,10 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
               <PopoverTrigger asChild>
                 <button
                   aria-label={calendarCopy.currency}
-                  className="text-xs text-muted-foreground hover:text-text transition-colors flex items-center gap-0.5"
+                  className={textRoleClassName(
+                    "meta",
+                    "hover:text-text transition-colors flex items-center gap-0.5"
+                  )}
                 >
                   {getCurrencySymbol(displayData.currency ?? "unknown", locale)}
                   <ChevronDown aria-hidden="true" className="h-2.5 w-2.5 opacity-50" />
@@ -210,7 +213,10 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
                       key={curr}
                       onClick={() => handleChange("currency", curr)}
                       className={cn(
-                        "w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors",
+                        textRoleClassName(
+                          "meta",
+                          "w-full text-left px-2 py-1.5 rounded text-text hover:bg-accent transition-colors"
+                        ),
                         displayData.currency === curr && "bg-accent"
                       )}
                     >

@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { textRoleClassName } from "@/components/typography";
 import { useLedgerTimeZone } from "@/lib/ledger-time-zone";
 import {
   type DateRangeType,
@@ -104,7 +105,12 @@ export function StatsChart({
 
   if (chartPoints.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+      <div
+        className={textRoleClassName(
+          "bodyMuted",
+          "rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center"
+        )}
+      >
         {statsChartCopy.noData}
       </div>
     );
@@ -286,7 +292,12 @@ export function StatsChart({
 
               {/* Tooltip */}
               {isHovered && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-popover text-popover-foreground text-xs rounded shadow-lg border whitespace-nowrap z-tooltip pointer-events-none">
+                <div
+                  className={textRoleClassName(
+                    "meta",
+                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-popover text-popover-foreground rounded shadow-lg border whitespace-nowrap z-tooltip pointer-events-none"
+                  )}
+                >
                   <div className="font-medium">{displayDate}</div>
                   <div className={isCapped ? "text-danger" : ""}>
                     {statsChartCopy.expense}: {formatAmount(p.total)}
