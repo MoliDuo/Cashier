@@ -85,6 +85,77 @@ describe("source-document-queries", () => {
     ).toHaveLength(2);
   });
 
+  it("narrows bills and their shown entries by category and currency, on one entry", async () => {
+    const db = getTestDb();
+    const bookId = sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`;
+    const docs = await db
+      .insert(sourceDocuments)
+      .values([
+        { ledgerId, title: "Mixed", documentDate: "2026-03-20", bookId },
+        { ledgerId, title: "Plain", documentDate: "2026-03-21", bookId },
+      ])
+      .returning();
+    const mixed = requireDefined(docs[0], "mixed document");
+    const plain = requireDefined(docs[1], "plain document");
+    await db.insert(ledgerEntries).values([
+      {
+        ledgerId,
+        sourceDocumentId: mixed.id,
+        amount: "30.00",
+        currency: "CNY",
+        itemName: "Noodles",
+        categoryId,
+      },
+      {
+        ledgerId,
+        sourceDocumentId: mixed.id,
+        amount: "5.00",
+        currency: "CNY",
+        itemName: "Bag",
+      },
+      {
+        ledgerId,
+        sourceDocumentId: plain.id,
+        amount: "12.00",
+        currency: "CNY",
+        itemName: "Tape",
+      },
+    ]);
+    await activateTestSourceDocumentProjection(db, mixed.id);
+    await activateTestSourceDocumentProjection(db, plain.id);
+
+    // A bill matches when one of its entries does, and shows only those entries.
+    const byCategory = await listStreamPage(ledgerId, { categoryId, limit: 10 });
+    expect(byCategory.items.map((item) => item.id)).toEqual([mixed.id]);
+    expect(byCategory.items[0]?.ledgerEntries?.map((entry) => entry.itemName)).toEqual(["Noodles"]);
+    await expect(getStreamTotal(ledgerId, { categoryId })).resolves.toMatchObject({
+      total: "30",
+    });
+
+    const uncategorized = await listStreamPage(ledgerId, {
+      categoryId: "__uncategorized__",
+      limit: 10,
+    });
+    expect(uncategorized.items.map((item) => item.id).sort()).toEqual([mixed.id, plain.id].sort());
+    await expect(
+      getStreamTotal(ledgerId, { categoryId: "__uncategorized__" })
+    ).resolves.toMatchObject({ total: "17" });
+
+    // Every entry filter applies to the same entry, as the entry view reads them.
+    const noMatch = await listStreamPage(ledgerId, {
+      categoryId,
+      currency: "USD",
+      limit: 10,
+    });
+    expect(noMatch.items).toEqual([]);
+    const byCurrency = await listStreamPage(ledgerId, {
+      currency: "CNY",
+      search: "tape",
+      limit: 10,
+    });
+    expect(byCurrency.items.map((item) => item.id)).toEqual([plain.id]);
+  });
+
   it("totals only completed documents across the full Stream filter", async () => {
     const db = getTestDb();
     const docs = await db

@@ -104,8 +104,19 @@ export function useLedgerEntriesTab({
         maxAmount: filters.maxAmount,
         statuses: filters.statuses,
         search: filters.search,
+        categoryId: filters.categoryId,
+        currency: filters.currency,
       }),
-    [bookId, filters.maxAmount, filters.minAmount, filters.search, filters.statuses, period]
+    [
+      bookId,
+      filters.categoryId,
+      filters.currency,
+      filters.maxAmount,
+      filters.minAmount,
+      filters.search,
+      filters.statuses,
+      period,
+    ]
   );
   const streamPageKey = queryDescriptor.queryKey;
 

@@ -47,6 +47,14 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(screen.getByText("已选 3 / 已加载 3 条")).toBeInTheDocument();
   });
 
+  it("counts items, not what has loaded, on a list that is whole", () => {
+    renderToolbar({ selectedCount: 2, loadedCount: 5, wholeList: true });
+
+    expect(screen.getByRole("checkbox", { name: "全选 5 项" })).toBeInTheDocument();
+    expect(screen.getByText("已选 2 项")).toBeInTheDocument();
+    expect(screen.queryByText(/已加载/)).not.toBeInTheDocument();
+  });
+
   it("flips the control's words once everything loaded is selected", () => {
     renderToolbar({ selectedCount: 3, isAllSelected: true });
 

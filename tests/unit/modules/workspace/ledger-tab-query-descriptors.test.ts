@@ -23,6 +23,8 @@ describe("ledger tab query descriptors", () => {
       maxAmount: null,
       statuses: null,
       search: "coffee",
+      categoryId: null,
+      currency: null,
     };
     expect(descriptor.queryKey).toEqual(queryKeys.sourceDocumentStream(keyFilters));
     expect(descriptor.totalQueryKey).toEqual(queryKeys.sourceDocumentStreamTotal(keyFilters));
@@ -120,8 +122,26 @@ describe("ledger tab query descriptors", () => {
       maxAmount: "20",
       statuses: "cancelled,failed",
       search: null,
+      categoryId: null,
+      currency: null,
     };
     expect(descriptor.queryKey).toEqual(queryKeys.sourceDocumentStream(keyFilters));
     expect(descriptor.totalQueryKey).toEqual(queryKeys.sourceDocumentStreamTotal(keyFilters));
+  });
+
+  it("keys and sends a bill list's category and currency", () => {
+    const descriptor = buildStreamQueryDescriptor({
+      period: { range: "month", offset: 0 },
+      categoryId: "__uncategorized__",
+      currency: "USD",
+    });
+    expect(descriptor.totalInput).toMatchObject({
+      categoryId: "__uncategorized__",
+      currency: "USD",
+    });
+    expect(descriptor.queryKey.at(-1)).toMatchObject({
+      categoryId: "__uncategorized__",
+      currency: "USD",
+    });
   });
 });

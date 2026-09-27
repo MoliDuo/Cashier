@@ -61,6 +61,8 @@ export const batchActionsCopy = {
   deleteDescriptionDocuments: (v: { count: string | number; scope: string | number }) =>
     `确定删除所选 ${v.count} 张单据吗？${v.scope} 此操作无法撤销。`,
   selectAllLoadedCount: (v: { loaded: string | number }) => `全选已加载的 ${v.loaded} 条`,
+  selectAllItemCount: (v: { count: string | number }) => `全选 ${v.count} 项`,
+  selectedItemCount: (v: { selected: string | number }) => `已选 ${v.selected} 项`,
   selectedLoadedCount: (v: { selected: string | number; loaded: string | number }) =>
     `已选 ${v.selected} / 已加载 ${v.loaded} 条`,
   unloadedExcluded: "尚未加载的明细不在本次选择中",

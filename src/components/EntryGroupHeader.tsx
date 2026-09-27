@@ -46,8 +46,8 @@ export function groupSelectionState(
  * same size, weight and colour as the amounts it sums, so a day's figure is read
  * the same way wherever it appears.
  *
- * The two of them sit on the rows' own columns: a card is inset `mx-2` like this
- * band, and a row's text starts one `px-3` inside the card's 1px border, so the
+ * The two of them sit on the rows' own columns: a card spans the same width as
+ * this band, and a row's text starts one `px-3` inside the card's 1px border, so the
  * band pads by 13px rather than 12. The rule keeps the card's full width, because
  * it is the same kind of boundary.
  *
@@ -61,7 +61,7 @@ export function EntryGroupHeader({ title, totalLabel, selection }: EntryGroupHea
   return (
     <div
       className={cn(
-        "relative mx-2 mb-4 border-b border-border pb-2 pt-2",
+        "relative mb-4 border-b border-border pb-2 pt-2",
         // The hover tint goes behind the band, not over it, so pointing at a day
         // to select it does not wash the date out.
         selection != null &&

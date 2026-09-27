@@ -113,31 +113,11 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
       // the details tab. What is left is one entry row's height, which is the
       // point: this header carries less than a row does.
       //
-      // The left inset is the same whether or not rows can be selected: the
-      // selection indicator is the card's outline now, so nothing takes the
-      // chevron's place and the title never shifts entering selection mode.
-      className="flex h-[calc(var(--selectable-card-header-height,56px)-2px)] items-center gap-1 py-2 pl-2 pr-2 sm:pl-3 sm:pr-3"
+      // The title leads, then what the bill is in, then its total; the chevron
+      // and the menu close the row. Selection is the card's outline, so nothing
+      // takes a control's place and the title never shifts entering it.
+      className="flex h-[calc(var(--selectable-card-header-height,56px)-2px)] items-center gap-1 py-2 pl-1 pr-2 sm:pl-2 sm:pr-3"
     >
-      {hasExpandableContent && !selectionMode ? (
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color] duration-[var(--motion-feedback)]"
-          aria-label={isExpanded ? sourceDocumentCardCopy.collapse : sourceDocumentCardCopy.expand}
-          aria-expanded={isExpanded}
-          aria-controls={contentId}
-        >
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 transition-transform duration-[var(--motion-feedback)] ease-[var(--motion-state-ease)]",
-              isExpanded && "rotate-180"
-            )}
-          />
-        </button>
-      ) : (
-        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center" />
-      )}
-
       <button
         type="button"
         onClick={onViewDetails}
@@ -167,6 +147,25 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
             <SourceDocumentCardTotal entries={ledgerEntries} mainCurrency={mainCurrency} />
           </div>
         )}
+        {hasExpandableContent && !selectionMode ? (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color] duration-[var(--motion-feedback)] hover:text-text"
+            aria-label={
+              isExpanded ? sourceDocumentCardCopy.collapse : sourceDocumentCardCopy.expand
+            }
+            aria-expanded={isExpanded}
+            aria-controls={contentId}
+          >
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform duration-[var(--motion-feedback)] ease-[var(--motion-state-ease)]",
+                isExpanded && "rotate-180"
+              )}
+            />
+          </button>
+        ) : null}
 
         {showActions && (
           <div

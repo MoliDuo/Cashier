@@ -14,6 +14,11 @@ import { batchActionsCopy } from "@/copy/workspace";
 export interface LedgerEntriesBatchActionToolbarProps {
   selectedCount: number;
   loadedCount?: number;
+  /**
+   * Every item is on screen — a record's own entries — so the counts speak of
+   * items, not of what has loaded so far.
+   */
+  wholeList?: boolean;
   isAllSelected: boolean;
   hasMoreData?: boolean;
   onSelectAll: () => void;
@@ -71,6 +76,7 @@ export interface LedgerEntriesBatchActionToolbarProps {
 export function LedgerEntriesBatchActionToolbar({
   selectedCount,
   loadedCount = selectedCount,
+  wholeList = false,
   isAllSelected,
   hasMoreData = false,
   onSelectAll,
@@ -124,6 +130,9 @@ export function LedgerEntriesBatchActionToolbar({
   // Nothing selected means nothing to act on; keeping the buttons visible but
   // unavailable says what the mode offers without a layout shift on first tap.
   const actionsDisabled = isProcessing || selectedCount === 0;
+  const selectAllLabel = wholeList
+    ? batchActionsCopy.selectAllItemCount({ count: loadedCount })
+    : batchActionsCopy.selectAllLoadedCount({ loaded: loadedCount });
   const masterChecked: boolean | "indeterminate" = isAllSelected
     ? true
     : selectedCount > 0
@@ -196,17 +205,11 @@ export function LedgerEntriesBatchActionToolbar({
           }}
           // The box's own name, because the label next to it also carries the
           // loaded-scope note, which is not part of what the control is.
-          aria-label={
-            isAllSelected
-              ? batchActionsCopy.deselectAll
-              : batchActionsCopy.selectAllLoadedCount({ loaded: loadedCount })
-          }
+          aria-label={isAllSelected ? batchActionsCopy.deselectAll : selectAllLabel}
           className="h-4 w-4"
         />
         <span className={textRoleClassName("bodyStrong", "whitespace-nowrap")}>
-          {isAllSelected
-            ? batchActionsCopy.deselectAll
-            : batchActionsCopy.selectAllLoadedCount({ loaded: loadedCount })}
+          {isAllSelected ? batchActionsCopy.deselectAll : selectAllLabel}
         </span>
         {isAllSelected && hasMoreData ? (
           <span className="whitespace-nowrap text-xs text-muted-foreground">
@@ -241,7 +244,12 @@ export function LedgerEntriesBatchActionToolbar({
 
       <div className={textRoleClassName("meta", "basis-full space-y-0.5")} aria-live="polite">
         <p>
-          {batchActionsCopy.selectedLoadedCount({ selected: selectedCount, loaded: loadedCount })}
+          {wholeList
+            ? batchActionsCopy.selectedItemCount({ selected: selectedCount })
+            : batchActionsCopy.selectedLoadedCount({
+                selected: selectedCount,
+                loaded: loadedCount,
+              })}
         </p>
         {hasMoreData ? <p>{batchActionsCopy.unloadedExcluded}</p> : null}
         {selectedCount > 100 && limitedActions.length > 0 ? (

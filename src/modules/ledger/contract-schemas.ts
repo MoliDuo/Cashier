@@ -28,7 +28,7 @@ const currencyCodeSchema = z.preprocess(
   (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
   z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO 4217 code")
 );
-const optionalCurrencyCodeSchema = currencyCodeSchema.optional();
+export const optionalCurrencyCodeSchema = currencyCodeSchema.optional();
 const nullableCurrencyCodeSchema = currencyCodeSchema.nullable().optional();
 const aiLanguageSchema = z.string().min(2).max(35);
 const positiveDecimalSchema = z
@@ -72,7 +72,9 @@ export const periodInputSchema = z.discriminatedUnion("range", [
     .refine((value) => value.from <= value.to, { message: "Invalid date range", path: ["to"] }),
 ]);
 
-const categoryFilterSchema = z.union([uuidSchema, z.literal(UNCATEGORIZED_SENTINEL)]).optional();
+export const categoryFilterSchema = z
+  .union([uuidSchema, z.literal(UNCATEGORIZED_SENTINEL)])
+  .optional();
 
 function parseLedgerContract<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);

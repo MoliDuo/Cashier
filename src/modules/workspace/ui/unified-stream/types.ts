@@ -31,8 +31,3 @@ export type UnifiedStreamItem = UnifiedStreamGroup["items"][number];
 export type RendererProps = UnifiedStreamGroupProps & {
   selectedIdSet: ReadonlySet<string>;
 };
-
-export type ControlledRendererProps = RendererProps & {
-  getExpanded: (sourceDocumentId: string) => boolean;
-  onExpandedChange: (sourceDocumentId: string, expanded: boolean) => void;
-};

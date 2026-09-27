@@ -153,7 +153,7 @@ export function DetailsTabSkeleton() {
  */
 export function StatsTabSkeleton() {
   return (
-    <div aria-hidden="true" className="space-y-6 pb-24" data-testid="stats-tab-skeleton">
+    <div aria-hidden="true" className="space-y-6" data-testid="stats-tab-skeleton">
       {/* Stats Header Skeleton */}
       <div className="flex flex-col gap-6 bg-surface">
         {/* 1. Period selector (周/月/年) */}

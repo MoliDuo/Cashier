@@ -180,6 +180,7 @@ function SourceDocumentDetailSheet({
     <LedgerEntriesBatchActionToolbar
       selectedCount={selection.selectedIds.length}
       loadedCount={ledgerEntries.length}
+      wholeList
       isAllSelected={selection.isAllSelected}
       onSelectAll={() => selection.handleSelectAll(true)}
       onClearSelection={() => selection.handleSelectAll(false)}

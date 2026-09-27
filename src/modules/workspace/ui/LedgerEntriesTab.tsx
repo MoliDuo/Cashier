@@ -1,4 +1,4 @@
-import type { Ledger } from "@/modules/ledger/contracts";
+import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { Period } from "@/modules/ledger/domain/period";
 import { type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
@@ -13,6 +13,8 @@ interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
   ledger?: Ledger;
+  /** Offered by the filter; a bill matches when one of its entries does. */
+  categories: EntryCategory[];
   period: Period;
   today: string;
   onPeriodChange: (period: Period) => void;
@@ -25,6 +27,7 @@ interface LedgerEntriesTabProps {
 export function LedgerEntriesTab({
   bookId,
   ledger,
+  categories,
   period,
   today,
   onPeriodChange,
@@ -64,6 +67,8 @@ export function LedgerEntriesTab({
         isProcessing={selection.isBatchPending}
         filters={filters}
         onFiltersChange={onFiltersChange}
+        categories={categories}
+        preferredCurrencies={ledger?.settings.currencies ?? []}
         period={period}
         today={today}
         onPeriodChange={onPeriodChange}
@@ -71,7 +76,7 @@ export function LedgerEntriesTab({
         {...(stream.filteredTotal === undefined ? {} : { filteredTotal: stream.filteredTotal })}
         {...(timeZone != null ? { timeZone } : {})}
       />
-      {stream.hasUnconverted ? <IncompleteConversionNotice className="mx-2 mb-2" /> : null}
+      {stream.hasUnconverted ? <IncompleteConversionNotice className="mb-2" /> : null}
 
       {stream.isError && <LedgerQueryErrorBanner empty={!stream.hasData} onRetry={stream.retry} />}
       {(!stream.isError || stream.hasData) && (

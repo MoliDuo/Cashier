@@ -2,6 +2,7 @@ import "server-only";
 import { calculateCompletedSourceDocumentTotal } from "./reads/filters";
 import type { GetStreamTotalInput, StreamTotalDto } from "../contracts";
 import { normalizeSearchTerm } from "@/lib/search";
+import { streamCategoryFilter } from "../stream-filter-policy";
 
 export async function getStreamTotal(
   ledgerId: string,
@@ -16,11 +17,11 @@ export async function getStreamTotal(
   }
 
   const search = normalizeSearchTerm(input.search);
-  const filters = { ...input };
-  delete filters.search;
+  const { search: _search, categoryId, ...filters } = input;
   return calculateCompletedSourceDocumentTotal({
     ledgerId,
     ...filters,
     ...(search != null ? { search } : {}),
+    ...streamCategoryFilter(categoryId),
   });
 }

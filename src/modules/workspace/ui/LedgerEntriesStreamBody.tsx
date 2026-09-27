@@ -96,12 +96,14 @@ export function LedgerEntriesStreamBody({
 
           {/* No records state */}
           {!isLoading && streamGroups.length === 0 && (
-            <div className="space-y-6 px-2 pt-2">
+            <div className="space-y-6 pt-2">
               <div className="text-center py-20 text-muted-foreground flex flex-col items-center gap-2">
                 <span>
                   {filters.search != null ||
                   filters.minAmount != null ||
                   filters.maxAmount != null ||
+                  filters.categoryId != null ||
+                  filters.currency != null ||
                   (filters.statuses?.length ?? 0) > 0
                     ? entryFilterPanelCopy.noMatchingResults
                     : commonCopy.noRecords}

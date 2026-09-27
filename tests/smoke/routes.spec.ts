@@ -37,7 +37,7 @@ test("账目 and 统计 are routes of their own, Back walks them, and old links 
 
   // 流水 and 明细 became the two views of 账目, and their links follow.
   await page.goto("/details?search=tea");
-  await expect(page).toHaveURL(/\/records\?view=entries&search=tea$/);
+  await expect(page).toHaveURL(/\/records\?(?=.*\bview=entries\b)(?=.*\bsearch=tea\b)/);
   await page.goto("/stream");
   await expect(page).toHaveURL(/\/records$/);
 

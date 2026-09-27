@@ -6,7 +6,7 @@ import { useLedgerWorkspace } from "../ledger-workspace-context";
 
 /** 账目 by bill: every record, newest first, under the page's filters. */
 export function DocumentsView() {
-  const { ledger, recordScope, timeZone, today } = useLedgerWorkspace();
+  const { ledger, categories, recordScope, timeZone, today } = useLedgerWorkspace();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { period, filterParams, handleFiltersChange, handlePeriodChange } = usePeriodFilter({
@@ -18,6 +18,7 @@ export function DocumentsView() {
     <LedgerEntriesTab
       bookId={recordScope ?? undefined}
       ledger={ledger}
+      categories={categories}
       period={period}
       today={today}
       onPeriodChange={handlePeriodChange}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
+import { ArrowLeft, ListChecks } from "lucide-react";
 import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -123,7 +123,7 @@ export function DetailsTab({
           {tab.isSelectionMode ? (
             <ArrowLeft className="h-4 w-4" />
           ) : (
-            <SquareDashedMousePointer className="h-4 w-4" />
+            <ListChecks className="h-4 w-4" />
           )}
         </Button>
         {!tab.isSelectionMode ? (
@@ -144,9 +144,7 @@ export function DetailsTab({
           </>
         ) : null}
       </EntriesToolbarShell>
-      {monthStats.unconvertedCount > 0 ? (
-        <IncompleteConversionNotice className="mx-2 mb-2" />
-      ) : null}
+      {monthStats.unconvertedCount > 0 ? <IncompleteConversionNotice className="mb-2" /> : null}
       <div className="space-y-4">
         <div className="space-y-4">
           <LedgerEntryGroupsView
@@ -162,7 +160,7 @@ export function DetailsTab({
             onSetGroupSelection={tab.setGroupSelection}
           />
           {tab.isLoading ? (
-            <div className="space-y-4 px-2 animate-pulse" role="status" aria-busy="true">
+            <div className="space-y-4 animate-pulse" role="status" aria-busy="true">
               {[1, 2, 3].map((idx) => (
                 <div key={idx} className="bg-surface rounded-xl border border-border p-4 h-20" />
               ))}

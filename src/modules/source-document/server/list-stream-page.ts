@@ -6,7 +6,7 @@ import { normalizeSearchTerm } from "@/lib/search";
 import { getLedgerRefreshBaseline, getLedgerVersion } from "./ledger-changes";
 import { listTargetSourceDocuments } from "./reads/list";
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/modules/ledger/server/entry-reads/list-ledger-entry-views-by-source-document-ids";
-import { filterStreamEntries } from "../stream-filter-policy";
+import { filterStreamEntries, streamCategoryFilter } from "../stream-filter-policy";
 import { createHash } from "node:crypto";
 import {
   decodeSourceDocumentStreamCursor,
@@ -60,6 +60,8 @@ function filterFingerprint(input: ListStreamPageInput, search: string | undefine
     maxAmount: input.maxAmount ?? null,
     statuses: [...new Set(input.statuses ?? [])].sort(),
     search: search?.trim() ?? null,
+    categoryId: input.categoryId ?? null,
+    currency: input.currency ?? null,
   };
   return createHash("sha256").update(JSON.stringify(normalized)).digest("hex").slice(0, 16);
 }
@@ -110,6 +112,8 @@ export async function listStreamPage(
     ...(input.minAmount != null ? { minAmount: input.minAmount } : {}),
     ...(input.maxAmount != null ? { maxAmount: input.maxAmount } : {}),
     ...(search != null ? { search } : {}),
+    ...streamCategoryFilter(input.categoryId),
+    ...(input.currency != null ? { currency: input.currency } : {}),
     ...(innerCursor != null ? { cursor: innerCursor } : {}),
     limit,
   });
@@ -126,6 +130,8 @@ export async function listStreamPage(
       ...(input.minAmount != null ? { minAmount: input.minAmount } : {}),
       ...(input.maxAmount != null ? { maxAmount: input.maxAmount } : {}),
       ...(search != null ? { search } : {}),
+      ...(input.categoryId != null ? { categoryId: input.categoryId } : {}),
+      ...(input.currency != null ? { currency: input.currency } : {}),
     }),
   }));
   const baseline = await getLedgerRefreshBaseline(ledgerId);

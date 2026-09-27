@@ -23,6 +23,10 @@ import {
   type PreparedInlineImage,
 } from "@/modules/source-document/api-v1-policy";
 import { decodeBase64Image } from "@/modules/source-document/base64-image";
+import {
+  categoryFilterSchema,
+  optionalCurrencyCodeSchema,
+} from "@/modules/ledger/contract-schemas";
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
 
 const uuidSchema = z.string().regex(UUID_REGEX, "Invalid UUID");
@@ -280,6 +284,8 @@ const streamFilterInputShape = {
     )
     .optional(),
   search: optionalSearchSchema,
+  categoryId: categoryFilterSchema,
+  currency: optionalCurrencyCodeSchema,
 };
 
 export const streamTotalInputSchema =

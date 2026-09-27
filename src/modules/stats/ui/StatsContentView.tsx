@@ -77,7 +77,7 @@ export function StatsContentView({
 
   if (isError && stats == null) {
     return (
-      <div className="space-y-6 pb-24">
+      <div className="space-y-6">
         <div
           role="alert"
           className="flex flex-col items-center gap-3 rounded-lg border border-danger/30 bg-danger/5 px-4 py-8 text-center"
@@ -119,7 +119,7 @@ export function StatsContentView({
   );
 
   return (
-    <div className="relative space-y-6 pb-24" aria-busy={isLoading}>
+    <div className="relative space-y-6" aria-busy={isLoading}>
       {isError ? (
         <div
           role="alert"

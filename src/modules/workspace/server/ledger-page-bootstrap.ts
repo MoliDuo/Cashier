@@ -177,6 +177,8 @@ export async function getLedgerRouteBootstrap(
       maxAmount: input.advancedFilters?.maxAmount,
       statuses: input.advancedFilters?.statuses,
       search: input.advancedFilters?.search,
+      categoryId: input.advancedFilters?.categoryId,
+      currency: input.advancedFilters?.currency,
     });
     await Promise.all([
       queryClient.prefetchInfiniteQuery({

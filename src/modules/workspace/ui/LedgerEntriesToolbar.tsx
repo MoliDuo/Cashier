@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
+import { ArrowLeft, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -15,7 +15,7 @@ import { formatCurrencyAmount } from "@/lib/format/currency";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { PeriodBar } from "./PeriodBar";
-import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
+import type { BatchEntryDateImpact, EntryCategory } from "@/modules/ledger/contracts";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { commonCopy } from "@/copy/common";
 import { batchActionsCopy, ledgerEntriesTabCopy } from "@/copy/workspace";
@@ -45,6 +45,8 @@ interface LedgerEntriesToolbarProps {
   isProcessing?: boolean;
   filters: EntryFilters;
   onFiltersChange: (filters: EntryFilters) => void;
+  categories: EntryCategory[];
+  preferredCurrencies: string[];
   period: Period;
   /** Today in the ledger's zone, which the period is counted from. */
   today: string;
@@ -75,6 +77,8 @@ export function LedgerEntriesToolbar({
   isProcessing: externallyProcessing = false,
   filters,
   onFiltersChange,
+  categories,
+  preferredCurrencies,
   period,
   today,
   onPeriodChange,
@@ -157,7 +161,7 @@ export function LedgerEntriesToolbar({
         {isSelectionMode ? (
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         ) : (
-          <SquareDashedMousePointer aria-hidden="true" className="h-4 w-4" />
+          <ListChecks aria-hidden="true" className="h-4 w-4" />
         )}
       </Button>
 
@@ -188,8 +192,8 @@ export function LedgerEntriesToolbar({
           <EntryFilterPanel
             filters={filters}
             onFiltersChange={onFiltersChange}
-            showCategory={false}
-            showCurrency={false}
+            categories={categories}
+            preferredCurrencies={preferredCurrencies}
             className="w-auto"
           />
         </>

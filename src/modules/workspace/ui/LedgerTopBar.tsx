@@ -37,10 +37,12 @@ export function LedgerTopBar({
 }: LedgerTopBarProps) {
   const inSettings = activeTab === "settings";
   const openSettings = (event: MouseEvent<HTMLAnchorElement>) => {
-    // A plain click moves within the app; a modified one opens the link as usual.
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    // A plain click moves within the app. A modified one opens the link as
+    // usual, and so does a click before the page is ready: a plain link still
+    // works then, where the in-app move would have to be dropped.
+    if (disabled || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
-    if (!disabled) onOpenSettings();
+    onOpenSettings();
   };
 
   return (
@@ -91,7 +93,6 @@ export function LedgerTopBar({
             onClick={openSettings}
             aria-label={ledgerPageCopy.settings}
             title={ledgerPageCopy.settings}
-            aria-disabled={disabled || undefined}
             className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface2 hover:text-text"
           >
             <Settings className="size-5" aria-hidden="true" />

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/contracts";
@@ -20,6 +20,28 @@ export interface TargetSourceDocumentFilterInput {
   minAmount?: string;
   maxAmount?: string;
   search?: string;
+  /** Records holding an entry in this category. */
+  categoryId?: string;
+  /** Records holding an entry with no category; wins over `categoryId`. */
+  uncategorizedOnly?: boolean;
+  /** Records holding an entry in this currency. */
+  currency?: string;
+}
+
+/**
+ * Whether any entry-level filter is set. They all apply to one and the same
+ * entry of a record, the way the entry view reads them, so a record matches
+ * when one of its entries matches all of them together.
+ */
+function hasEntryFilters(input: TargetSourceDocumentFilterInput): boolean {
+  return (
+    input.minAmount !== undefined ||
+    input.maxAmount !== undefined ||
+    (input.search != null && input.search !== "") ||
+    input.uncategorizedOnly === true ||
+    (input.categoryId != null && input.categoryId !== "") ||
+    (input.currency != null && input.currency !== "")
+  );
 }
 
 export interface TargetSourceDocumentListInput extends TargetSourceDocumentFilterInput {
@@ -48,11 +70,7 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
   }
   const searchPattern =
     input.search != null && input.search !== "" ? escapedLikeContains(input.search) : null;
-  if (
-    input.minAmount !== undefined ||
-    input.maxAmount !== undefined ||
-    (input.search != null && input.search !== "")
-  ) {
+  if (hasEntryFilters(input)) {
     const matchedConverted = convertedAmountSql({
       amount: sql`matched_entries.amount`,
       currency: sql`matched_entries.currency`,
@@ -70,6 +88,18 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
           searchPattern != null
             ? sql`AND lower(matched_entries.item_name || ' ' || COALESCE(matched_entries.description, ''))
           LIKE ${searchPattern}`
+            : sql``
+        }
+        ${
+          input.uncategorizedOnly === true
+            ? sql`AND matched_entries.category_id IS NULL`
+            : input.categoryId != null && input.categoryId !== ""
+              ? sql`AND matched_entries.category_id = ${input.categoryId}`
+              : sql``
+        }
+        ${
+          input.currency != null && input.currency !== ""
+            ? sql`AND matched_entries.currency = ${input.currency}`
             : sql``
         }
     )`);
@@ -100,6 +130,14 @@ export async function calculateCompletedSourceDocumentTotal(
       sql`lower(${ledgerEntries.itemName} || ' ' || COALESCE(${ledgerEntries.description}, ''))
         LIKE ${searchPattern}`
     );
+  }
+  if (input.uncategorizedOnly === true) {
+    matchedEntryConditions.push(isNull(ledgerEntries.categoryId));
+  } else if (input.categoryId != null && input.categoryId !== "") {
+    matchedEntryConditions.push(eq(ledgerEntries.categoryId, input.categoryId));
+  }
+  if (input.currency != null && input.currency !== "") {
+    matchedEntryConditions.push(eq(ledgerEntries.currency, input.currency));
   }
   const result = await db
     .select({

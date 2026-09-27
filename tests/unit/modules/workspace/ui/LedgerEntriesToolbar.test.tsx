@@ -16,6 +16,8 @@ const defaultProps = {
   onClearSelection: vi.fn(),
   filters: {} as const,
   onFiltersChange: vi.fn(),
+  categories: [],
+  preferredCurrencies: [],
   period: defaultPeriod,
   today: "2026-09-27",
   onPeriodChange: vi.fn(),

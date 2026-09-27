@@ -22,7 +22,7 @@ export function EntriesToolbarShell({
       // lands the total on the same column as the amounts in the cards below,
       // which are inset by their border plus the row's `px-3`. `p-2` on the
       // right would leave the total 4px proud of them.
-      className={`relative mx-2 mb-2 flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2 pr-3 sm:mb-4 ${className}`}
+      className={`relative mb-2 flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2 pr-3 sm:mb-4 ${className}`}
     >
       {children}
       {totalLabel != null && totalLabel !== "" ? (

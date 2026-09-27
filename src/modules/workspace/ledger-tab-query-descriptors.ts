@@ -26,6 +26,9 @@ export function buildStreamQueryDescriptor(input: {
   maxAmount?: string | null | undefined;
   statuses?: readonly SourceDocumentProcessingStatus[] | null | undefined;
   search?: string | null | undefined;
+  /** A category id, or the uncategorized sentinel. */
+  categoryId?: string | null | undefined;
+  currency?: string | null | undefined;
 }): StreamQueryDescriptor {
   const canonicalStatuses = canonicalizeSourceDocumentProcessingStatuses(
     input.statuses == null ? undefined : [...input.statuses]
@@ -39,6 +42,8 @@ export function buildStreamQueryDescriptor(input: {
     ...(input.maxAmount != null ? { maxAmount: input.maxAmount } : {}),
     ...(canonicalStatuses != null ? { statuses: canonicalStatuses } : {}),
     ...(search != null ? { search } : {}),
+    ...(input.categoryId != null ? { categoryId: input.categoryId } : {}),
+    ...(input.currency != null ? { currency: input.currency } : {}),
   };
   const keyFilters = {
     bookId: input.bookId ?? null,
@@ -47,6 +52,8 @@ export function buildStreamQueryDescriptor(input: {
     maxAmount: input.maxAmount ?? null,
     statuses: statusesKey,
     search,
+    categoryId: input.categoryId ?? null,
+    currency: input.currency ?? null,
   };
 
   return {

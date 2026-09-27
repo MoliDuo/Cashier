@@ -92,6 +92,9 @@ export interface ListStreamPageInput {
   maxAmount?: string;
   statuses?: string[];
   search?: string;
+  /** A category id, or the uncategorized sentinel. */
+  categoryId?: string;
+  currency?: string;
   cursor?: string | null | undefined;
   limit: number;
 }
@@ -104,6 +107,9 @@ export interface GetStreamTotalInput {
   maxAmount?: string;
   statuses?: readonly SourceDocumentProcessingStatus[];
   search?: string;
+  /** A category id, or the uncategorized sentinel. */
+  categoryId?: string;
+  currency?: string;
 }
 
 export interface CredentialSourceDocumentStatusResult {

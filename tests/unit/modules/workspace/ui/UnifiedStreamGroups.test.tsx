@@ -1,43 +1,15 @@
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedStreamGroup } from "@/modules/source-document/stream-grouping";
 import { LedgerEntriesUnifiedGroups } from "@/modules/workspace/ui/UnifiedStreamGroups";
 
-const { cardProps, useStreamListMotionMock, virtualizerOptions } = vi.hoisted(() => ({
-  cardProps: vi.fn(),
-  virtualizerOptions: vi.fn(),
-  useStreamListMotionMock: vi.fn(() => ({
-    entering: new Set<string>(),
-    exiting: [],
-    updated: new Set<string>(),
-    reducedMotion: false,
-    registerNode: vi.fn(),
-  })),
-}));
+const { cardProps } = vi.hoisted(() => ({ cardProps: vi.fn() }));
 vi.mock("@/modules/source-document/ui/SourceDocumentCard", () => ({
   SourceDocumentCard: (props: unknown) => {
     cardProps(props);
     return <div>Source document</div>;
   },
 }));
-vi.mock("@/modules/workspace/ui/use-stream-list-motion", () => ({
-  useStreamListMotion: useStreamListMotionMock,
-}));
-vi.mock("@tanstack/react-virtual", () => ({
-  useWindowVirtualizer: (options: { count: number; scrollMargin: number }) => {
-    virtualizerOptions(options);
-    return {
-      getTotalSize: () => options.count * 88,
-      getVirtualItems: () =>
-        Array.from({ length: Math.min(options.count, 10) }, (_, index) => ({
-          index,
-          start: index * 88,
-        })),
-      measureElement: vi.fn(),
-    };
-  },
-}));
-
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -344,110 +316,42 @@ describe("LedgerEntriesUnifiedGroups", () => {
     );
   });
 
-  it("keeps FLIP motion through 80 documents and virtualizes the 81st", () => {
-    useStreamListMotionMock.mockClear();
-    const commonProps = {
+  it("renders every loaded bill, with no virtual window", () => {
+    render(
+      <LedgerEntriesUnifiedGroups
+        streamGroups={[largeGroup(120)]}
+        mainCurrency="CNY"
+        onViewSourceDetail={vi.fn()}
+        onDeleteSourceConfirm={vi.fn()}
+        isSelectionMode={false}
+        selectedIds={[]}
+        onToggleSelection={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText("Source document")).toHaveLength(120);
+  });
+
+  it("fades in only the bills that arrive after the list first showed", () => {
+    const props = {
       mainCurrency: "CNY",
       onViewSourceDetail: vi.fn(),
       onDeleteSourceConfirm: vi.fn(),
       isSelectionMode: false,
       selectedIds: [],
       onToggleSelection: vi.fn(),
-      noRecordsText: "No records",
-      getItemProps: () => ({}),
     };
-    const { rerender } = render(
-      <LedgerEntriesUnifiedGroups streamGroups={[largeGroup(80)]} {...commonProps} />
+    const first = largeGroup(2);
+    const { container, rerender } = render(
+      <LedgerEntriesUnifiedGroups streamGroups={[first]} {...props} />
     );
-    expect(useStreamListMotionMock).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("virtualized-source-document-stream")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".stream-card-enter")).toHaveLength(0);
 
-    rerender(<LedgerEntriesUnifiedGroups streamGroups={[largeGroup(81)]} {...commonProps} />);
-    expect(screen.getByTestId("virtualized-source-document-stream")).toBeInTheDocument();
-    expect(useStreamListMotionMock).toHaveBeenCalledTimes(1);
-  });
+    const arrived = largeGroup(3);
+    rerender(<LedgerEntriesUnifiedGroups streamGroups={[arrived]} {...props} />);
 
-  it("mounts only the virtual window for a 500-document stream", () => {
-    cardProps.mockClear();
-    const commonProps = {
-      mainCurrency: "CNY",
-      onViewSourceDetail: vi.fn(),
-      onDeleteSourceConfirm: vi.fn(),
-      isSelectionMode: false,
-      selectedIds: [],
-      onToggleSelection: vi.fn(),
-      noRecordsText: "No records",
-      getItemProps: () => ({}),
-      collapseEntriesDefault: true,
-    };
-    render(<LedgerEntriesUnifiedGroups streamGroups={[largeGroup(500)]} {...commonProps} />);
-    expect(screen.getByTestId("virtualized-source-document-stream")).toBeInTheDocument();
-    expect(cardProps.mock.calls.length).toBeGreaterThan(0);
-    expect(cardProps.mock.calls.length).toBeLessThan(500);
-    expect(cardProps).toHaveBeenCalledWith(
-      expect.objectContaining({ expanded: false, onExpandedChange: expect.any(Function) })
-    );
-  });
-
-  it("remeasures the window offset when preceding content changes size", () => {
-    let top = 120;
-    let notifyResize: (() => void) | undefined;
-    const observe = vi.fn();
-    const disconnect = vi.fn();
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        constructor(callback: () => void) {
-          notifyResize = callback;
-        }
-        observe = observe;
-        disconnect = disconnect;
-      }
-    );
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
-      this: HTMLElement
-    ) {
-      const elementTop = this.dataset.testid === "virtualized-source-document-stream" ? top : 0;
-      return {
-        top: elementTop,
-        bottom: elementTop,
-        left: 0,
-        right: 0,
-        width: 0,
-        height: 0,
-        x: 0,
-        y: elementTop,
-        toJSON: () => ({}),
-      };
-    });
-    virtualizerOptions.mockClear();
-
-    const { unmount } = render(
-      <div>
-        <div data-testid="preceding-content" />
-        <LedgerEntriesUnifiedGroups
-          streamGroups={[largeGroup(81)]}
-          mainCurrency="CNY"
-          onViewSourceDetail={vi.fn()}
-          onDeleteSourceConfirm={vi.fn()}
-          isSelectionMode={false}
-          selectedIds={[]}
-          onToggleSelection={vi.fn()}
-        />
-      </div>
-    );
-    expect(virtualizerOptions).toHaveBeenLastCalledWith(
-      expect.objectContaining({ scrollMargin: 120 })
-    );
-    expect(observe).toHaveBeenCalledWith(screen.getByTestId("preceding-content"));
-
-    top = 240;
-    act(() => notifyResize?.());
-    expect(virtualizerOptions).toHaveBeenLastCalledWith(
-      expect.objectContaining({ scrollMargin: 240 })
-    );
-
-    unmount();
-    expect(disconnect).toHaveBeenCalledTimes(1);
+    const entering = container.querySelectorAll(".stream-card-enter");
+    expect(entering).toHaveLength(1);
+    expect(entering[0]).toHaveAttribute("data-stream-card-id", "document-2");
   });
 });
