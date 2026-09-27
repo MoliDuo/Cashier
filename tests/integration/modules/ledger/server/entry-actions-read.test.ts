@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { getLedgerEntriesAction } from "@/modules/ledger/server/list-entries";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
+import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
@@ -464,6 +465,38 @@ describe("getLedgerEntriesAction", () => {
     const midEntry = result.items[0];
     expect(midEntry).toBeDefined();
     expect(midEntry?.itemName).toBe("Mid");
+  });
+
+  it("bounds foreign entries by their amount at the document day's rate", async () => {
+    const db = getTestDb();
+    // 1 USD is 7.2 / 1.1 = 6.545… CNY on this day; the earlier day has no rate.
+    await insertExchangeRates("2024-01-15", { USD: "1.1", CNY: "7.2" });
+    const ratedDoc = await seedDoc(db, ledgerId, "2024-01-15");
+    const unratedDoc = await seedDoc(db, ledgerId, "2023-06-01");
+    const entry = (sourceDocumentId: string, itemName: string, amount: string) => ({
+      id: randomUUID(),
+      ledgerId,
+      sourceDocumentId,
+      itemName,
+      amount,
+      currency: "USD",
+    });
+    await db
+      .insert(ledgerEntries)
+      .values([
+        entry(ratedDoc.id, "Within", "10.00"),
+        entry(ratedDoc.id, "Above", "20.00"),
+        entry(unratedDoc.id, "Unrated", "10.00"),
+      ]);
+    const bounds = { minAmount: "20", maxAmount: "100" };
+
+    const listed = await getTargetLedgerEntriesAction(ledgerId, bounds);
+    const totals = await getLedgerStatsAction(bounds);
+
+    expect(listed.items.map((item) => item.itemName)).toEqual(["Within"]);
+    expect(totals.totals).toEqual([
+      expect.objectContaining({ currency: "USD", count: 1, total: "10" }),
+    ]);
   });
 
   it("rejects a page size it cannot serve", async () => {

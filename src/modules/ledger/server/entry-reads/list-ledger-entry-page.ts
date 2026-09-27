@@ -50,7 +50,10 @@ export async function listLedgerEntryPage({
       const whereConditions = [
         tenantCondition,
         ...buildLedgerEntryEffectiveDateConditions(filters),
-        ...buildLedgerEntryValueConditions(filters),
+        ...buildLedgerEntryValueConditions(filters, {
+          mainCurrency: sql`(SELECT main_currency FROM ledgers WHERE id = ${ledgerId})`,
+          date: sql`documents.effective_date`,
+        }),
         cursorCondition,
       ].filter((condition): condition is SQL<unknown> => condition != null);
 

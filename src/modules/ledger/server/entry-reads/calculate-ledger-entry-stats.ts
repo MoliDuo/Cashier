@@ -41,7 +41,12 @@ export async function calculateLedgerEntryStats({
 }: CalculateLedgerEntryStatsInput): Promise<LedgerEntrySummary> {
   const tenantCondition = and(eq(ledgerEntries.ledgerId, ledgerId));
   const { currency, ...filtersWithoutCurrency } = filters;
-  const valueConditions = joinConditions(buildLedgerEntryValueConditions(filtersWithoutCurrency));
+  const valueConditions = joinConditions(
+    buildLedgerEntryValueConditions(filtersWithoutCurrency, {
+      mainCurrency: sql`settings.main_currency`,
+      date: sql`documents.effective_date`,
+    })
+  );
   const dateConditions = joinConditions(buildLedgerEntryEffectiveDateConditions(filters));
   const currencyCondition =
     currency == null || currency === "" ? sql`` : sql`AND ledger_entries.currency = ${currency}`;

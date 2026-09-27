@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { eq, isNull, sql, type SQL } from "drizzle-orm";
+import { eq, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { ValidationError } from "@/lib/errors";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import { ledgerEntries } from "@/persistence";
-import { entryConvertedAmountSql } from "@/modules/currency/server/conversion-sql";
+import { convertedAmountSql } from "@/modules/currency/server/conversion-sql";
 import type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
 import { serializeLedgerQuery } from "@/modules/ledger/ledger-query";
 import { z } from "zod";
@@ -14,6 +14,15 @@ import { dateStringSchema, UUID_REGEX } from "@/lib/validation";
 export type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
 
 /**
+ * The main currency and accounting date an amount bound converts against,
+ * named by the caller from what its query already has joined.
+ */
+export interface LedgerEntryConversionOperands {
+  mainCurrency: SQLWrapper;
+  date: SQLWrapper;
+}
+
+/**
  * Entry-value filters (category, currency, amount range, search).
  *
  * These conditions reference `ledger_entries` columns and may be reused by
@@ -21,8 +30,17 @@ export type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
  * date-range conditions are owned by the callers that join
  * `source_documents` under the conventional `documents` alias.
  */
-export function buildLedgerEntryValueConditions(filters: LedgerEntryFilterParams): SQL<unknown>[] {
+export function buildLedgerEntryValueConditions(
+  filters: LedgerEntryFilterParams,
+  conversion: LedgerEntryConversionOperands
+): SQL<unknown>[] {
   const conditions: SQL<unknown>[] = [];
+  const convertedAmount = () =>
+    convertedAmountSql({
+      amount: ledgerEntries.amount,
+      currency: ledgerEntries.currency,
+      ...conversion,
+    });
 
   if (filters.uncategorizedOnly) {
     conditions.push(isNull(ledgerEntries.categoryId));
@@ -37,11 +55,11 @@ export function buildLedgerEntryValueConditions(filters: LedgerEntryFilterParams
   // An entry without a rate for its day has no converted amount and never
   // matches an amount bound.
   if (filters.minAmount !== undefined && filters.minAmount !== null) {
-    conditions.push(sql`${entryConvertedAmountSql()} >= ${filters.minAmount}`);
+    conditions.push(sql`${convertedAmount()} >= ${filters.minAmount}`);
   }
 
   if (filters.maxAmount !== undefined && filters.maxAmount !== null) {
-    conditions.push(sql`${entryConvertedAmountSql()} <= ${filters.maxAmount}`);
+    conditions.push(sql`${convertedAmount()} <= ${filters.maxAmount}`);
   }
 
   if (filters.search != null && filters.search !== "") {
