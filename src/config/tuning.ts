@@ -64,13 +64,6 @@ export const CATEGORY_ASSIGNMENT_MAX_ENTRIES = 5000;
 export const CATEGORY_RUN_BUDGET_MS =
   FUNCTION_BUDGET_MS - AI_CATEGORY_REQUEST_TIMEOUT_MS - OUTCOME_RESERVE_MS;
 
-/**
- * Upload ceilings, per ledger: files planned but not yet finalized, and bytes
- * stored since UTC midnight (100 MiB).
- */
-export const UPLOAD_PENDING_FILE_LIMIT = 20;
-export const UPLOAD_DAILY_BYTES_LIMIT = 104_857_600;
-
 /** JPEG quality for a normalised receipt photo. */
 export const MAX_IMAGE_QUALITY = 85;
 

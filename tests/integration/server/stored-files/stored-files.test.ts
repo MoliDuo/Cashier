@@ -20,7 +20,6 @@ import {
   MAX_ORIGINAL_BYTES_PER_FILE,
   UPLOAD_PLAN_EXPIRY_MS,
 } from "@/lib/storage/upload-policy";
-import { UPLOAD_DAILY_BYTES_LIMIT, UPLOAD_PENDING_FILE_LIMIT } from "@/config/tuning";
 import { storedFiles } from "@/persistence";
 
 const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
@@ -116,15 +115,9 @@ describe("stored-file uploads and reads", () => {
     expect(await db.select().from(storedFiles)).toEqual([]);
   });
 
-  it("caps pending files and the day's bytes per ledger", async () => {
+  it("plans uploads without a per-ledger quota", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    );
     objectStore.current = new DirectMemoryObjectStore();
     const file = {
       contentType: "image/jpeg",
@@ -132,38 +125,15 @@ describe("stored-file uploads and reads", () => {
       originalFilename: null,
       checksum: "a".repeat(64),
     };
-    for (let planned = 0; planned < UPLOAD_PENDING_FILE_LIMIT; planned += MAX_FILES) {
+    // Well past the 20 pending files the removed quota allowed.
+    for (let planned = 0; planned < 24; planned += MAX_FILES) {
       await planDirectUpload(
         ledgerId,
         Array.from({ length: MAX_FILES }, () => file)
       );
     }
-    await expect(planDirectUpload(ledgerId, [file])).rejects.toMatchObject({
-      code: "UPLOAD_QUOTA_EXCEEDED",
-    });
-    await expect(planDirectUpload(otherLedgerId, [file])).resolves.toBeDefined();
 
-    // A finalized file from today counts toward the byte budget; one from
-    // yesterday does not.
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-    await db.insert(storedFiles).values(
-      [today, yesterday].map((createdAt) => {
-        const id = crypto.randomUUID();
-        return {
-          id,
-          ledgerId: otherLedgerId,
-          storageKey: `${otherLedgerId}/stored/${id}`,
-          contentType: "image/webp",
-          byteSize: UPLOAD_DAILY_BYTES_LIMIT - 1,
-          createdAt,
-          finalizedAt: createdAt,
-        };
-      })
-    );
-    await expect(planDirectUpload(otherLedgerId, [file])).rejects.toMatchObject({
-      code: "UPLOAD_QUOTA_EXCEEDED",
-    });
+    expect(await db.select().from(storedFiles)).toHaveLength(24);
   });
 
   it("verifies, normalizes and readies uploaded files, and a retry changes nothing", async () => {

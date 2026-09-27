@@ -1,19 +1,17 @@
 import "server-only";
 import crypto from "node:crypto";
-import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notExists } from "drizzle-orm";
 import type {
   DirectUploadPlanContract,
   StoredFileContract,
   UploadFileRequestContract,
 } from "./types";
 import { db } from "@/lib/db";
-import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import { getS3Storage } from "@/lib/storage/s3";
-import { AppError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { processImage } from "@/lib/storage/image-processing";
-import { UPLOAD_DAILY_BYTES_LIMIT, UPLOAD_PENDING_FILE_LIMIT } from "@/config/tuning";
 import {
   DIRECT_UPLOAD_FINALIZE_BUFFER_MS,
   MAX_FILES,
@@ -32,47 +30,24 @@ interface PendingFile {
   checksum: string | null;
 }
 
-/**
- * Records files as pending under the ledger lock, once they fit the ledger's
- * quota: a bounded number waiting for finalization, and a daily byte budget
- * that counts every file stored since UTC midnight.
- */
+/** Records files as pending; finalization or the daily sweep settles them. */
 async function reservePendingFiles(
   ledgerId: string,
   files: readonly PendingFile[],
   now: Date
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
-    const utcDayStart = new Date(now);
-    utcDayStart.setUTCHours(0, 0, 0, 0);
-    const [usage] = await tx
-      .select({
-        pending: sql<number>`count(*) FILTER (WHERE ${storedFiles.finalizedAt} IS NULL)::int`,
-        bytesToday: sql<number>`coalesce(sum(${storedFiles.byteSize}) FILTER (WHERE ${storedFiles.createdAt} >= ${utcDayStart}), 0)::bigint`,
-      })
-      .from(storedFiles)
-      .where(eq(storedFiles.ledgerId, ledgerId));
-    const reservedBytes = files.reduce((sum, file) => sum + file.byteSize, 0);
-    if (
-      (usage?.pending ?? 0) + files.length > UPLOAD_PENDING_FILE_LIMIT ||
-      Number(usage?.bytesToday ?? 0) + reservedBytes > UPLOAD_DAILY_BYTES_LIMIT
-    ) {
-      throw new AppError("Upload quota exceeded", "UPLOAD_QUOTA_EXCEEDED", 429);
-    }
-    await tx.insert(storedFiles).values(
-      files.map((file) => ({
-        id: file.id,
-        ledgerId,
-        storageKey: durableKey(ledgerId, file.id),
-        contentType: file.contentType,
-        byteSize: file.byteSize,
-        originalFilename: file.originalFilename,
-        checksum: file.checksum,
-        createdAt: now,
-      }))
-    );
-  });
+  await db.insert(storedFiles).values(
+    files.map((file) => ({
+      id: file.id,
+      ledgerId,
+      storageKey: durableKey(ledgerId, file.id),
+      contentType: file.contentType,
+      byteSize: file.byteSize,
+      originalFilename: file.originalFilename,
+      checksum: file.checksum,
+      createdAt: now,
+    }))
+  );
 }
 
 /**

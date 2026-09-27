@@ -209,9 +209,8 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ### 存储
 
-- 网页图片用短时签名 PUT URL 直传到私有 S3 兼容存储。规划阶段在账本锁下为每张图登记一行 pending 的
-  `stored_files`，前提是账本还有额度：最多 20 个 pending 文件，UTC 零点以来最多存 100 MiB。签名 URL 指向
-  `temporary/{ledgerId}/{storedFileId}`。
+- 网页图片用短时签名 PUT URL 直传到私有 S3 兼容存储。规划阶段为每张图登记一行 pending 的 `stored_files`，
+  不设额度：只有两个人在用，没有确认的文件由每日 cron 清掉。签名 URL 指向 `temporary/{ledgerId}/{storedFileId}`。
 - 15 分钟内的最终化会核对每个临时对象的 MIME、大小和 SHA-256，用 sharp 归一化（同时剥离 EXIF），写入持久
   key 并标记 ready；重复最终化原样返回。只有 ready 的文件能挂到提取尝试上。
 - API v1 的内联图片不经过 `temporary/`：服务端归一化后同样预留 pending 行，写入持久对象，再标记 ready。
