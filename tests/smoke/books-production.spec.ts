@@ -411,7 +411,7 @@ test("books production picks up another browser's change when 设置 comes back 
     // Coming back to this browser is what brings the other browser's book in:
     // the ledger's sync version moved, so every query on 设置 reads again.
     await expect(bookRow(page, bookName)).toHaveCount(0);
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
     await expect(bookRow(page, bookName)).toBeVisible();
     await deleteBook(page, bookName);
     await expect(bookRow(other.page, bookName)).toHaveCount(1);
