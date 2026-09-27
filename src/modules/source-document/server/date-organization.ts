@@ -10,7 +10,7 @@ import type {
 } from "@/modules/source-document/contracts";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
-import { assertSourceDocumentNotProcessing } from "./write-guards";
+import { assertSourceDocumentsNotProcessing } from "./write-guards";
 import { copyDocumentInput } from "./document-input";
 import { getSourceDocumentInTransaction } from "./reads/list";
 
@@ -118,7 +118,7 @@ export async function applyDateOrganization(
     );
     if (lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId)
       throw new ConflictError("Source document changed before date organization");
-    await assertSourceDocumentNotProcessing(tx, lockedDocument);
+    await assertSourceDocumentsNotProcessing(tx, [lockedDocument]);
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
@@ -157,20 +157,22 @@ export async function applyDateOrganization(
         destinationByEntry.set(entryId, { documentId: id, entryDate: group.entryDate! });
     }
 
+    // Every entry takes its place in its (possibly new) document, in one statement.
     const positions = new Map<string, number>();
-    for (const entry of currentEntries) {
-      const destination = destinationByEntry.get(entry.id);
-      const docId = destination?.documentId ?? input.sourceDocumentId;
-      const position = positions.get(docId) ?? 0;
-      positions.set(docId, position + 1);
-      await tx
-        .update(ledgerEntries)
-        .set({
-          sourceDocumentId: docId,
-          position,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(ledgerEntries.id, entry.id), eq(ledgerEntries.ledgerId, input.ledgerId)));
+    const moves = currentEntries.map((entry) => {
+      const documentId = destinationByEntry.get(entry.id)?.documentId ?? input.sourceDocumentId;
+      const position = positions.get(documentId) ?? 0;
+      positions.set(documentId, position + 1);
+      return sql`(${entry.id}::uuid, ${documentId}::uuid, ${position}::integer)`;
+    });
+    if (moves.length > 0) {
+      await tx.execute(sql`
+        UPDATE ${ledgerEntries} AS entry
+        SET source_document_id = move.source_document_id, position = move.position,
+            updated_at = ${new Date()}
+        FROM (VALUES ${sql.join(moves, sql`, `)}) AS move(id, source_document_id, position)
+        WHERE entry.id = move.id AND entry.ledger_id = ${input.ledgerId}
+      `);
     }
     const remainingItems = lockedDocument.dateOrganizationSuggestion.items.filter(
       (item) => !assigned.has(item.ledgerEntryId)

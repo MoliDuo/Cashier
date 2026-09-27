@@ -8,7 +8,7 @@ import { getSourceDocumentInTransaction } from "./reads/list";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
-import { assertSourceDocumentNotProcessing } from "./write-guards";
+import { assertSourceDocumentsNotProcessing } from "./write-guards";
 import { copyDocumentInput } from "./document-input";
 
 export async function splitSourceDocumentAtomically(input: {
@@ -62,7 +62,7 @@ export async function splitSourceDocumentAtomically(input: {
       input.ledgerId,
       input.sourceDocumentId
     );
-    await assertSourceDocumentNotProcessing(tx, lockedDocument);
+    await assertSourceDocumentsNotProcessing(tx, [lockedDocument]);
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),

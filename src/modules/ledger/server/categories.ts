@@ -21,7 +21,7 @@ import {
   lockSourceDocumentsForUpdate,
   type PostgresTransaction,
 } from "@/lib/db/transaction-locks";
-import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
+import { assertSourceDocumentsNotProcessing } from "@/modules/source-document/server/write-guards";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 
 function mapCategory(row: typeof entryCategories.$inferSelect): EntryCategoryDto {
@@ -227,7 +227,7 @@ export async function saveEntryCategories(
         )
         .then((rows) => rows.map((row) => row.id).sort());
       const documents = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
-      for (const document of documents) await assertSourceDocumentNotProcessing(tx, document);
+      await assertSourceDocumentsNotProcessing(tx, documents);
       await tx
         .update(ledgerEntries)
         .set({ categoryId: null, updatedAt: now })
@@ -414,7 +414,7 @@ export async function applyCategoryPreset(
             )
             .then((rows) => rows.map((row) => row.id).sort());
     const lockedDocuments = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
-    for (const document of lockedDocuments) await assertSourceDocumentNotProcessing(tx, document);
+    await assertSourceDocumentsNotProcessing(tx, lockedDocuments);
     // Deleting a category unsets its entries, so the entries each migrating
     // category holds are noted first and moved onto their target once the
     // preset exists.

@@ -5,7 +5,7 @@ import { compare } from "@/lib/money/decimal";
 import type { DateOrganizationSuggestion } from "@/lib/ai/date-organization";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
-import { assertSourceDocumentNotProcessing } from "../write-guards";
+import { assertSourceDocumentsNotProcessing } from "../write-guards";
 
 import {
   activeDocumentWhere,
@@ -171,7 +171,7 @@ export async function replaceDocumentEntriesInTransaction(
 ): Promise<void> {
   const document = input.document;
   const dateChanged = input.entryDate !== undefined && input.entryDate !== document.documentDate;
-  await assertSourceDocumentNotProcessing(tx, document);
+  await assertSourceDocumentsNotProcessing(tx, [document]);
 
   await replaceManualProjection(tx, {
     previousEntries: input.previousEntries,

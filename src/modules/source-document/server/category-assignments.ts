@@ -10,7 +10,7 @@ import {
   sourceDocuments,
 } from "@/persistence";
 import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
-import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
+import { assertSourceDocumentsNotProcessing } from "@/modules/source-document/server/write-guards";
 import { leaseHeldBy } from "@/lib/db/lease";
 import type { CategoryAssignmentLease } from "@/server/category-assignment/assignments";
 import { ConflictError } from "@/lib/errors";
@@ -103,7 +103,7 @@ export async function applyCategoryAssignments(
     };
 
     try {
-      await assertSourceDocumentNotProcessing(tx, document);
+      await assertSourceDocumentsNotProcessing(tx, [document]);
     } catch (error) {
       if (error instanceof ConflictError) {
         return finishWithoutWrite("conflict", "document_changed");
@@ -162,43 +162,59 @@ export async function applyCategoryAssignments(
     // Each entry is written only if it still has the category it had when it
     // was selected; one changed since then is a conflict on its own, and the
     // document's other entries still apply.
-    let appliedCount = 0;
-    let confirmedCount = 0;
-    let conflictCount = 0;
-    for (const entry of selected) {
-      let outcome: "applied" | "confirmed" | "conflict" = "confirmed";
-      if (entry.currentCategoryId !== entry.work.targetCategoryId) {
-        const written = await tx
-          .update(ledgerEntries)
-          .set({ categoryId: entry.work.targetCategoryId, updatedAt: now })
-          .where(
-            and(
-              eq(ledgerEntries.ledgerId, ledgerId),
-              eq(ledgerEntries.id, entry.work.ledgerEntryId),
-              eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
-              sql`${ledgerEntries.categoryId} IS NOT DISTINCT FROM ${entry.work.originalCategoryId}`
+    const changing = selected.filter(
+      (entry) => entry.currentCategoryId !== entry.work.targetCategoryId
+    );
+    const written =
+      changing.length === 0
+        ? []
+        : await tx
+            .execute<{ id: string }>(
+              sql`
+            UPDATE ledger_entries AS entry
+            SET category_id = target.category_id, updated_at = ${now}
+            FROM (VALUES ${sql.join(
+              changing.map(
+                (item) =>
+                  sql`(${item.work.ledgerEntryId}::uuid, ${item.work.targetCategoryId}::uuid, ${item.work.originalCategoryId}::uuid)`
+              ),
+              sql`, `
+            )}) AS target(id, category_id, original_category_id)
+            WHERE entry.id = target.id
+              AND entry.ledger_id = ${ledgerId}
+              AND entry.source_document_id = ${input.sourceDocumentId}
+              AND entry.category_id IS NOT DISTINCT FROM target.original_category_id
+            RETURNING entry.id
+          `
             )
-          )
-          .returning({ id: ledgerEntries.id });
-        outcome = written.length > 0 ? "applied" : "conflict";
-      }
-      if (outcome === "applied") appliedCount += 1;
-      else if (outcome === "confirmed") confirmedCount += 1;
-      else conflictCount += 1;
-      await tx
-        .update(categoryAssignmentEntries)
-        .set({
-          outcome,
-          errorCode: outcome === "conflict" ? "entry_changed" : null,
-          updatedAt: now,
-        })
-        .where(
-          and(
-            eq(categoryAssignmentEntries.jobId, jobId),
-            eq(categoryAssignmentEntries.ledgerEntryId, entry.work.ledgerEntryId)
-          )
-        );
+            .then((result) => result.rows);
+    const applied = new Set(written.map((row) => row.id));
+    const outcomes = selected.map((entry) => ({
+      ledgerEntryId: entry.work.ledgerEntryId,
+      outcome:
+        entry.currentCategoryId === entry.work.targetCategoryId
+          ? ("confirmed" as const)
+          : applied.has(entry.work.ledgerEntryId)
+            ? ("applied" as const)
+            : ("conflict" as const),
+    }));
+    if (outcomes.length > 0) {
+      await tx.execute(sql`
+        UPDATE ${categoryAssignmentEntries} AS work
+        SET outcome = result.outcome::category_assignment_entry_outcome,
+            error_code = CASE WHEN result.outcome = 'conflict' THEN 'entry_changed' END,
+            updated_at = ${now}
+        FROM (VALUES ${sql.join(
+          outcomes.map((item) => sql`(${item.ledgerEntryId}::uuid, ${item.outcome}::text)`),
+          sql`, `
+        )}) AS result(ledger_entry_id, outcome)
+        WHERE work.job_id = ${jobId} AND work.ledger_entry_id = result.ledger_entry_id
+      `);
     }
+    const count = (outcome: string) => outcomes.filter((item) => item.outcome === outcome).length;
+    const appliedCount = count("applied");
+    const confirmedCount = count("confirmed");
+    const conflictCount = count("conflict");
     await tx
       .update(categoryAssignmentDocuments)
       .set({ status: "succeeded", errorCode: null, updatedAt: now })

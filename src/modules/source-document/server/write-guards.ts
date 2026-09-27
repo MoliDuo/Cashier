@@ -1,25 +1,34 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { ConflictError } from "@/lib/errors";
 import { extractionAttempts, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
-export async function assertSourceDocumentNotProcessing(
+/**
+ * Refuses a hand edit while any of the documents is being processed, since
+ * the parse replaces its entries when it completes. One query however many
+ * documents; the latest-attempt foreign key keeps each attempt on its document.
+ */
+export async function assertSourceDocumentsNotProcessing(
   tx: PostgresTransaction,
-  document: Pick<typeof sourceDocuments.$inferSelect, "ledgerId" | "id" | "latestAttemptId">
+  documents: readonly Pick<typeof sourceDocuments.$inferSelect, "ledgerId" | "latestAttemptId">[]
 ): Promise<void> {
-  if (document.latestAttemptId == null) return;
-  const attempt = await tx
-    .select({ status: extractionAttempts.status })
+  const attemptIds = documents.flatMap((document) =>
+    document.latestAttemptId == null ? [] : [document.latestAttemptId]
+  );
+  if (attemptIds.length === 0) return;
+  const ledgerIds = [...new Set(documents.map((document) => document.ledgerId))];
+  const processing = await tx
+    .select({ id: extractionAttempts.id })
     .from(extractionAttempts)
     .where(
       and(
-        eq(extractionAttempts.ledgerId, document.ledgerId),
-        eq(extractionAttempts.sourceDocumentId, document.id),
-        eq(extractionAttempts.id, document.latestAttemptId)
+        inArray(extractionAttempts.ledgerId, ledgerIds),
+        inArray(extractionAttempts.id, attemptIds),
+        eq(extractionAttempts.status, "processing")
       )
     )
-    .then((rows) => rows[0]);
-  if (attempt?.status === "processing") {
+    .limit(1);
+  if (processing.length > 0) {
     throw new ConflictError("Source document cannot be edited while processing");
   }
 }

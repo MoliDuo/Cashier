@@ -530,21 +530,27 @@ export async function persistCategoryAssignmentDecisions(input: {
   const { lease } = input;
   const now = new Date();
   const persisted = await withHeldJob(lease, async (tx) => {
-    for (const decision of input.decisions) {
-      const updated = await tx
-        .update(categoryAssignmentEntries)
-        .set({ targetCategoryId: decision.categoryId, decisionPersisted: true, updatedAt: now })
-        .where(
-          and(
-            eq(categoryAssignmentEntries.ledgerId, lease.ledgerId),
-            eq(categoryAssignmentEntries.jobId, lease.jobId),
-            eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId),
-            eq(categoryAssignmentEntries.ledgerEntryId, decision.ledgerEntryId),
-            isNull(categoryAssignmentEntries.outcome)
-          )
-        )
-        .returning({ id: categoryAssignmentEntries.ledgerEntryId });
-      if (updated.length !== 1)
+    if (input.decisions.length > 0) {
+      // Decisions are unique per entry, so every one must land on an entry
+      // of this block that has no outcome yet.
+      const updated = await tx.execute(sql`
+        UPDATE ${categoryAssignmentEntries} AS work
+        SET target_category_id = decision.category_id, decision_persisted = true,
+            updated_at = ${now}
+        FROM (VALUES ${sql.join(
+          input.decisions.map(
+            (decision) => sql`(${decision.ledgerEntryId}::uuid, ${decision.categoryId}::uuid)`
+          ),
+          sql`, `
+        )}) AS decision(ledger_entry_id, category_id)
+        WHERE work.ledger_id = ${lease.ledgerId}
+          AND work.job_id = ${lease.jobId}
+          AND work.source_document_id = ${input.sourceDocumentId}
+          AND work.ledger_entry_id = decision.ledger_entry_id
+          AND work.outcome IS NULL
+        RETURNING work.ledger_entry_id
+      `);
+      if (updated.rows.length !== input.decisions.length)
         throw new ConflictError("AI returned an entry outside the claimed request block");
     }
     await tx
@@ -836,39 +842,50 @@ export async function retryCategoryAssignmentFailures(input: {
       })
       .returning({ id: categoryAssignmentJobs.id });
     if (created == null) throw new ConflictError("Retry assignment could not be created");
-    const changedDocuments = new Set<string>();
-    for (const { work, current } of failedDocuments) {
-      const changed = current == null;
-      if (changed) changedDocuments.add(work.sourceDocumentId);
-      await tx.insert(categoryAssignmentDocuments).values({
-        jobId: created.id,
-        ledgerId: input.ledgerId,
-        sourceDocumentId: work.sourceDocumentId,
-        selectionOrder: work.selectionOrder,
-        status: changed ? "conflict" : "pending",
-        completedChunkCount: changed ? 0 : work.completedChunkCount,
-        nextAttemptAt: now,
-        errorCode: changed ? "document_changed" : null,
-        createdAt: now,
-        updatedAt: now,
-      });
+    const changedDocuments = new Set(
+      failedDocuments
+        .filter(({ current }) => current == null)
+        .map(({ work }) => work.sourceDocumentId)
+    );
+    for (const batch of batches(failedDocuments)) {
+      await tx.insert(categoryAssignmentDocuments).values(
+        batch.map(({ work }) => {
+          const changed = changedDocuments.has(work.sourceDocumentId);
+          return {
+            jobId: created.id,
+            ledgerId: input.ledgerId,
+            sourceDocumentId: work.sourceDocumentId,
+            selectionOrder: work.selectionOrder,
+            status: changed ? ("conflict" as const) : ("pending" as const),
+            completedChunkCount: changed ? 0 : work.completedChunkCount,
+            nextAttemptAt: now,
+            errorCode: changed ? "document_changed" : null,
+            createdAt: now,
+            updatedAt: now,
+          };
+        })
+      );
     }
-    for (const entry of failedEntries) {
-      const changed = changedDocuments.has(entry.sourceDocumentId);
-      await tx.insert(categoryAssignmentEntries).values({
-        jobId: created.id,
-        ledgerId: input.ledgerId,
-        ledgerEntryId: entry.ledgerEntryId,
-        sourceDocumentId: entry.sourceDocumentId,
-        selectionOrder: entry.selectionOrder,
-        originalCategoryId: entry.originalCategoryId,
-        targetCategoryId: changed ? null : entry.targetCategoryId,
-        decisionPersisted: !changed && entry.decisionPersisted,
-        outcome: changed ? "conflict" : null,
-        errorCode: changed ? "document_changed" : null,
-        createdAt: now,
-        updatedAt: now,
-      });
+    for (const batch of batches(failedEntries)) {
+      await tx.insert(categoryAssignmentEntries).values(
+        batch.map((entry) => {
+          const changed = changedDocuments.has(entry.sourceDocumentId);
+          return {
+            jobId: created.id,
+            ledgerId: input.ledgerId,
+            ledgerEntryId: entry.ledgerEntryId,
+            sourceDocumentId: entry.sourceDocumentId,
+            selectionOrder: entry.selectionOrder,
+            originalCategoryId: entry.originalCategoryId,
+            targetCategoryId: changed ? null : entry.targetCategoryId,
+            decisionPersisted: !changed && entry.decisionPersisted,
+            outcome: changed ? ("conflict" as const) : null,
+            errorCode: changed ? "document_changed" : null,
+            createdAt: now,
+            updatedAt: now,
+          };
+        })
+      );
     }
     await finishCategoryAssignmentJobIfDone(tx, created.id, input.ledgerId);
     return created;
