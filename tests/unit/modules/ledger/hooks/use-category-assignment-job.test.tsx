@@ -12,8 +12,8 @@ const { getJob, invalidateLedger } = vi.hoisted(() => ({
 vi.mock("@/modules/ledger/queries", () => ({
   fetchCategoryAssignmentJob: getJob,
 }));
-vi.mock("@/lib/mutations/ledger-invalidation", () => ({
-  invalidateLedgerQueries: invalidateLedger,
+vi.mock("@/lib/mutations/ledger-sync", () => ({
+  syncLedgerAfterWrite: invalidateLedger,
 }));
 
 const runningJob = {

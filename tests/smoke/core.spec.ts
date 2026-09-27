@@ -7,10 +7,9 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const item = `Smoke ${testInfo.project.name} ${testInfo.repeatEachIndex}`;
-  // Every tab refreshes by tapping the destination it is already on, and the
-  // destinations stay disabled until the tab content has hydrated — so the
+  // The destinations stay disabled until the tab content has hydrated, so the
   // stream destination doubles as the signal that the page is ready.
-  const refreshControl = page
+  const readySignal = page
     .getByRole("navigation", { name: "账本导航" })
     .getByRole("button", { name: "流水", exact: true });
   await expect
@@ -37,7 +36,7 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
   await create.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(create).toHaveCount(0);
   await page.reload();
-  await expect(refreshControl).toBeEnabled();
+  await expect(readySignal).toBeEnabled();
   await page
     .getByTestId("source-document-card-root")
     .filter({ hasText: item })
@@ -63,7 +62,7 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
   await expect(page).not.toHaveURL(/detail=/);
   await page.reload();
   await expect(page.getByText(`${item} edited`, { exact: true })).toHaveCount(0);
-  await expect(refreshControl).toBeEnabled();
+  await expect(readySignal).toBeEnabled();
   await page
     .getByRole("navigation", { name: "账本导航" })
     .getByRole("button", { name: "设置", exact: true })

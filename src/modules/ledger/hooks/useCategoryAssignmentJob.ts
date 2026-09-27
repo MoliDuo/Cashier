@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchCategoryAssignmentJob } from "@/modules/ledger/queries";
 import { queryKeys } from "@/lib/query-keys";
-import { invalidateLedgerQueries } from "@/lib/mutations/ledger-invalidation";
+import { syncLedgerAfterWrite } from "@/lib/mutations/ledger-sync";
 import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import {
   isCategoryAssignmentJobActive,
@@ -17,8 +17,6 @@ const ACTIVE_POLL_INTERVAL_MS = 3_000;
 const PROGRESS_REFRESH_INTERVAL_MS = 3_000;
 /** Backoff for the status read itself; the poll has to outlast a slow run. */
 const ERROR_POLL_INTERVALS_MS = [5_000, 10_000, 20_000, 30_000];
-/** What a finished or progressing run makes stale. */
-const REFRESH_GROUPS = ["documents", "categories", "stats"] as const;
 
 /** A run's outcome that still has to reach the reader. */
 export interface CategoryAssignmentNotice {
@@ -146,7 +144,7 @@ export function useCategoryAssignmentJob(): CategoryAssignmentJobState {
   }, []);
   const refreshLedger = useCallback(() => {
     lastRefreshAtRef.current = Date.now();
-    void invalidateLedgerQueries(queryClient, [...REFRESH_GROUPS]);
+    void syncLedgerAfterWrite(queryClient).catch(() => undefined);
   }, [queryClient]);
 
   /**

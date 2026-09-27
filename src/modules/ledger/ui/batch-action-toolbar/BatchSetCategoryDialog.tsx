@@ -26,9 +26,6 @@ interface BatchSetCategoryDialogProps {
   pickedCategoryIds: readonly string[];
   clearPicked: boolean;
   onTogglePick: (categoryId: string | null, picked: boolean) => void;
-  /** The selection changed after the dialog captured it; confirming would file
-   * a different set of entries than the one on screen. */
-  selectionChanged: boolean;
   isConfirming: boolean;
   onConfirm: () => void;
 }
@@ -55,7 +52,6 @@ export function BatchSetCategoryDialog({
   pickedCategoryIds,
   clearPicked,
   onTogglePick,
-  selectionChanged,
   isConfirming,
   onConfirm,
 }: BatchSetCategoryDialogProps) {
@@ -197,13 +193,10 @@ export function BatchSetCategoryDialog({
         <DialogFooter className="shrink-0 gap-2 border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:items-center sm:justify-between sm:space-x-0 sm:px-6 sm:py-4">
           <p className={textRoleClassName("meta")} aria-live="polite">
             {summary || batchActionsCopy.categorySelectionRequired}
-            {selectionChanged
-              ? `${summary === "" ? "" : " "}${batchActionsCopy.selectionMoved}`
-              : ""}
           </p>
           <Button
             type="button"
-            disabled={!confirmable || selectionChanged || isConfirming || selectedCount === 0}
+            disabled={!confirmable || isConfirming || selectedCount === 0}
             onClick={onConfirm}
           >
             {confirmLabel}

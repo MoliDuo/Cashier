@@ -49,7 +49,6 @@ import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
 import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
 import type { EntryEditData } from "@/modules/source-document/types";
-import { useLedgerRefreshPolling } from "./useLedgerRefreshPolling";
 import { commonCopy } from "@/copy/common";
 import { sourceDocumentActionCopy, sourceDocumentDetailCopy } from "@/copy/source-document";
 
@@ -133,7 +132,6 @@ export function useSourceDocumentDetail({
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
-  useLedgerRefreshPolling(open && id !== "");
   const sourceDocument = query.data ?? null;
   const ledgerEntries = sourceDocument?.ledgerEntries ?? NO_ENTRIES;
 
@@ -173,83 +171,67 @@ export function useSourceDocumentDetail({
     SaveSourceDocumentChangesResultDto,
     { expectedVersion: number; changes: PendingChanges; onCommitted: () => void }
   >({
-    invalidates: ["documents", "stats"],
     mutationFn: async ({ expectedVersion, changes }) =>
       unwrapVersionedCommandResult(
         await saveSourceDocumentChangesAction(
           toSaveSourceDocumentChangesInput(id, expectedVersion, changes)
         )
       ),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
     onSuccess: (_result, input) => input.onCommitted(),
   });
   const splitMutation = useLedgerMutation<
     SplitSourceDocumentResultDto,
     Omit<SplitSourceDocumentInput, "sourceDocumentId">
   >({
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: (input) => splitSourceDocumentAction({ sourceDocumentId: id, ...input }),
-    refreshMode: "background",
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
   });
   const dateOrganizationMutation = useLedgerMutation<
     ApplyDateOrganizationResultDto,
     Omit<ApplyDateOrganizationInput, "sourceDocumentId">
   >({
-    invalidates: ["documents", "stats"],
     mutationFn: (input) => applyDateOrganizationAction({ sourceDocumentId: id, ...input }),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
     onSuccess: (result) => commitDetailSnapshot(result.sourceDocument),
   });
   const dismissDateOrganizationMutation = useLedgerMutation<{ dismissed: true }, string>({
-    invalidates: ["documents"],
     mutationFn: (suggestionId) =>
       dismissDateOrganizationAction({ sourceDocumentId: id, suggestionId }),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
   });
   const addEntryMutation = useLedgerMutation<{ ledgerEntryId: string }, AddEntryData>({
-    invalidates: ["documents", "stats"],
     mutationFn: (data) =>
       createLedgerEntryAction({ sourceDocumentId: id, ...data, amount: String(data.amount) }),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
   });
   const deleteEntryMutation = useLedgerMutation<
     { ledgerEntryId: string; deleted: true },
     { entryId: string; onCommitted: () => void }
   >({
-    invalidates: ["documents", "stats"],
     mutationFn: ({ entryId }) => deleteLedgerEntryAction(id, entryId),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
     onSuccess: (_result, input) => input.onCommitted(),
   });
   const batchUpdateMutation = useLedgerMutation<
     { ledgerEntryIds: string[]; affectedCount: number },
     { ids: string[]; patch: BatchPatch }
   >({
-    invalidates: ["documents", "stats"],
     mutationFn: ({ ids, patch }) => batchUpdateLedgerEntriesAction([id], ids, patch),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
   });
   const batchDeleteMutation = useLedgerMutation<
     PartialBatchCommandResult,
     { entryIds: string[]; onCommitted: (result: PartialBatchCommandResult) => void }
   >({
-    invalidates: ["documents", "stats"],
     mutationFn: ({ entryIds }) => batchDeleteLedgerEntriesAction([id], entryIds),
-    refreshMode: "background",
-    refreshQueryKey: detailKey,
+    waitFor: detailKey,
     onSuccess: (result, input) => input.onCommitted(result),
   });
   const deleteDocumentMutation = useLedgerMutation<unknown, (() => void) | undefined>({
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: () => deleteSourceDocumentAction(id),
-    refreshMode: "background",
     successMessage: commonCopy.deleteSuccess,
     errorMessage: commonCopy.deleteFailed,
     onSuccess: (_result, onCommitted) => {
@@ -258,14 +240,12 @@ export function useSourceDocumentDetail({
     },
   });
   const cancelMutation = useLedgerMutation<unknown, void>({
-    invalidates: ["documents", "stats"],
     mutationFn: () => cancelSourceDocumentProcessingAction(id),
     successMessage: sourceDocumentActionCopy.cancelSuccess,
     errorMessage: sourceDocumentActionCopy.cancelError,
     onSuccess: onClose,
   });
   const assignBookMutation = useLedgerMutation({
-    invalidates: ["documents", "stats"],
     // An archived target says so instead of snapping the picker back silently.
     errorMessage: commonCopy.bookChangeFailed,
     mutationFn: (bookId: string) =>

@@ -14,7 +14,6 @@ import {
   useQuery,
   useQueryClient,
   type InfiniteData,
-  type QueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
@@ -24,15 +23,12 @@ import {
   openLedgerDetail,
   openLedgerEntrySourceDocument,
 } from "@/lib/navigation/ledger-detail-navigation";
-import { queryKeys } from "@/lib/query-keys";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
 import type {
   BatchUpdateSourceDocumentsResultDto,
   PartialBatchCommandResult,
   SourceDocumentListItemDto,
 } from "@/modules/source-document/contracts";
-import { useLedgerRefreshPolling } from "@/modules/source-document/hooks/useLedgerRefreshPolling";
 import { fetchStreamPage, fetchStreamTotal } from "@/modules/source-document/queries";
 import {
   batchDeleteSourceDocumentsAction,
@@ -75,33 +71,6 @@ function flattenAndDeduplicate(
   return result;
 }
 
-function seedRefreshBaseline(
-  queryClient: QueryClient,
-  page: { generation: string; hasTransitionalWork: boolean }
-) {
-  queryClient.setQueryData<LedgerRefreshResult>(queryKeys.sourceDocumentRefresh(), (current) => {
-    // A page refreshes only its own projection, not every ledger cache.
-    // Only the refresh consumer may advance an existing baseline. A newer page
-    // that shows work still processing does start its polling, though: a list
-    // refetched after a mutation can show another device's upload that the
-    // idle baseline never heard of, and without the poll it would stay
-    // "processing" on screen until the window next regains focus.
-    if (current != null) {
-      return page.hasTransitionalWork &&
-        !current.hasTransitionalWork &&
-        BigInt(page.generation) > BigInt(current.version)
-        ? { ...current, hasTransitionalWork: true }
-        : current;
-    }
-    return {
-      version: page.generation,
-      changed: false,
-      hasTransitionalWork: page.hasTransitionalWork,
-      invalidations: { categories: false, settings: false, stats: false },
-    };
-  });
-}
-
 interface UseLedgerEntriesTabOptions {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
@@ -140,13 +109,19 @@ export function useLedgerEntriesTab({
   );
   const streamPageKey = queryDescriptor.queryKey;
 
+  // Selecting freezes the list: a background refresh must not swap the rows
+  // out from under the selection. The queries read again once it ends.
+  const [frozen, setFrozen] = useState(false);
+
   const totalQuery = useQuery({
     queryKey: queryDescriptor.totalQueryKey,
+    enabled: !frozen,
     queryFn: () => fetchStreamTotal(queryDescriptor.totalInput),
   });
 
   const streamQuery = useInfiniteQuery({
     queryKey: streamPageKey,
+    enabled: !frozen,
     queryFn: async ({ pageParam }) => {
       const pageInput = queryDescriptor.getPageInput(pageParam as string | undefined);
       let page = await fetchStreamPage(pageInput);
@@ -156,7 +131,6 @@ export function useLedgerEntriesTab({
           throw new Error("Stream restart did not produce a valid first page");
         }
       }
-      seedRefreshBaseline(queryClient, page);
       return page;
     },
     initialPageParam: undefined as string | undefined,
@@ -200,7 +174,6 @@ export function useLedgerEntriesTab({
         let page = await fetchStreamPage(firstPageInput);
         if (page.restartRequired) page = await fetchStreamPage(firstPageInput);
         if (page.restartRequired || cancelled) return;
-        seedRefreshBaseline(queryClient, page);
         queryClient.setQueryData<InfiniteData<StreamPage, string | undefined>>(streamPageKey, {
           pages: [page],
           pageParams: [undefined],
@@ -214,8 +187,6 @@ export function useLedgerEntriesTab({
       cancelled = true;
     };
   }, [data, queryClient, queryDescriptor, streamPageKey]);
-
-  useLedgerRefreshPolling(data?.pages[0] != null);
 
   const streamGroups = useMemo(
     () => buildUnifiedStreamGroups(flattenAndDeduplicate(data?.pages), mainCurrency),
@@ -253,6 +224,7 @@ export function useLedgerEntriesTab({
     isSelectionLimitReached,
     selectableCount,
   } = useSelection({ allIds: allSourceDocumentIds, queryFingerprint });
+  if (frozen !== isSelectionMode) setFrozen(isSelectionMode);
 
   const selectedEntryIds = useMemo(() => {
     const selected = new Set(selectedIds);
@@ -291,8 +263,7 @@ export function useLedgerEntriesTab({
     BatchUpdateSourceDocumentsResultDto,
     { ids: string[]; entryDate: string }
   >({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: ({ ids, entryDate }) =>
       batchUpdateSourceDocumentsAction({
         sourceDocumentIds: ids,
@@ -309,8 +280,7 @@ export function useLedgerEntriesTab({
     PartialBatchCommandResult,
     { ids: string[]; onCommitted: () => void }
   >({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: ({ ids }) => batchDeleteSourceDocumentsAction(ids),
     onSuccess: (result, { onCommitted }) => {
       if (result.failed.length === 0) onCommitted();
@@ -320,8 +290,7 @@ export function useLedgerEntriesTab({
   });
 
   const batchRetry = useLedgerMutation<PartialBatchCommandResult, string[]>({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: (ids) => batchRetrySourceDocumentsAction(ids),
     onSuccess: (result) =>
       settleBatchResult(result, batchActionsCopy.retried({ count: result.succeeded.length })),
@@ -359,13 +328,11 @@ export function useLedgerEntriesTab({
   const [cancellingIds, setCancellingIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const retryMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
-    invalidates: ["documents", "stats"],
     mutationFn: ({ sourceDocumentId }) => retrySourceDocumentAction(sourceDocumentId),
     successMessage: sourceDocumentActionCopy.retrySuccess,
     errorMessage: sourceDocumentActionCopy.retryError,
   });
   const cancelMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
-    invalidates: ["documents", "stats"],
     mutationFn: ({ sourceDocumentId }) => cancelSourceDocumentProcessingAction(sourceDocumentId),
     successMessage: sourceDocumentActionCopy.cancelSuccess,
     errorMessage: sourceDocumentActionCopy.cancelError,
@@ -434,8 +401,7 @@ export function useLedgerEntriesTab({
   );
 
   const deleteSourceDocument = useLedgerMutation<void, string>({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: async (id) => {
       await deleteSourceDocumentAction(id);
     },
@@ -490,7 +456,6 @@ export function useLedgerEntriesTab({
       isSelectionLimitReached,
       hasMoreData: hasNextPage || allSourceDocumentIds.length > selectableCount,
       loadedCount: allSourceDocumentIds.length,
-      queryFingerprint,
       selectedIds,
       selectedEntryIds,
       isBatchPending,

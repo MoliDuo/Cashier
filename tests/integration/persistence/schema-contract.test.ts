@@ -155,6 +155,8 @@ describe("PostgreSQL schema contract", () => {
       "trg_ledger_entries_change_log",
       "trg_entry_categories_change_log",
       "trg_ledgers_settings_change_log",
+      "trg_books_change_log",
+      "trg_service_credentials_change_log",
     ]) {
       expect(names.has(name), `missing trigger ${name}`).toBe(true);
     }

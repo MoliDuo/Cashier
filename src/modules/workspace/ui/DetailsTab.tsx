@@ -56,7 +56,6 @@ export function DetailsTab({
 }: DetailsTabProps) {
   const { sentinelRef, ...tab } = useDetailsTab({
     bookId,
-    categories,
     ledger,
     period,
     advancedFilters,
@@ -105,7 +104,6 @@ export function DetailsTab({
               pickedCategoryIds={tab.pickedCategoryIds}
               clearCategoryPicked={tab.clearCategoryPicked}
               onToggleCategoryPick={tab.toggleCategoryPick}
-              categorySelectionChanged={tab.categorySelectionChanged}
               onConfirmCategory={tab.confirmCategory}
               isConfirmingCategory={tab.isConfirmingCategory}
               isAssigningCategories={false}
@@ -224,7 +222,6 @@ export function DetailsTab({
           isPreviewing={tab.isPreviewingDate}
           previewFailed={tab.datePreviewFailed}
           onRetryPreview={tab.retryDatePreview}
-          selectionChanged={tab.dateSelectionChanged}
           isConfirming={tab.updateDates.isPending}
           onConfirm={() => tab.updateDates.mutate()}
           {...(timeZone != null ? { timeZone } : {})}

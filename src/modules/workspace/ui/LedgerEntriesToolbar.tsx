@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, SquareDashedMousePointer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
@@ -29,7 +29,6 @@ interface LedgerEntriesToolbarProps {
   loadedCount: number;
   selectedSourceDocumentIds?: string[];
   selectedEntryIds?: string[];
-  queryFingerprint: string;
   onToggleSelectionMode: () => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
@@ -63,7 +62,6 @@ export function LedgerEntriesToolbar({
   loadedCount,
   selectedSourceDocumentIds = [],
   selectedEntryIds = [],
-  queryFingerprint,
   onToggleSelectionMode,
   onSelectAll,
   onClearSelection,
@@ -93,38 +91,26 @@ export function LedgerEntriesToolbar({
   const [dateImpactError, setDateImpactError] = useState(false);
   const [isPreviewingDateImpact, setIsPreviewingDateImpact] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [dateSelectionSnapshot, setDateSelectionSnapshot] = useState<{
-    sourceDocumentIds: string[];
-    entryIds: string[];
-    queryFingerprint: string;
-  } | null>(null);
-  const dateSelectionMatches =
-    dateSelectionSnapshot != null &&
-    dateSelectionSnapshot.queryFingerprint === queryFingerprint &&
-    dateSelectionSnapshot.sourceDocumentIds.length === selectedSourceDocumentIds.length &&
-    dateSelectionSnapshot.sourceDocumentIds.every(
-      (id, index) => id === selectedSourceDocumentIds[index]
-    ) &&
-    dateSelectionSnapshot.entryIds.length === selectedEntryIds.length &&
-    dateSelectionSnapshot.entryIds.every((id, index) => id === selectedEntryIds[index]);
   const isProcessing = externallyProcessing || isUpdatingDates || isRetrying || isDeleting;
+  // The list is frozen while selecting, so the selection a preview describes is
+  // the one the confirm writes; a late answer after closing is dropped.
+  const previewRequestRef = useRef(0);
 
   const previewDateImpact = async () => {
     if (onPreviewDateImpact == null) return;
-    const snapshot = {
-      sourceDocumentIds: [...selectedSourceDocumentIds],
-      entryIds: [...selectedEntryIds],
-      queryFingerprint,
-    };
+    const requestId = ++previewRequestRef.current;
     setIsPreviewingDateImpact(true);
     setDateImpactError(false);
     try {
-      setDateImpact(await onPreviewDateImpact(snapshot.sourceDocumentIds, snapshot.entryIds));
-      setDateSelectionSnapshot(snapshot);
+      const impact = await onPreviewDateImpact(
+        [...selectedSourceDocumentIds],
+        [...selectedEntryIds]
+      );
+      if (previewRequestRef.current === requestId) setDateImpact(impact);
     } catch {
-      setDateImpactError(true);
+      if (previewRequestRef.current === requestId) setDateImpactError(true);
     } finally {
-      setIsPreviewingDateImpact(false);
+      if (previewRequestRef.current === requestId) setIsPreviewingDateImpact(false);
     }
   };
 
@@ -135,23 +121,17 @@ export function LedgerEntriesToolbar({
 
   const handleDateDialogOpenChange = (open: boolean) => {
     if (!open) {
+      previewRequestRef.current += 1;
       setDateImpact(null);
-      setDateSelectionSnapshot(null);
       setDateImpactError(false);
+      setIsPreviewingDateImpact(false);
     }
     setDateDialogOpen(open);
   };
 
   const handleConfirmDate = async () => {
     if (onUpdateDates == null) return;
-    if (dateSelectionSnapshot == null) {
-      // No preview to honour, so the live selection is the one that was shown.
-      await onUpdateDates(selectedDate, [...selectedSourceDocumentIds]);
-      handleDateDialogOpenChange(false);
-      return;
-    }
-    if (!dateSelectionMatches) return;
-    await onUpdateDates(selectedDate, dateSelectionSnapshot.sourceDocumentIds);
+    await onUpdateDates(selectedDate, [...selectedSourceDocumentIds]);
     handleDateDialogOpenChange(false);
   };
 
@@ -223,7 +203,6 @@ export function LedgerEntriesToolbar({
         isPreviewing={isPreviewingDateImpact || isUpdatingDates}
         previewFailed={dateImpactError}
         onRetryPreview={() => void previewDateImpact()}
-        selectionChanged={dateSelectionSnapshot != null && !dateSelectionMatches}
         {...(isAllSelected && hasMoreData ? { scopeNote: batchActionsCopy.loadedScope } : {})}
         isConfirming={isUpdatingDates}
         onConfirm={() => void handleConfirmDate()}

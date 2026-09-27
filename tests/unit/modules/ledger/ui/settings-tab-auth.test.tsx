@@ -140,19 +140,8 @@ describe("SettingsTab account authentication controls", () => {
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign out|退出登录/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
-    expect(refetchQueries).toHaveBeenCalledWith({
-      type: "active",
-      predicate: expect.any(Function),
-    });
-    const { predicate } = refetchQueries.mock.calls[0]![0] as {
-      predicate: (query: { queryKey: readonly unknown[] }) => boolean;
-    };
-    // Retrying has to reach both book lists — the switcher's live one and the
-    // archived-inclusive one the 分账 section reads — while leaving the rest of
-    // the ledger alone.
-    expect(predicate({ queryKey: ["ledger", "books"] })).toBe(true);
-    expect(predicate({ queryKey: ["ledger", "books", "including-archived"] })).toBe(true);
-    expect(predicate({ queryKey: ["ledger", "source-documents", "stream"] })).toBe(false);
-    expect(predicate({ queryKey: ["ledger", "categories"] })).toBe(true);
+    // Retrying reads every ledger query on the page again, both book lists
+    // included; there is no list of which ones 设置 happens to hold.
+    expect(refetchQueries).toHaveBeenCalledWith({ queryKey: ["ledger"], type: "active" });
   });
 });

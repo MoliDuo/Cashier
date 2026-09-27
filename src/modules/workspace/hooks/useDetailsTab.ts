@@ -15,12 +15,12 @@ import {
 } from "@/lib/date-utils";
 import { add as addDecimal } from "@/lib/money/decimal";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
+import { queryKeys } from "@/lib/query-keys";
 import { periodKey, type Period } from "@/modules/ledger/domain/period";
 import type {
   ActiveLedgerEntryDto,
   CategoryAssignmentMode,
   CategoryAssignmentJob,
-  EntryCategory,
   Ledger,
 } from "@/modules/ledger/contracts";
 import { buildDetailsQueryDescriptor } from "@/modules/ledger/ledger-query-descriptor";
@@ -43,32 +43,17 @@ const DIRECT_ASSIGNMENT_LIMIT = 100;
 
 type BatchDateImpact = Awaited<ReturnType<typeof previewBatchLedgerEntryDateAction>>;
 
-/** The selection a date preview answered for, kept so confirmation can use it. */
-interface DatePreviewRequest {
-  entryIds: string[];
-  sourceDocumentIds: string[];
-  queryFingerprint: string;
-  impact: BatchDateImpact;
-}
-
 /**
  * The date dialog has one source of truth: what it is currently showing.
  * Closed, waiting for the preview, failed to compute it, or holding the
- * result — with the impact and the selection it describes kept together, so a
- * result can never be confirmed against a different selection.
+ * result. The list is frozen while selecting, so the selection it describes
+ * cannot move underneath it.
  */
 type DatePreviewState =
   | { status: "closed" }
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; request: DatePreviewRequest };
-
-/** The selection the open category dialog is asking about, fixed at the moment it opened. */
-interface CategorySnapshot {
-  queryFingerprint: string;
-  categorySignature: string;
-  ledgerEntryIds: string[];
-}
+  | { status: "ready"; impact: BatchDateImpact };
 
 interface EntryDateGroup {
   title: string;
@@ -77,15 +62,9 @@ interface EntryDateGroup {
   total: string;
 }
 
-/** True when both selections hold the same ids in the same order. */
-function selectionMatches(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((id, index) => id === b[index]);
-}
-
 interface UseDetailsTabOptions {
   /** The book the list is narrowed to; undefined means 总账. */
   bookId?: string | undefined;
-  categories: readonly EntryCategory[];
   ledger?: Ledger | undefined;
   period: Period;
   advancedFilters: LedgerAdvancedFilters;
@@ -100,7 +79,6 @@ interface UseDetailsTabOptions {
  */
 export function useDetailsTab({
   bookId,
-  categories,
   ledger,
   period,
   advancedFilters,
@@ -122,14 +100,20 @@ export function useDetailsTab({
     [advancedFilters, bookId, mainCurrency, period]
   );
 
+  // Selecting freezes the list: a background refresh must not swap the rows
+  // out from under the selection. The queries read again once it ends.
+  const [frozen, setFrozen] = useState(false);
+
   const summaryQuery = useQuery({
     queryKey: descriptor.summaryQueryKey,
+    enabled: !frozen,
     queryFn: () => fetchLedgerSummary(descriptor.summaryInput),
     staleTime: QUERY.DEFAULT_STALE_TIME_MS,
     refetchOnWindowFocus: false,
   });
   const entriesQuery = useInfiniteQuery({
     queryKey: descriptor.entriesQueryKey,
+    enabled: !frozen,
     queryFn: ({ pageParam }) =>
       fetchLedgerEntries(descriptor.getEntriesInput(pageParam as string | undefined)),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -163,11 +147,7 @@ export function useDetailsTab({
   const queryHasData = entriesQuery.data !== undefined || summaryQuery.data !== undefined;
 
   const retry = useCallback(() => {
-    void queryClient.refetchQueries({
-      type: "active",
-      predicate: ({ queryKey: key }) =>
-        key[0] === "ledger" && (key[1] === "entries" || key[1] === "summary"),
-    });
+    void queryClient.refetchQueries({ queryKey: queryKeys.ledger(), type: "active" });
   }, [queryClient]);
 
   const sentinelRef = useInfiniteScroll({
@@ -226,6 +206,7 @@ export function useDetailsTab({
   );
   const selection = useSelection({ allIds, queryFingerprint, maxSelected: null });
   const { selectedIds, clearSelection, isSelectionMode } = selection;
+  if (frozen !== isSelectionMode) setFrozen(isSelectionMode);
 
   useEffect(() => {
     document.documentElement.dataset.batchSelection = String(isSelectionMode);
@@ -242,8 +223,7 @@ export function useDetailsTab({
     { ledgerEntryIds: string[]; affectedCount: number },
     { categoryId?: string | null; currency?: string | null }
   >({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: (data) =>
       batchUpdateLedgerEntriesAction(sourceDocumentIdsFor(selectedIds), selectedIds, data),
     errorMessage: commonCopy.error,
@@ -258,8 +238,7 @@ export function useDetailsTab({
     Awaited<ReturnType<typeof batchDeleteLedgerEntriesAction>>,
     void
   >({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: () =>
       batchDeleteLedgerEntriesAction(sourceDocumentIdsFor(selectedIds), selectedIds),
     errorMessage: commonCopy.deleteFailed,
@@ -285,34 +264,23 @@ export function useDetailsTab({
   const dateRequestIdRef = useRef(0);
 
   /**
-   * Asks for the impact of the selection as it stands right now. The request
-   * number is taken before the call and every open, retry or close supersedes
-   * it, so an answer that arrives late — out of order, or after the dialog was
-   * reopened on something else — is dropped instead of overwriting the current
-   * one. A preview never describes a selection it was not asked about.
+   * Asks for the impact of the selection. Every open, retry or close takes a new
+   * request number, so an answer that arrives after the dialog closed or asked
+   * again is dropped instead of overwriting the current one.
    */
   const startDatePreview = useCallback(() => {
     const requestId = ++dateRequestIdRef.current;
     const entryIds = [...selectedIds];
-    const capturedFingerprint = queryFingerprint;
     setDatePreview({ status: "loading" });
     void (async () => {
-      let impact: BatchDateImpact;
-      let sourceDocumentIds: string[];
       try {
-        impact = await previewBatchLedgerEntryDateAction(entryIds);
-        sourceDocumentIds = sourceDocumentIdsFor(entryIds);
+        const impact = await previewBatchLedgerEntryDateAction(entryIds);
+        if (dateRequestIdRef.current === requestId) setDatePreview({ status: "ready", impact });
       } catch {
         if (dateRequestIdRef.current === requestId) setDatePreview({ status: "error" });
-        return;
       }
-      if (dateRequestIdRef.current !== requestId) return;
-      setDatePreview({
-        status: "ready",
-        request: { entryIds, sourceDocumentIds, queryFingerprint: capturedFingerprint, impact },
-      });
     })();
-  }, [queryFingerprint, selectedIds, sourceDocumentIdsFor]);
+  }, [selectedIds]);
 
   const setDateDialogVisibility = useCallback((open: boolean) => {
     dateRequestIdRef.current += 1;
@@ -327,43 +295,26 @@ export function useDetailsTab({
     startDatePreview();
   }, [setDateDialogVisibility, startDatePreview]);
 
-  // A preview answered for one book says nothing about the next one, and a
-  // request still in flight when the screen goes away has nowhere to land.
+  // A request still in flight when the screen goes away has nowhere to land.
   useEffect(() => {
     return () => {
       dateRequestIdRef.current += 1;
     };
   }, []);
 
-  // The preview is answered for a snapshot of the selection, so a selection
-  // that moved since then is no longer what the dialog describes.
-  const dateSelectionChanged =
-    datePreview.status === "ready" &&
-    (datePreview.request.queryFingerprint !== queryFingerprint ||
-      !selectionMatches(datePreview.request.entryIds, selectedIds));
-  const dateImpact = datePreview.status === "ready" ? datePreview.request.impact : null;
+  const dateImpact = datePreview.status === "ready" ? datePreview.impact : null;
   const datePreviewFailed = datePreview.status === "error";
   const isPreviewingDate = datePreview.status === "loading";
 
   const updateDates = useLedgerMutation<{ impact: BatchDateImpact }, void>({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
-    mutationFn: async () => {
-      if (datePreview.status !== "ready") throw new Error("selection_changed");
-      const { request } = datePreview;
-      if (
-        request.queryFingerprint !== queryFingerprint ||
-        !selectionMatches(request.entryIds, selectedIds)
-      ) {
-        throw new Error("selection_changed");
-      }
-      return batchUpdateLedgerEntryDatesAction(
-        request.sourceDocumentIds,
-        request.entryIds,
+    waitFor: false,
+    mutationFn: () =>
+      batchUpdateLedgerEntryDatesAction(
+        sourceDocumentIdsFor(selectedIds),
+        selectedIds,
         selectedDate
-      );
-    },
-    errorMessage: batchActionsCopy.selectionChanged,
+      ),
+    errorMessage: commonCopy.error,
     onSuccess: (result) => {
       toast.success(batchActionsCopy.datesUpdated({ count: result.impact.affectedEntryCount }));
       clearSelection();
@@ -376,41 +327,18 @@ export function useDetailsTab({
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pickedCategoryIds, setPickedCategoryIds] = useState<string[]>([]);
   const [clearCategoryPicked, setClearCategoryPicked] = useState(false);
-  // Captured when the dialog opens. There is no server preview to ask for, so
-  // the task row's ledger entry ids are the authority from the moment it is
-  // written; the snapshot only has to survive the trip from open to confirm.
-  const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshot | null>(null);
   const categoryRequestKeyRef = useRef<string | null>(null);
   // The run outlives this tab, so the page follows it and this dialog only hands
   // it over: nothing here polls, and nothing here announces what the page began.
   const { registerSubmittedJob } = useCategoryAssignment();
-  const categorySelectionChanged =
-    categorySnapshot != null &&
-    (categorySnapshot.queryFingerprint !== queryFingerprint ||
-      categorySnapshot.categorySignature !== categories.map((category) => category.id).join(":") ||
-      !selectionMatches(categorySnapshot.ledgerEntryIds, selectedIds));
 
-  // Opening captures the selection and drops the picks of the previous visit;
-  // closing drops both. A snapshot that no longer matches the selection can
-  // never be confirmed, so the dialog cannot promise one thing and do another.
-  const setCategoryDialogVisibility = useCallback(
-    (open: boolean) => {
-      setCategoryDialogOpen(open);
-      if (open) categoryRequestKeyRef.current = null;
-      setCategorySnapshot(
-        open
-          ? {
-              queryFingerprint,
-              categorySignature: categories.map((category) => category.id).join(":"),
-              ledgerEntryIds: [...selectedIds],
-            }
-          : null
-      );
-      setPickedCategoryIds([]);
-      setClearCategoryPicked(false);
-    },
-    [categories, queryFingerprint, selectedIds]
-  );
+  // Opening drops the picks of the previous visit, and so does closing.
+  const setCategoryDialogVisibility = useCallback((open: boolean) => {
+    setCategoryDialogOpen(open);
+    if (open) categoryRequestKeyRef.current = null;
+    setPickedCategoryIds([]);
+    setClearCategoryPicked(false);
+  }, []);
 
   // Clearing is exclusive: "no category" is not one more candidate to weigh
   // against the others, it is the other answer to the same question.
@@ -434,8 +362,7 @@ export function useDetailsTab({
     CategoryAssignmentJob,
     { requestKey: string; mode: CategoryAssignmentMode; ledgerEntryIds: string[] }
   >({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: (input) => startCategoryAssignmentAction(input),
     errorMessage: batchActionsCopy.aiCategoryFailed,
     onSuccess: (job) => {
@@ -467,12 +394,8 @@ export function useDetailsTab({
   const { mutateAsync: assignCategory } = update;
   const { mutate: startCategoryRun } = startAiCategory;
   const confirmCategory = useCallback(() => {
-    const snapshot = categorySnapshot;
-    if (snapshot == null || snapshot.ledgerEntryIds.length === 0) return;
-    if (categorySelectionChanged) {
-      toast.error(batchActionsCopy.selectionMoved);
-      return;
-    }
+    const ledgerEntryIds = [...selectedIds];
+    if (ledgerEntryIds.length === 0) return;
 
     const pick = resolveBatchCategoryPick({
       categoryIds: pickedCategoryIds,
@@ -480,7 +403,7 @@ export function useDetailsTab({
     });
     if (
       (pick.kind === "clear" || pick.kind === "assign") &&
-      snapshot.ledgerEntryIds.length <= DIRECT_ASSIGNMENT_LIMIT
+      ledgerEntryIds.length <= DIRECT_ASSIGNMENT_LIMIT
     ) {
       void assignCategory({ categoryId: pick.kind === "clear" ? null : pick.categoryId }).then(
         () => setCategoryDialogVisibility(false),
@@ -489,7 +412,7 @@ export function useDetailsTab({
       return;
     }
     if (pick.kind === "ai" || pick.kind === "assign" || pick.kind === "clear") {
-      if (snapshot.ledgerEntryIds.length > CATEGORY_ASSIGNMENT_MAX_ENTRIES) {
+      if (ledgerEntryIds.length > CATEGORY_ASSIGNMENT_MAX_ENTRIES) {
         toast.error(
           batchActionsCopy.categorySelectionTooLarge({ max: CATEGORY_ASSIGNMENT_MAX_ENTRIES })
         );
@@ -497,7 +420,7 @@ export function useDetailsTab({
       }
       startCategoryRun({
         requestKey: (categoryRequestKeyRef.current ??= crypto.randomUUID()),
-        ledgerEntryIds: snapshot.ledgerEntryIds,
+        ledgerEntryIds,
         mode:
           pick.kind === "ai"
             ? { kind: "ai", candidateCategoryIds: [...pick.categoryIds] }
@@ -508,10 +431,9 @@ export function useDetailsTab({
     }
   }, [
     assignCategory,
-    categorySelectionChanged,
-    categorySnapshot,
     clearCategoryPicked,
     pickedCategoryIds,
+    selectedIds,
     setCategoryDialogVisibility,
     startCategoryRun,
   ]);
@@ -567,7 +489,6 @@ export function useDetailsTab({
     setSelectedDate,
     dateImpact,
     datePreviewFailed,
-    dateSelectionChanged,
     isPreviewingDate,
     updateDates,
     categoryDialogOpen,
@@ -575,7 +496,6 @@ export function useDetailsTab({
     pickedCategoryIds,
     clearCategoryPicked,
     toggleCategoryPick,
-    categorySelectionChanged,
     confirmCategory,
     isConfirmingCategory: update.isPending || startAiCategory.isPending,
   };

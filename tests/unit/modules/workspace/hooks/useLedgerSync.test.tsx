@@ -8,19 +8,16 @@ import {
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getStreamRefreshActionMock, applyStreamRefreshToCacheMock } = vi.hoisted(() => ({
+const { getStreamRefreshActionMock } = vi.hoisted(() => ({
   getStreamRefreshActionMock: vi.fn(),
-  applyStreamRefreshToCacheMock: vi.fn(),
 }));
 
 vi.mock("@/modules/source-document/queries", () => ({
   fetchStreamRefresh: getStreamRefreshActionMock,
 }));
-vi.mock("@/modules/source-document/hooks/stream-refresh-cache", () => ({
-  applyStreamRefreshToCache: applyStreamRefreshToCacheMock,
-}));
 
-import { useLedgerRefreshPolling } from "@/modules/source-document/hooks/useLedgerRefreshPolling";
+import { useQuery } from "@tanstack/react-query";
+import { useLedgerSync } from "@/modules/workspace/hooks/useLedgerSync";
 import { queryKeys } from "@/lib/query-keys";
 
 const unchanged = {
@@ -46,13 +43,12 @@ async function flush() {
   });
 }
 
-describe("useLedgerRefreshPolling", () => {
+describe("useLedgerSync", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     focusManager.setFocused(true);
     onlineManager.setOnline(true);
     getStreamRefreshActionMock.mockReset();
-    applyStreamRefreshToCacheMock.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -67,7 +63,7 @@ describe("useLedgerRefreshPolling", () => {
       .mockResolvedValueOnce({ ...unchanged, version: "2" });
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    renderHook(() => useLedgerSync(), { wrapper });
     await flush();
     expect(getStreamRefreshActionMock).toHaveBeenCalledWith({
       afterVersion: "0",
@@ -94,13 +90,13 @@ describe("useLedgerRefreshPolling", () => {
   it("uses a hydrated baseline without refreshing during the three-second stale window", async () => {
     getStreamRefreshActionMock.mockResolvedValue(unchanged);
     const { queryClient, wrapper } = setup();
-    queryClient.setQueryData(queryKeys.sourceDocumentRefresh(), {
+    queryClient.setQueryData(queryKeys.ledgerSync(), {
       ...unchanged,
       version: "7",
       hasTransitionalWork: true,
     });
 
-    renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    renderHook(() => useLedgerSync(), { wrapper });
     await flush();
     expect(getStreamRefreshActionMock).not.toHaveBeenCalled();
 
@@ -123,7 +119,7 @@ describe("useLedgerRefreshPolling", () => {
       .mockResolvedValueOnce(unchanged);
     const { wrapper } = setup();
 
-    const { result } = renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    const { result } = renderHook(() => useLedgerSync(), { wrapper });
     await flush();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -152,7 +148,7 @@ describe("useLedgerRefreshPolling", () => {
     getStreamRefreshActionMock.mockRejectedValue(new Error("temporary outage"));
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    renderHook(() => useLedgerSync(), { wrapper });
     await flush();
     const intervals = [3_000, 6_000, 12_000, 24_000, 30_000, 30_000];
     for (const [index, interval] of intervals.entries()) {
@@ -173,7 +169,7 @@ describe("useLedgerRefreshPolling", () => {
       .mockResolvedValue(unchanged);
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    renderHook(() => useLedgerSync(), { wrapper });
     await flush();
     focusManager.setFocused(false);
     await act(async () => {
@@ -200,12 +196,75 @@ describe("useLedgerRefreshPolling", () => {
     );
     const { wrapper } = setup();
 
-    renderHook(() => useLedgerRefreshPolling(), { wrapper });
-    renderHook(() => useLedgerRefreshPolling(), { wrapper });
+    renderHook(() => useLedgerSync(), { wrapper });
+    renderHook(() => useLedgerSync(), { wrapper });
     await flush();
     expect(getStreamRefreshActionMock).toHaveBeenCalledTimes(1);
 
     resolve(unchanged);
     await flush();
+  });
+
+  it("makes every visible ledger query read again when the version moves", async () => {
+    getStreamRefreshActionMock.mockResolvedValue({ ...unchanged, version: "8", changed: true });
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(queryKeys.ledgerSync(), { ...unchanged, version: "7" });
+    const stream = vi.fn().mockResolvedValue("stream");
+    const stats = vi.fn().mockResolvedValue("stats");
+    const settings = vi.fn().mockResolvedValue("settings");
+
+    renderHook(
+      () => {
+        useLedgerSync();
+        useQuery({
+          queryKey: ["ledger", "source-documents", "stream", {}],
+          queryFn: stream,
+          staleTime: Infinity,
+        });
+        useQuery({
+          queryKey: ["ledger", "enhanced-stats", {}],
+          queryFn: stats,
+          staleTime: Infinity,
+        });
+        useQuery({ queryKey: ["ledger", "settings"], queryFn: settings, staleTime: Infinity });
+      },
+      { wrapper }
+    );
+    await flush();
+    expect(stream).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await flush();
+
+    expect(getStreamRefreshActionMock).toHaveBeenCalledWith({ afterVersion: "7" });
+    for (const read of [stream, stats, settings]) expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the ledger alone when nothing moved", async () => {
+    getStreamRefreshActionMock.mockResolvedValue(unchanged);
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(queryKeys.ledgerSync(), unchanged);
+    const stream = vi.fn().mockResolvedValue("stream");
+
+    renderHook(
+      () => {
+        useLedgerSync();
+        useQuery({ queryKey: ["ledger", "entries", {}], queryFn: stream, staleTime: Infinity });
+      },
+      { wrapper }
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await flush();
+
+    expect(getStreamRefreshActionMock).toHaveBeenCalled();
+    expect(stream).toHaveBeenCalledTimes(1);
   });
 });

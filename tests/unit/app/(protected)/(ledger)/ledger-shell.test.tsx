@@ -5,16 +5,14 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { activeTabState, navigateMock, routerPrefetchMock, toastError, prefetchStatsTabQueryMock } =
-  vi.hoisted(() => ({
+const { activeTabState, navigateMock, routerPrefetchMock, prefetchStatsTabQueryMock } = vi.hoisted(
+  () => ({
     activeTabState: { current: "stream" as string },
     navigateMock: vi.fn(),
     routerPrefetchMock: vi.fn(),
-    toastError: vi.fn(),
     prefetchStatsTabQueryMock: vi.fn(),
-  }));
-
-vi.mock("sonner", () => ({ toast: { error: toastError } }));
+  })
+);
 
 vi.mock("@/modules/workspace/hooks/useLedgerNavigation", () => ({
   useLedgerNavigation: () => ({
@@ -51,7 +49,6 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
 
 import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
 import { ledgerPageCopy } from "@/copy/app";
-import { commonCopy } from "@/copy/common";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 
@@ -103,9 +100,8 @@ function renderShell(
   );
 }
 
-/** The destination's own sr-only status joins its label while a refresh runs. */
 function destination(tab: LedgerTab) {
-  return screen.getByRole("button", { name: new RegExp(`^${ledgerPageCopy[tab]}(\\s|$)`) });
+  return screen.getByRole("button", { name: ledgerPageCopy[tab] });
 }
 
 describe("LedgerShell", () => {
@@ -114,7 +110,7 @@ describe("LedgerShell", () => {
     activeTabState.current = "stream";
   });
 
-  it("refetches the tab the reader is already on rather than navigating to it", async () => {
+  it("does nothing when the destination is the tab the reader is on", async () => {
     const user = userEvent.setup();
     const stream = vi.fn().mockResolvedValue("stream");
     renderShell(["ledger", "source-documents", "stream"], stream);
@@ -122,8 +118,8 @@ describe("LedgerShell", () => {
 
     await user.click(destination("stream"));
 
-    await waitFor(() => expect(stream).toHaveBeenCalledTimes(2));
     expect(navigateMock).not.toHaveBeenCalled();
+    expect(stream).toHaveBeenCalledTimes(1);
   });
 
   it("navigates when the destination is another tab", async () => {
@@ -136,30 +132,6 @@ describe("LedgerShell", () => {
 
     expect(navigateMock).toHaveBeenCalledWith("stats");
     expect(stream).toHaveBeenCalledTimes(1);
-  });
-
-  it("refreshes 设置 like any other tab, since it holds nothing unsaved", async () => {
-    const user = userEvent.setup();
-    activeTabState.current = "settings";
-    const settings = vi.fn().mockResolvedValue("settings");
-    renderShell(["ledger", "settings"], settings);
-    await waitFor(() => expect(destination("settings")).toBeEnabled());
-
-    await user.click(destination("settings"));
-
-    await waitFor(() => expect(settings).toHaveBeenCalledTimes(2));
-    expect(navigateMock).not.toHaveBeenCalled();
-  });
-
-  it("reports a refresh that failed, so a stale tab is not read as a fresh one", async () => {
-    const user = userEvent.setup();
-    const stream = vi.fn().mockResolvedValueOnce("stream").mockRejectedValue(new Error("offline"));
-    renderShell(["ledger", "source-documents", "stream"], stream);
-    await waitFor(() => expect(destination("stream")).toBeEnabled());
-
-    await user.click(destination("stream"));
-
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith(commonCopy.refreshFailed));
   });
 
   it("prefetches a hovered route for the book being viewed now", async () => {

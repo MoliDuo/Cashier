@@ -1,19 +1,17 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  invalidateLedgerQueries,
-  type LedgerInvalidationGroup,
-} from "@/lib/mutations/ledger-invalidation";
+import { syncLedgerAfterWrite } from "@/lib/mutations/ledger-sync";
 import { commonCopy } from "@/copy/common";
 
 export interface UseLedgerMutationOptions<TData, TVariables> {
   mutationFn: (variables: TVariables) => Promise<TData>;
-  refreshMode?: "wait" | "background";
-  /** In background mode, only this detail view must be ready before the next edit. */
-  refreshQueryKey?: readonly unknown[];
-  invalidates:
-    | readonly LedgerInvalidationGroup[]
-    | ((data: TData, variables: TVariables) => readonly LedgerInvalidationGroup[]);
+  /**
+   * What the command waits for before it counts as done. By default the whole
+   * visible ledger has read again. A key waits for that one query — an editor
+   * waiting on its own record — and false waits for nothing, so a background
+   * list refresh never holds a finished command pending.
+   */
+  waitFor?: QueryKey | false;
   successMessage?: string | null;
   errorMessage?: string | null;
   onSuccess?: (data: TData, variables: TVariables) => void | Promise<void>;
@@ -29,17 +27,8 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
   options: UseLedgerMutationOptions<TData, TVariables>
 ) {
   const queryClient = useQueryClient();
-  const {
-    mutationFn,
-    refreshMode = "wait",
-    refreshQueryKey,
-    invalidates,
-    successMessage,
-    errorMessage,
-    onSuccess,
-    onError,
-    onSettled,
-  } = options;
+  const { mutationFn, waitFor, successMessage, errorMessage, onSuccess, onError, onSettled } =
+    options;
 
   return useMutation<TData, Error, TVariables>({
     mutationFn,
@@ -52,34 +41,31 @@ export function useLedgerMutation<TData = unknown, TVariables = void>(
 
       if (successMessage != null) toast.success(successMessage);
 
-      const groups = typeof invalidates === "function" ? invalidates(data, variables) : invalidates;
       const refresh = async () => {
         try {
-          await invalidateLedgerQueries(queryClient, groups);
-        } catch (invalidationError) {
-          console.error("[useLedgerMutation] resource invalidation failed", {
-            error: invalidationError,
-          });
+          await syncLedgerAfterWrite(queryClient);
+        } catch (refreshError) {
+          console.error("[useLedgerMutation] ledger refresh failed", { error: refreshError });
           toast.error(commonCopy.savedRefreshFailed);
           globalThis.setTimeout(() => {
-            void invalidateLedgerQueries(queryClient, groups).catch((retryError) => {
-              console.error("[useLedgerMutation] resource invalidation retry failed", {
+            void syncLedgerAfterWrite(queryClient).catch((retryError) => {
+              console.error("[useLedgerMutation] ledger refresh retry failed", {
                 error: retryError,
               });
             });
           }, 1_000);
         }
       };
-      if (refreshMode === "background") {
-        void refresh();
-        if (refreshQueryKey != null) {
-          await queryClient.refetchQueries(
-            { queryKey: refreshQueryKey, exact: true, type: "active" },
-            { cancelRefetch: false }
-          );
-        }
-      } else {
+      if (waitFor === undefined) {
         await refresh();
+        return;
+      }
+      void refresh();
+      if (waitFor !== false) {
+        await queryClient.refetchQueries(
+          { queryKey: waitFor, exact: true, type: "active" },
+          { cancelRefetch: false }
+        );
       }
     },
     onError: (error, variables) => {

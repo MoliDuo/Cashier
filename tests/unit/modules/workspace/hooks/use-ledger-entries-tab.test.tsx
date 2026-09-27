@@ -14,7 +14,6 @@ import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query
 const mocks = vi.hoisted(() => ({
   fetchStreamPage: vi.fn(),
   fetchStreamTotal: vi.fn(),
-  useLedgerRefreshPolling: vi.fn(),
   deleteSourceDocument: vi.fn(),
   batchUpdate: vi.fn(),
   batchDelete: vi.fn(),
@@ -32,9 +31,6 @@ vi.mock("sonner", () => ({
 vi.mock("@/modules/source-document/queries", () => ({
   fetchStreamPage: mocks.fetchStreamPage,
   fetchStreamTotal: mocks.fetchStreamTotal,
-}));
-vi.mock("@/modules/source-document/hooks/useLedgerRefreshPolling", () => ({
-  useLedgerRefreshPolling: mocks.useLedgerRefreshPolling,
 }));
 vi.mock("@/modules/source-document/server-actions/delete", () => ({
   deleteSourceDocumentAction: mocks.deleteSourceDocument,
@@ -145,7 +141,6 @@ async function selectDocuments(result: TabResult, ids: string[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
-  mocks.useLedgerRefreshPolling.mockReturnValue({});
   mocks.fetchStreamTotal.mockResolvedValue({ total: "12.00", unconvertedCount: 0 });
   mocks.fetchStreamPage.mockImplementation((params: { cursor?: string }) =>
     Promise.resolve(
@@ -267,99 +262,6 @@ describe("useLedgerEntriesTab stream", () => {
     expect(mocks.fetchStreamTotal).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps refresh polling disabled until the first page is available", async () => {
-    const page = deferred<unknown>();
-    mocks.fetchStreamPage.mockReturnValueOnce(page.promise);
-
-    renderTab();
-    expect(mocks.useLedgerRefreshPolling).toHaveBeenLastCalledWith(false);
-
-    page.resolve({
-      items: [makeItem("doc-1")],
-      nextCursor: null,
-      generation: "4",
-      hasTransitionalWork: true,
-    });
-    await waitFor(() => expect(mocks.useLedgerRefreshPolling).toHaveBeenLastCalledWith(true));
-  });
-
-  it("does not let a newer stream page consume pending shared invalidations", async () => {
-    const client = newClient(Infinity);
-    const baseline = {
-      version: "1",
-      changed: true,
-      hasTransitionalWork: true,
-      invalidations: { categories: true, settings: true, stats: true },
-    };
-    client.setQueryData(queryKeys.sourceDocumentRefresh(), baseline);
-    mocks.fetchStreamPage.mockResolvedValueOnce({
-      items: [makeItem("new")],
-      nextCursor: null,
-      generation: "8",
-      hasTransitionalWork: false,
-    });
-    const { result, unmount } = renderTab({}, client);
-
-    await waitFor(() => expect(result.current.stream.isLoading).toBe(false));
-    expect(client.getQueryData(queryKeys.sourceDocumentRefresh())).toEqual(baseline);
-    unmount();
-    client.clear();
-  });
-
-  it("does not overwrite a newer refresh baseline with an older stream page", async () => {
-    mocks.fetchStreamPage.mockResolvedValueOnce({
-      items: [makeItem("doc-1")],
-      nextCursor: null,
-      generation: "8",
-      hasTransitionalWork: true,
-    });
-    const client = newClient(Infinity);
-    const refreshKey = queryKeys.sourceDocumentRefresh();
-    client.setQueryData(refreshKey, {
-      version: "9",
-      changed: false,
-      hasTransitionalWork: false,
-      invalidations: { categories: false, settings: false, stats: false },
-    });
-    const { result } = renderTab({}, client);
-
-    await waitFor(() => expect(result.current.stream.isLoading).toBe(false));
-    expect(client.getQueryData(refreshKey)).toMatchObject({
-      version: "9",
-      hasTransitionalWork: false,
-    });
-  });
-
-  it("starts polling when a newer page shows work an idle baseline never saw", async () => {
-    // Another device uploaded while this one sat idle; a mutation here then
-    // refetched the list, which now shows that upload still processing.
-    mocks.fetchStreamPage.mockResolvedValueOnce({
-      items: [makeItem("doc-1", { status: "processing" })],
-      nextCursor: null,
-      generation: "10",
-      hasTransitionalWork: true,
-    });
-    const client = newClient(Infinity);
-    const refreshKey = queryKeys.sourceDocumentRefresh();
-    const invalidations = { categories: true, settings: false, stats: true };
-    client.setQueryData(refreshKey, {
-      version: "9",
-      changed: true,
-      hasTransitionalWork: false,
-      invalidations,
-    });
-    const { result } = renderTab({}, client);
-
-    await waitFor(() => expect(result.current.stream.isLoading).toBe(false));
-    // The version stays the refresh consumer's to advance.
-    expect(client.getQueryData(refreshKey)).toEqual({
-      version: "9",
-      changed: true,
-      hasTransitionalWork: true,
-      invalidations,
-    });
-  });
-
   it("keeps the current list until a fresh first page replaces a mismatched generation", async () => {
     const freshPage = deferred<unknown>();
     mocks.fetchStreamPage
@@ -440,10 +342,8 @@ describe("useLedgerEntriesTab stream", () => {
     await waitFor(() => expect(result.current.stream.hasData).toBe(true));
     expect(mocks.fetchStreamPage).toHaveBeenCalledTimes(2);
     expect(renderedIds(result)).toEqual(["doc-fresh"]);
-    expect(client.getQueryData(queryKeys.sourceDocumentRefresh())).toMatchObject({
-      version: "2",
-      hasTransitionalWork: true,
-    });
+    // The sync version is the refresh driver's alone; a list never writes it.
+    expect(client.getQueryData(queryKeys.ledgerSync())).toBeUndefined();
   });
 
   it("fails a first-page fetch that requests two consecutive restarts", async () => {
@@ -460,7 +360,7 @@ describe("useLedgerEntriesTab stream", () => {
     await waitFor(() => expect(result.current.stream.isError).toBe(true));
     expect(result.current.stream.hasData).toBe(false);
     expect(mocks.fetchStreamPage).toHaveBeenCalledTimes(2);
-    expect(client.getQueryData(queryKeys.sourceDocumentRefresh())).toBeUndefined();
+    expect(client.getQueryData(queryKeys.ledgerSync())).toBeUndefined();
   });
 });
 

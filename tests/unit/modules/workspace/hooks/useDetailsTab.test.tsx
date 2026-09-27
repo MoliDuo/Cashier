@@ -65,7 +65,6 @@ function deferred() {
 type DetailsTabOptions = Parameters<typeof useDetailsTab>[0];
 
 const baseOptions: DetailsTabOptions = {
-  categories: [],
   period: { range: "all" },
   advancedFilters: {},
 };
@@ -366,27 +365,6 @@ describe("useDetailsTab", () => {
     );
   });
 
-  it("rejects confirmation when selection changes after date preview", async () => {
-    previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce({
-      selectedEntryCount: 2,
-      sourceDocumentCount: 1,
-      affectedEntryCount: 2,
-      sourceDocumentIds: ["document-1"],
-    });
-    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
-
-    act(() => {
-      result.current.handleSelect("entry-1", true);
-      result.current.handleSelect("entry-2", true);
-    });
-    act(() => result.current.openDateDialog());
-    await act(async () => Promise.resolve());
-    act(() => result.current.handleSelect("entry-2", false));
-
-    await expect(result.current.updateDates.mutateAsync()).rejects.toThrow("selection_changed");
-    expect(batchUpdateLedgerEntryDatesActionMock).not.toHaveBeenCalled();
-  });
-
   it("keeps selection when a batch update fails", async () => {
     batchUpdateLedgerEntriesActionMock.mockRejectedValueOnce(new Error("Ledger entry not found"));
     const { result } = await renderDetailsTab([entry("entry-1")]);
@@ -508,20 +486,18 @@ describe("useDetailsTab", () => {
     expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
   });
 
-  it("refuses to start when the selection moved under the dialog", async () => {
-    const { result } = await renderDetailsTab([entry("entry-1"), entry("entry-2")]);
-    act(() => result.current.handleSelect("entry-1", true));
-    act(() => result.current.setCategoryDialogOpen(true));
-    act(() => result.current.toggleCategoryPick("category-1", true));
-    // The dialog is still open but the selection behind it changed.
-    act(() => result.current.handleSelect("entry-2", true));
+  it("freezes the list while selecting and reads it again afterwards", async () => {
+    const { result, queryClient } = await renderDetailsTab([entry("entry-1")]);
+    const reads = fetchLedgerEntriesMock.mock.calls.length;
 
-    await act(async () => result.current.confirmCategory());
+    act(() => result.current.toggleSelectionMode());
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ledger"] });
+    });
+    expect(fetchLedgerEntriesMock).toHaveBeenCalledTimes(reads);
 
-    expect(result.current.categorySelectionChanged).toBe(true);
-    expect(startCategoryAssignmentActionMock).not.toHaveBeenCalled();
-    expect(batchUpdateLedgerEntriesActionMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith(batchActionsCopy.selectionMoved);
+    act(() => result.current.toggleSelectionMode());
+    await waitFor(() => expect(fetchLedgerEntriesMock.mock.calls.length).toBeGreaterThan(reads));
   });
 
   it("writes a single pick straight through at the direct limit", async () => {
@@ -664,7 +640,6 @@ describe("useDetailsTab", () => {
     await act(async () => Promise.resolve());
 
     expect(result.current.dateImpact).toEqual(dateImpact(1));
-    expect(result.current.dateSelectionChanged).toBe(false);
     expect(result.current.updateDates.isPending).toBe(false);
   });
 
@@ -682,19 +657,5 @@ describe("useDetailsTab", () => {
 
     await waitFor(() => expect(result.current.dateImpact).toEqual(dateImpact(1)));
     expect(result.current.datePreviewFailed).toBe(false);
-  });
-
-  it("refuses to confirm a preview once the filters moved under it", async () => {
-    previewBatchLedgerEntryDateActionMock.mockResolvedValueOnce(dateImpact(1));
-    const { result, rerender } = await renderDetailsTab([entry("entry-1")]);
-    act(() => result.current.handleSelect("entry-1", true));
-    act(() => result.current.openDateDialog());
-    await waitFor(() => expect(result.current.dateImpact).toEqual(dateImpact(1)));
-
-    rerender({ ...baseOptions, advancedFilters: { search: "coffee" } });
-
-    expect(result.current.dateSelectionChanged).toBe(true);
-    await expect(result.current.updateDates.mutateAsync()).rejects.toThrow("selection_changed");
-    expect(batchUpdateLedgerEntryDatesActionMock).not.toHaveBeenCalled();
   });
 });

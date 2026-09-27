@@ -41,9 +41,6 @@ interface BatchDateDialogProps {
   isPreviewing: boolean;
   previewFailed: boolean;
   onRetryPreview: () => void;
-  /** The selection moved after the preview; confirming would act on something
-   * other than what was previewed. */
-  selectionChanged: boolean;
   /** A caveat about the scope, as display text, e.g. that only loaded rows
    * are selected. */
   scopeNote?: string;
@@ -67,7 +64,6 @@ export function BatchDateDialog({
   isPreviewing,
   previewFailed,
   onRetryPreview,
-  selectionChanged,
   scopeNote,
   isConfirming,
   onConfirm,
@@ -88,9 +84,7 @@ export function BatchDateDialog({
         <DialogHeader>
           <DialogTitle>{batchActionsCopy.dateImpactTitle}</DialogTitle>
         </DialogHeader>
-        {selectionChanged ? (
-          <p className="text-sm text-muted-foreground">{batchActionsCopy.selectionChanged}</p>
-        ) : previewFailed ? (
+        {previewFailed ? (
           <p className="text-sm text-destructive" role="alert">
             {batchActionsCopy.dateImpactFailed}
           </p>
@@ -127,7 +121,7 @@ export function BatchDateDialog({
               {batchActionsCopy.retryImpact}
             </Button>
           ) : (
-            <Button disabled={isPending || selectionChanged || value === ""} onClick={onConfirm}>
+            <Button disabled={isPending || value === ""} onClick={onConfirm}>
               {commonCopy.confirm}
             </Button>
           )}

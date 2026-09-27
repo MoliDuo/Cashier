@@ -12,6 +12,12 @@
 export const queryKeys = {
   // === Ledger ===
   ledger: () => ["ledger"] as const,
+  /**
+   * The ledger's sync version. Deliberately outside the ["ledger"] prefix: a
+   * version change invalidates every ledger query, and must not invalidate
+   * the query that reported it.
+   */
+  ledgerSync: () => ["ledger-sync"] as const,
 
   // === Ledger Entries ===
   ledgerEntries: (params?: QueryKeyParams | null) =>
@@ -46,7 +52,6 @@ export const queryKeys = {
     ["ledger", "source-document", documentId, "detail"] as const,
   sourceDocumentDetailPrefix: () => ["ledger", "source-document"] as const,
   sourceDocumentInput: (id: string) => ["ledger", "source-document", id, "input"] as const,
-  sourceDocumentRefresh: () => ["ledger", "source-documents", "refresh"] as const,
 
   // === Categories ===
   entryCategories: () => ["ledger", "categories"] as const,

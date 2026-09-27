@@ -1,29 +1,44 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { invalidateVisibleLedger } from "@/lib/mutations/ledger-sync";
 import { fetchStreamRefresh } from "@/modules/source-document/queries";
 import type { LedgerRefreshResult } from "@/modules/source-document/contract-refresh";
-import { queryKeys } from "@/lib/query-keys";
-import { applyStreamRefreshToCache } from "./stream-refresh-cache";
 
 const REFRESH_INTERVAL_MS = 3_000;
 const REFRESH_STALE_TIME_MS = 3_000;
 const MAX_ERROR_INTERVAL_MS = 30_000;
 const consecutiveFailures = new WeakMap<object, number>();
 
-export function useLedgerRefreshPolling(enabled = true) {
+function hasChanged(result: LedgerRefreshResult): boolean {
+  return (
+    result.changed ||
+    result.invalidations.categories ||
+    result.invalidations.settings ||
+    result.invalidations.stats
+  );
+}
+
+/**
+ * The ledger's one refresh driver, mounted once by the ledger layout so every
+ * route is kept current by the same poll. It reads the ledger's sync version;
+ * when the version has moved, every visible ledger query reads again —
+ * whichever of them the change touched. While records are still being
+ * processed the visible page polls every few seconds; otherwise it refreshes
+ * when the window regains focus or the network comes back.
+ */
+export function useLedgerSync() {
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.sourceDocumentRefresh();
+  const queryKey = queryKeys.ledgerSync();
 
   return useQuery({
     queryKey,
     queryFn: async (): Promise<LedgerRefreshResult> => {
       try {
         const previous = queryClient.getQueryData<LedgerRefreshResult>(queryKey);
-        const result = await fetchStreamRefresh({
-          afterVersion: previous?.version ?? "0",
-        });
-        await applyStreamRefreshToCache(queryClient, result);
+        const result = await fetchStreamRefresh({ afterVersion: previous?.version ?? "0" });
+        if (previous != null && hasChanged(result)) await invalidateVisibleLedger(queryClient);
         consecutiveFailures.delete(queryClient);
         return result;
       } catch (error) {
@@ -31,7 +46,6 @@ export function useLedgerRefreshPolling(enabled = true) {
         throw error;
       }
     },
-    enabled,
     staleTime: REFRESH_STALE_TIME_MS,
     retry: false,
     refetchInterval: (query) => {

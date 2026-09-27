@@ -11,7 +11,6 @@ const defaultProps = {
   isAllSelected: false,
   selectedCount: 0,
   loadedCount: 5,
-  queryFingerprint: "query-1",
   onToggleSelectionMode: vi.fn(),
   onSelectAll: vi.fn(),
   onClearSelection: vi.fn(),
@@ -145,47 +144,5 @@ describe("LedgerEntriesToolbar", () => {
     await waitFor(() =>
       expect(onUpdateDates).toHaveBeenCalledWith(expect.any(String), ["document-1"])
     );
-  });
-
-  it("blocks date confirmation when the selection query changes after preview", async () => {
-    const onUpdateDates = vi.fn();
-    const onPreviewDateImpact = vi.fn().mockResolvedValue({
-      selectedEntryCount: 1,
-      sourceDocumentCount: 1,
-      affectedEntryCount: 1,
-    });
-    const { rerender } = render(
-      <LedgerEntriesToolbar
-        {...defaultProps}
-        isSelectionMode
-        selectedCount={1}
-        selectedSourceDocumentIds={["document-1"]}
-        selectedEntryIds={["entry-1"]}
-        onUpdateDates={onUpdateDates}
-        onPreviewDateImpact={onPreviewDateImpact}
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /修改日期/ }));
-    await waitFor(() => expect(onPreviewDateImpact).toHaveBeenCalledOnce());
-
-    rerender(
-      <LedgerEntriesToolbar
-        {...defaultProps}
-        queryFingerprint="query-2"
-        isSelectionMode
-        selectedCount={1}
-        selectedSourceDocumentIds={["document-1"]}
-        selectedEntryIds={["entry-1"]}
-        onUpdateDates={onUpdateDates}
-        onPreviewDateImpact={onPreviewDateImpact}
-      />
-    );
-
-    expect(screen.getByText("所选项目已变化，请重新预览日期影响。")).toBeInTheDocument();
-    const confirm = screen.getByRole("button", { name: "确认" });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(confirm);
-    expect(onUpdateDates).not.toHaveBeenCalled();
   });
 });

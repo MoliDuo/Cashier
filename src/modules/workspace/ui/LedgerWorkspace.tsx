@@ -15,6 +15,7 @@ import { buildLedgerEntryFilters } from "../ledger-filter-state";
 import { readLedgerFilterParams } from "../ledger-url-params";
 import { readPeriodParams } from "../period-url-params";
 import { useLedgerToday } from "../hooks/useLedgerToday";
+import { useLedgerSync } from "../hooks/useLedgerSync";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import { BookReveal } from "./BookReveal";
 import { NewRecordDialog } from "./NewRecordDialog";
@@ -56,6 +57,8 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
     mainCurrency,
     preferredCurrencies,
   } = useLedgerPageEnvironment();
+  // The one refresh driver: every route below is kept current by this poll.
+  useLedgerSync();
   const timeZone = ledger?.settings.timeZone ?? DEFAULT_TIME_ZONE;
   const today = useLedgerToday(timeZone, ledgerToday);
 

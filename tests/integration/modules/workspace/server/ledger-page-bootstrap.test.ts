@@ -183,7 +183,7 @@ describe("ledger page bootstrap", () => {
     expect(query(route, "ledger", "source-documents", "stream-total")?.state.data).toMatchObject({
       total: "30",
     });
-    expect(query(route, "ledger", "source-documents", "refresh")?.state.data).toMatchObject({
+    expect(query(route, "ledger-sync")?.state.data).toMatchObject({
       changed: false,
       hasTransitionalWork: false,
     });

@@ -179,7 +179,7 @@ describe("useLedgerSettings", () => {
       expect(invalidate).not.toHaveBeenCalled();
     });
 
-    it("stores saved categories and invalidates category-bearing queries", async () => {
+    it("stores saved categories and refreshes the visible ledger", async () => {
       const { result, queryClient } = setup();
       saveAction.mockResolvedValue([{ ...category, name: "Dining" }]);
       const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
@@ -195,13 +195,7 @@ describe("useLedgerSettings", () => {
         { ...category, name: "Dining" },
       ]);
       expect(invalidate.mock.calls.map(([filters]) => filters!.queryKey)).toEqual([
-        queryKeys.entryCategories(),
-        queryKeys.sourceDocumentStreamPrefix(),
-        queryKeys.ledgerEntriesPrefix(),
-        queryKeys.sourceDocumentDetailPrefix(),
-        queryKeys.summaryPrefix(),
-        queryKeys.enhancedStatsPrefix(),
-        queryKeys.sourceDocumentStreamTotalPrefix(),
+        queryKeys.ledger(),
       ]);
     });
 

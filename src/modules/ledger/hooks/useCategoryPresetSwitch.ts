@@ -170,8 +170,7 @@ export function useCategoryPresetSwitch({ categories }: UseCategoryPresetSwitchO
   const canConfirm = !isPreparing && !serverChanged && summary.unsetCount === 0 && !noChanges;
 
   const mutation = useLedgerMutation<ApplyCategoryPresetResult, ApplyCategoryPresetInput>({
-    invalidates: ["categories", "stats", "documents"],
-    refreshMode: "background",
+    waitFor: false,
     mutationFn: (input) => applyCategoryPresetAction(input),
     onSuccess: (saved) => {
       queryClient.setQueryData(queryKeys.entryCategories(), saved.categories);

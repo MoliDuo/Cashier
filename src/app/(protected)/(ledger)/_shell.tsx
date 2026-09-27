@@ -1,12 +1,10 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { AppShell } from "@/modules/workspace/ui/AppShell";
 import { SwipeTabSurface } from "@/modules/workspace/ui/SwipeTabSurface";
 import { TabNavigation } from "@/modules/workspace/ui/TabNavigation";
 import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
-import { useActiveTabQueryState } from "@/modules/workspace/hooks/useActiveTabQueryState";
 import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigation";
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import { useWorkspaceStore } from "@/modules/workspace/store";
@@ -17,7 +15,6 @@ import {
   prefetchDetailsTabQuery,
   prefetchStatsTabQuery,
 } from "@/modules/workspace/prefetch-ledger-tabs";
-import { commonCopy } from "@/copy/common";
 
 /**
  * The header and tab bar every ledger route shares. It renders outside the
@@ -35,35 +32,12 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
   const { activeTab, hrefFor, navigate, prefetch } = useLedgerNavigation();
   useTabScrollRestoration(activeTab);
 
-  // The destination a reader is already on has nowhere to navigate, so it
-  // carries the tab's refresh instead: every tab is reloaded from the same
-  // gesture, and no tab needs a control of its own for it.
-  const { isRefreshing, refreshActiveTab } = useActiveTabQueryState({ activeTab });
-  const [refreshPending, setRefreshPending] = useState(false);
-
-  const refreshCurrentTab = useCallback(async () => {
-    // A refresh already under way needs no second one.
-    if (isRefreshing || refreshPending) return;
-    setRefreshPending(true);
-    try {
-      await refreshActiveTab();
-    } catch {
-      toast.error(commonCopy.refreshFailed);
-    } finally {
-      setRefreshPending(false);
-    }
-  }, [isRefreshing, refreshActiveTab, refreshPending]);
-
   const changeTab = useCallback(
     (tab: LedgerTab) => {
-      if (!ready) return;
-      if (tab === activeTab) {
-        void refreshCurrentTab();
-        return;
-      }
+      if (!ready || tab === activeTab) return;
       navigate(tab);
     },
-    [activeTab, navigate, ready, refreshCurrentTab]
+    [activeTab, navigate, ready]
   );
 
   const preloadTab = useCallback(
@@ -92,7 +66,6 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
       navigation={
         <TabNavigation
           disabled={!ready}
-          refreshing={refreshPending}
           activeTab={activeTab}
           onTabChange={changeTab}
           onOpenInput={openInput}

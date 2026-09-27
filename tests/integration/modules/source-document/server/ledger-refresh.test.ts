@@ -96,8 +96,9 @@ describe("ledger refresh", () => {
   );
 
   it("invalidates everything for a future version", async () => {
-    expect(await refresh("1")).toMatchObject({
-      version: "0",
+    const current = await version();
+    expect(await refresh((current + BigInt(1)).toString())).toMatchObject({
+      version: current.toString(),
       changed: true,
       invalidations: { categories: true, settings: true, stats: true },
     });

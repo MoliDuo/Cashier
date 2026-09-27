@@ -392,7 +392,7 @@ test("books production sees a book archived by another browser when 设置 opens
   expect(errors).toEqual([]);
 });
 
-test("books production refreshes 设置 to pick up another browser's change", async ({
+test("books production picks up another browser's change when 设置 comes back into view", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -408,11 +408,10 @@ test("books production refreshes 设置 to pick up another browser's change", as
     await openTab(other.page, "设置");
     await addBook(other.page, bookName);
 
-    // The list this browser already holds is fresh, so only the manual refresh
-    // can bring the other browser's book in — and 设置 refreshes by tapping the
-    // destination this browser is already on.
+    // Coming back to this browser is what brings the other browser's book in:
+    // the ledger's sync version moved, so every query on 设置 reads again.
     await expect(bookRow(page, bookName)).toHaveCount(0);
-    await openTab(page, "设置");
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
     await expect(bookRow(page, bookName)).toBeVisible();
     await deleteBook(page, bookName);
     await expect(bookRow(other.page, bookName)).toHaveCount(1);

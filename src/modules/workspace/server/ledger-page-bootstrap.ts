@@ -214,7 +214,7 @@ export async function getLedgerRouteBootstrap(
     const stream = queryClient.getQueryData<InfiniteData<StreamPage>>(descriptor.queryKey);
     const firstPage = stream?.pages[0];
     if (firstPage != null && !firstPage.restartRequired) {
-      queryClient.setQueryData(queryKeys.sourceDocumentRefresh(), {
+      queryClient.setQueryData(queryKeys.ledgerSync(), {
         version: firstPage.generation,
         changed: false,
         hasTransitionalWork: firstPage.hasTransitionalWork,

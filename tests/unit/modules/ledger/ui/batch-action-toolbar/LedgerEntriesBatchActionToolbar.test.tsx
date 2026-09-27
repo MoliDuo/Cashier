@@ -257,20 +257,4 @@ describe("LedgerEntriesBatchActionToolbar", () => {
 
     expect(onConfirmCategory).toHaveBeenCalledOnce();
   });
-
-  it("holds the confirm when the selection moved under the dialog", () => {
-    renderToolbar({
-      selectedCount: 5,
-      categories: [dining],
-      onChangeCategory: vi.fn(),
-      onConfirmCategory: vi.fn(),
-      onToggleCategoryPick: vi.fn(),
-      categoryDialogOpen: true,
-      pickedCategoryIds: ["category-1", "category-2"],
-      categorySelectionChanged: true,
-    });
-
-    expect(screen.getByText(/所选项目已变化/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "AI 分类 5 条明细" })).toBeDisabled();
-  });
 });

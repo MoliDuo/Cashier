@@ -23,8 +23,6 @@ export const commonCopy = {
   loadMore: "加载更多",
   discard: "放弃",
   refresh: "刷新",
-  refreshFailed: "刷新失败，请重试",
-  refreshing: "刷新中…",
   unsavedChangesTitle: "有未保存的更改",
   unsavedChangesDescription: "未保存的修改将丢失，是否放弃？",
   continueEditing: "继续编辑",

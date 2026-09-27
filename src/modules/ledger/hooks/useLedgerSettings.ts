@@ -108,8 +108,6 @@ export function useLedgerSettings({
     }
   };
   const updateLedgerMutation = useLedgerMutation<Ledger, UpdateLedgerData>({
-    invalidates: (_ledger, data) =>
-      data.mainCurrency === undefined ? ["settings"] : ["settings", "documents", "stats"],
     mutationFn: async (data) => {
       const result = await updateLedgerSettingsAction({
         expectedUpdatedAt: ledger.updatedAt,
@@ -157,7 +155,6 @@ export function useLedgerSettings({
     Awaited<ReturnType<typeof generateEntryCategoryMetadataAction>>,
     { categoryId: string; requestId: number }
   >({
-    invalidates: ["categories"],
     mutationFn: ({ categoryId }) => generateEntryCategoryMetadataAction(categoryId),
     // Restart the category list's polling until every category has its metadata.
     onSuccess: () => setMetadataPollingSession((session) => session + 1),
@@ -188,7 +185,6 @@ export function useLedgerSettings({
   );
 
   const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>({
-    invalidates: ["categories", "stats"],
     mutationFn: (input) => saveEntryCategoriesAction(input),
     successMessage: settingsCopy.categoriesSaved,
     errorMessage: settingsCopy.saveCategoriesFailed,
@@ -204,7 +200,6 @@ export function useLedgerSettings({
     CreatedServiceCredential,
     { name: string; bookId: string }
   >({
-    invalidates: ["credentials"],
     mutationFn: (input) => createServiceCredentialAction(input),
     successMessage: settingsCopy.credentialCreated,
     errorMessage: null,
@@ -220,14 +215,12 @@ export function useLedgerSettings({
   });
 
   const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>({
-    invalidates: ["credentials"],
     mutationFn: (input) => updateServiceCredentialAction(input.id, { bookId: input.bookId }),
     successMessage: settingsCopy.credentialBookChanged,
     errorMessage: settingsCopy.credentialBookChangeFailed,
   });
 
   const deleteCredential = useLedgerMutation<void, string>({
-    invalidates: ["credentials"],
     mutationFn: (id) => deleteServiceCredentialAction(id),
     successMessage: settingsCopy.credentialDeleted,
     errorMessage: settingsCopy.deleteFailed,

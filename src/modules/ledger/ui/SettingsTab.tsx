@@ -118,15 +118,7 @@ export function SettingsTab({
             variant="outline"
             size="sm"
             onClick={() => {
-              void queryClient.refetchQueries({
-                type: "active",
-                predicate: ({ queryKey: key }) =>
-                  key[0] === "ledger" &&
-                  (key.length === 1 ||
-                    key[1] === "categories" ||
-                    key[1] === "settings" ||
-                    key[1] === "books"),
-              });
+              void queryClient.refetchQueries({ queryKey: queryKeys.ledger(), type: "active" });
             }}
           >
             <RefreshCw className="size-4" />

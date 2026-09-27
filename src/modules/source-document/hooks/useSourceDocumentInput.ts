@@ -299,7 +299,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     Awaited<ReturnType<typeof createSourceDocumentAction>>,
     CreateVariables
   >({
-    invalidates: ["documents", "stats"],
     mutationFn: async (variables) => {
       const currentIdentity = createSubmissionIdentityRef.current;
       let uploadedPayload =
@@ -349,7 +348,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   });
 
   const retryMutation = useLedgerMutation<RetrySourceDocumentResponseDto, RetryVariables>({
-    invalidates: ["documents", "stats"],
     mutationFn: async ({ payload, signal }) => {
       if (sourceDocumentId == null) throw new Error("No source document ID for retry");
       const uploadedPayload = await uploadSourceDocumentSubmissionImages(

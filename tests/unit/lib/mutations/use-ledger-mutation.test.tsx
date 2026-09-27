@@ -55,9 +55,7 @@ describe("useLedgerMutation", () => {
         detail: useQuery({ queryKey: key, queryFn: detailFn }),
         list: useQuery({ queryKey: queryKeys.ledgerEntriesPrefix(), queryFn: listFn }),
         mutation: useLedgerMutation({
-          refreshMode: "background",
-          refreshQueryKey: key,
-          invalidates: ["documents"],
+          waitFor: key,
           mutationFn: async () => "saved",
         }),
       }),
@@ -96,8 +94,7 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          refreshMode: "background",
-          invalidates: ["documents"],
+          waitFor: false,
           mutationFn: async () => "saved",
         }),
       { wrapper }
@@ -125,7 +122,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          invalidates: ["credentials"],
           mutationFn: async () => "saved",
           successMessage: "Saved",
           onSuccess: async () => {
@@ -154,7 +150,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          invalidates: ["credentials"],
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -182,7 +177,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          invalidates: ["credentials"],
           mutationFn: async () => "saved",
           successMessage: "Saved",
           errorMessage: "Failed",
@@ -210,7 +204,6 @@ describe("useLedgerMutation", () => {
       const { result } = renderHook(
         () =>
           useLedgerMutation({
-            invalidates: ["credentials"],
             mutationFn: async () => "saved",
             successMessage: null,
           }),
@@ -245,7 +238,6 @@ describe("useLedgerMutation", () => {
         () => ({
           query: useQuery({ queryKey: queryKeys.ledgerSettings(), queryFn }),
           mutation: useLedgerMutation({
-            invalidates: ["credentials"],
             mutationFn,
             successMessage: null,
           }),
@@ -278,7 +270,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          invalidates: ["documents"],
           mutationFn: async () => {
             throw new Error("write failed");
           },
@@ -308,7 +299,6 @@ describe("useLedgerMutation", () => {
     const { result } = renderHook(
       () =>
         useLedgerMutation({
-          invalidates: ["documents"],
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -329,7 +319,6 @@ describe("useLedgerMutation", () => {
       () => ({
         query: useQuery({ queryKey: ["ledger", "entries", {}], queryFn }),
         mutation: useLedgerMutation({
-          invalidates: ["documents"],
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -357,7 +346,6 @@ describe("useLedgerMutation", () => {
           getNextPageParam: (lastPage) => (lastPage < 4 ? lastPage + 1 : undefined),
         }),
         mutation: useLedgerMutation({
-          invalidates: ["documents"],
           mutationFn: async () => "saved",
           successMessage: null,
         }),
@@ -377,5 +365,55 @@ describe("useLedgerMutation", () => {
     });
 
     expect(queryFn.mock.calls.length).toBeLessThanOrEqual(12);
+  });
+
+  describe("with the ledger's sync version on screen", () => {
+    function renderWithSync(nextVersion: string) {
+      const { queryClient, wrapper } = setup();
+      const sync = vi.fn(async () => ({ version: nextVersion }));
+      queryClient.setQueryData(queryKeys.ledgerSync(), { version: "1" });
+      const list = vi.fn(async () => "list");
+      const hook = renderHook(
+        () => ({
+          sync: useQuery({ queryKey: queryKeys.ledgerSync(), queryFn: sync, staleTime: Infinity }),
+          list: useQuery({ queryKey: ["ledger", "entries", {}], queryFn: list }),
+          mutation: useLedgerMutation({ mutationFn: async () => "saved", successMessage: null }),
+        }),
+        { wrapper }
+      );
+      return { queryClient, sync, list, ...hook };
+    }
+
+    it("reads the version again and leaves the lists to it when it moved", async () => {
+      const { queryClient, sync, result } = renderWithSync("2");
+      await waitFor(() => expect(result.current.list.isSuccess).toBe(true));
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+
+      await act(async () => {
+        await result.current.mutation.mutateAsync();
+      });
+
+      expect(sync).toHaveBeenCalledTimes(1);
+      // The sync read is the one that invalidates when the version moves; the
+      // stub here does not, so the mutation must not have done it either.
+      expect(invalidate).not.toHaveBeenCalled();
+    });
+
+    it("invalidates the visible ledger itself when the version stayed", async () => {
+      const { queryClient, sync, list, result } = renderWithSync("1");
+      await waitFor(() => expect(result.current.list.isSuccess).toBe(true));
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+
+      await act(async () => {
+        await result.current.mutation.mutateAsync();
+      });
+
+      expect(sync).toHaveBeenCalledTimes(1);
+      expect(invalidate).toHaveBeenCalledWith(
+        { queryKey: ["ledger"], refetchType: "active" },
+        { throwOnError: true }
+      );
+      expect(list).toHaveBeenCalledTimes(2);
+    });
   });
 });

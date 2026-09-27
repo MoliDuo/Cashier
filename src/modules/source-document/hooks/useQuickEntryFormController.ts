@@ -111,8 +111,7 @@ export function useQuickEntryFormController({
     Awaited<ReturnType<typeof createQuickEntryAction>>,
     CreateQuickEntryPayload
   >({
-    refreshMode: "background",
-    invalidates: ["documents", "stats"],
+    waitFor: false,
     mutationFn: (data: CreateQuickEntryPayload) => createQuickEntryAction(data),
     successMessage: null,
     errorMessage: quickEntryFormCopy.quickEntryError,

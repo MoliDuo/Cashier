@@ -45,8 +45,6 @@ export interface LedgerEntriesBatchActionToolbarProps {
   /** The clear row is picked. */
   clearCategoryPicked?: boolean;
   onToggleCategoryPick?: (categoryId: string | null, picked: boolean) => void;
-  /** The captured selection no longer matches the live one. */
-  categorySelectionChanged?: boolean;
   isConfirmingCategory?: boolean;
   isProcessing?: boolean;
   className?: string;
@@ -96,7 +94,6 @@ export function LedgerEntriesBatchActionToolbar({
   pickedCategoryIds = [],
   clearCategoryPicked = false,
   onToggleCategoryPick,
-  categorySelectionChanged = false,
   isConfirmingCategory = false,
   isProcessing: externallyProcessing = false,
   className,
@@ -264,7 +261,6 @@ export function LedgerEntriesBatchActionToolbar({
           pickedCategoryIds={pickedCategoryIds}
           clearPicked={clearCategoryPicked}
           onTogglePick={onToggleCategoryPick}
-          selectionChanged={categorySelectionChanged}
           isConfirming={isConfirmingCategory}
           onConfirm={onConfirmCategory}
         />

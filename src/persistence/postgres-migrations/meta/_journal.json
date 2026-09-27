@@ -141,6 +141,13 @@
       "when": 1790497406975,
       "tag": "0019_ledger_time_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790501644482,
+      "tag": "0020_sync_books_and_time_zone",
+      "breakpoints": true
     }
   ]
 }

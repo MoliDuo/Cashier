@@ -3,11 +3,13 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import {
+  books,
   entryCategories,
   extractionAttempts,
   ledgerEntries,
   ledgerSyncState,
   ledgers,
+  serviceCredentials,
 } from "@/persistence";
 
 async function syncState(ledgerId: string) {
@@ -87,6 +89,41 @@ describe("record_ledger_change trigger", () => {
       settings: afterCurrency.version,
       stats: afterCurrency.version,
     });
+  });
+
+  it("moves the version for a book, an API key and the ledger's zone, not a key's use", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const [book] = await db
+      .insert(books)
+      .values({ ledgerId, name: "旅行", sortOrder: 9 })
+      .returning({ id: books.id });
+    const afterBook = await syncState(ledgerId);
+
+    const [credential] = await db
+      .insert(serviceCredentials)
+      .values({
+        ledgerId,
+        bookId: book!.id,
+        name: "Shortcut",
+        tokenHash: "a".repeat(64),
+        tokenPrefix: "csh_abcd",
+        tokenSuffix: "wxyz",
+      })
+      .returning({ id: serviceCredentials.id });
+    const afterKey = await syncState(ledgerId);
+    expect(afterKey.version).toBe(afterBook.version + BigInt(1));
+
+    await db
+      .update(serviceCredentials)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(serviceCredentials.id, credential!.id));
+    expect((await syncState(ledgerId)).version).toBe(afterKey.version);
+
+    await db.update(ledgers).set({ timeZone: "Europe/Paris" }).where(eq(ledgers.id, ledgerId));
+    const afterZone = await syncState(ledgerId);
+    expect(afterZone.version).toBe(afterKey.version + BigInt(1));
+    expect(afterZone.stats).toBe(afterZone.version);
   });
 
   it("creates a ledger's sync row on its first change and lets the ledger go", async () => {
