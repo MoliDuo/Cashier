@@ -24,6 +24,7 @@ import type { LedgerAdvancedFilters } from "../initial-query-state";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import { usePeriodLabel } from "./usePeriodLabel";
+import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { commonCopy } from "@/copy/common";
 import { detailsTabCopy, entryFilterPanelCopy } from "@/copy/workspace";
 
@@ -141,12 +142,7 @@ export function DetailsTab({
         ) : null}
       </EntriesToolbarShell>
       {monthStats.unconvertedCount > 0 ? (
-        <div
-          role="status"
-          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
-        >
-          {commonCopy.incompleteAccountingProjection}
-        </div>
+        <IncompleteConversionNotice className="mx-2 mb-2" />
       ) : null}
       <div className="space-y-4">
         <div className="space-y-4">

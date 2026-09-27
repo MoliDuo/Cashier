@@ -7,7 +7,7 @@ import { LedgerEntriesToolbar } from "./LedgerEntriesToolbar";
 import { LedgerEntriesStreamBody } from "./LedgerEntriesStreamBody";
 import { LedgerEntriesOverlays, preloadEditRetryDialog } from "./LedgerEntriesOverlays";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
-import { commonCopy } from "@/copy/common";
+import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 
 interface LedgerEntriesTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -67,14 +67,7 @@ export function LedgerEntriesTab({
         {...(stream.filteredTotal === undefined ? {} : { filteredTotal: stream.filteredTotal })}
         {...(timeZone != null ? { timeZone } : {})}
       />
-      {stream.hasUnconverted ? (
-        <div
-          role="status"
-          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
-        >
-          {commonCopy.incompleteAccountingProjection}
-        </div>
-      ) : null}
+      {stream.hasUnconverted ? <IncompleteConversionNotice className="mx-2 mb-2" /> : null}
 
       {stream.isError && <LedgerQueryErrorBanner empty={!stream.hasData} onRetry={stream.retry} />}
       {(!stream.isError || stream.hasData) && (

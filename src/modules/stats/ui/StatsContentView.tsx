@@ -15,7 +15,7 @@ import { StatsRanking } from "./StatsRanking";
 import { StatsSummary } from "./StatsSummary";
 import { StatsWeekdayRhythm } from "./StatsWeekdayRhythm";
 import { DISPLAY_LOCALE } from "@/lib/constants";
-import { commonCopy } from "@/copy/common";
+import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { statsTabCopy } from "@/copy/stats";
 
 interface StatsContentViewProps {
@@ -178,12 +178,7 @@ export function StatsContentView({
       />
 
       {stats?.unconvertedCount != null && stats.unconvertedCount > 0 ? (
-        <div
-          role="status"
-          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
-        >
-          {commonCopy.incompleteAccountingProjection}
-        </div>
+        <IncompleteConversionNotice />
       ) : null}
 
       {/*
