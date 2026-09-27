@@ -10,7 +10,8 @@ export const settingsCopy = {
   themeDark: "深色模式",
   aiLanguage: "AI 输出语言",
   mainCurrency: "主货币",
-  collapseEntries: "默认折叠记录",
+  collapseEntries: "默认折叠账单",
+  collapseEntriesDesc: "账单卡片默认只显示标题和合计，点开再看明细。",
   preferredCurrencies: "偏好货币",
   preferredCurrenciesNone: "未选择币种",
   preferredCurrenciesSummary: (v: { currencies: string | number; count: string | number }) =>
@@ -80,6 +81,7 @@ export const settingsCopy = {
     `确定删除分类“${v.name}”吗？相关明细将变为未分类。`,
   categoryName: "分类名称",
   aiPrompt: "账本提示词",
+  aiPromptDesc: "AI 解析账单和分类时会一并参考这段说明，例如常去的商家该归到哪一类。",
   newCategoryPlaceholder: "新分类名称",
   addCategory: "添加",
   updateSuccess: "设置更新成功",
@@ -171,13 +173,9 @@ export const settingsCopy = {
   reloadCategories: "载入最新分类",
 };
 
-export const settingsAccountCopy = {
-  passkeySection: "通行密钥",
-};
-
 export const settingsBooksCopy = {
   title: "分账",
-  description: "每笔记录属于一个分账；总账始终汇总全部分账，无需设置。",
+  description: "每张账单属于一个分账；总账始终汇总全部分账，无需设置。",
   name: "名称",
   namePlaceholder: "分账名称",
   add: "新增分账",
@@ -213,6 +211,7 @@ export const settingsBooksCopy = {
 };
 
 export const settingsPasskeysCopy = {
+  title: "通行密钥",
   description: "用指纹、面容或设备密码登录，不需要输入邮箱。",
   unsupported: "当前浏览器不支持通行密钥。",
   add: "添加通行密钥",
@@ -254,6 +253,7 @@ export const settingsEmailsCopy = {
   remove: (v: { email: string | number }) => `移除 ${v.email}`,
   removeTitle: (v: { email: string | number }) => `移除 ${v.email}？`,
   removeDesc: "该邮箱将无法再登录。账户至少要保留一个邮箱。",
+  removeConfirm: "移除",
   lastEmail: "账户至少要保留一个登录邮箱。",
   codeSent: "验证码已发送",
   added: "已添加邮箱",
@@ -278,7 +278,6 @@ export const serviceCredentialsCopy = {
   namePlaceholder: "密钥名称 (例如: 自动记账脚本)",
   createSuccessTitle: "服务密钥创建成功",
   createSuccessDesc: "这是您唯一一次查看完整密钥的机会。请立即复制并妥善保存。",
-  copy: "复制",
   copyCredential: "复制密钥",
   saved: "我已保存",
   deleteTitle: "删除服务密钥",

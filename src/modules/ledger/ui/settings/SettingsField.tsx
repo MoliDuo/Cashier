@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { textRoleClassName } from "@/components/typography";
 
 interface SettingsFieldProps {
   title: string;
+  /** What the field changes, when the name alone does not say it. */
+  description?: string;
   /** Buttons that act on this whole field, aligned with its heading. */
   actions?: ReactNode;
   stacked?: boolean;
@@ -13,7 +16,13 @@ interface SettingsFieldProps {
   children?: ReactNode;
 }
 
-export function SettingsField({ title, actions, stacked = false, children }: SettingsFieldProps) {
+export function SettingsField({
+  title,
+  description,
+  actions,
+  stacked = false,
+  children,
+}: SettingsFieldProps) {
   return (
     <div
       className={cn(
@@ -23,7 +32,10 @@ export function SettingsField({ title, actions, stacked = false, children }: Set
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-text">{title}</h3>
+          <h3 className={textRoleClassName("bodyStrong")}>{title}</h3>
+          {description != null && (
+            <p className={textRoleClassName("meta", "mt-0.5")}>{description}</p>
+          )}
         </div>
         {actions != null && <div className="shrink-0">{actions}</div>}
       </div>

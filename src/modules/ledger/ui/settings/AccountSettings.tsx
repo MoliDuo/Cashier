@@ -9,11 +9,11 @@ import { EmailSettings } from "./EmailSettings";
 import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
 import { SettingsField } from "./SettingsField";
-import { SettingsSection } from "./SettingsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { settingsAccountCopy, settingsCopy } from "@/copy/settings";
+import { settingsCopy } from "@/copy/settings";
 
 interface AccountSettingsProps {
   /** The address this session signed in with, for the list's first frame. */
@@ -54,9 +54,7 @@ export function AccountSettings({
     <>
       {/* 通行密钥 and API 密钥 each save on their own, so each is a card of
           its own rather than a field inside 账户, the way 分账 and 记账规则 are. */}
-      <SettingsSection title={settingsAccountCopy.passkeySection}>
-        <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
-      </SettingsSection>
+      <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
       <ServiceCredentialSection
         credentials={credentials}
         books={books}

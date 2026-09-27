@@ -143,7 +143,7 @@ describe("EmailSettings", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "移除 other@example.com" }));
     await act(async () => {
-      fireEvent.click(await screen.findByRole("button", { name: "删除" }));
+      fireEvent.click(await screen.findByRole("button", { name: "移除" }));
     });
 
     await waitFor(() => expect(onAllSessionsEnded).toHaveBeenCalledTimes(1));
@@ -160,7 +160,7 @@ describe("EmailSettings", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "移除 other@example.com" }));
     await act(async () => {
-      fireEvent.click(await screen.findByRole("button", { name: "删除" }));
+      fireEvent.click(await screen.findByRole("button", { name: "移除" }));
     });
 
     await waitFor(() => expect(onRequireReauthentication).toHaveBeenCalledTimes(1));

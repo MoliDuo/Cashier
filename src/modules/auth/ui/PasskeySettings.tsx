@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Button } from "@/components/ui/button";
+import { SettingsSection } from "@/components/SettingsSection";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -159,15 +160,15 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
 
   return (
     <>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="min-w-0 text-sm text-muted-foreground">
-            {supported ? settingsPasskeysCopy.description : settingsPasskeysCopy.unsupported}
-          </p>
+      <SettingsSection
+        title={settingsPasskeysCopy.title}
+        description={
+          supported ? settingsPasskeysCopy.description : settingsPasskeysCopy.unsupported
+        }
+        actions={
           <Button
             type="button"
             size="sm"
-            className="shrink-0"
             disabled={!supported}
             onClick={() => {
               setName(settingsPasskeysCopy.defaultName);
@@ -177,7 +178,8 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
           >
             {settingsPasskeysCopy.add}
           </Button>
-        </div>
+        }
+      >
         {passkeys.length > 0 ? (
           <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
             {passkeys.map((passkey) => (
@@ -226,7 +228,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
             {settingsPasskeysCopy.empty}
           </p>
         )}
-      </div>
+      </SettingsSection>
 
       <Dialog open={isAddOpen} onOpenChange={(open) => !pending && setIsAddOpen(open)}>
         <DialogContent variant="modal">

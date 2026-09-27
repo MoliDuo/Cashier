@@ -64,7 +64,7 @@ test("settings save as they change, with nothing to confirm on the way out", asy
 
   // Leaving the field saves it; switching tabs straight after asks nothing.
   await prompt.fill(next);
-  await page.getByRole("switch", { name: "默认折叠记录", exact: true }).focus();
+  await page.getByRole("switch", { name: "默认折叠账单", exact: true }).focus();
   await expect(page.getByText("设置更新成功").first()).toBeVisible();
   await navigation.getByRole("button", { name: "流水", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);

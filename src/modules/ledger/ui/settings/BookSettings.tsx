@@ -46,7 +46,7 @@ import {
   type BookMutationResult,
 } from "@/modules/ledger/server-actions/books";
 import { SettingsField } from "./SettingsField";
-import { SettingsSection } from "./SettingsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { ledgerQueryErrorCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
@@ -245,6 +245,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
   return (
     <SettingsSection
       title={settingsBooksCopy.title}
+      description={settingsBooksCopy.description}
       actions={
         <Button
           type="button"

@@ -10,7 +10,7 @@ import type {
 import { CurrencySection } from "../CurrencySection";
 import { CategorySection } from "../CategorySection";
 import { SettingsField } from "./SettingsField";
-import { SettingsSection } from "./SettingsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -85,7 +85,10 @@ export function BookkeepingSettings({
   return (
     <>
       <SettingsSection title={settingsCopy.bookkeepingRules}>
-        <SettingsField title={settingsCopy.collapseEntries}>
+        <SettingsField
+          title={settingsCopy.collapseEntries}
+          description={settingsCopy.collapseEntriesDesc}
+        >
           <Switch
             aria-label={settingsCopy.collapseEntries}
             checked={shown.collapseEntriesDefault}
@@ -111,7 +114,11 @@ export function BookkeepingSettings({
             </SelectContent>
           </Select>
         </SettingsField>
-        <SettingsField title={settingsCopy.aiPrompt} stacked>
+        <SettingsField
+          title={settingsCopy.aiPrompt}
+          description={settingsCopy.aiPromptDesc}
+          stacked
+        >
           <Textarea
             value={prompt ?? shown.aiCustomPrompt}
             name="aiCustomPrompt"

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
 import { AccountSettings } from "./settings/AccountSettings";
 import { BookSettings } from "./settings/BookSettings";
-import { SettingsSection } from "./settings/SettingsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { SettingsField } from "./settings/SettingsField";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { useLedgerSettings } from "@/modules/ledger/hooks/useLedgerSettings";

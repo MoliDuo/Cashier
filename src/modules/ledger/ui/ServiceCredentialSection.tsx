@@ -29,7 +29,7 @@ import { formatInstantDateLabel } from "@/lib/date-utils";
 import { copyToClipboard } from "@/lib/utils";
 import { UI, DISPLAY_LOCALE } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SettingsSection } from "./settings/SettingsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { commonCopy } from "@/copy/common";
 import { serviceCredentialsCopy, settingsBooksCopy } from "@/copy/settings";
 
@@ -267,21 +267,8 @@ export function ServiceCredentialSection({
             <DialogDescription>{serviceCredentialsCopy.createSuccessDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="group relative break-all rounded border bg-surface p-4 font-mono text-sm">
+            <div className="break-all rounded border bg-surface p-4 font-mono text-sm">
               {createdCredential?.token}
-              <Button
-                size="sm"
-                variant="outline"
-                className="absolute right-2 top-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                onClick={() => handleCopy(createdCredential?.token ?? "")}
-              >
-                {hasCopied ? (
-                  <Check size={14} className="mr-1" />
-                ) : (
-                  <Copy size={14} className="mr-1" />
-                )}
-                {hasCopied ? commonCopy.success : serviceCredentialsCopy.copy}
-              </Button>
             </div>
             <Button
               className="w-full gap-2"

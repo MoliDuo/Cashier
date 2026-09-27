@@ -15,7 +15,7 @@ import { useCategoryManagementDraft } from "@/modules/ledger/hooks/useCategoryMa
 import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPresetSwitch";
 import { CategoryEditDialog } from "./CategoryEditDialog";
 import { CategoryPresetDialog } from "./CategoryPresetDialog";
-import { SettingsSection } from "./settings/SettingsSection";
+import { SettingsSection } from "@/components/SettingsSection";
 import { useCategoryAssignment } from "./category-assignment-context";
 import { commonCopy } from "@/copy/common";
 import { settingsCopy } from "@/copy/settings";

@@ -259,7 +259,7 @@ export function EmailSettings({
         onOpenChange={(open) => !open && setRemoveTarget(null)}
         title={settingsEmailsCopy.removeTitle({ email: removeTarget ?? "" })}
         description={settingsEmailsCopy.removeDesc}
-        confirmLabel={commonCopy.delete}
+        confirmLabel={settingsEmailsCopy.removeConfirm}
         variant="destructive"
         onConfirm={async () => {
           if (removeTarget == null) return false;
