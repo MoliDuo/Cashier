@@ -290,9 +290,7 @@ test("books production moves a record from one book to another", async ({ page }
   expect(errors).toEqual([]);
 });
 
-test("books production keeps the viewed book and the record picker apart", async ({
-  page,
-}, testInfo) => {
+test("books production starts a record in the viewed book", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const suffix = testInfo.project.name;
@@ -307,12 +305,11 @@ test("books production keeps the viewed book and the record picker apart", async
   await openTab(page, "流水");
   await selectBookByName(page, bookA);
 
-  // The view is 甲账, but 记一笔 starts from its own memory — the first book in
-  // 设置 order — because the two choices are answers to different questions.
+  // Viewing a book, 记一笔 starts in that book.
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   let dialog = page.getByRole("dialog").last();
   await dialog.getByRole("button", { name: "快速记账", exact: true }).click();
-  await expect(dialog.getByLabel("分账", { exact: true })).toContainText("共同支出");
+  await expect(dialog.getByLabel("分账", { exact: true })).toContainText(bookA);
 
   await dialog.getByLabel("分账", { exact: true }).press("ArrowDown");
   await page.getByRole("option", { name: bookB, exact: true }).click();
@@ -324,12 +321,13 @@ test("books production keeps the viewed book and the record picker apart", async
     page.getByText(`已保存到「${bookB}」，当前视图不会显示这条记录。`, { exact: true })
   ).toBeVisible();
 
-  // Saving elsewhere changed the picker's memory, not what is being viewed.
+  // Saving elsewhere did not move the view, and the next record still starts
+  // in the book being viewed.
   await expect(currentBookOption(page)).toHaveText(bookA);
   await expect(page.getByText(item, { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   dialog = page.getByRole("dialog").last();
-  await expect(dialog.getByLabel("分账", { exact: true })).toContainText(bookB);
+  await expect(dialog.getByLabel("分账", { exact: true })).toContainText(bookA);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 

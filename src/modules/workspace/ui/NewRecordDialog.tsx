@@ -64,9 +64,10 @@ export function NewRecordDialog({
     if (!open && isSubmitting) return;
     setInputOpen(open);
   };
-  // The picker opens on this device's last pick, falling back to the first
-  // book in 设置 order. It is a per-record choice: changing it does not move
-  // the view, and only a saved record updates the memory.
+  // The picker opens on the book being viewed; on 总账 — no single book — it
+  // opens on this device's last pick, then the first book in 设置 order. It is
+  // a per-record choice: changing it does not move the view, and only a saved
+  // record updates the memory.
   const [bookId, setBookId] = useState("");
   // Every opening starts the per-record pick over. A books refetch while the
   // dialog stays open must not overwrite what the user chose for this record,
@@ -76,11 +77,9 @@ export function NewRecordDialog({
     setLastOpen(isOpen);
     if (isOpen) {
       const remembered = readLastNewRecordBookId();
-      setBookId(
-        remembered != null && books.some((book) => book.id === remembered)
-          ? remembered
-          : (books[0]?.id ?? "")
-      );
+      const isLive = (id: string | null): id is string =>
+        id != null && books.some((book) => book.id === id);
+      setBookId(isLive(scope) ? scope : isLive(remembered) ? remembered : (books[0]?.id ?? ""));
     }
   }
   // A pick whose book is no longer live (archived between the save and now,

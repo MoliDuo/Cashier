@@ -158,22 +158,24 @@ describe("NewRecordDialog book picker", () => {
     expect(formsAttrs()).toMatchObject({ bookId: BOOK_A, savedBook: `${BOOK_A}:Daily` });
   });
 
+  it("opens on the book being viewed, ahead of the remembered one", () => {
+    writeLastNewRecordBookId(BOOK_A);
+    const { open } = renderDialog({ scope: BOOK_B });
+    open();
+
+    expect(formsAttrs()).toMatchObject({ bookId: BOOK_B, viewedBookId: BOOK_B });
+  });
+
   it("gives the forms the picked book's zone, not the viewed book's", () => {
     const { open } = renderDialog({ scope: BOOK_B });
     open();
+
+    fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_A } });
 
     expect(formsAttrs()).toMatchObject({
       bookId: BOOK_A,
       viewedBookId: BOOK_B,
       timeZone: "Asia/Shanghai",
-    });
-
-    fireEvent.change(screen.getByTestId("book-select"), { target: { value: BOOK_B } });
-
-    expect(formsAttrs()).toMatchObject({
-      bookId: BOOK_B,
-      savedBook: `${BOOK_B}:Travel`,
-      timeZone: "America/Los_Angeles",
     });
   });
 
