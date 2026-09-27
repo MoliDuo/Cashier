@@ -16,17 +16,22 @@ describe("contract schema omission semantics", () => {
   it("omits undefined optional keys in source-document create/retry schemas", () => {
     const createParsed = createSourceDocumentInputSchema.parse({
       text: "Lunch 12.50",
-      timezone: undefined,
+      documentDate: undefined,
     });
     const retryParsed = retrySourceDocumentInputSchema.parse({
       text: "Lunch 12.50",
       storedFileIds: [],
       documentDate: null,
-      timezone: undefined,
     });
 
-    expect(Object.prototype.hasOwnProperty.call(createParsed, "timezone")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(retryParsed, "timezone")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(createParsed, "documentDate")).toBe(false);
+    expect(retryParsed).not.toHaveProperty("timezone");
+  });
+
+  it("refuses the retired device zone: the ledger's zone dates every record", () => {
+    expect(() =>
+      createSourceDocumentInputSchema.parse({ text: "Lunch 12.50", timezone: "Europe/Paris" })
+    ).toThrow();
   });
 
   it("keeps the API v1 Shortcut contract compact and normalizes ISO entry dates", () => {

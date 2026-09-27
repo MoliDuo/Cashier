@@ -60,18 +60,6 @@ const optionalTitleSchema = codePointLimitedText(200)
   .transform((value) => value.trim())
   .refine((value) => value.length > 0, "Title must not be empty")
   .optional();
-const timezoneSchema = z
-  .string()
-  .max(50)
-  .refine((timezone) => {
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
-      return true;
-    } catch {
-      return false;
-    }
-  }, "Invalid IANA timezone")
-  .optional();
 
 // Build MIME pattern from the shared policy list
 const SUPPORTED_MIME_PATTERN = SUPPORTED_MIME_TYPES.map((t) =>
@@ -120,7 +108,6 @@ const sourceDocumentPayloadSchema = strictObjectSchema({
     .max(MAX_FILES, `Maximum ${MAX_FILES} images allowed`)
     .optional(),
   documentDate: optionalDateStringSchema,
-  timezone: timezoneSchema,
 });
 
 export const createSourceDocumentInputSchema = sourceDocumentPayloadSchema.superRefine(
@@ -211,7 +198,6 @@ export const retrySourceDocumentInputSchema = strictObjectSchema({
   text: z.string().trim().max(MAX_TEXT_CHARACTERS).nullable(),
   storedFileIds: z.array(uuidSchema).max(MAX_FILES),
   documentDate: dateStringSchema.nullable(),
-  timezone: timezoneSchema,
 }).superRefine((value, ctx) => {
   if ((value.text == null || value.text === "") && value.storedFileIds.length === 0) {
     ctx.addIssue({ code: "custom", message: "Content (text or images) is required" });
@@ -372,8 +358,6 @@ export const createQuickEntryInputSchema = strictObjectSchema({
   itemName: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(500).nullable().optional(),
   entryDate: optionalDateStringSchema,
-  /** The device zone, a fallback for a book without one of its own. */
-  timezone: timezoneSchema,
 });
 
 function parseSourceDocumentContract<T>(schema: z.ZodType<T>, input: unknown): T {

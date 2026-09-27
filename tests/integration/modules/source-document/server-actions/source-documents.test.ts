@@ -269,10 +269,10 @@ describe("SourceDocument Actions", () => {
         .set({ timeZone: "Asia/Singapore" })
         .where(eq(ledgers.id, testLedgerId));
 
-      // The request's zone is only the device the reader happened to use.
-      await expect(
-        createdDate({ text: "Lunch 12", bookId, timezone: "Europe/Paris" })
-      ).resolves.toEqual({ bookId, date: "2026-03-21" });
+      await expect(createdDate({ text: "Lunch 12", bookId })).resolves.toEqual({
+        bookId,
+        date: "2026-03-21",
+      });
     });
 
     it("follows the ledger's zone when it changes", async () => {
@@ -282,7 +282,7 @@ describe("SourceDocument Actions", () => {
         .set({ timeZone: "Europe/Paris" })
         .where(eq(ledgers.id, testLedgerId));
 
-      await expect(createdDate({ text: "Lunch 12", timezone: "Asia/Singapore" })).resolves.toEqual({
+      await expect(createdDate({ text: "Lunch 12" })).resolves.toEqual({
         bookId,
         date: "2026-03-20",
       });

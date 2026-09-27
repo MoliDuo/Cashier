@@ -60,8 +60,8 @@ export type Ledger = InferSelectModel<typeof ledgers>;
 /**
  * A 分账: the bucket every record belongs to. Reading all of them together is
  * 总账, which is a view over every book rather than a designated one, so no row
- * here is special. `time_zone` is retired: the ledger's zone dates every book,
- * and the column stays only until the release that drops it.
+ * here is special. A book has no zone of its own: the ledger's zone dates every
+ * book.
  */
 export const books = pgTable(
   "books",
@@ -69,7 +69,6 @@ export const books = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     ledgerId: uuid("ledger_id").notNull(),
     name: text("name").notNull(),
-    timeZone: text("time_zone"),
     sortOrder: integer("sort_order").notNull().default(0),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: rowTimestamp("created_at"),
@@ -89,10 +88,6 @@ export const books = pgTable(
       .on(table.ledgerId, table.name)
       .where(sql`${table.archivedAt} IS NULL`),
     check("ck_books_name_length", sql`length(btrim(${table.name})) BETWEEN 1 AND 20`),
-    check(
-      "ck_books_time_zone_length",
-      sql`${table.timeZone} IS NULL OR length(${table.timeZone}) <= 50`
-    ),
   ]
 );
 

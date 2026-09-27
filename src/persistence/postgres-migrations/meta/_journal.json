@@ -148,6 +148,13 @@
       "when": 1790501644482,
       "tag": "0020_sync_books_and_time_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790506580286,
+      "tag": "0021_retire_book_time_zone",
+      "breakpoints": true
     }
   ]
 }

@@ -296,19 +296,15 @@ describe("createQuickEntryAction", () => {
       return document?.documentDate;
     }
 
-    it("dates it in the ledger's zone, whatever zone the request came from", async () => {
+    it("dates it in the ledger's zone, and follows the zone when it changes", async () => {
       // The ledger starts in Shanghai.
-      await expect(
-        filedDate({ categoryId, amount: "100", timezone: "Europe/Paris" })
-      ).resolves.toBe("2026-03-21");
+      await expect(filedDate({ categoryId, amount: "100" })).resolves.toBe("2026-03-21");
 
       await getTestDb()
         .update(ledgers)
         .set({ timeZone: "Europe/Paris" })
         .where(eq(ledgers.id, ledgerId));
-      await expect(
-        filedDate({ categoryId, amount: "100", timezone: "Asia/Shanghai" })
-      ).resolves.toBe("2026-03-20");
+      await expect(filedDate({ categoryId, amount: "100" })).resolves.toBe("2026-03-20");
     });
 
     it("dates every book by the same zone", async () => {
