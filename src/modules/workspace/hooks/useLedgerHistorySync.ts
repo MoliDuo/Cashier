@@ -29,9 +29,9 @@ export function useLedgerHistorySync({
     const next =
       activeTab === "stats"
         ? normalizeStatsSearchParams(searchParams)
-        : activeTab === "settings"
-          ? null
-          : normalizePeriodSearchParams(searchParams);
+        : activeTab === "records"
+          ? normalizePeriodSearchParams(searchParams)
+          : null;
     if (next != null) replaceLedgerUrl(pathname, next);
   }, [activeTab, pathname, searchParams]);
 

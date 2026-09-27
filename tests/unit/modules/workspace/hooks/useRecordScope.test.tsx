@@ -24,6 +24,7 @@ function renderScope(initialScope: string | null, books: readonly BookDto[] | un
     ({ books: current }) => ({
       ...useRecordScope(current),
       storedBookId: useWorkspaceStore((state) => state.bookId),
+      onRecordScopeChange: useWorkspaceStore((state) => state.setBookId),
     }),
     { wrapper, initialProps: { books } }
   );

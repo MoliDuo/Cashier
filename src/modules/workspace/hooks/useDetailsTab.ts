@@ -208,13 +208,6 @@ export function useDetailsTab({
   const { selectedIds, clearSelection, isSelectionMode } = selection;
   if (frozen !== isSelectionMode) setFrozen(isSelectionMode);
 
-  useEffect(() => {
-    document.documentElement.dataset.batchSelection = String(isSelectionMode);
-    return () => {
-      delete document.documentElement.dataset.batchSelection;
-    };
-  }, [isSelectionMode]);
-
   // --- Batch update and delete ----------------------------------------------
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

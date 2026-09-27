@@ -1,6 +1,7 @@
 "use client";
 import { SettingsTab } from "@/modules/ledger/ui/SettingsTab";
 import { UNCATEGORIZED_SENTINEL } from "@/modules/ledger/contract-schemas";
+import { RECORDS_VIEW_PARAM } from "@/lib/ledger-tabs";
 import { useLedgerNavigation } from "../../hooks/useLedgerNavigation";
 import { useWorkspaceStore } from "../../store";
 import { useLedgerWorkspace } from "../ledger-workspace-context";
@@ -13,12 +14,14 @@ interface SettingsRouteProps {
 export function SettingsRoute({ userEmail }: SettingsRouteProps) {
   const { ledger, categories, books } = useLedgerWorkspace();
   const { navigate } = useLedgerNavigation();
-  const detailsQuery = useWorkspaceStore((state) => state.routeQueries.details ?? "");
+  const recordsQuery = useWorkspaceStore((state) => state.routeQueries.records ?? "");
 
-  // A preset switch can retire the category 明细 was filtered by; the reader
-  // then lands on 明细 without it rather than on an empty list.
-  const goToDetails = (validCategoryIds: readonly string[]) => {
-    const query = new URLSearchParams(detailsQuery);
+  // After a preset switch the reader lands on 账目's entries to check them. The
+  // switch can retire the category they were filtered by, which is then
+  // dropped rather than leaving an empty list.
+  const goToEntries = (validCategoryIds: readonly string[]) => {
+    const query = new URLSearchParams(recordsQuery);
+    query.set(RECORDS_VIEW_PARAM, "entries");
     const categoryId = query.get("categoryId");
     if (
       categoryId != null &&
@@ -27,7 +30,7 @@ export function SettingsRoute({ userEmail }: SettingsRouteProps) {
     ) {
       query.delete("categoryId");
     }
-    navigate("details", query);
+    navigate("records", query);
   };
 
   return (
@@ -36,7 +39,7 @@ export function SettingsRoute({ userEmail }: SettingsRouteProps) {
       initialCategories={categories}
       initialBooks={books}
       {...(userEmail !== undefined ? { userEmail } : {})}
-      onGoToDetails={goToDetails}
+      onGoToDetails={goToEntries}
     />
   );
 }

@@ -52,7 +52,7 @@ export function shouldWarnNewRecordMayBeHidden(
   committedView: CommittedView,
   entryDate: string
 ): boolean {
-  if (activeTab !== "stream") return true;
+  if (activeTab !== "records") return true;
   const committedFilters = committedView.filters;
 
   if (

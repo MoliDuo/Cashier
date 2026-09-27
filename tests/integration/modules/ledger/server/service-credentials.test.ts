@@ -278,18 +278,23 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     expect(attempt?.requestedDate).toBe(formatDateTimeForApi(new Date()));
   });
 
-  it("dates an upload in its key's book zone", async () => {
+  it("files an upload into its key's book, dated in the ledger's zone", async () => {
     const db = getTestDb();
     const knownToken = "sk_book_zone";
     const { computeHash, prefixSuffix } = await import("@/lib/security/service-credential-token");
-    // Give the key's book a zone so the upload is dated in that book's day.
+    // The ledger keeps one zone for every book; UTC+14 is a day ahead of the
+    // default zone for ten hours of each day, which is when this would catch a
+    // regression back to a per-book or server zone.
+    await db
+      .update(ledgers)
+      .set({ timeZone: "Pacific/Kiritimati" })
+      .where(eq(ledgers.id, testLedgerId));
     const zonedBookId = crypto.randomUUID();
     await db.insert(books).values({
       id: zonedBookId,
       ledgerId: testLedgerId,
       name: "Zoned",
       sortOrder: 9,
-      timeZone: "Pacific/Kiritimati",
     });
     const { prefix, suffix } = prefixSuffix(knownToken);
     const createdCredentials = await db

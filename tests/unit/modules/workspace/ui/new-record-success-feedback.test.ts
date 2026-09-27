@@ -59,7 +59,7 @@ describe("new record success feedback", () => {
     showNewRecordSuccessFeedback({
       mode: "quick",
       result: { sourceDocumentId: "source-2", documentDate: "2026-07-17" },
-      activeTab: "stream",
+      activeTab: "records",
       committedView: { filters: {}, range: { from: "2026-07-01", to: "2026-07-31" } },
       viewedBookId,
       savedBook: viewedBook,
@@ -73,7 +73,7 @@ describe("new record success feedback", () => {
     showNewRecordSuccessFeedback({
       mode: "quick",
       result: { sourceDocumentId: "source-3", documentDate: "2026-07-17" },
-      activeTab: "stream",
+      activeTab: "records",
       committedView: { filters: {}, range: { from: "2026-07-01", to: "2026-07-31" } },
       viewedBookId,
       savedBook: { id: "book-other", name: "Travel" },
@@ -98,7 +98,7 @@ describe("new record success feedback", () => {
     showNewRecordSuccessFeedback({
       mode: "ai",
       result: { sourceDocumentId: "source-4", documentDate: "2026-07-17" },
-      activeTab: "stream",
+      activeTab: "records",
       committedView: { filters: {}, range: null },
       viewedBookId: null,
       savedBook: { id: "book-2", name: "Travel" },
@@ -109,14 +109,14 @@ describe("new record success feedback", () => {
   it("warns for narrowing filters and dates outside the committed range", () => {
     expect(
       shouldWarnNewRecordMayBeHidden(
-        "stream",
+        "records",
         { filters: { statuses: ["processing"] }, range: null },
         "2026-07-17"
       )
     ).toBe(true);
     expect(
       shouldWarnNewRecordMayBeHidden(
-        "stream",
+        "records",
         { filters: {}, range: { from: "2026-07-18", to: "2026-07-31" } },
         "2026-07-17"
       )

@@ -36,7 +36,7 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { omitUndefinedProperties } from "@/lib/validation";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
-import type { LedgerTab } from "@/lib/ledger-tabs";
+import type { LedgerPage } from "@/lib/ledger-tabs";
 import {
   buildDetailsQueryDescriptor,
   buildStatsQueryDescriptor,
@@ -138,7 +138,7 @@ export async function getLedgerShellBootstrap(input: {
 }
 
 export interface GetLedgerRouteBootstrapInput {
-  tab: LedgerTab;
+  page: LedgerPage;
   ledgerDto: LedgerDto;
   scope: LedgerViewScope;
   period?: Period;
@@ -160,7 +160,7 @@ export async function getLedgerRouteBootstrap(
   const period = input.period ?? DEFAULT_PERIOD;
   const queryClient = new QueryClient();
 
-  if (input.tab === "settings") {
+  if (input.page === "settings") {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.ledgerSettings(),
       queryFn: () => getLedgerSettingsView(ledgerId),
@@ -169,7 +169,7 @@ export async function getLedgerRouteBootstrap(
     return dehydrate(queryClient);
   }
 
-  if (input.tab === "stream") {
+  if (input.page === "documents") {
     const descriptor = buildStreamQueryDescriptor({
       ...(bookId == null ? {} : { bookId }),
       period,
@@ -224,7 +224,7 @@ export async function getLedgerRouteBootstrap(
     return dehydrate(queryClient);
   }
 
-  if (input.tab === "details") {
+  if (input.page === "entries") {
     const descriptor = buildDetailsQueryDescriptor({
       ...(bookId == null ? {} : { bookId }),
       period,

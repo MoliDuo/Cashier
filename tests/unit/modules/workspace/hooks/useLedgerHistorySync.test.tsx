@@ -20,7 +20,7 @@ function renderSync(activeTab: LedgerTab, search: string) {
         pathname: `/${tab}`,
         searchParams: new URLSearchParams(query),
       });
-      return useWorkspaceStore((state) => state.routeQueries);
+      return useWorkspaceStore((state) => state);
     },
     { wrapper, initialProps: { tab: activeTab, query: search } }
   );
@@ -28,7 +28,7 @@ function renderSync(activeTab: LedgerTab, search: string) {
 
 describe("useLedgerHistorySync", () => {
   beforeEach(() => {
-    window.history.replaceState({}, "", `/stream?${detailSearch}`);
+    window.history.replaceState({}, "", `/records?${detailSearch}`);
   });
 
   afterEach(() => {
@@ -37,18 +37,25 @@ describe("useLedgerHistorySync", () => {
   });
 
   it("remembers each route's query without the open record", () => {
-    const { result, rerender } = renderSync("details", `period=lastMonth&${detailSearch}`);
-    expect(result.current.details).toBe("period=lastMonth");
+    const { result, rerender } = renderSync("records", `view=entries&${detailSearch}`);
+    expect(result.current.routeQueries.records).toBe("view=entries");
 
     rerender({ tab: "stats", query: "range=year" });
-    expect(result.current).toEqual({ details: "period=lastMonth", stats: "range=year" });
+    expect(result.current.routeQueries).toEqual({ records: "view=entries", stats: "range=year" });
+    expect(result.current.lastBrowsedTab).toBe("stats");
+  });
+
+  it("keeps the tab 设置 was opened from", () => {
+    const { result, rerender } = renderSync("records", "");
+    rerender({ tab: "settings", query: "" });
+    expect(result.current.lastBrowsedTab).toBe("records");
   });
 
   it("drops a custom period it cannot read", async () => {
     const replace = vi.spyOn(window.history, "replaceState");
-    renderSync("details", "period=custom&startDate=2026-02-01&categoryId=c1");
+    renderSync("records", "period=custom&startDate=2026-02-01&categoryId=c1");
     await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith(expect.anything(), "", "/details?categoryId=c1")
+      expect(replace).toHaveBeenCalledWith(expect.anything(), "", "/records?categoryId=c1")
     );
   });
 });

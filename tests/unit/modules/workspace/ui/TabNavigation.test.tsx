@@ -3,102 +3,93 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TabNavigation } from "@/modules/workspace/ui/TabNavigation";
 
-function renderNavigation(element: React.ReactNode) {
-  return render(element);
-}
-
 describe("TabNavigation", () => {
   it("disables every action until the ledger content is ready", () => {
-    renderNavigation(
-      <TabNavigation disabled activeTab="stream" onTabChange={vi.fn()} onOpenInput={vi.fn()} />
+    render(
+      <TabNavigation
+        variant="bottom"
+        disabled
+        activeTab="records"
+        onTabChange={vi.fn()}
+        onOpenInput={vi.fn()}
+      />
     );
     for (const button of screen.getAllByRole("button")) expect(button).toBeDisabled();
   });
-  it("renders the four destinations with the new-record action in the middle", async () => {
+
+  it("puts 记一笔 between 账目 and 统计 on the bottom bar", async () => {
     const user = userEvent.setup();
     const onTabChange = vi.fn();
     const onOpenInput = vi.fn();
 
-    renderNavigation(
-      <TabNavigation activeTab="stream" onTabChange={onTabChange} onOpenInput={onOpenInput} />
+    render(
+      <TabNavigation
+        variant="bottom"
+        activeTab="records"
+        onTabChange={onTabChange}
+        onOpenInput={onOpenInput}
+      />
     );
 
-    expect(screen.getByRole("button", { name: "流水" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: "明细" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "统计" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
-
-    const buttons = screen.getAllByRole("button");
-    expect(buttons.map((button) => button.textContent)).toEqual([
-      "流水",
-      "明细",
+    expect(screen.getByRole("button", { name: "账目" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "账目",
       "",
       "统计",
-      "设置",
     ]);
+    expect(screen.queryByRole("button", { name: "设置" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "统计" }));
     expect(onTabChange).toHaveBeenCalledWith("stats");
 
-    await user.click(screen.getByRole("button", { name: /记一笔|new record/i }));
+    await user.click(screen.getByRole("button", { name: "记一笔" }));
     expect(onOpenInput).toHaveBeenCalledOnce();
+  });
+
+  it("offers only the two tabs in the top bar", () => {
+    render(<TabNavigation variant="top" activeTab="stats" onTabChange={vi.fn()} />);
+
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "账目",
+      "统计",
+    ]);
+    expect(screen.getByRole("button", { name: "统计" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("marks neither tab on 设置", () => {
+    render(<TabNavigation variant="top" activeTab="settings" onTabChange={vi.fn()} />);
+
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).not.toHaveAttribute("aria-current");
+    }
   });
 
   it("reports a tap on the active destination too; the shell decides it goes nowhere", async () => {
     const user = userEvent.setup();
     const onTabChange = vi.fn();
 
-    renderNavigation(
-      <TabNavigation activeTab="stream" onTabChange={onTabChange} onOpenInput={vi.fn()} />
-    );
+    render(<TabNavigation variant="top" activeTab="records" onTabChange={onTabChange} />);
+    await user.click(screen.getByRole("button", { name: "账目" }));
 
-    await user.click(screen.getByRole("button", { name: "流水" }));
-
-    expect(onTabChange).toHaveBeenCalledWith("stream");
+    expect(onTabChange).toHaveBeenCalledWith("records");
   });
 
-  it("calls onTabIntent on pointer enter and focus for inactive destinations", async () => {
+  it("calls onTabIntent on pointer enter and focus for inactive destinations only", async () => {
     const user = userEvent.setup();
     const onTabIntent = vi.fn();
 
-    renderNavigation(
+    render(
       <TabNavigation
-        activeTab="stream"
+        variant="top"
+        activeTab="records"
         onTabChange={vi.fn()}
-        onOpenInput={vi.fn()}
         onTabIntent={onTabIntent}
       />
     );
 
-    const statsButton = screen.getByRole("button", { name: "统计" });
-    await user.hover(statsButton);
+    await user.hover(screen.getByRole("button", { name: "统计" }));
     expect(onTabIntent).toHaveBeenCalledWith("stats");
-
-    const detailsButton = screen.getByRole("button", { name: "明细" });
-    detailsButton.focus();
-    expect(onTabIntent).toHaveBeenCalledWith("details");
-  });
-
-  it("preloads new-record code on pointer and keyboard job without opening", async () => {
-    const user = userEvent.setup();
-    const onInputIntent = vi.fn();
-    const onOpenInput = vi.fn();
-
-    renderNavigation(
-      <TabNavigation
-        activeTab="stream"
-        onTabChange={vi.fn()}
-        onOpenInput={onOpenInput}
-        onInputIntent={onInputIntent}
-      />
-    );
-
-    const addButton = screen.getByRole("button", { name: /记一笔|new record/i });
-    await user.hover(addButton);
-    expect(onInputIntent).toHaveBeenCalled();
-    expect(onOpenInput).not.toHaveBeenCalled();
-
-    addButton.focus();
-    expect(onInputIntent.mock.calls.length).toBeGreaterThanOrEqual(2);
+    await user.hover(screen.getByRole("button", { name: "账目" }));
+    expect(onTabIntent).not.toHaveBeenCalledWith("records");
   });
 });

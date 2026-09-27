@@ -300,13 +300,6 @@ export function useLedgerEntriesTab({
   const isBatchPending =
     batchUpdateDates.isPending || batchDelete.isPending || batchRetry.isPending;
 
-  useEffect(() => {
-    document.documentElement.dataset.batchSelection = String(isSelectionMode);
-    return () => {
-      delete document.documentElement.dataset.batchSelection;
-    };
-  }, [isSelectionMode]);
-
   const handleToggleSelection = useCallback(
     (id: string) => {
       if (!isBatchPending) toggleSelection(id);

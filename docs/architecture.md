@@ -45,7 +45,7 @@ Cashier 只有一种运行环境（Vercel、PostgreSQL、S3 兼容存储），�
 
 ```
 src/app/                  路由与 API handler：认证、校验、调用、映射响应
-  (protected)/(ledger)/   stream、details、stats、settings 四个真实路由，共用一个 layout
+  (protected)/(ledger)/   records、stats、settings 三个真实路由，共用一个 layout
   api/ledger-queries      浏览器读取的唯一入口（类型化查询注册表）
   api/v1                  外部 API（快捷指令）
   api/cron/daily          每日兜底清扫
@@ -245,9 +245,16 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ### 路由与数据
 
-- **路由。** 每个账本页面是 `src/app/(protected)/(ledger)/` 下的真实路由。共享 layout 负责外壳、当前分账、
-  新建记录对话框和详情弹层；跨路由状态放在每个 layout 一份的 workspace store（`src/modules/workspace/store.tsx`），
-  不用注册式 context。每个路由管自己不带前缀的查询参数。
+- **路由。** 每个账本页面是 `src/app/(protected)/(ledger)/` 下的真实路由：`/records`（账目）、`/stats`（统计）、
+  `/settings`（设置）。共享 layout 负责外壳、当前分账、新建记录对话框和详情弹层；跨路由状态放在每个 layout 一份的
+  workspace store（`src/modules/workspace/store.tsx`），不用注册式 context。每个路由管自己不带前缀的查询参数。
+- **账目的两种视图。** 账目用 `view` 参数在一个路由里切换"按账单"（默认，省略）和"按明细"（`view=entries`），
+  两种视图共用周期和筛选参数，切换视图不丢掉正在看的范围。旧的 `/stream`、`/details` 在 `next.config` 里
+  重定向到对应视图，查询参数原样带过去；更早的 `/?tab=` 书签由首页映射。
+- **外壳。** 导航只有账目和统计两个 tab。手机上顶栏放分账切换器和设置齿轮，底栏是"账目 ｜ ＋ ｜ 统计"；
+  桌面上一条顶栏放应用名、分账切换器、两个 tab、"记一笔"和齿轮。设置不是 tab：从齿轮进入，顶栏换成返回箭头，
+  回到进入设置之前的那个 tab。当前分账只在顶栏的 `BookSwitcher` 里选，没有隐藏的手势入口；页面左右边距由
+  `AppShell` 统一负责。
 - **打开的账单只记在网址里。** `?detail=<id>` 是唯一的记录，`DetailSheetHost` 直接读它，没有第二份弹层栈。
   打开时推入一条历史；已经开着一张时（例如拆分后的"查看新账单"）替换这一条，所以弹层从不叠加。关闭时，
   如果这一条是自己推进来的就后退，否则替换掉参数；浏览器后退和点关闭走的是同一条路。弹层等退出动画结束才卸载，
@@ -269,8 +276,9 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   （`waitFor`），或完全不等刷新（`waitFor: false`）。
 - **选择时列表冻结。** 批量选择期间列表查询暂停（`enabled: false`），后台刷新不会在选中项下面换掉行；
   退出选择后过期的查询自动重新读取。批量对话框操作的就是此刻的选择，不需要快照和比对。
-- **页面各管自己的加载和错误状态。** 统计在刷新期间保留上一次成功的数据和对应周期；同一代的流水刷新保留已加载的页。
-- **流水。** 流水页显示处理中、失败和已完成的全部票据。服务端 keyset 分页按
+- **页面各管自己的加载和错误状态。** 统计在刷新期间保留上一次成功的数据和对应周期；同一代的账单列表刷新保留已加载的页。
+  页面不等分类加载完：分类还没到时，行上的分类图标先用占位。
+- **按账单视图。** 显示处理中、失败和已完成的全部票据。服务端 keyset 分页按
   `entryDate DESC, createdAt DESC, id DESC` 排序，浏览器保持服务端顺序。
 - **文案。** 界面只有中文，全部文案集中在 `src/copy/`，按界面区域分文件，每个文件导出若干 `xxxCopy` 对象。
   普通文案是字符串，带参数的是函数（`batchDeleted({ count })`），组件、hook、服务端直接 import，

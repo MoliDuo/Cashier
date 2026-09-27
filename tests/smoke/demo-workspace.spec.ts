@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { selectBook } from "./book-switch";
+import { openTab } from "./navigation";
 
 test("@demo opens a populated workspace with evidence and statistics", async ({ page }) => {
   const errors: string[] = [];
@@ -24,15 +25,15 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   await expect(detail.getByText("Flat White", { exact: true })).toBeVisible();
   await expect(detail.getByText("Chicken Sandwich", { exact: true })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) < 1024) {
-    await detail.getByRole("button", { name: "原始凭证", exact: true }).click();
+    await detail.getByRole("button", { name: /^原始凭证/ }).click();
   }
   await expect(detail.getByRole("img", { name: "图片 1" })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) < 1024) {
-    await detail.getByRole("button", { name: "返回明细", exact: true }).click();
+    await detail.getByRole("button", { name: "明细", exact: true }).click();
   }
   await detail.getByRole("button", { name: "关闭", exact: true }).click();
 
-  // The strip runs 总账 / 共同支出 / 哞哞 / 梁梁; FreshMart is in 梁梁 and
+  // The switcher lists 总账 / 共同支出 / 哞哞 / 梁梁; FreshMart is in 梁梁 and
   // Harbor Coffee in 哞哞.
   await selectBook(page, 2);
   await expect(page.getByText("FreshMart", { exact: true }).first()).toBeVisible();
@@ -62,10 +63,7 @@ test("@demo opens a populated workspace with evidence and statistics", async ({ 
   ).toBeVisible();
   await blurryDetail.getByRole("button", { name: "关闭", exact: true }).click();
 
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "统计", exact: true })
-    .click();
+  await openTab(page, "统计");
   await expect(page.getByText("Dining", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Household", { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);

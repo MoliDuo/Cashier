@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openTab } from "./navigation";
 import { signIn } from "./sign-in";
 
 test("protected redirect, default ledger, manual entry, edit, delete and sign out", async ({
@@ -8,10 +9,10 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
   page.on("pageerror", (error) => errors.push(error.message));
   const item = `Smoke ${testInfo.project.name} ${testInfo.repeatEachIndex}`;
   // The destinations stay disabled until the tab content has hydrated, so the
-  // stream destination doubles as the signal that the page is ready.
+  // 账目 destination doubles as the signal that the page is ready.
   const readySignal = page
     .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "流水", exact: true });
+    .getByRole("button", { name: "账目", exact: true });
   await expect
     .poll(
       async () => {
@@ -65,10 +66,7 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
   await page.reload();
   await expect(page.getByText(`${item} edited`, { exact: true })).toHaveCount(0);
   await expect(readySignal).toBeEnabled();
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "设置", exact: true })
-    .click();
+  await openTab(page, "设置");
   await page.getByRole("button", { name: "退出登录", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "退出登录", exact: true }).click();
   await expect(page).toHaveURL(/\/login/);

@@ -1,29 +1,28 @@
 "use client";
 import { usePathname, useSearchParams } from "next/navigation";
 import { usePeriodFilter } from "../../hooks/usePeriodFilter";
-import { LedgerEntriesTab } from "../LedgerEntriesTab";
+import { DetailsTab } from "../DetailsTab";
 import { useLedgerWorkspace } from "../ledger-workspace-context";
 
-/** 流水: every record, newest first, under the route's own filters. */
-export function StreamRoute() {
-  const { ledger, recordScope, timeZone, today } = useLedgerWorkspace();
+/** 账目 by entry: the entries themselves, under the page's filters. */
+export function EntriesView() {
+  const { ledger, categories, recordScope, timeZone, today } = useLedgerWorkspace();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { period, filterParams, handleFiltersChange, handlePeriodChange } = usePeriodFilter({
-    pathname,
-    searchParams,
-  });
+  const { period, filters, filterParams, handleFiltersChange, handlePeriodChange } =
+    usePeriodFilter({ pathname, searchParams });
 
   return (
-    <LedgerEntriesTab
+    <DetailsTab
       bookId={recordScope ?? undefined}
+      categories={categories}
       ledger={ledger}
       period={period}
       today={today}
       onPeriodChange={handlePeriodChange}
+      filters={filters}
       onFiltersChange={handleFiltersChange}
       advancedFilters={filterParams}
-      collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
       timeZone={timeZone}
     />
   );

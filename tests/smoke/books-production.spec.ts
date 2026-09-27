@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { currentBookOption, openBookSwitcher, selectBook } from "./book-switch";
+import { currentBookOption, selectBook, selectBookByName } from "./book-switch";
+import { openTab } from "./navigation";
 import { signIn } from "./sign-in";
 
 /**
@@ -27,13 +28,6 @@ function apiBase(): string {
 async function login(page: Page) {
   await signIn(page);
   await expect(page.getByRole("button", { name: "记一笔", exact: true })).toBeEnabled();
-}
-
-async function openTab(page: Page, name: "流水" | "明细" | "统计" | "设置") {
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name, exact: true })
-    .click();
 }
 
 /** The 分账 row that names `name`, matched exactly so one book cannot shadow another. */
@@ -64,19 +58,6 @@ async function archiveBook(page: Page, name: string) {
   await bookRow(page, name).getByRole("button", { name: "归档", exact: true }).click();
   await page.getByRole("dialog").last().getByRole("button", { name: "归档", exact: true }).click();
   await expect(bookRow(page, name).getByRole("button", { name: "恢复" })).toBeVisible();
-}
-
-/** The pull-down switcher, picking by name so a leftover book cannot shift the pick. */
-async function selectBookByName(page: Page, name: string) {
-  await openBookSwitcher(page);
-  // By accessible name, not `hasText`: that comparison ignores case, so a book
-  // named Eta would otherwise also find Theta and the click would be ambiguous.
-  await page
-    .getByRole("group", { name: "分账" })
-    .getByRole("button", { name, exact: true })
-    .click();
-  await expect(page.getByTestId("book-reveal")).toHaveAttribute("data-pull-reveal", "closed");
-  await expect(currentBookOption(page)).toHaveText(name);
 }
 
 /** Opens 记一笔, files one quick entry into `book`, and waits for it to be gone. */

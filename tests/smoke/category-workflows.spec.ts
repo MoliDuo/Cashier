@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openTab } from "./navigation";
 import { signIn } from "./sign-in";
 
 test("AI category assignment remains visible across tabs and fits narrow screens", async ({
@@ -19,10 +20,9 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   await create.getByRole("textbox", { name: "金额", exact: true }).fill("12.34");
   await create.getByRole("button", { name: "记一笔", exact: true }).click();
 
-  const navigation = page.getByRole("navigation", { name: "账本导航" });
-  await navigation.getByRole("button", { name: "明细", exact: true }).click();
-  await expect(page).toHaveURL(/\/details/);
-  // 流水 leaves the page when 明细 commits, not when the URL changes.
+  await openTab(page, "明细");
+  await expect(page).toHaveURL(/\/records\?view=entries/);
+  // The bill view leaves the page when the entry view commits, not when the URL changes.
   await expect(page.getByText(item, { exact: true })).toHaveCount(1);
   await expect(page.getByText(item, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "选择", exact: true }).click();
@@ -51,9 +51,9 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   const status = page.locator("#category-assignment-status");
   await expect(status).toBeVisible();
 
-  await navigation.getByRole("button", { name: "设置", exact: true }).click();
+  await openTab(page, "设置");
   await expect(status).toBeVisible();
-  await navigation.getByRole("button", { name: "明细", exact: true }).click();
+  await openTab(page, "明细");
   await expect(status).toBeVisible();
   await expect(status).toContainText(/已更新 1 条，0 条已符合目标分类/, { timeout: 20_000 });
 
@@ -67,8 +67,8 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   // A finished run reports itself until the reader closes it, and then stays closed.
   await status.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(status).toHaveCount(0);
-  await navigation.getByRole("button", { name: "设置", exact: true }).click();
+  await openTab(page, "设置");
   await expect(status).toHaveCount(0);
-  await navigation.getByRole("button", { name: "明细", exact: true }).click();
+  await openTab(page, "明细");
   await expect(status).toHaveCount(0);
 });

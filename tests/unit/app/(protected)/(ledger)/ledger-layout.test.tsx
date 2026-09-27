@@ -143,7 +143,7 @@ describe("RoutePrefetch", () => {
     requestHeaders.current = new Headers({ RSC: "1" });
 
     const tree = await RoutePrefetch({
-      tab: "details",
+      tab: "records",
       searchParams: Promise.resolve({}),
       children: child,
     });
@@ -152,16 +152,21 @@ describe("RoutePrefetch", () => {
     expect(getLedgerRouteBootstrapMock).not.toHaveBeenCalled();
   });
 
-  it("prefetches a document request's filters for the viewed book", async () => {
+  it("prefetches a document request's view and filters for the viewed book", async () => {
     await RoutePrefetch({
-      tab: "details",
-      searchParams: Promise.resolve({ period: "lastMonth", categoryId: "c1", search: "tea" }),
+      tab: "records",
+      searchParams: Promise.resolve({
+        view: "entries",
+        period: "lastMonth",
+        categoryId: "c1",
+        search: "tea",
+      }),
       children: child,
     });
 
     expect(getLedgerRouteBootstrapMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        tab: "details",
+        page: "entries",
         scope: expect.objectContaining({ bookId: BOOK_B, ledgerToday: "2026-09-26" }),
         period: { range: "month", offset: -1 },
         advancedFilters: expect.objectContaining({ categoryId: "c1", search: "tea" }),
@@ -185,7 +190,7 @@ describe("RoutePrefetch", () => {
     loadLedgerViewMock.mockRejectedValue(new UnauthorizedError());
 
     await expect(
-      RoutePrefetch({ tab: "stream", searchParams: Promise.resolve({}), children: child })
+      RoutePrefetch({ tab: "records", searchParams: Promise.resolve({}), children: child })
     ).rejects.toThrow("REDIRECT");
   });
 

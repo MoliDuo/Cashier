@@ -10,7 +10,6 @@ import { useWorkspaceStore } from "../store";
 interface UseRecordScopeResult {
   /** The book the page is showing, or null for 总账. */
   recordScope: RecordScope;
-  onRecordScopeChange: (scope: RecordScope) => void;
 }
 
 /**
@@ -41,5 +40,5 @@ export function useRecordScope(books: readonly BookDto[] | undefined): UseRecord
     if (!dead) writeBookScopeCookie(scope);
   }, [dead, scope]);
 
-  return { recordScope, onRecordScopeChange: setScope };
+  return { recordScope };
 }

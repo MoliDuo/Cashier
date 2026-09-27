@@ -1,30 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { currentBookOption, openBookSwitcher, selectBook } from "./book-switch";
-
-/**
- * Switches tab by keyboard. The demo runner serves `next dev`, whose error
- * overlay sits over the bottom-left nav on a phone and swallows the click that
- * "流水" needs; focusing the tab and pressing Enter is the same path a
- * keyboard user takes, and the overlay does not intercept it.
- */
-async function switchTab(page: Page, name: string) {
-  const tab = page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name, exact: true });
-  await tab.focus();
-  await page.keyboard.press("Enter");
-}
-
-/** Picks a book from the switcher by name, rather than by its position. */
-async function selectBookByName(page: Page, name: string) {
-  await openBookSwitcher(page);
-  await page
-    .getByRole("group", { name: "分账" })
-    .getByRole("button")
-    .filter({ hasText: name })
-    .click();
-  await expect(page.getByTestId("book-reveal")).toHaveAttribute("data-pull-reveal", "closed");
-}
+import { currentBookOption, selectBook, selectBookByName } from "./book-switch";
+import { openTab } from "./navigation";
 
 /**
  * The row of the 分账 list that names `name`. Matched on the exact name, not a
@@ -130,10 +106,7 @@ test("@demo manages books and the book each API key writes to", async ({ page })
   await page.goto("/");
   await page.getByRole("button", { name: "以开发身份进入", exact: true }).click();
   await expect(page).not.toHaveURL(/\/login/);
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "设置", exact: true })
-    .click();
+  await openTab(page, "设置");
 
   // 分账 section: the three seeded books. 总账 is a view over all of them, so
   // nothing here marks a default any more, and the ledger has one zone for all.
@@ -255,10 +228,7 @@ test("@demo deletes, archives and restores a book it creates for itself", async 
   await page.goto("/");
   await page.getByRole("button", { name: "以开发身份进入", exact: true }).click();
   await expect(page).not.toHaveURL(/\/login/);
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "设置", exact: true })
-    .click();
+  await openTab(page, "设置");
   await expect(page.getByRole("heading", { name: "分账", exact: true })).toBeVisible();
 
   // A key is still bound to 梁梁, so archiving it is refused with the reason,
@@ -302,38 +272,29 @@ test("@demo archiving the book being viewed falls back to the ledger total", asy
   await page.getByRole("button", { name: "以开发身份进入", exact: true }).click();
   await expect(page).not.toHaveURL(/\/login/);
 
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "设置", exact: true })
-    .click();
+  await openTab(page, "设置");
   await page.getByRole("button", { name: "新增分账", exact: true }).click();
   await page.getByRole("dialog").getByLabel("名称", { exact: true }).fill(bookName);
   await page.getByRole("dialog").getByRole("button", { name: "新增分账", exact: true }).click();
   await expect(bookRow(page, bookName)).toBeVisible();
 
   // Narrow the records view to that book.
-  await switchTab(page, "流水");
+  await openTab(page, "流水");
   await selectBookByName(page, bookName);
   await expect(currentBookOption(page)).toHaveText(bookName);
 
   // Retiring it from Settings drops the scope: it can no longer name a live
   // book, so the records view falls back to 总账 rather than keeping a book that
   // is gone.
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "设置", exact: true })
-    .click();
+  await openTab(page, "设置");
   await archiveBook(page, bookName);
   await expect(page.getByRole("heading", { name: "已归档的分账", exact: true })).toBeVisible();
-  await switchTab(page, "流水");
+  await openTab(page, "流水");
   // The dead scope is gone once the strip marks 总账 again.
   await expect(currentBookOption(page)).toHaveText("总账");
 
   // Leave the workspace as it was found: restore the book, then remove it.
-  await page
-    .getByRole("navigation", { name: "账本导航" })
-    .getByRole("button", { name: "设置", exact: true })
-    .click();
+  await openTab(page, "设置");
   await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
   await bookRow(page, bookName).getByRole("button", { name: "删除", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();

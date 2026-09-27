@@ -19,7 +19,11 @@ interface WorkspaceState {
   /** Each route's last query, so returning to a tab returns to its filters. */
   routeQueries: Partial<Record<LedgerTab, string>>;
   rememberRouteQuery: (tab: LedgerTab, query: string) => void;
+  /** The tab 设置 was opened from, which its back arrow returns to. */
+  lastBrowsedTab: BrowsedTab;
 }
+
+type BrowsedTab = Exclude<LedgerTab, "settings">;
 
 type WorkspaceStore = StoreApi<WorkspaceState>;
 
@@ -33,11 +37,13 @@ function createWorkspaceStore(initialBookId: string | null): WorkspaceStore {
     setNewRecordOpen: (newRecordOpen) => set({ newRecordOpen }),
     routeQueries: {},
     rememberRouteQuery: (tab, query) =>
-      set((state) =>
-        state.routeQueries[tab] === query
+      set((state) => {
+        const lastBrowsedTab = tab === "settings" ? state.lastBrowsedTab : tab;
+        return state.routeQueries[tab] === query && state.lastBrowsedTab === lastBrowsedTab
           ? state
-          : { routeQueries: { ...state.routeQueries, [tab]: query } }
-      ),
+          : { routeQueries: { ...state.routeQueries, [tab]: query }, lastBrowsedTab };
+      }),
+    lastBrowsedTab: "records",
   }));
 }
 

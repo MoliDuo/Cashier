@@ -110,7 +110,7 @@ function renderDialog(overrides: Partial<DialogProps> = {}) {
   const props: DialogProps = {
     scope: null,
     books: defaultBooks,
-    activeTab: "stream",
+    activeTab: "records",
     committedView: { filters: {}, range: null },
     categories: [],
     mainCurrency: "CNY",

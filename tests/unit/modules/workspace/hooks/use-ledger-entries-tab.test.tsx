@@ -379,7 +379,6 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
     const { result, unmount } = renderTab();
 
     await selectDocuments(result, ["doc-1"]);
-    expect(document.documentElement.dataset.batchSelection).toBe("true");
     expect(result.current.selection.selectedEntryIds).toEqual(["entry-1", "entry-2"]);
     expect(result.current.selection.hasMoreData).toBe(false);
 
@@ -389,7 +388,6 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
     expect(result.current.selection.selectedIds).toEqual([]);
 
     unmount();
-    expect(document.documentElement.dataset.batchSelection).toBeUndefined();
   });
 
   it("does not clear selection or show success when a batch date update fails", async () => {

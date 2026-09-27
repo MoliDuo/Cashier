@@ -3,7 +3,7 @@ import {
   buildLedgerUrl,
   parseStatusesParam,
   formatStatusesParam,
-  buildDetailsDrilldownSearchParams,
+  buildEntriesDrilldownSearchParams,
   readLedgerFilterParams,
   updateLedgerSearchParams,
 } from "@/modules/workspace/ledger-url-params";
@@ -128,13 +128,13 @@ describe("ledger-url-params", () => {
 
   it("builds a drilldown query from nothing but the range and what was pressed", () => {
     expect(
-      buildDetailsDrilldownSearchParams({
+      buildEntriesDrilldownSearchParams({
         startDate: "2026-02-01",
         endDate: "2026-02-28",
         categoryId: "c1",
         currency: null,
       }).toString()
-    ).toBe("range=custom&from=2026-02-01&to=2026-02-28&categoryId=c1");
+    ).toBe("range=custom&from=2026-02-01&to=2026-02-28&view=entries&categoryId=c1");
   });
 
   describe("parseStatusesParam", () => {

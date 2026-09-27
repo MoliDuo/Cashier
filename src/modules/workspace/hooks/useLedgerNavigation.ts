@@ -7,11 +7,11 @@ import { useWorkspaceStore } from "../store";
 import { readPeriodParams, writePeriodParams } from "../period-url-params";
 
 /** The routes that read a period; moving between them carries it along. */
-const PERIOD_TABS: ReadonlySet<LedgerTab> = new Set(["stream", "details", "stats"]);
+const PERIOD_TABS: ReadonlySet<LedgerTab> = new Set(["records", "stats"]);
 
 /**
  * Moves between the ledger's routes. A tab opens on the query it was last left
- * with, so 明细's filters are still there after a look at 统计 — but the period
+ * with, so 账目's filters are still there after a look at 统计 — but the period
  * is one for the whole ledger, so it comes along from the route being left.
  * Scroll position is each tab's own business (useTabScrollRestoration).
  */

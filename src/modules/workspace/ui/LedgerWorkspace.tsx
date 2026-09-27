@@ -1,7 +1,6 @@
 "use client";
 import { useMemo, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { LedgerTimeZoneProvider } from "@/lib/ledger-time-zone";
 import { ledgerTabFromPathname } from "@/lib/ledger-tabs";
 import { readLedgerDetailParam } from "@/lib/navigation/ledger-detail-navigation";
@@ -18,7 +17,6 @@ import { readPeriodParams } from "../period-url-params";
 import { useLedgerToday } from "../hooks/useLedgerToday";
 import { useLedgerSync } from "../hooks/useLedgerSync";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
-import { BookReveal } from "./BookReveal";
 import { NewRecordDialog } from "./NewRecordDialog";
 import { DetailSheetHost } from "./DetailSheetHost";
 import { LedgerWorkspaceContext, type LedgerWorkspaceValue } from "./ledger-workspace-context";
@@ -33,10 +31,6 @@ interface LedgerWorkspaceProps {
 /** Only before the ledger itself has loaded; the ledger always names its zone. */
 const DEFAULT_TIME_ZONE = "Asia/Shanghai";
 
-function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn("animate-pulse rounded bg-surface2", className)} />;
-}
-
 /**
  * The part of the ledger that outlives a route change: the book scope, the
  * new-record dialog, the detail sheets and the queries every route reads.
@@ -47,7 +41,9 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
   const searchParams = useSearchParams();
   const activeTab = ledgerTabFromPathname(pathname);
   const { books } = useBooks({});
-  const { recordScope, onRecordScopeChange } = useRecordScope(books);
+  // Forgets a book that stopped being live and remembers the choice in a cookie;
+  // the top bar's switcher is where the choice is made.
+  const { recordScope } = useRecordScope(books);
   useLedgerHistorySync({ activeTab, pathname, searchParams });
 
   const {
@@ -96,8 +92,6 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
     );
   }
 
-  const carriesBookSwitch = activeTab !== "settings" && value.books.length > 0;
-
   return (
     <LedgerWorkspaceContext.Provider value={value}>
       <LedgerTimeZoneProvider timeZone={timeZone}>
@@ -108,26 +102,9 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
               onRetry={() => void categoriesQuery.refetch()}
             />
           ) : null}
-          {categoriesQuery.isPending && categoriesHaveNoData ? (
-            <div className="space-y-3 px-2 py-4" role="status" aria-busy="true">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </div>
-          ) : null}
-
-          <div
-            className={categoriesHaveNoData ? "hidden" : undefined}
-            aria-hidden={categoriesHaveNoData || undefined}
-          >
-            {carriesBookSwitch ? (
-              <BookReveal
-                books={value.books}
-                scope={recordScope}
-                onScopeChange={onRecordScopeChange}
-              />
-            ) : null}
-            <div className="mt-0 min-w-0 max-w-full overflow-x-clip">{children}</div>
-          </div>
+          {/* The page does not wait for the categories: a row whose category
+              has not loaded yet shows a neutral icon until it does. */}
+          <div className="min-w-0 max-w-full overflow-x-clip">{children}</div>
 
           <NewRecordDialog
             scope={recordScope}

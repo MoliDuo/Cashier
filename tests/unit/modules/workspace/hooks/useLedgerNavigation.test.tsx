@@ -27,9 +27,9 @@ function useHarness() {
 
 describe("useLedgerNavigation", () => {
   beforeEach(() => {
-    pathname.current = "/stream";
+    pathname.current = "/records";
     search.current = "";
-    window.history.replaceState({}, "", "/stream");
+    window.history.replaceState({}, "", "/records");
   });
 
   afterEach(() => {
@@ -43,15 +43,18 @@ describe("useLedgerNavigation", () => {
   });
 
   it("returns to a tab on the filters it was left with, under the current period", () => {
+    pathname.current = "/stats";
     search.current = "range=year";
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.remember("details", "offset=-1&categoryId=c1"));
+    act(() => result.current.remember("records", "view=entries&offset=-1&categoryId=c1"));
 
     // The period is one for the whole ledger, so it comes from the route being
-    // left; the filters are 明细's own.
-    expect(result.current.navigation.hrefFor("details")).toBe("/details?categoryId=c1&range=year");
-    act(() => result.current.navigation.navigate("details"));
-    expect(router.push).toHaveBeenCalledWith("/details?categoryId=c1&range=year", {
+    // left; the view and the filters are 账目's own.
+    expect(result.current.navigation.hrefFor("records")).toBe(
+      "/records?view=entries&categoryId=c1&range=year"
+    );
+    act(() => result.current.navigation.navigate("records"));
+    expect(router.push).toHaveBeenCalledWith("/records?view=entries&categoryId=c1&range=year", {
       scroll: false,
     });
   });
@@ -60,23 +63,23 @@ describe("useLedgerNavigation", () => {
     pathname.current = "/settings";
     search.current = "";
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.remember("details", "offset=-1"));
+    act(() => result.current.remember("records", "offset=-1"));
 
-    expect(result.current.navigation.hrefFor("details")).toBe("/details?offset=-1");
+    expect(result.current.navigation.hrefFor("records")).toBe("/records?offset=-1");
     expect(result.current.navigation.hrefFor("settings")).toBe("/settings");
   });
 
   it("goes to an explicit query instead of the remembered one", () => {
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.remember("details", "period=lastMonth"));
+    act(() => result.current.remember("records", "period=lastMonth"));
     act(() =>
-      result.current.navigation.navigate("details", new URLSearchParams("period=thisYear"))
+      result.current.navigation.navigate("records", new URLSearchParams("period=thisYear"))
     );
-    expect(router.push).toHaveBeenCalledWith("/details?period=thisYear", { scroll: false });
+    expect(router.push).toHaveBeenCalledWith("/records?period=thisYear", { scroll: false });
   });
 
   it("replaces an open record's history entry so Back cannot reopen it", () => {
-    window.history.replaceState({}, "", "/stream?detail=doc-1");
+    window.history.replaceState({}, "", "/records?detail=doc-1");
     const { result } = renderHook(useHarness, { wrapper });
     act(() => result.current.navigation.navigate("stats"));
     expect(router.replace).toHaveBeenCalledWith("/stats", { scroll: false });

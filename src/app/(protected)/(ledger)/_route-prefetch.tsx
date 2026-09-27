@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { HydrationBoundary, type DehydratedState } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
-import type { LedgerTab } from "@/lib/ledger-tabs";
+import { ledgerPageFor, type LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
 import { readPeriodParams } from "@/modules/workspace/period-url-params";
 import {
@@ -42,20 +42,19 @@ export async function RoutePrefetch({
   const view = await orSignIn(loadLedgerView());
   const ledgerDto = view.context.ledgerDto;
   const params = toUrlSearchParams(await searchParams);
+  const page = ledgerPageFor(tab, params);
   let state: DehydratedState | undefined;
   try {
     state = await getLedgerRouteBootstrap({
-      tab,
+      page,
       ledgerDto,
       scope: view,
       period: readPeriodParams(params),
-      ...(tab === "stream" || tab === "details"
-        ? { advancedFilters: readLedgerFilterParams(params) }
-        : {}),
+      ...(tab === "records" ? { advancedFilters: readLedgerFilterParams(params) } : {}),
     });
   } catch (error) {
     logger.error(
-      { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id), tab },
+      { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id), page },
       "Ledger route bootstrap failed; falling back to client queries"
     );
   }

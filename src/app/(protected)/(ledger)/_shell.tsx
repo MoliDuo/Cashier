@@ -2,13 +2,13 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/modules/workspace/ui/AppShell";
-import { SwipeTabSurface } from "@/modules/workspace/ui/SwipeTabSurface";
+import { LedgerTopBar } from "@/modules/workspace/ui/LedgerTopBar";
 import { TabNavigation } from "@/modules/workspace/ui/TabNavigation";
 import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
 import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigation";
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import { useWorkspaceStore } from "@/modules/workspace/store";
-import type { LedgerTab } from "@/lib/ledger-tabs";
+import { readRecordsView, type LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
 import { readPeriodParams } from "@/modules/workspace/period-url-params";
 import {
@@ -17,15 +17,16 @@ import {
 } from "@/modules/workspace/prefetch-ledger-tabs";
 
 /**
- * The header and tab bar every ledger route shares. It renders outside the
- * layout's data Suspense, so the frame is on screen while the ledger loads;
- * navigation stays disabled until the workspace has mounted, so an early click
- * cannot race its hydration.
+ * The bars every ledger route shares. They render outside the layout's data
+ * Suspense, so the frame is on screen while the ledger loads; navigation stays
+ * disabled until the workspace has mounted, so an early click cannot race its
+ * hydration.
  */
 export function LedgerShell({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const ready = useWorkspaceStore((state) => state.ready);
   const setNewRecordOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
+  const lastBrowsedTab = useWorkspaceStore((state) => state.lastBrowsedTab);
   // The viewed book changes on the client with no server render behind it, so
   // the hover prefetch reads it live from the store.
   const bookId = useWorkspaceStore((state) => state.bookId) ?? undefined;
@@ -45,7 +46,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
       const href = hrefFor(tab);
       prefetch(href);
       const query = new URLSearchParams(href.split("?")[1] ?? "");
-      if (tab === "details") {
+      if (tab === "records" && readRecordsView(query) === "entries") {
         void prefetchDetailsTabQuery(
           queryClient,
           bookId,
@@ -63,8 +64,29 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AppShell
-      navigation={
+      topBar={
+        <LedgerTopBar
+          activeTab={activeTab}
+          disabled={!ready}
+          navigation={
+            <TabNavigation
+              variant="top"
+              disabled={!ready}
+              activeTab={activeTab}
+              onTabChange={changeTab}
+              onTabIntent={preloadTab}
+            />
+          }
+          onOpenInput={openInput}
+          onInputIntent={preloadNewRecordModules}
+          settingsHref={hrefFor("settings")}
+          onOpenSettings={() => changeTab("settings")}
+          onLeaveSettings={() => changeTab(lastBrowsedTab)}
+        />
+      }
+      bottomBar={
         <TabNavigation
+          variant="bottom"
           disabled={!ready}
           activeTab={activeTab}
           onTabChange={changeTab}
@@ -74,9 +96,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
         />
       }
     >
-      <SwipeTabSurface activeTab={activeTab} onTabChange={changeTab} onTabIntent={preloadTab}>
-        {children}
-      </SwipeTabSurface>
+      {children}
     </AppShell>
   );
 }

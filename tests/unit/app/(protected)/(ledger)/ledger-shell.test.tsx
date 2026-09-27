@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { activeTabState, navigateMock, routerPrefetchMock, prefetchStatsTabQueryMock } = vi.hoisted(
   () => ({
-    activeTabState: { current: "stream" as string },
+    activeTabState: { current: "records" as string },
     navigateMock: vi.fn(),
     routerPrefetchMock: vi.fn(),
     prefetchStatsTabQueryMock: vi.fn(),
@@ -28,17 +28,24 @@ vi.mock("@/modules/workspace/hooks/useTabScrollRestoration", () => ({
 }));
 
 vi.mock("@/modules/workspace/ui/AppShell", () => ({
-  AppShell: ({ children, navigation }: { children: ReactNode; navigation?: ReactNode }) => (
+  AppShell: ({
+    children,
+    topBar,
+    bottomBar,
+  }: {
+    children: ReactNode;
+    topBar: ReactNode;
+    bottomBar: ReactNode;
+  }) => (
     <>
-      {navigation}
+      <div data-testid="top-bar">{topBar}</div>
+      <div data-testid="bottom-bar">{bottomBar}</div>
       {children}
     </>
   ),
 }));
 
-vi.mock("@/modules/workspace/ui/SwipeTabSurface", () => ({
-  SwipeTabSurface: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
+vi.mock("@/modules/workspace/ui/BookSwitcher", () => ({ BookSwitcher: () => null }));
 
 vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({ preloadNewRecordModules: vi.fn() }));
 
@@ -100,23 +107,26 @@ function renderShell(
   );
 }
 
-function destination(tab: LedgerTab) {
-  return screen.getByRole("button", { name: ledgerPageCopy[tab] });
+/** A tab on the phone's bottom bar; the desktop top bar carries the same two. */
+function destination(tab: Exclude<LedgerTab, "settings">) {
+  return within(screen.getByTestId("bottom-bar")).getByRole("button", {
+    name: ledgerPageCopy[tab],
+  });
 }
 
 describe("LedgerShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    activeTabState.current = "stream";
+    activeTabState.current = "records";
   });
 
   it("does nothing when the destination is the tab the reader is on", async () => {
     const user = userEvent.setup();
     const stream = vi.fn().mockResolvedValue("stream");
     renderShell(["ledger", "source-documents", "stream"], stream);
-    await waitFor(() => expect(destination("stream")).toBeEnabled());
+    await waitFor(() => expect(destination("records")).toBeEnabled());
 
-    await user.click(destination("stream"));
+    await user.click(destination("records"));
 
     expect(navigateMock).not.toHaveBeenCalled();
     expect(stream).toHaveBeenCalledTimes(1);
@@ -156,5 +166,28 @@ describe("LedgerShell", () => {
 
     await waitFor(() => expect(prefetchStatsTabQueryMock).toHaveBeenCalled());
     expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[1]).toBeUndefined();
+  });
+
+  it("opens 设置 from the gear, not from a tab", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    const gear = within(screen.getByTestId("top-bar")).getByRole("link", { name: "设置" });
+    await waitFor(() => expect(destination("stats")).toBeEnabled());
+
+    await user.click(gear);
+
+    expect(navigateMock).toHaveBeenCalledWith("settings");
+  });
+
+  it("goes back from 设置 to the tab it was opened from", async () => {
+    const user = userEvent.setup();
+    activeTabState.current = "settings";
+    renderShell();
+    const back = within(screen.getByTestId("top-bar")).getByRole("button", { name: "返回" });
+    await waitFor(() => expect(back).toBeEnabled());
+
+    await user.click(back);
+
+    expect(navigateMock).toHaveBeenCalledWith("records");
   });
 });

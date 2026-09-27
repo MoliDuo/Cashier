@@ -14,7 +14,7 @@ import {
 } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { resolveAuthenticatedHome } from "@/modules/workspace/server/resolve-authenticated-home";
-import type { LedgerTab } from "@/lib/ledger-tabs";
+import type { LedgerPage } from "@/lib/ledger-tabs";
 import type { Period } from "@/modules/ledger/domain/period";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 
@@ -46,7 +46,7 @@ vi.mock("@/modules/ledger/server/books", async (importOriginal) => {
 });
 
 interface PageInput {
-  tab: LedgerTab;
+  page: LedgerPage;
   period?: Period;
   advancedFilters?: LedgerAdvancedFilters;
   /** The book the scope cookie names. */
@@ -64,7 +64,7 @@ async function loadPage(input: PageInput) {
   const [shell, route] = await Promise.all([
     getLedgerShellBootstrap({ ledgerDto, books: view.books, categories: view.categories }),
     getLedgerRouteBootstrap({
-      tab: input.tab,
+      page: input.page,
       ledgerDto,
       scope: view,
       ...(input.period === undefined ? {} : { period: input.period }),
@@ -155,7 +155,7 @@ describe("ledger page bootstrap", () => {
   });
 
   it("dehydrates the ledger, its live books and its categories for the shell", async () => {
-    const { shell, view } = await loadPage({ tab: "stream" });
+    const { shell, view } = await loadPage({ page: "documents" });
 
     expect(query(shell, "ledger")?.state.data).toMatchObject({ id: ledgerId });
     expect(
@@ -173,7 +173,7 @@ describe("ledger page bootstrap", () => {
 
     // 16:30 UTC on the 30th is already October in Shanghai, the ledger's zone,
     // where the deployment's UTC would still say September.
-    const { view, route } = await loadPage({ tab: "stream" });
+    const { view, route } = await loadPage({ page: "documents" });
 
     expect(view.ledgerToday).toBe("2026-10-01");
     expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
@@ -201,7 +201,7 @@ describe("ledger page bootstrap", () => {
       book: otherBookId,
     });
 
-    const { view, route } = await loadPage({ tab: "stream", bookId: otherBookId });
+    const { view, route } = await loadPage({ page: "documents", bookId: otherBookId });
 
     // London is still in September, so this month is September for every book.
     expect(view.bookId).toBe(otherBookId);
@@ -216,7 +216,7 @@ describe("ledger page bootstrap", () => {
     await seedDocument({ title: "tea", date: "2026-09-12", amounts: ["60.00"] });
 
     const { route } = await loadPage({
-      tab: "stream",
+      page: "documents",
       advancedFilters: {
         minAmount: "20",
         maxAmount: "100",
@@ -239,7 +239,7 @@ describe("ledger page bootstrap", () => {
     });
 
     const { route } = await loadPage({
-      tab: "details",
+      page: "entries",
       period: { range: "custom", from: "2026-09-01", to: "2026-09-30" },
       advancedFilters: { minAmount: "20", maxAmount: "100" },
     });
@@ -253,7 +253,7 @@ describe("ledger page bootstrap", () => {
 
   it("prefetches stats under the key the stats tab asks for, for the remembered book", async () => {
     const period: Period = { range: "year", offset: -2 };
-    const { view, route } = await loadPage({ tab: "stats", bookId, period });
+    const { view, route } = await loadPage({ page: "stats", bookId, period });
 
     const expected = buildStatsQueryDescriptor({ bookId, period, mainCurrency: "CNY" });
     const stats = query(route, "ledger", "enhanced-stats");
@@ -270,14 +270,14 @@ describe("ledger page bootstrap", () => {
       .set({ archivedAt: new Date() })
       .where(eq(books.id, otherBookId));
 
-    const { view, route } = await loadPage({ tab: "stats", bookId: otherBookId });
+    const { view, route } = await loadPage({ page: "stats", bookId: otherBookId });
 
     expect(view.bookId).toBeNull();
     expect(query(route, "ledger", "enhanced-stats")?.queryKey[2]).toMatchObject({ bookId: null });
   });
 
   it("prefetches the settings view for 设置", async () => {
-    const { route } = await loadPage({ tab: "settings" });
+    const { route } = await loadPage({ page: "settings" });
 
     expect(route.queries.map((candidate) => candidate.queryKey)).toEqual([["ledger", "settings"]]);
     expect(route.queries[0]?.state.status).toBe("success");
@@ -286,7 +286,7 @@ describe("ledger page bootstrap", () => {
   it("keeps the remembered book when the books fail", async () => {
     request.failBooks = true;
 
-    const { view, shell, route } = await loadPage({ tab: "stream", bookId: otherBookId });
+    const { view, shell, route } = await loadPage({ page: "documents", bookId: otherBookId });
 
     // A list that failed is not evidence the book is gone; losing it would
     // quietly reset the reader to 总账.

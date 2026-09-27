@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openTab } from "./navigation";
 import { signIn } from "./sign-in";
 
 test("unsaved input is kept as a draft and leaving never asks", async ({ page }, testInfo) => {
@@ -51,8 +52,7 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
 test("settings save as they change, with nothing to confirm on the way out", async ({ page }) => {
   await signIn(page);
 
-  const navigation = page.getByRole("navigation");
-  await navigation.getByRole("button", { name: "设置", exact: true }).click();
+  await openTab(page, "设置");
   const prompt = page.getByRole("textbox", { name: "账本提示词", exact: true });
   const original = await prompt.inputValue();
   const next = `smoke prompt ${Date.now()}`;
@@ -61,11 +61,11 @@ test("settings save as they change, with nothing to confirm on the way out", asy
   await prompt.fill(next);
   await page.getByRole("switch", { name: "默认折叠账单", exact: true }).focus();
   await expect(page.getByText("设置更新成功").first()).toBeVisible();
-  await navigation.getByRole("button", { name: "流水", exact: true }).click();
+  await openTab(page, "流水");
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
   await page.reload();
-  await navigation.getByRole("button", { name: "设置", exact: true }).click();
+  await openTab(page, "设置");
   await expect(prompt).toHaveValue(next);
   await prompt.fill(original);
   await prompt.blur();
