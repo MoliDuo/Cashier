@@ -1,4 +1,5 @@
 "use client";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { EmptyState } from "@/components/EmptyState";
@@ -90,7 +91,10 @@ export function StatsRanking({
               disabled={onCategoryClick == null}
               aria-label={`${displayName}, ${amount}, ${hasShare ? share : statsTabCopy.noShare}`}
               className={cn(
-                "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 text-left",
+                "group grid w-full items-center gap-3 text-left",
+                onCategoryClick != null
+                  ? "grid-cols-[2.5rem_minmax(0,1fr)_auto_1rem]"
+                  : "grid-cols-[2.5rem_minmax(0,1fr)_auto]",
                 onCategoryClick != null &&
                   "-mx-2 cursor-pointer rounded-lg px-2 py-1 transition-colors hover:bg-surface2/50"
               )}
@@ -128,6 +132,10 @@ export function StatsRanking({
                   {hasShare ? share : "—"}
                 </span>
               </span>
+              {/* Says the row opens something: the category's entries. */}
+              {onCategoryClick != null ? (
+                <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />
+              ) : null}
             </button>
           );
         })}

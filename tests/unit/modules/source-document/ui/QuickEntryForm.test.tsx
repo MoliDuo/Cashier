@@ -31,8 +31,23 @@ vi.mock("@/components/ui/select", () => ({
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <button type="button" className={className}>
+  SelectTrigger: ({
+    children,
+    className,
+    "aria-label": ariaLabel,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+    "aria-label"?: string;
+  }) => (
+    <button
+      type="button"
+      role="combobox"
+      aria-controls="currency-options"
+      aria-expanded={false}
+      aria-label={ariaLabel}
+      className={className}
+    >
       {children}
     </button>
   ),
@@ -81,7 +96,7 @@ describe("QuickEntryForm", () => {
     });
   });
 
-  it("renders currency selector with main currency first", () => {
+  it("leads with the amount and its currency, then category, date and name", () => {
     const { container } = render(
       <QuickEntryForm
         categories={[createCategory()]}
@@ -90,43 +105,33 @@ describe("QuickEntryForm", () => {
       />
     );
 
-    expect(screen.getByText("货币")).toBeTruthy();
     const amountInput = screen.getByRole("textbox", { name: "金额" });
     expect(amountInput).toHaveAttribute("inputmode", "decimal");
     expect(amountInput).toHaveAttribute("placeholder", "0.00");
-    expect(screen.getAllByText("MYR")).toHaveLength(2);
+    expect(screen.getByRole("combobox", { name: "货币" })).toBeInTheDocument();
 
     const options = screen.getAllByTestId("currency-option").map((node) => node.textContent);
     expect(options.slice(0, 3)).toEqual(["MYR", "USD", "CNY"]);
 
-    const itemNameInput = container.querySelector("input[placeholder='名称（可选）']");
-    const labels = Array.from(container.querySelectorAll("p")).map((node) => ({
-      text: node.textContent,
-      node,
-    }));
-    const dateLabel = labels.find((label) => label.text === "选择日期")?.node ?? null;
-    const categoryLabel = labels.find((label) => label.text === "选择分类")?.node ?? null;
-    const currencyLabel = labels.find((label) => label.text === "货币")?.node ?? null;
+    const labels = Array.from(container.querySelectorAll("p"));
+    const categoryLabel = labels.find((node) => node.textContent === "选择分类")!;
+    const dateLabel = labels.find((node) => node.textContent === "选择日期")!;
+    const itemNameInput = container.querySelector("input[placeholder='名称（可选）']")!;
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(amountInput.compareDocumentPosition(categoryLabel)).toBe(following);
+    expect(categoryLabel.compareDocumentPosition(dateLabel)).toBe(following);
+    expect(dateLabel.compareDocumentPosition(itemNameInput)).toBe(following);
+  });
 
-    expect(itemNameInput).not.toBeNull();
-    expect(dateLabel).not.toBeNull();
-    expect(categoryLabel).not.toBeNull();
-    expect(currencyLabel).not.toBeNull();
-    if (itemNameInput == null) {
-      throw new Error("Expected item name input");
-    }
-    if (dateLabel == null || categoryLabel == null || currencyLabel == null) {
-      throw new Error("Expected ordered quick entry labels");
-    }
+  it("names a missing amount or category under its field only after a submit", () => {
+    render(<QuickEntryForm categories={[createCategory()]} mainCurrency="CNY" />);
 
-    expect(itemNameInput.compareDocumentPosition(dateLabel)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(dateLabel.compareDocumentPosition(categoryLabel)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(categoryLabel.compareDocumentPosition(currencyLabel)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(currencyLabel.compareDocumentPosition(amountInput)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
+    expect(screen.queryByText("请输入金额")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /记一笔/ }));
+
+    expect(screen.getByText("请输入金额")).toBeInTheDocument();
+    expect(screen.getByText("请选择分类")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "金额" })).toHaveAttribute("aria-invalid", "true");
   });
 
   it("accepts a decimal amount with at most two fractional digits", () => {

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { safePrefetch } from "@/lib/safe-prefetch";
@@ -68,14 +68,11 @@ interface NewRecordFormsProps {
   mainCurrency: string;
   preferredCurrencies: string[];
   timeZone?: string;
-  aiDirty: boolean;
-  quickDirty: boolean;
-  setInputMode: (mode: NewRecordInputMode) => void;
   setInputOpen: (open: boolean) => void;
   setAiPending: (pending: boolean) => void;
   setQuickPending: (pending: boolean) => void;
-  setAiDirty: (dirty: boolean) => void;
-  setQuickDirty: (dirty: boolean) => void;
+  /** The record's book picker, shown in each form's footer. */
+  bookPicker: ReactNode;
 }
 
 export function NewRecordForms({
@@ -89,14 +86,10 @@ export function NewRecordForms({
   mainCurrency,
   preferredCurrencies,
   timeZone,
-  aiDirty,
-  quickDirty,
-  setInputMode,
   setInputOpen,
   setAiPending,
   setQuickPending,
-  setAiDirty,
-  setQuickDirty,
+  bookPicker,
 }: NewRecordFormsProps) {
   const handleSuccess = useCallback(
     (mode: NewRecordInputMode, result: CreatedRecordResult) => {
@@ -113,42 +106,31 @@ export function NewRecordForms({
         savedBook,
       });
 
-      if (mode === "ai") {
-        if (quickDirty) setInputMode("quick");
-        else setInputOpen(false);
-        return;
-      }
-
-      if (aiDirty) setInputMode("ai");
-      else setInputOpen(false);
+      // A saved record closes the dialog. Whatever was typed into the other
+      // mode stays in that mode's draft for the next opening.
+      setInputOpen(false);
     },
-    [
-      activeTab,
-      aiDirty,
-      committedView,
-      quickDirty,
-      savedBook,
-      setInputMode,
-      setInputOpen,
-      viewedBookId,
-    ]
+    [activeTab, committedView, savedBook, setInputOpen, viewedBookId]
   );
 
   return (
     <>
-      <div className={inputMode === "ai" ? undefined : "hidden"} aria-hidden={inputMode !== "ai"}>
+      <div
+        className={inputMode === "ai" ? "flex flex-1 flex-col" : "hidden"}
+        aria-hidden={inputMode !== "ai"}
+      >
         <SourceDocumentInput
           bookId={bookId}
 
           isActive={inputMode === "ai"}
+          footerStart={bookPicker}
           onPendingChange={setAiPending}
-          onDirtyChange={setAiDirty}
           {...(timeZone != null ? { timeZone } : {})}
           onSuccess={(result) => handleSuccess("ai", result)}
         />
       </div>
       <div
-        className={inputMode === "quick" ? undefined : "hidden"}
+        className={inputMode === "quick" ? "flex flex-1 flex-col" : "hidden"}
         aria-hidden={inputMode !== "quick"}
       >
         <QuickEntryForm
@@ -158,7 +140,7 @@ export function NewRecordForms({
           mainCurrency={mainCurrency}
           preferredCurrencies={preferredCurrencies}
           onPendingChange={setQuickPending}
-          onDirtyChange={setQuickDirty}
+          footerStart={bookPicker}
           {...(timeZone != null ? { timeZone } : {})}
           onSuccess={(result) => handleSuccess("quick", result)}
         />

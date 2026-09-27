@@ -1,6 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { buildSparklineGeometry } from "@/modules/stats/lib/sparkline-path";
+import { ChevronRight } from "lucide-react";
 import { statsTabCopy } from "@/copy/stats";
 
 interface StatsSparklineProps {
@@ -69,16 +70,23 @@ export function StatsSparkline({
     </svg>
   );
 
-  if (onExpand == null || disabled) return <div className="min-w-0">{figure}</div>;
-
+  // The line itself is a picture, not a control; the way to the full chart is
+  // a button that says where it goes.
   return (
-    <button
-      type="button"
-      onClick={onExpand}
-      aria-label={statsTabCopy.sparklineExpand}
-      className="block w-full min-w-0 rounded-md py-2 transition-opacity duration-[var(--motion-feedback)] hover:opacity-80"
-    >
+    <div className="min-w-0 space-y-1 py-2">
       {figure}
-    </button>
+      {onExpand == null || disabled ? null : (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onExpand}
+            className="inline-flex items-center gap-0.5 rounded-md px-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          >
+            {statsTabCopy.sparklineExpand}
+            <ChevronRight aria-hidden="true" className="size-3.5" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

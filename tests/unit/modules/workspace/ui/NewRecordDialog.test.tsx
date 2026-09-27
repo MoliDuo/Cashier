@@ -18,6 +18,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
     setInputMode: (mode: "ai" | "quick") => void;
     setAiPending: (pending: boolean) => void;
     setInputOpen: (open: boolean) => void;
+    bookPicker: ReactNode;
   }) => (
     <div
       data-testid="record-forms"
@@ -29,6 +30,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
       data-time-zone={props.timeZone ?? ""}
       data-input-mode={props.inputMode}
     >
+      {props.bookPicker}
       <button type="button" onClick={() => props.setAiPending(true)}>
         start submit
       </button>

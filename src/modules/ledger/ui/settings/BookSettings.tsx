@@ -9,6 +9,7 @@ import {
   Archive,
   ArchiveRestore,
   Check,
+  MoreVertical,
   Pencil,
   RefreshCw,
   Trash2,
@@ -18,6 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -305,26 +313,6 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          disabled={busy || index === 0}
-                          aria-label={settingsBooksCopy.moveUp({ name: book.name })}
-                          onClick={() => move(index, -1)}
-                        >
-                          <ArrowUp className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={busy || index === list.length - 1}
-                          aria-label={settingsBooksCopy.moveDown({ name: book.name })}
-                          onClick={() => move(index, 1)}
-                        >
-                          <ArrowDown className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
                           disabled={busy}
                           aria-label={settingsBooksCopy.rename({ name: book.name })}
                           title={settingsBooksCopy.rename({ name: book.name })}
@@ -332,30 +320,50 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                         >
                           <Pencil className="size-4" />
                         </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={busy}
-                          aria-label={settingsBooksCopy.archive}
-                          title={settingsBooksCopy.archive}
-                          className="text-muted-foreground hover:text-danger"
-                          onClick={() => setArchiveTarget(book)}
-                        >
-                          <Archive className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={busy}
-                          aria-label={settingsBooksCopy.delete}
-                          title={settingsBooksCopy.delete}
-                          className="text-muted-foreground hover:text-danger"
-                          onClick={() => setDeleteTarget(book)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                        {/* Renaming stays on the row; the rarer moves and the
+                            two ways to retire a book share one menu. */}
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={busy}
+                              aria-label={settingsBooksCopy.moreActions({ name: book.name })}
+                              title={settingsBooksCopy.moreActions({ name: book.name })}
+                            >
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              disabled={index === 0}
+                              onSelect={() => move(index, -1)}
+                            >
+                              <ArrowUp className="mr-2 size-4" />
+                              {settingsBooksCopy.moveUpShort}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={index === list.length - 1}
+                              onSelect={() => move(index, 1)}
+                            >
+                              <ArrowDown className="mr-2 size-4" />
+                              {settingsBooksCopy.moveDownShort}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => setArchiveTarget(book)}>
+                              <Archive className="mr-2 size-4" />
+                              {settingsBooksCopy.archive}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-danger focus:text-danger"
+                              onSelect={() => setDeleteTarget(book)}
+                            >
+                              <Trash2 className="mr-2 size-4" />
+                              {settingsBooksCopy.delete}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </>
                     )}
                   </div>

@@ -89,6 +89,22 @@ export function BookkeepingSettings({
 
   return (
     <>
+      {/*
+        分类 saves through a draft of its own — 管理分类 holds the edit session and
+        its 保存 — so it is a card of its own. It leads the page: it is what the
+        ledger is adjusted most often for.
+      */}
+      <CategorySection
+        categories={categories}
+        uncategorizedCount={uncategorizedCount}
+        onSaveCategories={onSaveCategories}
+        {...(onReloadCategories == null ? {} : { onReloadCategories })}
+        generatingCategoryIds={generatingCategoryIds}
+        failedCategoryIds={failedCategoryIds}
+        onRetryMetadata={onRetryMetadata}
+        isSaving={isSavingCategories}
+        {...(onGoToDetails == null ? {} : { onGoToDetails })}
+      />
       <SettingsSection title={settingsCopy.bookkeepingRules}>
         <SettingsField
           title={settingsCopy.collapseEntries}
@@ -160,21 +176,6 @@ export function BookkeepingSettings({
           disabled={saving}
         />
       </SettingsSection>
-      {/*
-        分类 saves through a draft of its own — 管理分类 holds the edit session and
-        its 保存 — so it is a card next to 记账规则 rather than a field inside it.
-      */}
-      <CategorySection
-        categories={categories}
-        uncategorizedCount={uncategorizedCount}
-        onSaveCategories={onSaveCategories}
-        {...(onReloadCategories == null ? {} : { onReloadCategories })}
-        generatingCategoryIds={generatingCategoryIds}
-        failedCategoryIds={failedCategoryIds}
-        onRetryMetadata={onRetryMetadata}
-        isSaving={isSavingCategories}
-        {...(onGoToDetails == null ? {} : { onGoToDetails })}
-      />
     </>
   );
 }

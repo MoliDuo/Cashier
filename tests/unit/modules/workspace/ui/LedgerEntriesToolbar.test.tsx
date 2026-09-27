@@ -140,7 +140,7 @@ describe("LedgerEntriesToolbar", () => {
     });
 
     await waitFor(() => expect(onPreviewDateImpact).toHaveBeenCalledOnce());
-    expect(await screen.findByText(/将影响 1 张单据和 1 条分录/)).toBeInTheDocument();
+    expect(await screen.findByText(/将影响 1 张账单和 1 条明细/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "确认" }));
     await waitFor(() =>

@@ -126,24 +126,6 @@ export function SettingsTab({
           </Button>
         </div>
       )}
-      <SettingsSection title={settingsCopy.appearance}>
-        <SettingsField title={settingsCopy.theme}>
-          <Select value={theme ?? "system"} onValueChange={setTheme}>
-            <SelectTrigger aria-label={settingsCopy.theme} className="w-full sm:w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(["system", "light", "dark"] as const).map((themeName) => (
-                <SelectItem key={themeName} value={themeName}>
-                  {themeLabel(themeName)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsField>
-      </SettingsSection>
-
-      <BookSettings />
 
       <BookkeepingSettings
         settings={settingsLedger.settings}
@@ -158,6 +140,8 @@ export function SettingsTab({
         isSavingCategories={saveCategories.isPending}
         {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
+
+      <BookSettings />
 
       {/* Removing a login email deletes every session server-side, so every device
           was signed out, not only this one; EmailSettings announces that before
@@ -177,6 +161,23 @@ export function SettingsTab({
         onRequireReauthentication={handleRequireReauthentication}
         onAllSessionsEnded={handleAllSessionsEnded}
       />
+
+      <SettingsSection title={settingsCopy.appearance}>
+        <SettingsField title={settingsCopy.theme}>
+          <Select value={theme ?? "system"} onValueChange={setTheme}>
+            <SelectTrigger aria-label={settingsCopy.theme} className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(["system", "light", "dark"] as const).map((themeName) => (
+                <SelectItem key={themeName} value={themeName}>
+                  {themeLabel(themeName)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingsField>
+      </SettingsSection>
     </div>
   );
 }

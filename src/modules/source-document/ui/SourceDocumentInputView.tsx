@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
-import type { ChangeEvent, ClipboardEvent, RefObject } from "react";
-import { Camera, RefreshCw, Send, X } from "lucide-react";
+import type { ChangeEvent, ClipboardEvent, ReactNode, RefObject } from "react";
+import { ImagePlus, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateFilter } from "@/components/ui/date-filter";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useFileDropZone } from "../hooks/useFileDropZone";
 import type { CameraCapture } from "../hooks/useCameraCapture";
 import { SourceDocumentCameraPanel } from "./SourceDocumentCameraPanel";
+import { NewRecordFooter } from "./NewRecordFooter";
 import {
   SourceDocumentImageModal,
   type SourceDocumentModalImage,
@@ -53,6 +54,8 @@ export interface SourceDocumentInputViewProps {
   onRemoveImage: (index: number) => void;
   onImageOpen: (index: number) => void;
   onImageClose: () => void;
+  /** Shown at the start of the footer, beside the submit — the book picker. */
+  footerStart?: ReactNode;
 }
 
 export function SourceDocumentInputView({
@@ -86,6 +89,7 @@ export function SourceDocumentInputView({
   onRemoveImage,
   onImageOpen,
   onImageClose,
+  footerStart,
 }: SourceDocumentInputViewProps) {
   const drop = useFileDropZone({ enabled: isDropEnabled, onFiles: onAddImageFiles });
   const showsViewfinder =
@@ -97,7 +101,10 @@ export function SourceDocumentInputView({
 
   return (
     <div
-      className={cn("space-y-4", drop.isDragging && "rounded-md ring-1 ring-primary")}
+      className={cn(
+        "flex flex-1 flex-col gap-4",
+        drop.isDragging && "rounded-md ring-1 ring-primary"
+      )}
       {...drop.dropProps}
     >
       {drop.isDragging ? (
@@ -163,6 +170,28 @@ export function SourceDocumentInputView({
         </div>
       )}
 
+      <div className="flex items-center gap-2">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={onFileInputChange}
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          multiple
+          aria-label={sourceDocumentInputCopy.image}
+          className="hidden"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onSelectImages}
+          disabled={isPending}
+        >
+          <ImagePlus className="mr-2 h-4 w-4" />
+          {sourceDocumentInputCopy.image}
+        </Button>
+      </div>
+
       <Textarea
         value={text}
         onChange={(event) => onTextChange(event.target.value)}
@@ -188,32 +217,12 @@ export function SourceDocumentInputView({
         </div>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={onFileInputChange}
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          multiple
-          aria-label={sourceDocumentInputCopy.image}
-          className="hidden"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onSelectImages}
-          disabled={isPending}
-        >
-          <Camera className="mr-2 h-4 w-4" />
-          {sourceDocumentInputCopy.image}
-        </Button>
-        <div className="flex-1" />
+      <NewRecordFooter start={footerStart}>
         <Button
           type="button"
           onClick={onSubmit}
           disabled={isPending || !canSubmit}
-          className="flex-1 sm:flex-initial"
+          className="min-w-28"
         >
           {isSubmitting ? (
             commonCopy.sendingStatus
@@ -229,7 +238,7 @@ export function SourceDocumentInputView({
             </>
           )}
         </Button>
-      </div>
+      </NewRecordFooter>
 
       <SourceDocumentImageModal
         images={images}

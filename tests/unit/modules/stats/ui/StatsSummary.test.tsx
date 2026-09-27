@@ -61,7 +61,7 @@ describe("StatsSummary", () => {
     expect(screen.getByText("—")).toBeVisible();
   });
 
-  it("offers the full trend from the sparkline, and stops offering it once open", () => {
+  it("offers the full trend beside the sparkline, and stops offering it once open", () => {
     const stats = buildEnhancedStatsFixture({
       chart: [
         { date: "2026-09-07", total: "10" },
@@ -73,10 +73,12 @@ describe("StatsSummary", () => {
       <StatsSummary {...propsFor(stats)} onExpandTrend={onExpandTrend} />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "查看完整趋势" }));
+    // The line is a picture; the way to the chart is a button that says so.
+    expect(screen.getByRole("img", { name: "本期日支出" }).closest("button")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "查看趋势" }));
     expect(onExpandTrend).toHaveBeenCalledOnce();
 
     rerender(<StatsSummary {...propsFor(stats)} />);
-    expect(screen.queryByRole("button", { name: "查看完整趋势" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查看趋势" })).not.toBeInTheDocument();
   });
 });

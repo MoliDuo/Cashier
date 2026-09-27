@@ -66,14 +66,10 @@ const baseProps = {
   categories: [],
   mainCurrency: "CNY",
   preferredCurrencies: [],
-  aiDirty: false,
-  quickDirty: false,
-  setInputMode: vi.fn(),
   setInputOpen: vi.fn(),
   setAiPending: vi.fn(),
   setQuickPending: vi.fn(),
-  setAiDirty: vi.fn(),
-  setQuickDirty: vi.fn(),
+  bookPicker: null,
 };
 
 describe("NewRecordForms picker memory", () => {
@@ -87,6 +83,13 @@ describe("NewRecordForms picker memory", () => {
     fireEvent.click(await screen.findByTestId("quick-save"));
 
     expect(window.localStorage.getItem("cashier:new-record-book")).toBe(BOOK_ID);
+  });
+
+  it("closes the dialog after any save, whatever the other mode still holds", async () => {
+    render(<NewRecordForms {...baseProps} bookId={BOOK_ID} />);
+    fireEvent.click(await screen.findByTestId("quick-save"));
+
+    expect(baseProps.setInputOpen).toHaveBeenCalledWith(false);
   });
 
   it("does not touch the memory when the save never succeeds", async () => {

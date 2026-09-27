@@ -1,18 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { currentBookOption, selectBook, selectBookByName } from "./book-switch";
+import { bookAction, bookMenu, bookRow } from "./book-rows";
 import { openTab } from "./navigation";
-
-/**
- * The row of the 分账 list that names `name`. Matched on the exact name, not a
- * substring, so one book cannot be confused with another that starts the same.
- */
-function bookRow(page: Page, name: string) {
-  return page.getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
-}
 
 /** Archives through the confirmation, which is the only path that may retire a book. */
 async function archiveBook(page: Page, name: string) {
-  await bookRow(page, name).getByRole("button", { name: "归档", exact: true }).click();
+  await bookAction(page, name, "归档");
   await page.getByRole("dialog").getByRole("button", { name: "归档", exact: true }).click();
 }
 
@@ -111,16 +104,14 @@ test("@demo manages books and the book each API key writes to", async ({ page })
   // 分账 section: the three seeded books. 总账 is a view over all of them, so
   // nothing here marks a default any more, and the ledger has one zone for all.
   await expect(page.getByRole("heading", { name: "分账", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "上移 梁梁", exact: true })).toBeVisible();
+  await expect(bookMenu(page, "梁梁")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "时区", exact: true })).toHaveText(
     "Asia/Shanghai"
   );
   await expect(bookRow(page, "共同支出").getByText("合计", { exact: true })).toHaveCount(0);
   // The former 总账 default is an ordinary book: nothing stops retiring it
   // (it is not clicked, the demo workspace is shared).
-  await expect(
-    bookRow(page, "共同支出").getByRole("button", { name: "归档", exact: true })
-  ).toBeEnabled();
+  await expect(bookMenu(page, "共同支出")).toBeEnabled();
 
   // Each key carries the book it writes to on its own picker, because uploads
   // follow the key; nothing repeats the book's name in words beside it.
@@ -235,7 +226,7 @@ test("@demo deletes, archives and restores a book it creates for itself", async 
   // and the refusal changes nothing.
   await archiveBook(page, "梁梁");
   await expect(page.getByText(/请先改绑这些密钥/)).toBeVisible();
-  await expect(bookRow(page, "梁梁").getByRole("button", { name: "归档" })).toBeEnabled();
+  await expect(bookMenu(page, "梁梁")).toBeEnabled();
 
   // Create the book this test owns.
   await page.getByRole("button", { name: "新增分账", exact: true }).click();
@@ -251,12 +242,12 @@ test("@demo deletes, archives and restores a book it creates for itself", async 
   // Only the archived row offers Restore, so this is the row that must be there —
   // and no live row may keep offering Archive for the same book.
   await expect(bookRow(page, bookName).getByRole("button", { name: "恢复" })).toBeVisible();
-  await expect(bookRow(page, bookName).getByRole("button", { name: "归档" })).toHaveCount(0);
+  await expect(bookMenu(page, bookName)).toHaveCount(0);
   await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
-  await expect(bookRow(page, bookName).getByRole("button", { name: "归档" })).toBeVisible();
+  await expect(bookMenu(page, bookName)).toBeVisible();
 
   // An empty book can be deleted outright, and deletion is final.
-  await bookRow(page, bookName).getByRole("button", { name: "删除", exact: true }).click();
+  await bookAction(page, bookName, "删除");
   await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
   await expect(bookRow(page, bookName)).toHaveCount(0);
 
@@ -296,7 +287,7 @@ test("@demo archiving the book being viewed falls back to the ledger total", asy
   // Leave the workspace as it was found: restore the book, then remove it.
   await openTab(page, "设置");
   await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
-  await bookRow(page, bookName).getByRole("button", { name: "删除", exact: true }).click();
+  await bookAction(page, bookName, "删除");
   await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
   await expect(bookRow(page, bookName)).toHaveCount(0);
 

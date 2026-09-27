@@ -15,13 +15,13 @@ export const sourceDocumentInputCopy = {
   image: "图片",
   send: "发送",
   uploadSuccess: "提交成功",
-  retrySuccess: "重试已提交",
-  retryError: "重试失败",
+  retrySuccess: "已开始重新处理",
+  retryError: "重新处理失败",
   entryDate: "日期（可选）",
   preparing: "正在准备图片",
   uploading: "正在上传图片",
   finalizing: "正在确认上传",
-  submitting: "正在创建记录，此阶段无法取消",
+  submitting: "正在创建账单，此阶段无法取消",
   cancelling: "正在取消上传…",
   imageTooLarge: (v: { fileName: string | number }) =>
     `图片过大：${v.fileName}。请使用更小的图片。`,
@@ -30,14 +30,14 @@ export const sourceDocumentInputCopy = {
   imageReadError: "无法读取所选图片，请重新选择。",
   imageUploadError: "图片上传失败，输入内容已保留，请重试。",
   networkError: "网络请求已中断，输入内容已保留，请重试。",
-  validationError: "记录内容校验失败，请检查后重试。",
-  createError: "创建记录失败，输入内容已保留，请重试。",
+  validationError: "账单内容校验失败，请检查后重试。",
+  createError: "创建账单失败，输入内容已保留，请重试。",
   tooManyImages: (v: { count: string | number }) => `最多只能上传 ${v.count} 张图片。`,
   cancelUpload: "取消上传",
-  savedMayBeHidden: "已保存，但当前筛选可能隐藏这条记录。",
+  savedMayBeHidden: "已保存，但当前筛选可能隐藏这张账单。",
   savedToOtherBook: (v: { book: string | number }) =>
-    `已保存到「${v.book}」，当前视图不会显示这条记录。`,
-  viewRecord: "查看新记录",
+    `已保存到「${v.book}」，当前视图不会显示这张账单。`,
+  viewRecord: "查看新账单",
   uploadedImage: (v: { index: string | number }) => `已上传图片 ${v.index}`,
   openCamera: "打开相机",
   collapseCamera: "收起相机",
@@ -52,7 +52,7 @@ export const sourceDocumentInputCopy = {
 };
 
 export const sourceDocumentEditRetryDialogCopy = {
-  title: "编辑重试",
+  title: "修改后重新处理",
   loadError: "无法加载原始凭证。",
   reload: "重新加载",
 };
@@ -62,7 +62,7 @@ export const sourceDocumentDetailCopy = {
   select: "选择",
   cancelSelect: "取消",
   noEntries: "暂无明细项目",
-  deleteConfirmDesc: "确定要删除此原始凭证吗？这将同时删除所有关联的账本记录。",
+  deleteConfirmDesc: "确定要删除这张账单吗？账单里的明细会一起删除，此操作无法撤销。",
   rawContent: "原始输入",
   rawEvidence: "原始凭证",
   entriesTab: "明细",
@@ -86,9 +86,9 @@ export const sourceDocumentDetailCopy = {
   addEntryCurrency: "币种",
   addEntrySuccess: "已添加明细",
   addEntryError: "添加明细失败",
-  batchUpdateSuccess: (v: { count: string | number }) => `已更新 ${v.count} 条记录`,
+  batchUpdateSuccess: (v: { count: string | number }) => `已更新 ${v.count} 条明细`,
   batchUpdateError: "更新失败",
-  batchDeleteSuccess: (v: { count: string | number }) => `已删除 ${v.count} 条记录`,
+  batchDeleteSuccess: (v: { count: string | number }) => `已删除 ${v.count} 条明细`,
   batchDeleteError: "删除失败",
   batchDeleteTitle: "删除所选明细",
   batchDeleteDescription: (v: { count: string | number }) =>
@@ -97,7 +97,7 @@ export const sourceDocumentDetailCopy = {
   deleteEntryDescription: "确定删除此项明细吗？此操作无法撤销。",
   batchDeletePartial: (v: { count: string | number }) => `${v.count} 项删除失败，已保留选中状态`,
   activeResultTitle: "保留的当前结果",
-  activeResultDescription: "以下明细为当前有效结果，重试处理期间仍继续使用。",
+  activeResultDescription: "以下明细为当前有效结果，重新处理期间仍继续使用。",
   splitTitle: "拆分账单",
   splitDescription: (v: { count: string | number }) =>
     `将选中的 ${v.count} 项明细移动到一张新账单。`,
@@ -138,15 +138,15 @@ export const sourceDocumentActionCopy = {
   cancelSuccess: "已取消处理",
   cancelError: "无法取消处理，已刷新为最新结果。",
   retry: "重新处理",
-  editRetry: "编辑重试",
-  retrySuccess: "已开始重试",
-  retryError: "重试失败",
+  editRetry: "修改后重新处理",
+  retrySuccess: "已开始重新处理",
+  retryError: "重新处理失败",
 };
 
 export const diagnosticCodeCopy = {
   unparsableDocument: "无法解析",
   unparsableDocumentDesc:
-    "AI 未能从这份单据中解析出可记账的支出。可以换一张更清晰的图片，或补充文字说明后重试。",
+    "AI 未能从这张账单中解析出可记账的支出。可以换一张更清晰的图片，或补充文字说明后重新处理。",
   aiProviderUnavailable: "AI 服务不可用",
   aiProviderUnavailableDesc: "AI 提供方暂时不可用。请稍后重试。",
   aiSchemaInvalid: "AI 响应无效",

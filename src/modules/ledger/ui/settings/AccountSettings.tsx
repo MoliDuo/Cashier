@@ -52,8 +52,15 @@ export function AccountSettings({
 
   return (
     <>
-      {/* 通行密钥 and API 密钥 each save on their own, so each is a card of
-          its own rather than a field inside 账户, the way 分账 and 记账规则 are. */}
+      {/* 账户 opens with who is signed in; 通行密钥 and API 密钥 each save on
+          their own, so each is a card of its own; signing out closes the group. */}
+      <SettingsSection title={settingsCopy.account}>
+        <EmailSettings
+          {...(userEmail !== undefined ? { userEmail } : {})}
+          onRequireReauthentication={onRequireReauthentication}
+          onAllSessionsEnded={onAllSessionsEnded}
+        />
+      </SettingsSection>
       <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
       <ServiceCredentialSection
         credentials={credentials}
@@ -63,16 +70,11 @@ export function AccountSettings({
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />
-      <SettingsSection title={settingsCopy.account}>
-        <EmailSettings
-          {...(userEmail !== undefined ? { userEmail } : {})}
-          onRequireReauthentication={onRequireReauthentication}
-          onAllSessionsEnded={onAllSessionsEnded}
-        />
+      <SettingsSection title={settingsCopy.signOut}>
         {/* The button sits on the heading row at every width, like 添加邮箱 and
             新建密钥, instead of dropping under its own label on a phone. */}
         <SettingsField
-          title={settingsCopy.signOut}
+          title={settingsCopy.signOutHere}
           stacked
           actions={
             <Button

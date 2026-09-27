@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
@@ -34,9 +34,10 @@ interface NewRecordDialogProps {
 }
 
 /**
- * The "new record" dialog: AI-parse / quick-entry mode toggle plus the active
- * input form. Closing it never asks: each form keeps its unsaved input as a
- * draft and restores it on the next opening.
+ * The "new record" dialog: the AI-parse / quick-entry toggle on top, the active
+ * form below, and a footer pinned to the bottom with the book on the left and
+ * the submit on the right. Closing it never asks: each form keeps its unsaved
+ * input as a draft and restores it on the next opening.
  */
 export function NewRecordDialog({
   scope,
@@ -56,8 +57,6 @@ export function NewRecordDialog({
   const [inputMode, setInputMode] = useState<NewRecordInputMode>("ai");
   const [aiPending, setAiPending] = useState(false);
   const [quickPending, setQuickPending] = useState(false);
-  const [aiDirty, setAiDirty] = useState(false);
-  const [quickDirty, setQuickDirty] = useState(false);
   const isSubmitting = aiPending || quickPending;
   const handleOpenChange = (open: boolean) => {
     if (!open && isSubmitting) return;
@@ -104,77 +103,51 @@ export function NewRecordDialog({
         <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <DialogTitle>{ledgerPageCopy.newRecord}</DialogTitle>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-none sm:p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <label htmlFor="record-book" className="text-sm">
-              {commonCopy.book}
-            </label>
-            <Select value={selectedBookId} onValueChange={setBookId} disabled={isSubmitting}>
-              <SelectTrigger id="record-book" className="w-40">
-                <SelectValue placeholder={bookPickerCopy.namePlaceholder} />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {books.map((book) => (
-                  <SelectItem key={book.id} value={book.id}>
-                    {book.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-1 rounded-md border border-border bg-surface2 p-1">
-            <button
-              type="button"
-              aria-pressed={inputMode === "ai"}
-              onClick={() => setInputMode("ai")}
-              disabled={isSubmitting}
-              className={cn(
-                "flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                inputMode === "ai"
-                  ? "bg-surface text-text shadow-sm"
-                  : "text-muted-foreground hover:text-text"
-              )}
-            >
-              {ledgerPageCopy.aiParse}
-            </button>
-            <button
-              type="button"
-              aria-pressed={inputMode === "quick"}
-              onClick={() => setInputMode("quick")}
-              disabled={isSubmitting}
-              className={cn(
-                "flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                inputMode === "quick"
-                  ? "bg-surface text-text shadow-sm"
-                  : "text-muted-foreground hover:text-text"
-              )}
-            >
-              {ledgerPageCopy.quickEntry}
-            </button>
-          </div>
-
-          <div>
-            <NewRecordForms
-              bookId={selectedBookId}
-              viewedBookId={scope}
-              savedBook={selectedBook}
-              activeTab={activeTab}
-              committedView={committedView}
-              inputMode={inputMode}
-              categories={categories}
-              mainCurrency={mainCurrency}
-              preferredCurrencies={preferredCurrencies}
-              aiDirty={aiDirty}
-              quickDirty={quickDirty}
-              setInputMode={setInputMode}
-              setInputOpen={setInputOpen}
-              setAiPending={setAiPending}
-              setQuickPending={setQuickPending}
-              setAiDirty={setAiDirty}
-              setQuickDirty={setQuickDirty}
-              timeZone={timeZone}
-            />
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 sm:flex-none sm:px-6 sm:pt-6">
+          <SegmentedControl
+            className="mb-4 shrink-0"
+            label={ledgerPageCopy.newRecordMode}
+            value={inputMode}
+            onChange={setInputMode}
+            disabled={isSubmitting}
+            options={[
+              { value: "ai", label: ledgerPageCopy.aiParse },
+              { value: "quick", label: ledgerPageCopy.quickEntry },
+            ]}
+          />
+          <NewRecordForms
+            bookId={selectedBookId}
+            viewedBookId={scope}
+            savedBook={selectedBook}
+            activeTab={activeTab}
+            committedView={committedView}
+            inputMode={inputMode}
+            categories={categories}
+            mainCurrency={mainCurrency}
+            preferredCurrencies={preferredCurrencies}
+            setInputOpen={setInputOpen}
+            setAiPending={setAiPending}
+            setQuickPending={setQuickPending}
+            timeZone={timeZone}
+            bookPicker={
+              <Select value={selectedBookId} onValueChange={setBookId} disabled={isSubmitting}>
+                <SelectTrigger
+                  className="w-full max-w-44"
+                  aria-label={commonCopy.book}
+                  title={commonCopy.book}
+                >
+                  <SelectValue placeholder={bookPickerCopy.namePlaceholder} />
+                </SelectTrigger>
+                <SelectContent position="popper" side="top">
+                  {books.map((book) => (
+                    <SelectItem key={book.id} value={book.id}>
+                      {book.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            }
+          />
         </div>
       </DialogContent>
     </Dialog>

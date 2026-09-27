@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
@@ -182,46 +182,107 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
       >
         {passkeys.length > 0 ? (
           <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
-            {passkeys.map((passkey) => (
-              <li key={passkey.id} className="flex items-center justify-between gap-2 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-text">{passkey.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {passkey.lastUsedAt == null
-                      ? settingsPasskeysCopy.createdAt({ date: dateLabel(passkey.createdAt) })
-                      : settingsPasskeysCopy.lastUsedAt({ date: dateLabel(passkey.lastUsedAt) })}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={settingsPasskeysCopy.rename({ name: passkey.name })}
-                    title={settingsPasskeysCopy.rename({ name: passkey.name })}
-                    className="text-muted-foreground"
-                    onClick={() => {
-                      setRenameValue(passkey.name);
-                      setError(null);
-                      setRenameTarget(passkey);
-                    }}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={settingsPasskeysCopy.delete({ name: passkey.name })}
-                    title={settingsPasskeysCopy.delete({ name: passkey.name })}
-                    className="text-muted-foreground hover:text-danger"
-                    onClick={() => setDeleteTarget(passkey)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
+            {passkeys.map((passkey) =>
+              renameTarget?.id === passkey.id ? (
+                <li key={passkey.id} className="space-y-2 p-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      autoFocus
+                      name="passkeyName"
+                      autoComplete="off"
+                      maxLength={PASSKEY_NAME_MAX_LENGTH}
+                      aria-label={settingsPasskeysCopy.rename({ name: passkey.name })}
+                      value={renameValue}
+                      disabled={pending}
+                      onChange={(event) => {
+                        setRenameValue(event.target.value);
+                        setError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          if (renameValue.trim() !== "") void rename();
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setRenameTarget(null);
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={commonCopy.save}
+                      title={commonCopy.save}
+                      disabled={pending || renameValue.trim() === ""}
+                      onClick={() => void rename()}
+                    >
+                      {pending ? (
+                        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                      ) : (
+                        <Check className="size-4" />
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={commonCopy.cancel}
+                      title={commonCopy.cancel}
+                      disabled={pending}
+                      onClick={() => setRenameTarget(null)}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                  {error != null ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {error}
+                    </p>
+                  ) : null}
+                </li>
+              ) : (
+                <li key={passkey.id} className="flex items-center justify-between gap-2 p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-text">{passkey.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {passkey.lastUsedAt == null
+                        ? settingsPasskeysCopy.createdAt({ date: dateLabel(passkey.createdAt) })
+                        : settingsPasskeysCopy.lastUsedAt({ date: dateLabel(passkey.lastUsedAt) })}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={settingsPasskeysCopy.rename({ name: passkey.name })}
+                      title={settingsPasskeysCopy.rename({ name: passkey.name })}
+                      className="text-muted-foreground"
+                      onClick={() => {
+                        setRenameValue(passkey.name);
+                        setError(null);
+                        setRenameTarget(passkey);
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={settingsPasskeysCopy.delete({ name: passkey.name })}
+                      title={settingsPasskeysCopy.delete({ name: passkey.name })}
+                      className="text-muted-foreground hover:text-danger"
+                      onClick={() => setDeleteTarget(passkey)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </li>
+              )
+            )}
           </ul>
         ) : isListPending ? null : (
           <p className="rounded-[var(--radius)] border border-dashed border-border p-3 text-sm text-muted-foreground">
@@ -265,49 +326,6 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
             <Button disabled={pending || name.trim() === ""} onClick={() => void register()}>
               {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
               {settingsPasskeysCopy.create}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={renameTarget != null}
-        onOpenChange={(open) => !pending && !open && setRenameTarget(null)}
-      >
-        <DialogContent variant="modal">
-          <DialogHeader>
-            <DialogTitle>{settingsPasskeysCopy.renameTitle}</DialogTitle>
-            <DialogDescription>{settingsPasskeysCopy.renameDesc}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="rename-passkey-name">{settingsPasskeysCopy.name}</Label>
-              <Input
-                id="rename-passkey-name"
-                name="passkeyName"
-                autoComplete="off"
-                maxLength={PASSKEY_NAME_MAX_LENGTH}
-                value={renameValue}
-                disabled={pending}
-                onChange={(event) => {
-                  setRenameValue(event.target.value);
-                  setError(null);
-                }}
-              />
-            </div>
-            {error != null ? (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameTarget(null)} disabled={pending}>
-              {commonCopy.cancel}
-            </Button>
-            <Button disabled={pending || renameValue.trim() === ""} onClick={() => void rename()}>
-              {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-              {commonCopy.save}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 
 interface SourceDocumentInputBaseProps {
@@ -12,6 +13,8 @@ interface SourceDocumentInputBaseProps {
    * be told to stop rather than waiting for an unmount that never comes.
    */
   isActive?: boolean;
+  /** Shown at the start of the form's footer, beside the submit — the book picker. */
+  footerStart?: ReactNode;
   initialData?: {
     text?: string;
     images?: Array<{ data: string; mimeType: string; storedFileId?: string }>;

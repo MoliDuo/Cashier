@@ -521,7 +521,8 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
 
   // --- Camera ---------------------------------------------------------------
 
-  const [isCameraOpen, setIsCameraOpen] = useState(true);
+  // The camera waits to be asked for, so opening the dialog never prompts for it.
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const isTouchInput = useIsTouchInput();
   const camera = useCameraCapture({
     enabled:

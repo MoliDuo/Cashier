@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ledgerQueryErrorCopy } from "@/copy/app";
@@ -177,7 +178,11 @@ describe("设置 book list data range", () => {
     archiveBookAction.mockResolvedValue({ ok: true, books: [retired, ARCHIVED] });
     renderBookSettings({ initialBooks: [LIVE, ARCHIVED] });
 
-    fireEvent.click(screen.getByRole("button", { name: settingsBooksCopy.archive }));
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: settingsBooksCopy.moreActions({ name: LIVE.name }) })
+    );
+    await user.click(screen.getByRole("menuitem", { name: settingsBooksCopy.archive }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: settingsBooksCopy.archive }));
 

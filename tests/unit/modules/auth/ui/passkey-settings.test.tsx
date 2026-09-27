@@ -131,13 +131,26 @@ describe("PasskeySettings", () => {
     actions.renamePasskeyAction.mockResolvedValue({ ok: true });
     renderSettings();
     fireEvent.click(await screen.findByRole("button", { name: "重命名 笔记本" }));
-    fireEvent.change(screen.getByLabelText("名称"), { target: { value: "工作电脑" } });
+    const input = screen.getByRole("textbox", { name: "重命名 笔记本" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "工作电脑" } });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "保存" }));
+      fireEvent.keyDown(input, { key: "Enter" });
     });
 
     expect(actions.renamePasskeyAction).toHaveBeenCalledWith("cred-1", "工作电脑");
     expect(await screen.findByText("工作电脑")).toBeInTheDocument();
+  });
+
+  it("drops an inline rename on Escape without writing", async () => {
+    renderSettings();
+    fireEvent.click(await screen.findByRole("button", { name: "重命名 笔记本" }));
+    const input = screen.getByRole("textbox", { name: "重命名 笔记本" });
+    fireEvent.change(input, { target: { value: "不要了" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(actions.renamePasskeyAction).not.toHaveBeenCalled();
+    expect(screen.getByText("笔记本")).toBeInTheDocument();
   });
 
   it("disables adding where the browser has no WebAuthn", async () => {

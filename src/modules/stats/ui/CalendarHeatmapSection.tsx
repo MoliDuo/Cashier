@@ -16,6 +16,7 @@ import { AdaptiveHeatmap } from "./AdaptiveHeatmap";
 import { getHeatmapLegend } from "../lib/heatmap-colors";
 import type { CalendarDayData, CalendarHeatmapStats } from "../types";
 import { calendarCopy } from "@/copy/controls";
+import { statsTabCopy } from "@/copy/stats";
 
 interface CalendarHeatmapSectionProps {
   days: CalendarDayData[];
@@ -118,6 +119,7 @@ export function CalendarHeatmapSection({
         </div>
         <span className="text-xs text-muted-foreground">{calendarCopy.more}</span>
       </div>
+      <p className="text-center text-xs text-muted-foreground">{statsTabCopy.heatmapHint}</p>
     </div>
   );
 }

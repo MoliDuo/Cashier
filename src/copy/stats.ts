@@ -44,7 +44,8 @@ export const statsTabCopy = {
     `${v.active} / ${v.total}`,
   sparklineLabel: "本期日支出",
   sparklinePrevious: "上期同期",
-  sparklineExpand: "查看完整趋势",
+  sparklineExpand: "查看趋势",
+  heatmapHint: "点日期查看当天的明细",
   dailyAverageLine: "日均",
   weekdayRhythm: "星期节律",
   weekdayAverage: (v: { weekday: string | number; amount: string | number }) =>

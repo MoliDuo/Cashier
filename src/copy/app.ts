@@ -34,6 +34,7 @@ export const ledgerPageCopy = {
   stats: "统计",
   back: "返回",
   newRecord: "记一笔",
+  newRecordMode: "记账方式",
   aiParse: "智能记账",
   quickEntry: "快速记账",
 };

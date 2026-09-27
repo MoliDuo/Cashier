@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { currentBookOption, selectBook, selectBookByName } from "./book-switch";
+import { bookAction, bookMenu, bookRow } from "./book-rows";
 import { openTab } from "./navigation";
 import { signIn } from "./sign-in";
 
@@ -31,10 +32,6 @@ async function login(page: Page) {
 }
 
 /** The 分账 row that names `name`, matched exactly so one book cannot shadow another. */
-function bookRow(page: Page, name: string) {
-  return page.getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
-}
-
 async function addBook(page: Page, name: string) {
   await page.getByRole("button", { name: "新增分账", exact: true }).click();
   const dialog = page.getByRole("dialog").last();
@@ -44,7 +41,7 @@ async function addBook(page: Page, name: string) {
 }
 
 async function deleteBook(page: Page, name: string) {
-  await bookRow(page, name).getByRole("button", { name: "删除", exact: true }).click();
+  await bookAction(page, name, "删除");
   await page.getByRole("dialog").last().getByRole("button", { name: "删除", exact: true }).click();
   await expect(bookRow(page, name)).toHaveCount(0);
 }
@@ -55,7 +52,7 @@ async function deleteBook(page: Page, name: string) {
  * workspace's own tests are not allowed to produce.
  */
 async function archiveBook(page: Page, name: string) {
-  await bookRow(page, name).getByRole("button", { name: "归档", exact: true }).click();
+  await bookAction(page, name, "归档");
   await page.getByRole("dialog").last().getByRole("button", { name: "归档", exact: true }).click();
   await expect(bookRow(page, name).getByRole("button", { name: "恢复" })).toBeVisible();
 }
@@ -136,15 +133,11 @@ test("books production creates, renames and reorders a book, and keeps it across
 
   // One step up, not to the top: the seeded books keep the positions every
   // other test in this runner depends on.
-  await bookRow(page, renamed)
-    .getByRole("button", { name: `上移 ${renamed}`, exact: true })
-    .click();
+  await bookAction(page, renamed, "上移");
   // 分账 is written from the action's answer, so the swap lands a round trip after
   // the click; the painted order is the state to wait on.
   await expect.poll(() => order([firstName, renamed])).toEqual([renamed, firstName]);
-  await expect(
-    bookRow(page, renamed).getByRole("button", { name: `上移 ${renamed}`, exact: true })
-  ).toBeEnabled();
+  await expect(bookMenu(page, renamed)).toBeEnabled();
 
   await page.reload();
   await expect(bookRow(page, renamed)).toBeVisible();
@@ -299,7 +292,7 @@ test("books production starts a record in the viewed book", async ({ page }, tes
   await dialog.getByRole("textbox", { name: "金额", exact: true }).fill("44.44");
   await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(
-    page.getByText(`已保存到「${bookB}」，当前视图不会显示这条记录。`, { exact: true })
+    page.getByText(`已保存到「${bookB}」，当前视图不会显示这张账单。`, { exact: true })
   ).toBeVisible();
 
   // Saving elsewhere did not move the view, and the next record still starts
@@ -365,7 +358,7 @@ test("books production sees a book archived by another browser when 设置 opens
     await expect(page.getByRole("heading", { name: "已归档的分账", exact: true })).toBeVisible();
     await expect(bookRow(page, bookName).getByText("已归档", { exact: true })).toBeVisible();
     await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
-    await expect(bookRow(page, bookName).getByRole("button", { name: "归档" })).toBeVisible();
+    await expect(bookMenu(page, bookName)).toBeVisible();
     await deleteBook(page, bookName);
   } finally {
     await other.context.close();
@@ -423,7 +416,7 @@ test("books production falls back to 总账 when the viewed book is archived", a
 
   await openTab(page, "设置");
   await bookRow(page, bookName).getByRole("button", { name: "恢复", exact: true }).click();
-  await expect(bookRow(page, bookName).getByRole("button", { name: "归档" })).toBeVisible();
+  await expect(bookMenu(page, bookName)).toBeVisible();
   await deleteBook(page, bookName);
   expect(errors).toEqual([]);
 });

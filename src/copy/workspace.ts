@@ -13,8 +13,8 @@ export const detailsTabCopy = {
 
 export const batchActionsCopy = {
   deselectAll: "取消全选",
-  selectDay: (v: { date: string | number }) => `选中${v.date}的全部记录`,
-  deselectDay: (v: { date: string | number }) => `取消选中${v.date}的全部记录`,
+  selectDay: (v: { date: string | number }) => `选中${v.date}的全部项目`,
+  deselectDay: (v: { date: string | number }) => `取消选中${v.date}的全部项目`,
   manualCategory: "设置分类",
   manualCategoryShort: "分类",
   categoryPickDescription: (v: { count: string | number }) =>
@@ -49,17 +49,17 @@ export const batchActionsCopy = {
     documents: string | number;
     entries: string | number;
     scope: string | number;
-  }) => `将影响 ${v.documents} 张单据和 ${v.entries} 条分录。${v.scope}`,
-  dateImpactFailed: "无法计算受影响的单据和分录，请重试后再继续。",
+  }) => `将影响 ${v.documents} 张账单和 ${v.entries} 条明细。${v.scope}`,
+  dateImpactFailed: "无法计算受影响的账单和明细，请重试后再继续。",
   retryImpact: "重试预览",
-  deleted: (v: { count: string | number }) => `已删除 ${v.count} 条记录`,
-  retried: (v: { count: string | number }) => `已提交 ${v.count} 条记录重试`,
+  deleted: (v: { count: string | number }) => `已删除 ${v.count} 张账单`,
+  retried: (v: { count: string | number }) => `已重新处理 ${v.count} 张账单`,
   partialResult: (v: { succeeded: string | number; failed: string | number }) =>
     `成功 ${v.succeeded} 项，失败 ${v.failed} 项`,
   loadedOnly: "仅选中已加载的部分",
-  deleteTitleDocuments: "删除所选单据",
+  deleteTitleDocuments: "删除所选账单",
   deleteDescriptionDocuments: (v: { count: string | number; scope: string | number }) =>
-    `确定删除所选 ${v.count} 张单据吗？${v.scope} 此操作无法撤销。`,
+    `确定删除所选 ${v.count} 张账单吗？账单里的明细会一起删除。${v.scope} 此操作无法撤销。`,
   selectAllLoadedCount: (v: { loaded: string | number }) => `全选已加载的 ${v.loaded} 条`,
   selectAllItemCount: (v: { count: string | number }) => `全选 ${v.count} 项`,
   selectedItemCount: (v: { selected: string | number }) => `已选 ${v.selected} 项`,
@@ -151,6 +151,6 @@ export const ledgerEntriesTabCopy = {
   loadMoreFailed: "加载更多失败，重试",
   noMore: "没有更多了",
   deleteConfirmTitle: "确认删除",
-  deleteConfirmDesc: "确定要删除这条记录吗？此操作无法撤销。",
+  deleteConfirmDesc: "确定要删除这张账单吗？账单里的明细会一起删除，此操作无法撤销。",
   loadingMore: "加载更多…",
 };
