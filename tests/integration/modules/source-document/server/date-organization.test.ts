@@ -115,7 +115,7 @@ describe("date organization", () => {
       ["2026-09-09", ["Yesterday"]],
       ["2026-09-08", ["Earlier"]],
     ]);
-    // Each new bill keeps the input the entries were read from, without a attempt.
+    // Each new bill keeps the input the entries were read from, without an attempt.
     expect(created.map(({ document }) => document.inputText)).toEqual([
       "Long screenshot text",
       "Long screenshot text",

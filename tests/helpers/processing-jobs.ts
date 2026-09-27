@@ -26,7 +26,7 @@ export function processingJobs() {
   };
 }
 
-/** A attempt processor whose model calls come from the given AI context. */
+/** An attempt processor whose model calls come from the given AI context. */
 export function attemptProcessor(createAIContext: (signal: AbortSignal) => AIContext) {
   return {
     process: (request: AttemptProcessingRequestContract) =>

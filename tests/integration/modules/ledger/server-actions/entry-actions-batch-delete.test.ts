@@ -43,7 +43,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     await ensureTestLedgerBooks(db, ledgerId);
   });
 
-  it("deletes multiple entries from one document without creating a attempt", async () => {
+  it("deletes multiple entries from one document without creating an attempt", async () => {
     const db = getTestDb();
     const doc = await seedDoc(db, ledgerId);
     const entries = await db

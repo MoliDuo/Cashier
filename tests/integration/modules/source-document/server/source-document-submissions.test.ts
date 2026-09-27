@@ -372,7 +372,7 @@ describe("target source-document submissions", () => {
       Array.from({ length: MAX_FILES + 1 }, () => finalizedFile(ledgerId, body))
     );
 
-    // Create a attempt with MAX_FILES files via the normal path (this succeeds)
+    // Create an attempt with MAX_FILES files via the normal path (this succeeds)
     const initial = await submitSourceDocument({
       ledgerId,
       input: {

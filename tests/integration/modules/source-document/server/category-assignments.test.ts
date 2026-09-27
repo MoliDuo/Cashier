@@ -258,7 +258,7 @@ describe("running a category assignment", () => {
     const job = await claimCategoryAssignmentJob({ jobId: started.id });
     await expect(nextCategoryAssignmentDocument(job!)).resolves.toMatchObject({
       kind: "document",
-      document: { attempt: 1, lastErrorCode: null },
+      document: { runNumber: 1, lastErrorCode: null },
     });
 
     await expect(
@@ -286,13 +286,13 @@ describe("running a category assignment", () => {
     const again = await claimCategoryAssignmentJob({ jobId: started.id });
     await expect(nextCategoryAssignmentDocument(again!)).resolves.toMatchObject({
       kind: "document",
-      document: { attempt: 2, lastErrorCode: "ai_rate_limited" },
+      document: { runNumber: 2, lastErrorCode: "ai_rate_limited" },
     });
     // Running out of budget hands the document back without spending the attempt.
     await yieldCategoryAssignmentDocument(again!, fixture.documentId);
     await expect(nextCategoryAssignmentDocument(again!)).resolves.toMatchObject({
       kind: "document",
-      document: { attempt: 2 },
+      document: { runNumber: 2 },
     });
   });
 

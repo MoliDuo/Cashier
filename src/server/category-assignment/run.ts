@@ -55,9 +55,9 @@ async function processDocument(
   const subject = {
     jobSubject: logIdentifier("processing-job", job.jobId),
     documentSubject: logIdentifier("source-document", sourceDocumentId),
-    attempt: document.attempt,
+    runNumber: document.runNumber,
   };
-  if (document.attempt > BACKGROUND_MAX_ATTEMPTS) {
+  if (document.runNumber > BACKGROUND_MAX_ATTEMPTS) {
     // Every earlier attempt died without recording an outcome.
     await failCategoryAssignmentDocument({
       lease: job,
@@ -152,13 +152,13 @@ async function processDocument(
     if (signal.aborted) return false;
     const failure = classifyFailure(error);
     const errorCode = failure.code ?? "ai_provider_unavailable";
-    const retrying = failure.kind === "transient" && document.attempt < BACKGROUND_MAX_ATTEMPTS;
+    const retrying = failure.kind === "transient" && document.runNumber < BACKGROUND_MAX_ATTEMPTS;
     const recorded = retrying
       ? await rescheduleCategoryAssignmentDocument({
           lease: job,
           sourceDocumentId,
           errorCode,
-          delayMs: retryDelayMs(document.attempt, failure.retryAfterMs),
+          delayMs: retryDelayMs(document.runNumber, failure.retryAfterMs),
         })
       : await failCategoryAssignmentDocument({ lease: job, sourceDocumentId, errorCode });
     const details = { ...subject, totalDurationMs: Date.now() - startedAt, errorCode, retrying };

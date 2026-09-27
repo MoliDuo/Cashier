@@ -188,9 +188,9 @@ describe("Processing Recovery", () => {
     const adapter = processingJobs();
 
     await adapter.recoverBatch(ledgerId, maxBatch);
-    await expect(adapter.claim(job.attemptId)).resolves.toMatchObject({ attempt: 1 });
+    await expect(adapter.claim(job.attemptId)).resolves.toMatchObject({ runNumber: 1 });
     await adapter.expireLease(job.attemptId);
-    await expect(adapter.claim(job.attemptId)).resolves.toMatchObject({ attempt: 2 });
+    await expect(adapter.claim(job.attemptId)).resolves.toMatchObject({ runNumber: 2 });
   });
 
   it("does not hand out an attempt before its retry is due", async () => {

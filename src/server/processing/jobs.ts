@@ -61,7 +61,7 @@ export async function claimProcessingJob(
       requestedAt: toIso(row.submitted_at),
     },
     claimToken: token,
-    attempt: Number(row.attempt_count),
+    runNumber: Number(row.attempt_count),
     expiresAt: toIso(row.claim_expires_at),
   };
 }

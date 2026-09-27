@@ -22,7 +22,7 @@ export interface ProcessingClaimContract {
   job: ProcessingJobContract;
   claimToken: string;
   /** Runs this attempt has been given, this one included. */
-  attempt: number;
+  runNumber: number;
   expiresAt: string;
 }
 

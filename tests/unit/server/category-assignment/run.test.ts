@@ -6,7 +6,7 @@ type Next =
       kind: "document";
       document: {
         sourceDocumentId: string;
-        attempt: number;
+        runNumber: number;
         completedChunkCount: number;
         lastErrorCode: string | null;
       };
@@ -130,13 +130,13 @@ import { runCategoryAssignmentJob } from "@/server/category-assignment/run";
 
 function document(
   index: number,
-  overrides: Partial<{ attempt: number; completedChunkCount: number; lastErrorCode: string }> = {}
+  overrides: Partial<{ runNumber: number; completedChunkCount: number; lastErrorCode: string }> = {}
 ): Next {
   return {
     kind: "document",
     document: {
       sourceDocumentId: `document-${index}`,
-      attempt: 1,
+      runNumber: 1,
       completedChunkCount: 0,
       lastErrorCode: null,
       ...overrides,
@@ -252,7 +252,7 @@ describe("category assignment run", () => {
   });
 
   it("fails a document on a transient failure in its last attempt", async () => {
-    state.queue = [document(1, { attempt: 3 })];
+    state.queue = [document(1, { runNumber: 3 })];
     adapters.decide.mockRejectedValueOnce(new AppError("timeout", "ai_timeout", 504));
 
     await run();
@@ -274,7 +274,7 @@ describe("category assignment run", () => {
   });
 
   it("fails a document whose earlier attempts all died, without asking the model", async () => {
-    state.queue = [document(1, { attempt: 4, lastErrorCode: "ai_rate_limited" })];
+    state.queue = [document(1, { runNumber: 4, lastErrorCode: "ai_rate_limited" })];
 
     await run();
     expect(adapters.decide).not.toHaveBeenCalled();

@@ -23,7 +23,7 @@ import { ValidationError } from "@/lib/errors";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Maximum number of files per upload attempt. */
+/** Maximum number of files per extraction attempt. */
 export const MAX_FILES = 4;
 
 /** Maximum original (raw uploaded) bytes per individual file. */

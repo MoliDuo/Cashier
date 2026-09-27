@@ -46,7 +46,7 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
     lease,
   };
   const attemptSubject = logIdentifier("attempt", claim.job.attemptId);
-  if (claim.attempt > BACKGROUND_MAX_ATTEMPTS) {
+  if (claim.runNumber > BACKGROUND_MAX_ATTEMPTS) {
     await recordProcessingFailure({
       ...failure,
       failureMessage: "Processing retry limit reached",
@@ -76,10 +76,10 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
   } catch (error) {
     if (error instanceof ProcessingCancelledError || held.signal.aborted) return true;
     const classified = classifyFailure(error);
-    if (classified.kind === "transient" && claim.attempt < BACKGROUND_MAX_ATTEMPTS) {
-      const delayMs = retryDelayMs(claim.attempt, classified.retryAfterMs);
+    if (classified.kind === "transient" && claim.runNumber < BACKGROUND_MAX_ATTEMPTS) {
+      const delayMs = retryDelayMs(claim.runNumber, classified.retryAfterMs);
       logger.warn(
-        { attemptSubject, errorCode: classified.code, attempt: claim.attempt, delayMs },
+        { attemptSubject, errorCode: classified.code, runNumber: claim.runNumber, delayMs },
         "Processing failed transiently; retrying later"
       );
       await rescheduleProcessingJob(lease, delayMs);

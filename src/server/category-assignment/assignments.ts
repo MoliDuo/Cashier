@@ -86,10 +86,10 @@ export interface ClaimedCategoryAssignmentJob extends CategoryAssignmentLease {
   customPrompt: string | null;
 }
 
-/** A document the run picked up; `attempt` already counts this one. */
+/** A document the run picked up; `runNumber` already counts this one. */
 export interface CategoryAssignmentDocumentWork {
   sourceDocumentId: string;
-  attempt: number;
+  runNumber: number;
   completedChunkCount: number;
   lastErrorCode: string | null;
 }
@@ -458,7 +458,7 @@ export async function nextCategoryAssignmentDocument(
         kind: "document",
         document: {
           sourceDocumentId: row.source_document_id,
-          attempt: Number(row.attempt_count),
+          runNumber: Number(row.attempt_count),
           completedChunkCount: Number(row.completed_chunk_count),
           lastErrorCode: row.error_code,
         },

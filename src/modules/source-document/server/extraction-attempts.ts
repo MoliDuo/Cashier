@@ -155,7 +155,7 @@ export async function createProcessingAttemptInTransaction(
 
   const fileIds = [...new Set(input.input.storedFileIds)];
   if (fileIds.length !== input.input.storedFileIds.length) {
-    throw new ValidationError("A stored file may only appear once in a attempt");
+    throw new ValidationError("A stored file may only appear once in an attempt");
   }
   const foundStoredFiles =
     fileIds.length === 0
