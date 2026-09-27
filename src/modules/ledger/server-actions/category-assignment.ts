@@ -69,8 +69,10 @@ async function start(
     customPrompt: settings?.aiCustomPrompt || null,
     ...(retryOfJobId == null ? {} : { retryOfJobId }),
   });
+  // The reply describes the job as it was submitted; the run starts after it.
+  const submitted = await loadJob(ledgerId, job.id);
   scheduleCategoryAssignmentAfter(job.id, ledgerId);
-  return loadJob(ledgerId, job.id);
+  return submitted;
 }
 
 /**
@@ -97,8 +99,9 @@ export const retryCategoryAssignmentFailuresAction = withLedgerAccess(
       ledgerId,
       ...validated,
     });
+    const submitted = await loadJob(ledgerId, retry.id);
     scheduleCategoryAssignmentAfter(retry.id, ledgerId);
-    return loadJob(ledgerId, retry.id);
+    return submitted;
   }
 );
 
