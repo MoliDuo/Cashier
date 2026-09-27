@@ -17,14 +17,18 @@ export type PostgresTransaction = Parameters<Parameters<typeof db.transaction>[0
 
 /**
  * Acquire a FOR UPDATE row lock on the target ledger row.
- * Returns the locked row so callers can read metadata without an extra round-trip.
- * Throws {@link NotFoundError} when the ledger does not exist or is soft-deleted.
+ * Returns its main currency, the one setting a locked writer reads.
+ * Throws {@link NotFoundError} when the ledger does not exist.
  */
 export async function lockLedgerForUpdate(
   tx: PostgresTransaction,
   ledgerId: string
-): Promise<typeof ledgers.$inferSelect> {
-  const rows = await tx.select().from(ledgers).where(eq(ledgers.id, ledgerId)).for("update");
+): Promise<{ mainCurrency: string }> {
+  const rows = await tx
+    .select({ mainCurrency: ledgers.mainCurrency })
+    .from(ledgers)
+    .where(eq(ledgers.id, ledgerId))
+    .for("update");
 
   if (rows.length === 0) {
     throw new NotFoundError("Ledger");
@@ -47,9 +51,9 @@ export async function lockBookForShare(
   tx: PostgresTransaction,
   ledgerId: string,
   bookId: string
-): Promise<typeof books.$inferSelect> {
+): Promise<void> {
   const rows = await tx
-    .select()
+    .select({ id: books.id })
     .from(books)
     .where(and(eq(books.ledgerId, ledgerId), eq(books.id, bookId), isNull(books.archivedAt)))
     .for("share");
@@ -57,22 +61,38 @@ export async function lockBookForShare(
   if (rows.length === 0) {
     throw new NotFoundError("Book");
   }
-
-  return rows[0]!;
 }
+
+// The document columns a locked writer re-reads; the input text and
+// suggestions stay unread.
+const lockedSourceDocumentColumns = {
+  id: sourceDocuments.id,
+  ledgerId: sourceDocuments.ledgerId,
+  bookId: sourceDocuments.bookId,
+  version: sourceDocuments.version,
+  title: sourceDocuments.title,
+  documentDate: sourceDocuments.documentDate,
+  latestAttemptId: sourceDocuments.latestAttemptId,
+  dateOrganizationSuggestion: sourceDocuments.dateOrganizationSuggestion,
+};
+
+export type LockedSourceDocument = Pick<
+  typeof sourceDocuments.$inferSelect,
+  keyof typeof lockedSourceDocumentColumns
+>;
 
 /**
  * Acquire a FOR UPDATE row lock on the target source document row.
- * Returns the locked row so callers can re-read pointers without an extra round-trip.
- * Throws {@link NotFoundError} when the document does not exist or is soft-deleted.
+ * Returns the columns callers re-read without an extra round-trip.
+ * Throws {@link NotFoundError} when the document does not exist.
  */
 export async function lockSourceDocumentForUpdate(
   tx: PostgresTransaction,
   ledgerId: string,
   sourceDocumentId: string
-): Promise<typeof sourceDocuments.$inferSelect> {
+): Promise<LockedSourceDocument> {
   const rows = await tx
-    .select()
+    .select(lockedSourceDocumentColumns)
     .from(sourceDocuments)
     .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)))
     .for("update");
@@ -90,14 +110,14 @@ export async function lockSourceDocumentForUpdate(
  * deadlocks when several transactions lock overlapping document sets.
  * Throws {@link ValidationError} for a duplicate ID (a programming error: no
  * caller ever legitimately targets the same document twice in one command)
- * and {@link NotFoundError} when any requested document does not exist, is
- * soft-deleted, or does not belong to `ledgerId`.
+ * and {@link NotFoundError} when any requested document does not exist or
+ * does not belong to `ledgerId`.
  */
 export async function lockSourceDocumentsForUpdate(
   tx: PostgresTransaction,
   ledgerId: string,
   sourceDocumentIds: readonly string[]
-): Promise<Array<typeof sourceDocuments.$inferSelect>> {
+): Promise<LockedSourceDocument[]> {
   const uniqueIds = new Set(sourceDocumentIds);
   if (uniqueIds.size !== sourceDocumentIds.length) {
     throw new ValidationError("A source document may only be locked once per command");
@@ -105,7 +125,7 @@ export async function lockSourceDocumentsForUpdate(
   const orderedIds = [...uniqueIds].sort();
 
   const rows = await tx
-    .select()
+    .select(lockedSourceDocumentColumns)
     .from(sourceDocuments)
     .where(and(eq(sourceDocuments.ledgerId, ledgerId), inArray(sourceDocuments.id, orderedIds)))
     .orderBy(asc(sourceDocuments.id))

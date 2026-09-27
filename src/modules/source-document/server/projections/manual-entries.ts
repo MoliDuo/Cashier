@@ -4,7 +4,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
 import type { DateOrganizationSuggestion } from "@/lib/ai/date-organization";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import type { PostgresTransaction } from "@/lib/db/transaction-locks";
+import type { LockedSourceDocument, PostgresTransaction } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentsNotProcessing } from "../write-guards";
 
 import {
@@ -161,7 +161,7 @@ export async function replaceDocumentEntriesInTransaction(
   tx: PostgresTransaction,
   input: {
     ledgerId: string;
-    document: typeof sourceDocuments.$inferSelect;
+    document: LockedSourceDocument;
     previousEntries: readonly (typeof ledgerEntries.$inferSelect)[];
     sourceDocumentId: string;
     entries: readonly LedgerProjectionEntryContract[];

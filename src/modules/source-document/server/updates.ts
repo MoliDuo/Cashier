@@ -19,6 +19,7 @@ import {
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   lockSourceDocumentsForUpdate,
+  type LockedSourceDocument,
 } from "@/lib/db/transaction-locks";
 import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
@@ -336,7 +337,7 @@ export async function updateSourceDocuments({
   const transactionResult = await db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, ledgerId);
 
-    let documents: Array<typeof sourceDocuments.$inferSelect>;
+    let documents: LockedSourceDocument[];
     try {
       documents = await lockSourceDocumentsForUpdate(tx, ledgerId, requestedIds);
     } catch (error) {

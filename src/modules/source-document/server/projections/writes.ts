@@ -11,6 +11,7 @@ import {
   lockBookForShare,
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
+  type LockedSourceDocument,
 } from "@/lib/db/transaction-locks";
 import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
@@ -23,9 +24,9 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
     // deleted underneath the activation.
     await lockLedgerForUpdate(tx, input.ledgerId);
 
-    // Also lock the source document row to serialise with concurrent soft-delete.
+    // Also lock the source document row to serialise with a concurrent delete.
     // Lock order: ledger → source document (prevents deadlocks).
-    let document: typeof sourceDocuments.$inferSelect;
+    let document: LockedSourceDocument;
     try {
       document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
     } catch (error) {
