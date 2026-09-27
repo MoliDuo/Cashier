@@ -55,7 +55,7 @@ test("@demo files a record into a book and moves it to another", async ({ page }
   await bookPicker.press("ArrowDown");
   await page.getByRole("option", { name: "梁梁" }).click();
   await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group").getByRole("button").first().click();
+  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await create.getByRole("textbox", { name: "金额", exact: true }).fill("33.00");
   await create.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(create).toHaveCount(0);
@@ -182,7 +182,7 @@ test("@demo the record picker remembers the book a record was saved into", async
   await bookPicker.press("ArrowDown");
   await page.getByRole("option", { name: "哞哞" }).click();
   await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group").getByRole("button").first().click();
+  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await create.getByRole("textbox", { name: "金额", exact: true }).fill("12.00");
   await create.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(create).toHaveCount(0);

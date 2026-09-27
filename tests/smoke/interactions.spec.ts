@@ -12,7 +12,7 @@ test("selection, instant edits and one-tap split navigation", async ({
   let dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "快速记账", exact: true }).click();
   await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(name);
-  await dialog.getByRole("group").getByRole("button").first().click();
+  await dialog.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await dialog.getByRole("textbox", { name: "金额", exact: true }).fill("12.34");
   await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(dialog).toHaveCount(0);

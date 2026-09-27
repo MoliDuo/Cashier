@@ -123,7 +123,8 @@ export function NewRecordForms({
           bookId={bookId}
 
           isActive={inputMode === "ai"}
-          footerStart={bookPicker}
+          // One picker at a time: the hidden form must not carry a second copy.
+          footerStart={inputMode === "ai" ? bookPicker : undefined}
           onPendingChange={setAiPending}
           {...(timeZone != null ? { timeZone } : {})}
           onSuccess={(result) => handleSuccess("ai", result)}
@@ -140,7 +141,7 @@ export function NewRecordForms({
           mainCurrency={mainCurrency}
           preferredCurrencies={preferredCurrencies}
           onPendingChange={setQuickPending}
-          footerStart={bookPicker}
+          footerStart={inputMode === "quick" ? bookPicker : undefined}
           {...(timeZone != null ? { timeZone } : {})}
           onSuccess={(result) => handleSuccess("quick", result)}
         />

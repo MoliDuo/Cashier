@@ -16,7 +16,7 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   const create = page.getByRole("dialog");
   await create.getByRole("button", { name: "快速记账", exact: true }).click();
   await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group").getByRole("button").first().click();
+  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await create.getByRole("textbox", { name: "金额", exact: true }).fill("12.34");
   await create.getByRole("button", { name: "记一笔", exact: true }).click();
 

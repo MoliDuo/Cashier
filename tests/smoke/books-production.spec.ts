@@ -69,7 +69,7 @@ async function recordQuickEntry(
   await picker.press("ArrowDown");
   await page.getByRole("option", { name: book, exact: true }).click();
   await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await dialog.getByRole("group").getByRole("button").first().click();
+  await dialog.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await dialog.getByRole("textbox", { name: "金额", exact: true }).fill(amount);
   await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(dialog).toHaveCount(0);
@@ -288,7 +288,7 @@ test("books production starts a record in the viewed book", async ({ page }, tes
   await dialog.getByLabel("分账", { exact: true }).press("ArrowDown");
   await page.getByRole("option", { name: bookB, exact: true }).click();
   await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await dialog.getByRole("group").getByRole("button").first().click();
+  await dialog.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await dialog.getByRole("textbox", { name: "金额", exact: true }).fill("44.44");
   await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(

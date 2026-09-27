@@ -30,7 +30,7 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
   dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "快速记账", exact: true }).click();
   await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(name);
-  await dialog.getByRole("group").getByRole("button").first().click();
+  await dialog.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
   await dialog.getByRole("textbox", { name: "金额", exact: true }).fill("5.00");
   await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
