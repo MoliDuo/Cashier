@@ -4,6 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LedgerTimeZoneProvider } from "@/lib/ledger-time-zone";
 import { ledgerTabFromPathname } from "@/lib/ledger-tabs";
+import { readLedgerDetailParam } from "@/lib/navigation/ledger-detail-navigation";
 import { textRoleClassName } from "@/components/typography";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
@@ -19,7 +20,7 @@ import { useLedgerSync } from "../hooks/useLedgerSync";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import { BookReveal } from "./BookReveal";
 import { NewRecordDialog } from "./NewRecordDialog";
-import { ModalStackGate } from "./ModalStackGate";
+import { DetailSheetHost } from "./DetailSheetHost";
 import { LedgerWorkspaceContext, type LedgerWorkspaceValue } from "./ledger-workspace-context";
 import { ledgerPageCopy } from "@/copy/app";
 
@@ -139,7 +140,8 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
             timeZone={timeZone}
           />
 
-          <ModalStackGate
+          <DetailSheetHost
+            detailId={readLedgerDetailParam(searchParams)}
             books={value.books}
             categories={categories}
             mainCurrency={mainCurrency}

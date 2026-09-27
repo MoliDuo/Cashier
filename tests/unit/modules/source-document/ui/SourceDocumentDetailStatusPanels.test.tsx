@@ -31,7 +31,6 @@ function renderPanels(sourceDocument: SourceDocument) {
       loadError={false}
       isLoading={false}
       isReloading={false}
-      reloadError={false}
       onClose={vi.fn()}
       onReload={vi.fn()}
     />

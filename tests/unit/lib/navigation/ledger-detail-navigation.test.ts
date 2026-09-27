@@ -1,39 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
-import { useModalStackStore } from "@/lib/store/modal-stack";
+import {
+  closeLedgerDetail,
+  openLedgerDetail,
+  openLedgerEntrySourceDocument,
+} from "@/lib/navigation/ledger-detail-navigation";
 
-describe("openLedgerEntrySourceDocument", () => {
+const pushed = { cashier: { ledgerNavigation: true, kind: "detail" } };
+
+describe("ledger detail navigation", () => {
   beforeEach(() => {
-    useModalStackStore.setState({ stack: [] });
-    window.history.replaceState({}, "", "/details?period=week");
+    window.history.replaceState({}, "", "/details?range=week");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     window.history.replaceState({}, "", "/");
-    useModalStackStore.setState({ stack: [] });
   });
 
-  it("opens the record the entry belongs to", () => {
-    openLedgerEntrySourceDocument({ sourceDocumentId: "document-1" });
-
-    expect(useModalStackStore.getState().stack).toEqual([
-      expect.objectContaining({
-        type: "source-document",
-        id: "document-1",
-      }),
-    ]);
-  });
-
-  it("writes the record into the URL so a reload reopens the same sheet", () => {
+  it("writes the record into the URL as a history entry of its own", () => {
     const pushState = vi.spyOn(window.history, "pushState");
 
     openLedgerEntrySourceDocument({ sourceDocumentId: "document-1" });
 
     expect(pushState).toHaveBeenCalledWith(
-      expect.objectContaining({ cashier: expect.objectContaining({ kind: "detail" }) }),
+      expect.objectContaining(pushed),
       "",
-      "/details?period=week&detail=document-1"
+      "/details?range=week&detail=document-1"
     );
   });
 
@@ -42,7 +34,48 @@ describe("openLedgerEntrySourceDocument", () => {
 
     openLedgerEntrySourceDocument({ sourceDocumentId: null });
 
-    expect(useModalStackStore.getState().stack).toEqual([]);
     expect(pushState).not.toHaveBeenCalled();
+  });
+
+  it("replaces an open record instead of stacking a second one", () => {
+    window.history.replaceState(pushed, "", "/details?range=week&detail=document-1");
+    const pushState = vi.spyOn(window.history, "pushState");
+    const replaceState = vi.spyOn(window.history, "replaceState");
+
+    openLedgerDetail("document-2");
+
+    expect(pushState).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalledWith(
+      expect.objectContaining(pushed),
+      "",
+      "/details?range=week&detail=document-2"
+    );
+  });
+
+  it("keeps a linked record's entry unmarked when it is replaced, so closing stays in the app", () => {
+    window.history.replaceState({}, "", "/details?detail=document-1");
+
+    openLedgerDetail("document-2");
+
+    expect(window.history.state).toMatchObject({ cashier: { kind: "filter" } });
+  });
+
+  it("closes a record it pushed by going back", () => {
+    window.history.replaceState(pushed, "", "/details?range=week&detail=document-1");
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => undefined);
+
+    closeLedgerDetail();
+
+    expect(back).toHaveBeenCalledOnce();
+  });
+
+  it("closes a linked record by replacing its parameter away", () => {
+    window.history.replaceState({}, "", "/details?range=week&detail=document-1");
+    const back = vi.spyOn(window.history, "back");
+
+    closeLedgerDetail();
+
+    expect(back).not.toHaveBeenCalled();
+    expect(window.location.search).toBe("?range=week");
   });
 });

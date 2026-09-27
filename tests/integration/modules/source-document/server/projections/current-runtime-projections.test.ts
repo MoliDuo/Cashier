@@ -5,7 +5,8 @@ import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup
 import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
-import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
+import { updateSourceDocuments } from "@/modules/source-document/server/updates";
+import { batchUpdateLedgerEntries } from "@/modules/source-document/server/entry-commands";
 
 const projectionEntry = {
   categoryId: null,
@@ -38,14 +39,21 @@ describe("current-runtime target adapters", () => {
       })
     ).toEqual([]);
 
-    const edited = await saveSourceDocumentChanges({
-      ledgerId,
-      sourceDocumentId: created.sourceDocumentId,
-      expectedVersion: 1,
-      sourceDocument: { title: "Edited" },
-      entries: [{ ledgerEntryId: originalEntry!.id, data: { amount: "18.00" } }],
-    });
-    expect(edited.ok).toBe(true);
+    await expect(
+      updateSourceDocuments({
+        ledgerId,
+        sourceDocumentIds: [created.sourceDocumentId],
+        data: { title: "Edited" },
+      })
+    ).resolves.toMatchObject({ updatedCount: 1 });
+    await expect(
+      batchUpdateLedgerEntries({
+        ledgerId,
+        sourceDocumentIds: [created.sourceDocumentId],
+        ledgerEntryIds: [originalEntry!.id],
+        amount: "18.00",
+      })
+    ).resolves.toMatchObject({ affectedCount: 1 });
     const replacementEntries = await db.query.ledgerEntries.findMany({
       where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     });

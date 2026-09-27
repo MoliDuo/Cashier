@@ -10,6 +10,7 @@ export const commonCopy = {
   selectItem: (v: { item: string | number }) => `选择${v.item}`,
   cancel: "取消",
   save: "保存",
+  saveFailed: "保存失败",
   savedRefreshFailed: "已保存，但无法刷新最新数据，请重试。",
   deleteSuccess: "删除成功",
   deleteFailed: "删除失败",

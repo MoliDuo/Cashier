@@ -1,7 +1,7 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { signIn } from "./sign-in";
 
-test("selection, discard confirmation and one-tap split navigation", async ({
+test("selection, instant edits and one-tap split navigation", async ({
   page,
   isMobile,
 }, testInfo) => {
@@ -47,26 +47,7 @@ test("selection, discard confirmation and one-tap split navigation", async ({
   await expect(dialog.getByRole("button", { name: "删除", exact: true }).first()).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath("detail-selection.png"), fullPage: true });
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
-  await dialog.getByRole("button", { name: "编辑", exact: true }).click();
-  // A field swaps from its display button to an input when it is clicked.
-  await dialog.getByRole("button", { name, exact: true }).first().click();
-  await dialog.getByRole("textbox").first().fill("Discard this title");
-  await dialog.getByRole("textbox").first().press("Enter");
-  await dialog.getByRole("button", { name: "取消编辑", exact: true }).click();
-  await expect(page.getByRole("dialog").last()).toContainText("有未保存的修改");
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "继续编辑", exact: true })
-    .click();
-  await dialog.getByRole("button", { name: "取消编辑", exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "放弃修改", exact: true })
-    .click();
-  await expect(dialog.getByText("Discard this title", { exact: true })).toHaveCount(0);
-  await dialog.getByRole("button", { name: "编辑", exact: true }).click();
+  // Adding an entry is always on offer; there is no edit mode to enter first.
   await dialog.getByRole("button", { name: "添加明细", exact: true }).click();
   const add = page.getByRole("dialog").last();
   await add.getByLabel("名称", { exact: true }).fill("Second item");
@@ -144,9 +125,14 @@ test("selection, discard confirmation and one-tap split navigation", async ({
   expect(jumpBox!.height + 0.001).toBeGreaterThanOrEqual(44);
   await activate(jump);
   await expect(page).not.toHaveURL(originalUrl);
-  // The bill being left behind is still in the DOM while it animates out.
-  await expect(page.getByRole("dialog").last()).toContainText("Third item");
+  // The new bill replaces the one it was split from; the sheets never stack.
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await expect(page.getByRole("dialog")).toContainText("Third item");
   await page.screenshot({ path: testInfo.outputPath("split-navigation.png"), fullPage: true });
   await page.reload();
-  await expect(page.getByRole("dialog").last()).toContainText("Third item");
+  await expect(page.getByRole("dialog")).toContainText("Third item");
+  // Closing lands on the list the first bill was opened from.
+  await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).not.toHaveURL(/detail=/);
 });

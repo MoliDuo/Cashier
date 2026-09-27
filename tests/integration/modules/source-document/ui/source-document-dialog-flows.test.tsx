@@ -23,28 +23,16 @@ function SourceDocumentDialogHarness({ onConfirm }: { onConfirm: () => Promise<b
         <DialogTitle>Bill details</DialogTitle>
         <span>Parent content</span>
         <SourceDocumentDetailConfirmDialogs
-          showBatchModePendingConfirm={false}
-          setShowBatchModePendingConfirm={vi.fn()}
-          handleSaveAndEnterBatchMode={async () => true}
-          handleDiscardAndEnterBatchMode={vi.fn()}
-          showBatchDeleteConfirm={false}
-          setShowBatchDeleteConfirm={vi.fn()}
-          selectedCount={0}
-          handleBatchDelete={async () => undefined}
+          showBatchDeleteConfirm={confirmOpen}
+          setShowBatchDeleteConfirm={setConfirmOpen}
+          selectedCount={2}
+          handleBatchDelete={onConfirm}
           pendingDeleteEntryId={null}
           setPendingDeleteEntryId={vi.fn()}
           handleDeleteEntry={async () => true}
           showDeleteConfirm={false}
           setShowDeleteConfirm={vi.fn()}
           handleDeleteDocument={async () => undefined}
-          saveAndContinueGate={{
-            confirmOpen,
-            setConfirmOpen,
-            confirmSaveAndContinue: onConfirm,
-            confirmDiscardAndContinue: async () => true,
-          }}
-          discardEditsGate={{ confirmOpen: false, setConfirmOpen: vi.fn() }}
-          handleConfirmDiscardEdits={vi.fn()}
         />
       </DialogContent>
     </Dialog>
@@ -56,20 +44,13 @@ describe("source-document dialog control flows", () => {
     const confirmation = deferred<boolean>();
     render(<SourceDocumentDialogHarness onConfirm={() => confirmation.promise} />);
 
-    fireEvent.click(screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue }));
-    expect(
-      screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue })
-    ).toBeDisabled();
-    expect(screen.getByRole("button", { name: commonCopy.continueEditing })).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: sourceDocumentDetailCopy.discardChanges })
-    ).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.delete }));
+    expect(screen.getByRole("button", { name: commonCopy.delete })).toBeDisabled();
+    expect(screen.getByRole("button", { name: commonCopy.cancel })).toBeDisabled();
 
     confirmation.resolve(true);
     await waitFor(() =>
-      expect(
-        screen.queryByText(sourceDocumentDetailCopy.saveBeforeActionTitle)
-      ).not.toBeInTheDocument()
+      expect(screen.queryByText(sourceDocumentDetailCopy.batchDeleteTitle)).not.toBeInTheDocument()
     );
     expect(screen.getByText("Parent content")).toBeInTheDocument();
   });
@@ -77,21 +58,19 @@ describe("source-document dialog control flows", () => {
   it("keeps the confirmation open when the action returns false", async () => {
     render(<SourceDocumentDialogHarness onConfirm={async () => false} />);
 
-    fireEvent.click(screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.delete }));
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: sourceDocumentDetailCopy.saveAndContinue })
-      ).not.toBeDisabled()
+      expect(screen.getByRole("button", { name: commonCopy.delete })).not.toBeDisabled()
     );
-    expect(screen.getByText(sourceDocumentDetailCopy.saveBeforeActionTitle)).toBeInTheDocument();
+    expect(screen.getByText(sourceDocumentDetailCopy.batchDeleteTitle)).toBeInTheDocument();
   });
 
   it("closes only the nested confirmation when cancelled", async () => {
     render(<SourceDocumentDialogHarness onConfirm={async () => true} />);
     expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("button", { name: commonCopy.continueEditing }));
+    fireEvent.click(screen.getByRole("button", { name: commonCopy.cancel }));
 
     await waitFor(() => expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1));
     expect(screen.getByText("Parent content")).toBeInTheDocument();

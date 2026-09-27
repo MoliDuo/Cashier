@@ -23,7 +23,6 @@ import {
   type PreparedInlineImage,
 } from "@/modules/source-document/api-v1-policy";
 import { decodeBase64Image } from "@/modules/source-document/base64-image";
-import { updateLedgerEntryInputSchema } from "@/modules/ledger/contract-schemas";
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
 
 const uuidSchema = z.string().regex(UUID_REGEX, "Invalid UUID");
@@ -299,36 +298,6 @@ export const updateSourceDocumentInputSchema = strictObjectSchema({
   message: "At least one source document patch is required",
 });
 
-export const saveSourceDocumentChangesInputSchema = strictObjectSchema({
-  sourceDocumentId: uuidSchema,
-  expectedVersion: z.number().int().positive(),
-  sourceDocument: updateSourceDocumentInputSchema.optional(),
-  entries: z
-    .array(
-      strictObjectSchema({
-        ledgerEntryId: uuidSchema,
-        data: updateLedgerEntryInputSchema,
-      })
-    )
-    .max(MAX_BATCH_SIZE)
-    .superRefine((entries, ctx) => {
-      const ids = entries.map((entry) => entry.ledgerEntryId);
-      if (new Set(ids).size !== ids.length) {
-        ctx.addIssue({
-          code: "custom",
-          message: "A ledger entry may only be updated once",
-        });
-      }
-    }),
-}).superRefine((input, ctx) => {
-  if (input.sourceDocument == null && input.entries.length === 0) {
-    ctx.addIssue({
-      code: "custom",
-      message: "At least one source document or ledger entry patch is required",
-    });
-  }
-});
-
 export const splitSourceDocumentInputSchema = strictObjectSchema({
   sourceDocumentId: uuidSchema,
   ledgerEntryIds: z
@@ -426,6 +395,5 @@ export type CreateSourceDocumentUploadPlanInput = z.infer<
 export type FinalizeSourceDocumentUploadInput = z.infer<
   typeof finalizeSourceDocumentUploadInputSchema
 >;
-export type UpdateSourceDocumentInput = z.infer<typeof updateSourceDocumentInputSchema>;
 export type BatchUpdateSourceDocumentsInput = z.infer<typeof updateSourceDocumentInputSchema>;
 export type CreateQuickEntryInput = z.infer<typeof createQuickEntryInputSchema>;

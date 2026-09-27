@@ -1,14 +1,16 @@
 import { sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { batchUpdateLedgerEntriesAction } from "@/modules/ledger/server-actions/entries";
 import { ValidationError } from "@/lib/errors";
-import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 import { getTestDb } from "tests/setup";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
+import { createCategoryData } from "tests/helpers/factories";
 
 /** A single-entry edit is a one-entry batch: the UI has no other update path. */
 function updateEntry(
@@ -71,6 +73,77 @@ describe("single-entry update", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
     expect(document?.version).toBe(1);
+  });
+
+  it.each(["50", "50.00", "50.000"])(
+    "treats numerically equivalent amount %s as a no-op",
+    async (amount) => {
+      await expect(updateEntry(sourceDocumentId, entryId, { amount })).resolves.toEqual({
+        ledgerEntryIds: [entryId],
+        affectedCount: 0,
+      });
+      const document = await getTestDb().query.sourceDocuments.findFirst({
+        where: eq(sourceDocuments.id, sourceDocumentId),
+      });
+      expect(document?.version).toBe(1);
+    }
+  );
+
+  it("keeps a category another writer set while the edit was in flight", async () => {
+    const db = getTestDb();
+    const category = createCategoryData(ledgerId, { name: "Meals", sortOrder: 0 });
+    await db.insert(entryCategories).values(category);
+    // A category assignment commits between the edit's rate lookup and its
+    // write, without advancing the document version.
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates").mockImplementation(async () => {
+      await db
+        .update(ledgerEntries)
+        .set({ categoryId: category.id })
+        .where(eq(ledgerEntries.id, entryId));
+    });
+
+    try {
+      await expect(updateEntry(sourceDocumentId, entryId, { currency: "EUR" })).resolves.toEqual({
+        ledgerEntryIds: [entryId],
+        affectedCount: 1,
+      });
+      expect(ensure).toHaveBeenCalledOnce();
+    } finally {
+      ensure.mockRestore();
+    }
+    expect(
+      await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, entryId) })
+    ).toMatchObject({ currency: "EUR", categoryId: category.id });
+  });
+
+  it("asks for the document day's rate when only a foreign amount changes", async () => {
+    const db = getTestDb();
+    await db
+      .update(ledgerEntries)
+      .set({ currency: "USD", amount: "10.00" })
+      .where(eq(ledgerEntries.id, entryId));
+    const document = await db.query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, sourceDocumentId),
+    });
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates").mockResolvedValue(undefined);
+
+    try {
+      await updateEntry(sourceDocumentId, entryId, { amount: "12" });
+      expect(ensure).toHaveBeenCalledWith([document?.effectiveDate]);
+    } finally {
+      ensure.mockRestore();
+    }
+  });
+
+  it("does not ask for a rate when a main-currency amount changes", async () => {
+    const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates").mockResolvedValue(undefined);
+
+    try {
+      await updateEntry(sourceDocumentId, entryId, { amount: "12" });
+      expect(ensure).not.toHaveBeenCalled();
+    } finally {
+      ensure.mockRestore();
+    }
   });
 
   it("edits a deduction while preserving its negative direction", async () => {

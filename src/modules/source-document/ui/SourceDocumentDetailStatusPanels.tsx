@@ -15,37 +15,24 @@ interface SourceDocumentDetailStatusPanelsProps {
   loadError: boolean;
   isLoading: boolean;
   isReloading: boolean;
-  reloadError: boolean;
   onClose: () => void;
   onReload: () => void;
 }
 
 /**
- * Loading/error skeletons plus the reload-failure, diagnostic, and
- * retained-result banners shown above the document body.
+ * Loading/error skeletons plus the diagnostic and retained-result banners
+ * shown above the document body.
  */
 export function SourceDocumentDetailStatusPanels({
   sourceDocument,
   loadError,
   isLoading,
   isReloading,
-  reloadError,
   onClose,
   onReload,
 }: SourceDocumentDetailStatusPanelsProps) {
   return (
     <>
-      {sourceDocument && reloadError ? (
-        <div
-          role="alert"
-          className="mb-3 flex items-center justify-between gap-2 text-sm text-danger"
-        >
-          <span>{sourceDocumentDetailCopy.reloadFailed}</span>
-          <Button variant="outline" onClick={onReload} disabled={isReloading}>
-            {commonCopy.retry}
-          </Button>
-        </div>
-      ) : null}
       {loadError && !sourceDocument ? (
         <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
           <p className="text-sm font-medium text-text">{sourceDocumentDetailCopy.loadError}</p>

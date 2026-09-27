@@ -222,7 +222,7 @@ describe("Processing Recovery", () => {
       attemptCount: BACKGROUND_MAX_ATTEMPTS + 1,
       claimToken: null,
     });
-    // A failure writes nothing a whole save could, so the version stays put.
+    // A failure changes none of the record's content, so the version stays put.
     await expect(
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, job.sourceDocumentId) })
     ).resolves.toMatchObject({ version: before!.version });

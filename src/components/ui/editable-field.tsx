@@ -25,6 +25,8 @@ interface EditableFieldProps {
   minRows?: number;
   /** Maximum rows for textarea before scrolling */
   maxRows?: number;
+  /** Names the input while editing; the display names itself by its text. */
+  inputAriaLabel?: string;
 }
 
 export function EditableField({
@@ -42,6 +44,7 @@ export function EditableField({
   cancelLabel,
   minRows = 1,
   maxRows = 10,
+  inputAriaLabel,
 }: EditableFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
@@ -165,6 +168,7 @@ export function EditableField({
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
+              aria-label={inputAriaLabel}
               rows={minRows}
               className={cn(
                 // Remove default styling that causes shifts
@@ -192,6 +196,7 @@ export function EditableField({
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
+              aria-label={inputAriaLabel}
               className={cn(
                 // Remove default styling that causes shifts
                 "border-0 bg-transparent shadow-none",

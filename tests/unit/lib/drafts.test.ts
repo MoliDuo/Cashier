@@ -24,9 +24,7 @@ describe("drafts", () => {
 
   it("scopes a key by ledger, kind and record", () => {
     expect(key).toBe("draft:ledger-1:new-record-ai:new");
-    expect(draftKey("ledger-2", "source-document", "doc-1")).toBe(
-      "draft:ledger-2:source-document:doc-1"
-    );
+    expect(draftKey("ledger-2", "retry", "doc-1")).toBe("draft:ledger-2:retry:doc-1");
   });
 
   it("reads back what was written, with its basis", () => {

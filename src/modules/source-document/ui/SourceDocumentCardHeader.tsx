@@ -6,7 +6,7 @@ import type {
 } from "@/modules/source-document/contracts";
 import type { SupportedSourceDocumentAction } from "@/modules/source-document/lifecycle";
 import { memo, useRef } from "react";
-import { ChevronDown, CircleStop, MoreVertical, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, CircleStop, FilePen, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -206,7 +206,7 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
                     onPointerEnter={onEditRetryIntent}
                     onFocus={onEditRetryIntent}
                   >
-                    <Pencil className="mr-2 h-4 w-4" />
+                    <FilePen className="mr-2 h-4 w-4" />
                     {sourceDocumentActionCopy.editRetry}
                   </DropdownMenuItem>
                 )}

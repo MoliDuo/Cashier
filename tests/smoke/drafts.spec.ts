@@ -22,8 +22,8 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
   await expect(dialog.getByRole("textbox", { name: /输入消费记录/ })).toHaveValue("");
   await page.keyboard.press("Escape");
 
-  // Browser back out of a detail with unsaved edits closes it without a prompt,
-  // and reopening the record restores the edits.
+  // A record's fields are written as they change, so Back out of its sheet
+  // closes it without a prompt and the change is already on the list.
   const name = `Draft record ${testInfo.project.name} ${Date.now()}`;
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   dialog = page.getByRole("dialog");
@@ -36,21 +36,16 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
   const card = page.getByTestId("source-document-card-root").filter({ hasText: name });
   await card.getByRole("button", { name, exact: true }).click();
   dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "编辑", exact: true }).click();
   await dialog.getByRole("button", { name, exact: true }).first().click();
-  await dialog.getByRole("textbox").first().fill(text);
-  await dialog.getByRole("textbox").first().press("Enter");
+  const title = dialog.getByRole("textbox", { name: "账单标题", exact: true });
+  await title.fill(text);
+  await title.press("Enter");
+  await expect(dialog.getByRole("button", { name: text, exact: true }).first()).toBeEnabled();
   await page.goBack();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await card.getByRole("button", { name, exact: true }).click();
-  dialog = page.getByRole("dialog");
-  await expect(dialog.getByText(text, { exact: true }).first()).toBeVisible();
-  await dialog
-    .getByRole("status")
-    .filter({ hasText: "有未保存的修改" })
-    .getByRole("button", { name: "放弃", exact: true })
-    .click();
-  await expect(dialog.getByText(text, { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByTestId("source-document-card-root").filter({ hasText: text })
+  ).toBeVisible();
 });
 
 test("settings save as they change, with nothing to confirm on the way out", async ({ page }) => {

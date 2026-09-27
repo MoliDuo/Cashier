@@ -4,72 +4,71 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import type { EntryCategory, LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
 import type { EntryEditData } from "@/modules/source-document/types";
-import type { EntriesPendingChanges } from "@/modules/source-document/detail-types";
 import { SelectableEditableEntryCard } from "./SelectableEditableEntryCard";
 import { commonCopy } from "@/copy/common";
 import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentEntriesListProps {
   entries: LedgerEntryEmbeddedViewDto[];
+  pendingEntries: Record<string, Partial<EntryEditData>>;
+  savingEntryIds: readonly string[];
   categories: EntryCategory[];
   preferredCurrencies: string[];
   mainCurrency: string;
   selectedEntryIds: string[];
   isSelectionMode: boolean;
-  interactionDisabled: boolean;
-  fieldsDisabled: boolean;
-  isEditMode: boolean;
+  readOnly: boolean;
+  isAddingEntry: boolean;
   onEntryChange: (entryId: string, changes: Partial<EntryEditData>) => void;
   onSelectEntry: (entryId: string, selected: boolean) => void;
-  displayEntryDate: string;
-  originalEntryDate: string;
-  onAddEntry?: (() => void) | undefined;
-  onDeleteEntry?: ((entryId: string) => void) | undefined;
-  pendingChanges: EntriesPendingChanges;
-  onRequestEdit?: () => void;
+  documentDate: string;
+  savedDocumentDate: string;
+  onAddEntry: () => void;
+  onDeleteEntry: (entryId: string) => void;
 }
+
+/**
+ * The record's entries. Tapping a row opens its fields for editing, and each
+ * field is written the moment it is changed; the row waits while its write is
+ * in flight.
+ */
 export function SourceDocumentEntriesList({
   entries,
+  pendingEntries,
+  savingEntryIds,
   categories,
   preferredCurrencies,
   mainCurrency,
   selectedEntryIds,
   isSelectionMode,
-  interactionDisabled,
-  fieldsDisabled,
-  isEditMode,
+  readOnly,
+  isAddingEntry,
   onEntryChange,
   onSelectEntry,
-  displayEntryDate,
-  originalEntryDate,
+  documentDate,
+  savedDocumentDate,
   onAddEntry,
   onDeleteEntry,
-  pendingChanges,
-  onRequestEdit,
 }: SourceDocumentEntriesListProps) {
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
-  const hasAddEntry = !interactionDisabled && isEditMode && onAddEntry != null;
+  const editable = !readOnly && !isSelectionMode;
 
   return (
-    <div className="min-w-0">
-      {/* The card, its border and its background belong to the parent, which
-          also renders the toolbar above this list. */}
-      <div className="divide-y">
-        {entries.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-8 md:p-12 text-center border border-dashed border-border/80 rounded-2xl bg-surface2/5">
-            <p className="text-muted-foreground text-sm font-medium">
-              {sourceDocumentDetailCopy.noEntries}
-            </p>
-          </div>
-        ) : (
-          entries.map((entry, index) => (
+    <div className="min-w-0 divide-y">
+      {entries.length === 0 ? (
+        <p className="p-8 text-center text-sm text-muted-foreground">
+          {sourceDocumentDetailCopy.noEntries}
+        </p>
+      ) : (
+        entries.map((entry, index) => {
+          const saving = savingEntryIds.includes(entry.id);
+          const active = editable && activeEntryId === entry.id;
+          return (
             <div
               key={entry.id}
+              aria-busy={saving || undefined}
               onClick={() => {
-                if (!isSelectionMode && !interactionDisabled) {
-                  setActiveEntryId(entry.id);
-                  onRequestEdit?.();
-                }
+                if (editable) setActiveEntryId(entry.id);
               }}
             >
               <SelectableEditableEntryCard
@@ -83,35 +82,34 @@ export function SourceDocumentEntriesList({
                 selectionLabel={commonCopy.selectItem({ item: entry.itemName })}
                 onEntryChange={onEntryChange}
                 onSelectEntry={onSelectEntry}
-                sourceDocumentEntryDate={displayEntryDate}
-                originalEntryDate={originalEntryDate}
-                readOnly={fieldsDisabled || activeEntryId !== entry.id}
-                isLast={!hasAddEntry && index === entries.length - 1}
-                onDelete={
-                  !interactionDisabled && isEditMode && onDeleteEntry != null
-                    ? () => onDeleteEntry(entry.id)
-                    : undefined
-                }
-                {...(pendingChanges[entry.id] !== undefined
-                  ? { pendingChanges: pendingChanges[entry.id] }
+                sourceDocumentEntryDate={documentDate}
+                originalEntryDate={savedDocumentDate}
+                readOnly={!active || saving}
+                isLast={!editable && index === entries.length - 1}
+                onDelete={active && !saving ? () => onDeleteEntry(entry.id) : undefined}
+                {...(pendingEntries[entry.id] !== undefined
+                  ? { pendingChanges: pendingEntries[entry.id] }
                   : {})}
               />
             </div>
-          ))
-        )}
-        {hasAddEntry ? (
+          );
+        })
+      )}
+      {editable ? (
+        <div className="p-2">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="w-full gap-1.5 border-dashed"
+            className="w-full gap-1.5 text-muted-foreground hover:text-text"
             onClick={onAddEntry}
+            disabled={isAddingEntry}
           >
-            <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+            <Plus aria-hidden="true" className="size-3.5" />
             {sourceDocumentDetailCopy.addEntryTitle}
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

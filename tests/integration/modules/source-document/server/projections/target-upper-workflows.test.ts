@@ -20,7 +20,6 @@ import {
   deleteLedgerEntry,
 } from "@/modules/source-document/server/entry-commands";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
-import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
@@ -252,14 +251,11 @@ describe("target upper workflows", () => {
     expect(stats.totals).toContainEqual({ currency: "USD", total: "11.73", count: 3 });
 
     await expect(
-      saveSourceDocumentChanges({
+      batchUpdateLedgerEntries({
         ledgerId,
-        sourceDocumentId: created.sourceDocumentId,
-        expectedVersion: 1,
-        entries: [
-          { ledgerEntryId: ids[0]!, data: { itemName: "Must roll back" } },
-          { ledgerEntryId: crypto.randomUUID(), data: { itemName: "Missing" } },
-        ],
+        sourceDocumentIds: [created.sourceDocumentId],
+        ledgerEntryIds: [ids[0]!, crypto.randomUUID()],
+        itemName: "Must roll back",
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
@@ -320,13 +316,11 @@ describe("target upper workflows", () => {
       items: [],
     });
     await expect(
-      saveSourceDocumentChanges({
+      batchUpdateLedgerEntries({
         ledgerId,
-        sourceDocumentId: created.sourceDocumentId,
-        expectedVersion: beforeDocument!.version,
-        entries: [
-          { ledgerEntryId: beforeEntryCount[0]!.id, data: { categoryId: otherCategory!.id } },
-        ],
+        sourceDocumentIds: [created.sourceDocumentId],
+        ledgerEntryIds: [beforeEntryCount[0]!.id],
+        categoryId: otherCategory!.id,
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 

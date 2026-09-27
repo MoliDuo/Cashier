@@ -1,7 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useModalStackStore } from "@/lib/store/modal-stack";
 import { useLedgerHistorySync } from "@/modules/workspace/hooks/useLedgerHistorySync";
 import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 import type { LedgerTab } from "@/lib/ledger-tabs";
@@ -30,31 +29,11 @@ function renderSync(activeTab: LedgerTab, search: string) {
 describe("useLedgerHistorySync", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", `/stream?${detailSearch}`);
-    useModalStackStore.getState().closeAll();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     window.history.replaceState({}, "", "/");
-    useModalStackStore.getState().closeAll();
-  });
-
-  it("opens the detail the URL names and closes it when the URL drops it, without asking", async () => {
-    const go = vi.spyOn(window.history, "go");
-    const { rerender } = renderSync("stream", detailSearch);
-
-    await waitFor(() =>
-      expect(useModalStackStore.getState().stack).toEqual([
-        { type: "source-document", id: detailId, returnFocus: null },
-      ])
-    );
-
-    // Browser back to the list: the sheet closes; history is never pulled back.
-    window.history.replaceState({}, "", "/stream");
-    rerender({ tab: "stream", query: "" });
-
-    await waitFor(() => expect(useModalStackStore.getState().stack).toEqual([]));
-    expect(go).not.toHaveBeenCalled();
   });
 
   it("remembers each route's query without the open record", () => {

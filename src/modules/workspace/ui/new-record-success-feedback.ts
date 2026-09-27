@@ -83,11 +83,7 @@ export function showNewRecordSuccessFeedback({
     toast.success(sourceDocumentInputCopy.savedToOtherBook({ book: savedBook.name }), {
       action: {
         label: sourceDocumentInputCopy.viewRecord,
-        onClick: () =>
-          openLedgerDetail({
-            type: "source-document",
-            id: result.sourceDocumentId,
-          }),
+        onClick: () => openLedgerDetail(result.sourceDocumentId),
       },
     });
     return;
@@ -97,11 +93,7 @@ export function showNewRecordSuccessFeedback({
     toast.success(sourceDocumentInputCopy.savedMayBeHidden, {
       action: {
         label: sourceDocumentInputCopy.viewRecord,
-        onClick: () =>
-          openLedgerDetail({
-            type: "source-document",
-            id: result.sourceDocumentId,
-          }),
+        onClick: () => openLedgerDetail(result.sourceDocumentId),
       },
     });
     return;

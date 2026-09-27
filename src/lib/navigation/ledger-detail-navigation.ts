@@ -1,7 +1,5 @@
 "use client";
 
-import type { ModalItem } from "@/lib/store/modal-stack";
-import { useModalStackStore } from "@/lib/store/modal-stack";
 import { writeLedgerHistory } from "@/lib/navigation/ledger-history";
 
 /** The open record, as `?detail=<id>` on whichever ledger route it was opened from. */
@@ -12,22 +10,38 @@ export function readLedgerDetailParam(params: Pick<URLSearchParams, "get">): str
   return id == null || id === "" ? null : id;
 }
 
-function setDetailParams(detail: { id: string } | null): URLSearchParams {
+function detailUrl(id: string | null): string {
   const params = new URLSearchParams(window.location.search);
-  if (detail == null) params.delete(LEDGER_DETAIL_PARAM);
-  else params.set(LEDGER_DETAIL_PARAM, detail.id);
-  return params;
-}
-
-function detailUrl(params: URLSearchParams): string {
+  if (id == null) params.delete(LEDGER_DETAIL_PARAM);
+  else params.set(LEDGER_DETAIL_PARAM, id);
   const query = params.toString();
   return query === "" ? window.location.pathname : `${window.location.pathname}?${query}`;
 }
 
-export function openLedgerDetail(item: Omit<ModalItem, "returnFocus">): void {
-  const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  useModalStackStore.getState().push({ ...item, returnFocus } as ModalItem);
-  writeLedgerHistory("push", detailUrl(setDetailParams({ id: item.id })), "detail");
+/** Whether the current history entry is one a detail sheet pushed. */
+function detailWasPushed(): boolean {
+  const state = window.history.state as { cashier?: { kind?: string } } | null;
+  return state?.cashier?.kind === "detail";
+}
+
+// The control that opened the sheet, so closing it puts focus back there. It
+// is interface state only; the URL stays the one record of what is open.
+let returnFocusTarget: HTMLElement | null = null;
+
+/**
+ * Opens a record. A sheet already open is replaced rather than stacked, so
+ * closing always lands back on the list it was opened from.
+ */
+export function openLedgerDetail(id: string): void {
+  const current = readLedgerDetailParam(new URLSearchParams(window.location.search));
+  if (current == null) {
+    returnFocusTarget =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    writeLedgerHistory("push", detailUrl(id), "detail");
+    return;
+  }
+  if (current === id) return;
+  writeLedgerHistory("replace", detailUrl(id), detailWasPushed() ? "detail" : "filter");
 }
 
 /**
@@ -37,31 +51,28 @@ export function openLedgerDetail(item: Omit<ModalItem, "returnFocus">): void {
  */
 export function openLedgerEntrySourceDocument(entry: { sourceDocumentId: string | null }): void {
   if (entry.sourceDocumentId == null || entry.sourceDocumentId === "") return;
-  openLedgerDetail({
-    type: "source-document",
-    id: entry.sourceDocumentId,
-  });
+  openLedgerDetail(entry.sourceDocumentId);
 }
 
+/**
+ * Closes the open record the way Back would: an entry the sheet pushed is
+ * popped, and a sheet reached by a link has its parameter replaced away.
+ */
 export function closeLedgerDetail(): void {
-  const modalState = useModalStackStore.getState();
-  const current = modalState.stack.at(-1);
-  const previous = modalState.stack.at(-2);
-  const params = setDetailParams(previous == null ? null : { id: previous.id });
-  const detail = new URLSearchParams(window.location.search);
-  const state = window.history.state as {
-    cashier?: { ledgerNavigation?: boolean; kind?: string };
-  } | null;
-  if (
-    current != null &&
-    readLedgerDetailParam(detail) === current.id &&
-    state?.cashier?.ledgerNavigation === true &&
-    state.cashier.kind === "detail"
-  ) {
+  if (readLedgerDetailParam(new URLSearchParams(window.location.search)) == null) return;
+  if (detailWasPushed()) {
     window.history.back();
     return;
   }
-  writeLedgerHistory("replace", detailUrl(params), "detail");
-  if (previous == null) modalState.closeAll();
-  else modalState.pop();
+  writeLedgerHistory("replace", detailUrl(null), "filter");
+}
+
+/** Hands focus back to the control that opened the sheet, once it has gone. */
+export function restoreDetailReturnFocus(): void {
+  const target = returnFocusTarget;
+  returnFocusTarget = null;
+  window.requestAnimationFrame(() => {
+    if (target?.isConnected === true) target.focus();
+    else document.querySelector<HTMLElement>("[data-ledger-focus-fallback]")?.focus();
+  });
 }

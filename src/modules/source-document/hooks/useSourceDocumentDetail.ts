@@ -1,17 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { LEDGER, QUERY } from "@/lib/constants";
-import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { openLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 import { queryKeys } from "@/lib/query-keys";
-import { useConfirmGate } from "@/hooks/use-confirm-gate";
 import { useSelection } from "@/hooks/use-selection";
 import type { BookDto, LedgerEntry } from "@/modules/ledger/contracts";
-import { useLedgerId } from "@/modules/ledger/hooks/useLedgerId";
 import { fetchBook } from "@/modules/ledger/queries";
 import {
   batchDeleteLedgerEntriesAction,
@@ -19,25 +16,15 @@ import {
   createLedgerEntryAction,
   deleteLedgerEntryAction,
 } from "@/modules/ledger/server-actions/entries";
-import {
-  SourceDocumentStaleCommandError,
-  unwrapVersionedCommandResult,
-} from "@/modules/source-document/command-results";
 import type {
   ApplyDateOrganizationInput,
   ApplyDateOrganizationResultDto,
   PartialBatchCommandResult,
-  SaveSourceDocumentChangesResultDto,
   SourceDocument,
   SplitSourceDocumentInput,
   SplitSourceDocumentResultDto,
 } from "@/modules/source-document/contracts";
-import { toSaveSourceDocumentChangesInput } from "@/modules/source-document/detail-save-input";
-import type {
-  AddEntryData,
-  PendingChanges,
-  SourceDocPendingChanges,
-} from "@/modules/source-document/detail-types";
+import type { AddEntryData, DocumentPatch } from "@/modules/source-document/detail-types";
 import { fetchSourceDocumentDetail } from "@/modules/source-document/queries";
 import { assignSourceDocumentBookAction } from "@/modules/source-document/server-actions/book";
 import {
@@ -46,51 +33,39 @@ import {
 } from "@/modules/source-document/server-actions/date-organization";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/server-actions/processing";
+import { retrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
 import { splitSourceDocumentAction } from "@/modules/source-document/server-actions/split";
-import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
+import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import type { EntryEditData } from "@/modules/source-document/types";
 import { commonCopy } from "@/copy/common";
 import { sourceDocumentActionCopy, sourceDocumentDetailCopy } from "@/copy/source-document";
 
 const NO_ENTRIES: LedgerEntry[] = [];
 
-/** An action that asks to save or discard pending edits before it runs. */
-type DeferredAction =
-  | { type: "cancel-processing" }
-  | { type: "open-retry" }
-  | { type: "open-delete" }
-  | { type: "open-add" }
-  | { type: "open-split" }
-  | { type: "request-entry-delete"; entryId: string }
-  | { type: "batch-delete" }
-  | { type: "batch-category"; categoryId: string | null }
-  | { type: "batch-currency"; currency: string };
-
 type BatchPatch = { categoryId: string | null } | { currency: string };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === "object" && !Array.isArray(value);
+/** Values being written, shown in place of the saved ones until the write settles. */
+interface PendingWrites {
+  document: DocumentPatch;
+  entries: Record<string, Partial<EntryEditData>>;
 }
 
-/** A stored edit is only trusted when every field is a plain value. */
-function parsePendingChanges(data: unknown): PendingChanges | null {
-  if (!isRecord(data) || !isRecord(data.sourceDoc) || !isRecord(data.entries)) return null;
-  const isValue = (value: unknown) =>
-    value === null || ["string", "number", "boolean"].includes(typeof value);
-  if (!Object.values(data.sourceDoc).every((value) => typeof value === "string")) return null;
-  for (const entry of Object.values(data.entries)) {
-    if (!isRecord(entry) || !Object.values(entry).every(isValue)) return null;
+const NO_PENDING_WRITES: PendingWrites = { document: {}, entries: {} };
+
+function withoutKeys<T extends object>(value: T, keys: readonly string[]): T {
+  const next = { ...value } as Record<string, unknown>;
+  for (const key of keys) delete next[key];
+  return next as T;
+}
+
+/** The fields of a patch that differ from what is saved. */
+function changedFields<T extends object>(saved: T, patch: Partial<T>): Partial<T> {
+  const changed: Partial<T> = {};
+  for (const [key, value] of Object.entries(patch) as [keyof T, T[keyof T]][]) {
+    if (value !== saved[key]) changed[key] = value;
   }
-  return data as unknown as PendingChanges;
+  return changed;
 }
-
-function countPendingChanges(changes: PendingChanges): number {
-  let count = Object.keys(changes.sourceDoc).length;
-  for (const entry of Object.values(changes.entries)) count += Object.keys(entry).length;
-  return count;
-}
-
-const EMPTY_CHANGES: PendingChanges = { sourceDoc: {}, entries: {} };
 
 interface UseSourceDocumentDetailOptions {
   id: string;
@@ -101,9 +76,10 @@ interface UseSourceDocumentDetailOptions {
 }
 
 /**
- * Everything the record sheet does: it reads the record, keeps the unsaved
- * edits as a draft, and runs every command against it. Pending edits never
- * rebase onto a newer server version; the save refuses them as a conflict.
+ * Everything the record sheet does: it reads the record and writes each field
+ * the moment it is changed. There is no edit mode and no whole save; the value
+ * being written shows in place until the write settles, and a failed write
+ * reads the record again.
  */
 export function useSourceDocumentDetail({
   id,
@@ -112,20 +88,13 @@ export function useSourceDocumentDetail({
   onClose,
 }: UseSourceDocumentDetailOptions) {
   const queryClient = useQueryClient();
-  const ledgerId = useLedgerId();
 
   // --- The record -----------------------------------------------------------
 
   const detailKey = queryKeys.sourceDocument(id);
   const query = useQuery({
     queryKey: detailKey,
-    queryFn: async () => {
-      const incoming = await fetchSourceDocumentDetail(id);
-      const current = queryClient.getQueryData<SourceDocument>(detailKey);
-      return incoming != null && current != null && current.version > incoming.version
-        ? current
-        : incoming;
-    },
+    queryFn: () => fetchSourceDocumentDetail(id),
     enabled: open && id !== "",
     staleTime: QUERY.SOURCE_DOC_STALE_TIME_MS,
     retry: false,
@@ -133,7 +102,7 @@ export function useSourceDocumentDetail({
     refetchOnReconnect: false,
   });
   const sourceDocument = query.data ?? null;
-  const ledgerEntries = sourceDocument?.ledgerEntries ?? NO_ENTRIES;
+  const savedEntries = sourceDocument?.ledgerEntries ?? NO_ENTRIES;
 
   // A record whose book was archived after it was filed is not in the live list,
   // so the picker resolves it separately rather than rendering blank. The query
@@ -147,38 +116,41 @@ export function useSourceDocumentDetail({
     staleTime: LEDGER.STALE_TIME_MS,
   });
 
+  const [pending, setPending] = useState<PendingWrites>(NO_PENDING_WRITES);
+  const selection = useSelection({ allIds: savedEntries.map((entry) => entry.id) });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+  const [showRetryDialog, setShowRetryDialog] = useState(false);
+  const [showSplitDialog, setShowSplitDialog] = useState(false);
+  const [showAddEntryDialog, setShowAddEntryDialog] = useState(false);
+  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
+  const [isEditRetrying, setIsEditRetrying] = useState(false);
+
   // --- Commands -------------------------------------------------------------
 
   /**
-   * Writes a command's saved document into the detail cache unless a newer
-   * version already arrived while the command was in flight, filling in the
-   * fields the command responses leave out.
+   * Writes a command's committed record into the detail cache, cancelling any
+   * read in flight so an older answer cannot land on top of it.
    */
   const commitDetailSnapshot = async (document: SourceDocument) => {
     await queryClient.cancelQueries({ queryKey: detailKey, exact: true });
-    queryClient.setQueryData<SourceDocument>(detailKey, (previous) =>
-      previous != null && previous.version > document.version
-        ? previous
-        : {
-            ...document,
-            hasImages: document.hasImages ?? false,
-            ledgerEntries: document.ledgerEntries ?? [],
-          }
-    );
+    queryClient.setQueryData<SourceDocument>(detailKey, {
+      ...document,
+      hasImages: document.hasImages ?? false,
+      ledgerEntries: document.ledgerEntries ?? [],
+    });
   };
 
-  const saveMutation = useLedgerMutation<
-    SaveSourceDocumentChangesResultDto,
-    { expectedVersion: number; changes: PendingChanges; onCommitted: () => void }
-  >({
-    mutationFn: async ({ expectedVersion, changes }) =>
-      unwrapVersionedCommandResult(
-        await saveSourceDocumentChangesAction(
-          toSaveSourceDocumentChangesInput(id, expectedVersion, changes)
-        )
-      ),
+  const documentMutation = useLedgerMutation<unknown, DocumentPatch>({
+    mutationFn: (data) => batchUpdateSourceDocumentsAction({ sourceDocumentIds: [id], data }),
     waitFor: detailKey,
-    onSuccess: (_result, input) => input.onCommitted(),
+  });
+  const entryMutation = useLedgerMutation<
+    unknown,
+    { entryId: string; patch: Partial<EntryEditData> }
+  >({
+    mutationFn: ({ entryId, patch }) => batchUpdateLedgerEntriesAction([id], [entryId], patch),
+    waitFor: detailKey,
   });
   const splitMutation = useLedgerMutation<
     SplitSourceDocumentResultDto,
@@ -206,13 +178,9 @@ export function useSourceDocumentDetail({
       createLedgerEntryAction({ sourceDocumentId: id, ...data, amount: String(data.amount) }),
     waitFor: detailKey,
   });
-  const deleteEntryMutation = useLedgerMutation<
-    { ledgerEntryId: string; deleted: true },
-    { entryId: string; onCommitted: () => void }
-  >({
-    mutationFn: ({ entryId }) => deleteLedgerEntryAction(id, entryId),
+  const deleteEntryMutation = useLedgerMutation<{ ledgerEntryId: string; deleted: true }, string>({
+    mutationFn: (entryId) => deleteLedgerEntryAction(id, entryId),
     waitFor: detailKey,
-    onSuccess: (_result, input) => input.onCommitted(),
   });
   const batchUpdateMutation = useLedgerMutation<
     { ledgerEntryIds: string[]; affectedCount: number },
@@ -221,21 +189,17 @@ export function useSourceDocumentDetail({
     mutationFn: ({ ids, patch }) => batchUpdateLedgerEntriesAction([id], ids, patch),
     waitFor: detailKey,
   });
-  const batchDeleteMutation = useLedgerMutation<
-    PartialBatchCommandResult,
-    { entryIds: string[]; onCommitted: (result: PartialBatchCommandResult) => void }
-  >({
-    mutationFn: ({ entryIds }) => batchDeleteLedgerEntriesAction([id], entryIds),
+  const batchDeleteMutation = useLedgerMutation<PartialBatchCommandResult, string[]>({
+    mutationFn: (entryIds) => batchDeleteLedgerEntriesAction([id], entryIds),
     waitFor: detailKey,
-    onSuccess: (result, input) => input.onCommitted(result),
   });
-  const deleteDocumentMutation = useLedgerMutation<unknown, (() => void) | undefined>({
+  const deleteDocumentMutation = useLedgerMutation<unknown, void>({
     waitFor: false,
     mutationFn: () => deleteSourceDocumentAction(id),
     successMessage: commonCopy.deleteSuccess,
     errorMessage: commonCopy.deleteFailed,
-    onSuccess: (_result, onCommitted) => {
-      onCommitted?.();
+    onSuccess: () => {
+      setShowDeleteConfirm(false);
       onClose();
     },
   });
@@ -243,271 +207,122 @@ export function useSourceDocumentDetail({
     mutationFn: () => cancelSourceDocumentProcessingAction(id),
     successMessage: sourceDocumentActionCopy.cancelSuccess,
     errorMessage: sourceDocumentActionCopy.cancelError,
-    onSuccess: onClose,
+  });
+  const retryMutation = useLedgerMutation<unknown, void>({
+    mutationFn: () => retrySourceDocumentAction(id),
+    waitFor: detailKey,
+    successMessage: sourceDocumentActionCopy.retrySuccess,
+    errorMessage: sourceDocumentActionCopy.retryError,
   });
   const assignBookMutation = useLedgerMutation({
     // An archived target says so instead of snapping the picker back silently.
     errorMessage: commonCopy.bookChangeFailed,
     mutationFn: (bookId: string) =>
       assignSourceDocumentBookAction({ sourceDocumentId: id, bookId }),
-    onSuccess: async () => {
-      await query.refetch();
-    },
+    waitFor: detailKey,
   });
 
-  // --- Pending edits and their draft ----------------------------------------
+  // --- State the sheet reads --------------------------------------------------
 
-  const [pendingChanges, setPendingChanges] = useState<PendingChanges>(EMPTY_CHANGES);
-  const hasPendingChanges =
-    Object.keys(pendingChanges.sourceDoc).length > 0 ||
-    Object.keys(pendingChanges.entries).length > 0;
-  const discardAllChanges = useCallback(() => setPendingChanges(EMPTY_CHANGES), []);
-
-  const handleSourceDocChange = useCallback(
-    (changes: SourceDocPendingChanges) => {
-      if (!sourceDocument) return;
-      setPendingChanges((prev) => {
-        const next = { ...prev.sourceDoc };
-        for (const [key, value] of Object.entries(changes)) {
-          const field = key as keyof SourceDocPendingChanges;
-          const original =
-            field === "title"
-              ? (sourceDocument.title ?? "")
-              : (sourceDocument.documentDate?.split("T")[0] ?? "");
-          if (value === original) delete next[field];
-          else next[field] = value;
-        }
-        return { ...prev, sourceDoc: next };
-      });
-    },
-    [sourceDocument]
-  );
-
-  const handleEntryChange = useCallback(
-    (entryId: string, changes: Partial<EntryEditData>) => {
-      const entry = ledgerEntries.find((e) => e.id === entryId);
-      if (!entry) return;
-      setPendingChanges((prev) => {
-        const entryChanges: Record<string, unknown> = { ...prev.entries[entryId] };
-        for (const [key, value] of Object.entries(changes)) {
-          const original = (entry as unknown as Record<string, unknown>)[key];
-          if (value === original) delete entryChanges[key];
-          else entryChanges[key] = value;
-        }
-        if (Object.keys(entryChanges).length === 0) {
-          const { [entryId]: _, ...rest } = prev.entries;
-          return { ...prev, entries: rest };
-        }
-        return { ...prev, entries: { ...prev.entries, [entryId]: entryChanges } };
-      });
-    },
-    [ledgerEntries]
-  );
-
-  const [isEditMode, setIsEditMode] = useState(false);
-  const key =
-    ledgerId == null || sourceDocument == null
-      ? null
-      : draftKey(ledgerId, "source-document", sourceDocument.id);
-  // Unsaved edits outlive the sheet: closing it keeps them for this record, and
-  // the next opening restores them in edit mode against the version they were
-  // made on, so a changed record still refuses them as a conflict.
-  const [restoredKey, setRestoredKey] = useState<string | null>(null);
-  const [draftBaseVersion, setDraftBaseVersion] = useState<number | null>(null);
-  if (open && key != null && restoredKey !== key) {
-    setRestoredKey(key);
-    const draft = readDraft(key, parsePendingChanges);
-    const baseVersion = draft?.basis == null ? NaN : Number(draft.basis);
-    if (draft != null && Number.isInteger(baseVersion)) {
-      setPendingChanges(draft.data);
-      setDraftBaseVersion(baseVersion);
-      setIsEditMode(true);
-    }
-  }
-
-  // The version the edits started from. A newer server snapshot never rebases
-  // them implicitly.
-  const baseVersionRef = useRef<number | null>(null);
-  const version = sourceDocument?.version;
-  useEffect(() => {
-    if (isEditMode || hasPendingChanges) {
-      baseVersionRef.current ??= draftBaseVersion ?? version ?? null;
-    } else {
-      baseVersionRef.current = null;
-    }
-  }, [draftBaseVersion, hasPendingChanges, isEditMode, version]);
-  // A restored draft's base is known before the effect records it.
-  const baseVersion = baseVersionRef.current ?? draftBaseVersion;
-  const hasVersionConflict =
-    hasPendingChanges && baseVersion != null && version != null && baseVersion !== version;
-
-  useEffect(() => {
-    if (!open || key == null || restoredKey !== key) return;
-    if (!hasPendingChanges) {
-      clearDraft(key);
-      return;
-    }
-    const base = baseVersionRef.current ?? version;
-    writeDraft(key, pendingChanges, base == null ? null : String(base));
-  }, [hasPendingChanges, key, open, pendingChanges, restoredKey, version]);
-
-  // --- Sheet state ----------------------------------------------------------
-
-  const selection = useSelection({ allIds: ledgerEntries.map((entry) => entry.id) });
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [isSplitting, setIsSplitting] = useState(false);
-  const [isReloading, setIsReloading] = useState(false);
-  const [reloadError, setReloadError] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
-  const [showRetryDialog, setShowRetryDialog] = useState(false);
-  const [showSplitDialog, setShowSplitDialog] = useState(false);
-  const [showAddEntryDialog, setShowAddEntryDialog] = useState(false);
-  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
-  const [showBatchModePendingConfirm, setShowBatchModePendingConfirm] = useState(false);
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (!open) {
-      setIsEditMode(false);
-      setRestoredKey(null);
-      setDraftBaseVersion(null);
-      setPendingChanges(EMPTY_CHANGES);
-    }
-  }
-
+  const isProcessing = sourceDocument?.supportedActions.includes("cancel_processing") === true;
   const busy =
-    isSaving || isDeleting || isRetrying || isSplitting || isReloading || cancelMutation.isPending;
-  const interactionDisabled = busy || sourceDocument == null;
-  const discardEditsGate = useConfirmGate<() => void>();
-  const deferredGate = useConfirmGate<DeferredAction>();
-  const { setConfirmOpen: setDeferredConfirmOpen } = deferredGate;
-  useEffect(() => {
-    if (hasVersionConflict) setDeferredConfirmOpen(false);
-  }, [hasVersionConflict, setDeferredConfirmOpen]);
+    deleteDocumentMutation.isPending ||
+    splitMutation.isPending ||
+    batchUpdateMutation.isPending ||
+    batchDeleteMutation.isPending ||
+    retryMutation.isPending ||
+    cancelMutation.isPending ||
+    isEditRetrying;
+  // Fields are written one at a time: nothing is editable while the record is
+  // being processed, since the run replaces its entries when it finishes.
+  const readOnly = sourceDocument == null || isProcessing || busy;
+  const title = pending.document.title ?? sourceDocument?.title ?? "";
+  const documentDate = pending.document.documentDate ?? sourceDocument?.documentDate ?? "";
 
-  const leaveEditing = () => {
-    discardAllChanges();
-    setDraftBaseVersion(null);
-    setIsEditMode(false);
+  // --- Field writes ---------------------------------------------------------
+
+  /**
+   * A failed write reads the record again, so what is shown is what is saved.
+   * An entry that is no longer there was replaced by a run, and the reader is
+   * told the record changed rather than that their edit failed.
+   */
+  const reportFailedWrite = async (entryId?: string) => {
+    const result = await query.refetch();
+    const entryGone =
+      entryId != null &&
+      result.data != null &&
+      !result.data.ledgerEntries.some((entry) => entry.id === entryId);
+    toast.error(entryGone ? sourceDocumentDetailCopy.entryReplaced : commonCopy.saveFailed);
   };
 
-  // --- Saving, reloading and editing ----------------------------------------
-
-  const saveAll = async (): Promise<boolean> => {
-    if (busy) return false;
-    const expectedVersion = baseVersionRef.current ?? version;
-    if (hasVersionConflict) {
-      toast.error(sourceDocumentDetailCopy.saveConflict);
-      return false;
-    }
-    if (expectedVersion == null) {
-      toast.error(sourceDocumentDetailCopy.saveAllFailed);
-      return false;
-    }
-    setIsSaving(true);
+  const updateDocument = async (patch: DocumentPatch) => {
+    if (sourceDocument == null || readOnly) return;
+    const changed = changedFields<DocumentPatch>(
+      { title: sourceDocument.title ?? "", documentDate: sourceDocument.documentDate ?? "" },
+      patch
+    );
+    if (changed.title !== undefined && changed.title.trim() === "") return;
+    const keys = Object.keys(changed);
+    if (keys.length === 0) return;
+    setPending((current) => ({ ...current, document: { ...current.document, ...changed } }));
     try {
-      await saveMutation.mutateAsync({
-        expectedVersion,
-        changes: pendingChanges,
-        onCommitted: leaveEditing,
-      });
-      leaveEditing();
-      toast.success(
-        sourceDocumentDetailCopy.saveAllSuccess({ count: countPendingChanges(pendingChanges) })
-      );
-      return true;
-    } catch (error) {
-      // A stale save keeps the edits like any failure, but says they were made
-      // on outdated data rather than that the save itself failed.
-      toast.error(
-        error instanceof SourceDocumentStaleCommandError
-          ? sourceDocumentDetailCopy.saveConflict
-          : sourceDocumentDetailCopy.saveAllFailed
-      );
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const reload = async () => {
-    if (isReloading) return false;
-    setIsReloading(true);
-    setReloadError(false);
-    try {
-      const result = await query.refetch();
-      if (result.error != null || result.data == null) {
-        throw result.error ?? new Error("Source document is unavailable");
-      }
-      discardAllChanges();
-      setDraftBaseVersion(null);
-      selection.clearSelection();
-      return true;
+      await documentMutation.mutateAsync(changed);
     } catch {
-      setReloadError(true);
-      return false;
+      await reportFailedWrite();
     } finally {
-      setIsReloading(false);
+      setPending((current) => ({ ...current, document: withoutKeys(current.document, keys) }));
     }
   };
 
-  const cancelEditMode = () => {
-    if (busy) return;
-    const cancel = () => {
-      leaveEditing();
-      void reload();
-    };
-    if (hasPendingChanges) discardEditsGate.requestConfirmation(cancel);
-    else cancel();
+  const updateEntry = async (entryId: string, patch: Partial<EntryEditData>) => {
+    const saved = savedEntries.find((entry) => entry.id === entryId);
+    if (saved == null || readOnly || pending.entries[entryId] != null) return;
+    const changed = changedFields<EntryEditData>(
+      {
+        itemName: saved.itemName,
+        amount: saved.amount,
+        currency: saved.currency ?? "",
+        categoryId: saved.categoryId,
+        description: saved.description,
+      },
+      patch
+    );
+    if (changed.itemName !== undefined && changed.itemName.trim() === "") return;
+    if (Object.keys(changed).length === 0) return;
+    setPending((current) => ({ ...current, entries: { ...current.entries, [entryId]: changed } }));
+    try {
+      await entryMutation.mutateAsync({ entryId, patch: changed });
+    } catch {
+      await reportFailedWrite(entryId);
+    } finally {
+      setPending((current) => ({ ...current, entries: withoutKeys(current.entries, [entryId]) }));
+    }
   };
 
   // --- Batch selection ------------------------------------------------------
 
-  const enterBatchSelectionMode = () => {
-    discardAllChanges();
-    setIsEditMode(false);
-    selection.setSelectionMode(true);
-  };
-
   const toggleSelectionMode = () => {
-    if (busy || sourceDocument == null || ledgerEntries.length === 0) return;
-    if (selection.isSelectionMode) selection.setSelectionMode(false);
-    else if (!isEditMode || !hasPendingChanges) enterBatchSelectionMode();
-    else setShowBatchModePendingConfirm(true);
+    if (readOnly || savedEntries.length === 0) return;
+    selection.setSelectionMode(!selection.isSelectionMode);
   };
 
   const batchPatch = async (patch: BatchPatch) => {
     if (selection.selectedIds.length === 0 || busy) return;
-    setIsSaving(true);
     try {
-      const result = await batchUpdateMutation.mutateAsync({
-        ids: selection.selectedIds,
-        patch,
-      });
+      const result = await batchUpdateMutation.mutateAsync({ ids: selection.selectedIds, patch });
       if (result.affectedCount > 0) {
         toast.success(sourceDocumentDetailCopy.batchUpdateSuccess({ count: result.affectedCount }));
       }
       selection.clearSelection();
     } catch {
       toast.error(sourceDocumentDetailCopy.batchUpdateError);
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const batchDelete = async () => {
     if (busy) return false;
-    setIsSaving(true);
     try {
-      const result = await batchDeleteMutation.mutateAsync({
-        entryIds: selection.selectedIds,
-        onCommitted: (committed) => {
-          if (committed.failed.length === 0) setShowBatchDeleteConfirm(false);
-        },
-      });
+      const result = await batchDeleteMutation.mutateAsync(selection.selectedIds);
       const unresolved = result.failed.map((item) => item.id);
       if (unresolved.length === 0) selection.clearSelection();
       else selection.retainSelection(unresolved);
@@ -518,24 +333,23 @@ export function useSourceDocumentDetail({
       }
       if (unresolved.length > 0) {
         toast.error(sourceDocumentDetailCopy.batchDeletePartial({ count: unresolved.length }));
+        return false;
       }
-      if (unresolved.length === 0) setShowBatchDeleteConfirm(false);
-      return unresolved.length === 0;
+      setShowBatchDeleteConfirm(false);
+      return true;
     } catch {
       toast.error(sourceDocumentDetailCopy.batchDeleteError);
       return false;
-    } finally {
-      setIsSaving(false);
     }
   };
 
   // --- Entries and the record -----------------------------------------------
 
-  const feedbackToastId = `source-document-entry:${sourceDocument?.id ?? ""}`;
+  const feedbackToastId = `source-document-entry:${id}`;
 
   const openSplit = () => {
     if (busy || selection.selectedIds.length === 0) return;
-    if (selection.selectedIds.length >= ledgerEntries.length) {
+    if (selection.selectedIds.length >= savedEntries.length) {
       toast.error(sourceDocumentDetailCopy.splitKeepOne);
       return;
     }
@@ -544,7 +358,6 @@ export function useSourceDocumentDetail({
 
   const split = async (entryDate: string) => {
     if (busy) return;
-    setIsSplitting(true);
     try {
       const result = await splitMutation.mutateAsync({
         ledgerEntryIds: selection.selectedIds,
@@ -556,20 +369,17 @@ export function useSourceDocumentDetail({
         id: feedbackToastId,
         action: {
           label: sourceDocumentDetailCopy.viewSplitBill,
-          onClick: () =>
-            openLedgerDetail({ type: "source-document", id: result.splitSourceDocumentId }),
+          // The new record replaces this one in the sheet; Back still lands on the list.
+          onClick: () => openLedgerDetail(result.splitSourceDocumentId),
         },
       });
     } catch {
       toast.error(sourceDocumentDetailCopy.splitFailed);
-    } finally {
-      setIsSplitting(false);
     }
   };
 
   const addEntry = async (data: AddEntryData): Promise<boolean> => {
-    if (busy) return false;
-    setIsSaving(true);
+    if (readOnly) return false;
     try {
       await addEntryMutation.mutateAsync(data);
       toast.success(sourceDocumentDetailCopy.addEntrySuccess, {
@@ -580,42 +390,35 @@ export function useSourceDocumentDetail({
     } catch {
       toast.error(sourceDocumentDetailCopy.addEntryError);
       return false;
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const deleteEntry = async (entryId: string): Promise<boolean> => {
-    if (busy) return false;
-    setIsSaving(true);
+    if (readOnly) return false;
     try {
-      await deleteEntryMutation.mutateAsync({
-        entryId,
-        onCommitted: () => setPendingDeleteEntryId(null),
-      });
+      await deleteEntryMutation.mutateAsync(entryId);
+      setPendingDeleteEntryId(null);
       toast.success(commonCopy.deleteSuccess, { id: feedbackToastId, action: null });
       return true;
     } catch {
       toast.error(commonCopy.deleteFailed);
       return false;
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  const deleteDocument = async (onCommitted?: () => void) => {
-    if (interactionDisabled) return;
-    setIsDeleting(true);
+  const deleteDocument = async () => {
+    if (sourceDocument == null || busy) return;
     try {
-      await deleteDocumentMutation.mutateAsync(onCommitted);
-    } finally {
-      setIsDeleting(false);
+      await deleteDocumentMutation.mutateAsync();
+    } catch {
+      // The mutation already reported the failure.
     }
   };
 
+  // A cancel can be tapped twice before its pending state renders.
   const cancelLockRef = useRef(false);
   const cancelProcessing = async () => {
-    if (cancelLockRef.current) return;
+    if (cancelLockRef.current || busy) return;
     cancelLockRef.current = true;
     try {
       await cancelMutation.mutateAsync();
@@ -626,101 +429,53 @@ export function useSourceDocumentDetail({
     }
   };
 
-  // --- Actions that wait on pending edits -----------------------------------
-
-  const executeAction = async (action: DeferredAction) => {
-    switch (action.type) {
-      case "cancel-processing":
-        await cancelProcessing();
-        return;
-      case "open-retry":
-        setShowRetryDialog(true);
-        return;
-      case "open-delete":
-        setShowDeleteConfirm(true);
-        return;
-      case "open-add":
-        setShowAddEntryDialog(true);
-        return;
-      case "open-split":
-        openSplit();
-        return;
-      case "request-entry-delete":
-        setPendingDeleteEntryId(action.entryId);
-        return;
-      case "batch-delete":
-        setShowBatchDeleteConfirm(true);
-        return;
-      case "batch-category":
-        await batchPatch({ categoryId: action.categoryId });
-        return;
-      case "batch-currency":
-        await batchPatch({ currency: action.currency });
+  const retry = async () => {
+    if (busy) return;
+    try {
+      await retryMutation.mutateAsync();
+    } catch {
+      // The mutation already reported the failure.
     }
-  };
-
-  const requestAction = (action: DeferredAction) => {
-    if (interactionDisabled || hasVersionConflict) return;
-    if (hasPendingChanges) deferredGate.requestConfirmation(action);
-    else void executeAction(action);
-  };
-
-  const continueDeferred = async (save: boolean) => {
-    const action = deferredGate.peekConfirmation();
-    if (action == null) return false;
-    if (save) {
-      if (!(await saveAll())) return false;
-    } else {
-      discardAllChanges();
-    }
-    deferredGate.resolveConfirmation();
-    await executeAction(action);
-    return true;
   };
 
   return {
     sourceDocument,
-    ledgerEntries,
+    /** The saved entries; the values being written are in `pendingEntries`. */
+    ledgerEntries: savedEntries,
+    pendingEntries: pending.entries,
+    title,
+    documentDate,
     isLoading: query.isLoading,
     loadError: query.error != null,
+    isReloading: query.isRefetching,
+    reload: () => void query.refetch(),
     archivedBookLabel:
       archivedRecordBook == null
         ? null
         : commonCopy.archivedBookOption({ name: archivedRecordBook.name }),
     isAssigningBook: assignBookMutation.isPending,
-    assignBook: (bookId: string) => assignBookMutation.mutate(bookId),
+    assignBook: (bookId: string) => {
+      if (!readOnly && bookId !== sourceDocument?.bookId) assignBookMutation.mutate(bookId);
+    },
     applyDateOrganization: dateOrganizationMutation.mutateAsync,
     dismissDateOrganization: dismissDateOrganizationMutation.mutateAsync,
     isOrganizingDates:
       dateOrganizationMutation.isPending || dismissDateOrganizationMutation.isPending,
-    isCancelling: cancelMutation.isPending,
-    editor: {
-      isEditMode,
-      pendingChanges,
-      hasPendingChanges,
-      pendingChangesCount: countPendingChanges(pendingChanges),
-      handleSourceDocChange,
-      handleEntryChange,
-      displayTitle: pendingChanges.sourceDoc.title ?? sourceDocument?.title ?? "",
-      splitInitialDate:
-        sourceDocument?.documentDate ?? sourceDocument?.createdAt.slice(0, 10) ?? "",
-    },
     selection,
     status: {
       busy,
-      interactionDisabled,
-      isSaving,
-      isSplitting,
-      isReloading,
-      reloadError,
-      /** Set while the sheet shows edits restored from an earlier visit. */
-      restoredDraft:
-        draftBaseVersion != null && hasPendingChanges
-          ? {
-              outdated: sourceDocument != null && draftBaseVersion !== sourceDocument.version,
-            }
-          : null,
-      setIsRetrying,
+      readOnly,
+      isProcessing,
+      /** Whether the record's title or date is being written. */
+      isSavingDocument: Object.keys(pending.document).length > 0,
+      /** The entries being written; each such row waits for its write to settle. */
+      savingEntryIds: Object.keys(pending.entries),
+      isBatchUpdating: batchUpdateMutation.isPending,
+      isSplitting: splitMutation.isPending,
+      isAddingEntry: addEntryMutation.isPending,
+      isCancelling: cancelMutation.isPending,
+      isRetrying: retryMutation.isPending,
+      setIsEditRetrying,
     },
     dialogs: {
       showDeleteConfirm,
@@ -735,63 +490,26 @@ export function useSourceDocumentDetail({
       setShowAddEntryDialog,
       pendingDeleteEntryId,
       setPendingDeleteEntryId,
-      showBatchModePendingConfirm,
-      setShowBatchModePendingConfirm,
-      discardEditsGate,
-      saveAndContinueGate: {
-        confirmOpen: deferredGate.confirmOpen,
-        setConfirmOpen: deferredGate.setConfirmOpen,
-        confirmSaveAndContinue: () => continueDeferred(true),
-        confirmDiscardAndContinue: () => continueDeferred(false),
-      },
     },
     actions: {
-      handleClose: () => {
-        if (!busy) onClose();
-      },
-      handleRequestLeave: (continueNavigation: () => void) => {
-        if (!busy) continueNavigation();
-      },
-      handleEnterEditMode: () => {
-        if (!selection.isSelectionMode && !interactionDisabled) setIsEditMode(true);
-      },
-      handleCancelEditMode: cancelEditMode,
-      handleEditSave: saveAll,
-      handleConfirmDiscardEdits: () => discardEditsGate.resolveConfirmation()?.(),
-      /** Drops a restored draft without leaving the sheet. */
-      handleDiscardDraft: () => {
-        if (!busy) leaveEditing();
-      },
-      handleReload: reload,
-      handleSaveAndEnterBatchMode: async () => {
-        if (!(await saveAll())) return false;
-        setIsEditMode(false);
-        selection.setSelectionMode(true);
-        setShowBatchModePendingConfirm(false);
-        return true;
-      },
-      handleDiscardAndEnterBatchMode: () => {
-        enterBatchSelectionMode();
-        setShowBatchModePendingConfirm(false);
-      },
-      handleToggleSelectionMode: toggleSelectionMode,
-      handleBatchDelete: batchDelete,
-      handleSplit: split,
-      handleAddEntrySubmit: addEntry,
-      handleDeleteEntry: deleteEntry,
-      handleDeleteDocument: deleteDocument,
-      handleBatchCategory: (categoryId: string | null) =>
-        requestAction({ type: "batch-category", categoryId }),
-      handleBatchCurrency: (currency: string) =>
-        requestAction({ type: "batch-currency", currency }),
-      handleOpenBatchDelete: () => requestAction({ type: "batch-delete" }),
-      handleCancelProcessing: () => requestAction({ type: "cancel-processing" }),
-      handleOpenRetry: () => requestAction({ type: "open-retry" }),
-      handleRequestDelete: () => requestAction({ type: "open-delete" }),
-      handleOpenAddEntry: () => requestAction({ type: "open-add" }),
-      handleOpenSplit: () => requestAction({ type: "open-split" }),
-      handleRequestDeleteEntry: (entryId: string) =>
-        requestAction({ type: "request-entry-delete", entryId }),
+      updateDocument,
+      updateEntry,
+      toggleSelectionMode,
+      batchCategory: (categoryId: string | null) => batchPatch({ categoryId }),
+      batchCurrency: (currency: string) => batchPatch({ currency }),
+      openBatchDelete: () => !busy && setShowBatchDeleteConfirm(true),
+      batchDelete,
+      openSplit,
+      split,
+      openAddEntry: () => !readOnly && setShowAddEntryDialog(true),
+      addEntry,
+      requestDeleteEntry: (entryId: string) => !readOnly && setPendingDeleteEntryId(entryId),
+      deleteEntry,
+      requestDeleteDocument: () => !busy && setShowDeleteConfirm(true),
+      deleteDocument,
+      cancelProcessing,
+      retry,
+      openEditRetry: () => !busy && setShowRetryDialog(true),
     },
   };
 }

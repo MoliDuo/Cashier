@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { roundToCurrency } from "@/lib/money/currency-precision";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
-import type { PendingChanges } from "@/modules/source-document/detail-types";
+import type { EntryEditData } from "@/modules/source-document/types";
 
 interface SourceDocumentDetailDisplayEntry extends Omit<
   LedgerEntry,
@@ -16,7 +16,8 @@ interface SourceDocumentDetailDisplayEntry extends Omit<
 
 interface BuildSourceDocumentDetailViewModelInput {
   ledgerEntries: LedgerEntry[];
-  pendingChanges: Pick<PendingChanges, "entries">;
+  /** Entry values being written, keyed by entry id. */
+  pendingChanges: { entries: Record<string, Partial<EntryEditData>> };
   mainCurrency: string;
   entryDate: string;
   originalEntryDate: string;
@@ -34,9 +35,9 @@ export function buildSourceDocumentDetailViewModel({
     const currency = change.currency ?? entry.currency ?? mainCurrency;
     const amount = new Decimal(change.amount ?? entry.amount).toFixed();
     // "Identity changed" means the currency or entry date that produced the
-    // persisted convertedAmount no longer matches the current draft, so that
-    // persisted value can't be reused. This is expected while an edit is
-    // pending (it resolves once the entry is saved and recalculated) and
+    // persisted convertedAmount no longer matches the value being written, so
+    // that persisted value can't be reused. This is expected while a write is
+    // in flight (it resolves once the entry is saved and recalculated) and
     // must not be reported as a missing exchange rate.
     const conversionIdentityChanged =
       currency !== (entry.currency ?? mainCurrency) || entryDate !== originalEntryDate;
@@ -73,8 +74,8 @@ export function buildSourceDocumentDetailViewModel({
     .toFixed();
   // A null convertedAmount has two distinct causes that must not be conflated:
   //  - the entry's conversion identity changed and hasn't been recomputed
-  //    yet (staleConversionCount below) — expected while an edit is pending,
-  //    resolves on save, and is NOT a missing exchange rate;
+  //    yet (staleConversionCount below) — expected while a write is in
+  //    flight, resolves once it lands, and is NOT a missing exchange rate;
   //  - the identity is unchanged but no persisted/derivable rate exists
   //    (unconvertedCount) — this is the real "missing exchange rate" case.
   const unconvertedCount = displayEntries.filter(

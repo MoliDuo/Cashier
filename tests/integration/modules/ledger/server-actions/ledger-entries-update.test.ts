@@ -73,8 +73,8 @@ describe("ledger entry update transport validation", () => {
     }).catch((error: unknown) => error);
 
     expect(rejection).toBeInstanceOf(ValidationError);
-    // A rejected command must not burn a version, or the next whole-document
-    // save from an untouched client would fail for a change that never happened.
+    // A rejected command must not burn a version: nothing about the record
+    // changed.
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });

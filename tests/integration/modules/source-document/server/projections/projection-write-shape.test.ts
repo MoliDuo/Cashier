@@ -11,9 +11,12 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import { addLedgerEntry, deleteLedgerEntry } from "@/modules/source-document/server/entry-commands";
+import {
+  addLedgerEntry,
+  batchUpdateLedgerEntries,
+  deleteLedgerEntry,
+} from "@/modules/source-document/server/entry-commands";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
-import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
 
 type TestDatabase = ReturnType<typeof getTestDb>;
 
@@ -242,15 +245,11 @@ describe("projection write shape", () => {
       { table: "ledger_entries", operation: "UPDATE", name: "ledger_entries_update" },
     ]);
 
-    await saveSourceDocumentChanges({
+    await batchUpdateLedgerEntries({
       ledgerId,
-      sourceDocumentId: created.sourceDocumentId,
-      expectedVersion: 1,
-      sourceDocument: { title: "Manual v2" },
-      entries: originalRows.map((row) => ({
-        ledgerEntryId: row.id,
-        data: { itemName: `${row.itemName} updated` },
-      })),
+      sourceDocumentIds: [created.sourceDocumentId],
+      ledgerEntryIds: originalRows.map((row) => row.id),
+      description: "updated",
     });
 
     // No archive INSERT; one set-based UPDATE, independent of row count.
@@ -268,10 +267,10 @@ describe("projection write shape", () => {
         )
       )
       .orderBy(ledgerEntries.position);
-    expect(activeRows.map((row) => row.itemName)).toEqual([
-      "One updated",
-      "Two updated",
-      "Three updated",
+    expect(activeRows.map((row) => [row.itemName, row.description])).toEqual([
+      ["One", "updated"],
+      ["Two", "updated"],
+      ["Three", "updated"],
     ]);
     for (const row of activeRows) {
       const original = originalById.get(row.id);
@@ -290,7 +289,7 @@ describe("projection write shape", () => {
     expect(Number(versionAfterReplace)).toBe(Number(versionAfterCreate) + 1);
   });
 
-  it("leaves entries a save does not change as they were", async () => {
+  it("leaves entries an edit does not change as they were", async () => {
     const db = getTestDb();
     const created = await createManualDocument({
       ledgerId,
@@ -308,16 +307,11 @@ describe("projection write shape", () => {
       .set({ updatedAt: staleUpdatedAt })
       .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId));
 
-    await saveSourceDocumentChanges({
+    await batchUpdateLedgerEntries({
       ledgerId,
-      sourceDocumentId: created.sourceDocumentId,
-      expectedVersion: 1,
-      entries: [
-        {
-          ledgerEntryId: "55555555-5555-4555-8555-555555555555",
-          data: { itemName: "Edited again" },
-        },
-      ],
+      sourceDocumentIds: [created.sourceDocumentId],
+      ledgerEntryIds: ["55555555-5555-4555-8555-555555555555"],
+      itemName: "Edited again",
     });
 
     const rows = await db

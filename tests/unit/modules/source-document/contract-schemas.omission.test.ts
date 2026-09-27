@@ -5,7 +5,6 @@ import {
   retrySourceDocumentInputSchema,
   updateSourceDocumentInputSchema,
   batchUpdateSourceDocumentsInputSchema,
-  saveSourceDocumentChangesInputSchema,
 } from "@/modules/source-document/contract-schemas";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
 import {
@@ -128,18 +127,5 @@ describe("contract schema omission semantics", () => {
     expect(batchUpdateSourceDocumentsInputSchema.safeParse({ status: "completed" }).success).toBe(
       false
     );
-  });
-
-  it("limits atomic save changes to 100 entries", () => {
-    const input = {
-      sourceDocumentId: crypto.randomUUID(),
-      expectedRevisionId: crypto.randomUUID(),
-      operationId: crypto.randomUUID(),
-      entries: Array.from({ length: 101 }, () => ({
-        ledgerEntryId: crypto.randomUUID(),
-        data: { itemName: "Item" },
-      })),
-    };
-    expect(saveSourceDocumentChangesInputSchema.safeParse(input).success).toBe(false);
   });
 });

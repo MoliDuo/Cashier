@@ -8,7 +8,8 @@ import { activeDocumentWhere } from "./projections/shared";
 
 /**
  * Cancels the document's current processing attempt. The attempt is not part
- * of what a whole-document save writes, so the version is left alone.
+ * of the record's content (title, date and entries), so the version is left
+ * alone.
  */
 export async function cancelSourceDocumentProcessing(
   ledgerId: string,

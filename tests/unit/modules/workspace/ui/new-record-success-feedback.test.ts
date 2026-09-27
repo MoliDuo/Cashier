@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { quickEntryFormCopy, sourceDocumentInputCopy } from "@/copy/source-document";
-import { useModalStackStore } from "@/lib/store/modal-stack";
 
 const toastSuccessMock = vi.hoisted(() => vi.fn());
 
@@ -20,7 +19,6 @@ const viewedBook = { id: viewedBookId, name: "Daily" };
 describe("new record success feedback", () => {
   beforeEach(() => {
     toastSuccessMock.mockReset();
-    useModalStackStore.getState().closeAll();
     window.history.replaceState({ next: "preserved" }, "", "/stats?range=year");
   });
 
@@ -55,13 +53,6 @@ describe("new record success feedback", () => {
       next: "preserved",
       cashier: { ledgerNavigation: true, kind: "detail" },
     });
-    expect(useModalStackStore.getState().stack).toEqual([
-      {
-        type: "source-document",
-        id: "source-1",
-        returnFocus: document.body,
-      },
-    ]);
   });
 
   it("uses the mode-specific generic toast for an unfiltered in-range Stream record", () => {

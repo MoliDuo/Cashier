@@ -1,8 +1,5 @@
 import type { z } from "zod";
-import type {
-  saveSourceDocumentChangesInputSchema,
-  splitSourceDocumentInputSchema,
-} from "./contract-schemas";
+import type { splitSourceDocumentInputSchema } from "./contract-schemas";
 
 import type { SourceDocumentProcessingStatus } from "./types";
 
@@ -24,20 +21,6 @@ export interface CreateSourceDocumentResponseDto {
   version: 1;
   status: "processing";
 }
-
-/**
- * The whole-document save's result: it commits only against the version the
- * draft was loaded at, so a draft another writer overtook comes back stale.
- */
-export type VersionedCommandResult<T> =
-  | { ok: true; sourceDocumentId: string; version: number; data: T }
-  | {
-      ok: false;
-      reason: "stale";
-      sourceDocumentId: string;
-      expectedVersion: number;
-      currentVersion: number;
-    };
 
 /**
  * Transaction semantics: one transaction per document, not one for the whole
@@ -64,12 +47,6 @@ export interface QuickEntryResponseDto {
 export interface CreatedRecordResult {
   sourceDocumentId: string;
   documentDate: string;
-}
-
-export type SaveSourceDocumentChangesInput = z.infer<typeof saveSourceDocumentChangesInputSchema>;
-
-export interface SaveSourceDocumentChangesResultDto {
-  updatedEntryIds: string[];
 }
 
 export type SplitSourceDocumentInput = z.infer<typeof splitSourceDocumentInputSchema>;

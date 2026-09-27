@@ -1,11 +1,8 @@
 /**
  * Canonical suite for the source-document version rule: `version` advances by
- * exactly one when, and only when, content a whole save can write changes
- * (title, document date, entries). Every other write leaves it alone, so an
- * open draft only goes stale when someone else changed what the draft edits.
- *
- * Only the whole save (`saveSourceDocumentChanges`) takes an
- * `expectedVersion`; the other commands state their own preconditions.
+ * exactly one when, and only when, the record's content changes (title,
+ * document date, entries). Every other write leaves it alone. No command takes
+ * an expected version; each states its own preconditions.
  */
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -25,7 +22,6 @@ import {
 } from "@/modules/source-document/server/date-organization";
 import {
   assignSourceDocumentBook,
-  saveSourceDocumentChanges,
   updateLedgerEntryDates,
   updateSourceDocuments,
 } from "@/modules/source-document/server/updates";
@@ -166,21 +162,19 @@ async function runCategoryAssignment(input: {
 }
 
 describe("source document version — content writes advance it by one", () => {
-  it("whole save: +1 on change, a replay of applied values is a no-op", async () => {
+  it("title and date together: +1 once, a replay of applied values is a no-op", async () => {
     const ledgerId = await newLedger();
     const { sourceDocumentId } = await createActiveDocument(ledgerId);
-    const save = (expectedVersion: number) =>
-      saveSourceDocumentChanges({
+    const edit = () =>
+      updateSourceDocuments({
         ledgerId,
-        sourceDocumentId,
-        expectedVersion,
-        sourceDocument: { title: "Updated" },
-        entries: [],
+        sourceDocumentIds: [sourceDocumentId],
+        data: { title: "Updated", documentDate: "2026-08-03" },
       });
 
-    expect(await save(1)).toMatchObject({ ok: true, version: 2 });
-    expect(await save(2)).toMatchObject({ ok: true, version: 2 });
-    expect(await currentVersion(sourceDocumentId)).toBe(2);
+    expect(await edit()).toMatchObject({ updatedCount: 1 });
+    expect(await edit()).toMatchObject({ updatedCount: 0 });
+    expect(await readDocument(sourceDocumentId)).toMatchObject({ title: "Updated", version: 2 });
   });
 
   it("batch title and date: +1 on change, unchanged values write nothing", async () => {
@@ -355,48 +349,8 @@ describe("source document version — other writes leave it alone", () => {
       "not found"
     );
   });
-});
 
-describe("whole save — a draft goes stale only when its content changed", () => {
-  it("rejects the second of two saves made from the same version with zero writes", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId } = await createActiveDocument(ledgerId);
-    const save = (title: string) =>
-      saveSourceDocumentChanges({
-        ledgerId,
-        sourceDocumentId,
-        expectedVersion: 1,
-        sourceDocument: { title },
-        entries: [],
-      });
-
-    expect(await save("First tab")).toMatchObject({ ok: true, version: 2 });
-    expect(await save("Second tab")).toEqual({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId,
-      expectedVersion: 1,
-      currentVersion: 2,
-    });
-    expect(await readDocument(sourceDocumentId)).toMatchObject({ title: "First tab", version: 2 });
-  });
-
-  it("goes stale when someone else added an entry", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
-    await addLedgerEntry({ ledgerId, sourceDocumentId, amount: "5.00", itemName: "Other tab" });
-
-    const stale = await saveSourceDocumentChanges({
-      ledgerId,
-      sourceDocumentId,
-      expectedVersion: 1,
-      entries: [{ ledgerEntryId: entryIds[0]!, data: { itemName: "Draft" } }],
-    });
-    expect(stale).toMatchObject({ ok: false, reason: "stale", currentVersion: 2 });
-    expect(await readEntry(entryIds[0]!)).toMatchObject({ itemName: "Item 1" });
-  });
-
-  it("stays current across an AI category assignment and keeps its result", async () => {
+  it("an AI category assignment leaves it alone and survives a later entry edit", async () => {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 2);
     const categoryId = await insertCategory(ledgerId, "Meals");
@@ -411,25 +365,27 @@ describe("whole save — a draft goes stale only when its content changed", () =
     ).toMatchObject({ status: "applied", appliedCount: 1 });
     expect(await currentVersion(sourceDocumentId)).toBe(1);
 
-    // The draft edits the categorized entry's name and another entry; neither
-    // patch names a category, so the assigned one survives the save.
-    const saved = await saveSourceDocumentChanges({
+    // Neither edit names a category, so the assigned one survives.
+    await batchUpdateLedgerEntries({
       ledgerId,
-      sourceDocumentId,
-      expectedVersion: 1,
-      entries: [
-        { ledgerEntryId: entryIds[0]!, data: { itemName: "Draft lunch" } },
-        { ledgerEntryId: entryIds[1]!, data: { amount: "20" } },
-      ],
+      sourceDocumentIds: [sourceDocumentId],
+      ledgerEntryIds: [entryIds[0]!],
+      itemName: "Edited lunch",
     });
-    expect(saved).toMatchObject({ ok: true, version: 2 });
-    expect(await readEntry(entryIds[0]!)).toMatchObject({ categoryId, itemName: "Draft lunch" });
+    await batchUpdateLedgerEntries({
+      ledgerId,
+      sourceDocumentIds: [sourceDocumentId],
+      ledgerEntryIds: [entryIds[1]!],
+      amount: "20",
+    });
+    expect(await currentVersion(sourceDocumentId)).toBe(3);
+    expect(await readEntry(entryIds[0]!)).toMatchObject({ categoryId, itemName: "Edited lunch" });
     const edited = await readEntry(entryIds[1]!);
     expect(edited.categoryId).toBeNull();
     expect(Number(edited.amount)).toBe(20);
   });
 
-  it("stays current across a category deletion and keeps the entry uncategorized", async () => {
+  it("a category deletion leaves it alone and the entry stays uncategorized", async () => {
     const ledgerId = await newLedger();
     const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
     const categoryId = await insertCategory(ledgerId, "Retired");
@@ -446,13 +402,13 @@ describe("whole save — a draft goes stale only when its content changed", () =
     });
     expect(await currentVersion(sourceDocumentId)).toBe(1);
 
-    const saved = await saveSourceDocumentChanges({
+    await batchUpdateLedgerEntries({
       ledgerId,
-      sourceDocumentId,
-      expectedVersion: 1,
-      entries: [{ ledgerEntryId: entryIds[0]!, data: { itemName: "Draft" } }],
+      sourceDocumentIds: [sourceDocumentId],
+      ledgerEntryIds: [entryIds[0]!],
+      itemName: "Edited",
     });
-    expect(saved).toMatchObject({ ok: true, version: 2 });
-    expect(await readEntry(entryIds[0]!)).toMatchObject({ categoryId: null, itemName: "Draft" });
+    expect(await currentVersion(sourceDocumentId)).toBe(2);
+    expect(await readEntry(entryIds[0]!)).toMatchObject({ categoryId: null, itemName: "Edited" });
   });
 });

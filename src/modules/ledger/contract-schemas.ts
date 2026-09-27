@@ -179,14 +179,6 @@ const createLedgerEntryInputSchema = strictObjectSchema({
   sourceDocumentId: uuidSchema,
 });
 
-export const updateLedgerEntryInputSchema = nonEmptyStrictObjectSchema({
-  categoryId: uuidSchema.nullable().optional(),
-  amount: nonZeroDecimalSchema.optional(),
-  currency: nullableCurrencyCodeSchema,
-  itemName: z.string().trim().min(1).max(200).optional(),
-  description: z.string().max(500).nullable().optional(),
-});
-
 const batchUpdateLedgerEntriesInputSchema = nonEmptyStrictObjectSchema({
   categoryId: uuidSchema.nullable().optional(),
   currency: nullableCurrencyCodeSchema,
@@ -321,7 +313,6 @@ export const parseLedgerStatsQuery = (input: unknown) =>
 export type UpdateLedgerInput = z.infer<typeof updateLedgerInputSchema>;
 export type SaveEntryCategoriesInput = z.infer<typeof saveEntryCategoriesInputSchema>;
 export type CreateLedgerEntryInput = z.infer<typeof createLedgerEntryInputSchema>;
-export type UpdateLedgerEntryInput = z.infer<typeof updateLedgerEntryInputSchema>;
 export type BatchUpdateLedgerEntriesInput = z.infer<typeof batchUpdateLedgerEntriesInputSchema>;
 export type CreateServiceCredentialInput = z.infer<typeof createServiceCredentialInputSchema>;
 export type UpdateServiceCredentialInput = z.infer<typeof updateServiceCredentialInputSchema>;

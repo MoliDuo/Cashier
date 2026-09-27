@@ -20,8 +20,8 @@ function normalizeCurrency(value: string | null) {
 
 /**
  * Drops the suggestion the reader dismissed. One already replaced or gone is
- * left as it is; the suggestion is not part of a whole-document save, so the
- * version is left alone.
+ * left as it is; the suggestion is not part of the record's content (title,
+ * date and entries), so the version is left alone.
  */
 export async function dismissDateOrganization(
   input: DismissDateOrganizationInput & { ledgerId: string }

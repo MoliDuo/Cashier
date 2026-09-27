@@ -1,8 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { expectAmountVariant, expectTextRole } from "tests/helpers/class-tables";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
 import { SourceDocumentViewDetails } from "@/modules/source-document/ui/SourceDocumentViewDetails";
@@ -45,15 +44,23 @@ vi.mock("@/modules/source-document/ui/EditableLedgerEntryItem", () => ({
   EditableLedgerEntryItem: ({
     ledgerEntry,
     pendingChanges,
+    readOnly,
+    onDelete,
   }: {
     ledgerEntry: LedgerEntry;
     pendingChanges?: { itemName?: string };
+    readOnly?: boolean;
+    onDelete?: () => void;
   }) => (
-    <input
-      aria-label="Entry name"
-      value={pendingChanges?.itemName ?? ledgerEntry.itemName}
-      readOnly
-    />
+    <div>
+      <input
+        aria-label="Entry name"
+        data-editable={!readOnly}
+        value={pendingChanges?.itemName ?? ledgerEntry.itemName}
+        readOnly
+      />
+      {onDelete != null ? <button onClick={onDelete}>delete-row</button> : null}
+    </div>
   ),
 }));
 
@@ -90,75 +97,100 @@ function renderWithQueryClient(element: ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
 }
 
-function renderDetails(count: number) {
-  const sourceDocument = documentWithFiles(count);
+const entry = (id: string, itemName: string): LedgerEntry => ({
+  id,
+  ledgerId: "ledger-1",
+  categoryId: null,
+  sourceDocumentId: "doc-1",
+  amount: "12.00",
+  currency: "CNY",
+  itemName,
+  description: null,
+  convertedAmount: "12.00",
+  exchangeRate: "1",
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+});
+
+type DetailsProps = Parameters<typeof SourceDocumentViewDetails>[0];
+
+function detailsProps(overrides: Partial<DetailsProps> = {}): DetailsProps {
+  return {
+    sourceDocument: documentWithFiles(0),
+    ledgerEntries: [],
+    pendingEntries: {},
+    savingEntryIds: [],
+    documentDate: "2026-07-28",
+    categories: [],
+    selectedEntryIds: [],
+    isSelectionMode: false,
+    mobileView: "details",
+    onEntryChange: vi.fn(),
+    onSelectEntry: vi.fn(),
+    onToggleSelectionMode: vi.fn(),
+    readOnly: false,
+    isAddingEntry: false,
+    onAddEntry: vi.fn(),
+    onDeleteEntry: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderDetails(count: number, overrides: Partial<DetailsProps> = {}) {
   return renderWithQueryClient(
     <SourceDocumentViewDetails
-      sourceDocument={sourceDocument}
-      ledgerEntries={[]}
-      categories={[]}
-      pendingChanges={{ sourceDoc: {}, entries: {} }}
-      selectedEntryIds={[]}
-      isSelectionMode={false}
-      mobileView="details"
-      onMobileViewChange={vi.fn()}
-      onSourceDocChange={vi.fn()}
-      onEntryChange={vi.fn()}
-      onSelectEntry={vi.fn()}
-      onToggleSelectionMode={vi.fn()}
-      interactionDisabled
+      {...detailsProps({ sourceDocument: documentWithFiles(count), ...overrides })}
     />
   );
 }
 
-describe("SourceDocumentViewDetails summary date", () => {
-  it("shows the transaction date as plain text outside edit mode", () => {
-    renderDetails(0);
+describe("SourceDocumentViewDetails entries", () => {
+  it("names the entries and counts them in the card header", () => {
+    renderDetails(0, { ledgerEntries: [entry("entry-1", "Lunch")] });
 
-    const dateRow = screen.getByTestId("source-document-date-row");
-    expect(dateRow).toHaveTextContent(/2026年7月28日|Jul 28, 2026/);
-    expect(within(dateRow).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("source-document-entries-header")).toHaveTextContent("明细1");
   });
 
-  it("previews the transaction date and the total in the toolbar", () => {
-    renderDetails(0);
+  it("opens a row for editing when it is tapped, with its delete at the end", () => {
+    const onDeleteEntry = vi.fn();
+    renderDetails(0, { ledgerEntries: [entry("entry-1", "Lunch")], onDeleteEntry });
 
-    const dateRow = screen.getByTestId("source-document-date-row");
-    // The bar reuses the ledger toolbar shell: select control, centred date, total.
-    expect(within(dateRow).getByText("交易时间")).toHaveClass("sr-only");
-    const date = within(dateRow).getByText(/2026年7月28日|Jul 28, 2026/);
-    expectTextRole(date, "bodyStrong");
-    expectAmountVariant(within(dateRow).getByText("¥0.00"), "item");
-    // The read-only date drops its calendar marker.
-    expect(dateRow.querySelector(".lucide-calendar")).not.toBeInTheDocument();
+    const name = screen.getByDisplayValue("Lunch");
+    expect(name).toHaveAttribute("data-editable", "false");
+    expect(screen.queryByText("delete-row")).not.toBeInTheDocument();
 
-    // The entry count no longer takes a row of its own.
-    expect(screen.queryByText("明细项目 (0)")).not.toBeInTheDocument();
-    expect(screen.queryByText("=")).not.toBeInTheDocument();
-    expect(screen.queryByText(/创建于/)).not.toBeInTheDocument();
+    fireEvent.click(name);
+    expect(screen.getByDisplayValue("Lunch")).toHaveAttribute("data-editable", "true");
+    fireEvent.click(screen.getByText("delete-row"));
+    expect(onDeleteEntry).toHaveBeenCalledWith("entry-1");
   });
 
-  it("restores the date picker in edit mode", () => {
-    renderWithQueryClient(
-      <SourceDocumentViewDetails
-        sourceDocument={documentWithFiles(0)}
-        ledgerEntries={[]}
-        categories={[]}
-        pendingChanges={{ sourceDoc: {}, entries: {} }}
-        selectedEntryIds={[]}
-        isSelectionMode={false}
-        isEditMode
-        mobileView="details"
-        onMobileViewChange={vi.fn()}
-        onSourceDocChange={vi.fn()}
-        onEntryChange={vi.fn()}
-        onSelectEntry={vi.fn()}
-        onToggleSelectionMode={vi.fn()}
-      />
-    );
+  it("keeps a row closed while its write is in flight, showing the value being written", () => {
+    renderDetails(0, {
+      ledgerEntries: [entry("entry-1", "Lunch")],
+      pendingEntries: { "entry-1": { itemName: "Brunch" } },
+      savingEntryIds: ["entry-1"],
+    });
 
-    const dateRow = screen.getByTestId("source-document-date-row");
-    expect(within(dateRow).getAllByRole("button").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByDisplayValue("Brunch"));
+    expect(screen.getByDisplayValue("Brunch")).toHaveAttribute("data-editable", "false");
+  });
+
+  it("always offers a new entry on an editable record", () => {
+    const onAddEntry = vi.fn();
+    renderDetails(0, { onAddEntry });
+
+    fireEvent.click(screen.getByRole("button", { name: "添加明细" }));
+    expect(onAddEntry).toHaveBeenCalledOnce();
+  });
+
+  it("offers neither editing nor selection on a read-only record", () => {
+    renderDetails(0, { ledgerEntries: [entry("entry-1", "Lunch")], readOnly: true });
+
+    fireEvent.click(screen.getByDisplayValue("Lunch"));
+    expect(screen.getByDisplayValue("Lunch")).toHaveAttribute("data-editable", "false");
+    expect(screen.queryByRole("button", { name: "添加明细" })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("选择")).not.toBeInTheDocument();
   });
 });
 
@@ -167,9 +199,6 @@ describe("SourceDocumentViewDetails image stage", () => {
     renderDetails(0);
     expect(screen.getByText(/暂无原始凭证|No original evidence/i)).toBeInTheDocument();
     expect(screen.getByTestId("source-document-details-pane")).not.toHaveClass("hidden");
-    expect(
-      screen.queryByRole("button", { name: /back to details|返回明细/i })
-    ).not.toBeInTheDocument();
   });
 
   it("uses the authenticated stored-file route and hides thumbnails for one image", () => {
@@ -197,111 +226,33 @@ describe("SourceDocumentViewDetails image stage", () => {
     );
   });
 
-  it("hides the details pane and returns from evidence through the controlled view", () => {
-    // The pane toggle is driven by the footer, so this component only reports
-    // the requested view back to its owner.
-    const onMobileViewChange = vi.fn();
-    renderWithQueryClient(
-      <SourceDocumentViewDetails
-        sourceDocument={documentWithFiles(1)}
-        ledgerEntries={[]}
-        categories={[]}
-        pendingChanges={{ sourceDoc: {}, entries: {} }}
-        selectedEntryIds={[]}
-        isSelectionMode={false}
-        mobileView="evidence"
-        onMobileViewChange={onMobileViewChange}
-        onSourceDocChange={vi.fn()}
-        onEntryChange={vi.fn()}
-        onSelectEntry={vi.fn()}
-        onToggleSelectionMode={vi.fn()}
-      />
-    );
+  it("shows only the evidence pane when the narrow view asks for it", () => {
+    renderDetails(1, { mobileView: "evidence" });
 
     expect(screen.getByTestId("source-document-details-pane")).toHaveClass("hidden", "lg:block");
-
-    fireEvent.click(screen.getByRole("button", { name: /back to details|返回明细/i }));
-    expect(onMobileViewChange).toHaveBeenCalledWith("details");
   });
 });
 
 describe("SourceDocumentViewDetails selection", () => {
-  it("shows the batch selection entry outside edit mode", () => {
-    const entry: LedgerEntry = {
-      id: "entry-1",
-      ledgerId: "ledger-1",
-      categoryId: null,
-      sourceDocumentId: "doc-1",
-      amount: "12.00",
-      currency: "CNY",
-      itemName: "Lunch",
-      description: null,
-      convertedAmount: "12.00",
-      exchangeRate: "1",
-      createdAt: "2026-07-28T00:00:00.000Z",
-      updatedAt: "2026-07-28T00:00:00.000Z",
-    };
+  it("switches into selection from the card header", () => {
     const onToggleSelectionMode = vi.fn();
+    renderDetails(0, { ledgerEntries: [entry("entry-1", "Lunch")], onToggleSelectionMode });
 
-    renderWithQueryClient(
-      <SourceDocumentViewDetails
-        sourceDocument={documentWithFiles(0)}
-        ledgerEntries={[entry]}
-        categories={[]}
-        pendingChanges={{ sourceDoc: {}, entries: {} }}
-        selectedEntryIds={[]}
-        isSelectionMode={false}
-        isEditMode={false}
-        mobileView="details"
-        onMobileViewChange={vi.fn()}
-        onSourceDocChange={vi.fn()}
-        onEntryChange={vi.fn()}
-        onSelectEntry={vi.fn()}
-        onToggleSelectionMode={onToggleSelectionMode}
-      />
-    );
-
-    fireEvent.click(screen.getByTitle(/select|选择/i));
+    fireEvent.click(screen.getByTitle("选择"));
     expect(onToggleSelectionMode).toHaveBeenCalledTimes(1);
   });
 
-  it("freezes the editable card and keeps pending changes when selection mode exits", () => {
-    const entry: LedgerEntry = {
-      id: "entry-1",
-      ledgerId: "ledger-1",
-      categoryId: null,
-      sourceDocumentId: "doc-1",
-      amount: "12.00",
-      currency: "CNY",
-      itemName: "Lunch",
-      description: null,
-      convertedAmount: "12.00",
-      exchangeRate: "1",
-      createdAt: "2026-07-28T00:00:00.000Z",
-      updatedAt: "2026-07-28T00:00:00.000Z",
-    };
-    const pendingChanges = {
-      sourceDoc: {},
-      entries: { "entry-1": { itemName: "Edited lunch" } },
-    };
+  it("freezes the rows while selecting and keeps values being written", () => {
     const onSelectEntry = vi.fn();
-    const commonProps = {
-      sourceDocument: documentWithFiles(0),
-      ledgerEntries: [entry],
-      categories: [],
-      pendingChanges,
-      selectedEntryIds: [],
-      mobileView: "details" as const,
-      onMobileViewChange: vi.fn(),
-      onSourceDocChange: vi.fn(),
-      onEntryChange: vi.fn(),
+    const props = detailsProps({
+      ledgerEntries: [entry("entry-1", "Lunch")],
+      pendingEntries: { "entry-1": { itemName: "Edited lunch" } },
       onSelectEntry,
-      onToggleSelectionMode: vi.fn(),
-    };
+    });
     const queryClient = new QueryClient();
     const { rerender } = render(
       <QueryClientProvider client={queryClient}>
-        <SourceDocumentViewDetails {...commonProps} isSelectionMode />
+        <SourceDocumentViewDetails {...props} isSelectionMode />
       </QueryClientProvider>
     );
 
@@ -310,12 +261,12 @@ describe("SourceDocumentViewDetails selection", () => {
     const checkbox = screen.getByRole("checkbox", { name: /Lunch/i });
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
     fireEvent.click(checkbox);
-    expect(onSelectEntry).toHaveBeenCalledTimes(1);
     expect(onSelectEntry).toHaveBeenCalledWith("entry-1", true);
+    expect(screen.queryByRole("button", { name: "添加明细" })).not.toBeInTheDocument();
 
     rerender(
       <QueryClientProvider client={queryClient}>
-        <SourceDocumentViewDetails {...commonProps} isSelectionMode={false} />
+        <SourceDocumentViewDetails {...props} isSelectionMode={false} />
       </QueryClientProvider>
     );
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
@@ -324,47 +275,17 @@ describe("SourceDocumentViewDetails selection", () => {
 });
 
 describe("SourceDocumentViewDetails entry row outline", () => {
-  const entry = (id: string, itemName: string): LedgerEntry => ({
-    id,
-    ledgerId: "ledger-1",
-    categoryId: null,
-    sourceDocumentId: "doc-1",
-    amount: "12.00",
-    currency: "CNY",
-    itemName,
-    description: null,
-    convertedAmount: "12.00",
-    exchangeRate: "1",
-    createdAt: "2026-07-28T00:00:00.000Z",
-    updatedAt: "2026-07-28T00:00:00.000Z",
-  });
-
-  function renderSelection(ledgerEntries: LedgerEntry[], selectedEntryIds: string[]) {
-    return renderWithQueryClient(
-      <SourceDocumentViewDetails
-        sourceDocument={documentWithFiles(0)}
-        ledgerEntries={ledgerEntries}
-        categories={[]}
-        pendingChanges={{ sourceDoc: {}, entries: {} }}
-        selectedEntryIds={selectedEntryIds}
-        isSelectionMode
-        mobileView="details"
-        onMobileViewChange={vi.fn()}
-        onSourceDocChange={vi.fn()}
-        onEntryChange={vi.fn()}
-        onSelectEntry={vi.fn()}
-        onToggleSelectionMode={vi.fn()}
-      />
-    );
-  }
-
   it("does not clip a selected entry's outline down to its top and bottom edges", () => {
     // Regression: the entries card clipped its rows, and the outline is drawn
     // one pixel outside the row — on the card's own border — so a selected row
     // lost both verticals and read as two stray strips above and below it.
-    const { container } = renderSelection([entry("entry-1", "Lunch")], ["entry-1"]);
+    const { container } = renderDetails(0, {
+      ledgerEntries: [entry("entry-1", "Lunch")],
+      selectedEntryIds: ["entry-1"],
+      isSelectionMode: true,
+    });
 
-    const card = screen.getByTestId("source-document-date-row").parentElement as HTMLElement;
+    const card = screen.getByTestId("source-document-entries-header").parentElement as HTMLElement;
     expect(card).not.toHaveClass("overflow-hidden");
     expect(
       container.querySelector('[data-selection-mode="true"][data-selected="true"]')

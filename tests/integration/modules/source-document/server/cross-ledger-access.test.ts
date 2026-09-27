@@ -13,7 +13,6 @@ import {
 } from "@/modules/source-document/server/date-organization";
 import {
   assignSourceDocumentBook,
-  saveSourceDocumentChanges,
   updateLedgerEntryDates,
   updateSourceDocuments,
 } from "@/modules/source-document/server/updates";
@@ -45,7 +44,6 @@ interface Neighbour {
   sourceDocumentId: string;
   ledgerEntryId: string;
   bookId: string;
-  version: number;
 }
 
 async function seedTwoLedgers(): Promise<{
@@ -78,10 +76,6 @@ async function seedTwoLedgers(): Promise<{
     })
     .returning();
   if (entry == null) throw new Error("Expected the neighbour's ledger entry");
-  const document = await db.query.sourceDocuments.findFirst({
-    where: eq(sourceDocuments.id, sourceDocumentId),
-  });
-  if (document == null) throw new Error("Expected the neighbour's source document");
   return {
     callerLedgerId,
     callerBookId: await testBookId(db, callerLedgerId),
@@ -90,7 +84,6 @@ async function seedTwoLedgers(): Promise<{
       sourceDocumentId,
       ledgerEntryId: entry.id,
       bookId: await testBookId(db, ledgerId),
-      version: document.version,
     },
   };
 }
@@ -152,17 +145,6 @@ const REACHES: Array<[name: string, reach: Reach]> = [
         ledgerId,
         sourceDocumentIds: [other.sourceDocumentId],
         data: { title: "Taken over" },
-      }),
-  ],
-  [
-    "saveSourceDocumentChanges",
-    (ledgerId, other) =>
-      saveSourceDocumentChanges({
-        ledgerId,
-        sourceDocumentId: other.sourceDocumentId,
-        expectedVersion: other.version,
-        sourceDocument: { title: "Taken over" },
-        entries: [{ ledgerEntryId: other.ledgerEntryId, data: { itemName: "Taken over" } }],
       }),
   ],
   [

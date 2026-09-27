@@ -1,15 +1,7 @@
-import type { EntryEditData } from "@/modules/source-document/types";
-
-export interface SourceDocPendingChanges {
+/** The record's own fields the detail sheet writes, each on its own. */
+export interface DocumentPatch {
   title?: string;
   documentDate?: string;
-}
-
-export type EntriesPendingChanges = Record<string, Partial<EntryEditData>>;
-
-export interface PendingChanges {
-  sourceDoc: SourceDocPendingChanges;
-  entries: EntriesPendingChanges;
 }
 
 /** Fields collected by the "add entry" dialog for a new ledger entry. */

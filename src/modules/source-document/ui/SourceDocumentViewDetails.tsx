@@ -1,22 +1,14 @@
 "use client";
 import type { LedgerEntryEmbeddedViewDto, EntryCategory } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
-import { type ReactNode, useMemo, memo } from "react";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { type ReactNode, memo } from "react";
 import { cn } from "@/lib/utils";
 import type { EntryEditData } from "@/modules/source-document/types";
-import { buildSourceDocumentDetailViewModel } from "./source-document-detail-view-model";
-import { SourceDocumentSummaryHeader } from "./SourceDocumentViewDetails/components/SourceDocumentSummaryHeader";
+import { SourceDocumentEntriesHeader } from "./SourceDocumentViewDetails/components/SourceDocumentEntriesHeader";
 import { SourceDocumentEntriesList } from "./SourceDocumentViewDetails/components/SourceDocumentEntriesList";
 import { SourceDocumentRawEvidence } from "./SourceDocumentViewDetails/components/SourceDocumentRawEvidence";
-import type {
-  PendingChanges,
-  SourceDocPendingChanges,
-} from "@/modules/source-document/detail-types";
 import { SourceDocumentDateOrganization } from "./SourceDocumentDateOrganization";
 import type { ApplyDateOrganizationInput } from "../contracts";
-import { sourceDocumentDetailCopy } from "@/copy/source-document";
 
 interface SourceDocumentViewDetailsProps {
   sourceDocument: SourceDocument;
@@ -25,24 +17,26 @@ interface SourceDocumentViewDetailsProps {
   // LedgerEntry would let `.sourceDocument` type-check while silently
   // reading undefined at runtime.
   ledgerEntries: LedgerEntryEmbeddedViewDto[];
+  /** Entry values being written, shown in place of the saved ones. */
+  pendingEntries: Record<string, Partial<EntryEditData>>;
+  /** Entries whose write has not settled; each such row waits. */
+  savingEntryIds: readonly string[];
+  /** The record's date as shown, including one being written. */
+  documentDate: string;
   categories: EntryCategory[];
   preferredCurrencies?: string[];
   mainCurrency?: string;
-  pendingChanges: PendingChanges;
   selectedEntryIds: string[];
   isSelectionMode: boolean;
-  onSourceDocChange: (changes: SourceDocPendingChanges) => void;
+  /** Writes one field of one entry. */
   onEntryChange: (entryId: string, changes: Partial<EntryEditData>) => void;
   onSelectEntry: (entryId: string, selected: boolean) => void;
   onToggleSelectionMode: () => void;
-  interactionDisabled?: boolean;
-  /** When true the entry/date fields are editable. */
-  isEditMode?: boolean;
-  /** Opens the add-entry dialog; the "add entry" button only shows in edit mode. */
-  onAddEntry?: () => void;
-  /** Deletes a single entry; the per-entry delete button only shows in edit mode. */
-  onDeleteEntry?: (entryId: string) => void;
-  onRequestEdit?: () => void;
+  /** Nothing is editable: the record is processing, loading or mid-command. */
+  readOnly: boolean;
+  isAddingEntry: boolean;
+  onAddEntry: () => void;
+  onDeleteEntry: (entryId: string) => void;
   onApplyDateOrganization?: (
     input: Omit<ApplyDateOrganizationInput, "sourceDocumentId">
   ) => Promise<unknown>;
@@ -50,17 +44,12 @@ interface SourceDocumentViewDetailsProps {
   isOrganizingDates?: boolean;
   dateOrganizationDisabled?: boolean;
   onDateAdjustmentStateChange?: (active: boolean, dirty: boolean) => void;
-  /**
-   * Which pane the narrow-viewport layout shows. The footer owns the toggle
-   * because the "view evidence" button sits in the action bar; desktop always
-   * shows both panes.
-   */
+  /** Which pane the narrow-viewport layout shows; desktop always shows both. */
   mobileView: "details" | "evidence";
-  onMobileViewChange: (view: "details" | "evidence") => void;
   /** Ledger timezone; the suggestion panel names today/yesterday against it. */
   timeZone?: string;
   /**
-   * The selection band, built by the modal that owns the batch write. It takes
+   * The selection band, built by the sheet that owns the batch write. It takes
    * the entries card's header row for as long as selection mode is on.
    */
   selectionToolbar?: ReactNode;
@@ -69,50 +58,30 @@ interface SourceDocumentViewDetailsProps {
 export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails({
   sourceDocument,
   ledgerEntries,
+  pendingEntries,
+  savingEntryIds,
+  documentDate,
   categories,
   preferredCurrencies = [],
   mainCurrency = "CNY",
-  pendingChanges,
   selectedEntryIds,
   isSelectionMode,
-  onSourceDocChange,
   onEntryChange,
   onSelectEntry,
   onToggleSelectionMode,
-  interactionDisabled = false,
-  isEditMode = false,
+  readOnly,
+  isAddingEntry,
   onAddEntry,
   onDeleteEntry,
-  onRequestEdit,
   onApplyDateOrganization,
   onDismissDateOrganization,
   isOrganizingDates = false,
   dateOrganizationDisabled = false,
   onDateAdjustmentStateChange,
   mobileView,
-  onMobileViewChange,
   timeZone,
   selectionToolbar,
 }: SourceDocumentViewDetailsProps): ReactNode {
-  const displayEntryDate =
-    pendingChanges.sourceDoc.documentDate ?? sourceDocument.documentDate ?? "";
-  // Entry/date fields are editable only while in edit mode (and never during a mutation).
-  const fieldsDisabled = interactionDisabled || !isEditMode;
-
-  const { totalInMainCurrency, unconvertedCount, staleConversionCount } = useMemo(
-    () =>
-      buildSourceDocumentDetailViewModel({
-        ledgerEntries,
-        pendingChanges,
-        mainCurrency,
-        entryDate: displayEntryDate,
-        originalEntryDate: sourceDocument.documentDate ?? "",
-      }),
-    [displayEntryDate, ledgerEntries, mainCurrency, pendingChanges, sourceDocument.documentDate]
-  );
-
-  const isInvalid =
-    sourceDocument.processingStatus === "failed" && sourceDocument.failureKind === "invalid_input";
   const hasEvidence =
     sourceDocument.files.length > 0 ||
     (sourceDocument.text != null && sourceDocument.text.trim().length > 0);
@@ -126,8 +95,8 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
           hasEvidence && mobileView === "evidence" && "hidden lg:block"
         )}
       >
-        {/* The suggestion leads: it is about to change the dates the bar below
-            shows, so it sits above them. */}
+        {/* The suggestion leads: it is about to change the dates of the
+            entries below, so it sits above them. */}
         {sourceDocument.dateOrganizationSuggestion != null &&
         onApplyDateOrganization != null &&
         onDismissDateOrganization != null ? (
@@ -136,7 +105,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
             suggestion={sourceDocument.dateOrganizationSuggestion}
             entries={ledgerEntries}
             mainCurrency={mainCurrency}
-            disabled={interactionDisabled || isOrganizingDates || dateOrganizationDisabled}
+            disabled={readOnly || isOrganizingDates || dateOrganizationDisabled}
             onApply={onApplyDateOrganization}
             onDismiss={onDismissDateOrganization}
             {...(timeZone != null ? { timeZone } : {})}
@@ -146,67 +115,47 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
           />
         ) : null}
 
-        {/* The toolbar and the entries are one card, the way the suggestion
-            panel above them reads: a header row over the list it summarises.
-            Deliberately not clipped: a selected entry row is outlined one pixel
-            outside itself, which is exactly the border the card draws there, so
-            clipping would leave the outline with only its top and bottom. */}
+        {/* The header and the entries are one card. Deliberately not clipped:
+            a selected entry row is outlined one pixel outside itself, which is
+            exactly the border the card draws there, so clipping would leave the
+            outline with only its top and bottom. */}
         <div className="min-w-0 rounded-lg border border-border bg-surface">
-          <SourceDocumentSummaryHeader
-            displayEntryDate={displayEntryDate}
-            totalInMainCurrency={totalInMainCurrency}
-            mainCurrency={mainCurrency}
-            staleConversionCount={staleConversionCount}
-            unconvertedCount={unconvertedCount}
-            onSourceDocChange={onSourceDocChange}
-            fieldsDisabled={fieldsDisabled}
-            isInvalid={isInvalid}
+          <SourceDocumentEntriesHeader
             entryCount={ledgerEntries.length}
             isSelectionMode={isSelectionMode}
-            interactionDisabled={interactionDisabled}
+            canSelect={ledgerEntries.length > 0 && (!readOnly || isSelectionMode)}
             onToggleSelectionMode={onToggleSelectionMode}
             {...(selectionToolbar != null ? { selectionToolbar } : {})}
           />
 
           <SourceDocumentEntriesList
             entries={ledgerEntries}
+            pendingEntries={pendingEntries}
+            savingEntryIds={savingEntryIds}
             categories={categories}
             preferredCurrencies={preferredCurrencies}
             mainCurrency={mainCurrency}
             selectedEntryIds={selectedEntryIds}
             isSelectionMode={isSelectionMode}
-            interactionDisabled={interactionDisabled}
-            fieldsDisabled={fieldsDisabled}
-            isEditMode={isEditMode}
+            readOnly={readOnly}
+            isAddingEntry={isAddingEntry}
             onEntryChange={onEntryChange}
             onSelectEntry={onSelectEntry}
-            displayEntryDate={displayEntryDate}
-            originalEntryDate={sourceDocument.documentDate ?? ""}
+            documentDate={documentDate}
+            savedDocumentDate={sourceDocument.documentDate ?? ""}
             onAddEntry={onAddEntry}
             onDeleteEntry={onDeleteEntry}
-            pendingChanges={pendingChanges.entries}
-            {...(onRequestEdit == null ? {} : { onRequestEdit })}
           />
         </div>
       </div>
       <aside
         className={cn(
-          "min-w-0 overflow-y-auto border-t pt-4 lg:min-h-0 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0",
+          "min-w-0 overflow-y-auto lg:min-h-0 lg:border-l lg:pl-4",
+          // Without evidence to switch to, the empty pane follows the entries.
+          !hasEvidence && "border-t pt-4 lg:border-t-0 lg:pt-0",
           hasEvidence && mobileView === "details" && "hidden lg:block"
         )}
       >
-        {hasEvidence ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="mb-3 lg:hidden"
-            onClick={() => onMobileViewChange("details")}
-          >
-            <ArrowLeft className="size-4" />
-            {sourceDocumentDetailCopy.backToDetails}
-          </Button>
-        ) : null}
         <SourceDocumentRawEvidence sourceDocument={sourceDocument} />
       </aside>
     </div>

@@ -1,4 +1,4 @@
-import { saveSourceDocumentChangesAction } from "@/modules/source-document/server-actions/update";
+import { batchUpdateSourceDocumentsAction } from "@/modules/source-document/server-actions/update";
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
@@ -106,18 +106,16 @@ describe("saveEntryCategoriesAction", () => {
     });
     expect(removed).toBeUndefined();
     expect(entry?.categoryId).toBeNull();
-    // Clearing a deleted category does not make an open draft stale.
+    // Clearing a deleted category leaves the document version alone.
     expect(
       await db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, document.id) })
     ).toMatchObject({ version: 1 });
     expect(
-      await saveSourceDocumentChangesAction({
-        sourceDocumentId: document.id,
-        expectedVersion: 1,
-        sourceDocument: { title: "Draft edit" },
-        entries: [],
+      await batchUpdateSourceDocumentsAction({
+        sourceDocumentIds: [document.id],
+        data: { title: "Edited title" },
       })
-    ).toMatchObject({ ok: true, version: 2 });
+    ).toMatchObject({ updatedCount: 1 });
     await saveEntryCategoriesAction({
       expectedRevision: await computeCategoryCollectionRevision(saved),
       categories: saved.map(({ id, name, description, icon }) => ({ id, name, description, icon })),

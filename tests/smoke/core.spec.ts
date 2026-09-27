@@ -43,20 +43,22 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
     .getByRole("button", { name: item, exact: true })
     .click();
   const detail = page.getByRole("dialog").first();
-  await detail.getByRole("button", { name: "编辑", exact: true }).click();
-  // A field swaps from its display button to an input when it is clicked.
+  // The title swaps from its display button to an input when it is clicked,
+  // and Enter writes it; there is no edit mode and nothing else to save.
   await detail.getByRole("button", { name: item, exact: true }).first().click();
-  const title = detail.getByRole("textbox").first();
+  const title = detail.getByRole("textbox", { name: "账单标题", exact: true });
   await title.fill(`${item} edited`);
   await title.press("Enter");
-  await detail.getByRole("button", { name: /^保存 \(/ }).click();
-  await expect(detail.getByRole("button", { name: "编辑", exact: true })).toBeVisible();
+  await expect(
+    detail.getByRole("button", { name: `${item} edited`, exact: true }).first()
+  ).toBeEnabled();
   await page.reload();
   await expect(
     page.getByRole("dialog").first().getByText(`${item} edited`, { exact: true }).first()
   ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("detail.png"), fullPage: true });
-  await page.getByRole("dialog").first().getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("dialog").first().getByRole("button", { name: "更多操作" }).click();
+  await page.getByRole("menuitem", { name: "删除账单", exact: true }).click();
   await page.getByRole("dialog").last().getByRole("button", { name: "删除", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page).not.toHaveURL(/detail=/);

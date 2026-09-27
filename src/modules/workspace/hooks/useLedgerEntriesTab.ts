@@ -419,7 +419,7 @@ export function useLedgerEntriesTab({
 
   const handleViewSourceDetail = useCallback(
     (group: { sourceDocument: SourceDocumentListItemDto; ledgerEntries: LedgerEntry[] }) => {
-      openLedgerDetail({ type: "source-document", id: group.sourceDocument.id });
+      openLedgerDetail(group.sourceDocument.id);
     },
     []
   );

@@ -7,35 +7,40 @@ import { sourceDocumentActionCopy, sourceDocumentDetailCopy } from "@/copy/sourc
 import { queryKeys } from "@/lib/query-keys";
 import type { LedgerEntry } from "@/modules/ledger/contracts";
 import type { SourceDocument } from "@/modules/source-document/contracts";
+import type { EntryEditData } from "@/modules/source-document/types";
 import { SourceDocumentDetailModal } from "@/modules/source-document/ui/SourceDocumentDetailModal";
 
 const {
   toastErrorMock,
   fetchDetailMock,
-  saveMock,
+  updateDocumentMock,
+  updateEntriesMock,
   splitMock,
-  createEntryMock,
   deleteMock,
   cancelMock,
+  retryMock,
+  editRetryDialogMock,
 } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
   fetchDetailMock: vi.fn(),
-  saveMock: vi.fn(),
+  updateDocumentMock: vi.fn(),
+  updateEntriesMock: vi.fn(),
   splitMock: vi.fn(),
-  createEntryMock: vi.fn(),
   deleteMock: vi.fn(),
   cancelMock: vi.fn(),
+  retryMock: vi.fn(),
+  editRetryDialogMock: vi.fn(),
 }));
 
 vi.mock("@/modules/source-document/queries", () => ({
   fetchSourceDocumentDetail: fetchDetailMock,
 }));
-vi.mock("@/modules/source-document/hooks/useLedgerRefreshPolling", () => ({
-  useLedgerRefreshPolling: () => undefined,
-}));
 vi.mock("@/modules/ledger/queries", () => ({ fetchBook: vi.fn() }));
+vi.mock("@/lib/mutations/ledger-sync", () => ({
+  syncLedgerAfterWrite: () => Promise.resolve(),
+}));
 vi.mock("@/modules/source-document/server-actions/update", () => ({
-  saveSourceDocumentChangesAction: saveMock,
+  batchUpdateSourceDocumentsAction: updateDocumentMock,
 }));
 vi.mock("@/modules/source-document/server-actions/split", () => ({
   splitSourceDocumentAction: splitMock,
@@ -46,6 +51,9 @@ vi.mock("@/modules/source-document/server-actions/delete", () => ({
 vi.mock("@/modules/source-document/server-actions/processing", () => ({
   cancelSourceDocumentProcessingAction: cancelMock,
 }));
+vi.mock("@/modules/source-document/server-actions/retry", () => ({
+  retrySourceDocumentAction: retryMock,
+}));
 vi.mock("@/modules/source-document/server-actions/book", () => ({
   assignSourceDocumentBookAction: vi.fn(),
 }));
@@ -54,9 +62,9 @@ vi.mock("@/modules/source-document/server-actions/date-organization", () => ({
   dismissDateOrganizationAction: vi.fn(),
 }));
 vi.mock("@/modules/ledger/server-actions/entries", () => ({
-  createLedgerEntryAction: createEntryMock,
+  createLedgerEntryAction: vi.fn(),
   deleteLedgerEntryAction: vi.fn(),
-  batchUpdateLedgerEntriesAction: vi.fn(),
+  batchUpdateLedgerEntriesAction: updateEntriesMock,
   batchDeleteLedgerEntriesAction: vi.fn(),
 }));
 
@@ -82,81 +90,122 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogTitle: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
+// The menu's items are always rendered, so each command is one click away.
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children?: ReactNode }) => (
+    <div role="menu">{children}</div>
+  ),
+  DropdownMenuItem: ({
+    children,
+    onClick,
+    disabled,
+  }: {
+    children?: ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+  }) => (
+    <button role="menuitem" onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
+  DropdownMenuSeparator: () => <hr />,
+}));
+
 vi.mock("@/components/ui/confirm-dialog", () => ({
   ConfirmDialog: ({
     open,
     title,
-    onOpenChange,
     onConfirm,
-    onSave,
-    onDiscard,
   }: {
     open?: boolean;
     title: string;
-    onOpenChange?: (open: boolean) => void;
     onConfirm?: () => void | Promise<void | boolean>;
-    onSave?: () => void | Promise<void | boolean>;
-    onDiscard?: () => void | Promise<void | boolean>;
   }) =>
     open ? (
       <div>
         <span>{title}</span>
         {/* The real dialog keeps itself open when its action throws. */}
-        <button onClick={() => void Promise.resolve((onSave ?? onConfirm)?.()).catch(() => {})}>
-          confirm-save
-        </button>
-        <button onClick={() => void Promise.resolve((onDiscard ?? onConfirm)?.()).catch(() => {})}>
-          confirm-discard
-        </button>
-        <button onClick={() => onOpenChange?.(false)}>confirm-cancel</button>
+        <button onClick={() => void Promise.resolve(onConfirm?.()).catch(() => {})}>confirm</button>
       </div>
     ) : null,
 }));
 
-vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => "ledger-1" }));
-
 vi.mock("@/components/ui/editable-field", () => ({
-  EditableField: () => null,
+  EditableField: ({
+    value,
+    onChange,
+    disabled,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+  }) => (
+    <div>
+      <span>{`title: ${value}`}</span>
+      <button disabled={disabled} onClick={() => onChange("Dinner receipt")}>
+        rename
+      </button>
+      <button disabled={disabled} onClick={() => onChange(value)}>
+        rename-unchanged
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/ui/date-filter", () => ({
+  DateFilter: ({
+    value,
+    onChange,
+    readOnly,
+  }: {
+    value: string;
+    onChange: (date: Date | null) => void;
+    readOnly?: boolean;
+  }) => (
+    <button disabled={readOnly} onClick={() => onChange(new Date(2026, 7, 2))}>
+      {`date: ${value}`}
+    </button>
+  ),
 }));
 
 vi.mock("@/modules/source-document/ui/SourceDocumentViewDetails", () => ({
   SourceDocumentViewDetails: ({
-    isEditMode,
     isSelectionMode,
-    onSourceDocChange,
+    readOnly,
+    pendingEntries,
+    savingEntryIds,
+    onEntryChange,
     onToggleSelectionMode,
     onSelectEntry,
-    onAddEntry,
-    onDateAdjustmentStateChange,
+    onDeleteEntry,
     selectionToolbar,
   }: {
-    isEditMode?: boolean;
     isSelectionMode: boolean;
-    onSourceDocChange: (change: { title: string }) => void;
+    readOnly: boolean;
+    pendingEntries: Record<string, Partial<EntryEditData>>;
+    savingEntryIds: readonly string[];
+    onEntryChange: (entryId: string, changes: Partial<EntryEditData>) => void;
     onToggleSelectionMode: () => void;
     onSelectEntry: (entryId: string, selected: boolean) => void;
-    onAddEntry?: () => void;
-    onDateAdjustmentStateChange?: (active: boolean, dirty: boolean) => void;
+    onDeleteEntry: (entryId: string) => void;
     selectionToolbar?: ReactNode;
   }) => (
     <div>
       {/* The real pane renders the band in the entries card's header row. */}
       {selectionToolbar}
-      <span>{isEditMode ? "editing" : "viewing"}</span>
+      <span>{readOnly ? "read-only" : "editable"}</span>
       <span>{isSelectionMode ? "selecting" : "not-selecting"}</span>
-      <button disabled={!isEditMode} onClick={() => onSourceDocChange({ title: "Changed" })}>
-        change-draft
-      </button>
-      <button disabled={!isEditMode} onClick={() => onSourceDocChange({ title: "Changed again" })}>
-        change-draft-again
+      <span>{`pending: ${pendingEntries["entry-1"]?.itemName ?? "none"}`}</span>
+      <span>{`saving: ${savingEntryIds.join(",") || "none"}`}</span>
+      <button onClick={() => onEntryChange("entry-1", { itemName: "Brunch" })}>rename-entry</button>
+      <button onClick={() => onEntryChange("entry-1", { itemName: "Lunch" })}>
+        rename-entry-unchanged
       </button>
       <button onClick={onToggleSelectionMode}>batch-toggle</button>
       <button onClick={() => onSelectEntry("entry-1", true)}>select-first</button>
-      <button onClick={onAddEntry}>add-entry</button>
-      <button onClick={() => onDateAdjustmentStateChange?.(true, false)}>
-        begin-date-adjustment
-      </button>
-      <button onClick={() => onDateAdjustmentStateChange?.(true, true)}>change-date-draft</button>
+      <button onClick={() => onDeleteEntry("entry-1")}>delete-entry</button>
     </div>
   ),
 }));
@@ -171,11 +220,13 @@ vi.mock("@/modules/ledger/ui/batch-action-toolbar", () => ({
 }));
 
 vi.mock("@/modules/source-document/ui/SourceDocumentEditRetryDialog", () => ({
-  SourceDocumentEditRetryDialog: () => null,
+  SourceDocumentEditRetryDialog: ({ open }: { open: boolean }) => {
+    editRetryDialogMock(open);
+    return open ? <div>edit-retry-dialog</div> : null;
+  },
 }));
 vi.mock("@/modules/source-document/ui/AddLedgerEntryDialog", () => ({
-  AddLedgerEntryDialog: ({ open }: { open: boolean }) =>
-    open ? <div>add-entry-dialog</div> : null,
+  AddLedgerEntryDialog: () => null,
 }));
 vi.mock("@/modules/source-document/ui/SourceDocumentSplitDialog", () => ({
   SourceDocumentSplitDialog: ({
@@ -229,18 +280,12 @@ const sourceDocument: SourceDocument = {
   hasImages: false,
   ledgerEntries: [entry],
   updatedAt: "2026-07-28T00:00:00.000Z",
-  supportedActions: [],
+  supportedActions: ["split_entries", "delete"],
   canEdit: true,
   errorCode: null,
 };
 
 const detailKey = queryKeys.sourceDocument("doc-1");
-/** The save button's label while one field of the draft differs from the server. */
-const saveOneChange = sourceDocumentDetailCopy.saveChanges({ count: 1 });
-
-function saved(version = 2) {
-  return { ok: true, sourceDocumentId: "doc-1", version, data: { updatedEntryIds: [] } };
-}
 
 let client: QueryClient;
 
@@ -252,12 +297,12 @@ function newClient(document: SourceDocument | null = sourceDocument) {
   return client;
 }
 
-function modal(id = "doc-1", onClose: () => void = vi.fn()) {
+function modal(onClose: () => void = vi.fn()) {
   return (
     <QueryClientProvider client={client}>
       <SourceDocumentDetailModal
         books={[]}
-        id={id}
+        id="doc-1"
         categories={[]}
         mainCurrency="CNY"
         preferredCurrencies={[]}
@@ -273,305 +318,210 @@ function renderModal(
   onClose: () => void = vi.fn()
 ) {
   newClient(document);
-  return render(modal("doc-1", onClose));
+  return render(modal(onClose));
 }
 
-/** A newer server version arriving while the sheet is open. */
-async function serverSends(document: SourceDocument | null) {
-  await act(async () => {
-    client.setQueryData(detailKey, document);
+/** A promise the test settles by hand, to look at the sheet mid-write. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
   });
-}
-
-function startEditing() {
-  fireEvent.click(screen.getByText(commonCopy.edit));
-  fireEvent.click(screen.getByText("change-draft"));
+  return { promise, resolve, reject };
 }
 
 describe("SourceDocumentDetailModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
     fetchDetailMock.mockResolvedValue(sourceDocument);
-    saveMock.mockResolvedValue(saved());
+    updateDocumentMock.mockResolvedValue({ sourceDocumentIds: ["doc-1"], updatedCount: 1 });
+    updateEntriesMock.mockResolvedValue({ ledgerEntryIds: ["entry-1"], affectedCount: 1 });
   });
 
   it("loads the record it is opened on", async () => {
     newClient(null);
     render(modal());
-    await waitFor(() => expect(screen.getByText("viewing")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("editable")).toBeInTheDocument());
     expect(fetchDetailMock).toHaveBeenCalledExactlyOnceWith("doc-1");
   });
 
-  it("does not let an earlier read overwrite a committed snapshot", async () => {
-    let resolve!: (value: SourceDocument) => void;
-    fetchDetailMock.mockReturnValue(
-      new Promise((done) => {
-        resolve = done;
+  it("writes a new title at once and shows it until the record reads back", async () => {
+    const write = deferred<unknown>();
+    updateDocumentMock.mockReturnValue(write.promise);
+    fetchDetailMock.mockResolvedValue({ ...sourceDocument, title: "Dinner receipt" });
+    renderModal();
+
+    fireEvent.click(screen.getByText("rename"));
+
+    await waitFor(() =>
+      expect(updateDocumentMock).toHaveBeenCalledWith({
+        sourceDocumentIds: ["doc-1"],
+        data: { title: "Dinner receipt" },
       })
     );
-    newClient(null);
-    render(modal());
+    expect(screen.getByText("title: Dinner receipt")).toBeInTheDocument();
+    await act(async () => write.resolve({ updatedCount: 1 }));
     await waitFor(() => expect(fetchDetailMock).toHaveBeenCalled());
-    await act(async () => {
-      client.setQueryData(detailKey, { ...sourceDocument, version: 3, title: "Committed" });
-      resolve({ ...sourceDocument, version: 2, title: "Old" });
-    });
-    await waitFor(() => expect(client.getQueryData(detailKey)).toMatchObject({ version: 3 }));
+    expect(screen.getByText("title: Dinner receipt")).toBeInTheDocument();
   });
 
-  it("keeps the editor mounted when deletion refreshes its data to null", async () => {
+  it("writes nothing for a title left as it was", () => {
     renderModal();
-    startEditing();
-    await serverSends(null);
-    expect(screen.getByText(saveOneChange)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("rename-unchanged"));
+    expect(updateDocumentMock).not.toHaveBeenCalled();
   });
 
-  it("clears committed edits before the refreshed server version arrives", async () => {
-    let finish!: (value: SourceDocument) => void;
-    fetchDetailMock.mockReturnValue(
-      new Promise((done) => {
-        finish = done;
+  it("writes a new date at once", async () => {
+    renderModal();
+    fireEvent.click(screen.getByText("date: 2026-07-28"));
+    await waitFor(() =>
+      expect(updateDocumentMock).toHaveBeenCalledWith({
+        sourceDocumentIds: ["doc-1"],
+        data: { documentDate: "2026-08-02" },
       })
     );
-    renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText(saveOneChange));
-    await waitFor(() => expect(screen.getByText("viewing")).toBeInTheDocument());
-    await serverSends({ ...sourceDocument, title: "Changed", version: 2 });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    await act(async () => finish({ ...sourceDocument, title: "Changed", version: 2 }));
-    expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
-  it("enters batch mode directly outside edit mode", () => {
+  it("writes one entry field on its own and holds that row until it settles", async () => {
+    const write = deferred<unknown>();
+    updateEntriesMock.mockReturnValue(write.promise);
     renderModal();
-    fireEvent.click(screen.getByText("batch-toggle"));
-    expect(screen.getByText("batch-toolbar")).toBeInTheDocument();
-    expect(screen.getByText("selecting")).toBeInTheDocument();
-    expect(screen.queryByText(commonCopy.edit)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("rename-entry"));
+
+    await waitFor(() =>
+      expect(updateEntriesMock).toHaveBeenCalledWith(["doc-1"], ["entry-1"], {
+        itemName: "Brunch",
+      })
+    );
+    expect(screen.getByText("pending: Brunch")).toBeInTheDocument();
+    expect(screen.getByText("saving: entry-1")).toBeInTheDocument();
+    await act(async () => write.resolve({ ledgerEntryIds: ["entry-1"], affectedCount: 1 }));
+    await waitFor(() => expect(screen.getByText("saving: none")).toBeInTheDocument());
+    expect(screen.getByText("pending: none")).toBeInTheDocument();
   });
 
-  it("leaves an unchanged edit session before entering batch mode", () => {
+  it("writes nothing for an entry field left as it was", () => {
     renderModal();
-    fireEvent.click(screen.getByText(commonCopy.edit));
-    expect(screen.getByText("editing")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("batch-toggle"));
-    expect(screen.getByText("viewing")).toBeInTheDocument();
-    expect(screen.getByText("batch-toolbar")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("rename-entry-unchanged"));
+    expect(updateEntriesMock).not.toHaveBeenCalled();
   });
 
-  it("saves a draft before entering batch mode", async () => {
+  it("reads the record again and says so when an entry write fails", async () => {
+    updateEntriesMock.mockRejectedValue(new Error("boom"));
     renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText("batch-toggle"));
-    expect(screen.getByText(sourceDocumentDetailCopy.batchModePendingTitle)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("confirm-save"));
-    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByText("batch-toolbar")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("rename-entry"));
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(commonCopy.saveFailed));
+    expect(fetchDetailMock).toHaveBeenCalled();
+    expect(screen.getByText("pending: none")).toBeInTheDocument();
   });
 
-  it("can discard a draft or cancel without changing modes", async () => {
+  it("names a record whose entry a run replaced, rather than a failed save", async () => {
+    updateEntriesMock.mockRejectedValue(new Error("Active ledger entry projection not found"));
+    fetchDetailMock.mockResolvedValue({ ...sourceDocument, ledgerEntries: [secondEntry] });
     renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText("batch-toggle"));
-    fireEvent.click(screen.getByText("confirm-cancel"));
-    expect(screen.getByText("editing")).toBeInTheDocument();
-    expect(screen.queryByText("batch-toolbar")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("batch-toggle"));
-    fireEvent.click(screen.getByText("confirm-discard"));
-    await waitFor(() => expect(screen.getByText("batch-toolbar")).toBeInTheDocument());
-    expect(screen.getByText("viewing")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("rename-entry"));
+
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentDetailCopy.entryReplaced)
+    );
   });
 
-  it("resets editor state when the selected source document changes", () => {
-    const { rerender } = renderModal();
-    client.setQueryData(queryKeys.sourceDocument("doc-2"), {
+  it("keeps a processing record read-only and says why", () => {
+    renderModal({
       ...sourceDocument,
-      id: "doc-2",
-      title: "Second receipt",
-      version: 2,
+      processingStatus: "processing",
+      supportedActions: ["cancel_processing", "retry", "edit_retry", "delete"],
     });
-    startEditing();
-    expect(screen.getByText("editing")).toBeInTheDocument();
 
-    rerender(modal("doc-2"));
-
-    expect(screen.getByText("viewing")).toBeInTheDocument();
-    expect(screen.queryByText(sourceDocumentDetailCopy.unsavedChanges)).not.toBeInTheDocument();
+    expect(screen.getByText(sourceDocumentDetailCopy.processingReadOnly)).toBeInTheDocument();
+    expect(screen.getByText("read-only")).toBeInTheDocument();
+    expect(screen.getByText("rename")).toBeDisabled();
+    fireEvent.click(screen.getByText("rename-entry"));
+    expect(updateEntriesMock).not.toHaveBeenCalled();
   });
 
-  it("reports a real conflict only on save and reloads after confirmed cancellation", async () => {
-    fetchDetailMock.mockResolvedValue({ ...sourceDocument, version: 2 });
+  it("enters and leaves selection mode directly", () => {
     renderModal();
-    startEditing();
-    await serverSends({ ...sourceDocument, version: 2 });
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByText(saveOneChange)).toBeEnabled();
-    fireEvent.click(screen.getByText(saveOneChange));
-    expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentDetailCopy.saveConflict);
-    fireEvent.click(screen.getByText(sourceDocumentDetailCopy.cancelEdit));
-    expect(fetchDetailMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("confirm-discard"));
-
-    await waitFor(() => expect(fetchDetailMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
-    expect(saveMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("batch-toggle"));
+    expect(screen.getByText("selecting")).toBeInTheDocument();
+    expect(screen.getByText("batch-toolbar")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("batch-toggle"));
+    expect(screen.getByText("not-selecting")).toBeInTheDocument();
   });
 
-  it("keeps edits when cancellation is declined", async () => {
-    renderModal();
-    startEditing();
-    await serverSends({ ...sourceDocument, version: 2 });
+  it("offers the record's commands in its menu", async () => {
+    const retryable: SourceDocument = {
+      ...sourceDocument,
+      supportedActions: ["split_entries", "retry", "edit_retry", "delete"],
+    };
+    retryMock.mockResolvedValue({});
+    fetchDetailMock.mockResolvedValue(retryable);
+    renderModal(retryable);
 
-    fireEvent.click(screen.getByText(sourceDocumentDetailCopy.cancelEdit));
-    fireEvent.click(screen.getByText("confirm-cancel"));
-    expect(fetchDetailMock).not.toHaveBeenCalled();
-    expect(screen.getByText("editing")).toBeInTheDocument();
-    expect(screen.getByText(saveOneChange)).toBeEnabled();
-  });
+    fireEvent.click(screen.getByRole("menuitem", { name: sourceDocumentActionCopy.retry }));
+    await waitFor(() => expect(retryMock).toHaveBeenCalledWith("doc-1"));
 
-  it("saves pending changes before continuing to another action", async () => {
-    renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText("add-entry"));
-
-    expect(screen.getByText(sourceDocumentDetailCopy.saveBeforeActionTitle)).toBeInTheDocument();
-    expect(screen.queryByText("add-entry-dialog")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("confirm-save"));
-
-    await waitFor(() => expect(saveMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(screen.getByText("add-entry-dialog")).toBeInTheDocument());
-  });
-
-  it("keeps the draft and deferred action blocked when save rejects", async () => {
-    saveMock.mockRejectedValue(new Error("unavailable"));
-    renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText("add-entry"));
-    fireEvent.click(screen.getByText("confirm-save"));
-
-    await waitFor(() => expect(saveMock).toHaveBeenCalledOnce());
-    await waitFor(() =>
-      expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentDetailCopy.saveAllFailed)
-    );
-    expect(screen.getByText(sourceDocumentDetailCopy.saveBeforeActionTitle)).toBeInTheDocument();
-    expect(screen.getByText("editing")).toBeInTheDocument();
-    expect(screen.queryByText("add-entry-dialog")).not.toBeInTheDocument();
-    expect(createEntryMock).not.toHaveBeenCalled();
-  });
-
-  it("names a save the server refused as stale a conflict", async () => {
-    saveMock.mockResolvedValue({
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: "doc-1",
-      expectedVersion: 1,
-      currentVersion: 2,
-    });
-    renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText(saveOneChange));
-
-    await waitFor(() =>
-      expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentDetailCopy.saveConflict)
-    );
-    expect(screen.getByText("editing")).toBeInTheDocument();
-  });
-
-  it("closes a deferred confirmation when the server version changes", async () => {
-    renderModal();
-    startEditing();
-    fireEvent.click(screen.getByText("add-entry"));
-    expect(screen.getByText(sourceDocumentDetailCopy.saveBeforeActionTitle)).toBeInTheDocument();
-
-    await serverSends({ ...sourceDocument, version: 2 });
+    fireEvent.click(screen.getByRole("menuitem", { name: sourceDocumentActionCopy.editRetry }));
+    expect(screen.getByText("edit-retry-dialog")).toBeInTheDocument();
     expect(
-      screen.queryByText(sourceDocumentDetailCopy.saveBeforeActionTitle)
+      screen.queryByRole("menuitem", { name: sourceDocumentActionCopy.cancelProcessing })
     ).not.toBeInTheDocument();
-    expect(screen.queryByText("add-entry-dialog")).not.toBeInTheDocument();
   });
 
-  it("closes at once and restores the unsaved edits on the next opening", () => {
-    const onClose = vi.fn();
-    const first = renderModal(sourceDocument, onClose);
-    startEditing();
-    fireEvent.click(screen.getByText("dialog-close"));
+  it("shows a pending indicator while processing is cancelled", async () => {
+    cancelMock.mockReturnValue(new Promise(() => {}));
+    renderModal({ ...sourceDocument, supportedActions: ["cancel_processing", "delete"] });
 
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(screen.queryByText(sourceDocumentDetailCopy.unsavedChanges)).not.toBeInTheDocument();
-    first.unmount();
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: sourceDocumentActionCopy.cancelProcessing })
+    );
 
-    renderModal();
-    expect(screen.getByText("editing")).toBeInTheDocument();
-    expect(screen.getByText(commonCopy.draftRestored)).toBeInTheDocument();
-    expect(screen.getByText(saveOneChange)).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("menuitem", { name: sourceDocumentActionCopy.cancelProcessing })
+      ).toBeDisabled()
+    );
+    expect(cancelMock).toHaveBeenCalledWith("doc-1");
   });
 
-  it("flags a draft made on an older version and refuses to save it", () => {
-    const first = renderModal();
-    startEditing();
-    first.unmount();
-
-    renderModal({ ...sourceDocument, version: 2 });
-    expect(screen.getByText(commonCopy.draftOutdated)).toBeInTheDocument();
-    fireEvent.click(screen.getByText(saveOneChange));
-    expect(toastErrorMock).toHaveBeenCalledWith(sourceDocumentDetailCopy.saveConflict);
-    expect(saveMock).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByText(commonCopy.discard));
-    expect(screen.getByText("viewing")).toBeInTheDocument();
-    expect(window.localStorage.length).toBe(0);
-  });
-
-  it("closes without asking while a date suggestion is being adjusted", () => {
+  it("keeps the sheet open when deleting the record fails", async () => {
+    deleteMock.mockRejectedValue(new Error("Source document not found"));
     const onClose = vi.fn();
     renderModal(sourceDocument, onClose);
-    fireEvent.click(screen.getByText("begin-date-adjustment"));
-    fireEvent.click(screen.getByText("change-date-draft"));
-    fireEvent.click(screen.getByText("dialog-close"));
 
-    expect(onClose).toHaveBeenCalledOnce();
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: sourceDocumentDetailCopy.deleteDocument })
+    );
+    fireEvent.click(screen.getByText("confirm"));
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(commonCopy.deleteFailed));
+    expect(deleteMock).toHaveBeenCalledWith("doc-1");
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("retries a failed save against the same base version", async () => {
-    saveMock.mockRejectedValueOnce(new Error("temporary failure"));
-    renderModal();
-    startEditing();
+  it("closes the sheet once the record is deleted", async () => {
+    deleteMock.mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    renderModal(sourceDocument, onClose);
 
-    fireEvent.click(screen.getByText(saveOneChange));
-    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByText(saveOneChange)).toBeEnabled());
-    fireEvent.click(screen.getByText(saveOneChange));
-    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: sourceDocumentDetailCopy.deleteDocument })
+    );
+    fireEvent.click(screen.getByText("confirm"));
 
-    expect(saveMock.mock.calls[0]![0]).toEqual({
-      sourceDocumentId: "doc-1",
-      expectedVersion: 1,
-      sourceDocument: { title: "Changed" },
-      entries: [],
-    });
-    expect(saveMock.mock.calls[1]![0]).toEqual(saveMock.mock.calls[0]![0]);
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
-  it("sends the latest draft values when a save is retried", async () => {
-    saveMock.mockRejectedValue(new Error("temporary failure"));
+  it("confirms before deleting one entry", () => {
     renderModal();
-    startEditing();
-
-    fireEvent.click(screen.getByText(saveOneChange));
-    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByText("change-draft-again")).toBeEnabled());
-    fireEvent.click(screen.getByText("change-draft-again"));
-    fireEvent.click(screen.getByText(saveOneChange));
-    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
-
-    expect(saveMock.mock.calls[1]![0]).toMatchObject({
-      sourceDocument: { title: "Changed again" },
-    });
+    fireEvent.click(screen.getByText("delete-entry"));
+    expect(screen.getByText(sourceDocumentDetailCopy.deleteEntryTitle)).toBeInTheDocument();
   });
 
   it("retries split with only the selected entries and date, then installs the snapshot", async () => {
@@ -581,11 +531,7 @@ describe("SourceDocumentDetailModal", () => {
       movedEntryCount: 1,
       sourceDocument: { ...sourceDocument, version: 2, ledgerEntries: [secondEntry] },
     });
-    renderModal({
-      ...sourceDocument,
-      supportedActions: ["split_entries"],
-      ledgerEntries: [entry, secondEntry],
-    });
+    renderModal({ ...sourceDocument, ledgerEntries: [entry, secondEntry] });
     fireEvent.click(screen.getByText("batch-toggle"));
     fireEvent.click(screen.getByText("select-first"));
     fireEvent.click(screen.getByText("open-split"));
@@ -608,30 +554,5 @@ describe("SourceDocumentDetailModal", () => {
       version: 2,
       ledgerEntries: [{ id: "entry-2" }],
     });
-  });
-
-  it("shows a pending indicator while processing is cancelled", async () => {
-    cancelMock.mockReturnValue(new Promise(() => {}));
-    renderModal({ ...sourceDocument, supportedActions: ["cancel_processing"] });
-
-    fireEvent.click(screen.getByText(sourceDocumentActionCopy.cancelProcessing).closest("button")!);
-
-    const cancel = screen.getByText(sourceDocumentActionCopy.cancelProcessing).closest("button");
-    await waitFor(() => expect(cancel).toHaveAttribute("aria-busy", "true"));
-    expect(cancel?.querySelector("svg")).toHaveClass("animate-spin");
-    expect(cancelMock).toHaveBeenCalledWith("doc-1");
-  });
-
-  it("keeps the sheet open when deleting the record fails", async () => {
-    deleteMock.mockRejectedValue(new Error("Source document not found"));
-    const onClose = vi.fn();
-    renderModal({ ...sourceDocument, supportedActions: ["delete"] }, onClose);
-
-    fireEvent.click(screen.getByRole("button", { name: commonCopy.delete }));
-    fireEvent.click(screen.getByText("confirm-save"));
-
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(commonCopy.deleteFailed));
-    expect(deleteMock).toHaveBeenCalledWith("doc-1");
-    expect(onClose).not.toHaveBeenCalled();
   });
 });

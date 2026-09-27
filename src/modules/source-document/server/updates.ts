@@ -1,18 +1,9 @@
-import { assertExpenseAmountDirection } from "@/lib/money/expense-amount";
 import { and, asc, eq, getTableColumns, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { compare } from "@/lib/money/decimal";
-import { roundToCurrency } from "@/lib/money/currency-precision";
 import { ledgerEntries, ledgers, books, sourceDocuments } from "@/persistence";
-import type {
-  BatchUpdateSourceDocumentsResultDto,
-  SaveSourceDocumentChangesResultDto,
-} from "@/modules/source-document/contracts";
-import type {
-  BatchUpdateSourceDocumentsInput as BatchUpdateSourceDocumentsPayload,
-  UpdateSourceDocumentInput as UpdateSourceDocumentPayload,
-} from "@/modules/source-document/contract-schemas";
+import type { BatchUpdateSourceDocumentsResultDto } from "@/modules/source-document/contracts";
+import type { BatchUpdateSourceDocumentsInput as BatchUpdateSourceDocumentsPayload } from "@/modules/source-document/contract-schemas";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { replaceDocumentEntriesInTransaction } from "./projections/manual-entries";
 import {
@@ -21,7 +12,6 @@ import {
   lockSourceDocumentsForUpdate,
   type LockedSourceDocument,
 } from "@/lib/db/transaction-locks";
-import type { UpdateLedgerEntryInput } from "@/modules/ledger/contract-schemas";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 
 function whereSourceDocumentNotDeleted(ledgerId: string) {
@@ -35,8 +25,9 @@ function whereSourceDocumentNotDeletedId(ledgerId: string, sourceDocumentId: str
 export type AssignBookResult = { ok: true } | { ok: false; reason: "book_unavailable" };
 
 /**
- * Moves a record to another book. The book is not part of what a whole-document
- * save writes, so the move neither checks nor advances the document version.
+ * Moves a record to another book. The book is not part of the record's
+ * versioned content (title, date and entries), so the move leaves the document
+ * version as it is.
  */
 export async function assignSourceDocumentBook(input: {
   ledgerId: string;
@@ -83,50 +74,7 @@ interface BatchUpdateSourceDocumentsInput {
   ledgerEntryIds?: string[];
 }
 
-interface SaveSourceDocumentChangesAdapterInput {
-  ledgerId: string;
-  sourceDocumentId: string;
-  expectedVersion: number;
-  sourceDocument?: UpdateSourceDocumentPayload;
-  entries: Array<{ ledgerEntryId: string; data: UpdateLedgerEntryInput }>;
-}
-
 type QueryExecutor = Pick<typeof db, "select">;
-
-function normalizeCurrency(currency: string | null, fallback = "CNY"): string {
-  return currency != null && currency !== "" ? currency : fallback;
-}
-
-/** The entries with each patch's fields applied and amounts rounded to their currency. */
-function applyEntryPatches(
-  entries: readonly (typeof ledgerEntries.$inferSelect)[],
-  patches: ReadonlyMap<string, UpdateLedgerEntryInput>,
-  mainCurrency: string
-) {
-  return entries.map((entry) => {
-    const patch = patches.get(entry.id);
-    const currency = patch?.currency !== undefined ? patch.currency : entry.currency;
-    const effectiveCurrency = normalizeCurrency(currency, mainCurrency);
-    if (patch?.amount !== undefined || patch?.currency !== undefined) {
-      assertExpenseAmountDirection(entry.amount, patch.amount ?? entry.amount, effectiveCurrency);
-    }
-    return {
-      id: entry.id,
-      categoryId: patch?.categoryId !== undefined ? patch.categoryId : entry.categoryId,
-      amount:
-        patch?.amount !== undefined || patch?.currency !== undefined
-          ? roundToCurrency(
-              patch.amount !== undefined ? String(patch.amount) : entry.amount,
-              effectiveCurrency
-            )
-          : entry.amount,
-      currency,
-      itemName: patch?.itemName !== undefined ? patch.itemName : entry.itemName,
-      description: patch?.description !== undefined ? patch.description : entry.description,
-      createdAt: entry.createdAt.toISOString(),
-    };
-  });
-}
 
 /**
  * Caches the rates the documents' foreign-currency entries are read at once
@@ -157,148 +105,6 @@ async function ensureRatesForDateChange(
     )
     .limit(1);
   if (foreign.length > 0) await ensureExchangeRates([entryDate]);
-}
-
-export async function saveSourceDocumentChanges(
-  input: SaveSourceDocumentChangesAdapterInput
-): Promise<
-  import("@/modules/source-document/contracts").VersionedCommandResult<SaveSourceDocumentChangesResultDto>
-> {
-  const [ledger, document, initialEntries] = await Promise.all([
-    db.query.ledgers.findFirst({
-      where: eq(ledgers.id, input.ledgerId),
-      columns: { mainCurrency: true },
-    }),
-    db.query.sourceDocuments.findFirst({
-      where: whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId),
-      columns: {
-        latestAttemptId: true,
-        version: true,
-        title: true,
-        documentDate: true,
-        effectiveDate: true,
-      },
-    }),
-    db.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
-      ),
-      orderBy: (entries, { asc: orderAscending }) => [
-        orderAscending(entries.position),
-        orderAscending(entries.createdAt),
-        orderAscending(entries.id),
-      ],
-    }),
-  ]);
-  if (ledger == null || document == null) throw new NotFoundError("Source document");
-  if (document.version !== input.expectedVersion) {
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: document.version,
-    };
-  }
-  const patches = new Map(input.entries.map((entry) => [entry.ledgerEntryId, entry.data]));
-  if (patches.size !== input.entries.length) {
-    throw new ConflictError("A ledger entry may only be updated once");
-  }
-  const initialEntriesById = new Map(initialEntries.map((entry) => [entry.id, entry]));
-  for (const entryId of patches.keys()) {
-    if (!initialEntriesById.has(entryId)) {
-      throw new NotFoundError("Active ledger entry projection");
-    }
-  }
-
-  const metadataChanged =
-    (input.sourceDocument?.title !== undefined && input.sourceDocument.title !== document.title) ||
-    (input.sourceDocument?.documentDate !== undefined &&
-      input.sourceDocument.documentDate !== document.documentDate);
-  const entriesChanged = input.entries.some(({ ledgerEntryId, data }) => {
-    const entry = initialEntriesById.get(ledgerEntryId)!;
-    const nextCurrency = data.currency !== undefined ? data.currency : entry.currency;
-    const effectiveCurrency = normalizeCurrency(nextCurrency, ledger.mainCurrency);
-    return (
-      (data.categoryId !== undefined && data.categoryId !== entry.categoryId) ||
-      (data.amount !== undefined &&
-        compare(roundToCurrency(String(data.amount), effectiveCurrency), entry.amount) !== 0) ||
-      (data.currency !== undefined && data.currency !== entry.currency) ||
-      (data.itemName !== undefined && data.itemName !== entry.itemName) ||
-      (data.description !== undefined && data.description !== entry.description)
-    );
-  });
-  if (!metadataChanged && !entriesChanged) {
-    return {
-      ok: true,
-      sourceDocumentId: input.sourceDocumentId,
-      version: input.expectedVersion,
-      data: { updatedEntryIds: input.entries.map((entry) => entry.ledgerEntryId) },
-    };
-  }
-
-  const nextEntries = applyEntryPatches(initialEntries, patches, ledger.mainCurrency);
-  const dateChanged =
-    input.sourceDocument?.documentDate !== undefined &&
-    input.sourceDocument.documentDate !== document.documentDate;
-  const convertsDifferently = nextEntries.some((entry) => {
-    const previous = initialEntriesById.get(entry.id)!;
-    return (
-      normalizeCurrency(entry.currency, ledger.mainCurrency) !== ledger.mainCurrency &&
-      (dateChanged ||
-        compare(entry.amount, previous.amount) !== 0 ||
-        entry.currency !== previous.currency)
-    );
-  });
-  if (convertsDifferently) {
-    await ensureExchangeRates([input.sourceDocument?.documentDate ?? document.effectiveDate]);
-  }
-
-  const committed = await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    const lockedDocument = await lockSourceDocumentForUpdate(
-      tx,
-      input.ledgerId,
-      input.sourceDocumentId
-    );
-    if (lockedDocument.version !== input.expectedVersion) {
-      return { ok: false as const, currentVersion: lockedDocument.version };
-    }
-    // Writes only the patched fields onto the entries as they are now, so a
-    // category another writer set since the draft was loaded survives.
-    const previousEntries = await loadProjectionEntriesForDocuments(tx, input.ledgerId, [
-      input.sourceDocumentId,
-    ]);
-    await replaceDocumentEntriesInTransaction(tx, {
-      document: lockedDocument,
-      previousEntries,
-      ledgerId: input.ledgerId,
-      sourceDocumentId: input.sourceDocumentId,
-      entries: applyEntryPatches(previousEntries, patches, ledger.mainCurrency),
-      ...(input.sourceDocument?.title === undefined ? {} : { title: input.sourceDocument.title }),
-      ...(input.sourceDocument?.documentDate === undefined
-        ? {}
-        : { entryDate: input.sourceDocument.documentDate }),
-    });
-    return { ok: true as const };
-  });
-
-  if (!committed.ok) {
-    return {
-      ok: false,
-      reason: "stale",
-      sourceDocumentId: input.sourceDocumentId,
-      expectedVersion: input.expectedVersion,
-      currentVersion: committed.currentVersion,
-    };
-  }
-  return {
-    ok: true,
-    sourceDocumentId: input.sourceDocumentId,
-    version: input.expectedVersion + 1,
-    data: { updatedEntryIds: input.entries.map((entry) => entry.ledgerEntryId) },
-  };
 }
 
 export async function updateSourceDocuments({

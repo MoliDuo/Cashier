@@ -14,8 +14,7 @@ const DRAFT_VERSION = 1;
 /** A draft nobody came back to within a week is dropped on its next read. */
 const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type DraftKind =
-  "categories" | "new-record-ai" | "new-record-quick" | "retry" | "source-document";
+export type DraftKind = "categories" | "new-record-ai" | "new-record-quick" | "retry";
 
 interface StoredDraft {
   v: number;

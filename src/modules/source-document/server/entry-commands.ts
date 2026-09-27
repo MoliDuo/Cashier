@@ -136,14 +136,16 @@ async function prepareBatchUpdate(input: {
   if (rows.length !== requestedIds.length) {
     throw new NotFoundError("Active ledger entry projection");
   }
+  const foreignDates: string[] = [];
   for (const entry of rows) {
     const nextCurrency = input.currency !== undefined ? input.currency : entry.currency;
     const effectiveCurrency = nextCurrency ?? entry.mainCurrency;
     assertExpenseAmountDirection(entry.amount, input.amount ?? entry.amount, effectiveCurrency);
+    if (effectiveCurrency !== entry.mainCurrency) foreignDates.push(entry.effectiveDate);
   }
-  if (input.currency != null && input.currency !== rows[0]?.mainCurrency) {
-    await ensureExchangeRates(rows.map((entry) => entry.effectiveDate));
-  }
+  // A foreign amount is converted on write, so its day's rate has to be there,
+  // whether the edit changed the currency or only the amount.
+  if (foreignDates.length > 0) await ensureExchangeRates(foreignDates);
 }
 
 export interface AddLedgerEntryInput {
