@@ -104,6 +104,7 @@ export function AuthLoginPage({
                   error={flow.error}
                   onEmailChange={flow.setEmail}
                   onSubmit={flow.handleSendOTP}
+                  secondary={flow.passkeySupported}
                 />
               ) : (
                 <OtpStep
@@ -124,7 +125,10 @@ export function AuthLoginPage({
             </>
           ) : (
             <>
-              <p className={textRoleClassName("bodyMuted")}>{authCopy.emailAuthNotConfigured}</p>
+              {/* With passkeys available there is nothing missing to report. */}
+              {flow.passkeySupported ? null : (
+                <p className={textRoleClassName("bodyMuted")}>{authCopy.emailAuthNotConfigured}</p>
+              )}
               {flow.error != null ? (
                 <p
                   role="alert"

@@ -11,6 +11,11 @@ interface EmailStepProps {
   error: string | null;
   onEmailChange: (email: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  /**
+   * Set when a passkey button above offers the primary way in: the code is the
+   * fallback, so it neither takes focus nor draws a second primary button.
+   */
+  secondary?: boolean;
 }
 
 export function EmailStep({
@@ -20,6 +25,7 @@ export function EmailStep({
   error,
   onEmailChange,
   onSubmit,
+  secondary = false,
 }: EmailStepProps) {
   return (
     <div className="space-y-4">
@@ -39,7 +45,7 @@ export function EmailStep({
             disabled={isLoading}
             className="h-11"
             autoComplete="email"
-            autoFocus
+            autoFocus={!secondary}
           />
         </div>
         {error != null && (
@@ -47,7 +53,12 @@ export function EmailStep({
             {error}
           </div>
         )}
-        <Button type="submit" className="w-full h-11" disabled={isLoading}>
+        <Button
+          type="submit"
+          variant={secondary ? "outline" : "default"}
+          className="w-full h-11"
+          disabled={isLoading}
+        >
           {isLoading ? (
             <>
               <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />

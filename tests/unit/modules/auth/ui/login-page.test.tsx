@@ -94,6 +94,17 @@ describe("AuthLoginPage", () => {
 
     expect(screen.getByRole("button", { name: "使用通行密钥登录" })).toBeInTheDocument();
     expect(screen.queryByText("或")).not.toBeInTheDocument();
+    // A working passkey means nothing is missing, so nothing is reported.
+    expect(screen.queryByText("邮箱登录未配置，请联系管理员")).not.toBeInTheDocument();
+  });
+
+  it("keeps the email code secondary to a passkey", async () => {
+    mockUseLoginFlow.mockReturnValueOnce(flowWith({ passkeySupported: true }));
+    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+    render(<AuthLoginPage emailAuthEnabled />);
+
+    expect(screen.getByLabelText("邮箱")).not.toHaveFocus();
+    expect(screen.getByRole("button", { name: "发送验证码" })).not.toHaveClass("bg-primary");
   });
 
   it("hides passkey sign-in where the browser has no WebAuthn", async () => {
