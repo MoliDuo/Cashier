@@ -54,10 +54,10 @@ export async function listLedgerEntryPage({
         cursorCondition,
       ].filter((condition): condition is SQL<unknown> => condition != null);
 
-      // Phase 1: a bounded keyset page over one scan of the live entries.
-      // The CTE applies visibility (soft delete of entry and document), the
-      // accounting-date range, entry filters and the cursor predicate in SQL, so
-      // no ordering scalar subquery is re-executed per row or per cursor branch.
+      // Phase 1: a bounded keyset page over one scan of the entries joined to
+      // their documents. The CTE applies the accounting-date range, entry
+      // filters and the cursor predicate in SQL, so no ordering scalar subquery
+      // is re-executed per row or per cursor branch.
       const page = await tx.execute<VisibleEntryRow & Record<string, unknown>>(sql`
     WITH visible_entries AS (
       SELECT
@@ -117,12 +117,7 @@ export async function listLedgerEntryPage({
                   inArray(
                     ledgerEntries.id,
                     pagedRows.map((row) => row.id)
-                  ),
-                  sql`EXISTS (
-                SELECT 1 FROM source_documents active_documents
-                WHERE active_documents.ledger_id = ${ledgerEntries.ledgerId}
-                  AND active_documents.id = ${ledgerEntries.sourceDocumentId}
-              )`
+                  )
                 ),
                 with: {
                   category: true,

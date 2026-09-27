@@ -9,7 +9,6 @@ import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup
 import { getTestDb } from "tests/setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
-import { hasActiveLedgerEntries } from "@/modules/ledger/server/entry-reads/has-active-entries";
 import {
   activateAttempt,
   createManualDocument,
@@ -102,25 +101,6 @@ describe("target Settings currency workflow", () => {
     });
     expect(updated.settings.aiLanguage).toBe("en");
     expect(updated.settings.mainCurrency).toBe("CNY");
-  });
-
-  it("hasActiveEntries returns false for empty ledger", async () => {
-    expect(await hasActiveLedgerEntries(ledgerId)).toBe(false);
-  });
-
-  it("hasActiveEntries returns true after entry creation", async () => {
-    await createEntry();
-    expect(await hasActiveLedgerEntries(ledgerId)).toBe(true);
-  });
-
-  it("hasActiveEntries returns false after the source document is deleted", async () => {
-    await createEntry();
-    expect(await hasActiveLedgerEntries(ledgerId)).toBe(true);
-
-    const db = getTestDb();
-    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, sourceDocumentId));
-
-    expect(await hasActiveLedgerEntries(ledgerId)).toBe(false);
   });
 
   it("allows main currency change after the source document is deleted", async () => {

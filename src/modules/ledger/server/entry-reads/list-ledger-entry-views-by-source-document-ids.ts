@@ -7,7 +7,6 @@ import {
 } from "@/modules/currency/server/conversion-sql";
 import { mapLedgerEntryEmbeddedViewDto } from "./mappers";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
-import { buildLedgerEntryVisibilityCondition } from "./ledger-entry-visibility";
 
 interface ListLedgerEntryViewsBySourceDocumentIdsInput {
   ledgerId: string;
@@ -29,8 +28,7 @@ export async function listLedgerEntryViewsBySourceDocumentIds({
   const entries = await db.query.ledgerEntries.findMany({
     where: and(
       eq(ledgerEntries.ledgerId, ledgerId),
-      inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds),
-      buildLedgerEntryVisibilityCondition(ledgerId)
+      inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds)
     ),
     with: { category: true },
     extras: {
@@ -45,10 +43,6 @@ export async function listLedgerEntryViewsBySourceDocumentIds({
   });
 
   for (const entry of entries) {
-    if (entry.sourceDocumentId == null || entry.sourceDocumentId === "") {
-      continue;
-    }
-
     const list = entriesBySourceDocumentId.get(entry.sourceDocumentId) ?? [];
     list.push(
       mapLedgerEntryEmbeddedViewDto({

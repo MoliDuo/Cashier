@@ -44,9 +44,7 @@ export async function calculateLedgerEntryStats({
   const valueConditions = joinConditions(buildLedgerEntryValueConditions(filtersWithoutCurrency));
   const dateConditions = joinConditions(buildLedgerEntryEffectiveDateConditions(filters));
   const currencyCondition =
-    currency == null || currency === ""
-      ? sql``
-      : sql`AND COALESCE(ledger_entries.currency, settings.main_currency) = ${currency}`;
+    currency == null || currency === "" ? sql`` : sql`AND ledger_entries.currency = ${currency}`;
 
   const result = await db.execute<StatsRow & Record<string, unknown>>(sql`
     WITH settings AS (
@@ -54,7 +52,7 @@ export async function calculateLedgerEntryStats({
     ),
     visible_entries AS (
       SELECT
-        COALESCE(ledger_entries.currency, settings.main_currency) AS currency,
+        ledger_entries.currency,
         ledger_entries.amount,
         convert_amount(ledger_entries.amount, ledger_entries.currency,
           settings.main_currency, documents.effective_date) AS converted_amount,

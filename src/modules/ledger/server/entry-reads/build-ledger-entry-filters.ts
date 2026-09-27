@@ -4,10 +4,6 @@ import { ValidationError } from "@/lib/errors";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import { ledgerEntries } from "@/persistence";
 import { entryConvertedAmountSql } from "@/modules/currency/server/conversion-sql";
-import {
-  buildLedgerEntrySourceDocumentDateCondition,
-  buildLedgerEntryVisibilityCondition,
-} from "./ledger-entry-visibility";
 import type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
 import { serializeLedgerQuery } from "@/modules/ledger/ledger-query";
 import { z } from "zod";
@@ -22,7 +18,7 @@ export type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
  *
  * These conditions reference `ledger_entries` columns and may be reused by
  * any query whose FROM item is the plain `ledger_entries` table. The
- * visibility and date-range conditions are owned by the callers that join
+ * date-range conditions are owned by the callers that join
  * `source_documents` under the conventional `documents` alias.
  */
 export function buildLedgerEntryValueConditions(filters: LedgerEntryFilterParams): SQL<unknown>[] {
@@ -74,33 +70,6 @@ export function buildLedgerEntryEffectiveDateConditions(
     conditions.push(sql`documents.effective_date <= ${filters.endDate}::date`);
   }
   return conditions;
-}
-
-export function buildLedgerEntryFilterConditions(
-  ledgerId: string,
-  filters: LedgerEntryFilterParams
-): SQL<unknown>[] {
-  const conditions: SQL<unknown>[] = [eq(ledgerEntries.ledgerId, ledgerId)];
-
-  const sourceDocumentDateRange: { startDate?: string | null; endDate?: string | null } = {};
-  if (filters.startDate !== undefined) {
-    sourceDocumentDateRange.startDate = filters.startDate;
-  }
-  if (filters.endDate !== undefined) {
-    sourceDocumentDateRange.endDate = filters.endDate;
-  }
-
-  const sourceDocumentDateCondition = buildLedgerEntrySourceDocumentDateCondition(
-    ledgerId,
-    sourceDocumentDateRange
-  );
-  if (sourceDocumentDateCondition != null) {
-    conditions.push(sourceDocumentDateCondition);
-  } else {
-    conditions.push(buildLedgerEntryVisibilityCondition(ledgerId));
-  }
-
-  return [...conditions, ...buildLedgerEntryValueConditions(filters)];
 }
 
 function queryFingerprint(ledgerId: string, filters: LedgerEntryFilterParams): string {

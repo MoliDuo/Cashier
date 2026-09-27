@@ -2,43 +2,34 @@ import "server-only";
 import { and, eq, exists, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
-import { ledgers, sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
+import { sourceDocumentFiles, storedFiles } from "@/persistence";
 import { mapStoredFile } from "./shared";
 import type { AuthorizedFileReadContract, StoredFileContract } from "./types";
 
-/** A live source document of the file's ledger lists the file among its inputs. */
-function referencedByLiveDocument() {
-  const byDocument = db
-    .select({ id: sourceDocumentFiles.id })
-    .from(sourceDocumentFiles)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.ledgerId, sourceDocumentFiles.ledgerId),
-        eq(sourceDocuments.id, sourceDocumentFiles.sourceDocumentId)
-      )
-    )
-    .where(
-      and(
-        eq(sourceDocumentFiles.ledgerId, storedFiles.ledgerId),
-        eq(sourceDocumentFiles.storedFileId, storedFiles.id)
-      )
-    );
-  return exists(byDocument);
-}
-
-/** A finalized file the ledger still references from a live source document. */
+/**
+ * A finalized file some document of the ledger lists among its inputs. The
+ * document link cascades away with its document, so the link is enough.
+ */
 async function findAuthorizedFile(ledgerId: string, fileId: string) {
   const rows = await db
     .select({ file: storedFiles })
     .from(storedFiles)
-    .innerJoin(ledgers, eq(ledgers.id, storedFiles.ledgerId))
     .where(
       and(
         eq(storedFiles.ledgerId, ledgerId),
         eq(storedFiles.id, fileId),
         isNotNull(storedFiles.finalizedAt),
-        referencedByLiveDocument()
+        exists(
+          db
+            .select({ id: sourceDocumentFiles.id })
+            .from(sourceDocumentFiles)
+            .where(
+              and(
+                eq(sourceDocumentFiles.ledgerId, storedFiles.ledgerId),
+                eq(sourceDocumentFiles.storedFileId, storedFiles.id)
+              )
+            )
+        )
       )
     )
     .limit(1);
