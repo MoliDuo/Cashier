@@ -55,7 +55,9 @@ function getSendOTPErrorMessage(
 ): string {
   switch (result.code) {
     case "rate_limited":
-      return authCopy.rateLimitedDesc;
+      return result.retryAfter == null
+        ? authCopy.rateLimitedDesc
+        : authCopy.rateLimitedWait({ minutes: Math.max(1, Math.ceil(result.retryAfter / 60)) });
     case "rate_limit_unavailable":
       return authCopy.rateLimitUnavailableDesc;
     case "config_error":

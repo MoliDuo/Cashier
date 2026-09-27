@@ -77,8 +77,18 @@ describe("useLoginFlow OTP sending", () => {
     await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
 
     expect(result.current.step).toBe("email");
-    expect(result.current.error).toBe(authCopy.rateLimitedDesc);
+    expect(result.current.error).toBe(authCopy.rateLimitedWait({ minutes: 1 }));
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it("says how long the wait is when the limit reports it", async () => {
+    sendOTPActionMock.mockResolvedValue({ ok: false, code: "rate_limited", retryAfter: 3000 });
+    const { result } = renderHook(() => useLoginFlow());
+
+    act(() => result.current.setEmail("user@example.com"));
+    await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
+
+    expect(result.current.error).toBe(authCopy.rateLimitedWait({ minutes: 50 }));
   });
 
   it("enters the OTP step only after a successful send", async () => {
