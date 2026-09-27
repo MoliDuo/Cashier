@@ -136,7 +136,10 @@ export function QuickEntryForm({
             className="h-14 min-w-0 flex-1 text-right text-2xl font-semibold tabular-nums"
           />
           <Select value={currency} onValueChange={setCurrency} disabled={isPending}>
-            <SelectTrigger className="h-14 w-24 shrink-0" aria-label={quickEntryFormCopy.currency}>
+            <SelectTrigger
+              className="w-24 shrink-0 data-[size=default]:h-14"
+              aria-label={quickEntryFormCopy.currency}
+            >
               <SelectValue placeholder={quickEntryFormCopy.selectCurrency} />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
@@ -219,6 +222,8 @@ export function QuickEntryForm({
           placeholder={quickEntryFormCopy.selectDate}
           size="sm"
           className="w-full"
+          showClear={false}
+          showClearShortcut={false}
           disabled={isPending}
         />
       </div>

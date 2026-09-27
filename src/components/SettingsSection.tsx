@@ -17,14 +17,18 @@ interface SettingsSectionProps {
 export function SettingsSection({ title, description, actions, children }: SettingsSectionProps) {
   return (
     <section className="space-y-4 rounded-lg border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className={textRoleClassName("sectionTitle")}>{title}</h2>
-          {description != null && (
-            <p className={textRoleClassName("bodyMuted", "mt-1")}>{description}</p>
+      {/* The title and its actions share one row at every width; a long
+          description runs underneath rather than pushing the buttons down. */}
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={textRoleClassName("sectionTitle", "min-w-0")}>{title}</h2>
+          {actions != null && (
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">{actions}</div>
           )}
         </div>
-        {actions != null && <div className="min-w-0">{actions}</div>}
+        {description != null && (
+          <p className={textRoleClassName("bodyMuted", "mt-1")}>{description}</p>
+        )}
       </div>
       <div className="[&>*+*]:mt-4 [&>*+*]:border-t [&>*+*]:border-border [&>*+*]:pt-4">
         {children}

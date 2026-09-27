@@ -262,6 +262,7 @@ function SourceDocumentDetailSheet({
                 size="sm"
                 className="min-w-fit shrink-0"
                 truncate={false}
+                showClear={false}
                 showClearShortcut={false}
                 readOnly={status.readOnly}
                 disabled={status.isSavingDocument}
