@@ -87,6 +87,25 @@ describe("useLedgerSync", () => {
     expect(getStreamRefreshActionMock).toHaveBeenCalledTimes(2);
   });
 
+  it("checks every thirty seconds while nothing is processing", async () => {
+    getStreamRefreshActionMock.mockResolvedValue(unchanged);
+    const { wrapper } = setup();
+
+    renderHook(() => useLedgerSync(), { wrapper });
+    await flush();
+    expect(getStreamRefreshActionMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(29_999);
+    });
+    expect(getStreamRefreshActionMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(getStreamRefreshActionMock).toHaveBeenCalledTimes(2);
+  });
+
   it("uses a hydrated baseline without refreshing during the three-second stale window", async () => {
     getStreamRefreshActionMock.mockResolvedValue(unchanged);
     const { queryClient, wrapper } = setup();

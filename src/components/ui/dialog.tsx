@@ -5,11 +5,24 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { textRoleClassName } from "@/components/typography";
 import { commonCopy } from "@/copy/common";
+import { useOverlayHistory } from "@/lib/navigation/overlay-history";
 
 const DialogDepthContext = React.createContext(0);
 
-function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
+function Dialog({
+  closeOnBack = true,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Root> & {
+  /**
+   * Back — an iPhone's edge swipe — closes the dialog rather than leaving the
+   * page under it. A dialog whose open state already lives in the URL, where
+   * Back reaches it on its own, turns this off.
+   */
+  closeOnBack?: boolean;
+}) {
   const parentDepth = React.useContext(DialogDepthContext);
+  const { open = false, onOpenChange } = props;
+  useOverlayHistory(open, () => onOpenChange?.(false), closeOnBack);
   return (
     <DialogDepthContext.Provider value={parentDepth + 1}>
       <DialogPrimitive.Root {...props} />

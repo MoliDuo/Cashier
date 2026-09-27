@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
@@ -21,6 +21,12 @@ const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
 vi.mock("@/modules/auth/server-actions/sign-in", () => ({
   signOutAction: vi.fn(),
 }));
+
+const { forgetLedgerDataOnThisDevice } = vi.hoisted(() => ({
+  forgetLedgerDataOnThisDevice: vi.fn(),
+}));
+
+vi.mock("@/lib/sign-out-cleanup", () => ({ forgetLedgerDataOnThisDevice }));
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -119,6 +125,32 @@ describe("SettingsTab account authentication controls", () => {
     expect(
       screen.queryByRole("button", { name: /delete account|删除账户/i })
     ).not.toBeInTheDocument();
+  });
+
+  it("clears this device's drafts and remembered book when the reader signs out", async () => {
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });
+    const ledger: Ledger = {
+      id: "ledger-1",
+      settings: { ...getDefaultLedger().settings },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    render(
+      <SettingsTab
+        ledger={ledger}
+        initialCategories={[]}
+        initialBooks={BOOKS}
+        userEmail="person@example.com"
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
+    const confirm = await screen.findByRole("dialog");
+    fireEvent.click(within(confirm).getByRole("button", { name: /退出登录/ }));
+
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/login"));
+    expect(forgetLedgerDataOnThisDevice).toHaveBeenCalledOnce();
   });
 
   it("keeps loaded settings visible when a query fails and exposes a local retry", () => {

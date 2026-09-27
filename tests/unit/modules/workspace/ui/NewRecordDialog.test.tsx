@@ -1,11 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useLayoutEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ledgerPageCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { writeLastNewRecordBookId } from "@/modules/workspace/new-record-book-memory";
-import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 
 vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
   InputFormLoadingFallback: () => null,
@@ -17,7 +16,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
     inputMode: string;
     setInputMode: (mode: "ai" | "quick") => void;
     setAiPending: (pending: boolean) => void;
-    setInputOpen: (open: boolean) => void;
+    onSaved: () => void;
     bookPicker: ReactNode;
   }) => (
     <div
@@ -37,7 +36,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
       <button type="button" onClick={() => props.setAiPending(false)}>
         settle submit
       </button>
-      <button type="button" onClick={() => props.setInputOpen(false)}>
+      <button type="button" onClick={() => props.onSaved()}>
         saved
       </button>
     </div>
@@ -101,15 +100,37 @@ const defaultBooks: BookDto[] = [
 
 type DialogProps = Parameters<typeof NewRecordDialog>[0];
 
-/** Stands in for the shell's + button, which opens the dialog through the store. */
-function OpenFlag({ open }: { open: boolean }) {
-  const setOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
-  useLayoutEffect(() => setOpen(open), [open, setOpen]);
-  return null;
+const onClose = vi.fn();
+
+beforeEach(() => onClose.mockClear());
+
+/**
+ * Stands in for the URL: the test opens the dialog as the + button's `?new=1`
+ * would, and a close lands the way the popped entry would.
+ */
+function UrlBackedDialog({ open, ...props }: DialogProps) {
+  const [isOpen, setIsOpen] = useState(open);
+  const [lastOpen, setLastOpen] = useState(open);
+  if (open !== lastOpen) {
+    setLastOpen(open);
+    setIsOpen(open);
+  }
+  return (
+    <NewRecordDialog
+      {...props}
+      open={isOpen}
+      onClose={() => {
+        onClose();
+        setIsOpen(false);
+      }}
+    />
+  );
 }
 
 function renderDialog(overrides: Partial<DialogProps> = {}) {
   const props: DialogProps = {
+    open: false,
+    onClose,
     scope: null,
     books: defaultBooks,
     activeTab: "records",
@@ -121,10 +142,7 @@ function renderDialog(overrides: Partial<DialogProps> = {}) {
     ...overrides,
   };
   const tree = (isOpen: boolean, extra: Partial<DialogProps> = {}) => (
-    <WorkspaceStoreProvider initialBookId={null}>
-      <OpenFlag open={isOpen} />
-      <NewRecordDialog {...props} {...extra} />
-    </WorkspaceStoreProvider>
+    <UrlBackedDialog {...props} {...extra} open={isOpen} />
   );
   const view = render(tree(false));
   const rerender = (isOpen: boolean, extra: Partial<DialogProps> = {}) =>
@@ -269,6 +287,7 @@ describe("NewRecordDialog state", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "saved" }));
 
+    expect(onClose).toHaveBeenCalledOnce();
     expect(screen.queryByTestId("record-forms")).toBeNull();
   });
 });

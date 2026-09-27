@@ -66,7 +66,7 @@ const baseProps = {
   categories: [],
   mainCurrency: "CNY",
   preferredCurrencies: [],
-  setInputOpen: vi.fn(),
+  onSaved: vi.fn(),
   setAiPending: vi.fn(),
   setQuickPending: vi.fn(),
   bookPicker: null,
@@ -89,7 +89,7 @@ describe("NewRecordForms picker memory", () => {
     render(<NewRecordForms {...baseProps} bookId={BOOK_ID} />);
     fireEvent.click(await screen.findByTestId("quick-save"));
 
-    expect(baseProps.setInputOpen).toHaveBeenCalledWith(false);
+    expect(baseProps.onSaved).toHaveBeenCalledOnce();
   });
 
   it("does not touch the memory when the save never succeeds", async () => {

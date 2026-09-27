@@ -1,6 +1,8 @@
 "use client";
 
-export type LedgerNavigationKind = "filter" | "stats" | "detail";
+import { isOverlayHistoryEntry } from "@/lib/navigation/overlay-history";
+
+export type LedgerNavigationKind = "filter" | "stats" | "detail" | "new-record";
 
 interface CashierHistoryMetadata {
   cashier?: {
@@ -32,6 +34,14 @@ export function writeLedgerHistory(
     ...currentCustomHistoryState(),
     cashier: { ledgerNavigation: true, kind },
   };
-  if (method === "push") window.history.pushState(state, "", url);
-  else window.history.replaceState(state, "", url);
+  if (method === "push" && isOverlayHistoryEntry()) {
+    // An open dialog's entry is taken over rather than stacked on: the dialog
+    // is on its way out, and Back must not land on it.
+    delete state.cashierOverlay;
+    window.history.replaceState(state, "", url);
+  } else if (method === "push") {
+    window.history.pushState(state, "", url);
+  } else {
+    window.history.replaceState(state, "", url);
+  }
 }

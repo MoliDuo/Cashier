@@ -8,6 +8,7 @@ import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
 import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigation";
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import { useWorkspaceStore } from "@/modules/workspace/store";
+import { openNewRecord } from "@/lib/navigation/ledger-new-record-navigation";
 import { readRecordsView, type LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
 import { readPeriodParams } from "@/modules/workspace/period-url-params";
@@ -25,7 +26,6 @@ import {
 export function LedgerShell({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const ready = useWorkspaceStore((state) => state.ready);
-  const setNewRecordOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
   const lastBrowsedTab = useWorkspaceStore((state) => state.lastBrowsedTab);
   // The viewed book changes on the client with no server render behind it, so
   // the hover prefetch reads it live from the store.
@@ -60,7 +60,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
     [bookId, hrefFor, prefetch, queryClient]
   );
 
-  const openInput = useCallback(() => setNewRecordOpen(true), [setNewRecordOpen]);
+  const openInput = openNewRecord;
 
   return (
     <AppShell

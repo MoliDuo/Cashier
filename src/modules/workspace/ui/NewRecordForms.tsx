@@ -68,7 +68,8 @@ interface NewRecordFormsProps {
   mainCurrency: string;
   preferredCurrencies: string[];
   timeZone?: string;
-  setInputOpen: (open: boolean) => void;
+  /** Closes the dialog once a record is saved. */
+  onSaved: () => void;
   setAiPending: (pending: boolean) => void;
   setQuickPending: (pending: boolean) => void;
   /** The record's book picker, shown in each form's footer. */
@@ -86,7 +87,7 @@ export function NewRecordForms({
   mainCurrency,
   preferredCurrencies,
   timeZone,
-  setInputOpen,
+  onSaved,
   setAiPending,
   setQuickPending,
   bookPicker,
@@ -108,9 +109,9 @@ export function NewRecordForms({
 
       // A saved record closes the dialog. Whatever was typed into the other
       // mode stays in that mode's draft for the next opening.
-      setInputOpen(false);
+      onSaved();
     },
-    [activeTab, committedView, savedBook, setInputOpen, viewedBookId]
+    [activeTab, committedView, onSaved, savedBook, viewedBookId]
   );
 
   return (

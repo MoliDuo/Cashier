@@ -33,3 +33,8 @@ export function parseBookScopeCookie(value: string | null | undefined): string |
 export function writeBookScopeCookie(bookId: string | null): void {
   document.cookie = buildBookScopeCookie(bookId);
 }
+
+/** Forgets the remembered scope, so the next sign-in opens on 总账. */
+export function clearBookScopeCookie(): void {
+  document.cookie = `${BOOK_SCOPE_COOKIE}=; path=/; max-age=0; samesite=lax`;
+}

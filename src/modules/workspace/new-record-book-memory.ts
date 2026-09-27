@@ -1,5 +1,6 @@
 import { isValidUuid } from "@/lib/validation";
 
+// Signing out clears every `cashier:` key (src/lib/sign-out-cleanup.ts).
 const LAST_NEW_RECORD_BOOK_KEY = "cashier:new-record-book";
 
 /**

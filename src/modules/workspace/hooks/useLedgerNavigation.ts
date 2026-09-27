@@ -3,6 +3,8 @@ import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ledgerTabFromPathname, ledgerTabHref, type LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerDetailParam } from "@/lib/navigation/ledger-detail-navigation";
+import { readNewRecordParam } from "@/lib/navigation/ledger-new-record-navigation";
+import { isOverlayHistoryEntry } from "@/lib/navigation/overlay-history";
 import { useWorkspaceStore } from "../store";
 import { readPeriodParams, writePeriodParams } from "../period-url-params";
 
@@ -37,8 +39,14 @@ export function useLedgerNavigation() {
   const navigate = useCallback(
     (tab: LedgerTab, query?: URLSearchParams) => {
       const href = query == null ? hrefFor(tab) : ledgerTabHref(tab, query.toString());
-      // An open detail's history entry is replaced, so Back cannot reopen it.
-      if (readLedgerDetailParam(new URLSearchParams(window.location.search)) != null) {
+      // An open detail's or 记一笔's history entry is replaced, so Back cannot
+      // reopen it.
+      const current = new URLSearchParams(window.location.search);
+      if (
+        readLedgerDetailParam(current) != null ||
+        readNewRecordParam(current) ||
+        isOverlayHistoryEntry()
+      ) {
         router.replace(href, { scroll: false });
       } else {
         router.push(href, { scroll: false });

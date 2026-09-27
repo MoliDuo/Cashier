@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useTheme } from "next-themes";
 import { signOutAction } from "@/modules/auth/server-actions/sign-in";
+import { forgetLedgerDataOnThisDevice } from "@/lib/sign-out-cleanup";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchEntryCategories } from "@/modules/ledger/queries";
@@ -93,6 +94,10 @@ export function SettingsTab({
   };
 
   const handleSignOut = async () => {
+    // Only a sign-out the reader chose clears the device. A session that ended
+    // for them (re-authentication, credentials changed) keeps the drafts for
+    // when they are back.
+    forgetLedgerDataOnThisDevice();
     await signOutTo("/login");
   };
 

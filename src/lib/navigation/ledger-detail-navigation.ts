@@ -1,6 +1,8 @@
 "use client";
 
 import { writeLedgerHistory } from "@/lib/navigation/ledger-history";
+import { LEDGER_NEW_RECORD_PARAM } from "@/lib/navigation/ledger-new-record-navigation";
+import { leavePastOverlays } from "@/lib/navigation/overlay-history";
 
 /** The open record, as `?detail=<id>` on whichever ledger route it was opened from. */
 export const LEDGER_DETAIL_PARAM = "detail";
@@ -12,6 +14,9 @@ export function readLedgerDetailParam(params: Pick<URLSearchParams, "get">): str
 
 function detailUrl(id: string | null): string {
   const params = new URLSearchParams(window.location.search);
+  // A record opened from 记一笔's success toast replaces nothing of the dialog:
+  // the dialog has closed, even if its Back has not landed yet.
+  params.delete(LEDGER_NEW_RECORD_PARAM);
   if (id == null) params.delete(LEDGER_DETAIL_PARAM);
   else params.set(LEDGER_DETAIL_PARAM, id);
   const query = params.toString();
@@ -60,11 +65,13 @@ export function openLedgerEntrySourceDocument(entry: { sourceDocumentId: string 
  */
 export function closeLedgerDetail(): void {
   if (readLedgerDetailParam(new URLSearchParams(window.location.search)) == null) return;
+  const replaceAway = () => writeLedgerHistory("replace", detailUrl(null), "filter");
   if (detailWasPushed()) {
-    window.history.back();
+    // Dialogs still open on the sheet (a delete confirmation) leave with it.
+    if (!leavePastOverlays(1)) window.history.back();
     return;
   }
-  writeLedgerHistory("replace", detailUrl(null), "filter");
+  if (!leavePastOverlays(0, replaceAway)) replaceAway();
 }
 
 /** Hands focus back to the control that opened the sheet, once it has gone. */

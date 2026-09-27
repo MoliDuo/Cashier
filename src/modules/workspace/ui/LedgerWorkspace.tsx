@@ -4,6 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { LedgerTimeZoneProvider } from "@/lib/ledger-time-zone";
 import { ledgerTabFromPathname } from "@/lib/ledger-tabs";
 import { readLedgerDetailParam } from "@/lib/navigation/ledger-detail-navigation";
+import { closeNewRecord, readNewRecordParam } from "@/lib/navigation/ledger-new-record-navigation";
 import { textRoleClassName } from "@/components/typography";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
@@ -107,6 +108,8 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
           <div className="min-w-0 max-w-full overflow-x-clip">{children}</div>
 
           <NewRecordDialog
+            open={readNewRecordParam(searchParams)}
+            onClose={closeNewRecord}
             scope={recordScope}
             books={value.books}
             activeTab={activeTab}

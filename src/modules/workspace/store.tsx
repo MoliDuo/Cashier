@@ -14,8 +14,6 @@ interface WorkspaceState {
    */
   bookId: string | null;
   setBookId: (bookId: string | null) => void;
-  newRecordOpen: boolean;
-  setNewRecordOpen: (open: boolean) => void;
   /** Each route's last query, so returning to a tab returns to its filters. */
   routeQueries: Partial<Record<LedgerTab, string>>;
   rememberRouteQuery: (tab: LedgerTab, query: string) => void;
@@ -36,8 +34,6 @@ function createWorkspaceStore(initialBookId: string | null): WorkspaceStore {
     setReady: (ready) => set({ ready }),
     bookId: initialBookId,
     setBookId: (bookId) => set((state) => (state.bookId === bookId ? state : { bookId })),
-    newRecordOpen: false,
-    setNewRecordOpen: (newRecordOpen) => set({ newRecordOpen }),
     routeQueries: {},
     rememberRouteQuery: (tab, query) =>
       set((state) => {

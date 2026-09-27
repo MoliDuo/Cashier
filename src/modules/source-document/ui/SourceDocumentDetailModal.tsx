@@ -199,7 +199,7 @@ function SourceDocumentDetailSheet({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
+      <Dialog open={open} onOpenChange={(value) => !value && onClose()} closeOnBack={false}>
         <DialogContent
           variant="detail"
           {...(onExitComplete !== undefined ? { onExitComplete } : {})}

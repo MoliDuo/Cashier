@@ -48,3 +48,46 @@ test("账目 and 统计 are routes of their own, Back walks them, and old links 
 
   expect(errors).toEqual([]);
 });
+
+test("Back closes the top dialog and leaves the page under it where it was", async ({ page }) => {
+  await signIn(page);
+  const navigation = page.getByRole("navigation", { name: "账本导航" });
+  const destination = (name: string) => navigation.getByRole("button", { name, exact: true });
+  await expect(destination("账目")).toBeEnabled();
+  // 统计 sits under 账目 in history, where a swipe back from 记一笔 used to land.
+  await destination("统计").click();
+  await expect(page).toHaveURL(/\/stats$/);
+  await destination("账目").click();
+  await expect(page).toHaveURL(/\/records$/);
+
+  const openNewRecord = page.getByRole("button", { name: "记一笔", exact: true }).first();
+  await openNewRecord.click();
+  const dialog = page.getByRole("dialog", { name: "记一笔" });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/records\?new=1$/);
+  await page.goBack();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/records$/);
+
+  // Closing it with its own control pops the entry it pushed: Back then leaves
+  // for 统计 in one step, with no dead entry in between.
+  await openNewRecord.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/records$/);
+
+  // Any other dialog is an entry of its own too.
+  await page
+    .getByRole("button", { name: /^区间：/ })
+    .first()
+    .click();
+  const period = page.getByRole("dialog", { name: "选择区间" });
+  await expect(period).toBeVisible();
+  await page.goBack();
+  await expect(period).toHaveCount(0);
+  await expect(page).toHaveURL(/\/records$/);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/stats$/);
+});

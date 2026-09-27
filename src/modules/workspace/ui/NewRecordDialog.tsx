@@ -6,7 +6,6 @@ import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 import { readLastNewRecordBookId } from "../new-record-book-memory";
-import { useWorkspaceStore } from "../store";
 import { NewRecordForms } from "./NewRecordForms";
 import type { CommittedView, NewRecordInputMode } from "./new-record-success-feedback";
 import {
@@ -20,6 +19,10 @@ import { ledgerPageCopy } from "@/copy/app";
 import { bookPickerCopy, commonCopy } from "@/copy/common";
 
 interface NewRecordDialogProps {
+  /** Whether the URL names the dialog open (`?new=1`). */
+  open: boolean;
+  /** Closes it the way Back would; the URL then says it is closed. */
+  onClose: () => void;
   /** The book being viewed, or null for 总账. */
   scope: RecordScope;
   /** The live books, for the record's book picker. */
@@ -40,6 +43,8 @@ interface NewRecordDialogProps {
  * input as a draft and restores it on the next opening.
  */
 export function NewRecordDialog({
+  open: isOpen,
+  onClose,
   scope,
   books,
   activeTab,
@@ -51,16 +56,14 @@ export function NewRecordDialog({
 }: NewRecordDialogProps) {
   // The dialog opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
-  // The shell's + button opens it from outside the page, so the open flag is shared.
-  const isOpen = useWorkspaceStore((state) => state.newRecordOpen);
-  const setInputOpen = useWorkspaceStore((state) => state.setNewRecordOpen);
+  // The shell's + button opens it from outside the page, so whether it is open
+  // lives in the URL, where the system back gesture can close it.
   const [inputMode, setInputMode] = useState<NewRecordInputMode>("ai");
   const [aiPending, setAiPending] = useState(false);
   const [quickPending, setQuickPending] = useState(false);
   const isSubmitting = aiPending || quickPending;
   const handleOpenChange = (open: boolean) => {
-    if (!open && isSubmitting) return;
-    setInputOpen(open);
+    if (!open && !isSubmitting) onClose();
   };
   // The picker opens on the book being viewed; on 总账 — no single book — it
   // opens on this device's last pick, then the first book in 设置 order. It is
@@ -87,7 +90,7 @@ export function NewRecordDialog({
   const selectedBookId = selectedBook?.id ?? "";
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange} closeOnBack={false}>
       <DialogContent
         variant="detail"
         className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-md sm:rounded-lg"
@@ -125,7 +128,7 @@ export function NewRecordDialog({
             categories={categories}
             mainCurrency={mainCurrency}
             preferredCurrencies={preferredCurrencies}
-            setInputOpen={setInputOpen}
+            onSaved={onClose}
             setAiPending={setAiPending}
             setQuickPending={setQuickPending}
             timeZone={timeZone}

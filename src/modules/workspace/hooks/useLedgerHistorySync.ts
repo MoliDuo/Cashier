@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { LEDGER_DETAIL_PARAM } from "@/lib/navigation/ledger-detail-navigation";
+import { LEDGER_NEW_RECORD_PARAM } from "@/lib/navigation/ledger-new-record-navigation";
 import { normalizePeriodSearchParams } from "../period-url-params";
 import { normalizeStatsSearchParams } from "../stats-url-params";
 import { replaceLedgerUrl } from "../ledger-url-navigation";
@@ -38,6 +39,7 @@ export function useLedgerHistorySync({
   useEffect(() => {
     const query = new URLSearchParams(searchParams.toString());
     query.delete(LEDGER_DETAIL_PARAM);
+    query.delete(LEDGER_NEW_RECORD_PARAM);
     rememberRouteQuery(activeTab, query.toString());
   }, [activeTab, rememberRouteQuery, searchParams]);
 }

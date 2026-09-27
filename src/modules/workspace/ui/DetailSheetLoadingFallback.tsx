@@ -11,7 +11,7 @@ function Skeleton({ className }: { className?: string }) {
 /** The sheet's outline while its code loads; closing it closes the record. */
 export function DetailSheetLoadingFallback() {
   return (
-    <Dialog open onOpenChange={(open) => !open && closeLedgerDetail()}>
+    <Dialog open onOpenChange={(open) => !open && closeLedgerDetail()} closeOnBack={false}>
       <DialogContent
         variant="detail"
         className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"

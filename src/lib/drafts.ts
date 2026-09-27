@@ -102,3 +102,18 @@ export function clearDraft(key: string): void {
     // Nothing to clear where storage is unavailable.
   }
 }
+
+/** Every draft on this device, for every ledger, gone — what signing out leaves. */
+export function clearAllDrafts(): void {
+  memory.clear();
+  try {
+    const keys = Array.from({ length: window.localStorage.length }, (_, index) =>
+      window.localStorage.key(index)
+    );
+    for (const key of keys) {
+      if (key?.startsWith("draft:") === true) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Nothing to clear where storage is unavailable.
+  }
+}
