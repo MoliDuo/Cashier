@@ -5,22 +5,22 @@
 [![CI/CD](https://github.com/Xiangyu-Labs/Cashier/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Xiangyu-Labs/Cashier/actions/workflows/ci-cd.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
 
-![Cashier 流水页面](./public/readme/stream-desktop.webp)
+![Cashier 账目页面](./public/readme/stream-desktop.webp)
 
 Cashier 最初只是我给自己做的记账工具：拍下小票，或者随手写一句“午饭 35 元”，剩下的整理工作交给 AI。
 它是为实际在用的两个人写的。以 AGPL 发布，是为了让想要它的人可以 fork 过去改成自己的样子，而不是要把它
 改得适合所有人。欢迎报告 bug；功能请求多半会得到"fork 吧，那样更适合你"的回答。
 
 Cashier 会从图片或文字中提取日期、商家、金额、币种、分类和消费明细。AI 的结果不是不可触碰的黑盒：
-你可以在入账前后检查、修改、重试，并在流水、明细和统计中继续管理这些记录。
+你可以在入账前后检查、修改、重新处理，并在账目和统计中继续管理这些账单。
 
 ## 它能做什么
 
 - 上传小票、发票图片，或直接输入自然语言记账
 - 提取账单标题、日期、金额、币种、分类和明细
 - 复核和编辑 AI 结果，处理识别失败的账单
-- 管理多币种消费，并按账本主币种查看汇总
-- 从流水、筛选明细和统计图表回看支出
+- 管理多币种消费，并按账本主币种查看汇总；用分账把账目分开看，总账看全部
+- 在账目里按账单或按明细回看、筛选，在统计图表里看支出的去向和走势
 - 创建账本级 API 密钥，供脚本、快捷指令和外部集成使用（见 [API v1](./docs/api.md)）
 - 中文界面；AI 可以按设置用其他语言填写账单内容
 

@@ -8,20 +8,10 @@ import {
 import { SourceDocumentSubmissionUploadError } from "@/modules/source-document/hooks/source-document-submission-upload";
 
 describe("buildSubmitPayload local business date", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("submits the browser-local date and IANA timezone explicitly", () => {
-    const realIntl = Intl;
-    vi.stubGlobal("Intl", {
-      ...realIntl,
-      DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: "Asia/Shanghai" }) }),
-    });
-
-    expect(buildSubmitPayload("receipt", [], new Date(2026, 6, 27, 0, 30))).toMatchObject({
-      text: "receipt",
-      documentDate: "2026-07-27",
-      timezone: "Asia/Shanghai",
-    });
+  it("submits the chosen date and no device zone; the ledger's zone dates the record", () => {
+    const payload = buildSubmitPayload("receipt", [], new Date(2026, 6, 27, 0, 30));
+    expect(payload).toMatchObject({ text: "receipt", documentDate: "2026-07-27" });
+    expect(payload).not.toHaveProperty("timezone");
   });
 
   it("sends new files for upload and keeps already stored ones by id", () => {
@@ -32,13 +22,11 @@ describe("buildSubmitPayload local business date", () => {
         { data: "blob:new", mimeType: "image/png", file },
         { data: "https://stored", mimeType: "image/jpeg", storedFileId: "stored-1" },
       ],
-      new Date(2026, 6, 27),
-      "UTC"
+      new Date(2026, 6, 27)
     );
 
     expect(payload).toEqual({
       documentDate: "2026-07-27",
-      timezone: "UTC",
       text: null,
       images: [{ file, mimeType: "image/png" }],
       storedFileIds: ["stored-1"],

@@ -83,7 +83,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 - `logger` / `console` 调用里的 id 类字段必须经过 `logIdentifier`；
 - 只有登记过的 writer（`registeredSourceDocumentWriters`）可以插入、更新或删除 `sourceDocuments`；
-- class 字面量不得使用任意字号或已退役的 `text-muted`。
+- class 字面量不得使用任意字号或已退役的 `text-muted`；功能代码不得使用原始的 `text-xs/sm/base/lg`。
 
 注释永远不算证据。
 
@@ -370,7 +370,10 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 
 ### 字号
 
-先在 `src/components/typography.ts` 里找角色，再考虑写原始字号。
+功能代码（`src/modules/**/ui`、`src/app`、`src/components` 顶层组件）只用 `src/components/typography.ts` 的角色，
+经 `textRoleClassName(role, 覆盖)` 取字号；颜色或字重不同就把覆盖类作为第二个参数。原始的 `text-xs` /
+`text-sm` / `text-base` / `text-lg` 由 ESLint 拦下，只有 `components/ui` 的基础组件、骨架屏和金额表
+（`amount-text.tsx`）例外。
 
 | 角色           | 字号          | 用途                         |
 | -------------- | ------------- | ---------------------------- |
@@ -410,6 +413,17 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   `reclassification` 与 `assignment` 混用，`email_change` 实为添加登录邮箱），删掉镜像和没人读的列，
   收紧类型，删掉约 10 个没有查询在用的索引，同步触发器每行只剩一条 UPDATE。这是 expand/contract 的一次性例外：
   为此把部署改成先构建后迁移，迁移在一个事务里执行，两个人都空闲时推送，旧版本只在迁移的几秒里面对新 schema。
+
+- **之后：前端换底子。** 刷新收成一个驱动；时区回到账本级，周期和日期由服务端按账本时区解析；详情改为逐字段
+  即时写，网址是打开哪张账单的唯一记录；流水和明细合并成账目的两种视图，设置移出 tab；列表不再虚拟化。
+
+### 等下一次发布
+
+这一批停止读写、但旧版本在迁移期间还在用的名字，按 expand/contract 留到部署之后的下一次发布再删：
+
+- `books.time_zone` 列和它的约束：本批代码已不读不写，下一次发布用迁移删除，名字登记进 `retiredNames`。
+- 创建账单和快速记账输入里的 `timezone` 字段：本批客户端已不再发送，服务端仍接受并忽略；下一次发布从
+  schema 里去掉。
 
 ### 不做
 

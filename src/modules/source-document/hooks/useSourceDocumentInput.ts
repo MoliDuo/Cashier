@@ -326,7 +326,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
           ...(uploadedPayload.documentDate == null
             ? {}
             : { documentDate: uploadedPayload.documentDate }),
-          ...(uploadedPayload.timezone == null ? {} : { timezone: uploadedPayload.timezone }),
         },
         variables.clientSubmissionId
       );
@@ -516,7 +515,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   const handleSubmit = () => {
     if (!hasInput) return;
 
-    submit(buildSubmitPayload(text, images, entryDate, timeZone));
+    submit(buildSubmitPayload(text, images, entryDate));
   };
 
   // --- Camera ---------------------------------------------------------------

@@ -18,7 +18,6 @@ export interface SourceDocumentUploadImage {
 
 export interface SourceDocumentSubmitPayload {
   documentDate: string;
-  timezone?: string;
   text: string | null;
   images?: SourceDocumentUploadImage[];
   storedFileIds: string[];
@@ -85,7 +84,6 @@ function filesFitUploadLimits(files: readonly File[]): boolean {
 function submissionBase(payload: SourceDocumentSubmitPayload): SourceDocumentSubmitPayload {
   return {
     documentDate: payload.documentDate,
-    ...(payload.timezone == null ? {} : { timezone: payload.timezone }),
     text: payload.text,
     storedFileIds: payload.storedFileIds,
   };

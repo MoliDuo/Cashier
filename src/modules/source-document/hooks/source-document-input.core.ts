@@ -108,8 +108,7 @@ export function parseStoredInputDraft(data: unknown): StoredInputDraft | null {
 export function buildSubmitPayload(
   text: string,
   images: EditableInputImage[],
-  entryDate: Date,
-  timeZone?: string
+  entryDate: Date
 ): SourceDocumentSubmitPayload {
   const newImages = images.flatMap((image) =>
     image.storedFileId == null && image.file != null
@@ -121,11 +120,6 @@ export function buildSubmitPayload(
   );
   return {
     documentDate: formatDateTimeForApi(entryDate),
-    ...(timeZone != null
-      ? { timezone: timeZone }
-      : typeof Intl !== "undefined"
-        ? { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }
-        : {}),
     text: text === "" ? null : text,
     ...(newImages.length > 0 ? { images: newImages } : {}),
     storedFileIds,
@@ -151,7 +145,6 @@ export function sourceDocumentPayloadsEqual(
 ): boolean {
   return (
     left.documentDate === right.documentDate &&
-    left.timezone === right.timezone &&
     left.text === right.text &&
     arraysEqual(left.storedFileIds, right.storedFileIds, (leftId, rightId) => leftId === rightId) &&
     arraysEqual(
@@ -166,7 +159,6 @@ export function sourceDocumentPayloadsEqual(
 export function snapshotPayload(payload: SourceDocumentSubmitPayload): SourceDocumentSubmitPayload {
   return {
     documentDate: payload.documentDate,
-    ...(payload.timezone === undefined ? {} : { timezone: payload.timezone }),
     text: payload.text,
     storedFileIds: [...payload.storedFileIds],
     ...(payload.images === undefined
