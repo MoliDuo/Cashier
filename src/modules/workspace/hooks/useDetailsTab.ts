@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
@@ -35,6 +35,8 @@ import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/c
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
+import { useBatchDatePreview } from "./useBatchDatePreview";
+import { uniquePagedItems } from "../paged-items";
 import { commonCopy } from "@/copy/common";
 import { batchActionsCopy, detailsTabCopy } from "@/copy/workspace";
 
@@ -42,18 +44,6 @@ import { batchActionsCopy, detailsTabCopy } from "@/copy/workspace";
 const DIRECT_ASSIGNMENT_LIMIT = 100;
 
 type BatchDateImpact = Awaited<ReturnType<typeof previewBatchLedgerEntryDateAction>>;
-
-/**
- * The date dialog has one source of truth: what it is currently showing.
- * Closed, waiting for the preview, failed to compute it, or holding the
- * result. The list is frozen while selecting, so the selection it describes
- * cannot move underneath it.
- */
-type DatePreviewState =
-  | { status: "closed" }
-  | { status: "loading" }
-  | { status: "error" }
-  | { status: "ready"; impact: BatchDateImpact };
 
 interface EntryDateGroup {
   title: string;
@@ -125,11 +115,7 @@ export function useDetailsTab({
     entriesQuery;
 
   const pages = entriesQuery.data?.pages;
-  const entries = useMemo(() => {
-    const byId = new Map<string, ActiveLedgerEntryDto>();
-    for (const page of pages ?? []) for (const item of page.items) byId.set(item.id, item);
-    return Array.from(byId.values());
-  }, [pages]);
+  const entries = useMemo(() => uniquePagedItems(pages), [pages]);
 
   const summary = summaryQuery.data;
   const monthStats = {
@@ -253,33 +239,18 @@ export function useDetailsTab({
   const [selectedDate, setSelectedDate] = useState(
     () => getDateInTimezone(timeZone) ?? formatDateTimeForApi(new Date())
   );
-  const [datePreview, setDatePreview] = useState<DatePreviewState>({ status: "closed" });
-  const dateRequestIdRef = useRef(0);
+  const datePreview = useBatchDatePreview(() =>
+    previewBatchLedgerEntryDateAction([...selectedIds])
+  );
+  const { start: startDatePreview, close: closeDatePreview } = datePreview;
 
-  /**
-   * Asks for the impact of the selection. Every open, retry or close takes a new
-   * request number, so an answer that arrives after the dialog closed or asked
-   * again is dropped instead of overwriting the current one.
-   */
-  const startDatePreview = useCallback(() => {
-    const requestId = ++dateRequestIdRef.current;
-    const entryIds = [...selectedIds];
-    setDatePreview({ status: "loading" });
-    void (async () => {
-      try {
-        const impact = await previewBatchLedgerEntryDateAction(entryIds);
-        if (dateRequestIdRef.current === requestId) setDatePreview({ status: "ready", impact });
-      } catch {
-        if (dateRequestIdRef.current === requestId) setDatePreview({ status: "error" });
-      }
-    })();
-  }, [selectedIds]);
-
-  const setDateDialogVisibility = useCallback((open: boolean) => {
-    dateRequestIdRef.current += 1;
-    setDateDialogOpen(open);
-    setDatePreview({ status: "closed" });
-  }, []);
+  const setDateDialogVisibility = useCallback(
+    (open: boolean) => {
+      closeDatePreview();
+      setDateDialogOpen(open);
+    },
+    [closeDatePreview]
+  );
 
   // The dialog opens on the day the user is about to set and fills in what the
   // change touches, instead of asking for the day first and the impact after.
@@ -288,16 +259,9 @@ export function useDetailsTab({
     startDatePreview();
   }, [setDateDialogVisibility, startDatePreview]);
 
-  // A request still in flight when the screen goes away has nowhere to land.
-  useEffect(() => {
-    return () => {
-      dateRequestIdRef.current += 1;
-    };
-  }, []);
-
-  const dateImpact = datePreview.status === "ready" ? datePreview.impact : null;
-  const datePreviewFailed = datePreview.status === "error";
-  const isPreviewingDate = datePreview.status === "loading";
+  const dateImpact = datePreview.impact;
+  const datePreviewFailed = datePreview.failed;
+  const isPreviewingDate = datePreview.isPreviewing;
 
   const updateDates = useLedgerMutation<{ impact: BatchDateImpact }, void>({
     waitFor: false,

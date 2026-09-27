@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { textRoleClassName } from "@/components/typography";
-import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { BatchCategoryDialog } from "./BatchCategoryDialog";
 import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
 import { BatchSetCategoryDialog } from "./BatchSetCategoryDialog";
 import { LedgerEntriesActions } from "./LedgerEntriesActions";
+import { SelectionBar } from "./SelectionBar";
 import { batchActionsCopy } from "@/copy/workspace";
 
 export interface LedgerEntriesBatchActionToolbarProps {
@@ -130,14 +128,6 @@ export function LedgerEntriesBatchActionToolbar({
   // Nothing selected means nothing to act on; keeping the buttons visible but
   // unavailable says what the mode offers without a layout shift on first tap.
   const actionsDisabled = isProcessing || selectedCount === 0;
-  const selectAllLabel = wholeList
-    ? batchActionsCopy.selectAllItemCount({ count: loadedCount })
-    : batchActionsCopy.selectAllLoadedCount({ loaded: loadedCount });
-  const masterChecked: boolean | "indeterminate" = isAllSelected
-    ? true
-    : selectedCount > 0
-      ? "indeterminate"
-      : false;
   // A surface that supports none of the batch writes still gets the way to
   // select all, but no empty row of buttons.
   const hasActions =
@@ -194,71 +184,50 @@ export function LedgerEntriesBatchActionToolbar({
   );
 
   return (
-    <div className={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1", className)}>
-      <label className="flex min-w-0 items-center gap-2">
-        <Checkbox
-          checked={masterChecked}
-          disabled={isProcessing}
-          onCheckedChange={(checked) => {
-            if (checked === true) onSelectAll();
-            else onClearSelection();
-          }}
-          // The box's own name, because the label next to it also carries the
-          // loaded-scope note, which is not part of what the control is.
-          aria-label={isAllSelected ? batchActionsCopy.deselectAll : selectAllLabel}
-          className="h-4 w-4"
-        />
-        <span className={textRoleClassName("bodyStrong", "whitespace-nowrap")}>
-          {isAllSelected ? batchActionsCopy.deselectAll : selectAllLabel}
-        </span>
-        {isAllSelected && hasMoreData ? (
-          <span className={textRoleClassName("meta", "whitespace-nowrap")}>
-            {batchActionsCopy.loadedOnly}
-          </span>
+    <>
+      <SelectionBar
+        selectedCount={selectedCount}
+        loadedCount={loadedCount}
+        wholeList={wholeList}
+        isAllSelected={isAllSelected}
+        hasMoreData={hasMoreData}
+        disabled={isProcessing}
+        onSelectAll={onSelectAll}
+        onClearSelection={onClearSelection}
+        {...(className != null ? { className } : {})}
+        note={
+          selectedCount > 100 && limitedActions.length > 0 ? (
+            <p>
+              {batchActionsCopy.batchLimit({ actions: limitedActions.join("、") })}
+              {onChangeCategory != null ? batchActionsCopy.categoryBatchUnlimited : null}
+            </p>
+          ) : null
+        }
+      >
+        {hasActions ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
+            <LedgerEntriesActions
+              disabled={actionsDisabled}
+              nonCategoryDisabled={selectedCount > 100}
+              isChangingCategory={isChangingCategory}
+              isChangingCurrency={isChangingCurrency}
+              isRetrying={isRetrying}
+              isDeleting={isDeleting}
+              isAssigningCategories={isAssigningCategories}
+              {...(onChangeCategory != null
+                ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
+                : {})}
+              {...(onChangeCurrency != null
+                ? { onOpenCurrency: () => setCurrencyDialogOpen(true) }
+                : {})}
+              {...(onChangeDate != null ? { onChangeDate } : {})}
+              {...(onRetry != null ? { onRetry } : {})}
+              {...(onSplit != null ? { onSplit } : {})}
+              {...(onDelete != null ? { onDelete } : {})}
+            />
+          </div>
         ) : null}
-      </label>
-
-      {hasActions ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
-          <LedgerEntriesActions
-            disabled={actionsDisabled}
-            nonCategoryDisabled={selectedCount > 100}
-            isChangingCategory={isChangingCategory}
-            isChangingCurrency={isChangingCurrency}
-            isRetrying={isRetrying}
-            isDeleting={isDeleting}
-            isAssigningCategories={isAssigningCategories}
-            {...(onChangeCategory != null
-              ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
-              : {})}
-            {...(onChangeCurrency != null
-              ? { onOpenCurrency: () => setCurrencyDialogOpen(true) }
-              : {})}
-            {...(onChangeDate != null ? { onChangeDate } : {})}
-            {...(onRetry != null ? { onRetry } : {})}
-            {...(onSplit != null ? { onSplit } : {})}
-            {...(onDelete != null ? { onDelete } : {})}
-          />
-        </div>
-      ) : null}
-
-      <div className={textRoleClassName("meta", "basis-full space-y-0.5")} aria-live="polite">
-        <p>
-          {wholeList
-            ? batchActionsCopy.selectedItemCount({ selected: selectedCount })
-            : batchActionsCopy.selectedLoadedCount({
-                selected: selectedCount,
-                loaded: loadedCount,
-              })}
-        </p>
-        {hasMoreData ? <p>{batchActionsCopy.unloadedExcluded}</p> : null}
-        {selectedCount > 100 && limitedActions.length > 0 ? (
-          <p>
-            {batchActionsCopy.batchLimit({ actions: limitedActions.join("、") })}
-            {onChangeCategory != null ? batchActionsCopy.categoryBatchUnlimited : null}
-          </p>
-        ) : null}
-      </div>
+      </SelectionBar>
 
       {onChangeCategory != null && confirmsCategory ? (
         <BatchSetCategoryDialog
@@ -289,6 +258,6 @@ export function LedgerEntriesBatchActionToolbar({
           onSelect={(currency) => void handleChangeCurrency(currency)}
         />
       ) : null}
-    </div>
+    </>
   );
 }

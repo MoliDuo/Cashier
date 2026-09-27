@@ -42,6 +42,7 @@ import { buildUnifiedStreamGroups } from "@/modules/source-document/stream-group
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { periodKey, type Period } from "@/modules/ledger/domain/period";
 import { buildLedgerEntryFilters } from "@/modules/workspace/ledger-filter-state";
+import { uniquePagedItems } from "@/modules/workspace/paged-items";
 import { buildStreamQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
 import { commonCopy } from "@/copy/common";
@@ -55,21 +56,6 @@ interface StreamRecoveryVariables {
 }
 
 type RecoveryAction = (variables: StreamRecoveryVariables) => Promise<unknown>;
-
-function flattenAndDeduplicate(
-  pages: readonly { items: SourceDocumentListItemDto[] }[] | undefined
-): SourceDocumentListItemDto[] {
-  const seen = new Set<string>();
-  const result: SourceDocumentListItemDto[] = [];
-  for (const page of pages ?? []) {
-    for (const doc of page.items) {
-      if (seen.has(doc.id)) continue;
-      seen.add(doc.id);
-      result.push(doc);
-    }
-  }
-  return result;
-}
 
 interface UseLedgerEntriesTabOptions {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -200,7 +186,7 @@ export function useLedgerEntriesTab({
   }, [data, queryClient, queryDescriptor, streamPageKey]);
 
   const streamGroups = useMemo(
-    () => buildUnifiedStreamGroups(flattenAndDeduplicate(data?.pages), mainCurrency),
+    () => buildUnifiedStreamGroups(uniquePagedItems(data?.pages), mainCurrency),
     [data, mainCurrency]
   );
 

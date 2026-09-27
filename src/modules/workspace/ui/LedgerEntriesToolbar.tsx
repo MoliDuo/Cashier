@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
@@ -15,6 +15,7 @@ import { formatCurrencyAmount } from "@/lib/format/currency";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { PeriodBar } from "./PeriodBar";
+import { useBatchDatePreview } from "../hooks/useBatchDatePreview";
 import type { BatchEntryDateImpact, EntryCategory } from "@/modules/ledger/contracts";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { commonCopy } from "@/copy/common";
@@ -91,45 +92,21 @@ export function LedgerEntriesToolbar({
   const [selectedDate, setSelectedDate] = useState(
     () => getDateInTimezone(timeZone) ?? formatDateTimeForApi(new Date()) ?? ""
   );
-  const [dateImpact, setDateImpact] = useState<BatchEntryDateImpact | null>(null);
-  const [dateImpactError, setDateImpactError] = useState(false);
-  const [isPreviewingDateImpact, setIsPreviewingDateImpact] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const isProcessing = externallyProcessing || isUpdatingDates || isRetrying || isDeleting;
-  // The list is frozen while selecting, so the selection a preview describes is
-  // the one the confirm writes; a late answer after closing is dropped.
-  const previewRequestRef = useRef(0);
-
-  const previewDateImpact = async () => {
-    if (onPreviewDateImpact == null) return;
-    const requestId = ++previewRequestRef.current;
-    setIsPreviewingDateImpact(true);
-    setDateImpactError(false);
-    try {
-      const impact = await onPreviewDateImpact(
-        [...selectedSourceDocumentIds],
-        [...selectedEntryIds]
-      );
-      if (previewRequestRef.current === requestId) setDateImpact(impact);
-    } catch {
-      if (previewRequestRef.current === requestId) setDateImpactError(true);
-    } finally {
-      if (previewRequestRef.current === requestId) setIsPreviewingDateImpact(false);
-    }
-  };
+  const datePreview = useBatchDatePreview<BatchEntryDateImpact>(() =>
+    onPreviewDateImpact == null
+      ? Promise.reject(new Error("No date preview on this surface"))
+      : onPreviewDateImpact([...selectedSourceDocumentIds], [...selectedEntryIds])
+  );
 
   const handleOpenDateDialog = () => {
     setDateDialogOpen(true);
-    void previewDateImpact();
+    if (onPreviewDateImpact != null) datePreview.start();
   };
 
   const handleDateDialogOpenChange = (open: boolean) => {
-    if (!open) {
-      previewRequestRef.current += 1;
-      setDateImpact(null);
-      setDateImpactError(false);
-      setIsPreviewingDateImpact(false);
-    }
+    if (!open) datePreview.close();
     setDateDialogOpen(open);
   };
 
@@ -203,10 +180,10 @@ export function LedgerEntriesToolbar({
         onOpenChange={handleDateDialogOpenChange}
         value={selectedDate}
         onChange={setSelectedDate}
-        impact={dateImpact == null ? null : batchDateImpactSummary(dateImpact)}
-        isPreviewing={isPreviewingDateImpact || isUpdatingDates}
-        previewFailed={dateImpactError}
-        onRetryPreview={() => void previewDateImpact()}
+        impact={datePreview.impact == null ? null : batchDateImpactSummary(datePreview.impact)}
+        isPreviewing={datePreview.isPreviewing || isUpdatingDates}
+        previewFailed={datePreview.failed}
+        onRetryPreview={datePreview.start}
         {...(isAllSelected && hasMoreData ? { scopeNote: batchActionsCopy.loadedScope } : {})}
         isConfirming={isUpdatingDates}
         onConfirm={() => void handleConfirmDate()}
