@@ -122,7 +122,7 @@ npm run account:enroll -- --email you@example.com
 | 变量                | 必需 | 默认值 | 说明                                           |
 | ------------------- | ---- | ------ | ---------------------------------------------- |
 | `DATABASE_URL`      | 是   | 无     | 必须是 `postgres://` 或 `postgresql://` 地址。 |
-| `DATABASE_POOL_MAX` | 否   | `2`    | 连接池上限，范围 1–50。                        |
+| `DATABASE_POOL_MAX` | 否   | `5`    | 连接池上限，范围 1–50。                        |
 
 ### S3 / Cloudflare R2
 

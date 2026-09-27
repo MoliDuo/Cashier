@@ -11,7 +11,7 @@ export const ENV_DEFAULTS = {
   AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
   LOG_LEVEL: "info",
   DEV_AUTH_BYPASS: "false",
-  DATABASE_POOL_MAX: "2",
+  DATABASE_POOL_MAX: "5",
 } as const;
 
 function blankToUndefined(value: unknown): unknown {
