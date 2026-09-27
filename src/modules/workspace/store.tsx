@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { createStore, useStore, type StoreApi } from "zustand";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 
@@ -21,6 +21,9 @@ interface WorkspaceState {
   rememberRouteQuery: (tab: LedgerTab, query: string) => void;
   /** The tab 设置 was opened from, which its back arrow returns to. */
   lastBrowsedTab: BrowsedTab;
+  /** The list's total, which a phone's top bar prints between the book and the gear. */
+  headerTotal: string | null;
+  setHeaderTotal: (total: string | null) => void;
 }
 
 type BrowsedTab = Exclude<LedgerTab, "settings">;
@@ -44,6 +47,9 @@ function createWorkspaceStore(initialBookId: string | null): WorkspaceStore {
           : { routeQueries: { ...state.routeQueries, [tab]: query }, lastBrowsedTab };
       }),
     lastBrowsedTab: "records",
+    headerTotal: null,
+    setHeaderTotal: (headerTotal) =>
+      set((state) => (state.headerTotal === headerTotal ? state : { headerTotal })),
   }));
 }
 
@@ -70,4 +76,18 @@ export function useWorkspaceStore<T>(selector: (state: WorkspaceState) => T): T 
   if (store == null)
     throw new Error("useWorkspaceStore must be used within WorkspaceStoreProvider");
   return useStore(store, selector);
+}
+
+/**
+ * Puts a list's total in the top bar for as long as the list is on screen, and
+ * takes it down when the list leaves. Outside the ledger's routes there is no
+ * top bar to print it, so there it does nothing.
+ */
+export function usePublishHeaderTotal(total: string | null) {
+  const store = useContext(WorkspaceStoreContext);
+  useEffect(() => {
+    if (store == null) return;
+    store.getState().setHeaderTotal(total);
+    return () => store.getState().setHeaderTotal(null);
+  }, [store, total]);
 }

@@ -55,6 +55,7 @@ vi.mock("@/modules/workspace/prefetch-ledger-tabs", () => ({
 }));
 
 import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
+import { EntriesToolbarShell } from "@/modules/workspace/ui/EntriesToolbarShell";
 import { ledgerPageCopy } from "@/copy/app";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
@@ -189,5 +190,41 @@ describe("LedgerShell", () => {
     await user.click(back);
 
     expect(navigateMock).toHaveBeenCalledWith("records");
+  });
+
+  it("prints the list's total in the top bar while the list is on screen", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const renderWith = (list: ReactNode) => (
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>{list}</LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(
+      renderWith(<EntriesToolbarShell totalLabel="¥10,800.33">{null}</EntriesToolbarShell>)
+    );
+
+    expect(within(screen.getByTestId("top-bar")).getByText("¥10,800.33")).toBeInTheDocument();
+
+    rerender(renderWith(null));
+
+    expect(within(screen.getByTestId("top-bar")).queryByText("¥10,800.33")).not.toBeInTheDocument();
+  });
+
+  it("leaves the total out of 设置's bar", () => {
+    activeTabState.current = "settings";
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>
+            <EntriesToolbarShell totalLabel="¥10,800.33">{null}</EntriesToolbarShell>
+          </LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+
+    expect(within(screen.getByTestId("top-bar")).queryByText("¥10,800.33")).not.toBeInTheDocument();
   });
 });

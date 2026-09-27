@@ -4,6 +4,8 @@ import { ArrowLeft, Plus, Settings, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import type { LedgerTab } from "@/lib/ledger-tabs";
+import { AmountText } from "@/modules/currency/ui/amount-text";
+import { useWorkspaceStore } from "@/modules/workspace/store";
 import { BookSwitcher } from "./BookSwitcher";
 import { ledgerPageCopy } from "@/copy/app";
 
@@ -22,7 +24,8 @@ interface LedgerTopBarProps {
 
 /**
  * The ledger's top bar. On 账目 and 统计 it holds the book switcher and the
- * gear (and, from md up, the tabs and 记一笔); on 设置 it is a back arrow and
+ * gear (and, from md up, the tabs and 记一笔; below md, the list's total
+ * between them); on 设置 it is a back arrow and
  * the page's name, since the book being viewed has no bearing there.
  */
 export function LedgerTopBar({
@@ -36,6 +39,7 @@ export function LedgerTopBar({
   onLeaveSettings,
 }: LedgerTopBarProps) {
   const inSettings = activeTab === "settings";
+  const headerTotal = useWorkspaceStore((state) => state.headerTotal);
   const openSettings = (event: MouseEvent<HTMLAnchorElement>) => {
     // A plain click moves within the app. A modified one opens the link as
     // usual, and so does a click before the page is ready: a plain link still
@@ -73,8 +77,15 @@ export function LedgerTopBar({
           </>
         )}
       </div>
+      {/* A phone's bar has no tabs, so the list's total sits in the middle;
+          the two sides share the rest equally, which keeps it centred. */}
+      {!inSettings && headerTotal != null ? (
+        <div className="flex shrink-0 justify-center whitespace-nowrap md:hidden">
+          <AmountText variant="summary">{headerTotal}</AmountText>
+        </div>
+      ) : null}
       <div className="hidden h-full flex-1 justify-center md:flex">{navigation}</div>
-      <div className="flex shrink-0 items-center gap-1 md:gap-2">
+      <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:gap-2">
         <Button
           type="button"
           size="sm"
