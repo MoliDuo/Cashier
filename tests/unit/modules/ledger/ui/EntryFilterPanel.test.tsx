@@ -15,7 +15,7 @@ async function openPanel() {
 }
 
 describe("EntryFilterPanel", () => {
-  it("counts only non-default periods as active filters", () => {
+  it("counts narrowing filters but not the period", () => {
     const view = render(
       <EntryFilterPanel
         filters={{}}
@@ -30,6 +30,18 @@ describe("EntryFilterPanel", () => {
     view.rerender(
       <EntryFilterPanel
         filters={{}}
+        periodParams={{ period: "all" }}
+        onFiltersChange={vi.fn()}
+        showCategory={false}
+        showCurrency={false}
+      />
+    );
+    // A period is a view, not a narrowing, so it lights no badge.
+    expect(screen.getByRole("button", { name: "筛选" })).toBeInTheDocument();
+
+    view.rerender(
+      <EntryFilterPanel
+        filters={{ search: "咖啡" }}
         periodParams={{ period: "all" }}
         onFiltersChange={vi.fn()}
         showCategory={false}

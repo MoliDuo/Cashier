@@ -66,8 +66,9 @@ export function useEntryFilterDraft({
   const activePreset = resolveActivePreset(periodParams);
   const displayPreset = tempPeriod ?? activePreset;
 
+  // The period is printed beside the total, so it is not counted as a filter:
+  // looking at 全部 or 上个月 is a view, not a narrowing.
   const activeFilterCount = [
-    activePreset !== "thisMonth",
     filters.search != null && filters.search.trim() !== "",
     showStatus && (filters.statuses?.length ?? 0) > 0,
     showCategory && filters.categoryId != null && filters.categoryId !== "",
