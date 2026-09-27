@@ -1,16 +1,16 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 
 export interface CategoryAssignmentContextValue {
   /** The ledger's most recent assignment run. */
-  job: CategoryReclassificationJob | null;
+  job: CategoryAssignmentJob | null;
   isActive: boolean;
   isReadError: boolean;
   refresh: () => Promise<unknown>;
   dismiss: () => void;
-  registerSubmittedJob: (job: CategoryReclassificationJob) => void;
+  registerSubmittedJob: (job: CategoryAssignmentJob) => void;
 }
 
 /**

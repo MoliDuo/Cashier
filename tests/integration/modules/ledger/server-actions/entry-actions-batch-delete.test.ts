@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb } from "tests/setup";
-import { ledgers, ledgerEntries, sourceDocumentRevisions } from "@/persistence";
+import { ledgers, ledgerEntries, extractionAttempts } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -43,7 +43,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     await ensureTestLedgerBooks(db, ledgerId);
   });
 
-  it("deletes multiple entries from one document without creating a revision", async () => {
+  it("deletes multiple entries from one document without creating a attempt", async () => {
     const db = getTestDb();
     const doc = await seedDoc(db, ledgerId);
     const entries = await db
@@ -61,10 +61,10 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .returning();
     await activateTestSourceDocumentProjection(db, doc.id);
 
-    const beforeRevisionCount = await db
-      .select({ id: sourceDocumentRevisions.id })
-      .from(sourceDocumentRevisions)
-      .where(eq(sourceDocumentRevisions.sourceDocumentId, doc.id));
+    const beforeAttemptCount = await db
+      .select({ id: extractionAttempts.id })
+      .from(extractionAttempts)
+      .where(eq(extractionAttempts.sourceDocumentId, doc.id));
     const result = await batchDeleteLedgerEntriesAction(
       [doc.id],
       entries.slice(0, 2).map((entry) => entry.id)
@@ -77,11 +77,11 @@ describe("batchDeleteLedgerEntriesAction", () => {
         .sort()
     );
     expect(result.failed).toHaveLength(0);
-    const afterRevisionCount = await db
-      .select({ id: sourceDocumentRevisions.id })
-      .from(sourceDocumentRevisions)
-      .where(eq(sourceDocumentRevisions.sourceDocumentId, doc.id));
-    expect(afterRevisionCount).toHaveLength(beforeRevisionCount.length);
+    const afterAttemptCount = await db
+      .select({ id: extractionAttempts.id })
+      .from(extractionAttempts)
+      .where(eq(extractionAttempts.sourceDocumentId, doc.id));
+    expect(afterAttemptCount).toHaveLength(beforeAttemptCount.length);
 
     const activeEntries = await db.query.ledgerEntries.findMany({
       where: eq(ledgerEntries.sourceDocumentId, doc.id),
@@ -192,12 +192,12 @@ describe("batchDeleteLedgerEntriesAction", () => {
     // A retry is being parsed: it will replace the entries when it completes,
     // so the group's transaction refuses the write as a whole.
     const [attempt] = await db
-      .insert(sourceDocumentRevisions)
-      .values({ ledgerId, sourceDocumentId: doc.id, processingStatus: "processing" })
+      .insert(extractionAttempts)
+      .values({ ledgerId, sourceDocumentId: doc.id, status: "processing" })
       .returning();
     await db
       .update(sourceDocuments)
-      .set({ latestSubmissionRevisionId: attempt!.id })
+      .set({ latestAttemptId: attempt!.id })
       .where(eq(sourceDocuments.id, doc.id));
 
     const result = await batchDeleteLedgerEntriesAction(

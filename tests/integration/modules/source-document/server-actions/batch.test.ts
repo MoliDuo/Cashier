@@ -4,7 +4,7 @@ import { getTestDb } from "tests/setup";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { createOpenAIMock } from "tests/helpers/mocks/openai";
 import { processAllPendingTasks } from "tests/helpers/processing";
-import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
@@ -68,18 +68,18 @@ describe("source document batch actions", () => {
       failed: [{ id: MISSING_ID, code: "NOT_FOUND" }],
     });
     await processAllPendingTasks();
-    const revisions = await db
+    const attempts = await db
       .select()
-      .from(sourceDocumentRevisions)
-      .where(eq(sourceDocumentRevisions.sourceDocumentId, document))
-      .orderBy(asc(sourceDocumentRevisions.createdAt));
-    expect(revisions).toHaveLength(2);
-    expect(revisions[1]).toMatchObject({ processingStatus: "completed" });
+      .from(extractionAttempts)
+      .where(eq(extractionAttempts.sourceDocumentId, document))
+      .orderBy(asc(extractionAttempts.submittedAt));
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toMatchObject({ status: "completed" });
     await expect(
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, document) })
     ).resolves.toMatchObject({
       inputText: "午餐 25元",
-      latestSubmissionRevisionId: revisions[1]!.id,
+      latestAttemptId: attempts[1]!.id,
     });
     await expect(
       db.select().from(ledgerEntries).where(eq(ledgerEntries.sourceDocumentId, document))

@@ -8,7 +8,7 @@ import { readAuthorizedFile } from "@/server/stored-files/reads";
 async function loadStoredFileForAI(ledgerId: string, storedFileId: string): Promise<string> {
   try {
     const read = await readAuthorizedFile(ledgerId, storedFileId);
-    if (read == null) throw new ValidationError("Stored image is not available for this revision");
+    if (read == null) throw new ValidationError("Stored image is not available for this attempt");
     await validateStoredImageBytes(Buffer.from(read.body), read.file.metadata.contentType);
     return `data:${read.file.metadata.contentType};base64,${Buffer.from(read.body).toString("base64")}`;
   } catch (error) {

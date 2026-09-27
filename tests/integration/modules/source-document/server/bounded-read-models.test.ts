@@ -1,4 +1,4 @@
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { ledgerEntries, sourceDocuments, storedFiles } from "@/persistence";
@@ -224,7 +224,7 @@ describe("bounded target read models", () => {
       .returning({ id: storedFiles.id });
 
     const capture = await captureSqlStatements(async () =>
-      createPendingRevision({
+      createPendingAttempt({
         ledgerId,
         input: {
           text: null,
@@ -288,8 +288,8 @@ describe("bounded target read models", () => {
       sensitiveUrl,
       storageKey,
       localPath,
-      "sourceDocumentRevisionId",
-      "revisionNumber",
+      "sourceDocumentAttemptId",
+      "attemptNumber",
     ]) {
       expect(serialized).not.toContain(forbidden);
     }
@@ -312,7 +312,7 @@ describe("bounded target read models", () => {
     expect(JSON.stringify(detail)).not.toContain(localPath);
   });
 
-  it("paginates a large ledger history without leaking source evidence or internal revisions", async () => {
+  it("paginates a large ledger history without leaking source evidence or internal attempts", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const historySize = 31;
@@ -355,10 +355,10 @@ describe("bounded target read models", () => {
       sensitiveUrl,
       storageKey,
       localPath,
-      "sourceDocumentRevisionId",
-      "activeRevisionId",
-      "latestSubmissionRevisionId",
-      "revisionNumber",
+      "sourceDocumentAttemptId",
+      "activeAttemptId",
+      "latestAttemptId",
+      "attemptNumber",
     ]) {
       expect(serialized).not.toContain(forbidden);
     }

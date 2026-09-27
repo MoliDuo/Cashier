@@ -79,7 +79,7 @@ describe("LedgerEntriesActions", () => {
   });
 
   it("shows a classification run on the category button that started it", () => {
-    renderActions({ isReclassifying: true });
+    renderActions({ isAssigningCategories: true });
 
     expect(screen.getByRole("button", { name: /设置分类|set category/i })).toHaveAttribute(
       "aria-busy",

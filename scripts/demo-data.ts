@@ -20,7 +20,7 @@ import {
   seedSourceDocument,
   seedUser,
   type SeedDatabase,
-  type SeedRevision,
+  type SeedAttempt,
 } from "./lib/seed";
 
 interface FixtureEntry {
@@ -34,20 +34,20 @@ interface FixtureEntry {
 
 interface FixtureDocument {
   id: string;
-  revisionId: string;
+  attemptId: string;
   title: string | null;
   dayOffset: number;
   inputText: string;
   book: string;
-  status: SeedRevision["processingStatus"];
-  failureKind?: NonNullable<SeedRevision["failureKind"]>;
+  status: SeedAttempt["status"];
+  failureKind?: NonNullable<SeedAttempt["failureKind"]>;
   failureCode?: string;
   failureMessage?: string;
   image?: { fileId: string; filename: string; asset: string };
   entries: FixtureEntry[];
   dateSuggestionId?: string;
   dateSuggestionEntryId?: string;
-  retainedResult?: { revisionId: string; title: string | null; entries: FixtureEntry[] };
+  retainedResult?: { attemptId: string; title: string | null; entries: FixtureEntry[] };
 }
 
 export interface FixtureCredential {
@@ -403,22 +403,20 @@ export async function insertFixture(
     const documentDate = isoDateWithOffset(asOf, document.dayOffset);
     const createdAt = new Date(`${documentDate}T12:00:00.000Z`);
     const image = document.image == null ? undefined : imagesByFileId.get(document.image.fileId);
-    const revisions: SeedRevision[] = [
+    const attempts: SeedAttempt[] = [
       ...(document.retainedResult == null
         ? []
         : [
             {
-              id: document.retainedResult.revisionId,
-              title: document.retainedResult.title,
-              inputDocumentDate: documentDate,
-              processingStatus: "completed" as const,
+              id: document.retainedResult.attemptId,
+              requestedDate: documentDate,
+              status: "completed" as const,
             },
           ]),
       {
-        id: document.revisionId,
-        title: document.title,
-        inputDocumentDate: documentDate,
-        processingStatus: document.status,
+        id: document.attemptId,
+        requestedDate: documentDate,
+        status: document.status,
         failureKind: document.failureKind ?? null,
         failureCode: document.failureCode ?? null,
         failureMessage: document.failureMessage ?? null,
@@ -430,11 +428,12 @@ export async function insertFixture(
       id: document.id,
       ledgerId,
       bookId: requireBookId(bookIds, document.book),
-      title: document.title,
+      // A failed retry keeps the title of the result it left in place.
+      title: document.title ?? document.retainedResult?.title ?? null,
       inputText: document.inputText,
       documentDate,
       dateOrganizationSuggestion: dateSuggestion(document, documentDate, asOf),
-      revisions,
+      attempts,
       files:
         image == null
           ? []

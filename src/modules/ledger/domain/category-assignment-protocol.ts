@@ -3,7 +3,7 @@ import { AppError } from "@/lib/errors";
 import type { AIMessageContentPart } from "@/lib/tasks/types";
 
 /**
- * The wire protocol between the ledger and the model for a reclassification
+ * The wire protocol between the ledger and the model for a category assignment
  * run. Deliberately index-based, mirroring the parser's `category_index`
  * protocol: models copy small integers far more reliably than UUIDs.
  *
@@ -12,13 +12,13 @@ import type { AIMessageContentPart } from "@/lib/tasks/types";
  * directive would be noise.
  */
 
-export interface ReclassificationCandidate {
+export interface CategoryAssignmentCandidate {
   id: string;
   name: string;
   description: string | null;
 }
 
-export interface ReclassificationSubject {
+export interface CategoryAssignmentSubject {
   ledgerEntryId: string;
   itemName: string;
   description: string | null;
@@ -30,25 +30,25 @@ export interface ReclassificationSubject {
 }
 
 /**
- * One source document and the entries projected from its active revision.
+ * One source document and the entries projected from its active attempt.
  *
- * Reclassification is sliced by document rather than by entry because the
- * evidence hangs off the revision: a receipt's N line items share one set of
+ * CategoryAssignment is sliced by document rather than by entry because the
+ * evidence hangs off the attempt: a receipt's N line items share one set of
  * images, so grouping sends each picture exactly once. The `subjects` order is
  * the index base the model answers in, and `entry_index` is scoped to this one
  * document — a run with one document per entry degrades to one call per entry.
  */
-export interface ReclassificationDocumentGroup {
+export interface CategoryAssignmentDocumentGroup {
   sourceDocumentId: string;
   title: string | null;
   documentDate: string | null;
   /** The text the user typed when submitting the document. */
   inputText: string | null;
   storedFileIds: readonly string[];
-  subjects: readonly ReclassificationSubject[];
+  subjects: readonly CategoryAssignmentSubject[];
 }
 
-export const reclassificationResponseSchema = z.object({
+export const categoryAssignmentResponseSchema = z.object({
   decisions: z.array(
     z.object({
       entry_index: z.number().int().min(1),
@@ -57,15 +57,15 @@ export const reclassificationResponseSchema = z.object({
   ),
 });
 
-export type ReclassificationResponse = z.infer<typeof reclassificationResponseSchema>;
+export type CategoryAssignmentResponse = z.infer<typeof categoryAssignmentResponseSchema>;
 
-export interface ResolvedReclassification {
+export interface ResolvedCategoryAssignment {
   decisions: { ledgerEntryId: string; categoryId: string }[];
   /** Entries the model placed in the category they already had. */
   confirmedCount: number;
 }
 
-function candidateLine(candidate: ReclassificationCandidate, index: number): string {
+function candidateLine(candidate: CategoryAssignmentCandidate, index: number): string {
   const description =
     candidate.description != null && candidate.description !== ""
       ? ` — ${candidate.description}`
@@ -73,7 +73,7 @@ function candidateLine(candidate: ReclassificationCandidate, index: number): str
   return `${index + 1}. ${candidate.name}${description}`;
 }
 
-function subjectLine(subject: ReclassificationSubject, index: number): string {
+function subjectLine(subject: CategoryAssignmentSubject, index: number): string {
   const fields = [
     `item_name: ${subject.itemName}`,
     `amount: ${subject.amount}${subject.currency == null ? "" : ` ${subject.currency}`}`,
@@ -86,8 +86,8 @@ function subjectLine(subject: ReclassificationSubject, index: number): string {
 }
 
 /** The system prompt: the candidate list and the rules for picking one. */
-export function buildReclassificationPrompt(input: {
-  candidates: readonly ReclassificationCandidate[];
+export function buildCategoryAssignmentPrompt(input: {
+  candidates: readonly CategoryAssignmentCandidate[];
   customPrompt?: string;
 }): string {
   const candidateSection = input.candidates.map(candidateLine).join("\n");
@@ -124,7 +124,7 @@ Return a single JSON object:
 ${customSection}`;
 }
 
-function documentHeaderLines(group: ReclassificationDocumentGroup): string[] {
+function documentHeaderLines(group: CategoryAssignmentDocumentGroup): string[] {
   const lines: string[] = [];
   if (group.title != null && group.title !== "") lines.push(`document_title: ${group.title}`);
   if (group.documentDate != null) lines.push(`document_date: ${group.documentDate}`);
@@ -143,8 +143,8 @@ function documentHeaderLines(group: ReclassificationDocumentGroup): string[] {
  * same image once per entry. `dataUrl` is passed through untouched — the
  * caller has already validated and encoded it.
  */
-export function buildReclassificationDocumentMessage(input: {
-  group: ReclassificationDocumentGroup;
+export function buildCategoryAssignmentDocumentMessage(input: {
+  group: CategoryAssignmentDocumentGroup;
   images?: readonly { dataUrl: string }[];
 }): AIMessageContentPart[] {
   const images = input.images ?? [];
@@ -169,15 +169,15 @@ export function buildReclassificationDocumentMessage(input: {
  * indexes. Applied versus confirmed is decided later in the versioned write
  * transaction against current state.
  */
-export function resolveReclassificationDecisions(input: {
-  subjects: readonly ReclassificationSubject[];
-  candidates: readonly ReclassificationCandidate[];
-  response: ReclassificationResponse;
-}): ResolvedReclassification {
+export function resolveCategoryAssignmentDecisions(input: {
+  subjects: readonly CategoryAssignmentSubject[];
+  candidates: readonly CategoryAssignmentCandidate[];
+  response: CategoryAssignmentResponse;
+}): ResolvedCategoryAssignment {
   if (input.response.decisions.length !== input.subjects.length) {
     throw new AppError("AI response did not cover every entry", "ai_schema_invalid");
   }
-  const decisions: ResolvedReclassification["decisions"] = [];
+  const decisions: ResolvedCategoryAssignment["decisions"] = [];
   const claimed = new Set<number>();
 
   for (const decision of input.response.decisions) {

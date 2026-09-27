@@ -2,9 +2,9 @@ import "server-only";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  categoryReclassificationJobDocuments,
-  categoryReclassificationJobEntries,
-  categoryReclassificationJobs,
+  categoryAssignmentDocuments,
+  categoryAssignmentEntries,
+  categoryAssignmentJobs,
   entryCategories,
   ledgerEntries,
   sourceDocuments,
@@ -12,7 +12,7 @@ import {
 import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "@/modules/source-document/server/write-guards";
 import { leaseHeldBy } from "@/lib/db/lease";
-import type { CategoryAssignmentLease } from "@/server/category-reclassification/assignments";
+import type { CategoryAssignmentLease } from "@/server/category-assignment/assignments";
 import { ConflictError } from "@/lib/errors";
 
 export interface ApplyCategoryAssignmentsInput {
@@ -46,15 +46,15 @@ export async function applyCategoryAssignments(
       .for("update")
       .then((rows) => rows[0]);
     const job = await tx
-      .select({ id: categoryReclassificationJobs.id })
-      .from(categoryReclassificationJobs)
+      .select({ id: categoryAssignmentJobs.id })
+      .from(categoryAssignmentJobs)
       .where(
         and(
-          eq(categoryReclassificationJobs.ledgerId, ledgerId),
-          eq(categoryReclassificationJobs.id, jobId),
+          eq(categoryAssignmentJobs.ledgerId, ledgerId),
+          eq(categoryAssignmentJobs.id, jobId),
           leaseHeldBy(
-            categoryReclassificationJobs.claimToken,
-            categoryReclassificationJobs.claimExpiresAt,
+            categoryAssignmentJobs.claimToken,
+            categoryAssignmentJobs.claimExpiresAt,
             claimToken
           )
         )
@@ -66,13 +66,13 @@ export async function applyCategoryAssignments(
     // no outcome left to record.
     if (document == null) return { status: "skipped" };
     const work = await tx
-      .select({ status: categoryReclassificationJobDocuments.status })
-      .from(categoryReclassificationJobDocuments)
+      .select({ status: categoryAssignmentDocuments.status })
+      .from(categoryAssignmentDocuments)
       .where(
         and(
-          eq(categoryReclassificationJobDocuments.ledgerId, ledgerId),
-          eq(categoryReclassificationJobDocuments.jobId, jobId),
-          eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId)
+          eq(categoryAssignmentDocuments.ledgerId, ledgerId),
+          eq(categoryAssignmentDocuments.jobId, jobId),
+          eq(categoryAssignmentDocuments.sourceDocumentId, input.sourceDocumentId)
         )
       )
       .then((rows) => rows[0]);
@@ -80,23 +80,23 @@ export async function applyCategoryAssignments(
 
     const finishWithoutWrite = async (status: "conflict" | "skipped", errorCode: string) => {
       await tx
-        .update(categoryReclassificationJobEntries)
+        .update(categoryAssignmentEntries)
         .set({ outcome: status, errorCode, updatedAt: now })
         .where(
           and(
-            eq(categoryReclassificationJobEntries.ledgerId, ledgerId),
-            eq(categoryReclassificationJobEntries.jobId, jobId),
-            eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId),
-            isNull(categoryReclassificationJobEntries.outcome)
+            eq(categoryAssignmentEntries.ledgerId, ledgerId),
+            eq(categoryAssignmentEntries.jobId, jobId),
+            eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId),
+            isNull(categoryAssignmentEntries.outcome)
           )
         );
       await tx
-        .update(categoryReclassificationJobDocuments)
+        .update(categoryAssignmentDocuments)
         .set({ status, errorCode, updatedAt: now })
         .where(
           and(
-            eq(categoryReclassificationJobDocuments.jobId, jobId),
-            eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId)
+            eq(categoryAssignmentDocuments.jobId, jobId),
+            eq(categoryAssignmentDocuments.sourceDocumentId, input.sourceDocumentId)
           )
         );
       return { status } as const;
@@ -113,26 +113,26 @@ export async function applyCategoryAssignments(
 
     const selected = await tx
       .select({
-        work: categoryReclassificationJobEntries,
+        work: categoryAssignmentEntries,
         currentCategoryId: ledgerEntries.categoryId,
         sourceDocumentId: ledgerEntries.sourceDocumentId,
       })
-      .from(categoryReclassificationJobEntries)
+      .from(categoryAssignmentEntries)
       .leftJoin(
         ledgerEntries,
         and(
           eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.id, categoryReclassificationJobEntries.ledgerEntryId)
+          eq(ledgerEntries.id, categoryAssignmentEntries.ledgerEntryId)
         )
       )
       .where(
         and(
-          eq(categoryReclassificationJobEntries.ledgerId, ledgerId),
-          eq(categoryReclassificationJobEntries.jobId, jobId),
-          eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId)
+          eq(categoryAssignmentEntries.ledgerId, ledgerId),
+          eq(categoryAssignmentEntries.jobId, jobId),
+          eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId)
         )
       )
-      .orderBy(categoryReclassificationJobEntries.selectionOrder);
+      .orderBy(categoryAssignmentEntries.selectionOrder);
     // A reparse replaces the entries and a split moves them to another
     // document; either way the selection no longer describes this one. An
     // entry that is gone joins as null and so fails the document check.
@@ -186,7 +186,7 @@ export async function applyCategoryAssignments(
       else if (outcome === "confirmed") confirmedCount += 1;
       else conflictCount += 1;
       await tx
-        .update(categoryReclassificationJobEntries)
+        .update(categoryAssignmentEntries)
         .set({
           outcome,
           errorCode: outcome === "conflict" ? "entry_changed" : null,
@@ -194,18 +194,18 @@ export async function applyCategoryAssignments(
         })
         .where(
           and(
-            eq(categoryReclassificationJobEntries.jobId, jobId),
-            eq(categoryReclassificationJobEntries.ledgerEntryId, entry.work.ledgerEntryId)
+            eq(categoryAssignmentEntries.jobId, jobId),
+            eq(categoryAssignmentEntries.ledgerEntryId, entry.work.ledgerEntryId)
           )
         );
     }
     await tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({ status: "succeeded", errorCode: null, updatedAt: now })
       .where(
         and(
-          eq(categoryReclassificationJobDocuments.jobId, jobId),
-          eq(categoryReclassificationJobDocuments.sourceDocumentId, input.sourceDocumentId)
+          eq(categoryAssignmentDocuments.jobId, jobId),
+          eq(categoryAssignmentDocuments.sourceDocumentId, input.sourceDocumentId)
         )
       );
     return { status: "applied", appliedCount, confirmedCount, conflictCount };

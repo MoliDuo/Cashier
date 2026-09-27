@@ -46,6 +46,10 @@ so CI does not gate the deploy. The local gate is the gate.
 - Follow expand/contract: the previous release keeps serving while a migration runs. Stop writing a
   column, then stop reading it, then drop it, each in its own release. Names the model no longer
   mentions but the database still has go in `retiredNames` in the schema contract test.
+- Vercel builds first and migrates after (`npm run build && npm run db:migrate`), and every pending
+  migration runs in one transaction, so a failed build or migration leaves the database untouched.
+- Name constraints and indexes `uq_<table>_…`, `idx_<table>_…`, `fk_<table>_<target>` and
+  `ck_<table>_…`; primary keys stay `<table>_pkey`. The schema contract test enforces it.
 
 ## Commits
 

@@ -6,7 +6,7 @@ import {
   books,
   entryCategories as categories,
   ledgerEntries,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   ledgers,
 } from "@/persistence";
@@ -163,10 +163,10 @@ describe("SourceDocument Actions", () => {
     expect(savedDoc).not.toHaveProperty("text");
     expect(savedDoc).not.toHaveProperty("imageUrls");
     expect(savedDoc?.inputText).toBe("午餐25元");
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, result.sourceDocumentId!),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.sourceDocumentId, result.sourceDocumentId!),
     });
-    expect(revision?.processingStatus).toBe("processing");
+    expect(attempt?.status).toBe("processing");
 
     // Process tasks to ensure cleanup
     await processAllPendingTasks();
@@ -186,14 +186,14 @@ describe("SourceDocument Actions", () => {
         where: eq(sourceDocuments.id, first.sourceDocumentId),
       })
     ).toHaveLength(1);
-    const revisions = await db.query.sourceDocumentRevisions.findMany({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, first.sourceDocumentId),
+    const attempts = await db.query.extractionAttempts.findMany({
+      where: eq(extractionAttempts.sourceDocumentId, first.sourceDocumentId),
     });
-    expect(revisions).toHaveLength(1);
-    // The one revision is the document's single queued processing attempt.
+    expect(attempts).toHaveLength(1);
+    // The one attempt is the document's single queued processing attempt.
     await expect(
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, first.sourceDocumentId) })
-    ).resolves.toMatchObject({ latestSubmissionRevisionId: revisions[0]!.id });
+    ).resolves.toMatchObject({ latestAttemptId: attempts[0]!.id });
   });
 
   it("should return error when no input provided", async () => {
@@ -251,11 +251,11 @@ describe("SourceDocument Actions", () => {
       const document = await getTestDb().query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, result.sourceDocumentId),
       });
-      const revision = await getTestDb().query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.sourceDocumentId, result.sourceDocumentId),
+      const attempt = await getTestDb().query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.sourceDocumentId, result.sourceDocumentId),
       });
       await processAllPendingTasks();
-      return { bookId: document?.bookId, date: revision?.inputDocumentDate };
+      return { bookId: document?.bookId, date: attempt?.requestedDate };
     }
 
     async function zonedBook(timeZone: string | null): Promise<string> {

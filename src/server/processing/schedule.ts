@@ -10,7 +10,7 @@ import { logIdentifier } from "@/lib/security/log-identifier";
  *
  * Every `after()` that executes a processing job goes through this helper
  * so a failure at the request boundary is always logged with the full job
- * identity (sourceDocumentId, revisionId) plus the optional requestId. The
+ * identity (sourceDocumentId, attemptId) plus the optional requestId. The
  * claim CAS on the attempt makes duplicate scheduling harmless: the second
  * execution simply finds the attempt already claimed or finished.
  */
@@ -21,7 +21,7 @@ export function scheduleProcessingAfter(job: ProcessingJobContract, requestId?: 
         {
           error,
           sourceDocumentSubject: logIdentifier("source-document", job.sourceDocumentId),
-          revisionSubject: logIdentifier("revision", job.revisionId),
+          attemptSubject: logIdentifier("attempt", job.attemptId),
           requestedAt: job.requestedAt,
           requestId,
         },

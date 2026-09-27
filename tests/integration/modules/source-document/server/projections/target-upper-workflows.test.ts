@@ -1,14 +1,9 @@
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
-import {
-  entryCategories,
-  ledgerEntries,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { entryCategories, ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { getTestDb } from "tests/setup";
@@ -17,7 +12,7 @@ import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 import {
-  activateRevision,
+  activateAttempt,
   createManualDocument,
 } from "@/modules/source-document/server/projections/writes";
 import {
@@ -26,7 +21,7 @@ import {
 } from "@/modules/source-document/server/entry-commands";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 
 const findVisibleEntry = async (id: string, ledgerId: string) => {
   const page = await listLedgerEntryPage({
@@ -64,22 +59,22 @@ describe("target upper workflows", () => {
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
     });
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       input: { text: "pending", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    const failedSubmission = await createPendingRevision({
+    const failedSubmission = await createPendingAttempt({
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(failedSubmission.revision.id),
+      lease: await claimAttemptForTest(failedSubmission.attempt.id),
       ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
-      revisionId: failedSubmission.revision.id,
+      attemptId: failedSubmission.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
@@ -119,17 +114,17 @@ describe("target upper workflows", () => {
     const activeEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     });
-    const failedPending = await createPendingRevision({
+    const failedPending = await createPendingAttempt({
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       input: { text: "failed replacement", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(failedPending.revision.id),
+      lease: await claimAttemptForTest(failedPending.attempt.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
-      revisionId: failedPending.revision.id,
+      attemptId: failedPending.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
@@ -304,7 +299,7 @@ describe("target upper workflows", () => {
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocuments)).toHaveLength(0);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(0);
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
 
     const created = await createManualDocument({
@@ -315,7 +310,7 @@ describe("target upper workflows", () => {
     const beforeDocument = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    const beforeRevisionCount = await db.select().from(sourceDocumentRevisions);
+    const beforeAttemptCount = await db.select().from(extractionAttempts);
     const beforeEntryCount = await db.select().from(ledgerEntries);
 
     await expect(listStreamPage(otherLedgerId, { limit: 20 })).resolves.toMatchObject({
@@ -339,13 +334,11 @@ describe("target upper workflows", () => {
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
     expect(afterDocument?.version).toBe(beforeDocument?.version);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(
-      beforeRevisionCount.length
-    );
+    expect(await db.select().from(extractionAttempts)).toHaveLength(beforeAttemptCount.length);
     expect(await db.select().from(ledgerEntries)).toHaveLength(beforeEntryCount.length);
   });
 
-  it("edits a manual entry in place while keeping its id and creating no revision", async () => {
+  it("edits a manual entry in place while keeping its id and creating no attempt", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await createManualDocument({
@@ -368,8 +361,8 @@ describe("target upper workflows", () => {
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    const revisions = await db.query.sourceDocumentRevisions.findMany({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
+    const attempts = await db.query.extractionAttempts.findMany({
+      where: eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId),
     });
     const active = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, original!.id),
@@ -380,7 +373,7 @@ describe("target upper workflows", () => {
 
     expect(updated).toMatchObject({ ledgerEntryIds: [original!.id] });
     expect(document?.version).toBe(initialVersion + 1);
-    expect(revisions).toHaveLength(0);
+    expect(attempts).toHaveLength(0);
     expect(active).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(retained).toHaveLength(1);
   });
@@ -398,16 +391,16 @@ describe("target upper workflows", () => {
       .insert(entryCategories)
       .values({ ledgerId: otherLedgerId, name: "Other" })
       .returning();
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       input: { text: "Lunch", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    await activateRevision({
-      lease: await claimRevisionForTest(pending.revision.id),
+    await activateAttempt({
+      lease: await claimAttemptForTest(pending.attempt.id),
       ledgerId,
       sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
+      attemptId: pending.attempt.id,
       entries: [entry],
     });
     const original = await db.query.ledgerEntries.findFirst({
@@ -423,7 +416,7 @@ describe("target upper workflows", () => {
     const afterUpdate = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, pending.document.id),
     });
-    const revisionCount = (await db.select().from(sourceDocumentRevisions)).length;
+    const attemptCount = (await db.select().from(extractionAttempts)).length;
     const stream = await listLedgerEntries(ledgerId, { limit: 20 });
     const detail = await findVisibleEntry(original!.id, ledgerId);
     const stats = await calculateLedgerStats(ledgerId, {});
@@ -443,7 +436,7 @@ describe("target upper workflows", () => {
       where: eq(sourceDocuments.id, pending.document.id),
     });
     expect(afterRollback?.version).toBe(afterUpdate?.version);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(revisionCount);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(attemptCount);
     await expect(
       batchUpdateLedgerEntries({
         ledgerId: otherLedgerId,

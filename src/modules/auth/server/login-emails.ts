@@ -12,9 +12,9 @@ import { DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
 import { sendEmail } from "@/lib/email-delivery";
 import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../domain/otp";
 import {
-  createEmailChangeChallenge,
-  discardEmailChangeChallenge,
-  verifyEmailChangeChallenge,
+  createLoginEmailChallenge,
+  discardLoginEmailChallenge,
+  verifyLoginEmailChallenge,
 } from "./account-security";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
@@ -35,12 +35,12 @@ export async function sendLoginEmailCode(input: {
     throw new ValidationError("Email delivery is not configured");
 
   const otp = generateOTP();
-  const tokenHash = hashOTP(otp);
+  const codeHash = hashOTP(otp);
   const expiresAt = getOTPExpiration();
-  const challenge = await createEmailChangeChallenge({
+  const challenge = await createLoginEmailChallenge({
     userId,
     newEmail,
-    tokenHash,
+    codeHash,
     expiresAt,
     now: new Date(),
     minimumIntervalMs: 60_000,
@@ -50,7 +50,7 @@ export async function sendLoginEmailCode(input: {
   // refusal: which one it is, is not something the caller needs to know.
   if (challenge === "duplicate") throw new ConflictError("Email is already in use");
   if (challenge === "locked")
-    throw new AppError("Verification is locked", "EMAIL_CHANGE_LOCKED", 429);
+    throw new AppError("Verification is locked", "LOGIN_EMAIL_LOCKED", 429);
   if (challenge === "rate_limited") {
     throw new RateLimitError("Please wait before requesting another code", 60);
   }
@@ -70,23 +70,23 @@ export async function sendLoginEmailCode(input: {
     if (delivery !== "sent") throw new Error("Email provider did not accept the message");
   } catch {
     try {
-      await discardEmailChangeChallenge({ userId, newEmail, tokenHash });
+      await discardLoginEmailChallenge({ userId, newEmail, codeHash });
     } catch (cleanupError) {
       logger.error(
         { error: cleanupError, subject: logIdentifier("user", userId) },
         "Failed to discard login email challenge after delivery failure"
       );
     }
-    throw new AppError("Email delivery failed", "EMAIL_CHANGE_DELIVERY_FAILED", 502);
+    throw new AppError("Email delivery failed", "LOGIN_EMAIL_DELIVERY_FAILED", 502);
   }
   return { newEmail, expiresAt: expiresAt.getTime() };
 }
 
 export async function verifyLoginEmailCode(userId: string, newEmail: string, otp: string) {
   if (!isValidOTPFormat(otp)) {
-    throw new AppError("Invalid verification code", "EMAIL_CHANGE_INVALID_CODE", 400);
+    throw new AppError("Invalid verification code", "LOGIN_EMAIL_INVALID_CODE", 400);
   }
-  const outcome = await verifyEmailChangeChallenge({
+  const outcome = await verifyLoginEmailChallenge({
     userId,
     newEmail,
     otp,
@@ -94,20 +94,20 @@ export async function verifyLoginEmailCode(userId: string, newEmail: string, otp
   });
   if (outcome.status === "verified") return { email: outcome.email };
   if (outcome.status === "not_found") {
-    throw new AppError("Verification challenge not found", "EMAIL_CHANGE_INVALID_CODE", 400);
+    throw new AppError("Verification challenge not found", "LOGIN_EMAIL_INVALID_CODE", 400);
   }
   if (outcome.status === "locked") {
-    throw new AppError("Verification is locked", "EMAIL_CHANGE_LOCKED", 429);
+    throw new AppError("Verification is locked", "LOGIN_EMAIL_LOCKED", 429);
   }
   if (outcome.status === "expired") {
-    throw new AppError("Verification code expired", "EMAIL_CHANGE_EXPIRED_CODE", 400);
+    throw new AppError("Verification code expired", "LOGIN_EMAIL_EXPIRED_CODE", 400);
   }
   if (outcome.status === "duplicate") throw new ConflictError("Email is already in use");
   if (outcome.status !== "incorrect") throw new ValidationError("Verification failed");
   if (outcome.locked) {
-    throw new AppError("Too many incorrect attempts", "EMAIL_CHANGE_LOCKED", 429);
+    throw new AppError("Too many incorrect attempts", "LOGIN_EMAIL_LOCKED", 429);
   }
-  throw new AppError("Incorrect verification code", "EMAIL_CHANGE_INVALID_CODE", 400, {
+  throw new AppError("Incorrect verification code", "LOGIN_EMAIL_INVALID_CODE", 400, {
     attemptsRemaining: outcome.attemptsRemaining,
   });
 }

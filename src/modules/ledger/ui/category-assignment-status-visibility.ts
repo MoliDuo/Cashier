@@ -1,18 +1,18 @@
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 
-const ACTIVE_CATEGORY_ASSIGNMENT_STATUSES = new Set(["preparing", "pending", "running"]);
+const ACTIVE_CATEGORY_ASSIGNMENT_STATUSES = new Set(["pending", "running"]);
 
 /**
  * The single test for "this run is still moving". The status band, the polling
  * schedule, and the settings warning all ask the same question, so they read
  * the same answer instead of each carrying their own status list.
  */
-export function isCategoryAssignmentJobActive(job: CategoryReclassificationJob | null): boolean {
+export function isCategoryAssignmentJobActive(job: CategoryAssignmentJob | null): boolean {
   return job != null && ACTIVE_CATEGORY_ASSIGNMENT_STATUSES.has(job.status);
 }
 
 export interface CategoryAssignmentStatusVisibilityInput {
-  job: CategoryReclassificationJob | null;
+  job: CategoryAssignmentJob | null;
   isReadError: boolean;
   /** This page watched the run while it was active, so its result is news rather than history. */
   wasActive: boolean;

@@ -9,7 +9,7 @@ import { BACKGROUND_MAX_ATTEMPTS, CATEGORY_RUN_BUDGET_MS } from "@/config/tuning
 import type {
   CategoryAssignmentDocumentWork,
   ClaimedCategoryAssignmentJob,
-} from "@/server/category-reclassification/assignments";
+} from "@/server/category-assignment/assignments";
 import {
   claimCategoryAssignmentJob,
   failCategoryAssignmentDocument,
@@ -21,9 +21,9 @@ import {
   renewCategoryAssignmentLease,
   rescheduleCategoryAssignmentDocument,
   yieldCategoryAssignmentDocument,
-} from "@/server/category-reclassification/assignments";
-import { loadReclassificationDocumentGroups } from "@/server/category-reclassification/document-groups";
-import { decideEntryCategories } from "@/server/category-reclassification/reclassifier";
+} from "@/server/category-assignment/assignments";
+import { loadCategoryAssignmentDocumentGroups } from "@/server/category-assignment/document-groups";
+import { decideEntryCategories } from "@/server/category-assignment/decide-entry-categories";
 
 const REQUEST_CHUNK_SIZE = 50;
 
@@ -74,7 +74,7 @@ async function processDocument(
         jobId: job.jobId,
         sourceDocumentId,
       });
-      const groups = await loadReclassificationDocumentGroups({
+      const groups = await loadCategoryAssignmentDocumentGroups({
         ledgerId: job.ledgerId,
         ledgerEntryIds: entryIds,
       });
@@ -217,14 +217,14 @@ async function runClaimed(scope: { jobId?: string; ledgerId?: string }): Promise
   return ran;
 }
 
-export async function runCategoryReclassificationJob(jobId: string): Promise<boolean> {
+export async function runCategoryAssignmentJob(jobId: string): Promise<boolean> {
   return runClaimed({ jobId });
 }
 
-export async function recoverLedgerCategoryReclassifications(ledgerId: string): Promise<void> {
+export async function recoverLedgerCategoryAssignments(ledgerId: string): Promise<void> {
   await runClaimed({ ledgerId });
 }
 
-export async function drainDueCategoryReclassifications(): Promise<void> {
+export async function drainDueCategoryAssignments(): Promise<void> {
   await runClaimed({});
 }

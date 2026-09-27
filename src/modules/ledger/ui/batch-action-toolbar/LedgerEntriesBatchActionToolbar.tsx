@@ -31,7 +31,7 @@ export interface LedgerEntriesBatchActionToolbarProps {
   onDelete?: () => void;
   isDeleting?: boolean;
   /** A classification run for this ledger is in flight. */
-  isReclassifying?: boolean;
+  isAssigningCategories?: boolean;
   /**
    * Passing this switches the category dialog from "the row you tap is applied"
    * to the confirm-based one, where several picks are a question for the model.
@@ -89,7 +89,7 @@ export function LedgerEntriesBatchActionToolbar({
   onSplit,
   onDelete,
   isDeleting = false,
-  isReclassifying = false,
+  isAssigningCategories = false,
   onConfirmCategory,
   categoryDialogOpen: categoryDialogOpenProp = false,
   onCategoryDialogOpenChange,
@@ -220,7 +220,7 @@ export function LedgerEntriesBatchActionToolbar({
             isChangingCurrency={isChangingCurrency}
             isRetrying={isRetrying}
             isDeleting={isDeleting}
-            isReclassifying={isReclassifying}
+            isAssigningCategories={isAssigningCategories}
             {...(onChangeCategory != null
               ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
               : {})}

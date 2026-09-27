@@ -10,7 +10,7 @@ import {
 import { getTestDb } from "tests/setup";
 import { createCategoryData, createLedgerData } from "tests/helpers/factories";
 import { createTestSourceDocument, ensureTestLedgerBooks } from "tests/helpers/schema-setup";
-import { loadReclassificationDocumentGroups } from "@/server/category-reclassification/document-groups";
+import { loadCategoryAssignmentDocumentGroups } from "@/server/category-assignment/document-groups";
 
 /** A document entry used to verify evidence grouping, at its own `position`. */
 async function seedProjectedEntry(input: {
@@ -86,7 +86,7 @@ describe("loadDocumentGroups", () => {
       itemName: "可乐",
     });
 
-    const groups = await loadReclassificationDocumentGroups({
+    const groups = await loadCategoryAssignmentDocumentGroups({
       ledgerId: ledger.id,
       // A dead id and an out-of-order pair: the grouping must survive both.
       ledgerEntryIds: [second, crypto.randomUUID(), first],
@@ -124,7 +124,7 @@ describe("loadDocumentGroups", () => {
       itemName: "打车",
     });
 
-    const groups = await loadReclassificationDocumentGroups({
+    const groups = await loadCategoryAssignmentDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [entryId],
     });
@@ -155,7 +155,7 @@ describe("loadDocumentGroups", () => {
       documentId: note.documentId,
     });
 
-    const groups = await loadReclassificationDocumentGroups({
+    const groups = await loadCategoryAssignmentDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [noteEntry, receiptEntry],
     });
@@ -193,7 +193,7 @@ describe("loadDocumentGroups", () => {
     });
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, deleted.documentId));
 
-    const groups = await loadReclassificationDocumentGroups({
+    const groups = await loadCategoryAssignmentDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [liveEntryId, replacedEntryId, deletedDocumentEntryId],
     });
@@ -214,7 +214,7 @@ describe("loadDocumentGroups", () => {
       documentId,
     });
 
-    const groups = await loadReclassificationDocumentGroups({
+    const groups = await loadCategoryAssignmentDocumentGroups({
       ledgerId: ledger.id,
       ledgerEntryIds: [entryId],
     });

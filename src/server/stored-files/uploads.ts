@@ -15,7 +15,7 @@ import { processImage } from "@/lib/storage/image-processing";
 import {
   DIRECT_UPLOAD_FINALIZE_BUFFER_MS,
   MAX_FILES,
-  MAX_NORMALIZED_BYTES_PER_REVISION,
+  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
   MAX_ORIGINAL_BYTES_PER_FILE,
   UPLOAD_PLAN_EXPIRY_MS,
 } from "@/lib/storage/upload-policy";
@@ -109,7 +109,7 @@ export async function planDirectUpload(
   if (files.some((file) => file.checksum == null || !/^[a-f\d]{64}$/.test(file.checksum))) {
     throw new ValidationError("Direct uploads require a lowercase SHA-256 checksum");
   }
-  if (files.reduce((total, file) => total + file.byteSize, 0) > MAX_NORMALIZED_BYTES_PER_REVISION) {
+  if (files.reduce((total, file) => total + file.byteSize, 0) > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
     throw new ValidationError("Direct upload batch exceeds the configured total byte limit");
   }
 
@@ -216,9 +216,9 @@ export async function finalizeDirectUpload(input: {
       .filter((row) => row.finalizedAt != null)
       .reduce((sum, row) => sum + row.byteSize, 0);
     const totalBytes = normalized.reduce((sum, file) => sum + file.bytes.length, readyBytes);
-    if (totalBytes > MAX_NORMALIZED_BYTES_PER_REVISION) {
+    if (totalBytes > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
       throw new ValidationError(
-        `Total stored bytes ${totalBytes} exceeds revision limit of ${MAX_NORMALIZED_BYTES_PER_REVISION}`
+        `Total stored bytes ${totalBytes} exceeds attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
       );
     }
 
@@ -275,9 +275,9 @@ export async function storeProcessedImages(
   }));
   validateRequests(files);
   const totalBytes = files.reduce((sum, file) => sum + file.byteSize, 0);
-  if (totalBytes > MAX_NORMALIZED_BYTES_PER_REVISION) {
+  if (totalBytes > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
     throw new ValidationError(
-      `Total stored bytes ${totalBytes} exceeds revision limit of ${MAX_NORMALIZED_BYTES_PER_REVISION}`
+      `Total stored bytes ${totalBytes} exceeds attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
     );
   }
   await reservePendingFiles(ledgerId, files, new Date());

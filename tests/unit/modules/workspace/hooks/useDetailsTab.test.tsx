@@ -15,7 +15,7 @@ const {
   batchUpdateLedgerEntryDatesActionMock,
   previewBatchLedgerEntryDateActionMock,
   startCategoryAssignmentActionMock,
-  reclassificationJobMock,
+  categoryAssignmentJobMock,
   fetchLedgerEntriesMock,
   fetchLedgerSummaryMock,
   toastErrorMock,
@@ -26,7 +26,7 @@ const {
   batchUpdateLedgerEntryDatesActionMock: vi.fn(),
   previewBatchLedgerEntryDateActionMock: vi.fn(),
   startCategoryAssignmentActionMock: vi.fn(),
-  reclassificationJobMock: vi.fn(),
+  categoryAssignmentJobMock: vi.fn(),
   fetchLedgerEntriesMock: vi.fn(),
   fetchLedgerSummaryMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -44,12 +44,12 @@ vi.mock("@/modules/ledger/server-actions/entries", () => ({
   previewBatchLedgerEntryDateAction: previewBatchLedgerEntryDateActionMock,
 }));
 
-vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
+vi.mock("@/modules/ledger/server-actions/category-assignment", () => ({
   startCategoryAssignmentAction: startCategoryAssignmentActionMock,
 }));
 
 vi.mock("@/modules/ledger/queries", () => ({
-  fetchCategoryReclassificationJob: reclassificationJobMock,
+  fetchCategoryAssignmentJob: categoryAssignmentJobMock,
   fetchLedgerEntries: fetchLedgerEntriesMock,
   fetchLedgerSummary: fetchLedgerSummaryMock,
 }));
@@ -178,7 +178,7 @@ const succeededJob = () => ({
 describe("useDetailsTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    reclassificationJobMock.mockResolvedValue(null);
+    categoryAssignmentJobMock.mockResolvedValue(null);
     fetchLedgerSummaryMock.mockResolvedValue({
       unconvertedCount: 0,
       convertedTotal: { total: "0", currency: "CNY" },
@@ -602,7 +602,7 @@ describe("useDetailsTab", () => {
 
   it("keeps following a run after its dialog is closed", async () => {
     const running = assignmentJob("running");
-    reclassificationJobMock.mockResolvedValueOnce(null).mockImplementation(async () => ({
+    categoryAssignmentJobMock.mockResolvedValueOnce(null).mockImplementation(async () => ({
       ...running,
     }));
     const { result, queryClient } = await renderDetailsTab([entry("entry-1")]);
@@ -621,11 +621,11 @@ describe("useDetailsTab", () => {
 
     // The dialog is gone but the run is not: the page still holds it, and still
     // reports its outcome once it ends.
-    const runQueryKey = ["ledger", "category-reclassification"];
+    const runQueryKey = ["ledger", "category-assignment"];
     await waitFor(() =>
       expect(queryClient.getQueryData(runQueryKey)).toMatchObject({ id: "job-1" })
     );
-    reclassificationJobMock.mockImplementation(async () => succeededJob());
+    categoryAssignmentJobMock.mockImplementation(async () => succeededJob());
     await act(async () => {
       await queryClient.refetchQueries({ queryKey: runQueryKey });
     });

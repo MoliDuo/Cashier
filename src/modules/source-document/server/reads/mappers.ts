@@ -20,7 +20,7 @@ export interface SourceDocumentRow {
   bookId?: string | null;
   documentDate: string | null;
   effectiveDate: string;
-  latestSubmissionRevisionId: string | null;
+  latestAttemptId: string | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -29,7 +29,6 @@ export interface SourceDocumentRow {
 }
 
 export interface SourceDocumentListHydrationRow {
-  revisionTitle: string | null;
   processingStatus: SourceDocumentProcessingStatus | null;
   failureKind: "invalid_input" | "processing_error" | null;
   failureMessage: string | null;
@@ -115,15 +114,9 @@ function mapLedgerEntryAggregateDto(
   };
 }
 
-export function effectiveDocumentTitle(
-  documentTitle: string | null | undefined,
-  revisionTitle: string | null | undefined
-): string | null {
-  for (const value of [documentTitle, revisionTitle]) {
-    const normalized = value?.trim();
-    if (normalized != null && normalized !== "") return normalized;
-  }
-  return null;
+/** The title as shown: trimmed, and null when there is nothing to show. */
+function displayTitle(title: string | null): string | null {
+  return title?.trim() || null;
 }
 
 export function mapListItem(
@@ -131,15 +124,15 @@ export function mapListItem(
   hydration: SourceDocumentListHydrationRow
 ): SourceDocumentListItemDto {
   const capabilities = deriveSourceDocumentCapabilities({
-    latestSubmissionStatus: hydration.processingStatus,
-    hasSubmissionInput: row.latestSubmissionRevisionId != null,
+    latestAttemptStatus: hydration.processingStatus,
+    hasSubmissionInput: row.latestAttemptId != null,
   });
   const item: SourceDocumentListItemDto = {
     id: row.id,
     bookId: row.bookId ?? null,
     version: row.version,
     ledgerId: row.ledgerId,
-    title: effectiveDocumentTitle(row.title, hydration.revisionTitle),
+    title: displayTitle(row.title),
     text: null,
     processingStatus: hydration.processingStatus,
     failureKind: hydration.failureKind,
@@ -172,15 +165,15 @@ export function mapSourceDocumentDetail(
           total: accountingTotal(hydration.ledgerEntries, hydration.mainCurrency),
         };
   const capabilities = deriveSourceDocumentCapabilities({
-    latestSubmissionStatus: hydration.processingStatus,
-    hasSubmissionInput: row.latestSubmissionRevisionId != null,
+    latestAttemptStatus: hydration.processingStatus,
+    hasSubmissionInput: row.latestAttemptId != null,
   });
   return {
     id: row.id,
     bookId: row.bookId ?? null,
     version: row.version,
     ledgerId: row.ledgerId,
-    title: effectiveDocumentTitle(row.title, hydration.revisionTitle),
+    title: displayTitle(row.title),
     text: hydration.inputText,
     files: hydration.files.map(mapStoredFileDto),
     ledgerEntries: hydration.ledgerEntries.map(mapLedgerEntryAggregateDto),

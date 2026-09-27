@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { batchActionsCopy } from "@/copy/workspace";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentProvider } from "@/modules/ledger/ui/CategoryAssignmentProvider";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 
@@ -14,20 +14,20 @@ const { getJob, toastSuccess, toastError } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/modules/ledger/queries", () => ({
-  fetchCategoryReclassificationJob: getJob,
+  fetchCategoryAssignmentJob: getJob,
   fetchCategoryAssignmentResults: vi.fn(async () => ({ items: [], nextCursor: null })),
 }));
 vi.mock("@/lib/mutations/ledger-invalidation", () => ({
   invalidateLedgerQueries: vi.fn(async () => undefined),
 }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
-vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
+vi.mock("@/modules/ledger/server-actions/category-assignment", () => ({
   cancelCategoryAssignmentAction: vi.fn(),
   retryCategoryAssignmentFailuresAction: vi.fn(),
   retryCategoryAssignmentLatestAction: vi.fn(),
 }));
 
-function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {
+function job(overrides: Partial<CategoryAssignmentJob> = {}): CategoryAssignmentJob {
   return {
     id: "job-1",
 
@@ -47,7 +47,6 @@ function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryRecl
     retryingDocumentCount: 0,
     nextRetryAt: null,
     candidateCategories: [],
-    errorCode: null,
     createdAt: "2026-09-14T00:00:00.000Z",
     updatedAt: "2026-09-14T00:00:00.000Z",
     completedAt: null,
@@ -72,7 +71,7 @@ const succeededJob = () =>
 const DONE_9_OF_10 = batchActionsCopy.aiCategoryDone({ applied: 9, confirmed: 1, issues: 0 });
 
 /** Asks the page for a run, the way the batch toolbar does after a submit. */
-function SubmitProbe({ run }: { run: CategoryReclassificationJob }) {
+function SubmitProbe({ run }: { run: CategoryAssignmentJob }) {
   const { registerSubmittedJob, job: current } = useCategoryAssignment();
   return (
     <>
@@ -100,7 +99,7 @@ function setup() {
 async function poll(queryClient: QueryClient) {
   await act(async () => {
     await queryClient.refetchQueries({
-      queryKey: ["ledger", "category-reclassification"],
+      queryKey: ["ledger", "category-assignment"],
     });
   });
 }

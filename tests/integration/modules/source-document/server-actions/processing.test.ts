@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
-import { ledgers, sourceDocumentRevisions } from "@/persistence";
+import { ledgers, extractionAttempts } from "@/persistence";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/server-actions/processing";
 
@@ -23,10 +23,10 @@ describe("cancelSourceDocumentProcessingAction", () => {
       processingStatus: "cancelled",
     });
     await expect(
-      db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.sourceDocumentId, documentId),
+      db.query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.sourceDocumentId, documentId),
       })
-    ).resolves.toMatchObject({ processingStatus: "cancelled" });
+    ).resolves.toMatchObject({ status: "cancelled" });
   });
 
   it("validates the document identity and propagates a missing document", async () => {

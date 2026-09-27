@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { saveSourceDocumentChanges } from "@/modules/source-document/server/updates";
@@ -33,8 +33,8 @@ describe("current-runtime target adapters", () => {
     });
     expect(originalEntry).toBeDefined();
     expect(
-      await db.query.sourceDocumentRevisions.findMany({
-        where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
+      await db.query.extractionAttempts.findMany({
+        where: eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId),
       })
     ).toEqual([]);
 

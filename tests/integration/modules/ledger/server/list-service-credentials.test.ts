@@ -53,7 +53,7 @@ describe("listServiceCredentials", () => {
         tokenPrefix: "sk_delet",
         tokenSuffix: "eted",
         createdAt: new Date("2026-03-02T00:00:00.000Z"),
-        deletedAt: new Date("2026-03-06T00:00:00.000Z"),
+        revokedAt: new Date("2026-03-06T00:00:00.000Z"),
         bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
       },
       {

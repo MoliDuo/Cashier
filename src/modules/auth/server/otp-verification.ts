@@ -2,7 +2,11 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { getLockoutExpiration, getMaxAttempts } from "../domain/otp";
 import { verificationChallenges } from "../domain/verification-challenge";
-import { consumeOtpToken, recordOtpFailure, type OtpToken } from "./otp-tokens";
+import {
+  consumeSignInChallenge,
+  recordOtpFailure,
+  type SignInChallengeRecord,
+} from "./sign-in-challenges";
 
 export interface VerificationResult {
   success: boolean;
@@ -14,7 +18,7 @@ export interface VerificationResult {
 export async function verifyOTPWithPolicy(
   email: string,
   otp: string,
-  record: OtpToken
+  record: SignInChallengeRecord
 ): Promise<VerificationResult> {
   const check = verificationChallenges.check(record, otp);
   if (!check.ok && check.reason === "locked") {
@@ -25,7 +29,7 @@ export async function verifyOTPWithPolicy(
     const maxAttempts = getMaxAttempts();
     const failure = await recordOtpFailure({
       email: email.toLowerCase(),
-      tokenHash: record.tokenHash,
+      codeHash: record.codeHash,
       maxAttempts,
       lockedUntil: getLockoutExpiration(),
     });
@@ -44,9 +48,9 @@ export async function verifyOTPWithPolicy(
       attemptsRemaining: maxAttempts - failure.attempts,
     };
   }
-  const consumed = await consumeOtpToken({
+  const consumed = await consumeSignInChallenge({
     email: email.toLowerCase(),
-    tokenHash: record.tokenHash,
+    codeHash: record.codeHash,
     now: new Date(),
     maxAttempts: getMaxAttempts(),
   });

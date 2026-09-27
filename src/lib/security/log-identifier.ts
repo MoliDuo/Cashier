@@ -17,7 +17,7 @@ export type LogIdentifierKind =
   | "user"
   | "ledger"
   | "source-document"
-  | "revision"
+  | "attempt"
   | "stored-file"
   | "processing-job";
 

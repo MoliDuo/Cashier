@@ -185,8 +185,9 @@ npm run account:enroll -- --email you@example.com
 
 `vercel.json` 写明了三件事（JSON 写不了注释，理由记在这里）：
 
-- **`buildCommand` 是 `npm run db:migrate && npm run build`。** 迁移在 advisory lock 保护下执行，失败就让整次
-  构建失败，不会部署出 schema 对不上的版本。写在仓库里而不是控制台，重建项目或 fork 之后也不会丢掉迁移这一步。
+- **`buildCommand` 是 `npm run build && npm run db:migrate`。** 先构建后迁移：构建失败时数据库不动；迁移在
+  advisory lock 下、在一个事务里执行，失败就整体回滚并让这次部署失败，不会部署出 schema 对不上的版本。旧版本
+  只在迁移执行的那几秒里面对新 schema。写在仓库里而不是控制台，重建项目或 fork 之后也不会丢掉迁移这一步。
 - **`ignoreCommand` 跳过 `main` 以外的构建**，因为不需要预览环境，而 Dependabot 的 PR 会触发没人看的构建。
   判断用 `VERCEL_GIT_COMMIT_REF`，并且**取不到分支名时照常构建**：写成"不是 main 就跳过"的话，变量读不到时
   连生产也会被跳过。那行 `echo` 把实际取值打进构建日志，方便排查。
@@ -210,8 +211,8 @@ npm run account:enroll -- --email you@example.com
 3. 记录当前部署的 Git 提交号。
 4. 阅读目标版本的提交记录和迁移变化。
 
-迁移在新版本构建之前执行，而旧版本在新构建上线之前（以及构建失败时）继续对外服务，所以每个迁移都兼容
-正在运行的旧版本。迁移链已经压缩成 `0000_baseline.sql`，等于 0057 之前所有迁移执行完后的 schema；还没升到
+迁移在新版本构建成功之后、上线之前执行，旧版本在此之前（以及构建或迁移失败时）继续对外服务，所以迁移默认
+兼容正在运行的旧版本；例外见 `docs/architecture.md` 的决定记录。迁移链已经压缩成 `0000_baseline.sql`，等于 0057 之前所有迁移执行完后的 schema；还没升到
 0057 的数据库，`npm run db:migrate` 会拒绝执行，并提示先部署 `pre-baseline` 这个 tag。
 
 完整备份包括：PostgreSQL 数据库、存储桶里的对象、`AUTH_SECRET` 等内部密钥（放在专用密钥管理系统里），

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import {
   isCategoryAssignmentJobActive,
   shouldShowCategoryAssignmentStatus,
 } from "@/modules/ledger/ui/category-assignment-status-visibility";
 
-function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {
+function job(overrides: Partial<CategoryAssignmentJob> = {}): CategoryAssignmentJob {
   return {
     id: "job-1",
 
@@ -25,7 +25,6 @@ function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryRecl
     retryingDocumentCount: 0,
     nextRetryAt: null,
     candidateCategories: [],
-    errorCode: null,
     createdAt: "2026-09-14T00:00:00.000Z",
     updatedAt: "2026-09-14T00:01:00.000Z",
     completedAt: "2026-09-14T00:01:00.000Z",
@@ -37,7 +36,6 @@ function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryRecl
 
 describe("isCategoryAssignmentJobActive", () => {
   it("counts every in-flight status and nothing else", () => {
-    expect(isCategoryAssignmentJobActive(job({ status: "preparing" }))).toBe(true);
     expect(isCategoryAssignmentJobActive(job({ status: "pending" }))).toBe(true);
     expect(isCategoryAssignmentJobActive(job({ status: "running" }))).toBe(true);
     expect(isCategoryAssignmentJobActive(job({ status: "succeeded" }))).toBe(false);

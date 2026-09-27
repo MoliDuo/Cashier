@@ -14,12 +14,12 @@ export async function closeProcessingLeaseInTransaction(
   lease: ProcessingLeaseContract
 ): Promise<boolean> {
   const closed = await tx.execute(sql`
-    UPDATE source_document_revisions revision
+    UPDATE extraction_attempts attempt
     SET claim_token = NULL, claim_expires_at = NULL
-    WHERE revision.id = ${lease.revisionId}
-      AND ${leaseHeldBy(sql`revision.claim_token`, sql`revision.claim_expires_at`, lease.claimToken)}
-      AND revision.processing_status = 'processing'
-    RETURNING revision.id
+    WHERE attempt.id = ${lease.attemptId}
+      AND ${leaseHeldBy(sql`attempt.claim_token`, sql`attempt.claim_expires_at`, lease.claimToken)}
+      AND attempt.status = 'processing'
+    RETURNING attempt.id
   `);
   return closed.rows.length === 1;
 }

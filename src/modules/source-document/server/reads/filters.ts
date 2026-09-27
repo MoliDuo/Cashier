@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { escapedLikeContains } from "@/lib/db/like-pattern";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/contracts";
 import { normalize as decimalNormalize } from "@/lib/money/decimal";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { convertedAmountSql } from "@/modules/currency/server/conversion-sql";
 
 // Amount filters and totals convert in the document's ledger currency on the
@@ -33,10 +33,10 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
   if (input.statuses != null && input.statuses.length > 0) {
     conditions.push(
       sql`EXISTS (
-        SELECT 1 FROM ${sourceDocumentRevisions}
-        WHERE ${sourceDocumentRevisions.id} = ${sourceDocuments.latestSubmissionRevisionId}
-          AND ${sourceDocumentRevisions.ledgerId} = ${input.ledgerId}
-          AND ${inArray(sourceDocumentRevisions.processingStatus, input.statuses)}
+        SELECT 1 FROM ${extractionAttempts}
+        WHERE ${extractionAttempts.id} = ${sourceDocuments.latestAttemptId}
+          AND ${extractionAttempts.ledgerId} = ${input.ledgerId}
+          AND ${inArray(extractionAttempts.status, input.statuses)}
       )`
     );
   }

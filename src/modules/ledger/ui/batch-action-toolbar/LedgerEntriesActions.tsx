@@ -12,7 +12,7 @@ interface LedgerEntriesActionsProps {
   isRetrying?: boolean;
   isDeleting?: boolean;
   /** An AI classification run for this ledger is in flight. */
-  isReclassifying?: boolean;
+  isAssigningCategories?: boolean;
   /** Opens the dialog that decides the category: one pick sets it, several ask
    * the model. The choice itself belongs to the band, which owns the list. */
   onOpenCategory?: () => void;
@@ -43,7 +43,7 @@ export function LedgerEntriesActions({
   isChangingCurrency = false,
   isRetrying = false,
   isDeleting = false,
-  isReclassifying = false,
+  isAssigningCategories = false,
   onOpenCategory,
   onOpenCurrency,
   onChangeDate,
@@ -58,7 +58,7 @@ export function LedgerEntriesActions({
           variant="outline"
           icon={Tag}
           disabled={disabled}
-          loading={isChangingCategory || isReclassifying}
+          loading={isChangingCategory || isAssigningCategories}
           shortLabel={batchActionsCopy.manualCategoryShort}
           onClick={onOpenCategory}
         >

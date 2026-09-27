@@ -4,13 +4,13 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { AppError } from "@/lib/errors";
 import { extractJson } from "@/lib/tasks/json-utils";
 import {
-  buildReclassificationDocumentMessage,
-  buildReclassificationPrompt,
-  reclassificationResponseSchema,
-  resolveReclassificationDecisions,
-  type ReclassificationCandidate,
-  type ReclassificationDocumentGroup,
-} from "@/modules/ledger/domain/reclassification-protocol";
+  buildCategoryAssignmentDocumentMessage,
+  buildCategoryAssignmentPrompt,
+  categoryAssignmentResponseSchema,
+  resolveCategoryAssignmentDecisions,
+  type CategoryAssignmentCandidate,
+  type CategoryAssignmentDocumentGroup,
+} from "@/modules/ledger/domain/category-assignment-protocol";
 import { AI_CATEGORY_REQUEST_TIMEOUT_MS } from "@/config/tuning";
 
 /** One document can be a full receipt: up to MAX_BATCH_SIZE rows, one decision each. */
@@ -23,8 +23,8 @@ const TEMPERATURE = 0.1;
  * against candidates, not an entry edit: the caller persists the decisions.
  */
 export async function decideEntryCategories(input: {
-  candidates: readonly ReclassificationCandidate[];
-  group: ReclassificationDocumentGroup;
+  candidates: readonly CategoryAssignmentCandidate[];
+  group: CategoryAssignmentDocumentGroup;
   /** Encoded evidence for this document; empty for a text-only submission. */
   images: readonly { dataUrl: string }[];
   customPrompt?: string;
@@ -33,7 +33,7 @@ export async function decideEntryCategories(input: {
   decisions: readonly { ledgerEntryId: string; categoryId: string }[];
   confirmedCount: number;
 }> {
-  const prompt = buildReclassificationPrompt({
+  const prompt = buildCategoryAssignmentPrompt({
     candidates: input.candidates,
     ...(input.customPrompt == null ? {} : { customPrompt: input.customPrompt }),
   });
@@ -42,7 +42,7 @@ export async function decideEntryCategories(input: {
     [
       {
         role: "user",
-        content: buildReclassificationDocumentMessage({
+        content: buildCategoryAssignmentDocumentMessage({
           group: input.group,
           images: input.images,
         }),
@@ -56,20 +56,17 @@ export async function decideEntryCategories(input: {
   );
 
   try {
-    const response = reclassificationResponseSchema.parse(JSON.parse(extractJson(result.content)));
-    return resolveReclassificationDecisions({
+    const response = categoryAssignmentResponseSchema.parse(
+      JSON.parse(extractJson(result.content))
+    );
+    return resolveCategoryAssignmentDecisions({
       subjects: input.group.subjects,
       candidates: input.candidates,
       response,
     });
   } catch (error) {
-    throw new AppError(
-      "AI category reclassification response was invalid",
-      "ai_schema_invalid",
-      502,
-      {
-        cause: error instanceof Error ? error.name : "UnknownError",
-      }
-    );
+    throw new AppError("AI category assignment response was invalid", "ai_schema_invalid", 502, {
+      cause: error instanceof Error ? error.name : "UnknownError",
+    });
   }
 }

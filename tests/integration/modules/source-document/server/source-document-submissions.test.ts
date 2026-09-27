@@ -1,5 +1,5 @@
 import { archiveBook } from "@/modules/ledger/server/books";
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import type { ObjectStore } from "@/lib/storage";
 import { and, eq, isNull } from "drizzle-orm";
 import { Pool, type PoolClient } from "pg";
@@ -12,7 +12,7 @@ import {
   ledgers,
   serviceCredentials,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
@@ -21,14 +21,14 @@ import { MAX_FILES } from "@/lib/storage/upload-policy";
 import { createTestBooks, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import {
-  activateRevision,
+  activateAttempt,
   createManualDocument,
 } from "@/modules/source-document/server/projections/writes";
 import {
   submitSourceDocument,
   submitSourceDocumentIdempotently,
 } from "@/modules/source-document/server/submissions";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 
 const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
 vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
@@ -41,14 +41,9 @@ async function finalizedFile(ledgerId: string, body: Buffer) {
 /** Attempts waiting in the queue: still processing and not held by a worker. */
 async function queuedAttemptIds(db: ReturnType<typeof getTestDb>): Promise<string[]> {
   const rows = await db
-    .select({ id: sourceDocumentRevisions.id })
-    .from(sourceDocumentRevisions)
-    .where(
-      and(
-        eq(sourceDocumentRevisions.processingStatus, "processing"),
-        isNull(sourceDocumentRevisions.claimToken)
-      )
-    );
+    .select({ id: extractionAttempts.id })
+    .from(extractionAttempts)
+    .where(and(eq(extractionAttempts.status, "processing"), isNull(extractionAttempts.claimToken)));
   return rows.map((row) => row.id);
 }
 
@@ -63,7 +58,7 @@ const entry = {
 } as const;
 
 describe("target source-document submissions", () => {
-  it("creates one document, revision, and job for concurrent user submissions", async () => {
+  it("creates one document, attempt, and job for concurrent user submissions", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const bookId = await testBookId(db, ledgerId);
@@ -91,12 +86,12 @@ describe("target source-document submissions", () => {
     }
     expect(replayed.existing).toEqual({
       sourceDocumentId: created.submission.document.id,
-      revisionId: created.submission.revision.id,
+      attemptId: created.submission.attempt.id,
       processingStatus: "processing",
     });
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await queuedAttemptIds(db)).toEqual([created.submission.revision.id]);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([created.submission.attempt.id]);
   });
 
   it("refuses a key reused with other content and scopes keys to their sender", async () => {
@@ -151,7 +146,7 @@ describe("target source-document submissions", () => {
     );
   });
 
-  it("atomically creates text, image, and mixed pending revisions with durable intents", async () => {
+  it("atomically creates text, image, and mixed pending attempts with durable intents", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
@@ -174,16 +169,16 @@ describe("target source-document submissions", () => {
     });
 
     expect(new Set([text.document.id, imageOnly.document.id, mixed.document.id]).size).toBe(3);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(3);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(3);
     expect(await queuedAttemptIds(db)).toHaveLength(3);
     expect(await db.select().from(sourceDocumentFiles)).toHaveLength(2);
     expect(mixed.job).toMatchObject({
       sourceDocumentId: mixed.document.id,
-      revisionId: mixed.revision.id,
+      attemptId: mixed.attempt.id,
     });
   });
 
-  it("rolls back the document, revision, and job when evidence is not finalized", async () => {
+  it("rolls back the document, attempt, and job when evidence is not finalized", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const [unfinalized] = await db
@@ -204,7 +199,7 @@ describe("target source-document submissions", () => {
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocuments)).toHaveLength(0);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(0);
   });
 
   it.each([
@@ -223,10 +218,10 @@ describe("target source-document submissions", () => {
 
       await expect(
         recordProcessingFailure({
-          lease: await claimRevisionForTest(pending.revision.id),
+          lease: await claimAttemptForTest(pending.attempt.id),
           ledgerId,
           sourceDocumentId: pending.document.id,
-          revisionId: pending.revision.id,
+          attemptId: pending.attempt.id,
           failureKind,
           failureMessage: failureKind === "invalid_input" ? "unreadable" : "processing failed",
           ...(failureCode == null ? {} : { failureCode }),
@@ -238,7 +233,7 @@ describe("target source-document submissions", () => {
       });
       expect(document).toMatchObject({
         inputText: "first parse evidence",
-        latestSubmissionRevisionId: pending.revision.id,
+        latestAttemptId: pending.attempt.id,
       });
       expect(
         (await getTargetSourceDocument(ledgerId, pending.document.id))?.supportedActions
@@ -266,12 +261,12 @@ describe("target source-document submissions", () => {
       inheritInput: false,
       bookId: await testBookId(db, ledgerId),
     });
-    const failedLease = await claimRevisionForTest(failed.revision.id);
+    const failedLease = await claimAttemptForTest(failed.attempt.id);
     await recordProcessingFailure({
       lease: failedLease,
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
-      revisionId: failed.revision.id,
+      attemptId: failed.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
@@ -283,20 +278,20 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(anomalous.revision.id),
+      lease: await claimAttemptForTest(anomalous.attempt.id),
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
-      revisionId: anomalous.revision.id,
+      attemptId: anomalous.attempt.id,
       failureKind: "invalid_input",
       failureMessage: "unreadable",
     });
 
     expect(
-      await activateRevision({
+      await activateAttempt({
         lease: failedLease,
         ledgerId,
         sourceDocumentId: active.sourceDocumentId,
-        revisionId: failed.revision.id,
+        attemptId: failed.attempt.id,
         entries: [{ ...entry, amount: "99.00" }],
       })
     ).toBe(false);
@@ -305,7 +300,7 @@ describe("target source-document submissions", () => {
         lease: failedLease,
         ledgerId,
         sourceDocumentId: active.sourceDocumentId,
-        revisionId: failed.revision.id,
+        attemptId: failed.attempt.id,
         failureKind: "processing_error",
         failureMessage: "processing failed",
       })
@@ -315,7 +310,7 @@ describe("target source-document submissions", () => {
     });
     expect(document).toMatchObject({
       inputText: "anomalous edit retry",
-      latestSubmissionRevisionId: anomalous.revision.id,
+      latestAttemptId: anomalous.attempt.id,
     });
     expect(
       await db.query.ledgerEntries.findFirst({ where: eq(ledgerEntries.id, activeEntry!.id) })
@@ -333,10 +328,10 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(initial.revision.id),
+      lease: await claimAttemptForTest(initial.attempt.id),
       ledgerId,
       sourceDocumentId: initial.document.id,
-      revisionId: initial.revision.id,
+      attemptId: initial.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
@@ -347,8 +342,8 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
 
-    const retryRevision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, retry.revision.id),
+    const retryAttempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, retry.attempt.id),
     });
     const retryDocument = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, retry.document.id),
@@ -359,11 +354,11 @@ describe("target source-document submissions", () => {
     expect(retry.document.id).toBe(initial.document.id);
     expect(retryDocument).toMatchObject({
       inputText: "original",
-      latestSubmissionRevisionId: retry.revision.id,
+      latestAttemptId: retry.attempt.id,
     });
-    expect(retryRevision?.processingStatus).toBe("processing");
+    expect(retryAttempt?.status).toBe("processing");
     expect(retryFiles.map((file) => file.storedFileId)).toEqual([image.id]);
-    expect(await queuedAttemptIds(db)).toEqual([retry.revision.id]);
+    expect(await queuedAttemptIds(db)).toEqual([retry.attempt.id]);
   });
 
   it("rejects inherited evidence retry when the document input exceeds MAX_FILES", async () => {
@@ -377,7 +372,7 @@ describe("target source-document submissions", () => {
       Array.from({ length: MAX_FILES + 1 }, () => finalizedFile(ledgerId, body))
     );
 
-    // Create a revision with MAX_FILES files via the normal path (this succeeds)
+    // Create a attempt with MAX_FILES files via the normal path (this succeeds)
     const initial = await submitSourceDocument({
       ledgerId,
       input: {
@@ -388,10 +383,10 @@ describe("target source-document submissions", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(initial.revision.id),
+      lease: await claimAttemptForTest(initial.attempt.id),
       ledgerId,
       sourceDocumentId: initial.document.id,
-      revisionId: initial.revision.id,
+      attemptId: initial.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
@@ -406,7 +401,7 @@ describe("target source-document submissions", () => {
       position: MAX_FILES,
     });
 
-    // Inherited evidence retry should now reject because createProcessingRevisionInTransaction
+    // Inherited evidence retry should now reject because createProcessingAttemptInTransaction
     // enforces the MAX_FILES limit.
     await expect(
       submitSourceDocument({
@@ -443,10 +438,10 @@ describe("target source-document submissions", () => {
     expect(JSON.stringify(detail)).not.toContain("/api/uploads/");
     expect(JSON.stringify(detail)).not.toContain("storageKey");
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(submitted.revision.id),
+      lease: await claimAttemptForTest(submitted.attempt.id),
       ledgerId,
       sourceDocumentId: submitted.document.id,
-      revisionId: submitted.revision.id,
+      attemptId: submitted.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
@@ -518,7 +513,7 @@ async function waitUntilBlockedOn(pool: Pool, holderXid: string): Promise<void> 
 
 async function expectNoRecordRows(db: ReturnType<typeof getTestDb>): Promise<void> {
   expect(await db.select().from(sourceDocuments)).toHaveLength(0);
-  expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(0);
+  expect(await db.select().from(extractionAttempts)).toHaveLength(0);
 }
 
 /**
@@ -679,8 +674,8 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     });
     expect(retry.document.id).toBe(documentId);
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await queuedAttemptIds(db)).toEqual([retry.revision.id]);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([retry.attempt.id]);
   });
 
   it("replays a completed idempotent submission without a second document", async () => {
@@ -705,7 +700,7 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     if (created.replayed || !replay.replayed) throw new Error("Expected a creation, then a replay");
     expect(replay.existing.sourceDocumentId).toBe(created.submission.document.id);
     expect(await db.select().from(sourceDocuments)).toHaveLength(1);
-    expect(await db.select().from(sourceDocumentRevisions)).toHaveLength(1);
-    expect(await queuedAttemptIds(db)).toEqual([created.submission.revision.id]);
+    expect(await db.select().from(extractionAttempts)).toHaveLength(1);
+    expect(await queuedAttemptIds(db)).toEqual([created.submission.attempt.id]);
   });
 });

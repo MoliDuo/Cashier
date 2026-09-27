@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { extractionAttempts, sourceDocuments } from "@/persistence";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
-import { ledgerScopedRevisionWhere } from "./projections/revision-guards";
+import { ledgerScopedAttemptWhere } from "./projections/attempt-guards";
 import { activeDocumentWhere } from "./projections/shared";
 
 /**
@@ -17,22 +17,22 @@ export async function cancelSourceDocumentProcessing(
   return db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, ledgerId);
     const document = await lockSourceDocumentForUpdate(tx, ledgerId, sourceDocumentId);
-    const revisionId = document.latestSubmissionRevisionId;
-    if (revisionId == null) throw new ConflictError("Source document has no submitted input");
+    const attemptId = document.latestAttemptId;
+    if (attemptId == null) throw new ConflictError("Source document has no submitted input");
 
     const now = new Date();
-    const revision = await tx
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "cancelled", finishedAt: now })
+    const attempt = await tx
+      .update(extractionAttempts)
+      .set({ status: "cancelled", finishedAt: now })
       .where(
         and(
-          ledgerScopedRevisionWhere(ledgerId, sourceDocumentId, revisionId),
-          eq(sourceDocumentRevisions.processingStatus, "processing")
+          ledgerScopedAttemptWhere(ledgerId, sourceDocumentId, attemptId),
+          eq(extractionAttempts.status, "processing")
         )
       )
-      .returning({ id: sourceDocumentRevisions.id })
+      .returning({ id: extractionAttempts.id })
       .then((rows) => rows[0]);
-    if (revision == null) throw new ConflictError("Source document is no longer processing");
+    if (attempt == null) throw new ConflictError("Source document is no longer processing");
 
     const updated = await tx
       .update(sourceDocuments)
@@ -40,7 +40,7 @@ export async function cancelSourceDocumentProcessing(
       .where(
         and(
           activeDocumentWhere(ledgerId, sourceDocumentId),
-          eq(sourceDocuments.latestSubmissionRevisionId, revisionId)
+          eq(sourceDocuments.latestAttemptId, attemptId)
         )
       )
       .returning({ id: sourceDocuments.id })

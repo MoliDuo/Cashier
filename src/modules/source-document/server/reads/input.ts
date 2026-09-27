@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import type { SourceDocumentInputDto } from "@/modules/source-document/contracts";
 import {
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
@@ -19,18 +19,18 @@ export async function getSourceDocumentInput(
       const document = await tx
         .select({
           id: sourceDocuments.id,
-          processingStatus: sourceDocumentRevisions.processingStatus,
-          documentDate: sourceDocumentRevisions.inputDocumentDate,
+          processingStatus: extractionAttempts.status,
+          documentDate: extractionAttempts.requestedDate,
           createdAt: sourceDocuments.createdAt,
           text: sourceDocuments.inputText,
         })
         .from(sourceDocuments)
         .leftJoin(
-          sourceDocumentRevisions,
+          extractionAttempts,
           and(
-            eq(sourceDocumentRevisions.ledgerId, sourceDocuments.ledgerId),
-            eq(sourceDocumentRevisions.sourceDocumentId, sourceDocuments.id),
-            eq(sourceDocumentRevisions.id, sourceDocuments.latestSubmissionRevisionId)
+            eq(extractionAttempts.ledgerId, sourceDocuments.ledgerId),
+            eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
+            eq(extractionAttempts.id, sourceDocuments.latestAttemptId)
           )
         )
         .where(

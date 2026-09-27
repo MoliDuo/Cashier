@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "tests/setup";
-import { otpTokens } from "@/persistence";
+import { signInChallenges } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { ensureTestLedgerBooks } from "tests/helpers/schema-setup";
 
@@ -35,7 +35,7 @@ describe("Auth Actions - sendOTPAction", () => {
     // Clean up
     const db = getTestDb();
     await ensureTestLedgerBooks(db, crypto.randomUUID());
-    await db.delete(otpTokens).where(eq(otpTokens.email, TEST_EMAIL));
+    await db.delete(signInChallenges).where(eq(signInChallenges.email, TEST_EMAIL));
   });
 
   it("should send OTP successfully with valid email", async () => {
@@ -49,11 +49,11 @@ describe("Auth Actions - sendOTPAction", () => {
 
     // Verify OTP was created in database
     const db = getTestDb();
-    const record = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, TEST_EMAIL),
+    const record = await db.query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, TEST_EMAIL),
     });
     expect(record).toBeDefined();
-    expect(record?.tokenHash).toBeDefined();
+    expect(record?.codeHash).toBeDefined();
   });
 
   it("should reject empty email", async () => {
@@ -90,8 +90,8 @@ describe("Auth Actions - sendOTPAction", () => {
     await sendOTPAction(mixedCaseEmail);
 
     const db = getTestDb();
-    const record = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, "test@example.com"),
+    const record = await db.query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, "test@example.com"),
     });
     expect(record).toBeDefined();
   });

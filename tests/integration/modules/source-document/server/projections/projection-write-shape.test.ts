@@ -7,7 +7,7 @@ import {
   ledgerEntries,
   ledgerSyncState,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
@@ -176,8 +176,8 @@ describe("projection write shape", () => {
     expect(
       await db
         .select()
-        .from(sourceDocumentRevisions)
-        .where(eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId))
+        .from(extractionAttempts)
+        .where(eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId))
     ).toHaveLength(0);
     const allEntries = await db
       .select({ id: ledgerEntries.id })
@@ -290,7 +290,7 @@ describe("projection write shape", () => {
     expect(Number(versionAfterReplace)).toBe(Number(versionAfterCreate) + 1);
   });
 
-  it("reuses positions across repeated removals and additions without creating revisions", async () => {
+  it("reuses positions across repeated removals and additions without creating attempts", async () => {
     const db = getTestDb();
     const created = await createManualDocument({
       ledgerId,
@@ -326,8 +326,8 @@ describe("projection write shape", () => {
     // Each entry add and delete changes whole-save content and bumps the version once.
     expect(document).toMatchObject({ version: 7 });
     expect(
-      await db.query.sourceDocumentRevisions.findMany({
-        where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
+      await db.query.extractionAttempts.findMany({
+        where: eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId),
       })
     ).toHaveLength(0);
     const rows = await db.query.ledgerEntries.findMany({

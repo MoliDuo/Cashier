@@ -8,18 +8,18 @@ import {
   sourceDocuments,
 } from "@/persistence";
 import type {
-  ReclassificationDocumentGroup,
-  ReclassificationSubject,
-} from "@/modules/ledger/domain/reclassification-protocol";
+  CategoryAssignmentDocumentGroup,
+  CategoryAssignmentSubject,
+} from "@/modules/ledger/domain/category-assignment-protocol";
 
 /**
  * Entries grouped by the source document their evidence hangs off. Entries
  * whose document is deleted are absent.
  */
-export async function loadReclassificationDocumentGroups(input: {
+export async function loadCategoryAssignmentDocumentGroups(input: {
   ledgerId: string;
   ledgerEntryIds: readonly string[];
-}): Promise<readonly ReclassificationDocumentGroup[]> {
+}): Promise<readonly CategoryAssignmentDocumentGroup[]> {
   if (input.ledgerEntryIds.length === 0) return [];
   const rows = await db
     .select({
@@ -81,7 +81,7 @@ export async function loadReclassificationDocumentGroups(input: {
     documentDate: string | null;
     inputText: string | null;
     files: Map<string, number>;
-    subjects: Map<string, { position: number; subject: ReclassificationSubject }>;
+    subjects: Map<string, { position: number; subject: CategoryAssignmentSubject }>;
   }
 
   const byDocument = new Map<string, GroupAccumulator>();
@@ -124,7 +124,7 @@ export async function loadReclassificationDocumentGroups(input: {
 
   return [...byDocument.values()]
     .sort((left, right) => byString(left.sourceDocumentId, right.sourceDocumentId))
-    .map((group): ReclassificationDocumentGroup => ({
+    .map((group): CategoryAssignmentDocumentGroup => ({
       sourceDocumentId: group.sourceDocumentId,
       title: group.title,
       documentDate: group.documentDate,

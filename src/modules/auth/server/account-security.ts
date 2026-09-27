@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { emailChangeChallenges, loginEmails, users } from "@/persistence";
+import { loginEmailChallenges, loginEmails, users } from "@/persistence";
 import { verificationChallenges } from "@/modules/auth/domain/verification-challenge";
 import { getLockoutExpiration, getMaxAttempts } from "@/modules/auth/domain/otp";
 import { carriedFailures, recordedFailure } from "./challenge-failures";
@@ -12,10 +12,10 @@ import { deleteUserSessions } from "./sessions";
  * this account and one on another account: either way the caller must not be
  * told which, and neither case can be verified into a second row.
  */
-export async function createEmailChangeChallenge(input: {
+export async function createLoginEmailChallenge(input: {
   userId: string;
   newEmail: string;
-  tokenHash: string;
+  codeHash: string;
   expiresAt: Date;
   now: Date;
   minimumIntervalMs: number;
@@ -32,8 +32,8 @@ export async function createEmailChangeChallenge(input: {
       where: eq(loginEmails.email, input.newEmail),
       columns: { id: true },
     });
-    const existing = await tx.query.emailChangeChallenges.findFirst({
-      where: eq(emailChangeChallenges.userId, input.userId),
+    const existing = await tx.query.loginEmailChallenges.findFirst({
+      where: eq(loginEmailChallenges.userId, input.userId),
       columns: { createdAt: true, lockedUntil: true },
     });
     if (duplicate != null) return "duplicate" as const;
@@ -47,21 +47,21 @@ export async function createEmailChangeChallenge(input: {
       return "rate_limited" as const;
     }
     await tx
-      .insert(emailChangeChallenges)
+      .insert(loginEmailChallenges)
       .values({
         userId: input.userId,
-        newEmail: input.newEmail,
-        tokenHash: input.tokenHash,
+        email: input.newEmail,
+        codeHash: input.codeHash,
         expiresAt: input.expiresAt,
         createdAt: input.now,
       })
       .onConflictDoUpdate({
-        target: emailChangeChallenges.userId,
+        target: loginEmailChallenges.userId,
         set: {
-          newEmail: input.newEmail,
-          tokenHash: input.tokenHash,
+          email: input.newEmail,
+          codeHash: input.codeHash,
           expiresAt: input.expiresAt,
-          ...carriedFailures(emailChangeChallenges, input.now),
+          ...carriedFailures(loginEmailChallenges, input.now),
           createdAt: input.now,
         },
       });
@@ -69,23 +69,23 @@ export async function createEmailChangeChallenge(input: {
   });
 }
 
-export async function discardEmailChangeChallenge(input: {
+export async function discardLoginEmailChallenge(input: {
   userId: string;
   newEmail: string;
-  tokenHash: string;
+  codeHash: string;
 }): Promise<void> {
   await db
-    .delete(emailChangeChallenges)
+    .delete(loginEmailChallenges)
     .where(
       and(
-        eq(emailChangeChallenges.userId, input.userId),
-        eq(emailChangeChallenges.newEmail, input.newEmail),
-        eq(emailChangeChallenges.tokenHash, input.tokenHash)
+        eq(loginEmailChallenges.userId, input.userId),
+        eq(loginEmailChallenges.email, input.newEmail),
+        eq(loginEmailChallenges.codeHash, input.codeHash)
       )
     );
 }
 
-export async function verifyEmailChangeChallenge(input: {
+export async function verifyLoginEmailChallenge(input: {
   userId: string;
   newEmail: string;
   otp: string;
@@ -100,11 +100,11 @@ export async function verifyEmailChangeChallenge(input: {
       await tx.execute(sql`select id from users where id = ${input.userId} for update`);
       const [challenge] = await tx
         .select()
-        .from(emailChangeChallenges)
+        .from(loginEmailChallenges)
         .where(
           and(
-            eq(emailChangeChallenges.userId, input.userId),
-            eq(emailChangeChallenges.newEmail, input.newEmail)
+            eq(loginEmailChallenges.userId, input.userId),
+            eq(loginEmailChallenges.email, input.newEmail)
           )
         )
         .for("update");
@@ -115,16 +115,16 @@ export async function verifyEmailChangeChallenge(input: {
       if (!check.ok) {
         const maxAttempts = getMaxAttempts();
         const [failure] = await tx
-          .update(emailChangeChallenges)
+          .update(loginEmailChallenges)
           .set(
-            recordedFailure(emailChangeChallenges, {
+            recordedFailure(loginEmailChallenges, {
               maxAttempts,
               lockedUntil: getLockoutExpiration(),
               now: input.now,
             })
           )
-          .where(eq(emailChangeChallenges.id, challenge.id))
-          .returning({ attempts: emailChangeChallenges.attempts });
+          .where(eq(loginEmailChallenges.id, challenge.id))
+          .returning({ attempts: loginEmailChallenges.attempts });
         const attempts = failure?.attempts ?? maxAttempts;
         return {
           status: "incorrect" as const,
@@ -140,11 +140,11 @@ export async function verifyEmailChangeChallenge(input: {
       await tx.insert(loginEmails).values({
         userId: input.userId,
         email: input.newEmail,
-        emailVerified: input.now,
+        verifiedAt: input.now,
         createdAt: input.now,
         updatedAt: input.now,
       });
-      await tx.delete(emailChangeChallenges).where(eq(emailChangeChallenges.id, challenge.id));
+      await tx.delete(loginEmailChallenges).where(eq(loginEmailChallenges.id, challenge.id));
       return { status: "verified" as const, email: input.newEmail };
     });
   } catch (error) {

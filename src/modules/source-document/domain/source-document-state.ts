@@ -1,6 +1,6 @@
 import {
   supportedSourceDocumentActions,
-  type RevisionProcessingStatus,
+  type AttemptProcessingStatus,
   type SupportedSourceDocumentAction,
 } from "@/modules/source-document/lifecycle";
 
@@ -9,7 +9,7 @@ import {
  * whose first parse failed: its entries belong to the document, not to a parse.
  */
 export function deriveSourceDocumentCapabilities(input: {
-  latestSubmissionStatus: RevisionProcessingStatus | null;
+  latestAttemptStatus: AttemptProcessingStatus | null;
   hasSubmissionInput: boolean;
 }): {
   canEdit: boolean;
@@ -17,7 +17,7 @@ export function deriveSourceDocumentCapabilities(input: {
 } {
   const supportedActions = supportedSourceDocumentActions(input);
   return {
-    canEdit: input.latestSubmissionStatus !== "processing",
+    canEdit: input.latestAttemptStatus !== "processing",
     supportedActions,
   };
 }

@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { books, entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { getTestDb } from "tests/setup";
 import {
   addLedgerEntry,
@@ -34,14 +34,14 @@ import { createManualDocument } from "@/modules/source-document/server/projectio
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
 import {
   claimCategoryAssignmentJob,
   nextCategoryAssignmentDocument,
   releaseCategoryAssignmentJob,
   startCategoryAssignment,
-} from "@/server/category-reclassification/assignments";
+} from "@/server/category-assignment/assignments";
 import { saveEntryCategories } from "@/modules/ledger/server/categories";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 
@@ -321,10 +321,10 @@ describe("source document version — other writes leave it alone", () => {
     expect(await currentVersion(sourceDocumentId)).toBe(1);
     expect(
       await recordProcessingFailure({
-        lease: await claimRevisionForTest(failed.revision.id),
+        lease: await claimAttemptForTest(failed.attempt.id),
         ledgerId,
         sourceDocumentId,
-        revisionId: failed.revision.id,
+        attemptId: failed.attempt.id,
         failureKind: "processing_error",
         failureMessage: "processing failed",
       })

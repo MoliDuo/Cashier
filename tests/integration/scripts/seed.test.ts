@@ -35,10 +35,7 @@ describe("seed", () => {
       bookId: books.get("旅行")!,
       title: "Harbor Coffee",
       documentDate: "2026-03-04",
-      revisions: [
-        { processingStatus: "failed", failureKind: "processing_error" },
-        { processingStatus: "completed" },
-      ],
+      attempts: [{ status: "failed", failureKind: "processing_error" }, { status: "completed" }],
       files: [{ byteSize: 3, originalFilename: "receipt.jpg" }],
       entries: [
         { itemName: "Flat White", amount: "16.00", currency: "USD" },
@@ -60,7 +57,7 @@ describe("seed", () => {
       .select()
       .from(schema.loginEmails)
       .where(eq(schema.loginEmails.userId, userId));
-    expect(email).toMatchObject({ email: "seed@example.com", emailVerified: at });
+    expect(email).toMatchObject({ email: "seed@example.com", verifiedAt: at });
     const [ledger] = await db.select().from(schema.ledgers).where(eq(schema.ledgers.id, ledgerId));
     expect(ledger).toMatchObject({ mainCurrency: "USD", aiLanguage: "zh-CN" });
     expect(
@@ -78,13 +75,13 @@ describe("seed", () => {
       .select()
       .from(schema.sourceDocuments)
       .where(eq(schema.sourceDocuments.id, documentId));
-    const revisions = await db
+    const attempts = await db
       .select()
-      .from(schema.sourceDocumentRevisions)
-      .where(eq(schema.sourceDocumentRevisions.sourceDocumentId, documentId));
-    const latest = revisions.find((revision) => revision.processingStatus === "completed");
-    expect(revisions).toHaveLength(2);
-    expect(document?.latestSubmissionRevisionId).toBe(latest?.id);
+      .from(schema.extractionAttempts)
+      .where(eq(schema.extractionAttempts.sourceDocumentId, documentId));
+    const latest = attempts.find((attempt) => attempt.status === "completed");
+    expect(attempts).toHaveLength(2);
+    expect(document?.latestAttemptId).toBe(latest?.id);
     expect(document?.effectiveDate).toBe("2026-03-04");
 
     const [file] = await db
@@ -145,8 +142,8 @@ describe("seed", () => {
         (SELECT count(*)::int FROM books) AS books,
         (SELECT count(*)::int FROM entry_categories) AS categories,
         (SELECT count(*)::int FROM source_documents) AS documents,
-        (SELECT count(*)::int FROM source_documents WHERE latest_submission_revision_id IS NULL)
-          AS without_revision,
+        (SELECT count(*)::int FROM source_documents WHERE latest_attempt_id IS NULL)
+          AS without_attempt,
         (SELECT count(*)::int FROM ledger_entries) AS entries,
         (SELECT count(*)::int FROM service_credentials) AS credentials
     `);
@@ -155,7 +152,7 @@ describe("seed", () => {
       books: 3,
       categories: 7,
       documents: 28,
-      without_revision: 0,
+      without_attempt: 0,
       entries: 26,
       credentials: 3,
     });

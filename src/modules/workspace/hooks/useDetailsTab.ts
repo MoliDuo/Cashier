@@ -19,7 +19,7 @@ import type { PeriodParams } from "@/lib/period-utils";
 import type {
   ActiveLedgerEntryDto,
   CategoryAssignmentMode,
-  CategoryReclassificationJob,
+  CategoryAssignmentJob,
   EntryCategory,
   Ledger,
 } from "@/modules/ledger/contracts";
@@ -31,7 +31,7 @@ import {
   batchUpdateLedgerEntryDatesAction,
   previewBatchLedgerEntryDateAction,
 } from "@/modules/ledger/server-actions/entries";
-import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/reclassification";
+import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/category-assignment";
 import { resolveBatchCategoryPick } from "@/modules/ledger/ui/batch-action-toolbar";
 import { useCategoryAssignment } from "@/modules/ledger/ui/category-assignment-context";
 import type { LedgerAdvancedFilters } from "../initial-query-state";
@@ -439,7 +439,7 @@ export function useDetailsTab({
   }, []);
 
   const startAiCategory = useLedgerMutation<
-    CategoryReclassificationJob,
+    CategoryAssignmentJob,
     { requestKey: string; mode: CategoryAssignmentMode; ledgerEntryIds: string[] }
   >({
     refreshMode: "background",

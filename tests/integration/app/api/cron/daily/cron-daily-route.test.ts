@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { flushAfterCallbacks } from "tests/setup.common";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { GET } from "@/app/api/cron/daily/route";
 
@@ -42,8 +42,8 @@ describe("GET /api/cron/daily", () => {
     vi.stubEnv("CRON_SECRET", SECRET);
     const db = getTestDb();
     await db.execute(sql`
-      INSERT INTO rate_limit_buckets (bucket_key, count, window_start, created_at)
-      VALUES ('stale-bucket', 1, now() - interval '3 days', now() - interval '3 days')
+      INSERT INTO rate_limit_buckets (bucket_key, count, window_start)
+      VALUES ('stale-bucket', 1, now() - interval '3 days')
     `);
 
     const response = await GET(cronRequest(`Bearer ${SECRET}`));
@@ -71,7 +71,7 @@ describe("GET /api/cron/daily", () => {
     vi.stubEnv("CRON_SECRET", SECRET);
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -82,7 +82,7 @@ describe("GET /api/cron/daily", () => {
 
     // The scheduled run claimed the attempt; the test provider then fails it.
     const claimed = await db.execute<{ attempt_count: number }>(sql`
-      SELECT attempt_count FROM source_document_revisions WHERE id = ${pending.revision.id}
+      SELECT attempt_count FROM extraction_attempts WHERE id = ${pending.attempt.id}
     `);
     expect(Number(claimed.rows[0]!.attempt_count)).toBeGreaterThanOrEqual(1);
   });

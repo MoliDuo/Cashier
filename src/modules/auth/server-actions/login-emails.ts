@@ -44,11 +44,11 @@ function mapError(error: unknown): LoginEmailErrorCode {
   if (error instanceof RateLimitError) return "rate_limited";
   if (error instanceof AppError) {
     switch (error.code) {
-      case "EMAIL_CHANGE_LOCKED":
+      case "LOGIN_EMAIL_LOCKED":
         return "locked";
-      case "EMAIL_CHANGE_EXPIRED_CODE":
+      case "LOGIN_EMAIL_EXPIRED_CODE":
         return "expired_code";
-      case "EMAIL_CHANGE_INVALID_CODE":
+      case "LOGIN_EMAIL_INVALID_CODE":
         return "invalid_code";
       case "LOGIN_EMAIL_LAST":
         return "last_email";

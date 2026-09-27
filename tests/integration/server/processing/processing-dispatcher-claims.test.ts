@@ -1,18 +1,18 @@
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import { ProcessingCancelledError } from "@/modules/source-document/domain/parse/contracts";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
 }));
 import { createAIContext } from "@/lib/tasks/ai-context";
-import { processingJobs, revisionProcessor } from "tests/helpers/processing-jobs";
+import { processingJobs, attemptProcessor } from "tests/helpers/processing-jobs";
 import { executeProcessingJob } from "@/server/processing/execute-job";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 /**
- * Creates a pending revision + job for a single source document.
+ * Creates a pending attempt + job for a single source document.
  * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions
  * when called multiple times within one test.
  */
@@ -33,7 +33,7 @@ async function pendingIntent(
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
   const bookId = await testBookId(db, ledgerId);
-  const pending = await createPendingRevision({
+  const pending = await createPendingAttempt({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
@@ -42,14 +42,14 @@ async function pendingIntent(
     ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
+      attemptId: pending.attempt.id,
       requestedAt,
     },
   };
 }
 
 describe("processing attempt jobs", () => {
-  it("processes parser, reconciliation, exchange-rate facts, and result writes by revision identity", async () => {
+  it("processes parser, reconciliation, exchange-rate facts, and result writes by attempt identity", async () => {
     const db = getTestDb();
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const generate = vi.fn(async () => ({
@@ -73,14 +73,14 @@ describe("processing attempt jobs", () => {
         reasoning: "single item",
       }),
     }));
-    const processor = revisionProcessor(() => ({ generate }));
-    const lease = await claimRevisionForTest(job.revisionId);
+    const processor = attemptProcessor(() => ({ generate }));
+    const lease = await claimAttemptForTest(job.attemptId);
 
     await expect(
       processor.process({
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
-        revisionId: job.revisionId,
+        attemptId: job.attemptId,
         lease,
         signal: new AbortController().signal,
       })
@@ -89,7 +89,7 @@ describe("processing attempt jobs", () => {
       processor.process({
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
-        revisionId: job.revisionId,
+        attemptId: job.attemptId,
         lease,
         signal: new AbortController().signal,
       })
@@ -99,7 +99,7 @@ describe("processing attempt jobs", () => {
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
     await expect(
       db.query.sourceDocuments.findFirst({ where: eq(sourceDocuments.id, job.sourceDocumentId) })
-    ).resolves.toMatchObject({ latestSubmissionRevisionId: job.revisionId });
+    ).resolves.toMatchObject({ latestAttemptId: job.attemptId });
   });
 
   it("processes with custom ledger prompt in AI generation request", async () => {
@@ -139,13 +139,13 @@ describe("processing attempt jobs", () => {
       }),
     }));
 
-    const processor = revisionProcessor(() => ({ generate }));
-    const lease = await claimRevisionForTest(job.revisionId);
+    const processor = attemptProcessor(() => ({ generate }));
+    const lease = await claimAttemptForTest(job.attemptId);
 
     await processor.process({
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
-      revisionId: job.revisionId,
+      attemptId: job.attemptId,
       lease,
       signal: new AbortController().signal,
     });
@@ -159,7 +159,7 @@ describe("processing attempt jobs", () => {
     expect(callArgs).toContain(customPrompt);
   });
 
-  it("retried revision uses current ledger settings", async () => {
+  it("retried attempt uses current ledger settings", async () => {
     const db = getTestDb();
     await insertExchangeRates(new Date().toISOString().slice(0, 10), { CNY: 8, USD: 1.2 });
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
@@ -187,13 +187,13 @@ describe("processing attempt jobs", () => {
       }),
     }));
 
-    const processor1 = revisionProcessor(() => ({ generate: generate1 }));
+    const processor1 = attemptProcessor(() => ({ generate: generate1 }));
 
     await processor1.process({
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
-      revisionId: job.revisionId,
-      lease: await claimRevisionForTest(job.revisionId),
+      attemptId: job.attemptId,
+      lease: await claimAttemptForTest(job.attemptId),
       signal: new AbortController().signal,
     });
 
@@ -208,9 +208,9 @@ describe("processing attempt jobs", () => {
       })
       .where(eq(ledgers.id, ledgerId));
 
-    // Create a second revision (retry) after the settings change
+    // Create a second attempt (retry) after the settings change
     const bookId = await testBookId(db, ledgerId);
-    const pending2 = await createPendingRevision({
+    const pending2 = await createPendingAttempt({
       ledgerId,
       input: { text: "Dinner 25.00 USD", storedFileIds: [], documentDate: null },
       bookId,
@@ -238,13 +238,13 @@ describe("processing attempt jobs", () => {
       }),
     }));
 
-    const processor2 = revisionProcessor(() => ({ generate: generate2 }));
+    const processor2 = attemptProcessor(() => ({ generate: generate2 }));
 
     await processor2.process({
       ledgerId,
       sourceDocumentId: pending2.document.id,
-      revisionId: pending2.revision.id,
-      lease: await claimRevisionForTest(pending2.revision.id),
+      attemptId: pending2.attempt.id,
+      lease: await claimAttemptForTest(pending2.attempt.id),
       signal: new AbortController().signal,
     });
 
@@ -262,17 +262,14 @@ describe("processing attempt jobs", () => {
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
 
-    const claims = await Promise.all([
-      adapter.claim(job.revisionId),
-      adapter.claim(job.revisionId),
-    ]);
+    const claims = await Promise.all([adapter.claim(job.attemptId), adapter.claim(job.attemptId)]);
 
     const won = claims.filter((claim) => claim != null);
     expect(won).toHaveLength(1);
     expect(won[0]?.ledgerId).toBeDefined();
     await expect(
-      db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, job.revisionId),
+      db.query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.id, job.attemptId),
       })
     ).resolves.toMatchObject({ attemptCount: 1, claimToken: won[0]!.claimToken });
   });
@@ -281,32 +278,32 @@ describe("processing attempt jobs", () => {
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
 
-    const first = await adapter.claim(job.revisionId);
+    const first = await adapter.claim(job.attemptId);
     expect(first).not.toBeNull();
-    const renewedUntil = await adapter.renew(job.revisionId, first!.claimToken);
+    const renewedUntil = await adapter.renew(job.attemptId, first!.claimToken);
     expect(new Date(renewedUntil!).getTime()).toBeGreaterThanOrEqual(
       new Date(first!.expiresAt).getTime()
     );
-    await adapter.expireLease(job.revisionId);
-    await expect(adapter.renew(job.revisionId, first!.claimToken)).resolves.toBeNull();
-    const second = await adapter.claim(job.revisionId);
+    await adapter.expireLease(job.attemptId);
+    await expect(adapter.renew(job.attemptId, first!.claimToken)).resolves.toBeNull();
+    const second = await adapter.claim(job.attemptId);
     expect(second).not.toBeNull();
     expect(second!.claimToken).not.toBe(first!.claimToken);
 
-    await expect(adapter.renew(job.revisionId, first!.claimToken)).resolves.toBeNull();
-    await expect(adapter.renew(job.revisionId, second!.claimToken)).resolves.not.toBeNull();
+    await expect(adapter.renew(job.attemptId, first!.claimToken)).resolves.toBeNull();
+    await expect(adapter.renew(job.attemptId, second!.claimToken)).resolves.not.toBeNull();
   });
 
-  it("does not hand out a job whose revision already finished", async () => {
+  it("does not hand out a job whose attempt already finished", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const adapter = processingJobs();
     await db
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "completed" })
-      .where(eq(sourceDocumentRevisions.id, job.revisionId));
+      .update(extractionAttempts)
+      .set({ status: "completed" })
+      .where(eq(extractionAttempts.id, job.attemptId));
 
-    await expect(adapter.claim(job.revisionId)).resolves.toBeNull();
+    await expect(adapter.claim(job.attemptId)).resolves.toBeNull();
   });
 
   it("returns false on duplicate claim", async () => {
@@ -314,11 +311,11 @@ describe("processing attempt jobs", () => {
     const adapter = processingJobs();
 
     // First claim succeeds
-    const first = await adapter.claim(job.revisionId);
+    const first = await adapter.claim(job.attemptId);
     expect(first).not.toBeNull();
 
     // Second claim (same adapter, same DB) returns null since job is claimed
-    const second = await adapter.claim(job.revisionId);
+    const second = await adapter.claim(job.attemptId);
     expect(second).toBeNull();
   });
 
@@ -332,9 +329,9 @@ describe("processing attempt jobs", () => {
     const result = await executeProcessingJob(job);
     expect(result).toBe(true);
 
-    const row = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
+    const row = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, job.attemptId),
     });
-    expect(row).toMatchObject({ processingStatus: "failed", attemptCount: 1, claimToken: null });
+    expect(row).toMatchObject({ status: "failed", attemptCount: 1, claimToken: null });
   });
 });

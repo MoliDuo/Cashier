@@ -73,7 +73,7 @@ export async function authenticateServiceCredential(
     // An archived book stops accepting uploads through its keys; the key
     // itself is untouched and starts working again if the book is restored.
     .innerJoin(books, and(eq(books.id, serviceCredentials.bookId), isNull(books.archivedAt)))
-    .where(and(eq(serviceCredentials.tokenHash, tokenHash), isNull(serviceCredentials.deletedAt)))
+    .where(and(eq(serviceCredentials.tokenHash, tokenHash), isNull(serviceCredentials.revokedAt)))
     .then((rows) => rows[0]);
 
   if (hashMatch == null) return null;
@@ -90,7 +90,7 @@ export async function authenticateServiceCredential(
       const [updated] = await db
         .update(serviceCredentials)
         .set({ lastUsedAt: new Date() })
-        .where(and(eq(serviceCredentials.id, hashMatch.id), isNull(serviceCredentials.deletedAt)))
+        .where(and(eq(serviceCredentials.id, hashMatch.id), isNull(serviceCredentials.revokedAt)))
         .returning({ id: serviceCredentials.id });
       // Revoke-race guard: if credential was revoked between SELECT and UPDATE,
       // the UPDATE returns 0 rows — return null to prevent auth through revoked credential.
@@ -113,7 +113,7 @@ export async function listServiceCredentials(ledgerId: string): Promise<ServiceC
   const rows = await db
     .select()
     .from(serviceCredentials)
-    .where(and(eq(serviceCredentials.ledgerId, ledgerId), isNull(serviceCredentials.deletedAt)))
+    .where(and(eq(serviceCredentials.ledgerId, ledgerId), isNull(serviceCredentials.revokedAt)))
     .orderBy(desc(serviceCredentials.createdAt))
     .limit(MAX_ACTIVE_CREDENTIALS);
   return rows.map(toServiceCredentialDto);
@@ -131,7 +131,7 @@ export async function createServiceCredential(
     const active = await tx
       .select({ id: serviceCredentials.id })
       .from(serviceCredentials)
-      .where(and(eq(serviceCredentials.ledgerId, ledgerId), isNull(serviceCredentials.deletedAt)));
+      .where(and(eq(serviceCredentials.ledgerId, ledgerId), isNull(serviceCredentials.revokedAt)));
     if (active.length >= MAX_ACTIVE_CREDENTIALS) {
       throw new ConflictError("A ledger can have at most 20 active service credentials.");
     }
@@ -174,7 +174,7 @@ export async function setServiceCredentialBook(
         and(
           eq(serviceCredentials.ledgerId, ledgerId),
           eq(serviceCredentials.id, credentialId),
-          isNull(serviceCredentials.deletedAt)
+          isNull(serviceCredentials.revokedAt)
         )
       )
       .returning()
@@ -191,12 +191,12 @@ export async function revokeServiceCredential(
 ): Promise<void> {
   const result = await db
     .update(serviceCredentials)
-    .set({ deletedAt: new Date() })
+    .set({ revokedAt: new Date() })
     .where(
       and(
         eq(serviceCredentials.ledgerId, ledgerId),
         eq(serviceCredentials.id, credentialId),
-        isNull(serviceCredentials.deletedAt)
+        isNull(serviceCredentials.revokedAt)
       )
     )
     .returning({ id: serviceCredentials.id });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { render } from "@react-email/render";
-import { otpTokens } from "@/persistence/schema/auth";
+import { signInChallenges } from "@/persistence/schema/auth";
 import { getTestDb } from "tests/setup";
 import { loginEmails } from "@/persistence";
 import { TEST_USER_ID } from "tests/helpers/schema-setup";
@@ -42,7 +42,7 @@ describe("sendOTPAction edge cases", () => {
       .update(loginEmails)
       .set({ email: testEmail })
       .where(eq(loginEmails.userId, TEST_USER_ID));
-    await db.delete(otpTokens).where(eq(otpTokens.email, testEmail));
+    await db.delete(signInChallenges).where(eq(signInChallenges.email, testEmail));
 
     headersMock.mockResolvedValue({
       get: (key: string) => {
@@ -68,8 +68,8 @@ describe("sendOTPAction edge cases", () => {
     expect(firstCall?.to).toBe(testEmail);
 
     const db = getTestDb();
-    const token = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, testEmail),
+    const token = await db.query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, testEmail),
     });
     expect(token).toBeDefined();
   });
@@ -88,11 +88,11 @@ describe("sendOTPAction edge cases", () => {
     process.env.AUTH_RESEND_KEY = "test-resend-key";
     const lockedUntil = new Date(Date.now() + 10 * 60 * 1000);
     await getTestDb()
-      .insert(otpTokens)
+      .insert(signInChallenges)
       .values({
         email: testEmail,
-        tokenHash: "locked-token-hash",
-        expires: new Date(Date.now() + 60 * 1000),
+        codeHash: "locked-token-hash",
+        expiresAt: new Date(Date.now() + 60 * 1000),
         attempts: 5,
         lockedUntil,
       });
@@ -100,10 +100,10 @@ describe("sendOTPAction edge cases", () => {
     await expect(sendOTPAction(testEmail)).resolves.toMatchObject({ ok: true });
 
     expect(resendSendMock).not.toHaveBeenCalled();
-    const token = await getTestDb().query.otpTokens.findFirst({
-      where: eq(otpTokens.email, testEmail),
+    const token = await getTestDb().query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, testEmail),
     });
-    expect(token).toMatchObject({ tokenHash: "locked-token-hash", attempts: 5, lockedUntil });
+    expect(token).toMatchObject({ codeHash: "locked-token-hash", attempts: 5, lockedUntil });
   });
 
   it("answers an unknown address like a real send but stores and sends nothing", async () => {
@@ -116,7 +116,9 @@ describe("sendOTPAction edge cases", () => {
 
     expect(resendSendMock).not.toHaveBeenCalled();
     await expect(
-      getTestDb().query.otpTokens.findFirst({ where: eq(otpTokens.email, "nobody@example.com") })
+      getTestDb().query.signInChallenges.findFirst({
+        where: eq(signInChallenges.email, "nobody@example.com"),
+      })
     ).resolves.toBeUndefined();
   });
 
@@ -126,7 +128,7 @@ describe("sendOTPAction edge cases", () => {
 
     await expect(sendOTPAction(testEmail)).resolves.toMatchObject({ code: "email_send_failed" });
     await expect(
-      getTestDb().query.otpTokens.findFirst({ where: eq(otpTokens.email, testEmail) })
+      getTestDb().query.signInChallenges.findFirst({ where: eq(signInChallenges.email, testEmail) })
     ).resolves.toBeUndefined();
 
     // The reader can ask again at once instead of waiting out a cooldown for

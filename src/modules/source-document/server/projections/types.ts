@@ -12,10 +12,10 @@ export interface LedgerProjectionEntryContract {
   dateHint?: DateHint;
 }
 
-export interface ActivateRevisionInput {
+export interface ActivateAttemptInput {
   ledgerId: string;
   sourceDocumentId: string;
-  revisionId: string;
+  attemptId: string;
   title?: string | null;
   entries: readonly LedgerProjectionEntryContract[];
   dateOrganizationSuggestion?: DateOrganizationSuggestion | null;

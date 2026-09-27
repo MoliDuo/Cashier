@@ -6,12 +6,7 @@ import { POST } from "@/app/api/v1/source-documents/route";
 import { GET } from "@/app/api/v1/source-documents/[sourceDocumentId]/route";
 import { getTestDb } from "tests/setup";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import {
-  ledgers,
-  serviceCredentials,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { ledgers, serviceCredentials, extractionAttempts, sourceDocuments } from "@/persistence";
 import { computeHash, prefixSuffix } from "@/lib/security/service-credential-token";
 import { AppError } from "@/lib/errors";
 
@@ -144,16 +139,16 @@ describe("API v1 source-documents route", () => {
 
     // An API key belongs to a person but is not that person's device, and
     // neither member's own zone applies: the record is dated by the server.
-    const created = await getTestDb().query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, data.revisionId),
+    const created = await getTestDb().query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, data.revisionId),
     });
     const serverToday = new Intl.DateTimeFormat("sv-SE", {
       ...(process.env.TZ ? { timeZone: process.env.TZ } : {}),
     }).format(new Date());
-    expect(created?.inputDocumentDate).toBe(serverToday);
+    expect(created?.requestedDate).toBe(serverToday);
   });
 
-  it("creates one document, revision, and processing job for concurrent idempotent requests", async () => {
+  it("creates one document, attempt, and processing job for concurrent idempotent requests", async () => {
     const image = await validJpegBase64();
     const makeRequest = () =>
       new NextRequest("http://localhost/api/v1/source-documents", {
@@ -176,18 +171,18 @@ describe("API v1 source-documents route", () => {
       .select({ id: sourceDocuments.id })
       .from(sourceDocuments)
       .where(eq(sourceDocuments.ledgerId, ledgerId));
-    const revisions = await db
-      .select({ id: sourceDocumentRevisions.id })
-      .from(sourceDocumentRevisions)
-      .where(eq(sourceDocumentRevisions.sourceDocumentId, firstBody.sourceDocumentId));
-    // The submitted revision is the document's queued processing attempt.
+    const attempts = await db
+      .select({ id: extractionAttempts.id })
+      .from(extractionAttempts)
+      .where(eq(extractionAttempts.sourceDocumentId, firstBody.sourceDocumentId));
+    // The submitted attempt is the document's queued processing attempt.
     const queued = await db
-      .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
+      .select({ attemptId: sourceDocuments.latestAttemptId })
       .from(sourceDocuments)
       .where(eq(sourceDocuments.id, firstBody.sourceDocumentId));
     expect(documents).toHaveLength(1);
-    expect(revisions).toHaveLength(1);
-    expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
+    expect(attempts).toHaveLength(1);
+    expect(queued).toEqual([{ attemptId: firstBody.revisionId }]);
   });
 
   it("returns X-Request-Id on error responses too", async () => {

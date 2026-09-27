@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { otpTokens } from "@/persistence/schema/auth";
+import { signInChallenges } from "@/persistence/schema/auth";
 import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 import {
   authenticateWithOTP,
@@ -29,10 +29,10 @@ const REQUEST_HEADERS = new Headers({ "x-real-ip": "127.0.0.1" });
 async function createTestOTP(email: string, otp: string, expiresAt?: Date) {
   const db = getTestDb();
 
-  await db.insert(otpTokens).values({
+  await db.insert(signInChallenges).values({
     email: email.toLowerCase(),
-    tokenHash: hashOTP(otp),
-    expires: expiresAt ?? new Date(Date.now() + 5 * 60 * 1000),
+    codeHash: hashOTP(otp),
+    expiresAt: expiresAt ?? new Date(Date.now() + 5 * 60 * 1000),
     attempts: 0,
   });
 }
@@ -65,7 +65,7 @@ describe("authenticateWithOTP", () => {
     // Verifying spends the token; nothing downstream can hand it back.
     const db = getTestDb();
     expect(
-      await db.query.otpTokens.findFirst({ where: eq(otpTokens.email, TEST_EMAIL) })
+      await db.query.signInChallenges.findFirst({ where: eq(signInChallenges.email, TEST_EMAIL) })
     ).toBeUndefined();
 
     await completeInteractiveSignIn(principal);
@@ -90,8 +90,8 @@ describe("authenticateWithOTP", () => {
     expect(error).toMatchObject({ code: AUTH_ERROR_CODES.OTP_INVALID });
 
     const db = getTestDb();
-    const token = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, TEST_EMAIL),
+    const token = await db.query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, TEST_EMAIL),
     });
     expect(token?.attempts).toBe(1);
   });
@@ -153,8 +153,8 @@ describe("authenticateWithOTP", () => {
     expect(error).toMatchObject({ code: AUTH_ERROR_CODES.OTP_LOCKED });
 
     const db = getTestDb();
-    const token = await db.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, TEST_EMAIL),
+    const token = await db.query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, TEST_EMAIL),
     });
     expect(token?.lockedUntil).toBeInstanceOf(Date);
   });

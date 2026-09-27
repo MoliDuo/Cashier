@@ -3,7 +3,7 @@
 import { compressImage } from "@/lib/image-utils";
 import {
   MAX_FILES,
-  MAX_NORMALIZED_BYTES_PER_REVISION,
+  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
   MAX_ORIGINAL_BYTES_PER_FILE,
 } from "@/lib/storage/upload-policy";
 import {
@@ -78,7 +78,7 @@ function isAbortError(error: unknown): boolean {
 function filesFitUploadLimits(files: readonly File[]): boolean {
   return (
     files.every((file) => file.size <= MAX_ORIGINAL_BYTES_PER_FILE) &&
-    files.reduce((total, file) => total + file.size, 0) <= MAX_NORMALIZED_BYTES_PER_REVISION
+    files.reduce((total, file) => total + file.size, 0) <= MAX_NORMALIZED_BYTES_PER_ATTEMPT
   );
 }
 

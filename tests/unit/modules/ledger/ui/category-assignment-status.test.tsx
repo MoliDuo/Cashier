@@ -4,10 +4,10 @@ import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commonCopy } from "@/copy/common";
 import { batchActionsCopy } from "@/copy/workspace";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentStatus } from "@/modules/ledger/ui/CategoryAssignmentStatus";
 
-vi.mock("@/modules/ledger/server-actions/reclassification", () => ({
+vi.mock("@/modules/ledger/server-actions/category-assignment", () => ({
   cancelCategoryAssignmentAction: vi.fn(),
   retryCategoryAssignmentFailuresAction: vi.fn(),
   retryCategoryAssignmentLatestAction: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock("@/modules/ledger/queries", () => ({
   fetchCategoryAssignmentResults: vi.fn(async () => ({ items: [], nextCursor: null })),
 }));
 
-function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryReclassificationJob {
+function job(overrides: Partial<CategoryAssignmentJob> = {}): CategoryAssignmentJob {
   return {
     id: "job-1",
 
@@ -36,7 +36,6 @@ function job(overrides: Partial<CategoryReclassificationJob> = {}): CategoryRecl
     retryingDocumentCount: 1,
     nextRetryAt: "2026-09-14T00:00:05.000Z",
     candidateCategories: [],
-    errorCode: null,
     createdAt: "2026-09-14T00:00:00.000Z",
     updatedAt: "2026-09-14T00:00:00.000Z",
     completedAt: null,
@@ -108,7 +107,7 @@ describe("CategoryAssignmentStatus", () => {
 
   it("hands the run a retry restarted back to the page", async () => {
     const { retryCategoryAssignmentLatestAction } =
-      await import("@/modules/ledger/server-actions/reclassification");
+      await import("@/modules/ledger/server-actions/category-assignment");
     const restarted = job({ id: "job-2", status: "running", processedCount: 0 });
     vi.mocked(retryCategoryAssignmentLatestAction).mockResolvedValue(restarted);
     const { onTaskRegistered, queryClient } = renderStatus({
@@ -123,7 +122,7 @@ describe("CategoryAssignmentStatus", () => {
 
     expect(onTaskRegistered).toHaveBeenCalledWith(restarted);
     // The page owns the cache write now, so the band must not also make one.
-    expect(queryClient.getQueryData(["ledger", "category-reclassification"])).toBeUndefined();
+    expect(queryClient.getQueryData(["ledger", "category-assignment"])).toBeUndefined();
   });
 
   it("lets a finished run's band be closed", () => {

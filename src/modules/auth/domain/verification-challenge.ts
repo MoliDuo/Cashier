@@ -1,7 +1,7 @@
 import { verifyOTP } from "./otp";
 
 interface VerificationChallengeRecord {
-  tokenHash: string;
+  codeHash: string;
   expiresAt: Date;
   attempts: number;
   lockedUntil: Date | null;
@@ -18,7 +18,7 @@ class VerificationChallengeService {
       return { ok: false, reason: "locked", lockedUntil: record.lockedUntil };
     }
     if (record.expiresAt <= now) return { ok: false, reason: "expired" };
-    return verifyOTP(otp, record.tokenHash) ? { ok: true } : { ok: false, reason: "invalid" };
+    return verifyOTP(otp, record.codeHash) ? { ok: true } : { ok: false, reason: "invalid" };
   }
 }
 

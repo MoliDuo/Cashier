@@ -1,43 +1,43 @@
 import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import type {
-  RevisionProcessingContextContract,
-  RevisionProcessingRequestContract,
+  AttemptProcessingContextContract,
+  AttemptProcessingRequestContract,
 } from "@/server/processing/types";
 import { db } from "@/lib/db";
 import {
   entryCategories,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
 } from "@/persistence";
 
-export async function loadRevisionProcessingContext(
-  request: RevisionProcessingRequestContract
-): Promise<RevisionProcessingContextContract> {
+export async function loadAttemptProcessingContext(
+  request: AttemptProcessingRequestContract
+): Promise<AttemptProcessingContextContract> {
   const [identity, files, categories] = await Promise.all([
     db
       .select({
         inputText: sourceDocuments.inputText,
-        inputDocumentDate: sourceDocumentRevisions.inputDocumentDate,
-        inputDateReference: sourceDocumentRevisions.inputDateReference,
-        processingStatus: sourceDocumentRevisions.processingStatus,
-        latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
+        requestedDate: extractionAttempts.requestedDate,
+        referenceDate: extractionAttempts.referenceDate,
+        processingStatus: extractionAttempts.status,
+        latestAttemptId: sourceDocuments.latestAttemptId,
         createdAt: sourceDocuments.createdAt,
       })
-      .from(sourceDocumentRevisions)
+      .from(extractionAttempts)
       .innerJoin(
         sourceDocuments,
         and(
-          eq(sourceDocuments.ledgerId, sourceDocumentRevisions.ledgerId),
-          eq(sourceDocuments.id, sourceDocumentRevisions.sourceDocumentId)
+          eq(sourceDocuments.ledgerId, extractionAttempts.ledgerId),
+          eq(sourceDocuments.id, extractionAttempts.sourceDocumentId)
         )
       )
       .where(
         and(
-          eq(sourceDocumentRevisions.ledgerId, request.ledgerId),
-          eq(sourceDocumentRevisions.sourceDocumentId, request.sourceDocumentId),
-          eq(sourceDocumentRevisions.id, request.revisionId)
+          eq(extractionAttempts.ledgerId, request.ledgerId),
+          eq(extractionAttempts.sourceDocumentId, request.sourceDocumentId),
+          eq(extractionAttempts.id, request.attemptId)
         )
       )
       .then((rows) => rows[0] ?? null),
@@ -69,20 +69,20 @@ export async function loadRevisionProcessingContext(
   ]);
 
   return {
-    revision:
+    attempt:
       identity == null
         ? null
         : {
             inputText: identity.inputText,
-            inputDocumentDate: identity.inputDocumentDate,
-            inputDateReference: identity.inputDateReference,
+            requestedDate: identity.requestedDate,
+            referenceDate: identity.referenceDate,
             processingStatus: identity.processingStatus,
           },
     document:
       identity == null
         ? null
         : {
-            latestSubmissionRevisionId: identity.latestSubmissionRevisionId,
+            latestAttemptId: identity.latestAttemptId,
             createdAt: identity.createdAt,
           },
     storedFileIds: files.map((file) => file.id),

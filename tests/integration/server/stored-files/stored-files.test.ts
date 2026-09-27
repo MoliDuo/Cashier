@@ -1,4 +1,4 @@
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import type { ObjectStore } from "@/lib/storage";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
@@ -16,7 +16,7 @@ import { DirectMemoryObjectStore } from "tests/helpers/memory-object-store";
 import {
   DIRECT_UPLOAD_FINALIZE_BUFFER_MS,
   MAX_FILES,
-  MAX_NORMALIZED_BYTES_PER_REVISION,
+  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
   MAX_ORIGINAL_BYTES_PER_FILE,
   UPLOAD_PLAN_EXPIRY_MS,
 } from "@/lib/storage/upload-policy";
@@ -104,7 +104,7 @@ describe("stored-file uploads and reads", () => {
       [{ ...file, byteSize: MAX_ORIGINAL_BYTES_PER_FILE + 1 }],
       [{ ...file, checksum: null }],
       Array.from(
-        { length: Math.floor(MAX_NORMALIZED_BYTES_PER_REVISION / MAX_ORIGINAL_BYTES_PER_FILE) + 1 },
+        { length: Math.floor(MAX_NORMALIZED_BYTES_PER_ATTEMPT / MAX_ORIGINAL_BYTES_PER_FILE) + 1 },
         () => ({ ...file, byteSize: MAX_ORIGINAL_BYTES_PER_FILE })
       ),
     ]) {
@@ -178,12 +178,12 @@ describe("stored-file uploads and reads", () => {
     expect(after.rows).toEqual(before.rows);
     expect(storage.readKeys).toEqual([`temporary/${ledgerId}/${id}`]);
 
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       input: { text: null, storedFileIds: [id], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
-    expect(pending.document.latestSubmissionRevisionId).toBe(pending.revision.id);
+    expect(pending.document.latestAttemptId).toBe(pending.attempt.id);
     await expect(readAuthorizedFile(ledgerId, id)).resolves.toMatchObject({ file: { id } });
     await expect(readAuthorizedFile(otherLedgerId, id)).resolves.toBeNull();
   });
@@ -224,7 +224,7 @@ describe("stored-file uploads and reads", () => {
     const { id } = await plannedUpload(storage, ledgerId, await receiptJpeg());
 
     await expect(
-      createPendingRevision({
+      createPendingAttempt({
         ledgerId,
         input: { text: null, storedFileIds: [id], documentDate: null },
         bookId: await testBookId(db, ledgerId),
@@ -278,7 +278,7 @@ describe("stored-file uploads and reads", () => {
     expect([...storage.files.keys()]).toEqual([]);
   });
 
-  it("keeps files pending when their normalized total is over the revision limit", async () => {
+  it("keeps files pending when their normalized total is over the attempt limit", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();

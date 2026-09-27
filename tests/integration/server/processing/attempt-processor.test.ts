@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { createPendingRevision, claimRevisionForTest } from "tests/helpers/processing-revision";
-import { revisionProcessor } from "tests/helpers/processing-jobs";
-import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { createPendingAttempt, claimAttemptForTest } from "tests/helpers/processing-attempt";
+import { attemptProcessor } from "tests/helpers/processing-jobs";
+import { ledgerEntries, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
@@ -39,7 +39,7 @@ function modelReply(
   });
 }
 
-describe("processRevision", () => {
+describe("processAttempt", () => {
   let ledgerId = "";
   let ensureRates: ReturnType<typeof vi.spyOn>;
 
@@ -57,40 +57,40 @@ describe("processRevision", () => {
 
   async function process(content: string, documentDate: string | null = "2026-09-01") {
     const db = getTestDb();
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       input: { text: "receipt", storedFileIds: [], documentDate },
       bookId: await testBookId(db, ledgerId),
     });
     const sourceDocumentId = pending.document.id;
-    const revisionId = pending.revision.id;
+    const attemptId = pending.attempt.id;
     // Late on the 30th in UTC, already the 31st further east.
     await db
       .update(sourceDocuments)
       .set({ createdAt: new Date("2026-08-30T23:30:00Z") })
       .where(eq(sourceDocuments.id, sourceDocumentId));
-    const lease = await claimRevisionForTest(revisionId);
+    const lease = await claimAttemptForTest(attemptId);
     const generate = vi.fn(async () => ({ content }));
 
-    const outcome = await revisionProcessor(() => ({ generate })).process({
+    const outcome = await attemptProcessor(() => ({ generate })).process({
       signal: new AbortController().signal,
       ledgerId,
       sourceDocumentId,
-      revisionId,
+      attemptId,
       lease,
     });
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, revisionId),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, attemptId),
     });
     const entries = await db
       .select()
       .from(ledgerEntries)
       .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId));
-    return { outcome, revision, entries };
+    return { outcome, attempt, entries };
   }
 
   it("records the AI's trimmed reason when it declares the document invalid", async () => {
-    const { outcome, revision, entries } = await process(
+    const { outcome, attempt, entries } = await process(
       modelReply({ outcome: "invalid", invalid_reason: "  This is a refund, not an expense. " })
     );
 
@@ -98,8 +98,8 @@ describe("processRevision", () => {
       processingStatus: "failed",
       failureMessage: "This is a refund, not an expense.",
     });
-    expect(revision).toMatchObject({
-      processingStatus: "failed",
+    expect(attempt).toMatchObject({
+      status: "failed",
       failureKind: "invalid_input",
       failureCode: "ai_declared_invalid",
       failureMessage: "This is a refund, not an expense.",
@@ -110,7 +110,7 @@ describe("processRevision", () => {
 
   it("keeps only the diagnostic when the parsed entries fail validation", async () => {
     // Positive as written, but nothing once rounded to the currency's cents.
-    const { outcome, revision, entries } = await process(
+    const { outcome, attempt, entries } = await process(
       modelReply({
         outcome: "success",
         entries: [{ item_name: "Rounding", amount: "0.001", currency: "EUR" }],
@@ -118,8 +118,8 @@ describe("processRevision", () => {
     );
 
     expect(outcome).toEqual({ processingStatus: "failed" });
-    expect(revision).toMatchObject({
-      processingStatus: "failed",
+    expect(attempt).toMatchObject({
+      status: "failed",
       failureKind: "invalid_input",
       failureCode: "entry_validation_failed",
       failureMessage: null,
@@ -128,7 +128,7 @@ describe("processRevision", () => {
   });
 
   it("stores foreign amounts as written and caches the document day's rates once", async () => {
-    const { outcome, revision, entries } = await process(
+    const { outcome, attempt, entries } = await process(
       modelReply({
         outcome: "success",
         entries: [
@@ -139,7 +139,7 @@ describe("processRevision", () => {
     );
 
     expect(outcome).toEqual({ processingStatus: "completed" });
-    expect(revision?.processingStatus).toBe("completed");
+    expect(attempt?.status).toBe("completed");
     expect(entries.map(({ amount, currency }) => ({ amount, currency }))).toEqual(
       expect.arrayContaining([
         { amount: "10.000", currency: "EUR" },

@@ -2,7 +2,7 @@ import type { SourceDocumentProcessingStatus } from "./types";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
 import type {
   ProcessingFailureCode,
-  RevisionFailureKind,
+  AttemptFailureKind,
   SupportedSourceDocumentAction,
 } from "@/modules/source-document/lifecycle";
 
@@ -22,7 +22,7 @@ interface SourceDocumentSummaryDto {
   ledgerId: string;
   title: string | null;
   processingStatus: SourceDocumentProcessingStatus | null;
-  failureKind: RevisionFailureKind | null;
+  failureKind: AttemptFailureKind | null;
   failureMessage: string | null;
   documentDate: string | null;
   createdAt: string;

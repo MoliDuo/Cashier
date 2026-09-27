@@ -1,17 +1,17 @@
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
-  categoryReclassificationJobDocuments,
-  categoryReclassificationJobEntries,
-  categoryReclassificationJobs,
+  categoryAssignmentDocuments,
+  categoryAssignmentEntries,
+  categoryAssignmentJobs,
   ledgerEntries,
   ledgers,
   sourceDocuments,
 } from "@/persistence";
 import {
-  getCategoryReclassificationJob,
-  getLatestCategoryReclassificationJob,
-} from "@/server/category-reclassification/jobs";
+  getCategoryAssignmentJob,
+  getLatestCategoryAssignmentJob,
+} from "@/server/category-assignment/jobs";
 import { getTestDb } from "tests/setup";
 import { createLedgerData, createSourceDocumentData } from "tests/helpers/factories";
 import { ensureTestLedgerBooks } from "tests/helpers/schema-setup";
@@ -43,15 +43,15 @@ describe("category assignment job reads", () => {
       }))
     );
     const [job] = await db
-      .insert(categoryReclassificationJobs)
+      .insert(categoryAssignmentJobs)
       .values({ ledgerId: ledger.id, mode: "clear", status: "running" })
       .returning();
-    await db.insert(categoryReclassificationJobDocuments).values([
+    await db.insert(categoryAssignmentDocuments).values([
       {
         jobId: job!.id,
         ledgerId: ledger.id,
         sourceDocumentId: documents[0]!.id,
-        firstSelectionOrder: 0,
+        selectionOrder: 0,
         status: "succeeded",
         evidenceIncomplete: true,
       },
@@ -59,14 +59,14 @@ describe("category assignment job reads", () => {
         jobId: job!.id,
         ledgerId: ledger.id,
         sourceDocumentId: documents[1]!.id,
-        firstSelectionOrder: 2,
+        selectionOrder: 2,
         status: "pending",
-        attempts: 1,
+        attemptCount: 1,
         errorCode: "ai_rate_limited",
         nextAttemptAt: new Date(Date.now() + 60_000),
       },
     ]);
-    await db.insert(categoryReclassificationJobEntries).values(
+    await db.insert(categoryAssignmentEntries).values(
       entryIds.map((id, index) => ({
         jobId: job!.id,
         ledgerId: ledger.id,
@@ -77,7 +77,7 @@ describe("category assignment job reads", () => {
       }))
     );
 
-    const read = await getCategoryReclassificationJob({ ledgerId: ledger.id, jobId: job!.id });
+    const read = await getCategoryAssignmentJob({ ledgerId: ledger.id, jobId: job!.id });
     expect(read).toMatchObject({
       id: job!.id,
       mode: { kind: "clear" },
@@ -93,10 +93,10 @@ describe("category assignment job reads", () => {
       evidenceIncomplete: true,
     });
     expect(read?.nextRetryAt).not.toBeNull();
-    expect(await getLatestCategoryReclassificationJob({ ledgerId: ledger.id })).toMatchObject({
+    expect(await getLatestCategoryAssignmentJob({ ledgerId: ledger.id })).toMatchObject({
       id: job!.id,
     });
-    expect(await getCategoryReclassificationJob({ ledgerId: other.id, jobId: job!.id })).toBeNull();
-    expect(await getLatestCategoryReclassificationJob({ ledgerId: other.id })).toBeNull();
+    expect(await getCategoryAssignmentJob({ ledgerId: other.id, jobId: job!.id })).toBeNull();
+    expect(await getLatestCategoryAssignmentJob({ ledgerId: other.id })).toBeNull();
   });
 });

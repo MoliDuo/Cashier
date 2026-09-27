@@ -37,12 +37,12 @@ export async function getLedgerRefreshBaseline(
         EXISTS (
           SELECT 1
           FROM source_documents document
-          JOIN source_document_revisions revision
-            ON revision.ledger_id = document.ledger_id
-           AND revision.source_document_id = document.id
-           AND revision.id = document.latest_submission_revision_id
+          JOIN extraction_attempts attempt
+            ON attempt.ledger_id = document.ledger_id
+           AND attempt.source_document_id = document.id
+           AND attempt.id = document.latest_attempt_id
           WHERE document.ledger_id = ${ledgerId}
-            AND revision.processing_status = 'processing'
+            AND attempt.status = 'processing'
         ) AS "hasTransitionalWork"
     `);
   const row = result.rows[0];
@@ -72,12 +72,12 @@ export async function summarizeLedgerChanges({
         EXISTS (
           SELECT 1
           FROM source_documents document
-          JOIN source_document_revisions revision
-            ON revision.ledger_id = document.ledger_id
-           AND revision.source_document_id = document.id
-           AND revision.id = document.latest_submission_revision_id
+          JOIN extraction_attempts attempt
+            ON attempt.ledger_id = document.ledger_id
+           AND attempt.source_document_id = document.id
+           AND attempt.id = document.latest_attempt_id
           WHERE document.ledger_id = ${ledgerId}
-            AND revision.processing_status = 'processing'
+            AND attempt.status = 'processing'
         ) AS "hasTransitionalWork"
       FROM (SELECT 1) baseline
       LEFT JOIN ledger_sync_state state ON state.ledger_id = ${ledgerId}

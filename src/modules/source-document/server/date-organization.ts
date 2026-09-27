@@ -2,7 +2,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
-import { ledgerEntries, ledgers, sourceDocuments, sourceDocumentRevisions } from "@/persistence";
+import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import type {
   ApplyDateOrganizationInput,
   ApplyDateOrganizationResultDto,
@@ -119,18 +119,6 @@ export async function applyDateOrganization(
     if (lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId)
       throw new ConflictError("Source document changed before date organization");
     await assertSourceDocumentNotProcessing(tx, lockedDocument);
-    const revisionTitle =
-      lockedDocument.latestSubmissionRevisionId == null
-        ? null
-        : ((
-            await tx.query.sourceDocumentRevisions.findFirst({
-              where: and(
-                eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-                eq(sourceDocumentRevisions.id, lockedDocument.latestSubmissionRevisionId)
-              ),
-              columns: { title: true },
-            })
-          )?.title ?? null);
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
@@ -155,7 +143,7 @@ export async function applyDateOrganization(
         id,
         ledgerId: input.ledgerId,
         bookId: lockedDocument.bookId,
-        title: lockedDocument.title ?? revisionTitle,
+        title: lockedDocument.title,
         version: 1,
         documentDate: group.entryDate,
       });

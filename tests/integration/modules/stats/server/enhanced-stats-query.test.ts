@@ -10,7 +10,7 @@ import {
   entryCategories,
   ledgerEntries,
   ledgers,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
 } from "@/persistence";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
@@ -189,16 +189,16 @@ describe("queryEnhancedStats", () => {
     // that leaves the previous active projection in place.
     await activateTestSourceDocumentProjection(db, doc.id);
     const [latestSubmission] = await db
-      .insert(sourceDocumentRevisions)
+      .insert(extractionAttempts)
       .values({
         ledgerId,
         sourceDocumentId: doc.id,
-        processingStatus: "processing",
+        status: "processing",
       })
-      .returning({ id: sourceDocumentRevisions.id });
+      .returning({ id: extractionAttempts.id });
     await db
       .update(sourceDocuments)
-      .set({ latestSubmissionRevisionId: latestSubmission!.id })
+      .set({ latestAttemptId: latestSubmission!.id })
       .where(eq(sourceDocuments.id, doc.id));
 
     const result = await getTargetEnhancedStatsQuery({

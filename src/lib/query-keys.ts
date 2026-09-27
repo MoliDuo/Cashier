@@ -64,7 +64,7 @@ export const queryKeys = {
 
   // === Categories ===
   entryCategories: () => ["ledger", "categories"] as const,
-  categoryReclassification: () => ["ledger", "category-reclassification"] as const,
+  categoryAssignment: () => ["ledger", "category-assignment"] as const,
   categoryAssignmentResults: (jobId: string) =>
     ["ledger", "category-assignment", jobId, "results"] as const,
   ledgerSettings: () => ["ledger", "settings"] as const,

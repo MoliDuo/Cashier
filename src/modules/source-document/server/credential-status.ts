@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
-import { ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import { toStableFailureCode } from "@/modules/source-document/lifecycle";
 import { accountingTotal } from "@/lib/money/accounting-total";
 import type { CredentialSourceDocumentStatusResult } from "@/modules/source-document/contracts";
@@ -17,7 +17,7 @@ export async function getCredentialSourceDocumentStatus(
   const rows = await db
     .select({
       document: sourceDocuments,
-      revision: sourceDocumentRevisions,
+      attempt: extractionAttempts,
       mainCurrency: ledgers.mainCurrency,
       entries: sql<
         Array<{
@@ -46,11 +46,11 @@ export async function getCredentialSourceDocumentStatus(
     })
     .from(sourceDocuments)
     .leftJoin(
-      sourceDocumentRevisions,
+      extractionAttempts,
       and(
-        eq(sourceDocumentRevisions.id, sourceDocuments.latestSubmissionRevisionId),
-        eq(sourceDocumentRevisions.sourceDocumentId, sourceDocuments.id),
-        eq(sourceDocumentRevisions.ledgerId, ledgerId)
+        eq(extractionAttempts.id, sourceDocuments.latestAttemptId),
+        eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
+        eq(extractionAttempts.ledgerId, ledgerId)
       )
     )
     .innerJoin(ledgers, eq(ledgers.id, sourceDocuments.ledgerId))
@@ -58,13 +58,13 @@ export async function getCredentialSourceDocumentStatus(
     .limit(1);
   const row = rows[0];
   if (row == null) return null;
-  const { document, revision } = row;
+  const { document, attempt } = row;
   const status =
-    revision == null
+    attempt == null
       ? "completed"
-      : revision.failureKind === "invalid_input"
+      : attempt.failureKind === "invalid_input"
         ? "invalid"
-        : (revision.processingStatus as CredentialSourceDocumentStatusResult["status"]);
+        : (attempt.status as CredentialSourceDocumentStatusResult["status"]);
   let result: CredentialSourceDocumentStatusResult["result"] = null;
   if (status === "completed") {
     result = {
@@ -85,19 +85,19 @@ export async function getCredentialSourceDocumentStatus(
   // the ledger owner reads, which may be absent.
   const error =
     status === "failed"
-      ? { code: toStableFailureCode(revision?.failureCode ?? null) }
+      ? { code: toStableFailureCode(attempt?.failureCode ?? null) }
       : status === "invalid"
-        ? { code: "VALIDATION_FAILED", message: revision?.failureMessage ?? null }
+        ? { code: "VALIDATION_FAILED", message: attempt?.failureMessage ?? null }
         : null;
   return {
     sourceDocumentId: document.id,
-    revisionId: revision?.id ?? null,
+    revisionId: attempt?.id ?? null,
     status,
-    submittedAt: (revision?.submittedAt ?? document.createdAt).toISOString(),
+    submittedAt: (attempt?.submittedAt ?? document.createdAt).toISOString(),
     finalizedAt:
-      revision == null
+      attempt == null
         ? document.createdAt.toISOString()
-        : (revision.finishedAt?.toISOString() ?? null),
+        : (attempt.finishedAt?.toISOString() ?? null),
     entryDate: document.documentDate,
     result,
     error,

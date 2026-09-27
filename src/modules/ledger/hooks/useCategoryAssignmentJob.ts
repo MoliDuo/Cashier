@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchCategoryReclassificationJob } from "@/modules/ledger/queries";
+import { fetchCategoryAssignmentJob } from "@/modules/ledger/queries";
 import { queryKeys } from "@/lib/query-keys";
 import { invalidateLedgerQueries } from "@/lib/mutations/ledger-invalidation";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import {
   isCategoryAssignmentJobActive,
   shouldShowCategoryAssignmentStatus,
@@ -23,12 +23,12 @@ const REFRESH_GROUPS = ["documents", "categories", "stats"] as const;
 /** A run's outcome that still has to reach the reader. */
 export interface CategoryAssignmentNotice {
   jobId: string;
-  job: CategoryReclassificationJob;
+  job: CategoryAssignmentJob;
 }
 
 export interface CategoryAssignmentJobState {
   /** The ledger's most recent run, or null when it has never had one. */
-  job: CategoryReclassificationJob | null;
+  job: CategoryAssignmentJob | null;
   isActive: boolean;
   isReadError: boolean;
   /** Whether the status band has something worth showing. */
@@ -41,14 +41,14 @@ export interface CategoryAssignmentJobState {
    * notice alive when the reader moves to another tab before it finishes, and
    * what reports a run whose first answer already says it is over.
    */
-  registerSubmittedJob: (job: CategoryReclassificationJob) => void;
+  registerSubmittedJob: (job: CategoryAssignmentJob) => void;
   /** Outcomes waiting for their toast; consumed once each, by the notifier. */
   notices: readonly CategoryAssignmentNotice[];
   consumeNotice: (jobId: string) => void;
 }
 
 /** Everything about a poll that a reader can see change. */
-function jobSignature(job: CategoryReclassificationJob): string {
+function jobSignature(job: CategoryAssignmentJob): string {
   return [
     job.status,
     job.processedCount,
@@ -85,9 +85,9 @@ export function useCategoryAssignmentJob(): CategoryAssignmentJobState {
   // failure, which has no job to key on.
   const [dismissedJobId, setDismissedJobId] = useState<string | null | "none">("none");
   const [notices, setNotices] = useState<CategoryAssignmentNotice[]>([]);
-  const query = useQuery<CategoryReclassificationJob | null>({
-    queryKey: queryKeys.categoryReclassification(),
-    queryFn: () => fetchCategoryReclassificationJob(),
+  const query = useQuery<CategoryAssignmentJob | null>({
+    queryKey: queryKeys.categoryAssignment(),
+    queryFn: () => fetchCategoryAssignmentJob(),
     refetchInterval: (query) => {
       if (query.state.status === "error") {
         const attempt = Math.max(0, query.state.fetchFailureCount - 1);
@@ -182,11 +182,11 @@ export function useCategoryAssignmentJob(): CategoryAssignmentJobState {
 
   const dismiss = useCallback(() => setDismissedJobId(job?.id ?? null), [job?.id]);
   const registerSubmittedJob = useCallback(
-    (submitted: CategoryReclassificationJob) => {
+    (submitted: CategoryAssignmentJob) => {
       setSubmittedJobIds((current) =>
         current.includes(submitted.id) ? current : [...current, submitted.id]
       );
-      queryClient.setQueryData(queryKeys.categoryReclassification(), submitted);
+      queryClient.setQueryData(queryKeys.categoryAssignment(), submitted);
     },
     [queryClient]
   );

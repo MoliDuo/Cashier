@@ -114,23 +114,22 @@ describe("PostgreSQL schema contract", () => {
   it("keeps every tenant-scoped composite foreign key", async () => {
     const byName = new Map((await fetchConstraints()).map((row) => [row.conname, row.definition]));
     const expected = [
-      "fk_ledger_entries_document_ledger",
-      "fk_ledger_entries_category_ledger",
-      "fk_source_document_files_document_ledger",
-      "fk_source_document_files_stored_file_ledger",
-      "fk_source_documents_latest_submission_revision",
+      "fk_ledger_entries_source_document",
+      "fk_ledger_entries_category",
+      "fk_source_document_files_source_document",
+      "fk_source_document_files_stored_file",
+      "fk_source_documents_latest_attempt",
+      "fk_extraction_attempts_source_document",
     ];
     for (const name of expected) {
       expect(byName.has(name), `missing foreign key ${name}`).toBe(true);
     }
 
     // The category FK must be ledger-scoped and keep the set-null behavior.
-    expect(byName.get("fk_ledger_entries_category_ledger")).toContain(
+    expect(byName.get("fk_ledger_entries_category")).toContain(
       "FOREIGN KEY (ledger_id, category_id)"
     );
-    expect(byName.get("fk_ledger_entries_category_ledger")).toContain(
-      "ON DELETE SET NULL (category_id)"
-    );
+    expect(byName.get("fk_ledger_entries_category")).toContain("ON DELETE SET NULL (category_id)");
     // The legacy single-column FK must be gone.
     expect(byName.has("ledger_entries_category_id_entry_categories_id_fk")).toBe(false);
   });
@@ -138,8 +137,7 @@ describe("PostgreSQL schema contract", () => {
   it("keeps sync version guards", async () => {
     const byName = new Map((await fetchConstraints()).map((row) => [row.conname, row.definition]));
 
-    // 0016 declared these inline, so PostgreSQL auto-named them.
-    expect(compact(byName.get("ledger_sync_state_version_check"))).toContain("version>=0");
+    expect(compact(byName.get("ck_ledger_sync_state_version"))).toContain("version>=0");
     expect(byName.has("ledger_change_batches_version_check")).toBe(false);
   });
 
@@ -153,7 +151,7 @@ describe("PostgreSQL schema contract", () => {
     }
     for (const name of [
       "trg_source_documents_change_log",
-      "trg_source_document_revisions_change_log",
+      "trg_extraction_attempts_change_log",
       "trg_ledger_entries_change_log",
       "trg_entry_categories_change_log",
       "trg_ledgers_settings_change_log",
@@ -193,20 +191,27 @@ describe("PostgreSQL schema contract", () => {
     for (const name of [
       "uq_entry_categories_ledger_id_id",
       "idx_ledger_entries_document_position",
-      "idx_source_documents_active_feed",
-      "idx_ledger_entries_active_feed",
-      "idx_ledger_entries_active_category",
-      "idx_ledger_entries_active_currency",
+      "idx_source_documents_feed",
+      "idx_source_documents_book_feed",
+      "idx_extraction_attempts_due",
+      "idx_ledger_entries_category",
       "idx_ledger_entries_search",
     ]) {
       expect(byName.has(name), `missing index ${name}`).toBe(true);
     }
-    expect(byName.get("idx_source_documents_active_feed")).toContain("effective_date");
+    expect(byName.get("idx_source_documents_feed")).toContain("effective_date");
+    expect(byName.get("idx_source_documents_book_feed")).toContain("book_id, effective_date");
     expect(byName.get("idx_ledger_entries_search")).toContain("gin");
   });
 
-  it("keeps deleted_at only as the credential revocation mark", async () => {
-    const tables = ["source_documents", "ledger_entries", "entry_categories", "stored_files"];
+  it("hard-deletes rows and marks only a credential as revoked", async () => {
+    const tables = [
+      "source_documents",
+      "ledger_entries",
+      "entry_categories",
+      "stored_files",
+      "service_credentials",
+    ];
     for (const table of tables) {
       const columns = (await fetchColumns(table)).map((column) => column.columnName);
       expect(columns, table).not.toContain("deleted_at");
@@ -214,7 +219,66 @@ describe("PostgreSQL schema contract", () => {
     const credentialColumns = (await fetchColumns("service_credentials")).map(
       (column) => column.columnName
     );
-    expect(credentialColumns).toContain("deleted_at");
+    expect(credentialColumns).toContain("revoked_at");
+  });
+
+  it("names every constraint and index by one convention", async () => {
+    const tables = new Set(
+      (
+        await getTestDb().execute<{ name: string }>(sql`
+          SELECT table_name AS name FROM information_schema.tables
+          WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'
+        `)
+      ).rows.map((row) => row.name)
+    );
+    const ownedBy = (name: string, prefix: string) =>
+      [...tables].some((table) => name.startsWith(`${prefix}_${table}_`));
+    const misnamed: string[] = [];
+    for (const row of await fetchConstraints()) {
+      const prefix = { c: "ck", f: "fk", u: "uq", p: null }[row.type];
+      if (prefix == null) {
+        if (!tables.has(row.conname.replace(/_pkey$/, ""))) misnamed.push(row.conname);
+      } else if (!ownedBy(row.conname, prefix)) {
+        misnamed.push(row.conname);
+      }
+    }
+    for (const row of await fetchIndexes()) {
+      if (row.indexname.endsWith("_pkey")) continue;
+      const prefix = row.indexdef.startsWith("CREATE UNIQUE") ? "uq" : "idx";
+      if (!ownedBy(row.indexname, prefix)) misnamed.push(row.indexname);
+    }
+    expect(misnamed).toEqual([]);
+  });
+
+  it("keeps entries tied to a document and attempt dates as dates", async () => {
+    const columns = await getTestDb().execute<{
+      table: string;
+      column: string;
+      nullable: string;
+      type: string;
+    }>(sql`
+      SELECT table_name AS table, column_name AS column, is_nullable AS nullable, data_type AS type
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND (table_name, column_name) IN (
+          ('ledger_entries', 'source_document_id'),
+          ('extraction_attempts', 'requested_date'),
+          ('extraction_attempts', 'claim_token'),
+          ('login_emails', 'verified_at')
+        )
+      ORDER BY table_name, column_name
+    `);
+    expect(columns.rows).toEqual([
+      { table: "extraction_attempts", column: "claim_token", nullable: "YES", type: "uuid" },
+      { table: "extraction_attempts", column: "requested_date", nullable: "YES", type: "date" },
+      { table: "ledger_entries", column: "source_document_id", nullable: "NO", type: "uuid" },
+      {
+        table: "login_emails",
+        column: "verified_at",
+        nullable: "NO",
+        type: "timestamp with time zone",
+      },
+    ]);
   });
 
   it("keeps no passwords, auth versions or setup state", async () => {

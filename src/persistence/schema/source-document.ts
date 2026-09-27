@@ -4,7 +4,6 @@ import {
   text,
   index,
   uniqueIndex,
-  timestamp,
   uuid,
   date,
   integer,
@@ -13,8 +12,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { type InferSelectModel, sql } from "drizzle-orm";
 import { ledgers, books } from "./ledger";
+import { rowTimestamp } from "./columns";
 
-const sourceDocumentRevisionsReference = pgTable("source_document_revisions", {
+const extractionAttemptsReference = pgTable("extraction_attempts", {
   id: uuid("id").notNull(),
   ledgerId: uuid("ledger_id").notNull(),
   sourceDocumentId: uuid("source_document_id").notNull(),
@@ -24,10 +24,9 @@ export const sourceDocuments = pgTable(
   "source_documents",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
+    ledgerId: uuid("ledger_id").notNull(),
     bookId: uuid("book_id").notNull(),
+    /** The title, whether typed or taken from the latest completed extraction. */
     title: text("title"),
     /** The text of the current attempt's input; its files are in `source_document_files`. */
     inputText: text("input_text"),
@@ -35,7 +34,8 @@ export const sourceDocuments = pgTable(
     effectiveDate: date("effective_date", { mode: "string" })
       .notNull()
       .generatedAlwaysAs(sql`COALESCE("document_date", ("created_at" AT TIME ZONE 'UTC')::date)`),
-    latestSubmissionRevisionId: uuid("latest_submission_revision_id"),
+    /** The newest extraction attempt; null for a record entered or split off by hand. */
+    latestAttemptId: uuid("latest_attempt_id"),
     version: integer("version").notNull().default(1),
     /** Who sent the create request that made the document: `user:<id>` or `credential:<id>`. */
     idempotencySource: text("idempotency_source"),
@@ -46,35 +46,36 @@ export const sourceDocuments = pgTable(
     dateOrganizationSuggestion: jsonb("date_organization_suggestion").$type<
       import("@/lib/ai/date-organization").DateOrganizationSuggestion
     >(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: rowTimestamp("created_at"),
+    updatedAt: rowTimestamp("updated_at"),
   },
   (table) => [
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "fk_source_documents_ledger",
+    }).onDelete("cascade"),
     uniqueIndex("uq_source_documents_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_source_documents_ledger_book").on(table.ledgerId, table.bookId),
     foreignKey({
       columns: [table.ledgerId, table.bookId],
       foreignColumns: [books.ledgerId, books.id],
-      name: "fk_source_documents_book_ledger",
+      name: "fk_source_documents_book",
     }),
-    index("idx_source_documents_active_feed").on(
+    index("idx_source_documents_feed").on(
       table.ledgerId,
       table.effectiveDate.desc(),
       table.createdAt.desc(),
       table.id.desc()
     ),
-    index("idx_source_documents_latest_submission_revision").on(table.latestSubmissionRevisionId),
-    index("idx_source_documents_ledger_document_date").on(
+    index("idx_source_documents_book_feed").on(
       table.ledgerId,
-      table.documentDate,
+      table.bookId,
+      table.effectiveDate.desc(),
       table.createdAt.desc(),
       table.id.desc()
     ),
-    check("source_documents_version_check", sql`${table.version} > 0`),
+    index("idx_source_documents_latest_attempt").on(table.latestAttemptId),
+    check("ck_source_documents_version", sql`${table.version} > 0`),
     check(
       "ck_source_documents_idempotency",
       sql`(${table.idempotencySource} IS NULL) = (${table.idempotencyKey} IS NULL)`
@@ -85,13 +86,13 @@ export const sourceDocuments = pgTable(
       table.idempotencyKey
     ),
     foreignKey({
-      columns: [table.ledgerId, table.id, table.latestSubmissionRevisionId],
+      columns: [table.ledgerId, table.id, table.latestAttemptId],
       foreignColumns: [
-        sourceDocumentRevisionsReference.ledgerId,
-        sourceDocumentRevisionsReference.sourceDocumentId,
-        sourceDocumentRevisionsReference.id,
+        extractionAttemptsReference.ledgerId,
+        extractionAttemptsReference.sourceDocumentId,
+        extractionAttemptsReference.id,
       ],
-      name: "fk_source_documents_latest_submission_revision",
+      name: "fk_source_documents_latest_attempt",
     }),
   ]
 );

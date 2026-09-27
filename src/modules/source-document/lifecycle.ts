@@ -1,13 +1,13 @@
 /** Pure lifecycle rules for source documents, shared by server and client code. */
 
-export type RevisionProcessingStatus = "processing" | "completed" | "failed" | "cancelled";
-export type RevisionFailureKind = "invalid_input" | "processing_error";
+export type AttemptProcessingStatus = "processing" | "completed" | "failed" | "cancelled";
+export type AttemptFailureKind = "invalid_input" | "processing_error";
 
 export type SupportedSourceDocumentAction =
   "retry" | "edit_retry" | "delete" | "cancel_processing" | "split_entries";
 
 export function supportedSourceDocumentActions(input: {
-  latestSubmissionStatus: RevisionProcessingStatus | null;
+  latestAttemptStatus: AttemptProcessingStatus | null;
   hasSubmissionInput: boolean;
   deleted?: boolean;
 }): readonly SupportedSourceDocumentAction[] {
@@ -15,7 +15,7 @@ export function supportedSourceDocumentActions(input: {
     return [];
   }
 
-  if (input.latestSubmissionStatus === "processing") {
+  if (input.latestAttemptStatus === "processing") {
     return ["cancel_processing", "retry", "edit_retry", "delete"];
   }
 

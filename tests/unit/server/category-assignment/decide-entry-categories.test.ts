@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIMessageContentPart } from "@/lib/tasks/types";
 import type {
-  ReclassificationCandidate,
-  ReclassificationDocumentGroup,
-} from "@/modules/ledger/domain/reclassification-protocol";
-import { decideEntryCategories } from "@/server/category-reclassification/reclassifier";
+  CategoryAssignmentCandidate,
+  CategoryAssignmentDocumentGroup,
+} from "@/modules/ledger/domain/category-assignment-protocol";
+import { decideEntryCategories } from "@/server/category-assignment/decide-entry-categories";
 
 const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
 
@@ -14,14 +14,14 @@ vi.mock("@/lib/ai/openai-client", () => ({
 
 type SentMessage = { role: string; content: AIMessageContentPart[] };
 
-const candidates: ReclassificationCandidate[] = [
+const candidates: CategoryAssignmentCandidate[] = [
   { id: "cat-food", name: "吃喝", description: null },
   { id: "cat-home", name: "居家", description: null },
 ];
 
 function group(
-  overrides: Partial<ReclassificationDocumentGroup> = {}
-): ReclassificationDocumentGroup {
+  overrides: Partial<CategoryAssignmentDocumentGroup> = {}
+): CategoryAssignmentDocumentGroup {
   return {
     sourceDocumentId: "doc-1",
     title: null,
@@ -56,7 +56,7 @@ function sentText(): string {
     .join("\n");
 }
 
-describe("entryReclassifierAdapter", () => {
+describe("entryCategoryDeciderAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

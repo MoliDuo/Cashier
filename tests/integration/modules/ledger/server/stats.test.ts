@@ -365,7 +365,7 @@ describe("getLedgerStatsAction", () => {
     await db.insert(loginEmails).values({
       userId: OTHER_USER_ID,
       email: "other@example.com",
-      emailVerified: new Date(),
+      verifiedAt: new Date(),
     });
 
     const otherLedgerId = randomUUID();

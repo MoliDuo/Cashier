@@ -6,12 +6,12 @@ import { describe, it, expect } from "vitest";
 import {
   MAX_FILES,
   MAX_ORIGINAL_BYTES_PER_FILE,
-  MAX_NORMALIZED_BYTES_PER_REVISION,
+  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
   MAX_MEGAPIXELS_PER_FILE,
   SUPPORTED_MIME_TYPES,
   validateFileUpload,
   validateImageProcessing,
-  validateRevisionUpload,
+  validateAttemptUpload,
   validateFileCount,
   validateAggregateFileCount,
   sanitizeMimeType,
@@ -69,17 +69,17 @@ describe("validateImageProcessing", () => {
   });
 });
 
-describe("validateRevisionUpload", () => {
+describe("validateAttemptUpload", () => {
   it("accepts the aggregate boundary and rejects one byte over it", () => {
-    expect(() => validateRevisionUpload(0, MAX_NORMALIZED_BYTES_PER_REVISION)).not.toThrow();
+    expect(() => validateAttemptUpload(0, MAX_NORMALIZED_BYTES_PER_ATTEMPT)).not.toThrow();
     expect(() =>
-      validateRevisionUpload(
-        MAX_NORMALIZED_BYTES_PER_REVISION / 2,
-        MAX_NORMALIZED_BYTES_PER_REVISION / 2
+      validateAttemptUpload(
+        MAX_NORMALIZED_BYTES_PER_ATTEMPT / 2,
+        MAX_NORMALIZED_BYTES_PER_ATTEMPT / 2
       )
     ).not.toThrow();
-    expect(() => validateRevisionUpload(MAX_NORMALIZED_BYTES_PER_REVISION, 1)).toThrow(
-      "exceeds revision limit"
+    expect(() => validateAttemptUpload(MAX_NORMALIZED_BYTES_PER_ATTEMPT, 1)).toThrow(
+      "exceeds attempt limit"
     );
   });
 });

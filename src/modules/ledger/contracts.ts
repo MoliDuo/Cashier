@@ -112,7 +112,7 @@ export interface StartCategoryAssignmentInput {
   ledgerEntryIds: string[];
 }
 export type CategoryAssignmentJobStatus =
-  "preparing" | "pending" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
+  "pending" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
 export type CategoryAssignmentEntryOutcome =
   "applied" | "confirmed" | "failed" | "conflict" | "skipped" | "cancelled";
 export interface CategoryAssignmentCandidateSnapshot {
@@ -125,7 +125,7 @@ export interface CategoryAssignmentCandidateSnapshot {
  * A category assignment run as the client sees it. Selection rows stay on the
  * server and every v2 entry has one mutually exclusive final outcome.
  */
-export interface CategoryReclassificationJobDto {
+export interface CategoryAssignmentJobDto {
   id: string;
   mode: CategoryAssignmentMode;
   status: CategoryAssignmentJobStatus;
@@ -146,14 +146,13 @@ export interface CategoryReclassificationJobDto {
   retryingDocumentCount: number;
   nextRetryAt: string | null;
   candidateCategories: CategoryAssignmentCandidateSnapshot[];
-  errorCode: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
   canRetryFailed: boolean;
   evidenceIncomplete: boolean;
 }
-export type CategoryReclassificationJob = CategoryReclassificationJobDto;
+export type CategoryAssignmentJob = CategoryAssignmentJobDto;
 
 export interface CategoryAssignmentEntryResultDto {
   ledgerEntryId: string;

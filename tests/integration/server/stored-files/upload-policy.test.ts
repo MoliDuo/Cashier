@@ -2,7 +2,7 @@ import type { ObjectStore } from "@/lib/storage";
 /**
  * Upload Policy Integration Tests
  *
- * Covers boundary enforcement across the full upload -> finalize -> revision-attach
+ * Covers boundary enforcement across the full upload -> finalize -> attempt-attach
  * pipeline, using the real Postgres adapters with an in-memory R2 store.
  * Every test verifies that policy violations terminate before durable state
  * is created and that internal keys are never leaked.
@@ -18,14 +18,14 @@ import {
   storeProcessedImages,
 } from "@/server/stored-files/uploads";
 import { DirectMemoryObjectStore, MemoryObjectStore } from "tests/helpers/memory-object-store";
-import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
+import { createProcessingAttemptInTransaction } from "@/modules/source-document/server/extraction-attempts";
 import { ConflictError, ValidationError } from "@/lib/errors";
 import {
-  MAX_NORMALIZED_BYTES_PER_REVISION,
+  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
   MAX_ORIGINAL_BYTES_PER_FILE,
   MAX_FILES,
 } from "@/lib/storage/upload-policy";
-import { sourceDocumentRevisions, storedFiles } from "@/persistence";
+import { extractionAttempts, storedFiles } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
@@ -151,20 +151,20 @@ describe("upload policy integration", () => {
     });
   });
 
-  describe("aggregate byte overflow at revision attachment", () => {
-    it("rejects revision attachment when total bytes exceed MAX_NORMALIZED_BYTES_PER_REVISION", async () => {
+  describe("aggregate byte overflow at attempt attachment", () => {
+    it("rejects attempt attachment when total bytes exceed MAX_NORMALIZED_BYTES_PER_ATTEMPT", async () => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
       const bookId = await testBookId(db, ledgerId);
       objectStore.current = new MemoryObjectStore();
 
-      // Create enough finalized stored files to overflow the revision aggregate limit.
+      // Create enough finalized stored files to overflow the attempt aggregate limit.
       // Each file must be below MAX_ORIGINAL_BYTES_PER_FILE (4 MB), but their sum
-      // must exceed MAX_NORMALIZED_BYTES_PER_REVISION (20 MB).
+      // must exceed MAX_NORMALIZED_BYTES_PER_ATTEMPT (20 MB).
       const fileSize = Math.floor(MAX_ORIGINAL_BYTES_PER_FILE * 0.9); // ~3.6 MB per file
-      const fileCount = Math.ceil(MAX_NORMALIZED_BYTES_PER_REVISION / fileSize) + 1; // enough to exceed
+      const fileCount = Math.ceil(MAX_NORMALIZED_BYTES_PER_ATTEMPT / fileSize) + 1; // enough to exceed
       const totalBytes = fileSize * fileCount;
-      expect(totalBytes).toBeGreaterThan(MAX_NORMALIZED_BYTES_PER_REVISION);
+      expect(totalBytes).toBeGreaterThan(MAX_NORMALIZED_BYTES_PER_ATTEMPT);
       expect(fileSize).toBeLessThanOrEqual(MAX_ORIGINAL_BYTES_PER_FILE);
 
       const files = await Promise.all(
@@ -173,11 +173,11 @@ describe("upload policy integration", () => {
         )
       );
 
-      // Try to create a pending revision linking both files — must run inside a
-      // db.transaction since createProcessingRevisionInTransaction expects a tx handle.
+      // Try to create a pending attempt linking both files — must run inside a
+      // db.transaction since createProcessingAttemptInTransaction expects a tx handle.
       await expect(
         db.transaction(async (tx) =>
-          createProcessingRevisionInTransaction(tx, {
+          createProcessingAttemptInTransaction(tx, {
             ledgerId,
             bookId,
             input: {
@@ -189,12 +189,12 @@ describe("upload policy integration", () => {
         )
       ).rejects.toThrow(ValidationError);
 
-      // No revision rows were created in the database
-      const revisions = await db.select().from(sourceDocumentRevisions);
-      expect(revisions).toHaveLength(0);
+      // No attempt rows were created in the database
+      const attempts = await db.select().from(extractionAttempts);
+      expect(attempts).toHaveLength(0);
     });
 
-    it("accepts revision attachment when total bytes are within limit", async () => {
+    it("accepts attempt attachment when total bytes are within limit", async () => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
       const bookId = await testBookId(db, ledgerId);
@@ -204,7 +204,7 @@ describe("upload policy integration", () => {
       const file = await finalizedFile(ledgerId, body);
 
       const result = await db.transaction(async (tx) =>
-        createProcessingRevisionInTransaction(tx, {
+        createProcessingAttemptInTransaction(tx, {
           ledgerId,
           bookId,
           input: { text: null, storedFileIds: [file.id], documentDate: "2026-07-15" },
@@ -212,12 +212,12 @@ describe("upload policy integration", () => {
       );
 
       expect(result.document).toBeDefined();
-      expect(result.revision).toBeDefined();
+      expect(result.attempt).toBeDefined();
     });
   });
 
-  describe("aggregate file count at revision boundary", () => {
-    it("rejects revision attachment when file count exceeds MAX_FILES", async () => {
+  describe("aggregate file count at attempt boundary", () => {
+    it("rejects attempt attachment when file count exceeds MAX_FILES", async () => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
       const bookId = await testBookId(db, ledgerId);
@@ -231,7 +231,7 @@ describe("upload policy integration", () => {
 
       await expect(
         db.transaction(async (tx) =>
-          createProcessingRevisionInTransaction(tx, {
+          createProcessingAttemptInTransaction(tx, {
             ledgerId,
             bookId,
             input: {
@@ -243,12 +243,12 @@ describe("upload policy integration", () => {
         )
       ).rejects.toThrow(ValidationError);
 
-      // No revision was created
-      const revisions = await db.select().from(sourceDocumentRevisions);
-      expect(revisions).toHaveLength(0);
+      // No attempt was created
+      const attempts = await db.select().from(extractionAttempts);
+      expect(attempts).toHaveLength(0);
     });
 
-    it("accepts revision attachment at exactly MAX_FILES", async () => {
+    it("accepts attempt attachment at exactly MAX_FILES", async () => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
       const bookId = await testBookId(db, ledgerId);
@@ -260,7 +260,7 @@ describe("upload policy integration", () => {
       );
 
       const result = await db.transaction(async (tx) =>
-        createProcessingRevisionInTransaction(tx, {
+        createProcessingAttemptInTransaction(tx, {
           ledgerId,
           bookId,
           input: {
@@ -272,10 +272,10 @@ describe("upload policy integration", () => {
       );
 
       expect(result.document).toBeDefined();
-      expect(result.revision).toBeDefined();
+      expect(result.attempt).toBeDefined();
     });
 
-    it("rejects revision with duplicate stored-file IDs", async () => {
+    it("rejects attempt with duplicate stored-file IDs", async () => {
       const db = getTestDb();
       const { ledgerId } = await createTestUserWithLedger(db);
       const bookId = await testBookId(db, ledgerId);
@@ -285,7 +285,7 @@ describe("upload policy integration", () => {
 
       await expect(
         db.transaction(async (tx) =>
-          createProcessingRevisionInTransaction(tx, {
+          createProcessingAttemptInTransaction(tx, {
             ledgerId,
             bookId,
             input: {
@@ -297,8 +297,8 @@ describe("upload policy integration", () => {
         )
       ).rejects.toThrow(ValidationError);
 
-      const revisions = await db.select().from(sourceDocumentRevisions);
-      expect(revisions).toHaveLength(0);
+      const attempts = await db.select().from(extractionAttempts);
+      expect(attempts).toHaveLength(0);
     });
   });
 

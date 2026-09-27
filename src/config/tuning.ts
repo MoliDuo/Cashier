@@ -51,7 +51,7 @@ export const AI_RETRY_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1_000;
  * parse and for recording the outcome, so a slow parse fails as
  * `processing_timeout` instead of being killed and retried from scratch.
  */
-export const AI_REVISION_DEADLINE_MS = FUNCTION_BUDGET_MS - 3 * OUTCOME_RESERVE_MS;
+export const AI_ATTEMPT_DEADLINE_MS = FUNCTION_BUDGET_MS - 3 * OUTCOME_RESERVE_MS;
 
 export const AI_CATEGORY_REQUEST_TIMEOUT_MS = 60_000;
 /** The most entries one category assignment can be started over. */

@@ -127,6 +127,13 @@
       "when": 1790399507689,
       "tag": "0017_drop_passwords_and_setup_state",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790488379154,
+      "tag": "0018_names_and_cleanup",
+      "breakpoints": true
     }
   ]
 }

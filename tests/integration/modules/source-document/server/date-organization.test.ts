@@ -115,15 +115,12 @@ describe("date organization", () => {
       ["2026-09-09", ["Yesterday"]],
       ["2026-09-08", ["Earlier"]],
     ]);
-    // Each new bill keeps the input the entries were read from, without a revision.
+    // Each new bill keeps the input the entries were read from, without a attempt.
     expect(created.map(({ document }) => document.inputText)).toEqual([
       "Long screenshot text",
       "Long screenshot text",
     ]);
-    expect(created.map(({ document }) => document.latestSubmissionRevisionId)).toEqual([
-      null,
-      null,
-    ]);
+    expect(created.map(({ document }) => document.latestAttemptId)).toEqual([null, null]);
     const stream = await listStreamPage(fixture.ledgerId);
     const createdCards = result.createdSourceDocumentIds.map((id) =>
       stream.items.find((item) => item.id === id)

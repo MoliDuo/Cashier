@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb } from "tests/setup";
-import { otpTokens, sessions } from "@/persistence";
+import { signInChallenges, sessions } from "@/persistence";
 import { hashOTP } from "@/modules/auth/domain/otp";
 import { DEV_AUTH_EMAIL } from "@/modules/auth/dev-auth";
 import { SESSION_COOKIE_NAME } from "@/modules/auth/constants";
@@ -43,11 +43,11 @@ describe("sign-in actions", () => {
   it("signs in with an OTP, and the cookie then names the session", async () => {
     const { userId } = await createTestUserWithLedger(getTestDb(), EMAIL);
     await getTestDb()
-      .insert(otpTokens)
+      .insert(signInChallenges)
       .values({
         email: EMAIL,
-        tokenHash: hashOTP("123456"),
-        expires: new Date(Date.now() + 5 * 60 * 1000),
+        codeHash: hashOTP("123456"),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       });
 
     await expect(signInWithOtpAction(EMAIL, "123456")).resolves.toEqual({ ok: true });
@@ -60,11 +60,11 @@ describe("sign-in actions", () => {
   it("returns the failure code and opens no session for a wrong code", async () => {
     await createTestUserWithLedger(getTestDb(), EMAIL);
     await getTestDb()
-      .insert(otpTokens)
+      .insert(signInChallenges)
       .values({
         email: EMAIL,
-        tokenHash: hashOTP("123456"),
-        expires: new Date(Date.now() + 5 * 60 * 1000),
+        codeHash: hashOTP("123456"),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       });
 
     await expect(signInWithOtpAction(EMAIL, "654321")).resolves.toEqual({

@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { AIMessageContentPart } from "@/lib/tasks/types";
 import {
-  buildReclassificationDocumentMessage,
-  buildReclassificationPrompt,
-  resolveReclassificationDecisions,
-  type ReclassificationCandidate,
-  type ReclassificationDocumentGroup,
-  type ReclassificationSubject,
-} from "@/modules/ledger/domain/reclassification-protocol";
+  buildCategoryAssignmentDocumentMessage,
+  buildCategoryAssignmentPrompt,
+  resolveCategoryAssignmentDecisions,
+  type CategoryAssignmentCandidate,
+  type CategoryAssignmentDocumentGroup,
+  type CategoryAssignmentSubject,
+} from "@/modules/ledger/domain/category-assignment-protocol";
 
-const candidates: ReclassificationCandidate[] = [
+const candidates: CategoryAssignmentCandidate[] = [
   { id: "cat-food", name: "吃喝", description: "正餐与饮品" },
   { id: "cat-home", name: "居家", description: null },
   { id: "cat-health", name: "健康", description: "医疗与健身" },
 ];
 
-function subject(overrides: Partial<ReclassificationSubject> = {}): ReclassificationSubject {
+function subject(overrides: Partial<CategoryAssignmentSubject> = {}): CategoryAssignmentSubject {
   return {
     ledgerEntryId: "entry-1",
     itemName: "Lunch set",
@@ -29,8 +29,8 @@ function subject(overrides: Partial<ReclassificationSubject> = {}): Reclassifica
 }
 
 function group(
-  overrides: Partial<ReclassificationDocumentGroup> = {}
-): ReclassificationDocumentGroup {
+  overrides: Partial<CategoryAssignmentDocumentGroup> = {}
+): CategoryAssignmentDocumentGroup {
   return {
     sourceDocumentId: "doc-1",
     title: null,
@@ -56,9 +56,9 @@ function textOf(parts: readonly AIMessageContentPart[]): string {
   return first != null && first.type === "text" ? first.text : "";
 }
 
-describe("buildReclassificationPrompt", () => {
+describe("buildCategoryAssignmentPrompt", () => {
   it("numbers candidates from 1 and requires the closest candidate", () => {
-    const prompt = buildReclassificationPrompt({ candidates });
+    const prompt = buildCategoryAssignmentPrompt({ candidates });
 
     expect(prompt).toContain("1. 吃喝 — 正餐与饮品");
     expect(prompt).toContain("2. 居家");
@@ -69,7 +69,7 @@ describe("buildReclassificationPrompt", () => {
   });
 
   it("points the model at the document itself and scopes the entry list to one document", () => {
-    const prompt = buildReclassificationPrompt({ candidates });
+    const prompt = buildCategoryAssignmentPrompt({ candidates });
 
     expect(prompt).toContain("That list covers a single source document");
     expect(prompt).toContain("its title, date, submitted text, and any attached image");
@@ -77,27 +77,27 @@ describe("buildReclassificationPrompt", () => {
   });
 
   it("carries the ledger's own instructions when it has any", () => {
-    expect(buildReclassificationPrompt({ candidates, customPrompt: "只按商家判断" })).toContain(
+    expect(buildCategoryAssignmentPrompt({ candidates, customPrompt: "只按商家判断" })).toContain(
       "只按商家判断"
     );
-    expect(buildReclassificationPrompt({ candidates, customPrompt: "" })).not.toContain(
+    expect(buildCategoryAssignmentPrompt({ candidates, customPrompt: "" })).not.toContain(
       "Additional Instructions"
     );
-    expect(buildReclassificationPrompt({ candidates })).not.toContain("Additional Instructions");
+    expect(buildCategoryAssignmentPrompt({ candidates })).not.toContain("Additional Instructions");
   });
 
   it("says nothing about an output locale", () => {
     // The response is integers; an output-locale directive would be noise.
-    const prompt = buildReclassificationPrompt({ candidates });
+    const prompt = buildCategoryAssignmentPrompt({ candidates });
 
     expect(prompt).not.toContain("Mandatory Output Locale");
     expect(prompt).not.toContain("Output Locale");
   });
 });
 
-describe("buildReclassificationDocumentMessage", () => {
+describe("buildCategoryAssignmentDocumentMessage", () => {
   it("numbers the document's entries from 1 and shows where each one sits today", () => {
-    const parts = buildReclassificationDocumentMessage({ group: group() });
+    const parts = buildCategoryAssignmentDocumentMessage({ group: group() });
 
     expect(parts).toHaveLength(1);
     const body = textOf(parts);
@@ -111,7 +111,7 @@ describe("buildReclassificationDocumentMessage", () => {
 
   it("carries the document's own context when it has any", () => {
     const body = textOf(
-      buildReclassificationDocumentMessage({
+      buildCategoryAssignmentDocumentMessage({
         group: group({
           title: "全家便利店",
           documentDate: "2026-09-10",
@@ -127,7 +127,7 @@ describe("buildReclassificationDocumentMessage", () => {
 
   it("omits context the document does not have and says nothing about images", () => {
     const body = textOf(
-      buildReclassificationDocumentMessage({
+      buildCategoryAssignmentDocumentMessage({
         group: group({ title: "", inputText: "" }),
       })
     );
@@ -139,7 +139,7 @@ describe("buildReclassificationDocumentMessage", () => {
   });
 
   it("appends the evidence as image parts after the text, in the order given", () => {
-    const parts = buildReclassificationDocumentMessage({
+    const parts = buildCategoryAssignmentDocumentMessage({
       group: group({ storedFileIds: ["f1", "f2"] }),
       images: [{ dataUrl: "data:image/jpeg;base64,AAA" }, { dataUrl: "data:image/png;base64,BBB" }],
     });
@@ -152,7 +152,7 @@ describe("buildReclassificationDocumentMessage", () => {
   });
 });
 
-describe("resolveReclassificationDecisions", () => {
+describe("resolveCategoryAssignmentDecisions", () => {
   const subjects = [
     subject({ ledgerEntryId: "a", currentCategoryId: null }),
     subject({ ledgerEntryId: "b", currentCategoryId: "cat-home" }),
@@ -161,7 +161,7 @@ describe("resolveReclassificationDecisions", () => {
 
   it("resolves one complete decision for every entry", () => {
     expect(
-      resolveReclassificationDecisions({
+      resolveCategoryAssignmentDecisions({
         subjects,
         candidates,
         response: {
@@ -184,7 +184,7 @@ describe("resolveReclassificationDecisions", () => {
 
   it("returns targets that already match so the transaction can confirm them", () => {
     expect(
-      resolveReclassificationDecisions({
+      resolveCategoryAssignmentDecisions({
         subjects,
         candidates,
         response: {
@@ -216,7 +216,7 @@ describe("resolveReclassificationDecisions", () => {
     ];
     for (const testCase of cases) {
       expect(() =>
-        resolveReclassificationDecisions({
+        resolveCategoryAssignmentDecisions({
           subjects: [subjects[0]!],
           candidates,
           response: { decisions: testCase.decisions },
@@ -227,7 +227,7 @@ describe("resolveReclassificationDecisions", () => {
 
   it("rejects duplicate entry decisions", () => {
     expect(() =>
-      resolveReclassificationDecisions({
+      resolveCategoryAssignmentDecisions({
         subjects: subjects.slice(0, 2),
         candidates,
         response: {
@@ -242,7 +242,7 @@ describe("resolveReclassificationDecisions", () => {
 
   it("rejects missing entry decisions", () => {
     expect(() =>
-      resolveReclassificationDecisions({
+      resolveCategoryAssignmentDecisions({
         subjects,
         candidates,
         response: { decisions: [{ entry_index: 3, category_index: 3 }] },

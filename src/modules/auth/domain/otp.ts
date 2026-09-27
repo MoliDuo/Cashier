@@ -16,8 +16,8 @@ export function generateOTP(): string {
 }
 
 export function hashOTP(otp: string): string {
-  // Per-token salt keeps token hashes unique even when two accounts receive
-  // the same six-digit code; otp_tokens.token_hash has a global unique index.
+  // A per-code salt means the stored hash says nothing about the code, even
+  // when two addresses receive the same six digits.
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.createHmac("sha256", deriveKey("otp")).update(`${salt}:${otp}`).digest("hex");
   return `v2:${hash}:${salt}`;

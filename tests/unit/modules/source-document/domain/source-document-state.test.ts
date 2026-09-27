@@ -5,7 +5,7 @@ describe("source document capabilities", () => {
   it("blocks manual writes while the latest submission is processing", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        latestSubmissionStatus: "processing",
+        latestAttemptStatus: "processing",
         hasSubmissionInput: true,
       })
     ).toMatchObject({ canEdit: false });
@@ -14,7 +14,7 @@ describe("source document capabilities", () => {
   it("allows editing the retained result after processing fails", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        latestSubmissionStatus: "failed",
+        latestAttemptStatus: "failed",
         hasSubmissionInput: true,
       })
     ).toMatchObject({
@@ -26,7 +26,7 @@ describe("source document capabilities", () => {
   it("allows editing by hand a document whose first parse failed", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        latestSubmissionStatus: "failed",
+        latestAttemptStatus: "failed",
         hasSubmissionInput: true,
       })
     ).toEqual({
@@ -38,7 +38,7 @@ describe("source document capabilities", () => {
   it("does not offer retry for a purely manual document without submitted input", () => {
     expect(
       deriveSourceDocumentCapabilities({
-        latestSubmissionStatus: null,
+        latestAttemptStatus: null,
         hasSubmissionInput: false,
       }).supportedActions
     ).not.toContain("retry");

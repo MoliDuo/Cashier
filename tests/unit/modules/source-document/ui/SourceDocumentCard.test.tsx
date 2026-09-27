@@ -49,7 +49,7 @@ const ledgerEntry: LedgerEntry = {
 };
 
 describe("SourceDocumentCard interactions", () => {
-  it("shows the total for completed direct revisions without an entry-source badge", () => {
+  it("shows the total for completed direct attempts without an entry-source badge", () => {
     render(
       <SourceDocumentCard
         sourceDocument={{ ...sourceDocument, processingStatus: null }}

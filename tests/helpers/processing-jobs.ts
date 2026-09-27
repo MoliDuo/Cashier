@@ -1,35 +1,35 @@
 import { eq } from "drizzle-orm";
-import type { RevisionProcessingRequestContract } from "@/server/processing/types";
+import type { AttemptProcessingRequestContract } from "@/server/processing/types";
 import type { AIContext } from "@/lib/tasks/types";
-import { processRevision } from "@/server/processing/revision-processor";
+import { processAttempt } from "@/server/processing/attempt-processor";
 import {
   claimProcessingJob,
   recoverProcessingJobs,
   renewProcessingJobLease,
 } from "@/server/processing/jobs";
-import { sourceDocumentRevisions } from "@/persistence";
+import { extractionAttempts } from "@/persistence";
 import { getTestDb } from "../setup";
 
 /** The processing queue functions under test. */
 export function processingJobs() {
   return {
-    claim: (revisionId: string) => claimProcessingJob(revisionId),
-    renew: (revisionId: string, claimToken: string) =>
-      renewProcessingJobLease(revisionId, claimToken),
+    claim: (attemptId: string) => claimProcessingJob(attemptId),
+    renew: (attemptId: string, claimToken: string) =>
+      renewProcessingJobLease(attemptId, claimToken),
     recoverBatch: (ledgerId: string, maxBatch: number) => recoverProcessingJobs(ledgerId, maxBatch),
     /** Leases run on the database clock, so a test expires one by moving it into the past. */
-    expireLease: (revisionId: string) =>
+    expireLease: (attemptId: string) =>
       getTestDb()
-        .update(sourceDocumentRevisions)
+        .update(extractionAttempts)
         .set({ claimExpiresAt: new Date(Date.now() - 60_000) })
-        .where(eq(sourceDocumentRevisions.id, revisionId)),
+        .where(eq(extractionAttempts.id, attemptId)),
   };
 }
 
-/** A revision processor whose model calls come from the given AI context. */
-export function revisionProcessor(createAIContext: (signal: AbortSignal) => AIContext) {
+/** A attempt processor whose model calls come from the given AI context. */
+export function attemptProcessor(createAIContext: (signal: AbortSignal) => AIContext) {
   return {
-    process: (request: RevisionProcessingRequestContract) =>
-      processRevision(request, { createAIContext }),
+    process: (request: AttemptProcessingRequestContract) =>
+      processAttempt(request, { createAIContext }),
   };
 }

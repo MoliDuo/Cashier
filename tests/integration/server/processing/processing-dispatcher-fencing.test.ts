@@ -1,11 +1,11 @@
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
-import { processingJobs, revisionProcessor } from "tests/helpers/processing-jobs";
+import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
+import { processingJobs, attemptProcessor } from "tests/helpers/processing-jobs";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 /**
- * Creates a pending revision + job for a single source document.
+ * Creates a pending attempt + job for a single source document.
  * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions
  * when called multiple times within one test.
  */
@@ -28,7 +28,7 @@ async function pendingIntent(
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
   const bookId = await testBookId(db, ledgerId);
-  const pending = await createPendingRevision({
+  const pending = await createPendingAttempt({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
@@ -37,7 +37,7 @@ async function pendingIntent(
     ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
+      attemptId: pending.attempt.id,
       requestedAt,
     },
   };
@@ -47,14 +47,14 @@ describe("leased processor fencing", () => {
   async function reclaimedLease(job: ProcessingJobContract) {
     const db = getTestDb();
     const adapter = processingJobs();
-    const first = await adapter.claim(job.revisionId);
+    const first = await adapter.claim(job.attemptId);
     expect(first).not.toBeNull();
     // Expire the first claim and let a second worker reclaim the attempt.
     await db
-      .update(sourceDocumentRevisions)
+      .update(extractionAttempts)
       .set({ claimExpiresAt: new Date(Date.now() - 60_000) })
-      .where(eq(sourceDocumentRevisions.id, job.revisionId));
-    const second = await adapter.claim(job.revisionId);
+      .where(eq(extractionAttempts.id, job.attemptId));
+    const second = await adapter.claim(job.attemptId);
     expect(second).not.toBeNull();
     return { adapter, firstToken: first!.claimToken, secondToken: second!.claimToken };
   }
@@ -85,26 +85,26 @@ describe("leased processor fencing", () => {
         reasoning: "single item",
       }),
     }));
-    const processor = revisionProcessor(() => ({ generate }));
+    const processor = attemptProcessor(() => ({ generate }));
 
     await expect(
       processor.process({
         signal: new AbortController().signal,
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
-        revisionId: job.revisionId,
-        lease: { revisionId: job.revisionId, claimToken: firstToken },
+        attemptId: job.attemptId,
+        lease: { attemptId: job.attemptId, claimToken: firstToken },
       })
     ).rejects.toThrow("Processing cancelled");
 
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, job.attemptId),
     });
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
-    expect(revision?.processingStatus).toBe("processing");
-    expect(document?.latestSubmissionRevisionId).toBe(job.revisionId);
+    expect(attempt?.status).toBe("processing");
+    expect(document?.latestAttemptId).toBe(job.attemptId);
     expect(document?.version).toBe(1);
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
@@ -135,26 +135,26 @@ describe("leased processor fencing", () => {
         reasoning: "blurry image",
       }),
     }));
-    const processor = revisionProcessor(() => ({ generate }));
+    const processor = attemptProcessor(() => ({ generate }));
 
     await expect(
       processor.process({
         signal: new AbortController().signal,
         ledgerId,
         sourceDocumentId: job.sourceDocumentId,
-        revisionId: job.revisionId,
-        lease: { revisionId: job.revisionId, claimToken: firstToken },
+        attemptId: job.attemptId,
+        lease: { attemptId: job.attemptId, claimToken: firstToken },
       })
     ).rejects.toThrow("Processing cancelled");
 
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, job.attemptId),
     });
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
-    expect(revision?.processingStatus).toBe("processing");
-    expect(revision?.failureMessage).toBeNull();
+    expect(attempt?.status).toBe("processing");
+    expect(attempt?.failureMessage).toBeNull();
     expect(document?.version).toBe(1);
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });

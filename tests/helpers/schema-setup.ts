@@ -136,9 +136,9 @@ export async function createTestSourceDocument(
       documentDate: overrides.entryDate ?? null,
       title: overrides.title ?? null,
       inputText: overrides.text ?? "Test document",
-      revisions: [
+      attempts: [
         {
-          processingStatus:
+          status:
             status === "processing"
               ? "processing"
               : status === "invalid" || status === "failed"
@@ -195,19 +195,19 @@ export async function activateTestSourceDocumentProjection(
     if (existingFiles.length === 0) {
       await seedDocumentFiles(tx, document, testImageFiles(content.imageUrls ?? []));
     }
-    if (content.parsed === true && document.latestSubmissionRevisionId == null) {
-      const [revision] = await tx
-        .insert(schema.sourceDocumentRevisions)
+    if (content.parsed === true && document.latestAttemptId == null) {
+      const [attempt] = await tx
+        .insert(schema.extractionAttempts)
         .values({
           ledgerId: document.ledgerId,
           sourceDocumentId,
-          processingStatus: "completed",
+          status: "completed",
           finishedAt: new Date(),
         })
-        .returning({ id: schema.sourceDocumentRevisions.id });
+        .returning({ id: schema.extractionAttempts.id });
       await tx
         .update(schema.sourceDocuments)
-        .set({ latestSubmissionRevisionId: revision!.id })
+        .set({ latestAttemptId: attempt!.id })
         .where(eq(schema.sourceDocuments.id, sourceDocumentId));
     }
     // Entries already settled keep their order; ones inserted since follow them.

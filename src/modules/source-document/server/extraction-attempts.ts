@@ -1,16 +1,16 @@
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import "server-only";
 import type {
-  RevisionFailureKind,
-  RevisionProcessingStatus,
+  AttemptFailureKind,
+  AttemptProcessingStatus,
   SupportedSourceDocumentAction,
 } from "@/modules/source-document/lifecycle";
 import type { ProcessingLeaseContract } from "@/server/processing/types";
 import { deriveSourceDocumentCapabilities } from "@/modules/source-document/domain/source-document-state";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
-import { MAX_FILES, MAX_NORMALIZED_BYTES_PER_REVISION } from "@/lib/storage/upload-policy";
-import { ledgers, sourceDocumentRevisions, sourceDocuments, storedFiles } from "@/persistence";
+import { MAX_FILES, MAX_NORMALIZED_BYTES_PER_ATTEMPT } from "@/lib/storage/upload-policy";
+import { ledgers, extractionAttempts, sourceDocuments, storedFiles } from "@/persistence";
 import {
   lockBookForShare,
   lockLedgerForUpdate,
@@ -20,7 +20,7 @@ import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 import { replaceDocumentInput } from "./document-input";
 
-export type CreatePendingRevisionInput = {
+export type CreatePendingAttemptInput = {
   ledgerId: string;
   input: {
     text: string | null;
@@ -36,13 +36,11 @@ function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
   return and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
 }
 
-function mapRevision(
-  row: typeof sourceDocumentRevisions.$inferSelect
-): SourceDocumentRevisionContract {
+function mapAttempt(row: typeof extractionAttempts.$inferSelect): SourceDocumentAttemptContract {
   return {
     id: row.id,
     sourceDocumentId: row.sourceDocumentId,
-    processingStatus: row.processingStatus,
+    processingStatus: row.status,
     submittedAt: row.submittedAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
   };
@@ -50,16 +48,16 @@ function mapRevision(
 
 function mapDocument(
   row: typeof sourceDocuments.$inferSelect,
-  latestSubmissionStatus: RevisionProcessingStatus | null
+  latestAttemptStatus: AttemptProcessingStatus | null
 ): SourceDocumentContract {
   return {
     id: row.id,
     ledgerId: row.ledgerId,
     version: row.version,
-    latestSubmissionRevisionId: row.latestSubmissionRevisionId,
+    latestAttemptId: row.latestAttemptId,
     supportedActions: deriveSourceDocumentCapabilities({
-      latestSubmissionStatus,
-      hasSubmissionInput: row.latestSubmissionRevisionId != null,
+      latestAttemptStatus,
+      hasSubmissionInput: row.latestAttemptId != null,
     }).supportedActions,
   };
 }
@@ -75,7 +73,7 @@ function mapDocument(
  */
 async function insertNewSourceDocument(
   tx: PostgresTransaction,
-  input: CreatePendingRevisionInput,
+  input: CreatePendingAttemptInput,
   sourceDocumentId: string
 ): Promise<typeof sourceDocuments.$inferSelect> {
   await lockLedgerForUpdate(tx, input.ledgerId);
@@ -94,10 +92,10 @@ async function insertNewSourceDocument(
   return rows[0]!;
 }
 
-export async function createProcessingRevisionInTransaction(
+export async function createProcessingAttemptInTransaction(
   tx: PostgresTransaction,
-  input: CreatePendingRevisionInput
-): Promise<{ document: SourceDocumentContract; revision: SourceDocumentRevisionContract }> {
+  input: CreatePendingAttemptInput
+): Promise<{ document: SourceDocumentContract; attempt: SourceDocumentAttemptContract }> {
   const ledger = await tx
     .select({ id: ledgers.id })
     .from(ledgers)
@@ -125,39 +123,39 @@ export async function createProcessingRevisionInTransaction(
       ? await insertNewSourceDocument(tx, input, sourceDocumentId)
       : await lockSourceDocumentForUpdate(tx, input.ledgerId, sourceDocumentId);
 
-  if (document.latestSubmissionRevisionId != null) {
+  if (document.latestAttemptId != null) {
     const currentPending = await tx
-      .select({ processingStatus: sourceDocumentRevisions.processingStatus })
-      .from(sourceDocumentRevisions)
+      .select({ status: extractionAttempts.status })
+      .from(extractionAttempts)
       .where(
         and(
-          eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-          eq(sourceDocumentRevisions.id, document.latestSubmissionRevisionId),
-          eq(sourceDocumentRevisions.sourceDocumentId, sourceDocumentId)
+          eq(extractionAttempts.ledgerId, input.ledgerId),
+          eq(extractionAttempts.id, document.latestAttemptId),
+          eq(extractionAttempts.sourceDocumentId, sourceDocumentId)
         )
       )
       .then((rows) => rows[0]);
-    if (currentPending?.processingStatus === "processing") {
+    if (currentPending?.status === "processing") {
       throw new ConflictError("Source document is already processing a submission");
     }
   }
 
-  const revision = await tx
-    .insert(sourceDocumentRevisions)
+  const attempt = await tx
+    .insert(extractionAttempts)
     .values({
       ledgerId: input.ledgerId,
       sourceDocumentId,
-      inputDocumentDate: input.input.documentDate,
-      inputDateReference: input.input.dateReference ?? input.input.documentDate,
-      processingStatus: "processing",
+      requestedDate: input.input.documentDate,
+      referenceDate: input.input.dateReference ?? input.input.documentDate,
+      status: "processing",
     })
     .returning()
     .then((rows) => rows[0]);
-  if (revision == null) throw new ConflictError("Failed to create source document revision");
+  if (attempt == null) throw new ConflictError("Failed to create source document attempt");
 
   const fileIds = [...new Set(input.input.storedFileIds)];
   if (fileIds.length !== input.input.storedFileIds.length) {
-    throw new ValidationError("A stored file may only appear once in a revision");
+    throw new ValidationError("A stored file may only appear once in a attempt");
   }
   const foundStoredFiles =
     fileIds.length === 0
@@ -175,33 +173,33 @@ export async function createProcessingRevisionInTransaction(
   if (foundStoredFiles.length !== fileIds.length) throw new NotFoundError("Stored file");
   const storedFileById = new Map(foundStoredFiles.map((file) => [file.id, file]));
   const storedFileRows = fileIds.map((id) => storedFileById.get(id)!);
-  // Enforce per-revision byte aggregate limit
+  // Enforce per-attempt byte aggregate limit
   const totalBytes = storedFileRows.reduce((sum, f) => sum + f.byteSize, 0);
-  if (totalBytes > MAX_NORMALIZED_BYTES_PER_REVISION) {
+  if (totalBytes > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
     throw new ValidationError(
-      `Total stored bytes ${totalBytes} exceeds revision limit of ${MAX_NORMALIZED_BYTES_PER_REVISION}`
+      `Total stored bytes ${totalBytes} exceeds attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
     );
   }
 
-  // Enforce per-revision file count limit (authoritative boundary).
+  // Enforce per-attempt file count limit (authoritative boundary).
   // fileIds is already deduplicated above, so this checks the final unique count.
   if (fileIds.length > MAX_FILES) {
     throw new ValidationError(
-      `Total file count ${fileIds.length} exceeds revision limit of ${MAX_FILES}`
+      `Total file count ${fileIds.length} exceeds attempt limit of ${MAX_FILES}`
     );
   }
 
   const updatedDocument = await tx
     .update(sourceDocuments)
     .set({
-      latestSubmissionRevisionId: revision.id,
+      latestAttemptId: attempt.id,
       updatedAt: new Date(),
     })
     .where(activeDocumentWhere(input.ledgerId, sourceDocumentId))
     .returning()
     .then((rows) => rows[0]);
   if (updatedDocument == null)
-    throw new ConflictError("Failed to update source document revision pointer");
+    throw new ConflictError("Failed to update source document attempt pointer");
   // The submission's input becomes the document's, even while the entries of
   // an earlier parse stay until this attempt completes.
   await replaceDocumentInput(tx, {
@@ -210,14 +208,14 @@ export async function createProcessingRevisionInTransaction(
     text: input.input.text,
     storedFileIds: fileIds,
   });
-  return { document: mapDocument(updatedDocument, "processing"), revision: mapRevision(revision) };
+  return { document: mapDocument(updatedDocument, "processing"), attempt: mapAttempt(attempt) };
 }
 
 export interface RecordProcessingFailureInput {
   ledgerId: string;
   sourceDocumentId: string;
-  revisionId: string;
-  failureKind: RevisionFailureKind;
+  attemptId: string;
+  failureKind: AttemptFailureKind;
   /**
    * User-facing text. `null` when the failure carries no explanation, in
    * which case the UI falls back to localized copy.
@@ -229,7 +227,7 @@ export interface RecordProcessingFailureInput {
 
 /**
  * Marks the latest submission as failed and releases its lease. Returns
- * false when the lease was lost or the revision was superseded, so a late
+ * false when the lease was lost or the attempt was superseded, so a late
  * worker never overwrites newer state.
  */
 export async function recordProcessingFailure(
@@ -244,25 +242,25 @@ export async function recordProcessingFailure(
       if (error instanceof NotFoundError) return false;
       throw error;
     }
-    if (document.latestSubmissionRevisionId !== input.revisionId) return false;
-    const revision = await tx
-      .select({ processingStatus: sourceDocumentRevisions.processingStatus })
-      .from(sourceDocumentRevisions)
+    if (document.latestAttemptId !== input.attemptId) return false;
+    const attempt = await tx
+      .select({ status: extractionAttempts.status })
+      .from(extractionAttempts)
       .where(
         and(
-          eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-          eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-          eq(sourceDocumentRevisions.id, input.revisionId)
+          eq(extractionAttempts.ledgerId, input.ledgerId),
+          eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId),
+          eq(extractionAttempts.id, input.attemptId)
         )
       )
       .for("update")
       .then((rows) => rows[0]);
-    if (revision?.processingStatus !== "processing") return false;
+    if (attempt?.status !== "processing") return false;
     if (!(await closeProcessingLeaseInTransaction(tx, input.lease))) return false;
     const updated = await tx
-      .update(sourceDocumentRevisions)
+      .update(extractionAttempts)
       .set({
-        processingStatus: "failed",
+        status: "failed",
         failureKind: input.failureKind,
         failureMessage: input.failureMessage,
         failureCode: input.failureCode ?? null,
@@ -270,13 +268,13 @@ export async function recordProcessingFailure(
       })
       .where(
         and(
-          eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-          eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-          eq(sourceDocumentRevisions.id, input.revisionId),
-          eq(sourceDocumentRevisions.processingStatus, "processing")
+          eq(extractionAttempts.ledgerId, input.ledgerId),
+          eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId),
+          eq(extractionAttempts.id, input.attemptId),
+          eq(extractionAttempts.status, "processing")
         )
       )
-      .returning({ id: sourceDocumentRevisions.id });
+      .returning({ id: extractionAttempts.id });
     if (updated.length === 0) return false;
     await tx
       .update(sourceDocuments)
@@ -284,7 +282,7 @@ export async function recordProcessingFailure(
       .where(
         and(
           activeDocumentWhere(input.ledgerId, input.sourceDocumentId),
-          eq(sourceDocuments.latestSubmissionRevisionId, input.revisionId)
+          eq(sourceDocuments.latestAttemptId, input.attemptId)
         )
       );
     return true;
@@ -295,14 +293,14 @@ export interface SourceDocumentContract {
   id: string;
   ledgerId: string;
   version: number;
-  latestSubmissionRevisionId: string | null;
+  latestAttemptId: string | null;
   supportedActions: readonly SupportedSourceDocumentAction[];
 }
 
-export interface SourceDocumentRevisionContract {
+export interface SourceDocumentAttemptContract {
   id: string;
   sourceDocumentId: string;
-  processingStatus: RevisionProcessingStatus | null;
+  processingStatus: AttemptProcessingStatus | null;
   submittedAt: string;
   finishedAt: string | null;
 }

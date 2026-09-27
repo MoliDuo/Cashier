@@ -51,7 +51,7 @@ export class ProcessingFailure extends Error {
 
 /**
  * Why a document that the AI processed produced no entries. This is internal
- * triage metadata stored in the revision's failure code; it is never rendered.
+ * triage metadata stored in the attempt's failure code; it is never rendered.
  * The ledger owner instead reads the AI-written natural-language reason.
  */
 export type InvalidDiagnostic =

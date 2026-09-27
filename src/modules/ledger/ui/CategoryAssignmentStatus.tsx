@@ -9,20 +9,20 @@ import {
   cancelCategoryAssignmentAction,
   retryCategoryAssignmentFailuresAction,
   retryCategoryAssignmentLatestAction,
-} from "@/modules/ledger/server-actions/reclassification";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+} from "@/modules/ledger/server-actions/category-assignment";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import { CategoryAssignmentResultDialog } from "./CategoryAssignmentResultDialog";
 import { isCategoryAssignmentJobActive } from "./category-assignment-status-visibility";
 import { commonCopy } from "@/copy/common";
 import { batchActionsCopy } from "@/copy/workspace";
 
 interface CategoryAssignmentStatusProps {
-  job: CategoryReclassificationJob | null;
+  job: CategoryAssignmentJob | null;
   isReadError: boolean;
   onRefresh: () => Promise<unknown>;
   onDismiss?: () => void;
   /** Hands a restarted run to the page, which reports its outcome once it ends. */
-  onTaskRegistered: (job: CategoryReclassificationJob) => void;
+  onTaskRegistered: (job: CategoryAssignmentJob) => void;
 }
 
 export function CategoryAssignmentStatus({
@@ -39,7 +39,7 @@ export function CategoryAssignmentStatus({
   const retryLatestKeyRef = useRef<{ jobId: string; requestKey: string } | null>(null);
   const cancel = useMutation({
     mutationFn: (jobId: string) => cancelCategoryAssignmentAction({ jobId }),
-    onSuccess: (saved) => queryClient.setQueryData(queryKeys.categoryReclassification(), saved),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.categoryAssignment(), saved),
   });
   const retryLatest = useMutation({
     mutationFn: (jobId: string) => {
@@ -86,7 +86,7 @@ export function CategoryAssignmentStatus({
     ? batchActionsCopy.categoryJobReadFailed
     : job == null
       ? batchActionsCopy.categoryJobReadFailed
-      : job.status === "pending" || job.status === "preparing"
+      : job.status === "pending"
         ? batchActionsCopy.categoryJobPending
         : job.status === "running"
           ? batchActionsCopy.categoryJobProgress({

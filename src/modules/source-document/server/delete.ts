@@ -6,9 +6,9 @@ import type { DeleteSourceDocumentResultDto } from "@/modules/source-document/co
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 
 /**
- * Deletes a document outright. Its entries, revisions, file links and category
+ * Deletes a document outright. Its entries, attempts, file links and category
  * assignment work go with it by cascade; the stored files themselves stay. A
- * worker still processing the document loses its revision, and with it the
+ * worker still processing the document loses its attempt, and with it the
  * lease it would finish under.
  */
 export async function deleteSourceDocumentAtomically(input: {

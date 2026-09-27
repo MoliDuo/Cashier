@@ -1,11 +1,11 @@
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { describe, expect, it } from "vitest";
-import { createProcessingRevisionInTransaction } from "@/modules/source-document/server/revisions";
+import { createProcessingAttemptInTransaction } from "@/modules/source-document/server/extraction-attempts";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
@@ -39,28 +39,28 @@ async function setupDocumentWithFailedRetry(
     bookId,
   });
 
-  // Step 2: Create a pending revision (processing)
+  // Step 2: Create a pending attempt (processing)
   const pending = await db.transaction(async (tx) => {
-    return createProcessingRevisionInTransaction(tx, {
+    return createProcessingAttemptInTransaction(tx, {
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       input: { text: "Retry text", storedFileIds: [], documentDate: null },
     });
   });
 
-  // Step 3: Set the pending revision outcome to invalid/failed
+  // Step 3: Set the pending attempt outcome to invalid/failed
   await recordProcessingFailure({
-    lease: await claimRevisionForTest(pending.revision.id),
+    lease: await claimAttemptForTest(pending.attempt.id),
     ledgerId,
     sourceDocumentId: created.sourceDocumentId,
-    revisionId: pending.revision.id,
+    attemptId: pending.attempt.id,
     failureKind,
     failureMessage: failureKind === "invalid_input" ? "Validation invalid" : "Processing failed",
   });
 
   return {
     sourceDocumentId: created.sourceDocumentId,
-    latestSubmissionRevisionId: pending.revision.id,
+    latestAttemptId: pending.attempt.id,
   };
 }
 
@@ -75,21 +75,21 @@ async function setupDocumentWithFirstParseFailure(
 ) {
   const bookId = await testBookId(db, ledgerId);
   const pending = await db.transaction((tx) =>
-    createProcessingRevisionInTransaction(tx, {
+    createProcessingAttemptInTransaction(tx, {
       ledgerId,
       bookId,
       input: { text: "First parse", storedFileIds: [], documentDate: null },
     })
   );
   await recordProcessingFailure({
-    lease: await claimRevisionForTest(pending.revision.id),
+    lease: await claimAttemptForTest(pending.attempt.id),
     ledgerId,
     sourceDocumentId: pending.document.id,
-    revisionId: pending.revision.id,
+    attemptId: pending.attempt.id,
     failureKind,
     failureMessage: failureKind === "invalid_input" ? "First parse invalid" : "Processing failed",
   });
-  return { sourceDocumentId: pending.document.id, latestSubmissionRevisionId: pending.revision.id };
+  return { sourceDocumentId: pending.document.id, latestAttemptId: pending.attempt.id };
 }
 
 describe("retry active result summary", () => {
@@ -193,10 +193,10 @@ describe("retry active result summary", () => {
       input: { text: "Edited text", storedFileIds: [file!.id], documentDate: null },
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(editRetry.revision.id),
+      lease: await claimAttemptForTest(editRetry.attempt.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
-      revisionId: editRetry.revision.id,
+      attemptId: editRetry.attempt.id,
       failureKind: "processing_error",
       failureMessage: "Processing failed",
     });
@@ -260,19 +260,19 @@ describe("retry active result summary", () => {
       bookId: await testBookId(db, ledgerId),
     });
 
-    // Create a failed pending revision
+    // Create a failed pending attempt
     const pending = await db.transaction(async (tx) => {
-      return createProcessingRevisionInTransaction(tx, {
+      return createProcessingAttemptInTransaction(tx, {
         ledgerId,
         sourceDocumentId: created.sourceDocumentId,
         input: { text: "Failed retry", storedFileIds: [], documentDate: null },
       });
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(pending.revision.id),
+      lease: await claimAttemptForTest(pending.attempt.id),
       ledgerId,
       sourceDocumentId: created.sourceDocumentId,
-      revisionId: pending.revision.id,
+      attemptId: pending.attempt.id,
       failureKind: "processing_error",
       failureMessage: "Processing failed",
     });

@@ -25,9 +25,9 @@ import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categorie
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
 import {
   getCategoryAssignmentResultsAction,
-  getCategoryReclassificationJobAction,
-} from "@/modules/ledger/server/get-category-reclassification-job";
-import { scheduleCategoryReclassificationRecoveryAfter } from "@/server/category-reclassification/schedule";
+  getCategoryAssignmentJobAction,
+} from "@/modules/ledger/server/get-category-assignment-job";
+import { scheduleCategoryAssignmentRecoveryAfter } from "@/server/category-assignment/schedule";
 import { getEnhancedStats } from "@/modules/stats/server/get-enhanced-stats";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { convertCurrency } from "@/modules/currency/server/convert-currency";
@@ -37,8 +37,8 @@ import { listPasskeys } from "@/modules/auth/server/passkeys";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
 /**
- * The `reclassification` poll below is the recovery driver for a batch AI
- * reclassification run, so this handler has to outlive the default function
+ * The `category-assignment` poll below is the recovery driver for a batch AI
+ * category assignment run, so this handler has to outlive the default function
  * budget the same way the protected page that starts a run does.
  */
 export const maxDuration = 120;
@@ -59,7 +59,7 @@ const requestSchema = z
       "summary",
       "settings",
       "stats",
-      "reclassification",
+      "category-assignment",
       "category-assignment-results",
       "source-document-input",
       "convert-currency",
@@ -164,13 +164,13 @@ export async function POST(request: Request) {
         noArgumentsSchema.parse(payload.args);
         result = await getLedgerSettingsAction();
         break;
-      case "reclassification": {
+      case "category-assignment": {
         noArgumentsSchema.parse(payload.args);
         const { ledger } = await requireLedgerAccess();
-        result = await getCategoryReclassificationJobAction();
+        result = await getCategoryAssignmentJobAction();
         // This poll is the recovery trigger: there is no cron, so a run
         // whose after() callback died is restarted on the next poll.
-        scheduleCategoryReclassificationRecoveryAfter(ledger.id);
+        scheduleCategoryAssignmentRecoveryAfter(ledger.id);
         break;
       }
       case "category-assignment-results":

@@ -1,12 +1,12 @@
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import {
-  activateRevision,
+  activateAttempt,
   createManualDocument,
 } from "@/modules/source-document/server/projections/writes";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
@@ -22,7 +22,7 @@ const projectionEntry = {
 } as const;
 
 describe("local contract release", () => {
-  it("writes only target revision, processing, and ledger projections", async () => {
+  it("writes only target attempt, processing, and ledger projections", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const pending = await submitSourceDocument({
@@ -34,14 +34,14 @@ describe("local contract release", () => {
       where: eq(sourceDocuments.id, pending.document.id),
     });
     expect(created).not.toBeNull();
-    expect(created?.latestSubmissionRevisionId).toBe(pending.revision.id);
+    expect(created?.latestAttemptId).toBe(pending.attempt.id);
 
     await expect(
-      activateRevision({
-        lease: await claimRevisionForTest(pending.revision.id),
+      activateAttempt({
+        lease: await claimAttemptForTest(pending.attempt.id),
         ledgerId,
         sourceDocumentId: pending.document.id,
-        revisionId: pending.revision.id,
+        attemptId: pending.attempt.id,
         title: "Target title",
         entries: [projectionEntry],
       })
@@ -51,14 +51,14 @@ describe("local contract release", () => {
       where: eq(sourceDocuments.id, pending.document.id),
     });
     expect(completed).toMatchObject({
-      latestSubmissionRevisionId: pending.revision.id,
+      latestAttemptId: pending.attempt.id,
       title: "Target title",
     });
     await expect(
-      db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, pending.revision.id),
+      db.query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.id, pending.attempt.id),
       })
-    ).resolves.toMatchObject({ processingStatus: "completed", claimToken: null });
+    ).resolves.toMatchObject({ status: "completed", claimToken: null });
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
   });
 
@@ -67,7 +67,7 @@ describe("local contract release", () => {
     const { ledgerId } = await createTestUserWithLedger(db);
     const created = await createManualDocument({
       ledgerId,
-      inputText: "target revision text",
+      inputText: "target attempt text",
       entries: [projectionEntry],
       bookId: await testBookId(db, ledgerId),
     });

@@ -44,7 +44,7 @@ describe("date organization", () => {
     ).toBeNull();
   });
 
-  it("only resolves complete dates when a historical revision has no reference date", () => {
+  it("only resolves complete dates when a historical attempt has no reference date", () => {
     expect(
       resolveDateHint({ kind: "relative", value: "yesterday", sourceText: "昨天" }, null)
     ).toBeNull();

@@ -42,8 +42,8 @@ export async function consumeRateLimit(
   let count: number;
   try {
     const result = await db.execute<{ count: number }>(sql`
-      INSERT INTO rate_limit_buckets (bucket_key, count, window_start, created_at)
-      VALUES (${rateLimitKey(name, subject)}, 1, ${windowStart}, NOW())
+      INSERT INTO rate_limit_buckets (bucket_key, count, window_start)
+      VALUES (${rateLimitKey(name, subject)}, 1, ${windowStart})
       ON CONFLICT (bucket_key) DO UPDATE SET
         count = CASE
           WHEN rate_limit_buckets.window_start = EXCLUDED.window_start
@@ -74,8 +74,8 @@ export async function acquireCooldown(
   seconds: number
 ): Promise<{ acquired: boolean; acquiredAt: Date; retryAfter: number }> {
   const result = await db.execute<{ window_start: Date }>(sql`
-    INSERT INTO rate_limit_buckets (bucket_key, count, window_start, created_at)
-    VALUES (${bucketKey}, 1, date_trunc('milliseconds', NOW()), NOW())
+    INSERT INTO rate_limit_buckets (bucket_key, count, window_start)
+    VALUES (${bucketKey}, 1, date_trunc('milliseconds', NOW()))
     ON CONFLICT (bucket_key) DO UPDATE SET
       count = 1,
       window_start = date_trunc('milliseconds', NOW())

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { createManualDocument } from "@/modules/source-document/server/projections/writes";
@@ -18,30 +18,30 @@ describe("cancel source-document processing", () => {
       bookId: await testBookId(db, ledgerId),
     });
     const processing = processingJobs();
-    const claim = await processing.claim(submission.revision.id);
+    const claim = await processing.claim(submission.attempt.id);
     expect(claim).not.toBeNull();
 
     await expect(cancelSourceDocumentProcessing(ledgerId, submission.document.id)).resolves.toEqual(
       { processingStatus: "cancelled" }
     );
 
-    const [document, revision] = await Promise.all([
+    const [document, attempt] = await Promise.all([
       db.query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, submission.document.id),
       }),
-      db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, submission.revision.id),
+      db.query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.id, submission.attempt.id),
       }),
     ]);
-    expect(document?.latestSubmissionRevisionId).toBe(submission.revision.id);
+    expect(document?.latestAttemptId).toBe(submission.attempt.id);
     expect(document?.version).toBe(submission.document.version);
     expect(document?.inputText).toBe("Lunch 12 CNY");
-    expect(revision).toMatchObject({
-      processingStatus: "cancelled",
-      inputDocumentDate: "2026-09-10",
+    expect(attempt).toMatchObject({
+      status: "cancelled",
+      requestedDate: "2026-09-10",
     });
-    await expect(processing.renew(submission.revision.id, claim!.claimToken)).resolves.toBeNull();
-    await expect(processing.claim(submission.revision.id)).resolves.toBeNull();
+    await expect(processing.renew(submission.attempt.id, claim!.claimToken)).resolves.toBeNull();
+    await expect(processing.claim(submission.attempt.id)).resolves.toBeNull();
   });
 
   it("keeps the previous entries when a retry is cancelled", async () => {
@@ -72,7 +72,7 @@ describe("cancel source-document processing", () => {
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, active.sourceDocumentId),
     });
-    expect(after?.latestSubmissionRevisionId).toBe(retry.revision.id);
+    expect(after?.latestAttemptId).toBe(retry.attempt.id);
     expect(
       await db.query.ledgerEntries.findMany({
         where: eq(ledgerEntries.sourceDocumentId, active.sourceDocumentId),

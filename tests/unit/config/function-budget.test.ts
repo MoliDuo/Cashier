@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AI_CATEGORY_REQUEST_TIMEOUT_MS,
   AI_REQUEST_TIMEOUT_MS,
-  AI_REVISION_DEADLINE_MS,
+  AI_ATTEMPT_DEADLINE_MS,
   CATEGORY_RUN_BUDGET_MS,
   FUNCTION_MAX_DURATION_SECONDS,
   LEASE_DURATION_MS,
@@ -32,7 +32,7 @@ describe("function time budget", () => {
   });
 
   it("ends a parse early enough to record its outcome", () => {
-    expect(AI_REVISION_DEADLINE_MS).toBeLessThanOrEqual(budgetMs - 20_000);
+    expect(AI_ATTEMPT_DEADLINE_MS).toBeLessThanOrEqual(budgetMs - 20_000);
   });
 
   it("lets the last document a category run claims finish its request", () => {
@@ -40,8 +40,8 @@ describe("function time budget", () => {
   });
 
   it("lets one model request finish inside the parse deadline", () => {
-    expect(AI_REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(AI_REVISION_DEADLINE_MS);
-    expect(AI_REVISION_DEADLINE_MS + OUTCOME_RESERVE_MS).toBeLessThanOrEqual(budgetMs);
+    expect(AI_REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(AI_ATTEMPT_DEADLINE_MS);
+    expect(AI_ATTEMPT_DEADLINE_MS + OUTCOME_RESERVE_MS).toBeLessThanOrEqual(budgetMs);
   });
 
   it("keeps a lease through a late heartbeat but frees a killed worker's within the budget", () => {

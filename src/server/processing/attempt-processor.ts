@@ -1,7 +1,7 @@
 import "server-only";
 import type {
-  RevisionProcessingRequestContract,
-  RevisionProcessingResultContract,
+  AttemptProcessingRequestContract,
+  AttemptProcessingResultContract,
 } from "@/server/processing/types";
 import { NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -27,14 +27,14 @@ import {
   isSuccessfulLoadImageResult,
   loadStoredFilesForAI,
 } from "./evidence";
-import { loadRevisionProcessingContext } from "./context";
+import { loadAttemptProcessingContext } from "./context";
 import { getLedgerSettings } from "@/modules/ledger/server/settings";
 import {
   ensureExchangeRates,
   formatExchangeRateDate,
 } from "@/modules/currency/server/exchange-rates";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
-import { activateRevision } from "@/modules/source-document/server/projections/writes";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
+import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import { createAIContext } from "@/lib/tasks/ai-context";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { runtimeEnv } from "@/lib/env/runtime";
@@ -45,44 +45,41 @@ function defaultAIContext(signal: AbortSignal): AIContext {
 }
 
 function failureLogContext(
-  request: RevisionProcessingRequestContract,
+  request: AttemptProcessingRequestContract,
   failureCode: InvalidDiagnostic
 ): Record<string, unknown> {
   return {
     ledgerSubject: logIdentifier("ledger", request.ledgerId),
     sourceDocumentSubject: logIdentifier("source-document", request.sourceDocumentId),
-    revisionSubject: logIdentifier("revision", request.revisionId),
+    attemptSubject: logIdentifier("attempt", request.attemptId),
     failureCode,
   };
 }
 
-export interface ProcessRevisionOptions {
+export interface ProcessAttemptOptions {
   /** Replaces the model client; tests pass a scripted generator here. */
   createAIContext?: (signal: AbortSignal) => AIContext;
 }
 
 /**
- * Parses one pending revision and either activates its entries or records why
+ * Parses one pending attempt and either activates its entries or records why
  * it could not. Every write is fenced by the caller's processing lease.
  */
-export async function processRevision(
-  request: RevisionProcessingRequestContract,
-  options: ProcessRevisionOptions = {}
-): Promise<RevisionProcessingResultContract> {
+export async function processAttempt(
+  request: AttemptProcessingRequestContract,
+  options: ProcessAttemptOptions = {}
+): Promise<AttemptProcessingResultContract> {
   const signal = request.signal;
   throwIfProcessingCancelled(signal);
   const [context, ledgerSettings] = await Promise.all([
-    loadRevisionProcessingContext(request),
+    loadAttemptProcessingContext(request),
     getLedgerSettings(request.ledgerId),
   ]);
-  const { revision, document, storedFileIds, categories } = context;
-  if (revision == null || document == null) throw new NotFoundError("Pending revision");
+  const { attempt, document, storedFileIds, categories } = context;
+  if (attempt == null || document == null) throw new NotFoundError("Pending attempt");
   // The claim only hands out the current, still-processing submission; one that
   // finished or was superseded since is someone else's to close.
-  if (
-    document.latestSubmissionRevisionId !== request.revisionId ||
-    revision.processingStatus !== "processing"
-  ) {
+  if (document.latestAttemptId !== request.attemptId || attempt.processingStatus !== "processing") {
     throw new ProcessingCancelledError();
   }
   throwIfProcessingCancelled(signal);
@@ -101,7 +98,7 @@ export async function processRevision(
   const ai = (options.createAIContext ?? defaultAIContext)(signal);
   const pipeline = await runParsePipeline(
     {
-      ...(revision.inputText == null ? {} : { text: revision.inputText }),
+      ...(attempt.inputText == null ? {} : { text: attempt.inputText }),
       ...(evidence.length === 0
         ? {}
         : { evidence: { images: evidence.map((item) => ({ dataUrl: item.dataUrl })) } }),
@@ -125,7 +122,7 @@ export async function processRevision(
   const output = toParseSourceDocumentOutput(pipeline);
   if (output.verificationStatus !== "passed") {
     const failureMessage = normalizeFailureReason(output.reason);
-    logger.warn(failureLogContext(request, output.diagnostic), "Revision could not be parsed");
+    logger.warn(failureLogContext(request, output.diagnostic), "Attempt could not be parsed");
     const preserved = await recordProcessingFailure({
       ...request,
       failureKind: "invalid_input",
@@ -149,7 +146,7 @@ export async function processRevision(
         ...failureLogContext(request, "entry_validation_failed"),
         validationReason: validation.reason ?? null,
       },
-      "Revision entries failed validation; no entries were recorded"
+      "Attempt entries failed validation; no entries were recorded"
     );
     const preserved = await recordProcessingFailure({
       ...request,
@@ -162,7 +159,7 @@ export async function processRevision(
     }
     return { processingStatus: "failed" };
   }
-  const { fallbackDate } = getEntryFallbackDate(revision.inputDocumentDate);
+  const { fallbackDate } = getEntryFallbackDate(attempt.requestedDate);
   const validEntries = output.ledgerEntries.filter(
     (entry) => compare(entry.amount, "0") > 0 || entry.isAdjustment === true
   );
@@ -185,7 +182,7 @@ export async function processRevision(
   }));
 
   const dateOrganizationSuggestion = createDateOrganizationSuggestion({
-    referenceDate: revision.inputDateReference,
+    referenceDate: attempt.referenceDate,
     sourceDocumentDate: fallbackDate,
     entries,
   });
@@ -193,11 +190,9 @@ export async function processRevision(
   // Cache the rates for the day the entries will be read on, so they show
   // converted as soon as they appear. Without them the entries still save and
   // show unconverted until maintenance fills the day.
-  await ensureExchangeRates([
-    revision.inputDocumentDate ?? formatExchangeRateDate(document.createdAt),
-  ]);
+  await ensureExchangeRates([attempt.requestedDate ?? formatExchangeRateDate(document.createdAt)]);
   throwIfProcessingCancelled(signal);
-  const activated = await activateRevision({
+  const activated = await activateAttempt({
     ...request,
     ...(output.title == null ? {} : { title: output.title }),
     entries: entryInputs,

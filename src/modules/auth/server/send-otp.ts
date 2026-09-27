@@ -8,7 +8,11 @@ import { normalizeEmail, DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
 import type { SendOTPEmail } from "@/modules/auth/contract-schemas";
 import { sendEmail } from "@/lib/email-delivery";
 import { consumeRateLimit } from "@/lib/rate-limit";
-import { createOtpToken, discardOtpToken, findOtpToken } from "./otp-tokens";
+import {
+  createSignInChallenge,
+  discardSignInChallenge,
+  findSignInChallenge,
+} from "./sign-in-challenges";
 import { findUserByEmail } from "./users";
 import { acquireResendCooldown, releaseResendCooldown } from "./otp-resend-cooldown";
 import { generateOTP, getResendCooldown } from "@/modules/auth/domain/otp";
@@ -65,7 +69,7 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
     };
   };
   if ((await findUserByEmail(normalizedEmail)) == null) return unsentResult();
-  const lockedUntil = (await findOtpToken(normalizedEmail))?.lockedUntil;
+  const lockedUntil = (await findSignInChallenge(normalizedEmail))?.lockedUntil;
   if (lockedUntil != null && lockedUntil > cooldown.acquiredAt) {
     logger.info(
       { subject: logIdentifier("email", normalizedEmail) },
@@ -75,13 +79,13 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
   }
 
   const otp = generateOTP();
-  let tokenHash: string | undefined;
+  let codeHash: string | undefined;
   let expiresAt: Date;
 
   try {
-    const token = await createOtpToken(normalizedEmail, otp);
+    const token = await createSignInChallenge(normalizedEmail, otp);
     expiresAt = token.expiresAt;
-    tokenHash = token.tokenHash;
+    codeHash = token.codeHash;
     const expiresInMinutes = Math.ceil(OTP_EXPIRES_SECONDS / 60);
     const delivery = await sendEmail({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
@@ -103,8 +107,8 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
       );
     }
   } catch (error) {
-    if (tokenHash !== undefined) {
-      await discardOtpToken(normalizedEmail, tokenHash).catch((discardError) => {
+    if (codeHash !== undefined) {
+      await discardSignInChallenge(normalizedEmail, codeHash).catch((discardError) => {
         logger.error(
           { error: discardError, subject: logIdentifier("email", normalizedEmail) },
           "Failed to discard OTP token after email failure"

@@ -6,7 +6,7 @@ import {
   ledgerEntries,
   ledgers,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
@@ -38,20 +38,19 @@ async function loadSourceDocumentDetailSnapshot(
     .select({
       ...getTableColumns(sourceDocuments),
       mainCurrency: ledgers.mainCurrency,
-      revisionTitle: sourceDocumentRevisions.title,
-      latestSubmissionStatus: sourceDocumentRevisions.processingStatus,
-      failureKind: sourceDocumentRevisions.failureKind,
-      failureMessage: sourceDocumentRevisions.failureMessage,
-      failureCode: sourceDocumentRevisions.failureCode,
+      latestAttemptStatus: extractionAttempts.status,
+      failureKind: extractionAttempts.failureKind,
+      failureMessage: extractionAttempts.failureMessage,
+      failureCode: extractionAttempts.failureCode,
     })
     .from(sourceDocuments)
     .innerJoin(ledgers, eq(ledgers.id, sourceDocuments.ledgerId))
     .leftJoin(
-      sourceDocumentRevisions,
+      extractionAttempts,
       and(
-        eq(sourceDocumentRevisions.ledgerId, ledgerId),
-        eq(sourceDocumentRevisions.sourceDocumentId, sourceDocuments.id),
-        eq(sourceDocumentRevisions.id, sourceDocuments.latestSubmissionRevisionId)
+        eq(extractionAttempts.ledgerId, ledgerId),
+        eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
+        eq(extractionAttempts.id, sourceDocuments.latestAttemptId)
       )
     )
     .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)))
@@ -136,9 +135,8 @@ async function loadSourceDocumentDetailSnapshot(
   }));
   const hydration: SourceDocumentHydrationRow = {
     mainCurrency: baseRow.mainCurrency,
-    revisionTitle: baseRow.revisionTitle,
     inputText: baseRow.inputText,
-    processingStatus: baseRow.latestSubmissionStatus,
+    processingStatus: baseRow.latestAttemptStatus,
     failureKind: baseRow.failureKind,
     failureMessage: baseRow.failureMessage,
     failureCode: baseRow.failureCode,
@@ -156,11 +154,10 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
   const rows = await db
     .select({
       ...getTableColumns(sourceDocuments),
-      revisionTitle: sourceDocumentRevisions.title,
-      latestSubmissionStatus: sourceDocumentRevisions.processingStatus,
-      failureKind: sourceDocumentRevisions.failureKind,
-      failureMessage: sourceDocumentRevisions.failureMessage,
-      failureCode: sourceDocumentRevisions.failureCode,
+      latestAttemptStatus: extractionAttempts.status,
+      failureKind: extractionAttempts.failureKind,
+      failureMessage: extractionAttempts.failureMessage,
+      failureCode: extractionAttempts.failureCode,
       hasImages: sql<boolean>`EXISTS (
             SELECT 1
             FROM ${sourceDocumentFiles} list_document_file
@@ -173,11 +170,11 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
     })
     .from(sourceDocuments)
     .leftJoin(
-      sourceDocumentRevisions,
+      extractionAttempts,
       and(
-        eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-        eq(sourceDocumentRevisions.sourceDocumentId, sourceDocuments.id),
-        eq(sourceDocumentRevisions.id, sourceDocuments.latestSubmissionRevisionId)
+        eq(extractionAttempts.ledgerId, input.ledgerId),
+        eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
+        eq(extractionAttempts.id, sourceDocuments.latestAttemptId)
       )
     )
     .where(and(...conditions))
@@ -193,8 +190,7 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
   return {
     items: pageRows.map((row) => {
       const hydration: SourceDocumentListHydrationRow = {
-        revisionTitle: row.revisionTitle,
-        processingStatus: row.latestSubmissionStatus,
+        processingStatus: row.latestAttemptStatus,
         failureKind: row.failureKind,
         failureMessage: row.failureMessage,
         failureCode: row.failureCode,

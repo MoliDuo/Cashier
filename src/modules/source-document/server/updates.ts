@@ -171,7 +171,7 @@ export async function saveSourceDocumentChanges(
     db.query.sourceDocuments.findFirst({
       where: whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId),
       columns: {
-        latestSubmissionRevisionId: true,
+        latestAttemptId: true,
         version: true,
         title: true,
         documentDate: true,
@@ -311,7 +311,7 @@ export async function updateSourceDocuments({
   const initialDocuments = await db
     .select({
       id: sourceDocuments.id,
-      latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
+      latestAttemptId: sourceDocuments.latestAttemptId,
       title: sourceDocuments.title,
       documentDate: sourceDocuments.documentDate,
     })
@@ -405,7 +405,7 @@ export async function updateSourceDocuments({
           return (
             current == null ||
             initial.id !== current.id ||
-            initial.latestSubmissionRevisionId !== current.latestSubmissionRevisionId
+            initial.latestAttemptId !== current.latestAttemptId
           );
         })
       ) {
@@ -415,7 +415,7 @@ export async function updateSourceDocuments({
       const projectionEntries = await loadProjectionEntriesForDocuments(tx, ledgerId, requestedIds);
       // Every requested document must be in a valid state for the batch to
       // commit — but only documents whose title or date actually changes get
-      // a new revision; a document already at the target date/title is a
+      // a new attempt; a document already at the target date/title is a
       // true no-op and keeps its current version untouched.
       const changedDocuments = documents.filter((document) => {
         return (

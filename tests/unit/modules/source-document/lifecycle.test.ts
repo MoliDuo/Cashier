@@ -13,23 +13,23 @@ describe("target application contracts", () => {
   it("exposes actions for stable document lifecycle states", () => {
     const cases = [
       [
-        { latestSubmissionStatus: "failed" as const, hasSubmissionInput: true },
+        { latestAttemptStatus: "failed" as const, hasSubmissionInput: true },
         ["split_entries", "retry", "edit_retry", "delete"],
       ],
       [
-        { latestSubmissionStatus: "cancelled" as const, hasSubmissionInput: true },
+        { latestAttemptStatus: "cancelled" as const, hasSubmissionInput: true },
         ["split_entries", "retry", "edit_retry", "delete"],
       ],
       [
-        { latestSubmissionStatus: "completed" as const, hasSubmissionInput: true },
+        { latestAttemptStatus: "completed" as const, hasSubmissionInput: true },
         ["split_entries", "retry", "edit_retry", "delete"],
       ],
       [
-        { latestSubmissionStatus: "processing" as const, hasSubmissionInput: true },
+        { latestAttemptStatus: "processing" as const, hasSubmissionInput: true },
         ["cancel_processing", "retry", "edit_retry", "delete"],
       ],
-      [{ latestSubmissionStatus: null, hasSubmissionInput: false }, ["split_entries", "delete"]],
-      [{ latestSubmissionStatus: "failed" as const, hasSubmissionInput: true, deleted: true }, []],
+      [{ latestAttemptStatus: null, hasSubmissionInput: false }, ["split_entries", "delete"]],
+      [{ latestAttemptStatus: "failed" as const, hasSubmissionInput: true, deleted: true }, []],
     ] as const;
 
     for (const [input, actions] of cases) {
@@ -39,11 +39,11 @@ describe("target application contracts", () => {
 
   it("only exposes splitting while no processing is pending", () => {
     expect(
-      supportedSourceDocumentActions({ latestSubmissionStatus: null, hasSubmissionInput: false })
+      supportedSourceDocumentActions({ latestAttemptStatus: null, hasSubmissionInput: false })
     ).toContain("split_entries");
     expect(
       supportedSourceDocumentActions({
-        latestSubmissionStatus: "processing",
+        latestAttemptStatus: "processing",
         hasSubmissionInput: true,
       })
     ).not.toContain("split_entries");
@@ -58,7 +58,7 @@ describe("target application contracts", () => {
     expect(
       toApiV1SourceDocumentCreateResponse({
         sourceDocumentId: response.sourceDocumentId,
-        revisionId: response.revisionId,
+        attemptId: response.revisionId,
         processingStatus: response.revisionState,
       })
     ).toEqual(fixture.response);

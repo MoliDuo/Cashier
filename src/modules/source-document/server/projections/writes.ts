@@ -1,12 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
 import "server-only";
 import type {
-  ActivateRevisionInput,
+  ActivateAttemptInput,
   CreateManualDocumentInput,
 } from "@/modules/source-document/server/projections/types";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
-import { sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { extractionAttempts, sourceDocuments } from "@/persistence";
 import {
   lockBookForShare,
   lockLedgerForUpdate,
@@ -17,7 +17,7 @@ import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal"
 import { activeDocumentWhere, replaceProjection } from "./shared";
 import { createCompletedProjectionInTransaction } from "./manual-entries";
 
-export async function activateRevision(input: ActivateRevisionInput): Promise<boolean> {
+export async function activateAttempt(input: ActivateAttemptInput): Promise<boolean> {
   return db.transaction(async (tx) => {
     // The ledger lock keeps the categories the entries reference from being
     // deleted underneath the activation.
@@ -32,20 +32,20 @@ export async function activateRevision(input: ActivateRevisionInput): Promise<bo
       if (error instanceof NotFoundError) return false;
       throw error;
     }
-    if (document.latestSubmissionRevisionId !== input.revisionId) return false;
-    const revision = await tx
+    if (document.latestAttemptId !== input.attemptId) return false;
+    const attempt = await tx
       .select()
-      .from(sourceDocumentRevisions)
+      .from(extractionAttempts)
       .where(
         and(
-          eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-          eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId),
-          eq(sourceDocumentRevisions.id, input.revisionId)
+          eq(extractionAttempts.ledgerId, input.ledgerId),
+          eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId),
+          eq(extractionAttempts.id, input.attemptId)
         )
       )
       .for("update")
       .then((rows) => rows[0]);
-    if (revision == null || revision.processingStatus !== "processing") {
+    if (attempt == null || attempt.status !== "processing") {
       return false;
     }
     if (!(await closeProcessingLeaseInTransaction(tx, input.lease))) {
@@ -59,21 +59,20 @@ export async function activateRevision(input: ActivateRevisionInput): Promise<bo
     });
     const now = new Date();
     await tx
-      .update(sourceDocumentRevisions)
+      .update(extractionAttempts)
       .set({
-        title: input.title ?? null,
-        processingStatus: "completed",
+        status: "completed",
         finishedAt: now,
         failureKind: null,
         failureMessage: null,
         failureCode: null,
       })
-      .where(eq(sourceDocumentRevisions.id, input.revisionId));
+      .where(eq(extractionAttempts.id, input.attemptId));
     await tx
       .update(sourceDocuments)
       .set({
         version: sql`${sourceDocuments.version} + 1`,
-        documentDate: revision.inputDocumentDate,
+        documentDate: attempt.requestedDate,
         ...(input.title == null || input.title === "" ? {} : { title: input.title }),
         dateOrganizationSuggestion: input.dateOrganizationSuggestion ?? null,
         updatedAt: now,

@@ -1,4 +1,4 @@
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
@@ -6,7 +6,7 @@ import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup
 import { executeProcessingJob } from "@/server/processing/execute-job";
 import { renewProcessingJobLease } from "@/server/processing/jobs";
 import type { ProcessingJobContract } from "@/server/processing/types";
-import { ledgerEntries, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 
 vi.mock("@/lib/tasks/ai-context", () => ({
   createAIContext: vi.fn(),
@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 /**
- * Creates a pending revision + job for a single source document.
+ * Creates a pending attempt + job for a single source document.
  * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions
  * when called multiple times within one test.
  */
@@ -35,7 +35,7 @@ async function pendingIntent(
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
   const bookId = await testBookId(db, ledgerId);
-  const pending = await createPendingRevision({
+  const pending = await createPendingAttempt({
     ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
@@ -44,7 +44,7 @@ async function pendingIntent(
     ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
+      attemptId: pending.attempt.id,
       requestedAt,
     },
   };
@@ -114,15 +114,15 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, job.attemptId),
     });
-    expect(document?.latestSubmissionRevisionId).toBe(job.revisionId);
-    expect(revision?.processingStatus).toBe("processing");
+    expect(document?.latestAttemptId).toBe(job.attemptId);
+    expect(attempt?.status).toBe("processing");
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
 
-  it("processes successfully, completing the revision and releasing its claim", async () => {
+  it("processes successfully, completing the attempt and releasing its claim", async () => {
     const db = getTestDb();
     const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
@@ -155,14 +155,14 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const doc = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, job.sourceDocumentId),
     });
-    expect(doc?.latestSubmissionRevisionId).toBe(job.revisionId);
+    expect(doc?.latestAttemptId).toBe(job.attemptId);
     expect(doc?.version).toBe(2);
 
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, job.attemptId),
     });
-    expect(revision).toMatchObject({
-      processingStatus: "completed",
+    expect(attempt).toMatchObject({
+      status: "completed",
       attemptCount: 1,
       claimToken: null,
       claimExpiresAt: null,
@@ -171,7 +171,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
     expect(await db.select().from(ledgerEntries)).toHaveLength(1);
   });
 
-  it("does not run a job whose revision was superseded", async () => {
+  it("does not run a job whose attempt was superseded", async () => {
     const db = getTestDb();
     const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
@@ -181,31 +181,31 @@ describe("executeProcessingJob — standalone function with real adapter/process
     // Simulate a retry: it cancels the attempt it replaces and points the
     // document at the new one.
     await db
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "cancelled", finishedAt: new Date() })
-      .where(eq(sourceDocumentRevisions.id, job.revisionId));
-    const newRevisionId = crypto.randomUUID();
-    await db.insert(sourceDocumentRevisions).values({
-      id: newRevisionId,
+      .update(extractionAttempts)
+      .set({ status: "cancelled", finishedAt: new Date() })
+      .where(eq(extractionAttempts.id, job.attemptId));
+    const newAttemptId = crypto.randomUUID();
+    await db.insert(extractionAttempts).values({
+      id: newAttemptId,
       ledgerId,
       sourceDocumentId: job.sourceDocumentId,
-      processingStatus: "processing",
+      status: "processing",
     });
     await db
       .update(sourceDocuments)
-      .set({ latestSubmissionRevisionId: newRevisionId })
+      .set({ latestAttemptId: newAttemptId })
       .where(eq(sourceDocuments.id, job.sourceDocumentId));
 
     const result = await executeProcessingJob(job);
     expect(result).toBe(false);
     expect(generate).not.toHaveBeenCalled();
 
-    // The claim refuses the superseded revision without counting a run.
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, job.revisionId),
+    // The claim refuses the superseded attempt without counting a run.
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, job.attemptId),
     });
-    expect(revision).toMatchObject({
-      processingStatus: "cancelled",
+    expect(attempt).toMatchObject({
+      status: "cancelled",
       attemptCount: 0,
       claimToken: null,
     });

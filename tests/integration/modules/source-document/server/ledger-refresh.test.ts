@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getStreamRefresh } from "@/modules/source-document/server/stream-refresh";
-import { ledgerSyncState, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerSyncState, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
@@ -112,14 +112,14 @@ describe("ledger refresh", () => {
 
     const document = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, documentId),
-      columns: { latestSubmissionRevisionId: true },
+      columns: { latestAttemptId: true },
     });
-    const revisionId = document?.latestSubmissionRevisionId;
-    if (revisionId == null) throw new Error("Expected processing revision");
+    const attemptId = document?.latestAttemptId;
+    if (attemptId == null) throw new Error("Expected processing attempt");
     await getTestDb()
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "completed", finishedAt: new Date() })
-      .where(eq(sourceDocumentRevisions.id, revisionId));
+      .update(extractionAttempts)
+      .set({ status: "completed", finishedAt: new Date() })
+      .where(eq(extractionAttempts.id, attemptId));
     expect((await refresh(processing.version)).hasTransitionalWork).toBe(false);
   });
 });

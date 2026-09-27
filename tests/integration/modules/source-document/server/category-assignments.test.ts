@@ -2,9 +2,9 @@ import { sql } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
-  categoryReclassificationJobEntries,
-  categoryReclassificationJobDocuments,
-  categoryReclassificationJobs,
+  categoryAssignmentEntries,
+  categoryAssignmentDocuments,
+  categoryAssignmentJobs,
   entryCategories,
   ledgerEntries,
   ledgers,
@@ -34,8 +34,8 @@ import {
   resolveLatestConflictSelection,
   startCategoryAssignment,
   yieldCategoryAssignmentDocument,
-} from "@/server/category-reclassification/assignments";
-import { getCategoryReclassificationJob } from "@/server/category-reclassification/jobs";
+} from "@/server/category-assignment/assignments";
+import { getCategoryAssignmentJob } from "@/server/category-assignment/jobs";
 
 async function addDocument(ledgerId: string, itemNames: string[]) {
   const db = getTestDb();
@@ -89,14 +89,14 @@ async function startAssign(
 /** Moves the job's lease into the past, as if its worker had died. */
 async function expireJobLease(jobId: string) {
   await getTestDb()
-    .update(categoryReclassificationJobs)
+    .update(categoryAssignmentJobs)
     .set({ claimExpiresAt: sql`clock_timestamp() - interval '1 second'` })
-    .where(eq(categoryReclassificationJobs.id, jobId));
+    .where(eq(categoryAssignmentJobs.id, jobId));
 }
 
 async function storedJob(jobId: string) {
-  return getTestDb().query.categoryReclassificationJobs.findFirst({
-    where: eq(categoryReclassificationJobs.id, jobId),
+  return getTestDb().query.categoryAssignmentJobs.findFirst({
+    where: eq(categoryAssignmentJobs.id, jobId),
   });
 }
 
@@ -113,35 +113,35 @@ describe("starting a category assignment", () => {
     const db = getTestDb();
     const documents = await db
       .select({
-        sourceDocumentId: categoryReclassificationJobDocuments.sourceDocumentId,
-        firstSelectionOrder: categoryReclassificationJobDocuments.firstSelectionOrder,
-        status: categoryReclassificationJobDocuments.status,
+        sourceDocumentId: categoryAssignmentDocuments.sourceDocumentId,
+        selectionOrder: categoryAssignmentDocuments.selectionOrder,
+        status: categoryAssignmentDocuments.status,
       })
-      .from(categoryReclassificationJobDocuments)
-      .where(eq(categoryReclassificationJobDocuments.jobId, started.id));
+      .from(categoryAssignmentDocuments)
+      .where(eq(categoryAssignmentDocuments.jobId, started.id));
     expect(documents).toEqual(
       expect.arrayContaining([
-        { sourceDocumentId: second.documentId, firstSelectionOrder: 0, status: "pending" },
-        { sourceDocumentId: fixture.documentId, firstSelectionOrder: 1, status: "pending" },
+        { sourceDocumentId: second.documentId, selectionOrder: 0, status: "pending" },
+        { sourceDocumentId: fixture.documentId, selectionOrder: 1, status: "pending" },
       ])
     );
     const entries = await db
       .select({
-        id: categoryReclassificationJobEntries.ledgerEntryId,
-        order: categoryReclassificationJobEntries.selectionOrder,
-        target: categoryReclassificationJobEntries.targetCategoryId,
-        decided: categoryReclassificationJobEntries.decisionPersisted,
+        id: categoryAssignmentEntries.ledgerEntryId,
+        order: categoryAssignmentEntries.selectionOrder,
+        target: categoryAssignmentEntries.targetCategoryId,
+        decided: categoryAssignmentEntries.decisionPersisted,
       })
-      .from(categoryReclassificationJobEntries)
-      .where(eq(categoryReclassificationJobEntries.jobId, started.id))
-      .orderBy(categoryReclassificationJobEntries.selectionOrder);
+      .from(categoryAssignmentEntries)
+      .where(eq(categoryAssignmentEntries.jobId, started.id))
+      .orderBy(categoryAssignmentEntries.selectionOrder);
     expect(entries).toEqual([
       { id: second.entryIds[1], order: 0, target: fixture.category.id, decided: true },
       { id: fixture.entryIds[0], order: 1, target: fixture.category.id, decided: true },
       { id: second.entryIds[0], order: 2, target: fixture.category.id, decided: true },
     ]);
     await expect(
-      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toMatchObject({
       status: "pending",
       entryCount: 3,
@@ -163,8 +163,8 @@ describe("starting a category assignment", () => {
     });
     const rows = await getTestDb()
       .select()
-      .from(categoryReclassificationJobEntries)
-      .where(eq(categoryReclassificationJobEntries.jobId, started.id));
+      .from(categoryAssignmentEntries)
+      .where(eq(categoryAssignmentEntries.jobId, started.id));
     expect(rows).toHaveLength(1);
   });
 
@@ -189,7 +189,7 @@ describe("running a category assignment", () => {
     expect(first).toMatchObject({ jobId: started.id, ledgerId: fixture.ledger.id });
     await expect(claimCategoryAssignmentJob({ jobId: started.id })).resolves.toBeNull();
     await expect(
-      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toMatchObject({ status: "running", activeDocumentCount: 1 });
 
     await expireJobLease(started.id);
@@ -248,7 +248,7 @@ describe("running a category assignment", () => {
     ).resolves.toEqual({ status: "claim_lost" });
     await releaseCategoryAssignmentJob(job!);
     await expect(
-      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toMatchObject({ status: "cancelled", cancelledCount: 1, documentCompleted: 1 });
   });
 
@@ -273,16 +273,16 @@ describe("running a category assignment", () => {
     expect(waiting.kind).toBe("wait");
     expect(waiting.kind === "wait" && waiting.delayMs).toBeGreaterThan(55_000);
     await expect(
-      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toMatchObject({ retryingDocumentCount: 1, activeDocumentCount: 0 });
 
     // Not due: released, the job is not claimable until the retry comes due.
     await releaseCategoryAssignmentJob(job!);
     await expect(claimCategoryAssignmentJob({ jobId: started.id })).resolves.toBeNull();
     await getTestDb()
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({ nextAttemptAt: sql`clock_timestamp() - interval '1 second'` })
-      .where(eq(categoryReclassificationJobDocuments.jobId, started.id));
+      .where(eq(categoryAssignmentDocuments.jobId, started.id));
     const again = await claimCategoryAssignmentJob({ jobId: started.id });
     await expect(nextCategoryAssignmentDocument(again!)).resolves.toMatchObject({
       kind: "document",
@@ -321,7 +321,7 @@ describe("running a category assignment", () => {
       claimExpiresAt: null,
     });
     await expect(
-      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toMatchObject({
       entryCount: 2,
       appliedCount: 1,
@@ -371,7 +371,7 @@ describe("running a category assignment", () => {
 
     expect(await storedJob(started.id)).toMatchObject({ status: "succeeded" });
     await expect(
-      getCategoryReclassificationJob({ ledgerId: fixture.ledger.id, jobId: started.id })
+      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toMatchObject({ entryCount: 1, appliedCount: 1, documentTotal: 1 });
   });
 
@@ -417,12 +417,12 @@ describe("running a category assignment", () => {
     );
     const outcomes = await db
       .select({
-        id: categoryReclassificationJobEntries.ledgerEntryId,
-        outcome: categoryReclassificationJobEntries.outcome,
-        errorCode: categoryReclassificationJobEntries.errorCode,
+        id: categoryAssignmentEntries.ledgerEntryId,
+        outcome: categoryAssignmentEntries.outcome,
+        errorCode: categoryAssignmentEntries.errorCode,
       })
-      .from(categoryReclassificationJobEntries)
-      .where(eq(categoryReclassificationJobEntries.jobId, started.id));
+      .from(categoryAssignmentEntries)
+      .where(eq(categoryAssignmentEntries.jobId, started.id));
     expect(outcomes).toEqual(
       expect.arrayContaining([
         { id: fixture.entryIds[0], outcome: "applied", errorCode: null },
@@ -435,7 +435,7 @@ describe("running a category assignment", () => {
       resolveLatestConflictSelection({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).resolves.toEqual({
       mode: { kind: "assign", categoryId: fixture.category.id },
-      parentJobId: started.id,
+      retryOfJobId: started.id,
       ledgerEntryIds: [secondEntryId],
     });
   });
@@ -452,12 +452,12 @@ describe("running a category assignment", () => {
       resolveLatestConflictSelection({ ledgerId: fixture.ledger.id, jobId: started.id })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     const stored = await getTestDb()
-      .select({ outcome: categoryReclassificationJobEntries.outcome })
-      .from(categoryReclassificationJobEntries)
+      .select({ outcome: categoryAssignmentEntries.outcome })
+      .from(categoryAssignmentEntries)
       .where(
         and(
-          eq(categoryReclassificationJobEntries.jobId, started.id),
-          eq(categoryReclassificationJobEntries.ledgerId, fixture.ledger.id)
+          eq(categoryAssignmentEntries.jobId, started.id),
+          eq(categoryAssignmentEntries.ledgerId, fixture.ledger.id)
         )
       );
     expect(stored).toEqual([{ outcome: "applied" }]);

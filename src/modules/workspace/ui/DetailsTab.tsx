@@ -105,7 +105,7 @@ export function DetailsTab({
               categorySelectionChanged={tab.categorySelectionChanged}
               onConfirmCategory={tab.confirmCategory}
               isConfirmingCategory={tab.isConfirmingCategory}
-              isReclassifying={false}
+              isAssigningCategories={false}
               isProcessing={tab.isPending}
             />
           ) : undefined

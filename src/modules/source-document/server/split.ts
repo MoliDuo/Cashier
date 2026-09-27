@@ -1,7 +1,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { ledgerEntries, ledgers, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import type { SplitSourceDocumentResultDto } from "@/modules/source-document/contracts";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { getSourceDocumentInTransaction } from "./reads/list";
@@ -10,10 +10,6 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
 import { assertSourceDocumentNotProcessing } from "./write-guards";
 import { copyDocumentInput } from "./document-input";
-
-function effectiveTitle(documentTitle: string | null, revisionTitle: string | null): string | null {
-  return documentTitle?.trim() || revisionTitle?.trim() || null;
-}
 
 export async function splitSourceDocumentAtomically(input: {
   ledgerId: string;
@@ -67,18 +63,6 @@ export async function splitSourceDocumentAtomically(input: {
       input.sourceDocumentId
     );
     await assertSourceDocumentNotProcessing(tx, lockedDocument);
-    const revisionTitle =
-      lockedDocument.latestSubmissionRevisionId == null
-        ? null
-        : ((
-            await tx.query.sourceDocumentRevisions.findFirst({
-              where: and(
-                eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-                eq(sourceDocumentRevisions.id, lockedDocument.latestSubmissionRevisionId)
-              ),
-              columns: { title: true },
-            })
-          )?.title ?? null);
     const currentEntries = await tx.query.ledgerEntries.findMany({
       where: and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
@@ -101,7 +85,7 @@ export async function splitSourceDocumentAtomically(input: {
       id: splitSourceDocumentId,
       ledgerId: input.ledgerId,
       bookId: lockedDocument.bookId,
-      title: effectiveTitle(lockedDocument.title, revisionTitle),
+      title: lockedDocument.title?.trim() || null,
       version: 1,
       documentDate: input.entryDate,
     });

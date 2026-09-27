@@ -20,8 +20,8 @@ import { durableKey } from "@/server/stored-files/shared";
 /** A drizzle database over the app schema, or a transaction opened on one. */
 export type SeedDatabase = PgDatabase<NodePgQueryResultHKT, typeof schema>;
 
-type RevisionStatus = (typeof schema.revisionProcessingStatusEnum.enumValues)[number];
-type RevisionFailureKind = (typeof schema.revisionFailureKindEnum.enumValues)[number];
+type AttemptStatus = (typeof schema.extractionAttemptStatusEnum.enumValues)[number];
+type AttemptFailureKind = (typeof schema.extractionFailureKindEnum.enumValues)[number];
 
 /** Rows written without a time get the moment of the write, as the app's own inserts do. */
 function timestamp(at: Date | undefined): Date {
@@ -38,7 +38,7 @@ export async function seedUser(
   await db.insert(schema.users).values({ id, createdAt: at, updatedAt: at }).onConflictDoNothing();
   await db
     .insert(schema.loginEmails)
-    .values({ userId: id, email: input.email, emailVerified: at, createdAt: at, updatedAt: at });
+    .values({ userId: id, email: input.email, verifiedAt: at, createdAt: at, updatedAt: at });
   return id;
 }
 
@@ -223,16 +223,15 @@ export async function seedDocumentFiles(
   return ids;
 }
 
-export interface SeedRevision {
+export interface SeedAttempt {
   id?: string;
-  title?: string | null;
-  /** Recorded as both the submitted date text and its resolved reference date. */
-  inputDocumentDate?: string | null;
-  processingStatus: RevisionStatus;
-  failureKind?: RevisionFailureKind | null;
+  /** Recorded as both the requested date and its resolved reference date. */
+  requestedDate?: string | null;
+  status: AttemptStatus;
+  failureKind?: AttemptFailureKind | null;
   failureCode?: string | null;
   failureMessage?: string | null;
-  /** Defaults to the revision's time, unless it is still processing. */
+  /** Defaults to the attempt's time, unless it is still processing. */
   finishedAt?: Date | null;
 }
 
@@ -255,7 +254,7 @@ export interface SeedSourceDocument {
   documentDate?: string | null;
   dateOrganizationSuggestion?: DateOrganizationSuggestion | null;
   /** Oldest first; the last one becomes the document's latest submission. */
-  revisions?: readonly SeedRevision[];
+  attempts?: readonly SeedAttempt[];
   files?: readonly SeedStoredFile[];
   /** The document's entries, positioned in list order. */
   entries?: readonly SeedEntry[];
@@ -286,29 +285,27 @@ export async function seedSourceDocument(
     updatedAt: at,
   });
 
-  let latestRevisionId: string | undefined;
-  for (const revision of input.revisions ?? []) {
-    latestRevisionId = revision.id ?? crypto.randomUUID();
+  let latestAttemptId: string | undefined;
+  for (const attempt of input.attempts ?? []) {
+    latestAttemptId = attempt.id ?? crypto.randomUUID();
     const finishedAt =
-      revision.finishedAt !== undefined
-        ? revision.finishedAt
-        : revision.processingStatus === "processing"
+      attempt.finishedAt !== undefined
+        ? attempt.finishedAt
+        : attempt.status === "processing"
           ? null
           : at;
-    await db.insert(schema.sourceDocumentRevisions).values({
-      id: latestRevisionId,
+    await db.insert(schema.extractionAttempts).values({
+      id: latestAttemptId,
       ledgerId,
       sourceDocumentId: id,
-      title: revision.title ?? null,
-      inputDocumentDate: revision.inputDocumentDate ?? null,
-      inputDateReference: revision.inputDocumentDate ?? null,
-      processingStatus: revision.processingStatus,
-      failureKind: revision.failureKind ?? null,
-      failureCode: revision.failureCode ?? null,
-      failureMessage: revision.failureMessage ?? null,
+      requestedDate: attempt.requestedDate ?? null,
+      referenceDate: attempt.requestedDate ?? null,
+      status: attempt.status,
+      failureKind: attempt.failureKind ?? null,
+      failureCode: attempt.failureCode ?? null,
+      failureMessage: attempt.failureMessage ?? null,
       submittedAt: at,
       finishedAt,
-      createdAt: at,
     });
   }
 
@@ -333,10 +330,10 @@ export async function seedSourceDocument(
     );
   }
 
-  if (latestRevisionId != null) {
+  if (latestAttemptId != null) {
     await db
       .update(schema.sourceDocuments)
-      .set({ latestSubmissionRevisionId: latestRevisionId })
+      .set({ latestAttemptId: latestAttemptId })
       .where(eq(schema.sourceDocuments.id, id));
   }
   return id;

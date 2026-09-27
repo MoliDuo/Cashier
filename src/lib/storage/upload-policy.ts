@@ -15,7 +15,7 @@ import { ValidationError } from "@/lib/errors";
  * storedFileIds without re-validating them against the current upload policy.
  * A stored file that passed policy checks at finalization time could later
  * exceed policy limits if the policy is tightened. Closing this gap requires
- * a policy version stamp on stored files or a re-validation step at revision
+ * a policy version stamp on stored files or a re-validation step at attempt
  * creation time. See Issue 2 in the Task 6 review.
  */
 
@@ -23,7 +23,7 @@ import { ValidationError } from "@/lib/errors";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Maximum number of files per upload revision. */
+/** Maximum number of files per upload attempt. */
 export const MAX_FILES = 4;
 
 /** Maximum original (raw uploaded) bytes per individual file. */
@@ -32,8 +32,8 @@ export const MAX_ORIGINAL_BYTES_PER_FILE = 3 * 1024 * 1024; // 3 MB
 /** Maximum normalized (post-processing) bytes per individual file. */
 export const MAX_NORMALIZED_BYTES_PER_FILE = 4 * 1024 * 1024; // 4 MB
 
-/** Maximum total normalized bytes across all files in a single revision. */
-export const MAX_NORMALIZED_BYTES_PER_REVISION = 3 * 1024 * 1024; // 3 MB
+/** Maximum total normalized bytes across all files in a single attempt. */
+export const MAX_NORMALIZED_BYTES_PER_ATTEMPT = 3 * 1024 * 1024; // 3 MB
 
 /** Maximum megapixels per image file (width * height / 1_000_000). */
 export const MAX_MEGAPIXELS_PER_FILE = 16;
@@ -109,22 +109,22 @@ export function validateImageProcessing(metadata: {
 }
 
 /**
- * Validate total normalized bytes against the per-revision aggregate limit.
- * Called during finalization and revision processing.
+ * Validate total normalized bytes against the per-attempt aggregate limit.
+ * Called during finalization and attempt processing.
  *
  * @param aggregateNormalizedBytes - Sum of all previously finalized normalized bytes
- *                                   across all files in the revision.
+ *                                   across all files in the attempt.
  * @param newFileBytes - Normalized size of the file being added.
  */
-export function validateRevisionUpload(
+export function validateAttemptUpload(
   aggregateNormalizedBytes: number,
   newFileBytes: number
 ): void {
   const total = aggregateNormalizedBytes + newFileBytes;
-  if (total > MAX_NORMALIZED_BYTES_PER_REVISION) {
+  if (total > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
     throw new ValidationError(
-      `Total normalized bytes ${total} exceeds revision limit of ` +
-        `${MAX_NORMALIZED_BYTES_PER_REVISION}`
+      `Total normalized bytes ${total} exceeds attempt limit of ` +
+        `${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
     );
   }
 }
@@ -140,7 +140,7 @@ export function validateFileCount(count: number): void {
 
 /**
  * Validate that the combined total of stored-file IDs, inline images,
- * and original images does not exceed the per-revision file limit.
+ * and original images does not exceed the per-attempt file limit.
  *
  * Called at schema, server-function, and transaction layers for defense in depth.
  */

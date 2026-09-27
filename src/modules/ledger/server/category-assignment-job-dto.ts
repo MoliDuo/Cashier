@@ -1,13 +1,13 @@
-import type { CategoryReclassificationJobDto } from "@/modules/ledger/contracts";
-import type { CategoryReclassificationJobRecord } from "@/server/category-reclassification/jobs";
+import type { CategoryAssignmentJobDto } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJobRecord } from "@/server/category-assignment/jobs";
 
 /**
  * The stored run as the client sees it. Selection rows stay on the server;
  * the DTO exposes mutually exclusive final-outcome counts.
  */
-export function toCategoryReclassificationJobDto(
-  job: CategoryReclassificationJobRecord
-): CategoryReclassificationJobDto {
+export function toCategoryAssignmentJobDto(
+  job: CategoryAssignmentJobRecord
+): CategoryAssignmentJobDto {
   return {
     id: job.id,
     mode: job.mode,
@@ -32,7 +32,6 @@ export function toCategoryReclassificationJobDto(
     retryingDocumentCount: job.retryingDocumentCount,
     nextRetryAt: job.nextRetryAt,
     candidateCategories: job.candidateSnapshot,
-    errorCode: job.lastError,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
     completedAt: job.completedAt,

@@ -5,9 +5,9 @@ import { createTestUser } from "tests/helpers/schema-setup";
 import { createSession, readSession } from "@/modules/auth/server/sessions";
 import { findUserByEmail, findUserById, listLoginEmails } from "@/modules/auth/server/users";
 import {
-  createEmailChangeChallenge,
+  createLoginEmailChallenge,
   removeLoginEmail,
-  verifyEmailChangeChallenge,
+  verifyLoginEmailChallenge,
 } from "@/modules/auth/server/account-security";
 import { loginEmails } from "@/persistence";
 import { hashOTP } from "@/modules/auth/domain/otp";
@@ -22,7 +22,7 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "first@example.com");
     await db
       .insert(loginEmails)
-      .values({ userId, email: "second@example.com", emailVerified: new Date() });
+      .values({ userId, email: "second@example.com", verifiedAt: new Date() });
 
     const first = await findUserByEmail("first@example.com");
     const second = await findUserByEmail("second@example.com");
@@ -39,7 +39,7 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "first@example.com");
     await db
       .insert(loginEmails)
-      .values({ userId, email: "second@example.com", emailVerified: new Date() });
+      .values({ userId, email: "second@example.com", verifiedAt: new Date() });
 
     const addresses = await listLoginEmails(userId);
     expect(addresses.map((row) => row.email)).toEqual(["first@example.com", "second@example.com"]);
@@ -51,17 +51,17 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "owner@example.com");
     const otp = "123456";
 
-    const created = await createEmailChangeChallenge({
+    const created = await createLoginEmailChallenge({
       userId,
       newEmail: "added@example.com",
-      tokenHash: hashOTP(otp),
+      codeHash: hashOTP(otp),
       expiresAt: new Date(Date.now() + 60_000),
       now: new Date(),
       minimumIntervalMs: 0,
     });
     expect(created).toBe("created");
 
-    const verified = await verifyEmailChangeChallenge({
+    const verified = await verifyLoginEmailChallenge({
       userId,
       newEmail: "added@example.com",
       otp,
@@ -77,16 +77,16 @@ describe("login emails", () => {
     const db = getTestDb();
     const userId = await createTestUser(db, "owner@example.com");
     const issue = (otp: string) =>
-      createEmailChangeChallenge({
+      createLoginEmailChallenge({
         userId,
         newEmail: "added@example.com",
-        tokenHash: hashOTP(otp),
+        codeHash: hashOTP(otp),
         expiresAt: new Date(Date.now() + 60_000),
         now: new Date(),
         minimumIntervalMs: 0,
       });
     const guess = (otp: string) =>
-      verifyEmailChangeChallenge({ userId, newEmail: "added@example.com", otp, now: new Date() });
+      verifyLoginEmailChallenge({ userId, newEmail: "added@example.com", otp, now: new Date() });
 
     expect(await issue("123456")).toBe("created");
     expect(await guess("000000")).toMatchObject({ status: "incorrect", attemptsRemaining: 4 });
@@ -101,10 +101,10 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "owner@example.com");
     await createTestUser(db, "taken@example.com", crypto.randomUUID());
 
-    const created = await createEmailChangeChallenge({
+    const created = await createLoginEmailChallenge({
       userId,
       newEmail: "taken@example.com",
-      tokenHash: hashOTP("123456"),
+      codeHash: hashOTP("123456"),
       expiresAt: new Date(Date.now() + 60_000),
       now: new Date(),
       minimumIntervalMs: 0,
@@ -117,7 +117,7 @@ describe("login emails", () => {
     const userId = await createTestUser(db, "first@example.com");
     await db
       .insert(loginEmails)
-      .values({ userId, email: "second@example.com", emailVerified: new Date() });
+      .values({ userId, email: "second@example.com", verifiedAt: new Date() });
     const { token } = await createSession(userId);
 
     const removed = await removeLoginEmail({

@@ -3,7 +3,7 @@ import type { LedgerStatsQueryInput, ListLedgerEntriesInput } from "./contract-s
 import type {
   BookDto,
   CategoryAssignmentResultPageDto,
-  CategoryReclassificationJobDto,
+  CategoryAssignmentJobDto,
   EntryCategoryWithCountDto,
   LedgerDto,
   LedgerEntryPageDto,
@@ -33,8 +33,8 @@ export const fetchEntryCategories = () =>
 
 export const fetchLedgerSettings = () => postLedgerQuery<LedgerSettingsViewDto>("settings");
 
-export const fetchCategoryReclassificationJob = () =>
-  postLedgerQuery<CategoryReclassificationJobDto | null>("reclassification");
+export const fetchCategoryAssignmentJob = () =>
+  postLedgerQuery<CategoryAssignmentJobDto | null>("category-assignment");
 
 export const fetchCategoryAssignmentResults = (input: {
   jobId: string;

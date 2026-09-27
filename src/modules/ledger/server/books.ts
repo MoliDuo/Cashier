@@ -52,7 +52,7 @@ async function countLiveBooks(tx: Pick<typeof db, "select">, ledgerId: string): 
 }
 
 /**
- * API keys pointing at the book. Revoked keys (`deleted_at` set) are dead: they
+ * API keys pointing at the book. Revoked keys (`revoked_at` set) are dead: they
  * cannot upload, they are not listed anywhere, and nothing can be rebound onto
  * them — so only the live ones make a book un-archivable. A hard delete is
  * different: the rows still reference the book either way.
@@ -70,7 +70,7 @@ async function countCredentials(
       and(
         eq(serviceCredentials.ledgerId, ledgerId),
         eq(serviceCredentials.bookId, bookId),
-        ...(options?.activeOnly === true ? [isNull(serviceCredentials.deletedAt)] : [])
+        ...(options?.activeOnly === true ? [isNull(serviceCredentials.revokedAt)] : [])
       )
     );
   return Number(rows[0]?.count ?? 0);

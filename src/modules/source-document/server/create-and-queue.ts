@@ -87,7 +87,7 @@ export async function createAndQueueSourceDocument(
     scheduleProcessingAfter(pending.job, input.requestId);
     return {
       sourceDocumentId: pending.document.id,
-      revisionId: pending.revision.id,
+      attemptId: pending.attempt.id,
       processingStatus: "processing",
     };
   } catch (error) {

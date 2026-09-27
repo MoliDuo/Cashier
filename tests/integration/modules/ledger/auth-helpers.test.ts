@@ -52,7 +52,7 @@ describe("requireLedgerAccess", () => {
     await db.insert(loginEmails).values({
       userId: otherUserId,
       email: "other@example.com",
-      emailVerified: new Date(),
+      verifiedAt: new Date(),
     });
 
     const otherLedgerId = randomUUID();

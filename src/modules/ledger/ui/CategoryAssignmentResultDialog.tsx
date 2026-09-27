@@ -11,12 +11,12 @@ import {
 import { textRoleClassName } from "@/components/typography";
 import { fetchCategoryAssignmentResults } from "@/modules/ledger/queries";
 import { queryKeys } from "@/lib/query-keys";
-import type { CategoryReclassificationJob } from "@/modules/ledger/contracts";
+import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 import { commonCopy } from "@/copy/common";
 import { batchActionsCopy } from "@/copy/workspace";
 
 interface CategoryAssignmentResultDialogProps {
-  job: CategoryReclassificationJob;
+  job: CategoryAssignmentJob;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRetryFailed?: () => void;

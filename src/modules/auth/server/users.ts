@@ -62,12 +62,12 @@ export async function findUserById(id: string): Promise<UserAccount | null> {
 /** The account's login addresses, oldest first. */
 export async function listLoginEmails(userId: string): Promise<LoginEmail[]> {
   const rows = await db
-    .select({ email: loginEmails.email, emailVerified: loginEmails.emailVerified })
+    .select({ email: loginEmails.email, verifiedAt: loginEmails.verifiedAt })
     .from(loginEmails)
     .where(eq(loginEmails.userId, userId))
     .orderBy(asc(loginEmails.createdAt), asc(loginEmails.id));
   return rows.map((row) => ({
     email: row.email,
-    emailVerifiedAt: row.emailVerified?.toISOString() ?? null,
+    emailVerifiedAt: row.verifiedAt?.toISOString() ?? null,
   }));
 }

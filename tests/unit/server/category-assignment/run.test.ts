@@ -96,7 +96,7 @@ vi.mock("@/config/tuning", () => ({
 vi.mock("@/lib/db/lease", () => ({
   holdLease: () => ({ signal: state.lease.signal, stop: () => undefined }),
 }));
-vi.mock("@/server/category-reclassification/assignments", () => ({
+vi.mock("@/server/category-assignment/assignments", () => ({
   claimCategoryAssignmentJob: adapters.claimJob,
   nextCategoryAssignmentDocument: adapters.next,
   loadCategoryAssignmentSelection: adapters.loadSelection,
@@ -108,13 +108,13 @@ vi.mock("@/server/category-reclassification/assignments", () => ({
   releaseCategoryAssignmentJob: adapters.release,
   renewCategoryAssignmentLease: adapters.renew,
 }));
-vi.mock("@/server/category-reclassification/document-groups", () => ({
-  loadReclassificationDocumentGroups: adapters.loadDocumentGroups,
+vi.mock("@/server/category-assignment/document-groups", () => ({
+  loadCategoryAssignmentDocumentGroups: adapters.loadDocumentGroups,
 }));
 vi.mock("@/modules/source-document/server/category-assignments", () => ({
   applyCategoryAssignments: adapters.apply,
 }));
-vi.mock("@/server/category-reclassification/reclassifier", () => ({
+vi.mock("@/server/category-assignment/decide-entry-categories", () => ({
   decideEntryCategories: adapters.decide,
 }));
 vi.mock("@/server/processing/evidence", () => ({
@@ -126,7 +126,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 vi.mock("@/lib/security/log-identifier", () => ({ logIdentifier: () => "hashed" }));
 
-import { runCategoryReclassificationJob } from "@/server/category-reclassification/run";
+import { runCategoryAssignmentJob } from "@/server/category-assignment/run";
 
 function document(
   index: number,
@@ -145,12 +145,12 @@ function document(
 }
 
 async function run() {
-  const running = runCategoryReclassificationJob("job-1");
+  const running = runCategoryAssignmentJob("job-1");
   await vi.runAllTimersAsync();
   return running;
 }
 
-describe("category reclassification run", () => {
+describe("category assignment run", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));

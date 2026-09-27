@@ -7,7 +7,7 @@ import {
   ledgerEntries,
   ledgers,
   loginEmails,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   users,
 } from "@/persistence";
@@ -88,10 +88,10 @@ describe("createQuickEntryAction", () => {
     expect(sourceDoc).toBeDefined();
     expect(sourceDoc?.title).toBe("Test Item");
     // A record typed in by hand has no input and no parse attempt.
-    expect(sourceDoc).toMatchObject({ inputText: null, latestSubmissionRevisionId: null });
+    expect(sourceDoc).toMatchObject({ inputText: null, latestAttemptId: null });
     await expect(
-      db.query.sourceDocumentRevisions.findMany({
-        where: eq(sourceDocumentRevisions.sourceDocumentId, result.sourceDocumentId),
+      db.query.extractionAttempts.findMany({
+        where: eq(extractionAttempts.sourceDocumentId, result.sourceDocumentId),
       })
     ).resolves.toEqual([]);
 
@@ -228,7 +228,7 @@ describe("createQuickEntryAction", () => {
     await db.insert(loginEmails).values({
       userId: otherUserId,
       email: "other@example.com",
-      emailVerified: new Date(),
+      verifiedAt: new Date(),
     });
 
     await db.insert(ledgers).values({

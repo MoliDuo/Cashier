@@ -9,7 +9,7 @@ import {
   ledgers,
   serviceCredentials,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
@@ -142,12 +142,12 @@ describe("API v1 source-documents route", () => {
       // The server writes the stored object directly; nothing goes through temporary/.
       expect([...mockR2.files.keys()]).toEqual([storedFile!.storageKey]);
 
-      // Verify the revision is the document's queued processing attempt
+      // Verify the attempt is the document's queued processing attempt
       const queued = await db
-        .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
+        .select({ attemptId: sourceDocuments.latestAttemptId })
         .from(sourceDocuments)
         .where(eq(sourceDocuments.id, data.sourceDocumentId));
-      expect(queued).toEqual([{ revisionId: data.revisionId }]);
+      expect(queued).toEqual([{ attemptId: data.revisionId }]);
     });
 
     it("returns 201 with a valid data URL image", async () => {
@@ -219,11 +219,11 @@ describe("API v1 source-documents route", () => {
       const document = await getTestDb().query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, body.sourceDocumentId),
       });
-      const revision = await getTestDb().query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, document!.latestSubmissionRevisionId!),
+      const attempt = await getTestDb().query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.id, document!.latestAttemptId!),
       });
       expect(document?.documentDate).toBeNull();
-      expect(revision?.inputDocumentDate).toBe("2026-07-27");
+      expect(attempt?.requestedDate).toBe("2026-07-27");
     });
 
     it("reports an invalid entryDate separately from valid image data", async () => {
@@ -300,10 +300,10 @@ describe("API v1 source-documents route", () => {
         .select({ id: sourceDocuments.id })
         .from(sourceDocuments)
         .where(eq(sourceDocuments.ledgerId, ledgerId));
-      const revisions = await db
-        .select({ id: sourceDocumentRevisions.id })
-        .from(sourceDocumentRevisions)
-        .where(eq(sourceDocumentRevisions.sourceDocumentId, firstBody.sourceDocumentId));
+      const attempts = await db
+        .select({ id: extractionAttempts.id })
+        .from(extractionAttempts)
+        .where(eq(extractionAttempts.sourceDocumentId, firstBody.sourceDocumentId));
       const storedFilesRows = await db
         .select({ id: storedFiles.id })
         .from(storedFiles)
@@ -313,15 +313,15 @@ describe("API v1 source-documents route", () => {
         .from(sourceDocumentFiles)
         .where(eq(sourceDocumentFiles.sourceDocumentId, firstBody.sourceDocumentId));
       const queued = await db
-        .select({ revisionId: sourceDocuments.latestSubmissionRevisionId })
+        .select({ attemptId: sourceDocuments.latestAttemptId })
         .from(sourceDocuments)
         .where(eq(sourceDocuments.id, firstBody.sourceDocumentId));
       expect(documents).toHaveLength(1);
-      expect(revisions).toHaveLength(1);
+      expect(attempts).toHaveLength(1);
       expect(storedFilesRows).toHaveLength(1);
       expect(documentFilesRows).toHaveLength(1);
       expect([...mockR2.files.keys()]).toEqual([`${ledgerId}/stored/${storedFilesRows[0]!.id}`]);
-      expect(queued).toEqual([{ revisionId: firstBody.revisionId }]);
+      expect(queued).toEqual([{ attemptId: firstBody.revisionId }]);
     });
 
     it("replays a repeated key without storing its images again", async () => {

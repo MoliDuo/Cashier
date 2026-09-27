@@ -13,14 +13,13 @@ const row: SourceDocumentRow = {
   bookId: "book",
   documentDate: null,
   effectiveDate: "2026-09-24",
-  latestSubmissionRevisionId: "retry",
+  latestAttemptId: "retry",
   version: 3,
   createdAt: new Date("2026-09-24"),
   updatedAt: new Date("2026-09-24"),
   dateOrganizationSuggestion: null,
 };
 const hydration: SourceDocumentHydrationRow = {
-  revisionTitle: null,
   inputText: "retry",
   processingStatus: "failed",
   failureKind: "processing_error",

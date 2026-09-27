@@ -9,9 +9,9 @@ import {
   ProcessingCancelledError,
   ProcessingFailure,
 } from "@/modules/source-document/domain/parse/contracts";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 import { claimProcessingJob, renewProcessingJobLease, rescheduleProcessingJob } from "./jobs";
-import { processRevision } from "./revision-processor";
+import { processAttempt } from "./attempt-processor";
 import { BACKGROUND_MAX_ATTEMPTS } from "@/config/tuning";
 
 function toFailureCode(error: unknown): ProcessingFailureCode {
@@ -35,17 +35,17 @@ function toFailureCode(error: unknown): ProcessingFailureCode {
  * until it runs out of attempts. Returns false when another execution holds it.
  */
 export async function executeProcessingJob(job: ProcessingJobContract): Promise<boolean> {
-  const claim = await claimProcessingJob(job.revisionId);
+  const claim = await claimProcessingJob(job.attemptId);
   if (claim == null) return false;
-  const lease = { revisionId: claim.job.revisionId, claimToken: claim.claimToken };
+  const lease = { attemptId: claim.job.attemptId, claimToken: claim.claimToken };
   const failure = {
     ledgerId: claim.ledgerId,
     sourceDocumentId: claim.job.sourceDocumentId,
-    revisionId: claim.job.revisionId,
+    attemptId: claim.job.attemptId,
     failureKind: "processing_error" as const,
     lease,
   };
-  const revisionSubject = logIdentifier("revision", claim.job.revisionId);
+  const attemptSubject = logIdentifier("attempt", claim.job.attemptId);
   if (claim.attempt > BACKGROUND_MAX_ATTEMPTS) {
     await recordProcessingFailure({
       ...failure,
@@ -56,20 +56,20 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
   }
 
   const held = holdLease(
-    async () => (await renewProcessingJobLease(lease.revisionId, lease.claimToken)) != null,
+    async () => (await renewProcessingJobLease(lease.attemptId, lease.claimToken)) != null,
     (reason, error) => {
       logger.warn(
-        { revisionSubject, reason, errorCode: findAppErrorCode(error) ?? "UNKNOWN" },
+        { attemptSubject, reason, errorCode: findAppErrorCode(error) ?? "UNKNOWN" },
         "Processing lease was lost; aborting worker"
       );
     }
   );
 
   try {
-    await processRevision({
+    await processAttempt({
       ledgerId: claim.ledgerId,
       sourceDocumentId: claim.job.sourceDocumentId,
-      revisionId: claim.job.revisionId,
+      attemptId: claim.job.attemptId,
       signal: held.signal,
       lease,
     });
@@ -79,7 +79,7 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
     if (classified.kind === "transient" && claim.attempt < BACKGROUND_MAX_ATTEMPTS) {
       const delayMs = retryDelayMs(claim.attempt, classified.retryAfterMs);
       logger.warn(
-        { revisionSubject, errorCode: classified.code, attempt: claim.attempt, delayMs },
+        { attemptSubject, errorCode: classified.code, attempt: claim.attempt, delayMs },
         "Processing failed transiently; retrying later"
       );
       await rescheduleProcessingJob(lease, delayMs);
@@ -87,7 +87,7 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
     }
     if (classified.kind === "configuration") {
       logger.error(
-        { revisionSubject, errorCode: classified.code },
+        { attemptSubject, errorCode: classified.code },
         "Processing failed on provider configuration"
       );
     }

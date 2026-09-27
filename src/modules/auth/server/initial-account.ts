@@ -57,7 +57,7 @@ export async function createInitialAccount(
     const [user] = await tx.insert(users).values({}).returning();
     if (user == null) throw new AppError("Failed to create the account", "ACCOUNT_FAILED", 500);
 
-    await tx.insert(loginEmails).values({ userId: user.id, email, emailVerified: now });
+    await tx.insert(loginEmails).values({ userId: user.id, email, verifiedAt: now });
 
     const [ledger] = await tx.insert(ledgers).values({}).returning();
     if (ledger == null) throw new AppError("Failed to create the ledger", "ACCOUNT_FAILED", 500);

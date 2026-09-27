@@ -4,7 +4,7 @@ import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { isValidOTPFormat } from "@/modules/auth/domain/otp";
 import { consumeRateLimit, type RateLimitDecision } from "@/lib/rate-limit";
-import { findOtpToken } from "./otp-tokens";
+import { findSignInChallenge } from "./sign-in-challenges";
 import { verifyOTPWithPolicy } from "./otp-verification";
 import { findUserByEmail } from "./users";
 import { logger } from "@/lib/logger";
@@ -81,7 +81,7 @@ export async function authenticateWithOTP(params: {
   }
   if (!limit.allowed) throw new OTPRateLimitedSignInError();
 
-  const record = await findOtpToken(normalizedEmail);
+  const record = await findSignInChallenge(normalizedEmail);
   if (record == null) {
     logger.warn(
       { subject: logIdentifier("email", normalizedEmail) },

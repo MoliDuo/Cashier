@@ -6,7 +6,7 @@ import {
   books,
   ledgers,
   serviceCredentials,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
 } from "@/persistence";
 import { eq } from "drizzle-orm";
@@ -179,11 +179,11 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     expect(doc).toBeDefined();
     expect(doc?.ledgerId).toBe(testLedgerId);
     expect(doc?.bookId).toBe(await testBookId(db, testLedgerId));
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, data.sourceDocumentId),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.sourceDocumentId, data.sourceDocumentId),
     });
     expect(doc?.inputText).toBeNull();
-    expect(revision?.processingStatus).toBe("processing");
+    expect(attempt?.status).toBe("processing");
   });
 
   it("should reject ledger entry with invalid service credential", async () => {
@@ -269,13 +269,13 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const doc = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, data.sourceDocumentId),
     });
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, doc!.latestSubmissionRevisionId!),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, doc!.latestAttemptId!),
     });
 
     expect(doc?.documentDate).toBeNull();
     // The fixture book has no zone of its own, so the server date decides.
-    expect(revision?.inputDocumentDate).toBe(formatDateTimeForApi(new Date()));
+    expect(attempt?.requestedDate).toBe(formatDateTimeForApi(new Date()));
   });
 
   it("dates an upload in its key's book zone", async () => {
@@ -319,10 +319,10 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     });
     // The record went to the key's book, not to the ledger's default one.
     expect(doc?.bookId).toBe(zonedBookId);
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, doc!.latestSubmissionRevisionId!),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, doc!.latestAttemptId!),
     });
-    expect(revision?.inputDocumentDate).toBe(getDateInTimezone("Pacific/Kiritimati"));
+    expect(attempt?.requestedDate).toBe(getDateInTimezone("Pacific/Kiritimati"));
   });
 
   it("should delete service credential via Action", async () => {
@@ -340,7 +340,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
       where: eq(serviceCredentials.id, createRes.id),
     });
     expect(check).toBeDefined();
-    expect(check?.deletedAt).not.toBeNull();
+    expect(check?.revokedAt).not.toBeNull();
   });
 
   it("tracks last use and rejects authentication immediately after revoke", async () => {

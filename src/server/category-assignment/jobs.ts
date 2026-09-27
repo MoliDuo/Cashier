@@ -2,24 +2,24 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  categoryReclassificationJobDocuments,
-  categoryReclassificationJobEntries,
-  categoryReclassificationJobs,
+  categoryAssignmentDocuments,
+  categoryAssignmentEntries,
+  categoryAssignmentJobs,
 } from "@/persistence";
 import type {
   CategoryAssignmentJobStatus,
   CategoryAssignmentMode,
 } from "@/modules/ledger/contracts";
-import type { ReclassificationCandidate } from "@/modules/ledger/domain/reclassification-protocol";
+import type { CategoryAssignmentCandidate } from "@/modules/ledger/domain/category-assignment-protocol";
 import { rowMode } from "./assignments";
 
 /** A job with its progress, counted from its entry and document rows when read. */
-export interface CategoryReclassificationJobRecord {
+export interface CategoryAssignmentJobRecord {
   id: string;
   ledgerId: string;
   status: CategoryAssignmentJobStatus;
   mode: CategoryAssignmentMode;
-  candidateSnapshot: ReclassificationCandidate[];
+  candidateSnapshot: CategoryAssignmentCandidate[];
   entryCount: number;
   appliedCount: number;
   confirmedCount: number;
@@ -35,7 +35,6 @@ export interface CategoryReclassificationJobRecord {
   retryingDocumentCount: number;
   nextRetryAt: string | null;
   evidenceIncomplete: boolean;
-  lastError: string | null;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -46,10 +45,8 @@ interface JobProgressRow extends Record<string, unknown> {
   ledger_id: string;
   status: CategoryAssignmentJobStatus;
   mode: "ai" | "assign" | "clear";
-  direct_category_id: string | null;
-  candidate_category_ids: string[];
-  candidate_snapshot: ReclassificationCandidate[];
-  last_error: string | null;
+  assign_category_id: string | null;
+  candidate_snapshot: CategoryAssignmentCandidate[];
   completed_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
@@ -72,15 +69,15 @@ function toIso(value: Date | string): string {
   return new Date(value).toISOString();
 }
 
-function mapJob(row: JobProgressRow): CategoryReclassificationJobRecord {
+function mapJob(row: JobProgressRow): CategoryAssignmentJobRecord {
   return {
     id: row.id,
     ledgerId: row.ledger_id,
     status: row.status,
     mode: rowMode({
       mode: row.mode,
-      directCategoryId: row.direct_category_id,
-      candidateCategoryIds: row.candidate_category_ids,
+      assignCategoryId: row.assign_category_id,
+      candidateSnapshot: row.candidate_snapshot,
     }),
     candidateSnapshot: row.candidate_snapshot,
     entryCount: Number(row.entry_count),
@@ -96,7 +93,6 @@ function mapJob(row: JobProgressRow): CategoryReclassificationJobRecord {
     retryingDocumentCount: Number(row.retrying),
     nextRetryAt: row.next_retry_at == null ? null : toIso(row.next_retry_at),
     evidenceIncomplete: row.evidence_incomplete === true,
-    lastError: row.last_error,
     completedAt: row.completed_at == null ? null : toIso(row.completed_at),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
@@ -105,8 +101,8 @@ function mapJob(row: JobProgressRow): CategoryReclassificationJobRecord {
 
 async function readJob(ledgerId: string, jobId: string | null) {
   const result = await db.execute<JobProgressRow>(sql`
-    SELECT job.id, job.ledger_id, job.status, job.mode, job.direct_category_id,
-      job.candidate_category_ids, job.candidate_snapshot, job.last_error,
+    SELECT job.id, job.ledger_id, job.status, job.mode, job.assign_category_id,
+      job.candidate_snapshot,
       job.completed_at, job.created_at, job.updated_at,
       entries.*, documents.*,
       CASE
@@ -114,7 +110,7 @@ async function readJob(ledgerId: string, jobId: string | null) {
           AND documents.due > 0 THEN 1
         ELSE 0
       END::text AS active
-    FROM ${categoryReclassificationJobs} AS job
+    FROM ${categoryAssignmentJobs} AS job
     CROSS JOIN LATERAL (
       SELECT
         count(*)::text AS entry_count,
@@ -124,13 +120,13 @@ async function readJob(ledgerId: string, jobId: string | null) {
         count(*) FILTER (WHERE outcome = 'conflict')::text AS conflict,
         count(*) FILTER (WHERE outcome = 'skipped')::text AS skipped,
         count(*) FILTER (WHERE outcome = 'cancelled')::text AS cancelled
-      FROM ${categoryReclassificationJobEntries} AS entry
+      FROM ${categoryAssignmentEntries} AS entry
       WHERE entry.job_id = job.id AND entry.ledger_id = job.ledger_id
     ) AS entries
     CROSS JOIN LATERAL (
       SELECT
         count(*)::text AS document_total,
-        count(*) FILTER (WHERE status NOT IN ('pending', 'running'))::text AS document_completed,
+        count(*) FILTER (WHERE status <> 'pending')::text AS document_completed,
         count(*) FILTER (
           WHERE status = 'pending' AND next_attempt_at <= clock_timestamp()
         ) AS due,
@@ -143,7 +139,7 @@ async function readJob(ledgerId: string, jobId: string | null) {
             AND next_attempt_at > clock_timestamp()
         ) AS next_retry_at,
         coalesce(bool_or(evidence_incomplete), false) AS evidence_incomplete
-      FROM ${categoryReclassificationJobDocuments} AS work
+      FROM ${categoryAssignmentDocuments} AS work
       WHERE work.job_id = job.id AND work.ledger_id = job.ledger_id
     ) AS documents
     WHERE job.ledger_id = ${ledgerId}
@@ -155,15 +151,15 @@ async function readJob(ledgerId: string, jobId: string | null) {
   return row == null ? null : mapJob(row);
 }
 
-export async function getCategoryReclassificationJob(input: {
+export async function getCategoryAssignmentJob(input: {
   ledgerId: string;
   jobId: string;
-}): Promise<CategoryReclassificationJobRecord | null> {
+}): Promise<CategoryAssignmentJobRecord | null> {
   return readJob(input.ledgerId, input.jobId);
 }
 
-export async function getLatestCategoryReclassificationJob(input: {
+export async function getLatestCategoryAssignmentJob(input: {
   ledgerId: string;
-}): Promise<CategoryReclassificationJobRecord | null> {
+}): Promise<CategoryAssignmentJobRecord | null> {
   return readJob(input.ledgerId, null);
 }

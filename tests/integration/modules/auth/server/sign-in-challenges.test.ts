@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb } from "tests/setup";
 import {
-  createOtpToken as createOTPToken,
-  discardOtpToken,
-  findOtpToken as findOTPRecord,
-} from "@/modules/auth/server/otp-tokens";
+  createSignInChallenge as createOTPToken,
+  discardSignInChallenge,
+  findSignInChallenge as findOTPRecord,
+} from "@/modules/auth/server/sign-in-challenges";
 import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";
 import { generateOTP, verifyOTP } from "@/modules/auth/domain/otp";
-import { otpTokens } from "@/persistence/schema/auth";
+import { signInChallenges } from "@/persistence/schema/auth";
 import { eq } from "drizzle-orm";
 import { runDailyMaintenance } from "@/server/maintenance/daily";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
@@ -17,13 +17,13 @@ vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => new MemoryObjectStore()
 
 const deleteOTPToken = async (email: string) => {
   const token = await findOTPRecord(email);
-  if (token != null) await discardOtpToken(email, token.tokenHash);
+  if (token != null) await discardSignInChallenge(email, token.codeHash);
 };
 const cleanupExpiredOTPTokens = async () => {
   const db = getTestDb();
-  const before = await db.select().from(otpTokens);
+  const before = await db.select().from(signInChallenges);
   await runDailyMaintenance();
-  return before.length - (await db.select().from(otpTokens)).length;
+  return before.length - (await db.select().from(signInChallenges)).length;
 };
 
 // Helper function for tests - combines data access and business logic
@@ -49,7 +49,7 @@ describe("OTP Repository", () => {
   beforeEach(async () => {
     db = getTestDb();
     // Clean OTP tokens before each test
-    await db.delete(otpTokens);
+    await db.delete(signInChallenges);
   });
 
   describe("createOTPToken", () => {
@@ -60,7 +60,7 @@ describe("OTP Repository", () => {
       expect(result.expiresAt).toBeInstanceOf(Date);
 
       // Verify token exists in database
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       expect(tokens).toHaveLength(1);
       const token = requireDefined(tokens[0], "Expected created OTP token");
       expect(token.email).toBe(testEmail.toLowerCase());
@@ -74,7 +74,7 @@ describe("OTP Repository", () => {
       await createOTPToken(testEmail, otp2);
 
       // Should only have one token
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       expect(tokens).toHaveLength(1);
 
       // Should be the second OTP
@@ -86,7 +86,7 @@ describe("OTP Repository", () => {
       const otp = generateOTP();
       await createOTPToken("Test@Example.COM", otp);
 
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       const token = requireDefined(tokens[0], "Expected normalized OTP token");
       expect(token.email).toBe("test@example.com");
     });
@@ -95,11 +95,11 @@ describe("OTP Repository", () => {
       const otp = generateOTP();
       await createOTPToken(testEmail, otp);
 
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       const token = requireDefined(tokens[0], "Expected stored OTP token");
-      expect(token.tokenHash).not.toBe(otp);
+      expect(token.codeHash).not.toBe(otp);
       // Verify the stored hash can be verified with the OTP (supports both new and legacy formats)
-      expect(verifyOTP(otp, token.tokenHash)).toBe(true);
+      expect(verifyOTP(otp, token.codeHash)).toBe(true);
     });
   });
 
@@ -176,9 +176,9 @@ describe("OTP Repository", () => {
       // Manually set expiration to past
       // Manually set expiration to past
       await db
-        .update(otpTokens)
-        .set({ expires: new Date(Date.now() - 1000 * 60 * 60) })
-        .where(eq(otpTokens.email, testEmail.toLowerCase()));
+        .update(signInChallenges)
+        .set({ expiresAt: new Date(Date.now() - 1000 * 60 * 60) })
+        .where(eq(signInChallenges.email, testEmail.toLowerCase()));
 
       const result = await verifyOTPToken(testEmail, otp);
 
@@ -200,7 +200,7 @@ describe("OTP Repository", () => {
       const result = await verifyOTPToken(testEmail, otp);
 
       expect(result.success).toBe(true);
-      expect(await db.select().from(otpTokens)).toHaveLength(0);
+      expect(await db.select().from(signInChallenges)).toHaveLength(0);
     });
 
     it("should allow only one concurrent successful consumption", async () => {
@@ -213,7 +213,7 @@ describe("OTP Repository", () => {
       ]);
 
       expect(results.filter((result) => result.success)).toHaveLength(1);
-      expect(await db.select().from(otpTokens)).toHaveLength(0);
+      expect(await db.select().from(signInChallenges)).toHaveLength(0);
     });
 
     it("refuses an OTP that has already been spent", async () => {
@@ -235,7 +235,7 @@ describe("OTP Repository", () => {
       ]);
 
       const token = requireDefined(
-        (await db.select().from(otpTokens))[0],
+        (await db.select().from(signInChallenges))[0],
         "Expected failed OTP token"
       );
       expect(token.attempts).toBe(3);
@@ -277,9 +277,9 @@ describe("OTP Repository", () => {
       // Set lockout to past
       // Set lockout to past
       await db
-        .update(otpTokens)
+        .update(signInChallenges)
         .set({ lockedUntil: new Date(Date.now() - 1000 * 60 * 60) })
-        .where(eq(otpTokens.email, testEmail.toLowerCase()));
+        .where(eq(signInChallenges.email, testEmail.toLowerCase()));
 
       const result = await verifyOTPToken(testEmail, otp);
       expect(result.success).toBe(true);
@@ -320,9 +320,9 @@ describe("OTP Repository", () => {
         await verifyOTPToken(testEmail, "000000");
       }
       await db
-        .update(otpTokens)
+        .update(signInChallenges)
         .set({ lastAttemptAt: sixteenMinutesAgo() })
-        .where(eq(otpTokens.email, testEmail));
+        .where(eq(signInChallenges.email, testEmail));
 
       await createOTPToken(testEmail, generateOTP());
 
@@ -336,9 +336,9 @@ describe("OTP Repository", () => {
         await verifyOTPToken(testEmail, "000000");
       }
       await db
-        .update(otpTokens)
+        .update(signInChallenges)
         .set({ lockedUntil: new Date(Date.now() - 60 * 1000), lastAttemptAt: sixteenMinutesAgo() })
-        .where(eq(otpTokens.email, testEmail));
+        .where(eq(signInChallenges.email, testEmail));
 
       const otp = generateOTP();
       await createOTPToken(testEmail, otp);
@@ -354,7 +354,7 @@ describe("OTP Repository", () => {
 
       await deleteOTPToken(testEmail);
 
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       expect(tokens).toHaveLength(0);
     });
 
@@ -374,15 +374,15 @@ describe("OTP Repository", () => {
       // Expire first token - use a fixed past date to be absolutely sure
       // Expire first token - use a fixed past date to be absolutely sure
       await db
-        .update(otpTokens)
-        .set({ expires: new Date("2000-01-01") })
-        .where(eq(otpTokens.email, "user1@example.com"));
+        .update(signInChallenges)
+        .set({ expiresAt: new Date("2000-01-01") })
+        .where(eq(signInChallenges.email, "user1@example.com"));
 
       const deleted = await cleanupExpiredOTPTokens();
 
       expect(deleted).toBe(1);
 
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       expect(tokens).toHaveLength(1);
       const token = requireDefined(tokens[0], "Expected remaining valid OTP token");
       expect(token.email).toBe("user2@example.com");
@@ -396,7 +396,7 @@ describe("OTP Repository", () => {
 
       expect(deleted).toBe(0);
 
-      const tokens = await db.select().from(otpTokens);
+      const tokens = await db.select().from(signInChallenges);
       expect(tokens).toHaveLength(1);
     });
   });

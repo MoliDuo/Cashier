@@ -106,7 +106,7 @@ function makeItem(id: string, overrides: Record<string, unknown> = {}) {
     hasImages: false,
     supportedActions: [],
     errorCode: null,
-    latestSubmissionRevisionId: null,
+    latestAttemptId: null,
     ...overrides,
   } as const;
 }

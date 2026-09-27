@@ -19,7 +19,7 @@ export const exchangeRates = pgTable(
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.rateDate, table.currency] }),
+    primaryKey({ name: "exchange_rates_pkey", columns: [table.rateDate, table.currency] }),
     check("ck_exchange_rates_per_eur_positive", sql`${table.perEur} > 0`),
   ]
 );

@@ -2,12 +2,12 @@ import { and, asc, eq } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
-import { sourceDocumentFiles, sourceDocumentRevisions, sourceDocuments } from "@/persistence";
+import { sourceDocumentFiles, extractionAttempts, sourceDocuments } from "@/persistence";
 import {
-  createProcessingRevisionInTransaction,
+  createProcessingAttemptInTransaction,
   type SourceDocumentContract,
-  type SourceDocumentRevisionContract,
-} from "@/modules/source-document/server/revisions";
+  type SourceDocumentAttemptContract,
+} from "@/modules/source-document/server/extraction-attempts";
 import type { ProcessingJobContract } from "@/server/processing/types";
 import { lockLedgerForUpdate, type PostgresTransaction } from "@/lib/db/transaction-locks";
 
@@ -16,13 +16,13 @@ async function submitInTransaction(
   input: SourceDocumentSubmissionInput,
   idempotency?: SourceDocumentIdempotencyInput
 ): Promise<SourceDocumentSubmissionResult> {
-  let revisionInput = input.input;
+  let attemptInput = input.input;
 
   if (input.sourceDocumentId != null) {
     const document = await tx
       .select({
         inputText: sourceDocuments.inputText,
-        latestSubmissionRevisionId: sourceDocuments.latestSubmissionRevisionId,
+        latestAttemptId: sourceDocuments.latestAttemptId,
       })
       .from(sourceDocuments)
       .where(
@@ -34,24 +34,24 @@ async function submitInTransaction(
       .for("update")
       .then((rows) => rows[0]);
     if (document == null) throw new NotFoundError("Source document");
-    const inputRevisionId = document.latestSubmissionRevisionId;
+    const inputAttemptId = document.latestAttemptId;
 
     if (input.inheritInput === true) {
-      if (inputRevisionId == null)
+      if (inputAttemptId == null)
         throw new ConflictError("Source document has no submission input");
       // The text and files are the document's current input; the dates the
       // parse read them with stay on the submission they came with.
       const previousInput = await tx
         .select({
-          documentDate: sourceDocumentRevisions.inputDocumentDate,
-          dateReference: sourceDocumentRevisions.inputDateReference,
+          documentDate: extractionAttempts.requestedDate,
+          dateReference: extractionAttempts.referenceDate,
         })
-        .from(sourceDocumentRevisions)
+        .from(extractionAttempts)
         .where(
           and(
-            eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-            eq(sourceDocumentRevisions.id, inputRevisionId),
-            eq(sourceDocumentRevisions.sourceDocumentId, input.sourceDocumentId)
+            eq(extractionAttempts.ledgerId, input.ledgerId),
+            eq(extractionAttempts.id, inputAttemptId),
+            eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId)
           )
         )
         .then((rows) => rows[0]);
@@ -68,38 +68,38 @@ async function submitInTransaction(
           )
           .orderBy(asc(sourceDocumentFiles.position))
       ).map((file) => file.id);
-      revisionInput = { ...previousInput, text: document.inputText, storedFileIds };
+      attemptInput = { ...previousInput, text: document.inputText, storedFileIds };
     }
 
-    if (input.supersedeProcessing === true && document?.latestSubmissionRevisionId != null) {
+    if (input.supersedeProcessing === true && document?.latestAttemptId != null) {
       await tx
-        .update(sourceDocumentRevisions)
-        .set({ processingStatus: "cancelled", finishedAt: new Date() })
+        .update(extractionAttempts)
+        .set({ status: "cancelled", finishedAt: new Date() })
         .where(
           and(
-            eq(sourceDocumentRevisions.ledgerId, input.ledgerId),
-            eq(sourceDocumentRevisions.id, document.latestSubmissionRevisionId),
-            eq(sourceDocumentRevisions.processingStatus, "processing")
+            eq(extractionAttempts.ledgerId, input.ledgerId),
+            eq(extractionAttempts.id, document.latestAttemptId),
+            eq(extractionAttempts.status, "processing")
           )
         );
     }
   }
 
-  if (revisionInput == null) throw new ValidationError("Submission input is required");
+  if (attemptInput == null) throw new ValidationError("Submission input is required");
   if (
-    (revisionInput.text == null || revisionInput.text.trim() === "") &&
-    revisionInput.storedFileIds.length === 0
+    (attemptInput.text == null || attemptInput.text.trim() === "") &&
+    attemptInput.storedFileIds.length === 0
   ) {
     throw new ValidationError("Submission text and files cannot both be empty");
   }
 
-  const pending = await createProcessingRevisionInTransaction(
+  const pending = await createProcessingAttemptInTransaction(
     tx,
     input.sourceDocumentId == null
       ? {
           ledgerId: input.ledgerId,
           bookId: input.bookId!,
-          input: revisionInput,
+          input: attemptInput,
           ...(idempotency == null
             ? {}
             : {
@@ -113,15 +113,15 @@ async function submitInTransaction(
       : {
           ledgerId: input.ledgerId,
           sourceDocumentId: input.sourceDocumentId,
-          input: revisionInput,
+          input: attemptInput,
         }
   );
   // The processing attempt is its own queue entry; recovery picks it up if the
   // request that scheduled its run dies first.
   const job = {
     sourceDocumentId: pending.document.id,
-    revisionId: pending.revision.id,
-    requestedAt: pending.revision.submittedAt,
+    attemptId: pending.attempt.id,
+    requestedAt: pending.attempt.submittedAt,
   };
   return { ...pending, job };
 }
@@ -147,7 +147,7 @@ export async function findIdempotentSubmission(
   const document = await executor
     .select({
       id: sourceDocuments.id,
-      revisionId: sourceDocuments.latestSubmissionRevisionId,
+      attemptId: sourceDocuments.latestAttemptId,
       fingerprint: sourceDocuments.idempotencyFingerprint,
     })
     .from(sourceDocuments)
@@ -166,7 +166,7 @@ export async function findIdempotentSubmission(
   // Creating a document sets its latest submission in the same transaction.
   return {
     sourceDocumentId: document.id,
-    revisionId: document.revisionId!,
+    attemptId: document.attemptId!,
     processingStatus: "processing",
   };
 }
@@ -200,13 +200,13 @@ export async function submitSourceDocumentIdempotently(
 
 export interface SourceDocumentSubmissionContract {
   sourceDocumentId: string;
-  revisionId: string;
+  attemptId: string;
   processingStatus: "processing";
 }
 
 export interface SourceDocumentSubmissionResult {
   document: SourceDocumentContract;
-  revision: SourceDocumentRevisionContract;
+  attempt: SourceDocumentAttemptContract;
   job: ProcessingJobContract;
 }
 

@@ -3,9 +3,9 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, ValidationError } from "@/lib/errors";
 import {
-  categoryReclassificationJobDocuments,
-  categoryReclassificationJobEntries,
-  categoryReclassificationJobs,
+  categoryAssignmentDocuments,
+  categoryAssignmentEntries,
+  categoryAssignmentJobs,
   entryCategories,
   ledgerEntries,
   sourceDocuments,
@@ -47,19 +47,22 @@ function violatesConstraint(error: unknown, constraint: string): boolean {
 function modeColumns(mode: CategoryAssignmentMode) {
   return {
     mode: mode.kind,
-    directCategoryId: mode.kind === "assign" ? mode.categoryId : null,
-    candidateCategoryIds: mode.kind === "ai" ? mode.candidateCategoryIds : [],
+    assignCategoryId: mode.kind === "assign" ? mode.categoryId : null,
   } as const;
 }
 
+/** The mode a job was started with; an `ai` run's candidates are its snapshot. */
 export function rowMode(row: {
   mode: "ai" | "assign" | "clear";
-  directCategoryId: string | null;
-  candidateCategoryIds: string[];
+  assignCategoryId: string | null;
+  candidateSnapshot: ReadonlyArray<{ id: string }>;
 }): CategoryAssignmentMode {
-  if (row.mode === "assign") return { kind: "assign", categoryId: row.directCategoryId! };
+  if (row.mode === "assign") return { kind: "assign", categoryId: row.assignCategoryId! };
   if (row.mode === "clear") return { kind: "clear" };
-  return { kind: "ai", candidateCategoryIds: row.candidateCategoryIds };
+  return {
+    kind: "ai",
+    candidateCategoryIds: row.candidateSnapshot.map((candidate) => candidate.id),
+  };
 }
 
 function batches<T>(items: readonly T[]): T[][] {
@@ -100,11 +103,7 @@ export type NextCategoryAssignmentDocument =
   | { kind: "lost" };
 
 const jobLeaseHeldBy = (claimToken: string) =>
-  leaseHeldBy(
-    categoryReclassificationJobs.claimToken,
-    categoryReclassificationJobs.claimExpiresAt,
-    claimToken
-  );
+  leaseHeldBy(categoryAssignmentJobs.claimToken, categoryAssignmentJobs.claimExpiresAt, claimToken);
 
 /**
  * Runs `work` in a transaction that holds the job row locked, or returns null
@@ -117,12 +116,12 @@ async function withHeldJob<T>(
 ): Promise<T | null> {
   return db.transaction(async (tx) => {
     const held = await tx
-      .select({ id: categoryReclassificationJobs.id })
-      .from(categoryReclassificationJobs)
+      .select({ id: categoryAssignmentJobs.id })
+      .from(categoryAssignmentJobs)
       .where(
         and(
-          eq(categoryReclassificationJobs.id, lease.jobId),
-          eq(categoryReclassificationJobs.ledgerId, lease.ledgerId),
+          eq(categoryAssignmentJobs.id, lease.jobId),
+          eq(categoryAssignmentJobs.ledgerId, lease.ledgerId),
           jobLeaseHeldBy(lease.claimToken)
         )
       )
@@ -147,7 +146,7 @@ export async function startCategoryAssignment(input: {
   ledgerEntryIds: readonly string[];
   candidates: CategoryAssignmentCandidateSnapshot[];
   customPrompt: string | null;
-  parentJobId?: string;
+  retryOfJobId?: string;
   now?: Date;
 }): Promise<{ id: string }> {
   const now = input.now ?? new Date();
@@ -157,25 +156,25 @@ export async function startCategoryAssignment(input: {
       await lockLedgerForUpdate(tx, input.ledgerId);
       const replay = await tx
         .select()
-        .from(categoryReclassificationJobs)
+        .from(categoryAssignmentJobs)
         .where(
           and(
-            eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
-            eq(categoryReclassificationJobs.requestKey, input.requestKey)
+            eq(categoryAssignmentJobs.ledgerId, input.ledgerId),
+            eq(categoryAssignmentJobs.requestKey, input.requestKey)
           )
         )
         .then((rows) => rows[0]);
       if (replay != null) {
         const selected = await tx
-          .select({ id: categoryReclassificationJobEntries.ledgerEntryId })
-          .from(categoryReclassificationJobEntries)
+          .select({ id: categoryAssignmentEntries.ledgerEntryId })
+          .from(categoryAssignmentEntries)
           .where(
             and(
-              eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-              eq(categoryReclassificationJobEntries.jobId, replay.id)
+              eq(categoryAssignmentEntries.ledgerId, input.ledgerId),
+              eq(categoryAssignmentEntries.jobId, replay.id)
             )
           )
-          .orderBy(categoryReclassificationJobEntries.selectionOrder);
+          .orderBy(categoryAssignmentEntries.selectionOrder);
         if (
           !sameJson(rowMode(replay), input.mode) ||
           !sameJson(replay.candidateSnapshot, input.candidates) ||
@@ -227,33 +226,33 @@ export async function startCategoryAssignment(input: {
       }
 
       const [created] = await tx
-        .insert(categoryReclassificationJobs)
+        .insert(categoryAssignmentJobs)
         .values({
           ledgerId: input.ledgerId,
           status: "pending",
           requestKey: input.requestKey,
           candidateSnapshot: input.candidates,
           customPromptSnapshot: input.customPrompt,
-          parentJobId: input.parentJobId ?? null,
+          retryOfJobId: input.retryOfJobId ?? null,
           ...modeColumns(input.mode),
           createdAt: now,
           updatedAt: now,
         })
-        .returning({ id: categoryReclassificationJobs.id });
+        .returning({ id: categoryAssignmentJobs.id });
       if (created == null) throw new ConflictError("Category assignment could not be created");
 
-      const firstSelectionOrder = new Map<string, number>();
+      const selectionOrder = new Map<string, number>();
       entryIds.forEach((id, index) => {
         const documentId = byId.get(id)!.sourceDocumentId;
-        if (!firstSelectionOrder.has(documentId)) firstSelectionOrder.set(documentId, index);
+        if (!selectionOrder.has(documentId)) selectionOrder.set(documentId, index);
       });
-      for (const batch of batches([...firstSelectionOrder])) {
-        await tx.insert(categoryReclassificationJobDocuments).values(
+      for (const batch of batches([...selectionOrder])) {
+        await tx.insert(categoryAssignmentDocuments).values(
           batch.map(([sourceDocumentId, order]) => ({
             jobId: created.id,
             ledgerId: input.ledgerId,
             sourceDocumentId,
-            firstSelectionOrder: order,
+            selectionOrder: order,
             nextAttemptAt: now,
             createdAt: now,
             updatedAt: now,
@@ -264,7 +263,7 @@ export async function startCategoryAssignment(input: {
       const decided = input.mode.kind !== "ai";
       const targetCategoryId = input.mode.kind === "assign" ? input.mode.categoryId : null;
       for (const batch of batches(entryIds.map((id, index) => ({ id, index })))) {
-        await tx.insert(categoryReclassificationJobEntries).values(
+        await tx.insert(categoryAssignmentEntries).values(
           batch.map(({ id, index }) => {
             const row = byId.get(id)!;
             return {
@@ -285,7 +284,7 @@ export async function startCategoryAssignment(input: {
       return created;
     });
   } catch (error) {
-    if (violatesConstraint(error, "uq_category_reclassification_jobs_active")) {
+    if (violatesConstraint(error, "uq_category_assignment_jobs_active")) {
       throw new ConflictError("A category assignment is already active for this ledger");
     }
     throw error;
@@ -295,16 +294,16 @@ export async function startCategoryAssignment(input: {
 export async function resolveLatestConflictSelection(input: { ledgerId: string; jobId: string }) {
   const original = await db
     .select()
-    .from(categoryReclassificationJobs)
+    .from(categoryAssignmentJobs)
     .where(
       and(
-        eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
-        eq(categoryReclassificationJobs.id, input.jobId),
-        inArray(categoryReclassificationJobs.status, ["partial", "failed", "cancelled"]),
+        eq(categoryAssignmentJobs.ledgerId, input.ledgerId),
+        eq(categoryAssignmentJobs.id, input.jobId),
+        inArray(categoryAssignmentJobs.status, ["partial", "failed", "cancelled"]),
         sql`EXISTS (
-          SELECT 1 FROM ${categoryReclassificationJobEntries} AS entry
-          WHERE entry.job_id = ${categoryReclassificationJobs.id}
-            AND entry.ledger_id = ${categoryReclassificationJobs.ledgerId}
+          SELECT 1 FROM ${categoryAssignmentEntries} AS entry
+          WHERE entry.job_id = ${categoryAssignmentJobs.id}
+            AND entry.ledger_id = ${categoryAssignmentJobs.ledgerId}
             AND entry.outcome = 'conflict'
         )`
       )
@@ -315,12 +314,12 @@ export async function resolveLatestConflictSelection(input: { ledgerId: string; 
   }
   const entries = await db
     .select({ ledgerEntryId: ledgerEntries.id })
-    .from(categoryReclassificationJobEntries)
+    .from(categoryAssignmentEntries)
     .innerJoin(
       ledgerEntries,
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.id, categoryReclassificationJobEntries.ledgerEntryId)
+        eq(ledgerEntries.id, categoryAssignmentEntries.ledgerEntryId)
       )
     )
     .innerJoin(
@@ -332,12 +331,12 @@ export async function resolveLatestConflictSelection(input: { ledgerId: string; 
     )
     .where(
       and(
-        eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-        eq(categoryReclassificationJobEntries.jobId, input.jobId),
-        eq(categoryReclassificationJobEntries.outcome, "conflict")
+        eq(categoryAssignmentEntries.ledgerId, input.ledgerId),
+        eq(categoryAssignmentEntries.jobId, input.jobId),
+        eq(categoryAssignmentEntries.outcome, "conflict")
       )
     )
-    .orderBy(categoryReclassificationJobEntries.selectionOrder);
+    .orderBy(categoryAssignmentEntries.selectionOrder);
   if (entries.length === 0) {
     throw new ValidationError(
       "Conflicted entries are no longer current; select their replacements from Details"
@@ -345,7 +344,7 @@ export async function resolveLatestConflictSelection(input: { ledgerId: string; 
   }
   return {
     mode: rowMode(original),
-    parentJobId: original.id,
+    retryOfJobId: original.id,
     ledgerEntryIds: entries.map((entry) => entry.ledgerEntryId),
   };
 }
@@ -363,23 +362,22 @@ export async function claimCategoryAssignmentJob(
     id: string;
     ledger_id: string;
     mode: "ai" | "assign" | "clear";
-    direct_category_id: string | null;
-    candidate_category_ids: string[];
+    assign_category_id: string | null;
     candidate_snapshot: CategoryAssignmentCandidateSnapshot[];
     custom_prompt_snapshot: string | null;
   }>(sql`
     WITH candidate AS (
-      SELECT job.id FROM ${categoryReclassificationJobs} AS job
+      SELECT job.id FROM ${categoryAssignmentJobs} AS job
       WHERE job.status IN ('pending', 'running')
         AND ${leaseFree(sql`job.claim_token`, sql`job.claim_expires_at`)}
         AND (
           EXISTS (
-            SELECT 1 FROM ${categoryReclassificationJobDocuments} AS work
+            SELECT 1 FROM ${categoryAssignmentDocuments} AS work
             WHERE work.job_id = job.id AND work.ledger_id = job.ledger_id
               AND work.status = 'pending' AND work.next_attempt_at <= clock_timestamp()
           )
           OR NOT EXISTS (
-            SELECT 1 FROM ${categoryReclassificationJobDocuments} AS work
+            SELECT 1 FROM ${categoryAssignmentDocuments} AS work
             WHERE work.job_id = job.id AND work.ledger_id = job.ledger_id
               AND work.status = 'pending'
           )
@@ -390,12 +388,12 @@ export async function claimCategoryAssignmentJob(
       LIMIT 1
       FOR UPDATE OF job SKIP LOCKED
     )
-    UPDATE ${categoryReclassificationJobs} AS job
+    UPDATE ${categoryAssignmentJobs} AS job
     SET status = 'running', claim_token = ${token}, claim_expires_at = ${leaseExpiry()},
         updated_at = ${new Date()}
     FROM candidate WHERE job.id = candidate.id
-    RETURNING job.id, job.ledger_id, job.mode, job.direct_category_id,
-      job.candidate_category_ids, job.candidate_snapshot, job.custom_prompt_snapshot
+    RETURNING job.id, job.ledger_id, job.mode, job.assign_category_id,
+      job.candidate_snapshot, job.custom_prompt_snapshot
   `);
   const row = claimed.rows[0];
   if (row == null) return null;
@@ -405,8 +403,8 @@ export async function claimCategoryAssignmentJob(
     claimToken: token,
     mode: rowMode({
       mode: row.mode,
-      directCategoryId: row.direct_category_id,
-      candidateCategoryIds: row.candidate_category_ids,
+      assignCategoryId: row.assign_category_id,
+      candidateSnapshot: row.candidate_snapshot,
     }),
     candidates: row.candidate_snapshot,
     customPrompt: row.custom_prompt_snapshot,
@@ -417,16 +415,16 @@ export async function renewCategoryAssignmentLease(
   lease: CategoryAssignmentLease
 ): Promise<boolean> {
   const rows = await db
-    .update(categoryReclassificationJobs)
+    .update(categoryAssignmentJobs)
     .set({ claimExpiresAt: leaseExpiry() })
     .where(
       and(
-        eq(categoryReclassificationJobs.id, lease.jobId),
-        eq(categoryReclassificationJobs.ledgerId, lease.ledgerId),
+        eq(categoryAssignmentJobs.id, lease.jobId),
+        eq(categoryAssignmentJobs.ledgerId, lease.ledgerId),
         jobLeaseHeldBy(lease.claimToken)
       )
     )
-    .returning({ id: categoryReclassificationJobs.id });
+    .returning({ id: categoryAssignmentJobs.id });
   return rows.length === 1;
 }
 
@@ -437,21 +435,21 @@ export async function nextCategoryAssignmentDocument(
   const next = await withHeldJob(lease, async (tx): Promise<NextCategoryAssignmentDocument> => {
     const picked = await tx.execute<{
       source_document_id: string;
-      attempts: number;
+      attempt_count: number;
       completed_chunk_count: number;
       error_code: string | null;
     }>(sql`
-      UPDATE ${categoryReclassificationJobDocuments} AS work
-      SET attempts = work.attempts + 1, updated_at = ${new Date()}
+      UPDATE ${categoryAssignmentDocuments} AS work
+      SET attempt_count = work.attempt_count + 1, updated_at = ${new Date()}
       WHERE (work.job_id, work.source_document_id) = (
         SELECT due.job_id, due.source_document_id
-        FROM ${categoryReclassificationJobDocuments} AS due
+        FROM ${categoryAssignmentDocuments} AS due
         WHERE due.job_id = ${lease.jobId} AND due.ledger_id = ${lease.ledgerId}
           AND due.status = 'pending' AND due.next_attempt_at <= clock_timestamp()
-        ORDER BY due.next_attempt_at, due.first_selection_order
+        ORDER BY due.next_attempt_at, due.selection_order
         LIMIT 1
       )
-      RETURNING work.source_document_id, work.attempts, work.completed_chunk_count,
+      RETURNING work.source_document_id, work.attempt_count, work.completed_chunk_count,
         work.error_code
     `);
     const row = picked.rows[0];
@@ -460,7 +458,7 @@ export async function nextCategoryAssignmentDocument(
         kind: "document",
         document: {
           sourceDocumentId: row.source_document_id,
-          attempt: Number(row.attempts),
+          attempt: Number(row.attempt_count),
           completedChunkCount: Number(row.completed_chunk_count),
           lastErrorCode: row.error_code,
         },
@@ -469,7 +467,7 @@ export async function nextCategoryAssignmentDocument(
     const waiting = await tx.execute<{ delay_ms: string | null }>(sql`
       SELECT ceil(extract(epoch FROM min(next_attempt_at) - clock_timestamp()) * 1000)::text
         AS delay_ms
-      FROM ${categoryReclassificationJobDocuments}
+      FROM ${categoryAssignmentDocuments}
       WHERE job_id = ${lease.jobId} AND ledger_id = ${lease.ledgerId} AND status = 'pending'
     `);
     const delayMs = waiting.rows[0]?.delay_ms;
@@ -486,24 +484,24 @@ export async function loadCategoryAssignmentSelection(input: {
   sourceDocumentId: string;
 }): Promise<string[]> {
   const entries = await db
-    .select({ id: categoryReclassificationJobEntries.ledgerEntryId })
-    .from(categoryReclassificationJobEntries)
+    .select({ id: categoryAssignmentEntries.ledgerEntryId })
+    .from(categoryAssignmentEntries)
     .where(
       and(
-        eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-        eq(categoryReclassificationJobEntries.jobId, input.jobId),
-        eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId)
+        eq(categoryAssignmentEntries.ledgerId, input.ledgerId),
+        eq(categoryAssignmentEntries.jobId, input.jobId),
+        eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId)
       )
     )
-    .orderBy(categoryReclassificationJobEntries.selectionOrder);
+    .orderBy(categoryAssignmentEntries.selectionOrder);
   return entries.map((entry) => entry.id);
 }
 
 function documentWhere(lease: CategoryAssignmentLease, sourceDocumentId: string) {
   return and(
-    eq(categoryReclassificationJobDocuments.ledgerId, lease.ledgerId),
-    eq(categoryReclassificationJobDocuments.jobId, lease.jobId),
-    eq(categoryReclassificationJobDocuments.sourceDocumentId, sourceDocumentId)
+    eq(categoryAssignmentDocuments.ledgerId, lease.ledgerId),
+    eq(categoryAssignmentDocuments.jobId, lease.jobId),
+    eq(categoryAssignmentDocuments.sourceDocumentId, sourceDocumentId)
   );
 }
 
@@ -513,7 +511,7 @@ export async function markCategoryAssignmentEvidenceIncomplete(
 ): Promise<void> {
   await withHeldJob(lease, (tx) =>
     tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({ evidenceIncomplete: true, updatedAt: new Date() })
       .where(documentWhere(lease, sourceDocumentId))
   );
@@ -534,23 +532,23 @@ export async function persistCategoryAssignmentDecisions(input: {
   const persisted = await withHeldJob(lease, async (tx) => {
     for (const decision of input.decisions) {
       const updated = await tx
-        .update(categoryReclassificationJobEntries)
+        .update(categoryAssignmentEntries)
         .set({ targetCategoryId: decision.categoryId, decisionPersisted: true, updatedAt: now })
         .where(
           and(
-            eq(categoryReclassificationJobEntries.ledgerId, lease.ledgerId),
-            eq(categoryReclassificationJobEntries.jobId, lease.jobId),
-            eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId),
-            eq(categoryReclassificationJobEntries.ledgerEntryId, decision.ledgerEntryId),
-            isNull(categoryReclassificationJobEntries.outcome)
+            eq(categoryAssignmentEntries.ledgerId, lease.ledgerId),
+            eq(categoryAssignmentEntries.jobId, lease.jobId),
+            eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId),
+            eq(categoryAssignmentEntries.ledgerEntryId, decision.ledgerEntryId),
+            isNull(categoryAssignmentEntries.outcome)
           )
         )
-        .returning({ id: categoryReclassificationJobEntries.ledgerEntryId });
+        .returning({ id: categoryAssignmentEntries.ledgerEntryId });
       if (updated.length !== 1)
         throw new ConflictError("AI returned an entry outside the claimed request block");
     }
     await tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({ completedChunkCount: input.completedChunkCount, updatedAt: now })
       .where(documentWhere(lease, input.sourceDocumentId));
     return true;
@@ -569,9 +567,9 @@ export async function yieldCategoryAssignmentDocument(
 ): Promise<void> {
   await withHeldJob(lease, (tx) =>
     tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({
-        attempts: sql`greatest(${categoryReclassificationJobDocuments.attempts} - 1, 0)`,
+        attemptCount: sql`greatest(${categoryAssignmentDocuments.attemptCount} - 1, 0)`,
         updatedAt: new Date(),
       })
       .where(documentWhere(lease, sourceDocumentId))
@@ -587,7 +585,7 @@ export async function rescheduleCategoryAssignmentDocument(input: {
 }): Promise<boolean> {
   const done = await withHeldJob(input.lease, async (tx) => {
     await tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({
         nextAttemptAt: databaseClockPlus(input.delayMs),
         errorCode: input.errorCode,
@@ -609,18 +607,18 @@ export async function failCategoryAssignmentDocument(input: {
   const now = new Date();
   const done = await withHeldJob(lease, async (tx) => {
     await tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({ status: "failed", errorCode: input.errorCode, updatedAt: now })
       .where(documentWhere(lease, input.sourceDocumentId));
     await tx
-      .update(categoryReclassificationJobEntries)
+      .update(categoryAssignmentEntries)
       .set({ outcome: "failed", errorCode: input.errorCode, updatedAt: now })
       .where(
         and(
-          eq(categoryReclassificationJobEntries.ledgerId, lease.ledgerId),
-          eq(categoryReclassificationJobEntries.jobId, lease.jobId),
-          eq(categoryReclassificationJobEntries.sourceDocumentId, input.sourceDocumentId),
-          isNull(categoryReclassificationJobEntries.outcome)
+          eq(categoryAssignmentEntries.ledgerId, lease.ledgerId),
+          eq(categoryAssignmentEntries.jobId, lease.jobId),
+          eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId),
+          isNull(categoryAssignmentEntries.outcome)
         )
       );
     return true;
@@ -649,7 +647,7 @@ export async function finishCategoryAssignmentJobIfDone(
   }>(sql`
     SELECT
       EXISTS (
-        SELECT 1 FROM ${categoryReclassificationJobDocuments}
+        SELECT 1 FROM ${categoryAssignmentDocuments}
         WHERE job_id = ${jobId} AND ledger_id = ${ledgerId} AND status = 'pending'
       ) AS pending,
       count(*) FILTER (WHERE outcome = 'applied')::text AS applied,
@@ -658,7 +656,7 @@ export async function finishCategoryAssignmentJobIfDone(
       count(*) FILTER (WHERE outcome = 'conflict')::text AS conflict,
       count(*) FILTER (WHERE outcome = 'skipped')::text AS skipped,
       count(*) FILTER (WHERE outcome = 'cancelled')::text AS cancelled
-    FROM ${categoryReclassificationJobEntries}
+    FROM ${categoryAssignmentEntries}
     WHERE job_id = ${jobId} AND ledger_id = ${ledgerId}
   `);
   const row = result.rows[0]!;
@@ -676,13 +674,13 @@ export async function finishCategoryAssignmentJobIfDone(
           : "partial";
   const now = new Date();
   await tx
-    .update(categoryReclassificationJobs)
+    .update(categoryAssignmentJobs)
     .set({ status, claimToken: null, claimExpiresAt: null, completedAt: now, updatedAt: now })
     .where(
       and(
-        eq(categoryReclassificationJobs.id, jobId),
-        eq(categoryReclassificationJobs.ledgerId, ledgerId),
-        inArray(categoryReclassificationJobs.status, ["pending", "running"])
+        eq(categoryAssignmentJobs.id, jobId),
+        eq(categoryAssignmentJobs.ledgerId, ledgerId),
+        inArray(categoryAssignmentJobs.status, ["pending", "running"])
       )
     );
   return true;
@@ -697,9 +695,9 @@ export async function releaseCategoryAssignmentJob(lease: CategoryAssignmentLeas
   await withHeldJob(lease, async (tx) => {
     if (await finishCategoryAssignmentJobIfDone(tx, lease.jobId, lease.ledgerId)) return;
     await tx
-      .update(categoryReclassificationJobs)
+      .update(categoryAssignmentJobs)
       .set({ claimToken: null, claimExpiresAt: null })
-      .where(eq(categoryReclassificationJobs.id, lease.jobId));
+      .where(eq(categoryAssignmentJobs.id, lease.jobId));
   });
 }
 
@@ -714,7 +712,7 @@ export async function cancelCategoryAssignment(input: {
     // Dropping the lease is what stops a worker mid-run: its next write finds
     // the lease gone and discards what it was about to store.
     const changed = await tx
-      .update(categoryReclassificationJobs)
+      .update(categoryAssignmentJobs)
       .set({
         status: "cancelled",
         claimToken: null,
@@ -724,31 +722,31 @@ export async function cancelCategoryAssignment(input: {
       })
       .where(
         and(
-          eq(categoryReclassificationJobs.id, input.jobId),
-          eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
-          inArray(categoryReclassificationJobs.status, ["preparing", "pending", "running"])
+          eq(categoryAssignmentJobs.id, input.jobId),
+          eq(categoryAssignmentJobs.ledgerId, input.ledgerId),
+          inArray(categoryAssignmentJobs.status, ["pending", "running"])
         )
       )
-      .returning({ id: categoryReclassificationJobs.id });
+      .returning({ id: categoryAssignmentJobs.id });
     if (changed.length === 0) return false;
     await tx
-      .update(categoryReclassificationJobEntries)
+      .update(categoryAssignmentEntries)
       .set({ outcome: "cancelled", errorCode: null, updatedAt: now })
       .where(
         and(
-          eq(categoryReclassificationJobEntries.jobId, input.jobId),
-          eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-          isNull(categoryReclassificationJobEntries.outcome)
+          eq(categoryAssignmentEntries.jobId, input.jobId),
+          eq(categoryAssignmentEntries.ledgerId, input.ledgerId),
+          isNull(categoryAssignmentEntries.outcome)
         )
       );
     await tx
-      .update(categoryReclassificationJobDocuments)
+      .update(categoryAssignmentDocuments)
       .set({ status: "cancelled", updatedAt: now })
       .where(
         and(
-          eq(categoryReclassificationJobDocuments.jobId, input.jobId),
-          eq(categoryReclassificationJobDocuments.ledgerId, input.ledgerId),
-          inArray(categoryReclassificationJobDocuments.status, ["pending", "running"])
+          eq(categoryAssignmentDocuments.jobId, input.jobId),
+          eq(categoryAssignmentDocuments.ledgerId, input.ledgerId),
+          eq(categoryAssignmentDocuments.status, "pending")
         )
       );
     return true;
@@ -765,24 +763,24 @@ export async function retryCategoryAssignmentFailures(input: {
   return db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, input.ledgerId);
     const replay = await tx
-      .select({ id: categoryReclassificationJobs.id })
-      .from(categoryReclassificationJobs)
+      .select({ id: categoryAssignmentJobs.id })
+      .from(categoryAssignmentJobs)
       .where(
         and(
-          eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
-          eq(categoryReclassificationJobs.requestKey, input.requestKey)
+          eq(categoryAssignmentJobs.ledgerId, input.ledgerId),
+          eq(categoryAssignmentJobs.requestKey, input.requestKey)
         )
       )
       .then((rows) => rows[0]);
     if (replay != null) return replay;
     const original = await tx
       .select()
-      .from(categoryReclassificationJobs)
+      .from(categoryAssignmentJobs)
       .where(
         and(
-          eq(categoryReclassificationJobs.ledgerId, input.ledgerId),
-          eq(categoryReclassificationJobs.id, input.jobId),
-          inArray(categoryReclassificationJobs.status, ["partial", "failed"])
+          eq(categoryAssignmentJobs.ledgerId, input.ledgerId),
+          eq(categoryAssignmentJobs.id, input.jobId),
+          inArray(categoryAssignmentJobs.status, ["partial", "failed"])
         )
       )
       .for("update")
@@ -792,62 +790,61 @@ export async function retryCategoryAssignmentFailures(input: {
         ? []
         : await tx
             .select()
-            .from(categoryReclassificationJobEntries)
+            .from(categoryAssignmentEntries)
             .where(
               and(
-                eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-                eq(categoryReclassificationJobEntries.jobId, input.jobId),
-                eq(categoryReclassificationJobEntries.outcome, "failed")
+                eq(categoryAssignmentEntries.ledgerId, input.ledgerId),
+                eq(categoryAssignmentEntries.jobId, input.jobId),
+                eq(categoryAssignmentEntries.outcome, "failed")
               )
             )
-            .orderBy(categoryReclassificationJobEntries.selectionOrder);
+            .orderBy(categoryAssignmentEntries.selectionOrder);
     if (original == null || failedEntries.length === 0) {
       throw new ValidationError("This assignment has no retryable failures");
     }
     const failedDocuments = await tx
-      .select({ work: categoryReclassificationJobDocuments, current: sourceDocuments })
-      .from(categoryReclassificationJobDocuments)
+      .select({ work: categoryAssignmentDocuments, current: sourceDocuments })
+      .from(categoryAssignmentDocuments)
       .leftJoin(
         sourceDocuments,
         and(
           eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, categoryReclassificationJobDocuments.sourceDocumentId)
+          eq(sourceDocuments.id, categoryAssignmentDocuments.sourceDocumentId)
         )
       )
       .where(
         and(
-          eq(categoryReclassificationJobDocuments.ledgerId, input.ledgerId),
-          eq(categoryReclassificationJobDocuments.jobId, input.jobId),
-          eq(categoryReclassificationJobDocuments.status, "failed")
+          eq(categoryAssignmentDocuments.ledgerId, input.ledgerId),
+          eq(categoryAssignmentDocuments.jobId, input.jobId),
+          eq(categoryAssignmentDocuments.status, "failed")
         )
       )
-      .orderBy(categoryReclassificationJobDocuments.firstSelectionOrder);
+      .orderBy(categoryAssignmentDocuments.selectionOrder);
     const [created] = await tx
-      .insert(categoryReclassificationJobs)
+      .insert(categoryAssignmentJobs)
       .values({
         ledgerId: input.ledgerId,
         status: "pending",
         mode: original.mode,
-        directCategoryId: original.directCategoryId,
-        candidateCategoryIds: original.candidateCategoryIds,
+        assignCategoryId: original.assignCategoryId,
         candidateSnapshot: original.candidateSnapshot,
         customPromptSnapshot: original.customPromptSnapshot,
         requestKey: input.requestKey,
-        parentJobId: original.id,
+        retryOfJobId: original.id,
         createdAt: now,
         updatedAt: now,
       })
-      .returning({ id: categoryReclassificationJobs.id });
+      .returning({ id: categoryAssignmentJobs.id });
     if (created == null) throw new ConflictError("Retry assignment could not be created");
     const changedDocuments = new Set<string>();
     for (const { work, current } of failedDocuments) {
       const changed = current == null;
       if (changed) changedDocuments.add(work.sourceDocumentId);
-      await tx.insert(categoryReclassificationJobDocuments).values({
+      await tx.insert(categoryAssignmentDocuments).values({
         jobId: created.id,
         ledgerId: input.ledgerId,
         sourceDocumentId: work.sourceDocumentId,
-        firstSelectionOrder: work.firstSelectionOrder,
+        selectionOrder: work.selectionOrder,
         status: changed ? "conflict" : "pending",
         completedChunkCount: changed ? 0 : work.completedChunkCount,
         nextAttemptAt: now,
@@ -858,7 +855,7 @@ export async function retryCategoryAssignmentFailures(input: {
     }
     for (const entry of failedEntries) {
       const changed = changedDocuments.has(entry.sourceDocumentId);
-      await tx.insert(categoryReclassificationJobEntries).values({
+      await tx.insert(categoryAssignmentEntries).values({
         jobId: created.id,
         ledgerId: input.ledgerId,
         ledgerEntryId: entry.ledgerEntryId,
@@ -888,30 +885,30 @@ export async function listCategoryAssignmentResults(input: {
   const limit = Math.min(input.limit ?? 50, 50);
   const rows = await db
     .select({
-      ledgerEntryId: categoryReclassificationJobEntries.ledgerEntryId,
+      ledgerEntryId: categoryAssignmentEntries.ledgerEntryId,
       itemName: ledgerEntries.itemName,
-      originalCategoryId: categoryReclassificationJobEntries.originalCategoryId,
-      targetCategoryId: categoryReclassificationJobEntries.targetCategoryId,
-      outcome: categoryReclassificationJobEntries.outcome,
-      errorCode: categoryReclassificationJobEntries.errorCode,
-      selectionOrder: categoryReclassificationJobEntries.selectionOrder,
+      originalCategoryId: categoryAssignmentEntries.originalCategoryId,
+      targetCategoryId: categoryAssignmentEntries.targetCategoryId,
+      outcome: categoryAssignmentEntries.outcome,
+      errorCode: categoryAssignmentEntries.errorCode,
+      selectionOrder: categoryAssignmentEntries.selectionOrder,
     })
-    .from(categoryReclassificationJobEntries)
+    .from(categoryAssignmentEntries)
     .leftJoin(
       ledgerEntries,
       and(
-        eq(ledgerEntries.id, categoryReclassificationJobEntries.ledgerEntryId),
+        eq(ledgerEntries.id, categoryAssignmentEntries.ledgerEntryId),
         eq(ledgerEntries.ledgerId, input.ledgerId)
       )
     )
     .where(
       and(
-        eq(categoryReclassificationJobEntries.jobId, input.jobId),
-        eq(categoryReclassificationJobEntries.ledgerId, input.ledgerId),
-        sql`${categoryReclassificationJobEntries.selectionOrder} >= ${cursor}`
+        eq(categoryAssignmentEntries.jobId, input.jobId),
+        eq(categoryAssignmentEntries.ledgerId, input.ledgerId),
+        sql`${categoryAssignmentEntries.selectionOrder} >= ${cursor}`
       )
     )
-    .orderBy(categoryReclassificationJobEntries.selectionOrder)
+    .orderBy(categoryAssignmentEntries.selectionOrder)
     .limit(limit + 1);
   const page = rows.slice(0, limit);
   const categoryIds = [

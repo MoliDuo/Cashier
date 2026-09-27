@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
-import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/reclassification";
-import { getCategoryReclassificationJobAction } from "@/modules/ledger/server/get-category-reclassification-job";
+import { startCategoryAssignmentAction } from "@/modules/ledger/server-actions/category-assignment";
+import { getCategoryAssignmentJobAction } from "@/modules/ledger/server/get-category-assignment-job";
 import { entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { getTestDb } from "tests/setup";
 import {
@@ -112,7 +112,7 @@ describe("submitSelection", () => {
     await flushAfterCallbacks();
 
     expect(job).toMatchObject({ total: 2, appliedCount: 0 });
-    const stored = await getCategoryReclassificationJobAction();
+    const stored = await getCategoryAssignmentJobAction();
     expect(stored).toMatchObject({
       status: "succeeded",
       total: 2,
@@ -151,7 +151,7 @@ describe("submitSelection", () => {
     });
     await flushAfterCallbacks(15_000);
 
-    await expect(getCategoryReclassificationJobAction()).resolves.toMatchObject({
+    await expect(getCategoryAssignmentJobAction()).resolves.toMatchObject({
       status: "failed",
       appliedCount: 0,
       confirmedCount: 0,
@@ -178,7 +178,7 @@ describe("submitSelection", () => {
     });
     await flushAfterCallbacks();
 
-    await expect(getCategoryReclassificationJobAction()).resolves.toMatchObject({
+    await expect(getCategoryAssignmentJobAction()).resolves.toMatchObject({
       status: "succeeded",
       appliedCount: 0,
       confirmedCount: 1,
@@ -216,7 +216,7 @@ describe("submitSelection", () => {
         candidateCategoryIds: [food.id, crypto.randomUUID()],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    await expect(getCategoryReclassificationJobAction()).resolves.toBeNull();
+    await expect(getCategoryAssignmentJobAction()).resolves.toBeNull();
   });
 
   it("rejects a candidate set that is no longer live before registering anything", async () => {
@@ -236,7 +236,7 @@ describe("submitSelection", () => {
         candidateCategoryIds: [food.id, home.id],
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    await expect(getCategoryReclassificationJobAction()).resolves.toBeNull();
+    await expect(getCategoryAssignmentJobAction()).resolves.toBeNull();
   });
 
   it("reports a provider failure without losing the run", async () => {
@@ -255,7 +255,7 @@ describe("submitSelection", () => {
     });
     await flushAfterCallbacks(15_000);
 
-    await expect(getCategoryReclassificationJobAction()).resolves.toMatchObject({
+    await expect(getCategoryAssignmentJobAction()).resolves.toMatchObject({
       status: "failed",
       failedCount: 1,
     });

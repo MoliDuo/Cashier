@@ -1,19 +1,19 @@
-import type { RevisionProcessingStatus } from "@/modules/source-document/lifecycle";
+import type { AttemptProcessingStatus } from "@/modules/source-document/lifecycle";
 
 /** A processing attempt waiting to run; the attempt is its own queue entry. */
 export interface ProcessingJobContract {
   sourceDocumentId: string;
-  revisionId: string;
+  attemptId: string;
   requestedAt: string;
 }
 
 /**
  * Claim identity for a leased processing worker. Writes that finalize a
- * revision or projection must verify this lease inside their transaction so a
+ * attempt or projection must verify this lease inside their transaction so a
  * worker whose lease was lost or reclaimed cannot commit stale results.
  */
 export interface ProcessingLeaseContract {
-  revisionId: string;
+  attemptId: string;
   claimToken: string;
 }
 
@@ -28,31 +28,31 @@ export interface ProcessingClaimContract {
 
 export interface RecoverableProcessingJobContract extends ProcessingJobContract {
   attemptCount: number;
-  nextAvailableAt: string;
+  nextAttemptAt: string;
 }
 
-export interface RevisionProcessingRequestContract {
+export interface AttemptProcessingRequestContract {
   ledgerId: string;
   sourceDocumentId: string;
-  revisionId: string;
+  attemptId: string;
   signal: AbortSignal;
   lease: ProcessingLeaseContract;
 }
 
-export interface RevisionProcessingResultContract {
-  processingStatus: Extract<RevisionProcessingStatus, "completed" | "failed">;
+export interface AttemptProcessingResultContract {
+  processingStatus: Extract<AttemptProcessingStatus, "completed" | "failed">;
   failureMessage?: string;
 }
 
-export interface RevisionProcessingContextContract {
-  revision: {
+export interface AttemptProcessingContextContract {
+  attempt: {
     inputText: string | null;
-    inputDocumentDate: string | null;
-    inputDateReference: string | null;
-    processingStatus: RevisionProcessingStatus | null;
+    requestedDate: string | null;
+    referenceDate: string | null;
+    processingStatus: AttemptProcessingStatus | null;
   } | null;
   document: {
-    latestSubmissionRevisionId: string | null;
+    latestAttemptId: string | null;
     createdAt: Date;
   } | null;
   storedFileIds: string[];

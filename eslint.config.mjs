@@ -11,11 +11,11 @@ export const registeredSourceDocumentWriters = [
   "src/modules/source-document/server/date-organization.ts",
   "src/modules/source-document/server/projections/manual-entries.ts",
   "src/modules/source-document/server/projections/writes.ts",
-  "src/modules/source-document/server/revisions.ts",
+  "src/modules/source-document/server/extraction-attempts.ts",
 ];
 
 const identifierKey =
-  "/^(?:userId|ledgerId|documentId|sourceDocumentId|revisionId|fileId|storedFileId)$/";
+  "/^(?:userId|ledgerId|documentId|sourceDocumentId|attemptId|fileId|storedFileId)$/";
 const logCall =
   "CallExpression[callee.type='MemberExpression'][callee.computed=false]:matches(" +
   "[callee.object.name='logger'][callee.property.name=/^(?:debug|info|warn|error|fatal)$/], " +

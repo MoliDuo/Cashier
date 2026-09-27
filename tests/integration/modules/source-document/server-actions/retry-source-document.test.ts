@@ -16,7 +16,7 @@ import {
   entryCategories,
   ledgerEntries,
   ledgers,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
 } from "@/persistence";
 
@@ -46,19 +46,19 @@ describe("source-document retry action", () => {
     });
   });
 
-  it("reprocesses a new revision while keeping the source-document identity stable", async () => {
+  it("reprocesses a new attempt while keeping the source-document identity stable", async () => {
     const db = getTestDb();
     const created = await createDocument("午餐 25元");
     await processAllPendingTasks();
     const before = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    expect(before?.latestSubmissionRevisionId).not.toBeNull();
+    expect(before?.latestAttemptId).not.toBeNull();
     await expect(
-      db.query.sourceDocumentRevisions.findFirst({
-        where: eq(sourceDocumentRevisions.id, before!.latestSubmissionRevisionId!),
+      db.query.extractionAttempts.findFirst({
+        where: eq(extractionAttempts.id, before!.latestAttemptId!),
       })
-    ).resolves.toMatchObject({ processingStatus: "completed" });
+    ).resolves.toMatchObject({ status: "completed" });
 
     vi.mocked(getOpenAIClient).mockReturnValue(
       createOpenAIMock({
@@ -85,9 +85,9 @@ describe("source-document retry action", () => {
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
-    const revisions = await db.query.sourceDocumentRevisions.findMany({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
-      orderBy: asc(sourceDocumentRevisions.createdAt),
+    const attempts = await db.query.extractionAttempts.findMany({
+      where: eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId),
+      orderBy: asc(extractionAttempts.submittedAt),
     });
     const activeEntries = await db.query.ledgerEntries.findMany({
       where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
@@ -97,18 +97,18 @@ describe("source-document retry action", () => {
     expect(after).toMatchObject({
       id: created.sourceDocumentId,
     });
-    expect(after?.latestSubmissionRevisionId).toBe(revisions[1]?.id);
+    expect(after?.latestAttemptId).toBe(attempts[1]?.id);
     expect(after?.inputText).toBe("晚餐 50元");
-    expect(revisions).toHaveLength(2);
-    expect(revisions[0]?.processingStatus).toBe("completed");
-    expect(revisions[1]?.processingStatus).toBe("completed");
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]?.status).toBe("completed");
+    expect(attempts[1]?.status).toBe("completed");
     expect(activeEntries).toMatchObject([{ itemName: "晚餐" }]);
   });
 
   it("validates the document to retry and propagates a missing one", async () => {
     await expect(retrySourceDocumentAction("not-a-uuid")).rejects.toThrow(ValidationError);
     await expect(retrySourceDocumentAction(crypto.randomUUID())).rejects.toThrow(NotFoundError);
-    expect(await getTestDb().select().from(sourceDocumentRevisions)).toEqual([]);
+    expect(await getTestDb().select().from(extractionAttempts)).toEqual([]);
   });
 
   it("rejects raw image payloads that bypass upload finalization", async () => {
@@ -121,7 +121,7 @@ describe("source-document retry action", () => {
     ).rejects.toThrow(ZodError);
   });
 
-  it("retry succeeds despite a previous failed revision, which kept the original entries", async () => {
+  it("retry succeeds despite a previous failed attempt, which kept the original entries", async () => {
     const db = getTestDb();
 
     // Step 1: Create a document and process it successfully
@@ -160,13 +160,13 @@ describe("source-document retry action", () => {
     // Neither the retry submission nor the recorded failure changes saveable content.
     expect(afterFail?.version).toBe(before!.version);
 
-    const revisions1 = await db.query.sourceDocumentRevisions.findMany({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
-      orderBy: asc(sourceDocumentRevisions.createdAt),
+    const attempts1 = await db.query.extractionAttempts.findMany({
+      where: eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId),
+      orderBy: asc(extractionAttempts.submittedAt),
     });
-    expect(revisions1).toHaveLength(2);
-    expect(revisions1[0]?.processingStatus).toBe("completed");
-    expect(revisions1[1]?.processingStatus).toBe("failed");
+    expect(attempts1).toHaveLength(2);
+    expect(attempts1[0]?.status).toBe("completed");
+    expect(attempts1[1]?.status).toBe("failed");
 
     // Step 4: Retry a second time with a working AI mock
     vi.mocked(getOpenAIClient).mockReturnValue(
@@ -197,15 +197,15 @@ describe("source-document retry action", () => {
       where: eq(sourceDocuments.id, created.sourceDocumentId),
     });
 
-    const revisions2 = await db.query.sourceDocumentRevisions.findMany({
-      where: eq(sourceDocumentRevisions.sourceDocumentId, created.sourceDocumentId),
-      orderBy: asc(sourceDocumentRevisions.createdAt),
+    const attempts2 = await db.query.extractionAttempts.findMany({
+      where: eq(extractionAttempts.sourceDocumentId, created.sourceDocumentId),
+      orderBy: asc(extractionAttempts.submittedAt),
     });
-    expect(revisions2).toHaveLength(3);
-    expect(revisions2[0]?.processingStatus).toBe("completed"); // original
-    expect(revisions2[1]?.processingStatus).toBe("failed"); // failed retry
-    expect(revisions2[2]?.processingStatus).toBe("completed");
-    expect(afterRetry?.latestSubmissionRevisionId).toBe(revisions2[2]?.id);
+    expect(attempts2).toHaveLength(3);
+    expect(attempts2[0]?.status).toBe("completed"); // original
+    expect(attempts2[1]?.status).toBe("failed"); // failed retry
+    expect(attempts2[2]?.status).toBe("completed");
+    expect(afterRetry?.latestAttemptId).toBe(attempts2[2]?.id);
 
     expect(await liveEntries()).toMatchObject([{ itemName: "晚餐" }]);
   });

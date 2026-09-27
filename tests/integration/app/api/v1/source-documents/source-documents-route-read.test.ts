@@ -13,7 +13,7 @@ import {
   ledgers,
   ledgerEntries,
   serviceCredentials,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
 } from "@/persistence";
 import { computeHash, prefixSuffix } from "@/lib/security/service-credential-token";
@@ -154,9 +154,9 @@ describe("API v1 source-documents route", () => {
       position: 0,
     });
     await db
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "completed", finishedAt: new Date() })
-      .where(eq(sourceDocumentRevisions.id, created.revisionId));
+      .update(extractionAttempts)
+      .set({ status: "completed", finishedAt: new Date() })
+      .where(eq(extractionAttempts.id, created.revisionId));
     await db
       .update(sourceDocuments)
       .set({ title: "Lunch receipt" })
@@ -207,15 +207,15 @@ describe("API v1 source-documents route", () => {
     ).then((response) => response.json());
     const db = getTestDb();
     await db
-      .update(sourceDocumentRevisions)
+      .update(extractionAttempts)
       .set({
-        processingStatus: "failed",
+        status: "failed",
         failureKind: "invalid_input",
         failureCode: "ai_declared_invalid",
         failureMessage: "This is a refund, not an expense.",
         finishedAt: new Date(),
       })
-      .where(eq(sourceDocumentRevisions.id, created.revisionId));
+      .where(eq(extractionAttempts.id, created.revisionId));
 
     const response = await GET(
       new NextRequest(`http://localhost/api/v1/source-documents/${created.sourceDocumentId}`, {
@@ -243,15 +243,15 @@ describe("API v1 source-documents route", () => {
     ).then((response) => response.json());
     const db = getTestDb();
     await db
-      .update(sourceDocumentRevisions)
+      .update(extractionAttempts)
       .set({
-        processingStatus: "failed",
+        status: "failed",
         failureKind: "invalid_input",
         failureCode: "entry_validation_failed",
         failureMessage: null,
         finishedAt: new Date(),
       })
-      .where(eq(sourceDocumentRevisions.id, created.revisionId));
+      .where(eq(extractionAttempts.id, created.revisionId));
 
     const response = await GET(
       new NextRequest(`http://localhost/api/v1/source-documents/${created.sourceDocumentId}`, {
@@ -297,9 +297,9 @@ describe("API v1 source-documents route", () => {
       },
     ]);
     await db
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "completed", finishedAt: new Date() })
-      .where(eq(sourceDocumentRevisions.id, created.revisionId));
+      .update(extractionAttempts)
+      .set({ status: "completed", finishedAt: new Date() })
+      .where(eq(extractionAttempts.id, created.revisionId));
     await db
       .update(sourceDocuments)
       .set({ title: "Mixed receipt" })
@@ -356,9 +356,9 @@ describe("API v1 source-documents route", () => {
       position: 0,
     });
     await db
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "completed", finishedAt: new Date() })
-      .where(eq(sourceDocumentRevisions.id, created.revisionId));
+      .update(extractionAttempts)
+      .set({ status: "completed", finishedAt: new Date() })
+      .where(eq(extractionAttempts.id, created.revisionId));
 
     const response = await GET(
       new NextRequest(`http://localhost/api/v1/source-documents/${created.sourceDocumentId}`, {

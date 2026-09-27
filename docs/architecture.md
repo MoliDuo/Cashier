@@ -35,7 +35,7 @@
 7. **测试直接测行为。** 服务端代码跑在真实 Postgres 上测，纯函数写单测，UI 测试保持少量，外加 smoke 流程。
    不 mock 被测代码本身。详见 [testing.md](./testing.md)。
 8. **部署遵守 expand/contract。** 迁移执行时，旧版本还在对外服务。删除一列要分三次发布：
-   先停写，再停读，最后才删。模型不再提到、库里还没删的名字登记在 `schema-contract.test.ts` 的
+   先停写，再停读，最后才删。Vercel 先构建再迁移，所有待执行的迁移在一个事务里完成，构建或迁移失败都不会动库。模型不再提到、库里还没删的名字登记在 `schema-contract.test.ts` 的
    `retiredNames` 里。
 9. **租户查询按 `ledger_id` 限定。** 即使只有一个账本也照做。
 
@@ -58,7 +58,7 @@ src/modules/<m>/          auth、currency、ledger、source-document、stats、w
   server/                 drizzle 数据访问与事务（"server-only"）
   domain/                 纯决策：状态、金额、解析、提示词；不碰数据库、框架和 IO
   hooks/ ui/              客户端代码，一个界面一个组件加一个 hook
-src/server/               跨模块的后台流程：processing、category-reclassification、maintenance、
+src/server/               跨模块的后台流程：processing、category-assignment、maintenance、
                           stored-files、api-v1 请求管线
 src/lib/                  共享基础设施：db（含租约帮手）、s3、ai、email、logger、env、money、format、
                           security、drafts、queries 传输层
@@ -90,21 +90,22 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ## 4. 数据模型
 
-表名沿用历史名字。改表名在迁移和旧版本并存的部署窗口里没法安全进行，收益又只是名字好看，
-所以下表的"概念"一列只用来说明职责。
+表名、列名、枚举和代码里的叫法一致（迁移 0018 统一过一次）。约束和索引按 `uq_<表>_…`、`idx_<表>_…`、
+`fk_<表>_<目标>`、`ck_<表>_…` 命名，主键保持 `<表>_pkey`，由 `schema-contract.test.ts` 检查。
 
-| 概念与表名                                              | 职责                                                                                                                                      |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `ledgers`（单行）、`books`、`categories`                | 账本设置、分账、分类。分类硬删除，名称唯一约束为 `DEFERRABLE`                                                                             |
-| 票据：`source_documents`                                | 所属分账、标题、日期、当前输入（文本）、`version`、指向当前提取尝试的 `latest_submission_revision_id`、幂等 key                           |
-| 票据文件：`source_document_files`                       | 票据当前输入的文件                                                                                                                        |
-| 提取尝试：`source_document_revisions`                   | 每一次提取：请求的日期、状态、租约、尝试次数、失败码。它本身就是任务队列，没有手动 revision                                               |
-| 条目：`ledger_entries`                                  | 金额、币种、分类、所属票据。不存折算值                                                                                                    |
-| 汇率：`exchange_rates(rate_date, currency, per_eur, …)` | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间                                                   |
-| `stored_files`                                          | 对象存储里文件的登记，`finalized_at` 为空即 pending                                                                                       |
-| `category_jobs`、`category_job_documents`               | 批量分类任务，租约放在 job 行上，进度在读取时统计                                                                                         |
-| 认证                                                    | `users`、`login_emails`、`sessions`、`passkeys`、`webauthn_challenges`、`verification_codes`、`rate_limit_buckets`、`service_credentials` |
-| `ledger_sync_state`                                     | 客户端刷新用的水位线，由语句级触发器维护                                                                                                  |
+| 概念与表名                                                                                           | 职责                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ledgers`（单行）、`books`、`entry_categories`                                                       | 账本设置、分账、分类。分类硬删除，名称唯一约束为 `DEFERRABLE`                                                                                                                      |
+| 票据：`source_documents`                                                                             | 所属分账、标题、日期、当前输入（文本）、`version`、指向最新提取尝试的 `latest_attempt_id`、幂等 key。标题只存在这里：提取成功时写入，用户可改                                      |
+| 票据文件：`source_document_files`                                                                    | 票据当前输入的文件                                                                                                                                                                 |
+| 提取尝试：`extraction_attempts`                                                                      | 每一次提取：请求的日期、状态、租约、尝试次数、失败码。它本身就是任务队列                                                                                                           |
+| 条目：`ledger_entries`                                                                               | 金额、币种、分类、所属票据（必填）。不存折算值                                                                                                                                     |
+| 汇率：`exchange_rates(rate_date, currency, per_eur, …)`                                              | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间                                                                                            |
+| `stored_files`                                                                                       | 对象存储里文件的登记，`finalized_at` 为空即 pending                                                                                                                                |
+| 批量分类：`category_assignment_jobs`、`category_assignment_documents`、`category_assignment_entries` | 租约放在 job 行上，进度在读取时统计；`ai` 任务的候选分类就是 `candidate_snapshot`                                                                                                  |
+| 认证                                                                                                 | `users`、`login_emails`、`sessions`、`passkeys`、`webauthn_challenges`、`sign_in_challenges`（登录验证码）、`login_email_challenges`（添加登录邮箱的验证码）、`rate_limit_buckets` |
+| API 密钥：`service_credentials`                                                                      | 吊销时写 `revoked_at`，行留作审计                                                                                                                                                  |
+| `ledger_sync_state`                                                                                  | 客户端刷新用的水位线，由行级触发器 `record_ledger_change` 维护：每改一行一条 UPDATE，同一事务复用一个版本号                                                                        |
 
 语义约定：
 
@@ -116,7 +117,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   周末取服务商给出的上一个工作日。服务商还没发布当天汇率时先存一行临时值，之后由维护流程刷新。
   改主币种只是改一个设置。
 - **重新提取成功时，在同一个事务里替换全部条目。** 失败或取消时旧条目原样保留，同时展示新的输入和失败原因。
-- **手动录入的票据没有提取记录。** 它的状态就是空闲。手动编辑就地改条目，不创建 revision，不复制条目历史。
+- **手动录入的票据没有提取记录。** 它的状态就是空闲。手动编辑就地改条目，不创建提取尝试，不复制条目历史。
 - **当前输入属于票据。** 提交或编辑重试会替换它；拆分和日期整理把它复制给每张新票据，让新记录保留证据。
 - 金额用 `numeric(21,3)` 加 decimal.js 字符串，能覆盖三位小数的币种。
 
@@ -130,8 +131,8 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 - 只有详情页的整体保存（`saveSourceDocumentChanges`）比较锁定行的 `version` 和调用方的 `expectedVersion`，
   并且只写它补丁的字段。其他命令检查各自依赖的更窄前置条件，例如票据不在处理中、所选条目仍在票据上、
   建议仍是最新的。
-- 票据详情是一个完整的契约，包含条目和证据文件的元数据。历史 revision 编号保留作审计；新的 revision
-  用 UUID 标识，并发靠票据版本。
+- 票据详情是一个完整的契约，包含条目和证据文件的元数据。提取尝试用 UUID 标识，保留作审计，并发靠票据版本。
+  API v1 对外仍把它叫作 `revisionId`，这是公开契约。
 - 用满足调用方的最窄读取。编辑重试的证据只读票据的输入，不加载调用方会丢弃的条目或分类投影。
 - 加载出来的账本设置是完整契约，只有更新输入是部分的；不要在每个使用者那里重复默认值。
 - 替换条目是票据聚合内部的帮手，不是独立的 writer。已经锁定的票据和条目直接传给事务帮手。
@@ -187,7 +188,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ### 票据提取
 
-- 一次提交创建一个提取尝试（`source_document_revisions` 行），并用 `after()` 安排工作。尝试本身就是队列项。
+- 一次提交创建一个提取尝试（`extraction_attempts` 行），并用 `after()` 安排工作。尝试本身就是队列项。
 - worker 在尝试仍处于处理中、且仍是票据最新提交时认领它，运行中续租，并在写入结果或失败的同一个事务里
   关闭它。AI 结果写回时做 fencing 检查。
 - `POST /api/v1/source-documents` 在图片处理、对象上传和落库完成后返回 `201`，不等 AI 解析。
@@ -360,12 +361,18 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   scripts 改 TypeScript、文档收敛。
 - **之后：文案模块。** 去掉 next-intl，文案改为 `src/copy/` 下的普通 TS 模块。只有一种语言，多语言框架带来的
   只有 provider、目录校验和测试 mock；集中存放保留了"一处看全部文案"的好处，类型和跳转由 TS 直接提供。
+- **之后：限流收敛。** 只有两个人用，登录之后的操作（API v1、上传额度）不再限流；登录前的限流集中到
+  `SIGN_IN_RATE_LIMITS` 和 `consumeRateLimit`。按邮箱计数被 60 秒重发冷却覆盖，删掉；汇率刷新不再借用限流表。
+- **之后：数据库整理（迁移 0018）。** 一次发布改完重构留下的误导名字（`revision` 实为提取尝试，
+  `reclassification` 与 `assignment` 混用，`email_change` 实为添加登录邮箱），删掉镜像和没人读的列，
+  收紧类型，删掉约 10 个没有查询在用的索引，同步触发器每行只剩一条 UPDATE。这是 expand/contract 的一次性例外：
+  为此把部署改成先构建后迁移，迁移在一个事务里执行，两个人都空闲时推送，旧版本只在迁移的几秒里面对新 schema。
 
 ### 不做
 
 - **条目自带日期。** 多日期输入不常见，为它改约 53 个文件不划算，拆分和日期整理保留。
 - **去掉 `ledger_id`。** 与租户隔离的要求冲突，改动面约 250 个文件，收益很低。
-- **CI 拦部署。** 推送到 `main` 后 Vercel 立刻迁移并部署，与 CI 并行。继续靠提交前本地 `npm run check` 兜底。
+- **CI 拦部署。** 推送到 `main` 后 Vercel 立刻构建、迁移并部署，与 CI 并行。继续靠提交前本地 `npm run check` 兜底。
 - **升级到 TypeScript 7。** 仓库脚本已不再调用 TS 编译器 API，但 typescript-eslint 和 dependency-cruiser
   还依赖它，要等两者支持。
 
@@ -377,6 +384,6 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 - **分类按请求块做检查点**：大票据的分类一个函数跑不完。
 - **先锁账本、再锁票据**：用户自己的编辑会和后台写入竞争。
 - **前端数据层**：React Query、SSR 预取与注水、水位线轮询、专用读取路由，不改成 `revalidatePath`。
-- **API v1 凭证设计、Postgres 限流、防账号枚举与计时攻击的措施。**
+- **API v1 凭证设计、登录前的 Postgres 限流、防账号枚举与计时攻击的措施。**
 - **S3 直传加 sharp 归一化**：Vercel 请求体上限 4.5MB，同时要剥离 EXIF。
 - **工程底座**：严格的 tsconfig、testcontainers、MSW 网络守卫、smoke 测试、baseline 迁移守卫。

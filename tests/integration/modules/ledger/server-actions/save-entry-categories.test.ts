@@ -11,7 +11,7 @@ import {
   ledgerEntries,
   ledgers,
   sourceDocuments,
-  sourceDocumentRevisions,
+  extractionAttempts,
 } from "@/persistence";
 import { getTestDb } from "tests/setup";
 import { createLedgerData, createSourceDocumentData } from "tests/helpers/factories";
@@ -151,16 +151,16 @@ describe("saveEntryCategoriesAction", () => {
       await activateTestSourceDocumentProjection(db, document.id);
       if (document === documents[1]) {
         const [attempt] = await db
-          .insert(sourceDocumentRevisions)
+          .insert(extractionAttempts)
           .values({
             ledgerId: ledger.id,
             sourceDocumentId: document.id,
-            processingStatus: "processing",
+            status: "processing",
           })
           .returning();
         await db
           .update(sourceDocuments)
-          .set({ latestSubmissionRevisionId: attempt!.id })
+          .set({ latestAttemptId: attempt!.id })
           .where(eq(sourceDocuments.id, document.id));
       }
     }

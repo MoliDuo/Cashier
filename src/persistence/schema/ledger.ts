@@ -14,6 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { type InferSelectModel, sql } from "drizzle-orm";
+import { rowTimestamp } from "./columns";
 
 // These declarations only provide physical target columns to FK builders.
 // The complete tables remain uniquely exported from their owning modules.
@@ -34,12 +35,8 @@ export const ledgers = pgTable(
     mainCurrency: varchar("main_currency", { length: 3 }).notNull().default("CNY"),
     collapseEntriesDefault: boolean("collapse_entries_default").notNull().default(false),
     aiCustomPrompt: text("ai_custom_prompt").notNull().default(""),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: rowTimestamp("created_at"),
+    updatedAt: rowTimestamp("updated_at"),
   },
   (table) => [
     check("ck_ledgers_main_currency", sql`${table.mainCurrency} ~ '^[A-Z]{3}$'`),
@@ -68,26 +65,25 @@ export const books = pgTable(
   "books",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
+    ledgerId: uuid("ledger_id").notNull(),
     name: text("name").notNull(),
     timeZone: text("time_zone"),
     sortOrder: integer("sort_order").notNull().default(0),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: rowTimestamp("created_at"),
+    updatedAt: rowTimestamp("updated_at"),
   },
   (table) => [
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "fk_books_ledger",
+    }).onDelete("cascade"),
     uniqueIndex("uq_books_ledger_id_id").on(table.ledgerId, table.id),
     index("idx_books_active_sort")
       .on(table.ledgerId, table.sortOrder, table.createdAt, table.id)
       .where(sql`${table.archivedAt} IS NULL`),
-    uniqueIndex("uniq_books_active_name")
+    uniqueIndex("uq_books_active_name")
       .on(table.ledgerId, table.name)
       .where(sql`${table.archivedAt} IS NULL`),
     check("ck_books_name_length", sql`length(btrim(${table.name})) BETWEEN 1 AND 20`),
@@ -104,23 +100,22 @@ export const entryCategories = pgTable(
   "entry_categories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
+    ledgerId: uuid("ledger_id").notNull(),
     name: text("name").notNull(),
     description: text("description"),
     icon: text("icon"),
     sortOrder: integer("sort_order").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: rowTimestamp("created_at"),
+    updatedAt: rowTimestamp("updated_at"),
   },
   (table) => [
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "fk_entry_categories_ledger",
+    }).onDelete("cascade"),
     uniqueIndex("uq_entry_categories_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_entry_categories_active_sort").on(
+    index("idx_entry_categories_sort").on(
       table.ledgerId,
       table.sortOrder,
       table.createdAt,
@@ -139,43 +134,24 @@ export const ledgerEntries = pgTable(
   "ledger_entries",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
+    ledgerId: uuid("ledger_id").notNull(),
     categoryId: uuid("category_id"),
-    sourceDocumentId: uuid("source_document_id"),
+    sourceDocumentId: uuid("source_document_id").notNull(),
     position: integer("position").notNull().default(0),
     amount: numeric("amount", { precision: 21, scale: 3, mode: "string" }).notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
     itemName: text("item_name").notNull(),
     description: text("description"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: rowTimestamp("created_at"),
+    updatedAt: rowTimestamp("updated_at"),
   },
   (table) => [
-    uniqueIndex("uq_ledger_entries_ledger_id_id").on(table.ledgerId, table.id),
-    index("idx_ledger_entries_active_feed").on(
-      table.ledgerId,
-      table.createdAt.desc(),
-      table.id.desc()
-    ),
-    index("idx_ledger_entries_active_category").on(
-      table.ledgerId,
-      table.categoryId,
-      table.createdAt.desc(),
-      table.id.desc()
-    ),
-    index("idx_ledger_entries_category_all").on(table.ledgerId, table.categoryId),
-    index("idx_ledger_entries_active_currency").on(
-      table.ledgerId,
-      table.currency,
-      table.createdAt.desc(),
-      table.id.desc()
-    ),
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "fk_ledger_entries_ledger",
+    }).onDelete("cascade"),
+    index("idx_ledger_entries_category").on(table.ledgerId, table.categoryId),
     index("idx_ledger_entries_document_position").on(
       table.ledgerId,
       table.sourceDocumentId,
@@ -188,26 +164,26 @@ export const ledgerEntries = pgTable(
     ),
     check("ck_ledger_entries_currency", sql`${table.currency} ~ '^[A-Z]{3}$'`),
     check("ck_ledger_entries_position", sql`${table.position} >= 0`),
-    // The live database (migration 0022) declares this FK as
-    // `ON DELETE SET NULL (category_id)` — PostgreSQL 15+ column-list form —
-    // so deleting a category nulls only category_id and never the NOT NULL
-    // ledger_id. Drizzle cannot express the column list, so the delete action
-    // is intentionally omitted here and enforced by the migration.
+    // The database declares this FK `ON DELETE SET NULL (category_id)` — the
+    // PostgreSQL 15+ column-list form — so deleting a category nulls only
+    // category_id and never the NOT NULL ledger_id. Drizzle cannot express the
+    // column list, so the delete action is left to the migration.
     foreignKey({
       columns: [table.ledgerId, table.categoryId],
       foreignColumns: [entryCategories.ledgerId, entryCategories.id],
-      name: "fk_ledger_entries_category_ledger",
+      name: "fk_ledger_entries_category",
     }),
     foreignKey({
       columns: [table.ledgerId, table.sourceDocumentId],
       foreignColumns: [sourceDocumentsReference.ledgerId, sourceDocumentsReference.id],
-      name: "fk_ledger_entries_document_ledger",
+      name: "fk_ledger_entries_source_document",
     }).onDelete("cascade"),
   ]
 );
 
 export type LedgerEntry = InferSelectModel<typeof ledgerEntries>;
 
+/** An API key. Revoking one stamps `revoked_at` and keeps the row for the record. */
 export const serviceCredentials = pgTable(
   "service_credentials",
   {
@@ -215,31 +191,31 @@ export const serviceCredentials = pgTable(
     tokenHash: text("token_hash"),
     tokenPrefix: text("token_prefix"),
     tokenSuffix: text("token_suffix"),
-    ledgerId: uuid("ledger_id")
-      .notNull()
-      .references(() => ledgers.id, { onDelete: "cascade" }),
+    ledgerId: uuid("ledger_id").notNull(),
     bookId: uuid("book_id").notNull(),
     name: text("name").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    createdAt: rowTimestamp("created_at"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (table) => [
-    index("idx_service_credentials_ledger_id").on(table.ledgerId),
+    foreignKey({
+      columns: [table.ledgerId],
+      foreignColumns: [ledgers.id],
+      name: "fk_service_credentials_ledger",
+    }).onDelete("cascade"),
     index("idx_service_credentials_ledger_book").on(table.ledgerId, table.bookId),
-    uniqueIndex("uniq_service_credentials_token_hash")
+    uniqueIndex("uq_service_credentials_token_hash")
       .on(table.tokenHash)
       .where(sql`${table.tokenHash} IS NOT NULL`),
     foreignKey({
       columns: [table.ledgerId, table.bookId],
       foreignColumns: [books.ledgerId, books.id],
-      name: "fk_service_credentials_book_ledger",
+      name: "fk_service_credentials_book",
     }),
     check(
-      "ck_active_service_credentials_hashed",
-      sql`${table.deletedAt} IS NOT NULL OR (${table.tokenHash} IS NOT NULL AND ${table.tokenPrefix} IS NOT NULL AND ${table.tokenSuffix} IS NOT NULL)`
+      "ck_service_credentials_active_hashed",
+      sql`${table.revokedAt} IS NOT NULL OR (${table.tokenHash} IS NOT NULL AND ${table.tokenPrefix} IS NOT NULL AND ${table.tokenSuffix} IS NOT NULL)`
     ),
   ]
 );

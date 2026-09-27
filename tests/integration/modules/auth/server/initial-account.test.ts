@@ -27,7 +27,7 @@ describe("createInitialAccount", () => {
     expect(await findUserByEmail("owner@example.com")).toMatchObject({ id: result.userId });
     const [address] = await db.select().from(loginEmails);
     expect(address).toMatchObject({ email: "owner@example.com", userId: result.userId });
-    expect(address?.emailVerified).toBeInstanceOf(Date);
+    expect(address?.verifiedAt).toBeInstanceOf(Date);
     expect(await db.select({ id: ledgers.id }).from(ledgers)).toEqual([{ id: result.ledgerId }]);
     const ledgerBooks = await db.query.books.findMany({
       where: eq(books.ledgerId, result.ledgerId),

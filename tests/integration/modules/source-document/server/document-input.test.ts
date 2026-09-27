@@ -1,6 +1,6 @@
 /**
  * The document carries its current input — text on the row, files in
- * `source_document_files` — alongside the revision copies it replaces. Every
+ * `source_document_files` — alongside the attempt copies it replaces. Every
  * write that changes which input a document reads keeps the two in step.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { asc, eq } from "drizzle-orm";
 import {
   ledgerSyncState,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
@@ -194,25 +194,25 @@ describe("source document input", () => {
       bookId: await testBookId(getTestDb(), ledgerId),
       input: { text: "Receipt", storedFileIds: [], documentDate: null },
     });
-    const revisionId = submitted.revision.id;
+    const attemptId = submitted.attempt.id;
     const db = getTestDb();
     const before = await syncVersion(ledgerId);
 
     await db
-      .update(sourceDocumentRevisions)
+      .update(extractionAttempts)
       .set({
         claimToken: crypto.randomUUID(),
         claimExpiresAt: new Date(Date.now() + 15_000),
         attemptCount: 1,
-        nextAvailableAt: new Date(Date.now() + 60_000),
+        nextAttemptAt: new Date(Date.now() + 60_000),
       })
-      .where(eq(sourceDocumentRevisions.id, revisionId));
+      .where(eq(extractionAttempts.id, attemptId));
     expect(await syncVersion(ledgerId)).toBe(before);
 
     await db
-      .update(sourceDocumentRevisions)
-      .set({ processingStatus: "cancelled", finishedAt: new Date() })
-      .where(eq(sourceDocumentRevisions.id, revisionId));
+      .update(extractionAttempts)
+      .set({ status: "cancelled", finishedAt: new Date() })
+      .where(eq(extractionAttempts.id, attemptId));
     expect(await syncVersion(ledgerId)).toBe(before! + BigInt(1));
   });
 
@@ -224,10 +224,10 @@ describe("source document input", () => {
       input: { text: "Receipt", storedFileIds: [], documentDate: null },
     });
     await expect(
-      getTestDb().insert(sourceDocumentRevisions).values({
+      getTestDb().insert(extractionAttempts).values({
         ledgerId,
         sourceDocumentId: submitted.document.id,
-        processingStatus: "processing",
+        status: "processing",
       })
     ).rejects.toThrow();
   });

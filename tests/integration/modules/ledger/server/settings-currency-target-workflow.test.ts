@@ -1,4 +1,4 @@
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { hasActiveLedgerEntries } from "@/modules/ledger/server/entry-reads/has-active-entries";
 import {
-  activateRevision,
+  activateAttempt,
   createManualDocument,
 } from "@/modules/source-document/server/projections/writes";
 
@@ -327,12 +327,12 @@ describe("settings concurrency invariants", () => {
     }
   });
 
-  it("concurrent main-currency change and first activateRevision are serialised by the ledger lock", async () => {
+  it("concurrent main-currency change and first activateAttempt are serialised by the ledger lock", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db, "settings-race-activate-revision");
+    const { ledgerId } = await createTestUserWithLedger(db, "settings-race-activate-attempt");
 
     for (let i = 0; i < 5; i++) {
-      // Create a pending revision first (this creates the document but not the active projection).
+      // Create a pending attempt first (this creates the document but not the active projection).
       const sourceDocumentId = crypto.randomUUID();
       await db
         .insert(sourceDocuments)
@@ -344,26 +344,26 @@ describe("settings concurrency invariants", () => {
         .returning()
         .then((rows) => rows[0]!);
 
-      const { revision } = await db.transaction(async (tx) => {
-        const { createProcessingRevisionInTransaction: createProcessingRevision } =
-          await import("@/modules/source-document/server/revisions");
-        return createProcessingRevision(tx, {
+      const { attempt } = await db.transaction(async (tx) => {
+        const { createProcessingAttemptInTransaction: createProcessingAttempt } =
+          await import("@/modules/source-document/server/extraction-attempts");
+        return createProcessingAttempt(tx, {
           ledgerId,
           sourceDocumentId,
           input: { text: "Race test", storedFileIds: [], documentDate: null },
         });
       });
 
-      const lease = await claimRevisionForTest(revision.id);
+      const lease = await claimAttemptForTest(attempt.id);
 
-      // Run main-currency change and activateRevision concurrently.
+      // Run main-currency change and activateAttempt concurrently.
       const results = await Promise.allSettled([
         updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
-        activateRevision({
+        activateAttempt({
           lease,
           ledgerId,
           sourceDocumentId,
-          revisionId: revision.id,
+          attemptId: attempt.id,
           entries: [
             {
               categoryId: null,
@@ -390,7 +390,7 @@ describe("settings concurrency invariants", () => {
       const mainCurrency = ledger?.mainCurrency;
 
       if (activateResult.status === "fulfilled" && activateResult.value === true) {
-        // activateRevision succeeded — entries were created.
+        // activateAttempt succeeded — entries were created.
         if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
           // Settings succeeded: must have run before activate, so mainCurrency is "USD"
           expect(mainCurrency).toBe("USD");

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { otpTokens } from "@/persistence/schema/auth";
+import { signInChallenges } from "@/persistence/schema/auth";
 import { hashOTP } from "@/modules/auth/domain/otp";
 import { db } from "@/lib/db";
-import { findOtpToken as findOTPRecord } from "@/modules/auth/server/otp-tokens";
+import { findSignInChallenge as findOTPRecord } from "@/modules/auth/server/sign-in-challenges";
 import { verifyOTPWithPolicy } from "@/modules/auth/server/otp-verification";
 
 const verify = async (email: string) =>
@@ -14,12 +14,12 @@ describe("otp-verification service", () => {
   it("findOTPRecord is case-insensitive for email input", async () => {
     const testDb = getTestDb();
     const email = "otp-case@example.com";
-    const tokenHash = hashOTP("123456");
+    const codeHash = hashOTP("123456");
 
-    await testDb.insert(otpTokens).values({
+    await testDb.insert(signInChallenges).values({
       email,
-      tokenHash,
-      expires: new Date(Date.now() + 60_000),
+      codeHash: codeHash,
+      expiresAt: new Date(Date.now() + 60_000),
       attempts: 0,
     });
 
@@ -32,10 +32,10 @@ describe("otp-verification service", () => {
     const testDb = getTestDb();
     const email = "locked-user@example.com";
 
-    await testDb.insert(otpTokens).values({
+    await testDb.insert(signInChallenges).values({
       email,
-      tokenHash: hashOTP("123456"),
-      expires: new Date(Date.now() + 60_000),
+      codeHash: hashOTP("123456"),
+      expiresAt: new Date(Date.now() + 60_000),
       attempts: 5,
       lockedUntil: new Date(Date.now() + 60_000),
     });
@@ -62,10 +62,10 @@ describe("otp-verification service", () => {
     const testDb = getTestDb();
     const email = "expired-lock@example.com";
 
-    await testDb.insert(otpTokens).values({
+    await testDb.insert(signInChallenges).values({
       email,
-      tokenHash: hashOTP("123456"),
-      expires: new Date(Date.now() + 60_000),
+      codeHash: hashOTP("123456"),
+      expiresAt: new Date(Date.now() + 60_000),
       attempts: 0,
       lockedUntil: new Date(Date.now() - 60_000),
     });
@@ -77,8 +77,8 @@ describe("otp-verification service", () => {
   it("findOTPRecord returns null when record does not exist", async () => {
     const testDb = getTestDb();
     const missingEmail = "missing@example.com";
-    const existing = await testDb.query.otpTokens.findFirst({
-      where: eq(otpTokens.email, missingEmail),
+    const existing = await testDb.query.signInChallenges.findFirst({
+      where: eq(signInChallenges.email, missingEmail),
     });
     expect(existing).toBeUndefined();
 

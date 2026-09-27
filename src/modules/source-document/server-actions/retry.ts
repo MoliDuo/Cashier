@@ -13,7 +13,7 @@ import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 /**
  * Direct Retry: retry an existing source document with immutable evidence.
  *
- * Inherits the current evidence (text + files) and queues a new processing revision
+ * Inherits the current evidence (text + files) and queues a new processing attempt
  * immediately. This is a "re-parse with same input" action.
  *
  * Direct retry never accepts input overrides — it always inherits evidence.

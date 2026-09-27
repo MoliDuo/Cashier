@@ -11,7 +11,7 @@ import type {
 import { db } from "@/lib/db";
 import { ConflictError, ValidationError } from "@/lib/errors";
 import {
-  categoryReclassificationJobs,
+  categoryAssignmentJobs,
   entryCategories,
   ledgerEntries,
   sourceDocuments,
@@ -44,19 +44,19 @@ async function assertCategoryCandidatesMutable(
 ): Promise<void> {
   if (categoryIds.length === 0) return;
   const active = await tx
-    .select({ id: categoryReclassificationJobs.id })
-    .from(categoryReclassificationJobs)
+    .select({ id: categoryAssignmentJobs.id })
+    .from(categoryAssignmentJobs)
     .where(
       and(
-        eq(categoryReclassificationJobs.ledgerId, ledgerId),
-        inArray(categoryReclassificationJobs.status, ["preparing", "pending", "running"]),
+        eq(categoryAssignmentJobs.ledgerId, ledgerId),
+        inArray(categoryAssignmentJobs.status, ["pending", "running"]),
         sql`(
           EXISTS (
             SELECT 1
-            FROM unnest(${categoryReclassificationJobs.candidateCategoryIds}) AS candidate(category_id)
-            WHERE ${inArray(sql`candidate.category_id`, categoryIds)}
+            FROM jsonb_array_elements(${categoryAssignmentJobs.candidateSnapshot}) AS candidate
+            WHERE ${inArray(sql`(candidate->>'id')::uuid`, categoryIds)}
           )
-          OR ${inArray(categoryReclassificationJobs.directCategoryId, categoryIds)}
+          OR ${inArray(categoryAssignmentJobs.assignCategoryId, categoryIds)}
         )`
       )
     )
@@ -330,12 +330,12 @@ export async function applyCategoryPreset(
   return db.transaction(async (tx) => {
     await lockLedgerForUpdate(tx, ledgerId);
     const activeAssignment = await tx
-      .select({ id: categoryReclassificationJobs.id })
-      .from(categoryReclassificationJobs)
+      .select({ id: categoryAssignmentJobs.id })
+      .from(categoryAssignmentJobs)
       .where(
         and(
-          eq(categoryReclassificationJobs.ledgerId, ledgerId),
-          inArray(categoryReclassificationJobs.status, ["preparing", "pending", "running"])
+          eq(categoryAssignmentJobs.ledgerId, ledgerId),
+          inArray(categoryAssignmentJobs.status, ["pending", "running"])
         )
       )
       .limit(1)

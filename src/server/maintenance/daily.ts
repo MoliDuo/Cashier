@@ -2,8 +2,8 @@ import "server-only";
 import { inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  categoryReclassificationJobs,
-  emailChangeChallenges,
+  categoryAssignmentJobs,
+  loginEmailChallenges,
   sessions,
   webauthnChallenges,
   ledgers,
@@ -14,7 +14,7 @@ import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { scheduleCategoryReclassificationDrainAfter } from "@/server/category-reclassification/schedule";
+import { scheduleCategoryAssignmentDrainAfter } from "@/server/category-assignment/schedule";
 import { scheduleProcessingRecovery } from "@/server/processing/recovery";
 import { CRON_BUDGET_MS } from "@/config/tuning";
 
@@ -73,7 +73,7 @@ export async function runDailyMaintenance(
 
   await step("expired_records", () => deleteExpiredRecords(now, deadlineAt));
   await step("processing_recovery", scheduleDueProcessing);
-  await step("category_recovery", async () => scheduleCategoryReclassificationDrainAfter());
+  await step("category_recovery", async () => scheduleCategoryAssignmentDrainAfter());
   await step("exchange_rates", () => refreshExchangeRates(now));
   await step("pending_files", () => deleteStalePendingFiles(now, deadlineAt));
   await step("unused_files", () => deleteUnusedFiles(now, deadlineAt));
@@ -97,8 +97,8 @@ async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void
     sql`DELETE FROM rate_limit_buckets WHERE bucket_key IN (
       SELECT bucket_key FROM rate_limit_buckets WHERE window_start < ${twoDaysAgo} LIMIT ${BATCH}
     )`,
-    sql`DELETE FROM otp_tokens WHERE id IN (
-      SELECT id FROM otp_tokens WHERE expires < ${now} LIMIT ${BATCH}
+    sql`DELETE FROM sign_in_challenges WHERE id IN (
+      SELECT id FROM sign_in_challenges WHERE expires_at < ${now} LIMIT ${BATCH}
     )`,
     sql`DELETE FROM ${webauthnChallenges} WHERE id IN (
       SELECT id FROM ${webauthnChallenges} WHERE expires_at < ${now} LIMIT ${BATCH}
@@ -106,12 +106,12 @@ async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void
     sql`DELETE FROM ${sessions} WHERE id IN (
       SELECT id FROM ${sessions} WHERE expires_at < ${now} LIMIT ${BATCH}
     )`,
-    sql`DELETE FROM ${emailChangeChallenges} WHERE id IN (
-      SELECT id FROM ${emailChangeChallenges} WHERE expires_at < ${now} LIMIT ${BATCH}
+    sql`DELETE FROM ${loginEmailChallenges} WHERE id IN (
+      SELECT id FROM ${loginEmailChallenges} WHERE expires_at < ${now} LIMIT ${BATCH}
     )`,
     // Result work rows cascade with the parent after the seven-day viewing window.
-    sql`DELETE FROM ${categoryReclassificationJobs} WHERE id IN (
-      SELECT id FROM ${categoryReclassificationJobs}
+    sql`DELETE FROM ${categoryAssignmentJobs} WHERE id IN (
+      SELECT id FROM ${categoryAssignmentJobs}
       WHERE status IN ('succeeded', 'partial', 'failed', 'cancelled')
         AND updated_at < ${sevenDaysAgo}
       LIMIT ${BATCH}

@@ -1,9 +1,9 @@
-import { claimRevisionForTest } from "tests/helpers/processing-revision";
+import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import {
   getTargetSourceDocument,
   listTargetSourceDocuments,
 } from "@/modules/source-document/server/reads/list";
-import { createPendingRevision } from "tests/helpers/processing-revision";
+import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
@@ -12,16 +12,16 @@ import {
   entryCategories,
   ledgerEntries,
   sourceDocumentFiles,
-  sourceDocumentRevisions,
+  extractionAttempts,
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
 import {
-  activateRevision,
+  activateAttempt,
   createManualDocument,
 } from "@/modules/source-document/server/projections/writes";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
-import { recordProcessingFailure } from "@/modules/source-document/server/revisions";
+import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 
 const projectionEntry = {
   categoryId: null,
@@ -34,7 +34,7 @@ const projectionEntry = {
 } as const;
 
 describe("current-runtime target adapters", () => {
-  it("creates, paginates, authorizes, and preserves revision state", async () => {
+  it("creates, paginates, authorizes, and preserves attempt state", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
@@ -44,14 +44,14 @@ describe("current-runtime target adapters", () => {
       crypto.randomUUID()
     );
 
-    const first = await createPendingRevision({
+    const first = await createPendingAttempt({
       ledgerId,
       input: { text: "first", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
     await expect(getTargetSourceDocument(otherLedgerId, first.document.id)).resolves.toBeNull();
     await expect(
-      createPendingRevision({
+      createPendingAttempt({
         ledgerId,
         sourceDocumentId: first.document.id,
         input: { text: "duplicate", storedFileIds: [], documentDate: null },
@@ -60,50 +60,50 @@ describe("current-runtime target adapters", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
     await expect(
       recordProcessingFailure({
-        lease: await claimRevisionForTest(first.revision.id),
+        lease: await claimAttemptForTest(first.attempt.id),
         ledgerId,
         sourceDocumentId: first.document.id,
-        revisionId: first.revision.id,
+        attemptId: first.attempt.id,
         failureKind: "processing_error",
         failureMessage: "processing failed",
         failureCode: "PROCESSING_UNAVAILABLE",
       })
     ).resolves.toBe(true);
 
-    const retry = await createPendingRevision({
+    const retry = await createPendingAttempt({
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "retry", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
     await expect(
-      activateRevision({
-        lease: await claimRevisionForTest(retry.revision.id),
+      activateAttempt({
+        lease: await claimAttemptForTest(retry.attempt.id),
         ledgerId,
         sourceDocumentId: first.document.id,
-        revisionId: retry.revision.id,
+        attemptId: retry.attempt.id,
         entries: [projectionEntry],
       })
     ).resolves.toBe(true);
 
-    const failedRetry = await createPendingRevision({
+    const failedRetry = await createPendingAttempt({
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "bad retry", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
     await recordProcessingFailure({
-      lease: await claimRevisionForTest(failedRetry.revision.id),
+      lease: await claimAttemptForTest(failedRetry.attempt.id),
       ledgerId,
       sourceDocumentId: first.document.id,
-      revisionId: failedRetry.revision.id,
+      attemptId: failedRetry.attempt.id,
       failureKind: "invalid_input",
       failureMessage: "unreadable",
     });
     const preserved = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, first.document.id),
     });
-    expect(preserved).toMatchObject({ latestSubmissionRevisionId: failedRetry.revision.id });
+    expect(preserved).toMatchObject({ latestAttemptId: failedRetry.attempt.id });
     // The failed retry leaves the entries of the completed one in place.
     expect(
       await db.query.ledgerEntries.findMany({
@@ -111,7 +111,7 @@ describe("current-runtime target adapters", () => {
       })
     ).toEqual([expect.objectContaining({ amount: "12.500" })]);
 
-    const second = await createPendingRevision({
+    const second = await createPendingAttempt({
       ledgerId,
       input: { text: "second", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
@@ -131,29 +131,29 @@ describe("current-runtime target adapters", () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const bookId = await testBookId(db, ledgerId);
-    const first = await createPendingRevision({
+    const first = await createPendingAttempt({
       ledgerId,
       input: { text: "first", storedFileIds: [], documentDate: null },
       bookId,
     });
-    await activateRevision({
-      lease: await claimRevisionForTest(first.revision.id),
+    await activateAttempt({
+      lease: await claimAttemptForTest(first.attempt.id),
       ledgerId,
       sourceDocumentId: first.document.id,
-      revisionId: first.revision.id,
+      attemptId: first.attempt.id,
       entries: [projectionEntry, projectionEntry],
     });
-    const reparse = await createPendingRevision({
+    const reparse = await createPendingAttempt({
       ledgerId,
       sourceDocumentId: first.document.id,
       input: { text: "reparse", storedFileIds: [], documentDate: null },
       bookId,
     });
-    await activateRevision({
-      lease: await claimRevisionForTest(reparse.revision.id),
+    await activateAttempt({
+      lease: await claimAttemptForTest(reparse.attempt.id),
       ledgerId,
       sourceDocumentId: first.document.id,
-      revisionId: reparse.revision.id,
+      attemptId: reparse.attempt.id,
       entries: [{ ...projectionEntry, amount: "20.00" }],
     });
 
@@ -177,18 +177,18 @@ describe("current-runtime target adapters", () => {
       .insert(entryCategories)
       .values({ ledgerId: otherLedgerId, name: "Other" })
       .returning();
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       input: { text: "receipt", storedFileIds: [], documentDate: null },
       bookId: await testBookId(db, ledgerId),
     });
 
     await expect(
-      activateRevision({
-        lease: await claimRevisionForTest(pending.revision.id),
+      activateAttempt({
+        lease: await claimAttemptForTest(pending.attempt.id),
         ledgerId,
         sourceDocumentId: pending.document.id,
-        revisionId: pending.revision.id,
+        attemptId: pending.attempt.id,
         entries: [{ ...projectionEntry, categoryId: otherCategory!.id }],
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -196,11 +196,11 @@ describe("current-runtime target adapters", () => {
     const document = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, pending.document.id),
     });
-    const revision = await db.query.sourceDocumentRevisions.findFirst({
-      where: eq(sourceDocumentRevisions.id, pending.revision.id),
+    const attempt = await db.query.extractionAttempts.findFirst({
+      where: eq(extractionAttempts.id, pending.attempt.id),
     });
-    expect(document).toMatchObject({ latestSubmissionRevisionId: pending.revision.id });
-    expect(revision?.processingStatus).toBe("processing");
+    expect(document).toMatchObject({ latestAttemptId: pending.attempt.id });
+    expect(attempt?.status).toBe("processing");
     expect(await db.select().from(ledgerEntries)).toHaveLength(0);
   });
 
@@ -222,7 +222,7 @@ describe("current-runtime target adapters", () => {
         finalizedAt: new Date(),
       })
       .returning();
-    const pending = await createPendingRevision({
+    const pending = await createPendingAttempt({
       ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: null, storedFileIds: [file!.id], documentDate: null },
@@ -234,7 +234,7 @@ describe("current-runtime target adapters", () => {
       "edit_retry",
       "delete",
     ]);
-    const pendingLease = await claimRevisionForTest(pending.revision.id);
+    const pendingLease = await claimAttemptForTest(pending.attempt.id);
     expect(await db.select().from(sourceDocumentFiles)).toHaveLength(1);
 
     await expect(
@@ -250,11 +250,11 @@ describe("current-runtime target adapters", () => {
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      activateRevision({
+      activateAttempt({
         lease: pendingLease,
         ledgerId,
         sourceDocumentId: active.sourceDocumentId,
-        revisionId: pending.revision.id,
+        attemptId: pending.attempt.id,
         entries: [{ ...projectionEntry, amount: "99.00" }],
       })
     ).resolves.toBe(false);
@@ -264,7 +264,7 @@ describe("current-runtime target adapters", () => {
         where: eq(sourceDocuments.id, active.sourceDocumentId),
       })
     ).toBeUndefined();
-    expect(await db.select().from(sourceDocumentRevisions)).toEqual([]);
+    expect(await db.select().from(extractionAttempts)).toEqual([]);
     expect(await db.select().from(sourceDocumentFiles)).toEqual([]);
     expect(await db.select().from(ledgerEntries)).toEqual([]);
     expect(await db.select().from(storedFiles)).toHaveLength(1);

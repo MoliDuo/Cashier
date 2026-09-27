@@ -5,12 +5,7 @@ import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
 } from "tests/helpers/schema-setup";
-import {
-  entryCategories,
-  ledgerEntries,
-  sourceDocumentRevisions,
-  sourceDocuments,
-} from "@/persistence";
+import { entryCategories, ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { eq } from "drizzle-orm";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/server/stream-total";
@@ -150,23 +145,23 @@ describe("source-document-queries", () => {
       await activateTestSourceDocumentProjection(db, doc.id, { parsed: doc.id !== failed.id });
     }
 
-    const failedRevision = requireDefined(
+    const failedAttempt = requireDefined(
       (
         await db
-          .insert(sourceDocumentRevisions)
+          .insert(extractionAttempts)
           .values({
             ledgerId,
             sourceDocumentId: failed.id,
-            processingStatus: "failed",
+            status: "failed",
             finishedAt: new Date(),
           })
           .returning()
       )[0],
-      "failed pending revision"
+      "failed pending attempt"
     );
     await db
       .update(sourceDocuments)
-      .set({ latestSubmissionRevisionId: failedRevision.id })
+      .set({ latestAttemptId: failedAttempt.id })
       .where(eq(sourceDocuments.id, failed.id));
 
     await expect(
