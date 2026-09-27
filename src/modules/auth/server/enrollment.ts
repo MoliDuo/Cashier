@@ -7,12 +7,8 @@ import type {
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { db } from "@/lib/db";
-import { incrementRateLimit, rateLimitKey } from "@/lib/rate-limit";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { keyedDigest } from "@/lib/security/keys";
-import {
-  AUTH_PASSKEY_IP_MAX_ATTEMPTS,
-  AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS,
-} from "@/config/tuning";
 import { webauthnChallenges } from "@/persistence";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import { finishPasskeyRegistration, startPasskeyRegistration } from "./passkeys";
@@ -86,15 +82,11 @@ export async function startEnrollment(
 ): Promise<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON } | null> {
   let limit;
   try {
-    limit = await incrementRateLimit(
-      rateLimitKey("auth:enroll:ip", ip),
-      AUTH_PASSKEY_IP_MAX_ATTEMPTS,
-      AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS
-    );
+    limit = await consumeRateLimit("enrollStartPerIp", ip);
   } catch {
     throw new AuthSignInError(AUTH_ERROR_CODES.AUTH_RATE_LIMIT_UNAVAILABLE);
   }
-  if (!limit.success) throw new AuthSignInError(AUTH_ERROR_CODES.PASSKEY_RATE_LIMITED);
+  if (!limit.allowed) throw new AuthSignInError(AUTH_ERROR_CODES.PASSKEY_RATE_LIMITED);
   const userId = await findEnrollmentUser(token, now);
   if (userId == null) return null;
   return startPasskeyRegistration(userId, now);

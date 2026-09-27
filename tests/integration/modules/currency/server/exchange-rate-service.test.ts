@@ -110,7 +110,7 @@ describe("refreshExchangeRates", () => {
     vi.restoreAllMocks();
   });
 
-  it("fills document days, replaces provisional days, keeps final ones, and waits out its cooldown", async () => {
+  it("fills document days, replaces provisional days, and keeps final ones", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     await db.insert(sourceDocuments).values({
@@ -158,9 +158,6 @@ describe("refreshExchangeRates", () => {
       bookId: await testBookId(db, ledgerId),
     });
     await refreshExchangeRates(new Date(now.getTime() + 5 * 60_000));
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    await refreshExchangeRates(new Date(now.getTime() + 16 * 60_000));
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 

@@ -98,7 +98,7 @@ describe("authenticateWithOTP", () => {
 
   it("charges the IP verification bucket before looking up a token", async () => {
     process.env.TRUSTED_PROXY = "platform";
-    const increment = vi.spyOn(rateLimit, "incrementRateLimit");
+    const consume = vi.spyOn(rateLimit, "consumeRateLimit");
 
     await expect(
       authenticateWithOTP({
@@ -108,8 +108,8 @@ describe("authenticateWithOTP", () => {
       })
     ).rejects.toMatchObject({ code: AUTH_ERROR_CODES.OTP_INVALID });
 
-    expect(increment).toHaveBeenCalledTimes(1);
-    increment.mockRestore();
+    expect(consume).toHaveBeenCalledExactlyOnceWith("otpVerifyPerIp", expect.any(String));
+    consume.mockRestore();
   });
 
   it("returns otp_expired for an expired OTP", async () => {

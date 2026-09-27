@@ -152,8 +152,11 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   一次性注册链接 `/enroll?token=…`，库里只存令牌的 HMAC（`purpose=enroll`），`/enroll` 在一个事务里注册
   passkey 并删掉这一行。链接只打印到终端，不写日志；它也是 passkey 全丢时的找回途径。
 - **验证码与限流。** 尝试次数与锁定只有一份实现（`src/modules/auth/domain/verification-challenge.ts`），
-  OTP 和改邮箱共用；重发不清零尝试次数和锁定。限流桶存在 Postgres，名字一律用 `rateLimitKey` 生成，
-  形如 `<用途>:<HMAC>`，不含原始邮箱、IP 或 id。
+  OTP 和改邮箱共用；重发不清零尝试次数和锁定。限流只加在登录之前（发码、校验、开始 passkey 登录、开始注册，
+  都按 IP），登录后的操作和 API v1 不限流。额度集中在 `SIGN_IN_RATE_LIMITS`（`src/config/tuning.ts`），
+  唯一的入口是 `consumeRateLimit`（`src/lib/rate-limit.ts`），计数存在 Postgres 的 `rate_limit_buckets`，
+  取不到计数时拒绝请求。桶名形如 `<用途>:<HMAC>`，不含原始邮箱或 IP。同一邮箱的发码由 60 秒重发冷却限制，
+  未知邮箱同样冷却，不暴露邮箱是否存在。
 - **密钥。** 每一种摘要都用 `deriveKey` / `keyedDigest`（`src/lib/security/keys.ts`），一种用途一把密钥，
   全部由 `AUTH_SECRET` 经 HKDF 派生。
 - **API v1 凭证。** 192 位随机值，HMAC 存储，绑定到分账。

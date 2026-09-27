@@ -3,7 +3,7 @@ import { RateLimitUnavailableError } from "@/lib/errors";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
 import { isValidOTPFormat } from "@/modules/auth/domain/otp";
-import { checkVerifyRateLimit } from "./otp-rate-limit";
+import { consumeRateLimit, type RateLimitDecision } from "@/lib/rate-limit";
 import { findOtpToken } from "./otp-tokens";
 import { verifyOTPWithPolicy } from "./otp-verification";
 import { findUserByEmail } from "./users";
@@ -70,22 +70,16 @@ export async function authenticateWithOTP(params: {
   const normalizedEmail = validateCredentials(params.email, params.otp);
 
   const ip = getClientIPFromHeaders(params.requestHeaders);
-  let isAllowed: boolean;
+  let limit: RateLimitDecision;
   try {
-    isAllowed = await checkVerifyRateLimit(ip);
+    limit = await consumeRateLimit("otpVerifyPerIp", ip);
   } catch (error) {
     if (error instanceof RateLimitUnavailableError) {
       throw new OTPRateLimitUnavailableSignInError();
     }
     throw error;
   }
-  if (!isAllowed) {
-    logger.warn(
-      { ipSubject: logIdentifier("ip", ip), emailSubject: logIdentifier("email", normalizedEmail) },
-      "OTP verify rate limit exceeded during sign-in"
-    );
-    throw new OTPRateLimitedSignInError();
-  }
+  if (!limit.allowed) throw new OTPRateLimitedSignInError();
 
   const record = await findOtpToken(normalizedEmail);
   if (record == null) {

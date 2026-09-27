@@ -7,14 +7,10 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { normalizeEmail, DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
 import type { SendOTPEmail } from "@/modules/auth/contract-schemas";
 import { sendEmail } from "@/lib/email-delivery";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { createOtpToken, discardOtpToken, findOtpToken } from "./otp-tokens";
 import { findUserByEmail } from "./users";
-import {
-  acquireResendCooldown,
-  checkSendRateLimit,
-  checkSendRateLimitByIP,
-  releaseResendCooldown,
-} from "./otp-rate-limit";
+import { acquireResendCooldown, releaseResendCooldown } from "./otp-resend-cooldown";
 import { generateOTP, getResendCooldown } from "@/modules/auth/domain/otp";
 import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
 import { signInCodeEmailCopy } from "@/copy/email";
@@ -43,19 +39,11 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
     throw new AppError("Email login is not configured", "EMAIL_NOT_CONFIGURED", 503);
   }
 
-  const ipRateLimit = await checkSendRateLimitByIP(params.ip);
-  if (!ipRateLimit.allowed) {
+  const ipLimit = await consumeRateLimit("otpSendPerIp", params.ip);
+  if (!ipLimit.allowed) {
     throw new RateLimitError(
       "Too many requests from this IP. Please try again later.",
-      ipRateLimit.retryAfter
-    );
-  }
-
-  const emailRateLimit = await checkSendRateLimit(normalizedEmail);
-  if (!emailRateLimit.allowed) {
-    throw new RateLimitError(
-      "Too many requests. Please try again later.",
-      emailRateLimit.retryAfter
+      ipLimit.retryAfterSeconds
     );
   }
 

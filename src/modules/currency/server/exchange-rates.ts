@@ -28,7 +28,6 @@ const providerTimeSeriesSchema = z.object({
  * that falls on a weekend or holiday has a publication to carry forward. */
 const LOOKBACK_DAYS = 7;
 const ENSURE_TIMEOUT_MS = 3_000;
-const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 const INSERT_CHUNK_ROWS = 1_000;
 const API_BASE_URL = "https://api.frankfurter.app";
 
@@ -232,18 +231,9 @@ export async function ensureExchangeRates(dates: readonly (string | null)[]): Pr
 
 /**
  * Fills the days documents need that have no rates and replaces provisional
- * days, at most once per cooldown across all instances. Runs from maintenance.
+ * days. Runs from the daily cron; a second run finds nothing left to fetch.
  */
 export async function refreshExchangeRates(now = new Date()): Promise<void> {
-  const claimed = await db.execute(sql`
-    INSERT INTO rate_limit_buckets (bucket_key, count, window_start, created_at)
-    VALUES ('exchange-rates:refresh', 1, ${now}, ${now})
-    ON CONFLICT (bucket_key) DO UPDATE SET window_start = EXCLUDED.window_start
-    WHERE rate_limit_buckets.window_start <= ${new Date(now.getTime() - REFRESH_COOLDOWN_MS)}
-    RETURNING bucket_key
-  `);
-  if (claimed.rows.length === 0) return;
-
   const today = formatExchangeRateDate(now);
   const wanted = await db.execute<{ rate_date: string }>(sql`
     SELECT DISTINCT documents.effective_date::text AS rate_date

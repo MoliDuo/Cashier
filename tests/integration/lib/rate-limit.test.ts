@@ -1,182 +1,91 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  acquireCooldown,
-  incrementRateLimit,
-  releaseCooldown,
-  releaseRateLimitIncrement,
-} from "@/lib/rate-limit";
-import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { acquireCooldown, consumeRateLimit, releaseCooldown } from "@/lib/rate-limit";
+import { db } from "@/lib/db";
+import { RateLimitUnavailableError } from "@/lib/errors";
+import { SIGN_IN_RATE_LIMITS } from "@/config/tuning";
 
-/** The count in the bucket's current fixed window; 0 when missing or expired. */
-async function currentCount(bucketKey: string, windowSeconds: number): Promise<number> {
-  const windowStart = Math.floor(Date.now() / 1000 / windowSeconds) * windowSeconds;
-  const result = await db.execute<{ curr_count: number }>(sql`
-    SELECT count AS curr_count
-    FROM rate_limit_buckets
-    WHERE bucket_key = ${bucketKey}
-      AND window_start = ${new Date(windowStart * 1000)}
-  `);
-  const row = result.rows?.[0];
-  return row == null ? 0 : Number(row.curr_count);
+async function bucketKeys(): Promise<string[]> {
+  const result = await db.execute<{ bucket_key: string }>(
+    sql`SELECT bucket_key FROM rate_limit_buckets ORDER BY bucket_key`
+  );
+  return result.rows.map((row) => row.bucket_key);
 }
 
 describe("Postgres rate limiter", () => {
   beforeEach(async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-08-06T00:00:00.000Z"));
     await db.execute(sql`DELETE FROM rate_limit_buckets`);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  it("returns success when under limit", async () => {
-    const result = await incrementRateLimit("test-under", 10, 60);
-    expect(result.success).toBe(true);
-    expect(result.remaining).toBe(9);
-  });
+  describe("consumeRateLimit", () => {
+    it("allows the named limit's quota in a window and then refuses until it resets", async () => {
+      const { max, windowSeconds } = SIGN_IN_RATE_LIMITS.otpVerifyPerIp;
+      for (let request = 0; request < max; request += 1) {
+        await expect(consumeRateLimit("otpVerifyPerIp", "192.0.2.1")).resolves.toEqual({
+          allowed: true,
+        });
+      }
 
-  it("returns failure when over limit", async () => {
-    const bucketKey = "test-over-1";
-    const limit = 5;
+      await expect(consumeRateLimit("otpVerifyPerIp", "192.0.2.1")).resolves.toEqual({
+        allowed: false,
+        retryAfterSeconds: windowSeconds,
+      });
 
-    for (let i = 0; i < limit; i++) {
-      const result = await incrementRateLimit(bucketKey, limit, 60);
-      expect(result.success).toBe(true);
-    }
+      vi.setSystemTime(new Date(Date.now() + windowSeconds * 1000));
+      await expect(consumeRateLimit("otpVerifyPerIp", "192.0.2.1")).resolves.toEqual({
+        allowed: true,
+      });
+    });
 
-    const over = await incrementRateLimit(bucketKey, limit, 60);
-    expect(over.success).toBe(false);
-    expect(over.remaining).toBe(0);
-  });
+    it("counts each limit and each subject on its own", async () => {
+      const { max } = SIGN_IN_RATE_LIMITS.otpVerifyPerIp;
+      for (let request = 0; request <= max; request += 1) {
+        await consumeRateLimit("otpVerifyPerIp", "192.0.2.1");
+      }
 
-  it("resets count when window expires", async () => {
-    const bucketKey = "test-window-reset";
+      await expect(consumeRateLimit("otpVerifyPerIp", "192.0.2.2")).resolves.toEqual({
+        allowed: true,
+      });
+      await expect(consumeRateLimit("otpSendPerIp", "192.0.2.1")).resolves.toEqual({
+        allowed: true,
+      });
+    });
 
-    await incrementRateLimit(bucketKey, 2, 1);
-    await incrementRateLimit(bucketKey, 2, 1);
+    it("shares one quota between concurrent callers", async () => {
+      const { max } = SIGN_IN_RATE_LIMITS.passkeyStartPerIp;
+      const results = await Promise.all(
+        Array.from({ length: max + 5 }, () => consumeRateLimit("passkeyStartPerIp", "unknown"))
+      );
 
-    // Within same 1-second window — should be over limit
-    const withinWindow = await incrementRateLimit(bucketKey, 2, 1);
-    expect(withinWindow.success).toBe(false);
+      expect(results.filter((result) => result.allowed)).toHaveLength(max);
+    });
 
-    // Wait for window to expire
-    vi.advanceTimersByTime(1100);
+    it("never stores the subject in a bucket key", async () => {
+      await consumeRateLimit("otpSendPerIp", "203.0.113.9");
+      await consumeRateLimit("enrollStartPerIp", "203.0.113.9");
 
-    const afterReset = await incrementRateLimit(bucketKey, 2, 1);
-    expect(afterReset.success).toBe(true);
-    expect(afterReset.remaining).toBe(1);
-  });
+      const keys = await bucketKeys();
+      expect(keys).toHaveLength(2);
+      for (const key of keys) {
+        expect(key).toMatch(/^[A-Za-z]+:[a-f0-9]{64}$/);
+        expect(key).not.toContain("203.0");
+      }
+    });
 
-  it("tracks different bucket keys independently", async () => {
-    const limit = 3;
+    it("fails closed when the counter cannot be written", async () => {
+      vi.spyOn(db, "execute").mockRejectedValueOnce(new Error("DB error"));
 
-    // Fill bucket-alpha to limit (3 increments)
-    let result = await incrementRateLimit("bucket-alpha", limit, 60);
-    expect(result.success).toBe(true);
-    result = await incrementRateLimit("bucket-alpha", limit, 60);
-    expect(result.success).toBe(true);
-    result = await incrementRateLimit("bucket-alpha", limit, 60);
-    expect(result.success).toBe(true);
-    expect(result.remaining).toBe(0);
-
-    // One more should exceed the limit
-    result = await incrementRateLimit("bucket-alpha", limit, 60);
-    expect(result.success).toBe(false);
-
-    // bucket-beta should still have all its capacity
-    result = await incrementRateLimit("bucket-beta", limit, 60);
-    expect(result.success).toBe(true);
-    expect(result.remaining).toBe(limit - 1);
-  });
-
-  it("handles sequential rapid increments accurately", async () => {
-    const bucketKey = "test-rapid";
-    const limit = 50;
-
-    for (let i = 0; i < limit; i++) {
-      const result = await incrementRateLimit(bucketKey, limit, 60);
-      expect(result.success).toBe(true);
-      expect(result.remaining).toBe(limit - (i + 1));
-    }
-
-    // One more should fail
-    const over = await incrementRateLimit(bucketKey, limit, 60);
-    expect(over.success).toBe(false);
-    expect(over.remaining).toBe(0);
-  });
-
-  it("reports correct remaining count", async () => {
-    const bucketKey = "test-remaining";
-    const limit = 10;
-
-    const r1 = await incrementRateLimit(bucketKey, limit, 60);
-    expect(r1.remaining).toBe(9);
-
-    const r2 = await incrementRateLimit(bucketKey, limit, 60);
-    expect(r2.remaining).toBe(8);
-
-    // Exhaust
-    for (let i = 0; i < 8; i++) {
-      await incrementRateLimit(bucketKey, limit, 60);
-    }
-
-    const r3 = await incrementRateLimit(bucketKey, limit, 60);
-    expect(r3.remaining).toBe(0);
-    expect(r3.success).toBe(false);
-  });
-
-  it("returns a resetTime in the future", async () => {
-    const result = await incrementRateLimit("test-reset-time", 10, 60);
-    expect(result.resetTime).toBeGreaterThan(Date.now());
-  });
-
-  it("counts the count of the current window", async () => {
-    await incrementRateLimit("test-current-live", 10, 60);
-    await incrementRateLimit("test-current-live", 10, 60);
-    await incrementRateLimit("test-current-live", 10, 60);
-
-    expect(await currentCount("test-current-live", 60)).toBe(3);
-  });
-
-  it("counts 0 for a missing bucket", async () => {
-    expect(await currentCount("test-current-missing", 60)).toBe(0);
-  });
-
-  it("counts 0 once the window has expired", async () => {
-    await incrementRateLimit("test-current-expired", 10, 1);
-    expect(await currentCount("test-current-expired", 1)).toBe(1);
-
-    vi.advanceTimersByTime(1100);
-    expect(await currentCount("test-current-expired", 1)).toBe(0);
-  });
-
-  it("enforces shared limit across concurrent callers", async () => {
-    const bucketKey = "test-concurrent";
-    const limit = 10;
-
-    // Fire limit+5 concurrent increments and count how many succeed
-    const promises = Array.from({ length: limit + 5 }, () =>
-      incrementRateLimit(bucketKey, limit, 60)
-    );
-    const results = await Promise.all(promises);
-
-    const successes = results.filter((r) => r.success).length;
-    expect(successes).toBe(limit);
-    expect(results.filter((r) => !r.success).length).toBe(5);
-  });
-
-  it("releases only an increment from the matching fixed window", async () => {
-    const reservation = await incrementRateLimit("test-release-increment", 10, 60);
-    expect(await currentCount("test-release-increment", 60)).toBe(1);
-
-    await releaseRateLimitIncrement("test-release-increment", 60, reservation.resetTime + 60_000);
-    expect(await currentCount("test-release-increment", 60)).toBe(1);
-
-    await releaseRateLimitIncrement("test-release-increment", 60, reservation.resetTime);
-    expect(await currentCount("test-release-increment", 60)).toBe(0);
+      await expect(consumeRateLimit("otpSendPerIp", "192.0.2.1")).rejects.toBeInstanceOf(
+        RateLimitUnavailableError
+      );
+    });
   });
 
   describe("cooldown methods", () => {

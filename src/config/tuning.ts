@@ -76,15 +76,17 @@ export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_LOCKOUT_MINUTES = 15;
 export const OTP_RESEND_COOLDOWN_SECONDS = 60;
 
-/** Sending a code: per address, and per address per hour. */
-export const AUTH_RATE_LIMIT_MAX = 10;
-export const AUTH_RATE_LIMIT_WINDOW_SECONDS = 900;
-export const OTP_IP_MAX_ATTEMPTS_PER_HOUR = 10;
-export const OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE = 5;
-
-/** Passkey sign-ins started per IP address, and the window they are counted over. */
-export const AUTH_PASSKEY_IP_MAX_ATTEMPTS = 30;
-export const AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS = 900;
+/**
+ * Rate limits on the requests made before signing in, per client IP. Nothing
+ * a signed-in session does is limited. The resend cooldown above caps codes
+ * sent to one address.
+ */
+export const SIGN_IN_RATE_LIMITS = {
+  otpSendPerIp: { max: 10, windowSeconds: 60 * 60 },
+  otpVerifyPerIp: { max: 5, windowSeconds: 60 },
+  passkeyStartPerIp: { max: 30, windowSeconds: 15 * 60 },
+  enrollStartPerIp: { max: 30, windowSeconds: 15 * 60 },
+} as const;
 
 /** How long a signed-in session survives without being renewed. */
 export const SESSION_MAX_AGE_DAYS = 14;

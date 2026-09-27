@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import { passkeys, webauthnChallenges } from "@/persistence";
 import { keyedDigest } from "@/lib/security/keys";
-import { AUTH_PASSKEY_IP_MAX_ATTEMPTS } from "@/config/tuning";
+import { SIGN_IN_RATE_LIMITS } from "@/config/tuning";
 import { SESSION_COOKIE_NAME } from "@/modules/auth/constants";
 import {
   ENROLLMENT_TTL_MS,
@@ -199,7 +199,7 @@ describe("enrolling a passkey", () => {
 
   it("counts starts per address", async () => {
     const { token } = await issued();
-    for (let attempt = 0; attempt < AUTH_PASSKEY_IP_MAX_ATTEMPTS; attempt += 1) {
+    for (let attempt = 0; attempt < SIGN_IN_RATE_LIMITS.enrollStartPerIp.max; attempt += 1) {
       expect((await startEnrollmentAction(token)).ok).toBe(true);
     }
 

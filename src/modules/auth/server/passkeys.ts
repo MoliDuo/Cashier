@@ -15,11 +15,7 @@ import { db } from "@/lib/db";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { runtimeEnv } from "@/lib/env/runtime";
 import { logger } from "@/lib/logger";
-import { incrementRateLimit, rateLimitKey } from "@/lib/rate-limit";
-import {
-  AUTH_PASSKEY_IP_MAX_ATTEMPTS,
-  AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS,
-} from "@/config/tuning";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { passkeys, webauthnChallenges } from "@/persistence";
 import { AUTH_ERROR_CODES, AuthSignInError } from "@/modules/auth/errors";
 import type { AuthenticatedPrincipal, PasskeySummary } from "@/modules/auth/contracts";
@@ -205,15 +201,11 @@ export async function startPasskeySignIn(
 ): Promise<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }> {
   let limit;
   try {
-    limit = await incrementRateLimit(
-      rateLimitKey("auth:passkey:ip", ip),
-      AUTH_PASSKEY_IP_MAX_ATTEMPTS,
-      AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS
-    );
+    limit = await consumeRateLimit("passkeyStartPerIp", ip);
   } catch {
     throw new AuthSignInError(AUTH_ERROR_CODES.AUTH_RATE_LIMIT_UNAVAILABLE);
   }
-  if (!limit.success) throw new AuthSignInError(AUTH_ERROR_CODES.PASSKEY_RATE_LIMITED);
+  if (!limit.allowed) throw new AuthSignInError(AUTH_ERROR_CODES.PASSKEY_RATE_LIMITED);
   const { rpID } = relyingParty();
   const options = await generateAuthenticationOptions({ rpID, userVerification: "preferred" });
   const challengeId = await storeChallenge({
