@@ -74,9 +74,6 @@ curl --request POST "https://cashier.example.com/api/v1/source-documents" \
 
 - `Location: /api/v1/source-documents/{sourceDocumentId}`
 - `X-Request-Id`
-- `X-RateLimit-Limit`
-- `X-RateLimit-Remaining`
-- `X-RateLimit-Reset`
 
 `201` 表示图片处理、对象上传和数据库写入已经完成，不代表 AI 解析已经完成。
 
@@ -129,13 +126,11 @@ Authorization: Bearer <token>
 - 改变或省略 key 可能创建重复单据。
 - HTTP 请求取消不会撤销服务器已经完成的上传。
 
-## 限流与错误
+## 错误
 
-- 默认每个服务凭证每 60 秒 60 次，`POST` 和 `GET` 共用额度。
-- `429` 返回 `Retry-After` 和三个 `X-RateLimit-*` 响应头。
+- API v1 不限流。服务凭证是 192 位随机值，无法猜测；轮询请按 `Retry-After` 的间隔进行。
 - `401` 返回 `WWW-Authenticate: Bearer`。
 - 每个响应都包含 `X-Request-Id`，报告问题时可以提供它，但不要提供 Bearer Token。
-- 请求认证前和无效 Token 的限流始终启用。`TRUSTED_PROXY=platform` 仅决定是否读取平台覆盖的单值客户端 IP 头；否则使用固定的哈希 `unknown` 桶。
 
 常见状态码：
 
@@ -146,7 +141,6 @@ Authorization: Bearer <token>
 | `400`  | JSON、幂等 key、日期、图片或整个请求体不符合大小与格式约束 |
 | `401`  | 缺少或无法识别服务凭证                                     |
 | `404`  | 单据不存在，或不属于该凭证对应账本                         |
-| `429`  | 超过限流额度                                               |
 | `500`  | 服务器无法安全生成结果                                     |
 
 API v1 当前没有计划中的 sunset，也没有 `/api/v2` 路由。公开契约以

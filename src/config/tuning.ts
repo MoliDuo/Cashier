@@ -93,9 +93,6 @@ export const OTP_VERIFY_MAX_ATTEMPTS_PER_MINUTE = 5;
 export const AUTH_PASSKEY_IP_MAX_ATTEMPTS = 30;
 export const AUTH_PASSKEY_RATE_LIMIT_WINDOW_SECONDS = 900;
 
-/** API v1, per credential. */
-export const API_RATE_LIMIT_PER_MINUTE = 60;
-
 /** How long a signed-in session survives without being renewed. */
 export const SESSION_MAX_AGE_DAYS = 14;
 

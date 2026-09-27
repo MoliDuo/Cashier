@@ -67,23 +67,11 @@ export class BookUnavailableError extends AppError {
  */
 export class RateLimitError extends AppError {
   retryAfter?: number;
-  metadata?: {
-    limit?: number;
-    remaining?: number;
-    resetTime?: number;
-  };
 
-  constructor(
-    message: string = "Too many requests",
-    retryAfter?: number,
-    metadata?: { limit?: number; remaining?: number; resetTime?: number }
-  ) {
+  constructor(message: string = "Too many requests", retryAfter?: number) {
     super(message, "RATE_LIMIT", 429);
     if (retryAfter !== undefined) {
       this.retryAfter = retryAfter;
-    }
-    if (metadata !== undefined) {
-      this.metadata = metadata;
     }
   }
 }

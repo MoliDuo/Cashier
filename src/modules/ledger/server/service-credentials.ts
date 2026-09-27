@@ -1,12 +1,7 @@
 import "server-only";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import {
-  BookUnavailableError,
-  ConflictError,
-  NotFoundError,
-  RateLimitUnavailableError,
-} from "@/lib/errors";
+import { BookUnavailableError, ConflictError, NotFoundError } from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
 import { books, ledgers, serviceCredentials } from "@/persistence";
 import { createToken, computeHash } from "@/lib/security/service-credential-token";
@@ -102,7 +97,7 @@ export async function authenticateServiceCredential(
       if (!updated) return null;
     } catch (error) {
       logError("modules/ledger:authenticate-service-credential:update-last-used", error);
-      throw new RateLimitUnavailableError();
+      throw error;
     }
   }
   // The authenticated contract is deliberately bounded to id, ledgerId and

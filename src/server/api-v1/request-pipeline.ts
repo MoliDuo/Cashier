@@ -2,23 +2,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { authenticateServiceCredential } from "@/modules/ledger/server/service-credentials";
 import type { AuthenticatedServiceCredential } from "@/modules/ledger/contracts";
-import { incrementRateLimit, rateLimitKey, type RateLimitResult } from "@/lib/rate-limit";
-import { UnauthorizedError, RateLimitError } from "@/lib/errors";
+import { UnauthorizedError } from "@/lib/errors";
 import { getErrorStatusCode, toSanitizedErrorResponse } from "@/lib/error-handlers";
-import { getClientIPFromHeaders } from "@/lib/utils/ip";
 import { logger } from "@/lib/logger";
-import { API_RATE_LIMIT_PER_MINUTE } from "@/config/tuning";
 
 interface ApiV1Context {
   credential: AuthenticatedServiceCredential;
   request: NextRequest;
   requestId: string;
 }
-
-// Pre-auth per-IP ceiling, applied before any credential parsing so a trusted
-// client IP cannot be used to drive unbounded database authentication work.
-const PRE_AUTH_IP_LIMIT_PER_MINUTE = 120;
-const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 /**
  * Request-level metrics collected by a route handler. Never contains the
@@ -54,34 +46,6 @@ function getBearerToken(request: NextRequest): string | null {
   return match?.[1] ?? null;
 }
 
-/**
- * Pre-auth per-IP rate-limit bucket key. The trusted client IP is stored only
- * as an HMAC digest so the raw address never reaches the database.
- */
-function preAuthBucketKey(clientIp: string): string {
-  return rateLimitKey("api-v1:preauth", clientIp);
-}
-
-/**
- * Derive the credential-wide rate-limit bucket key from the credential ID
- * only. The quota is shared across POST and GET and across all client IPs, so
- * the IP must not be part of the key.
- */
-function validCredentialBucketKey(credentialId: string): string {
-  return rateLimitKey("api-v1:credential", credentialId);
-}
-
-function applyRateLimitHeaders(
-  response: NextResponse,
-  limit: number,
-  result: RateLimitResult
-): void {
-  // The wire contract uses Unix seconds; the rate limiter keeps milliseconds internally.
-  response.headers.set("X-RateLimit-Limit", String(limit));
-  response.headers.set("X-RateLimit-Remaining", String(result.remaining));
-  response.headers.set("X-RateLimit-Reset", String(Math.floor(result.resetTime / 1000)));
-}
-
 export async function handleApiV1Route(
   request: NextRequest,
   { logContext, handler }: HandleApiV1RouteOptions
@@ -90,33 +54,14 @@ export async function handleApiV1Route(
   const startedAt = performance.now();
   const stages: Record<string, number> = {};
   try {
-    const clientIp = getClientIPFromHeaders(request.headers);
-
-    // 1. Pre-auth ceiling. Missing trusted client data uses one fixed HMAC
-    //    bucket so unauthenticated traffic is still bounded without raw IPs.
-    const preAuthStart = performance.now();
-    const preAuthResult = await incrementRateLimit(
-      preAuthBucketKey(clientIp),
-      PRE_AUTH_IP_LIMIT_PER_MINUTE,
-      RATE_LIMIT_WINDOW_SECONDS
-    );
-    stages.preAuthRateLimitMs = Math.round(performance.now() - preAuthStart);
-    if (!preAuthResult.success) {
-      throw new RateLimitError("Rate limit exceeded", undefined, {
-        limit: PRE_AUTH_IP_LIMIT_PER_MINUTE,
-        remaining: preAuthResult.remaining,
-        resetTime: preAuthResult.resetTime,
-      });
-    }
-
-    // 2. Case-insensitive Bearer parsing. Missing header, empty token, or
+    // 1. Case-insensitive Bearer parsing. Missing header, empty token, or
     //    trailing non-whitespace content is rejected without touching the DB.
     const token = getBearerToken(request);
     if (token == null) {
       throw new UnauthorizedError("Missing or invalid Authorization header");
     }
 
-    // 3. Authenticate the credential.
+    // 2. Authenticate the credential.
     const authStart = performance.now();
     const credential = await authenticateServiceCredential(token);
     stages.credentialAuthMs = Math.round(performance.now() - authStart);
@@ -125,28 +70,8 @@ export async function handleApiV1Route(
       throw new UnauthorizedError("Invalid Service Credential");
     }
 
-    // 4. Credential-wide quota shared by POST and GET regardless of client IP.
-    const validBucketKey = validCredentialBucketKey(credential.id);
-    const apiRateLimit = API_RATE_LIMIT_PER_MINUTE;
-    const rateLimitStart = performance.now();
-    const validRateResult = await incrementRateLimit(
-      validBucketKey,
-      apiRateLimit,
-      RATE_LIMIT_WINDOW_SECONDS
-    );
-    stages.credentialRateLimitMs = Math.round(performance.now() - rateLimitStart);
-
-    if (!validRateResult.success) {
-      throw new RateLimitError("Rate limit exceeded", undefined, {
-        limit: apiRateLimit,
-        remaining: validRateResult.remaining,
-        resetTime: validRateResult.resetTime,
-      });
-    }
-
     const result = await handler({ credential, request, requestId });
     const response = result.response;
-    applyRateLimitHeaders(response, apiRateLimit, validRateResult);
     response.headers.set("X-Request-Id", requestId);
     response.headers.set("Cache-Control", "private, no-store");
     logger.info(
@@ -176,25 +101,6 @@ export async function handleApiV1Route(
     });
     if (failure.cause instanceof UnauthorizedError) {
       response.headers.set("WWW-Authenticate", "Bearer");
-    }
-    if (failure.cause instanceof RateLimitError) {
-      const resetTime = failure.cause.metadata?.resetTime;
-      const retryAfter =
-        resetTime == null
-          ? failure.cause.retryAfter
-          : Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
-      if (retryAfter != null) {
-        response.headers.set("Retry-After", String(retryAfter));
-      }
-      if (failure.cause.metadata?.limit !== undefined) {
-        response.headers.set("X-RateLimit-Limit", String(failure.cause.metadata.limit));
-      }
-      if (failure.cause.metadata?.remaining !== undefined) {
-        response.headers.set("X-RateLimit-Remaining", String(failure.cause.metadata.remaining));
-      }
-      if (resetTime !== undefined) {
-        response.headers.set("X-RateLimit-Reset", String(Math.floor(resetTime / 1000)));
-      }
     }
     logger[status < 500 ? "warn" : "error"](
       {
