@@ -16,8 +16,21 @@ export async function getCredentialSourceDocumentStatus(
   // same ledger; a record entered by hand has none.
   const rows = await db
     .select({
-      document: sourceDocuments,
-      attempt: extractionAttempts,
+      document: {
+        id: sourceDocuments.id,
+        title: sourceDocuments.title,
+        documentDate: sourceDocuments.documentDate,
+        createdAt: sourceDocuments.createdAt,
+      },
+      attempt: {
+        id: extractionAttempts.id,
+        status: extractionAttempts.status,
+        failureKind: extractionAttempts.failureKind,
+        failureCode: extractionAttempts.failureCode,
+        failureMessage: extractionAttempts.failureMessage,
+        submittedAt: extractionAttempts.submittedAt,
+        finishedAt: extractionAttempts.finishedAt,
+      },
       mainCurrency: ledgers.mainCurrency,
       entries: sql<
         Array<{

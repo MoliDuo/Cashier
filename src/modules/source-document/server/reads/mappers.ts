@@ -13,7 +13,8 @@ import { deriveSourceDocumentCapabilities } from "@/modules/source-document/doma
 import { compare as decimalCompare } from "@/lib/money/decimal";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 
-export interface SourceDocumentRow {
+/** The document columns a list item shows; the stream never reads the input or the suggestion. */
+export interface SourceDocumentListRow {
   id: string;
   ledgerId: string;
   title: string | null;
@@ -24,6 +25,9 @@ export interface SourceDocumentRow {
   version: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface SourceDocumentRow extends SourceDocumentListRow {
   dateOrganizationSuggestion:
     import("@/lib/ai/date-organization").DateOrganizationSuggestion | null;
 }
@@ -120,7 +124,7 @@ function displayTitle(title: string | null): string | null {
 }
 
 export function mapListItem(
-  row: SourceDocumentRow,
+  row: SourceDocumentListRow,
   hydration: SourceDocumentListHydrationRow
 ): SourceDocumentListItemDto {
   const capabilities = deriveSourceDocumentCapabilities({

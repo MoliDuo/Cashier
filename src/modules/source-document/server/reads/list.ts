@@ -153,7 +153,16 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
   if (cursor != null) conditions.push(cursor);
   const rows = await db
     .select({
-      ...getTableColumns(sourceDocuments),
+      id: sourceDocuments.id,
+      ledgerId: sourceDocuments.ledgerId,
+      title: sourceDocuments.title,
+      bookId: sourceDocuments.bookId,
+      documentDate: sourceDocuments.documentDate,
+      effectiveDate: sourceDocuments.effectiveDate,
+      latestAttemptId: sourceDocuments.latestAttemptId,
+      version: sourceDocuments.version,
+      createdAt: sourceDocuments.createdAt,
+      updatedAt: sourceDocuments.updatedAt,
       latestAttemptStatus: extractionAttempts.status,
       failureKind: extractionAttempts.failureKind,
       failureMessage: extractionAttempts.failureMessage,

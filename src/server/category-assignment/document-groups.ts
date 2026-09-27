@@ -13,39 +13,28 @@ import type {
 } from "@/modules/ledger/domain/category-assignment-protocol";
 
 /**
- * Entries grouped by the source document their evidence hangs off. Entries
- * whose document is deleted are absent.
+ * The selected entries grouped by the source document their evidence hangs
+ * off. Three narrow reads — entries, their documents, the documents' files —
+ * so a document's input text is read once rather than per entry and image.
  */
 export async function loadCategoryAssignmentDocumentGroups(input: {
   ledgerId: string;
   ledgerEntryIds: readonly string[];
 }): Promise<readonly CategoryAssignmentDocumentGroup[]> {
   if (input.ledgerEntryIds.length === 0) return [];
-  const rows = await db
+  const entries = await db
     .select({
       ledgerEntryId: ledgerEntries.id,
-      entryPosition: ledgerEntries.position,
+      position: ledgerEntries.position,
       itemName: ledgerEntries.itemName,
       description: ledgerEntries.description,
       amount: ledgerEntries.amount,
       currency: ledgerEntries.currency,
       currentCategoryId: ledgerEntries.categoryId,
       currentCategoryName: entryCategories.name,
-      sourceDocumentId: sourceDocuments.id,
-      documentTitle: sourceDocuments.title,
-      documentDate: sourceDocuments.documentDate,
-      inputText: sourceDocuments.inputText,
-      storedFileId: sourceDocumentFiles.storedFileId,
-      storedFilePosition: sourceDocumentFiles.position,
+      sourceDocumentId: ledgerEntries.sourceDocumentId,
     })
     .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId)
-      )
-    )
     .leftJoin(
       entryCategories,
       and(
@@ -53,93 +42,72 @@ export async function loadCategoryAssignmentDocumentGroups(input: {
         eq(entryCategories.ledgerId, input.ledgerId)
       )
     )
-    // The file join is a LEFT join on purpose: a text-only record has no
-    // files, and an inner join here would drop its entries from the run
-    // entirely instead of merely leaving them without images. The liveness
-    // join above stays the only thing that excludes an entry.
-    .leftJoin(
-      sourceDocumentFiles,
-      and(
-        eq(sourceDocumentFiles.sourceDocumentId, sourceDocuments.id),
-        eq(sourceDocumentFiles.ledgerId, input.ledgerId)
-      )
-    )
     .where(
       and(
         eq(ledgerEntries.ledgerId, input.ledgerId),
         inArray(ledgerEntries.id, input.ledgerEntryIds)
       )
-    )
-    .orderBy(ledgerEntries.position, ledgerEntries.id, sourceDocumentFiles.position);
+    );
+  if (entries.length === 0) return [];
 
-  // The file join repeats each entry once per image, so both the subjects and
-  // the file ids are collected into maps keyed by their own id rather than
-  // appended per row.
-  interface GroupAccumulator {
-    sourceDocumentId: string;
-    title: string | null;
-    documentDate: string | null;
-    inputText: string | null;
-    files: Map<string, number>;
-    subjects: Map<string, { position: number; subject: CategoryAssignmentSubject }>;
-  }
-
-  const byDocument = new Map<string, GroupAccumulator>();
-  for (const row of rows) {
-    let group = byDocument.get(row.sourceDocumentId);
-    if (group == null) {
-      group = {
-        sourceDocumentId: row.sourceDocumentId,
-        title: row.documentTitle,
-        documentDate: row.documentDate,
-        inputText: row.inputText,
-        files: new Map(),
-        subjects: new Map(),
-      };
-      byDocument.set(row.sourceDocumentId, group);
-    }
-
-    group.subjects.set(row.ledgerEntryId, {
-      position: row.entryPosition,
-      subject: {
-        ledgerEntryId: row.ledgerEntryId,
-        itemName: row.itemName,
-        description: row.description,
-        amount: row.amount,
-        currency: row.currency,
-        currentCategoryId: row.currentCategoryId,
-        currentCategoryName: row.currentCategoryName,
-      },
-    });
-
-    if (row.storedFileId != null) {
-      const position = row.storedFilePosition ?? Number.MAX_SAFE_INTEGER;
-      const known = group.files.get(row.storedFileId);
-      if (known == null || position < known) group.files.set(row.storedFileId, position);
-    }
-  }
+  const documentIds = [...new Set(entries.map((entry) => entry.sourceDocumentId))];
+  const [documents, files] = await Promise.all([
+    db
+      .select({
+        id: sourceDocuments.id,
+        title: sourceDocuments.title,
+        documentDate: sourceDocuments.documentDate,
+        inputText: sourceDocuments.inputText,
+      })
+      .from(sourceDocuments)
+      .where(
+        and(eq(sourceDocuments.ledgerId, input.ledgerId), inArray(sourceDocuments.id, documentIds))
+      ),
+    // A text-only record has no files; its entries still take part.
+    db
+      .select({
+        sourceDocumentId: sourceDocumentFiles.sourceDocumentId,
+        storedFileId: sourceDocumentFiles.storedFileId,
+      })
+      .from(sourceDocumentFiles)
+      .where(
+        and(
+          eq(sourceDocumentFiles.ledgerId, input.ledgerId),
+          inArray(sourceDocumentFiles.sourceDocumentId, documentIds)
+        )
+      )
+      .orderBy(sourceDocumentFiles.position, sourceDocumentFiles.storedFileId),
+  ]);
 
   const byString = (left: string, right: string): number =>
     left < right ? -1 : left > right ? 1 : 0;
 
-  return [...byDocument.values()]
-    .sort((left, right) => byString(left.sourceDocumentId, right.sourceDocumentId))
-    .map((group): CategoryAssignmentDocumentGroup => ({
-      sourceDocumentId: group.sourceDocumentId,
-      title: group.title,
-      documentDate: group.documentDate,
-      inputText: group.inputText,
-      storedFileIds: [...group.files.entries()]
-        .sort((left, right) => left[1] - right[1] || byString(left[0], right[0]))
-        .map(([storedFileId]) => storedFileId),
+  return documents
+    .sort((left, right) => byString(left.id, right.id))
+    .map((document): CategoryAssignmentDocumentGroup => ({
+      sourceDocumentId: document.id,
+      title: document.title,
+      documentDate: document.documentDate,
+      inputText: document.inputText,
+      storedFileIds: files
+        .filter((file) => file.sourceDocumentId === document.id)
+        .map((file) => file.storedFileId),
       // Document order, not caller order: the model reads the entries in the
       // same sequence as the receipt it is looking at.
-      subjects: [...group.subjects.values()]
+      subjects: entries
+        .filter((entry) => entry.sourceDocumentId === document.id)
         .sort(
           (left, right) =>
-            left.position - right.position ||
-            byString(left.subject.ledgerEntryId, right.subject.ledgerEntryId)
+            left.position - right.position || byString(left.ledgerEntryId, right.ledgerEntryId)
         )
-        .map((entry) => entry.subject),
+        .map((entry): CategoryAssignmentSubject => ({
+          ledgerEntryId: entry.ledgerEntryId,
+          itemName: entry.itemName,
+          description: entry.description,
+          amount: entry.amount,
+          currency: entry.currency,
+          currentCategoryId: entry.currentCategoryId,
+          currentCategoryName: entry.currentCategoryName,
+        })),
     }));
 }

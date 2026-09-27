@@ -5,7 +5,7 @@ import {
   encodeSourceDocumentPageCursor,
 } from "../../stream-cursor";
 
-import type { SourceDocumentRow } from "./mappers";
+import type { SourceDocumentListRow } from "./mappers";
 
 export function cursorCondition(cursor: string | null | undefined): SQL<unknown> | null {
   if (cursor == null || cursor === "") return null;
@@ -28,7 +28,7 @@ export function cursorCondition(cursor: string | null | undefined): SQL<unknown>
   );
 }
 
-export function encodeCursor(row: SourceDocumentRow): string {
+export function encodeCursor(row: SourceDocumentListRow): string {
   return encodeSourceDocumentPageCursor({
     effectiveDate: row.effectiveDate,
     createdAt: row.createdAt.toISOString(),
