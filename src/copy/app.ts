@@ -19,7 +19,7 @@ export const errorCopy = {
 
 export const ledgerQueryErrorCopy = {
   emptyDescription: "无法加载当前页面，请检查网络后重试。",
-  description: "数据刷新失败，当前显示的内容可能不是最新的。",
+  description: "刷新失败，内容可能不是最新的。",
   retry: "重试",
 };
 

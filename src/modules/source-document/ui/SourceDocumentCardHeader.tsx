@@ -62,6 +62,21 @@ function getProcessingStatus(status: SourceDocumentProcessingStatus | null) {
   return null;
 }
 
+/**
+ * Where the card surface puts its selection-mode expand control so it lands on
+ * this header's chevron column. The surface positions against the card's outer
+ * edge, so each offset adds back the card's 1px border, and centres its 44px
+ * button on the 36px chevron (4px in from either side).
+ *
+ * With the menu, the chevron's right edge is 56px in at both sizes: `pr-2` +
+ * 36px menu + `ml-1` + `gap-2` on a phone, `pr-3` + 32px + 4px + 8px from `sm`.
+ * Without it, the chevron ends the row, one `pr-2` / `pr-3` in.
+ */
+export const SELECTION_EXPAND_POSITION = {
+  withMenu: "right-[calc(3.25rem+1px)]",
+  withoutMenu: "right-[calc(0.25rem+1px)] sm:right-[calc(0.5rem+1px)]",
+} as const;
+
 export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
   sourceDocument,
   ledgerEntries,
@@ -116,6 +131,8 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
       // The title leads, then what the bill is in, then its total; the chevron
       // and the menu close the row. Selection is the card's outline, so nothing
       // takes a control's place and the title never shifts entering it.
+      // `SELECTION_EXPAND_POSITION` below is measured off this padding and the
+      // menu's size; change them together.
       className="flex h-[calc(var(--selectable-card-header-height,56px)-2px)] items-center gap-1 py-2 pl-1 pr-2 sm:pl-2 sm:pr-3"
     >
       <button
@@ -147,7 +164,11 @@ export const SourceDocumentCardHeader = memo(function SourceDocumentCardHeader({
             <SourceDocumentCardTotal entries={ledgerEntries} mainCurrency={mainCurrency} />
           </div>
         )}
-        {hasExpandableContent && !selectionMode ? (
+        {hasExpandableContent && selectionMode ? (
+          // The surface draws the live control on this column while selecting;
+          // this keeps the room so the total stays where it was.
+          <span aria-hidden="true" className="h-9 w-9 shrink-0" />
+        ) : hasExpandableContent ? (
           <button
             type="button"
             onClick={onToggleExpanded}

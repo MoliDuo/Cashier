@@ -53,9 +53,7 @@ describe("SourceDocumentDetailStatusPanels", () => {
 
     expect(screen.getByText("无法解析")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "AI 未能从这张账单中解析出可记账的支出。可以换一张更清晰的图片，或补充文字说明后重新处理。"
-      )
+      screen.getByText("没能识别出支出。换张更清晰的图片，或补充文字后重试。")
     ).toBeInTheDocument();
   });
 
@@ -68,6 +66,6 @@ describe("SourceDocumentDetailStatusPanels", () => {
     });
 
     expect(screen.getByText("存储错误")).toBeInTheDocument();
-    expect(screen.getByText("保存数据时发生存储错误。请重试。")).toBeInTheDocument();
+    expect(screen.getByText("保存数据时出错。")).toBeInTheDocument();
   });
 });

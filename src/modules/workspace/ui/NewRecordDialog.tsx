@@ -100,7 +100,7 @@ export function NewRecordDialog({
           if (isSubmitting) event.preventDefault();
         }}
       >
-        <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
+        <DialogHeader className="shrink-0 border-b px-12 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <DialogTitle>{ledgerPageCopy.newRecord}</DialogTitle>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 sm:flex-none sm:px-6 sm:pt-6">

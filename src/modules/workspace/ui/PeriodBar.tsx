@@ -60,7 +60,7 @@ export function PeriodBar({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className={TOOLBAR_ICON_BUTTON_CLASS}
+          className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
           disabled={disabled}
           onClick={() => onChange(stepPeriod(period, -1))}
           aria-label={periodBarCopy.previous}
@@ -86,7 +86,7 @@ export function PeriodBar({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className={TOOLBAR_ICON_BUTTON_CLASS}
+          className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
           disabled={disabled || !canGoNext}
           onClick={() => onChange(stepPeriod(period, 1))}
           aria-label={periodBarCopy.next}
@@ -157,7 +157,7 @@ function PeriodDialog({
                   className={cn(
                     textRoleClassName(
                       "bodyStrong",
-                      "min-h-9 flex-1 rounded-md px-2 transition-colors duration-[var(--motion-feedback)]"
+                      "min-h-9 flex-1 whitespace-nowrap rounded-md px-1 transition-colors duration-[var(--motion-feedback)] sm:px-2"
                     ),
                     active
                       ? "bg-surface text-primary shadow-sm"
@@ -171,25 +171,27 @@ function PeriodDialog({
           </div>
           {custom ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              {/* Side by side the two dates get about 130px each on a phone,
+                  which cuts the date short, so they stack there. */}
+              <div className="grid gap-2 sm:flex sm:items-center">
                 <DateFilter
                   value={from}
                   onChange={(date) => date != null && setFrom(formatDateTimeForApi(date))}
                   size="sm"
-                  className="h-9 flex-1"
+                  className="h-9 w-full sm:flex-1"
                   showClear={false}
                   showClearShortcut={false}
                   ariaLabel={periodBarCopy.from}
                   {...(timeZone != null ? { timeZone } : {})}
                 />
-                <span aria-hidden="true" className="text-muted-foreground">
+                <span aria-hidden="true" className="hidden text-muted-foreground sm:inline">
                   –
                 </span>
                 <DateFilter
                   value={to}
                   onChange={(date) => date != null && setTo(formatDateTimeForApi(date))}
                   size="sm"
-                  className="h-9 flex-1"
+                  className="h-9 w-full sm:flex-1"
                   showClear={false}
                   showClearShortcut={false}
                   ariaLabel={periodBarCopy.to}

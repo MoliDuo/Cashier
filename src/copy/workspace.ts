@@ -5,10 +5,10 @@ export const detailsTabCopy = {
   noMore: "没有更多了",
   batchUpdated: (v: { count: string | number }) => `已更新 ${v.count} 项明细`,
   batchDeleted: (v: { count: string | number }) => `已删除 ${v.count} 项明细`,
-  batchUnresolved: (v: { count: string | number }) => `${v.count} 项未能修改，已保留选中状态`,
+  batchUnresolved: (v: { count: string | number }) => `${v.count} 项未修改，仍保持选中`,
   deleteSelectedTitle: "删除所选明细",
   deleteSelectedDescription: (v: { count: string | number }) =>
-    `确定删除所选 ${v.count} 项明细吗？此操作无法撤销。`,
+    `将删除 ${v.count} 项明细，无法撤销。`,
 };
 
 export const batchActionsCopy = {
@@ -18,25 +18,25 @@ export const batchActionsCopy = {
   manualCategory: "设置分类",
   manualCategoryShort: "分类",
   categoryPickDescription: (v: { count: string | number }) =>
-    `已选 ${v.count} 条明细：选择一个分类直接指定，选择多个分类由 AI 逐条判断。`,
+    `已选 ${v.count} 条。选一个分类直接设置，选多个由 AI 逐条判断。`,
   categorySelectionRequired: "请选择一个或多个分类",
   categoryPickAssign: (v: { count: string | number; name: string | number }) =>
     `将 ${v.count} 条明细指定为「${v.name}」`,
   categoryPickClear: (v: { count: string | number }) => `将清空 ${v.count} 条明细的分类`,
   categoryPickAi: (v: { entryCount: string | number; categoryCount: string | number }) =>
-    `将把 ${v.entryCount} 条明细分别归入已选的 ${v.categoryCount} 个分类之一。`,
+    `AI 将把 ${v.entryCount} 条明细归入这 ${v.categoryCount} 个分类。`,
   aiCategoryRunning: "正在归类，完成后会通知你",
   aiCategoryDone: (v: {
     applied: string | number;
     confirmed: string | number;
     issues: string | number;
-  }) => `已更新 ${v.applied} 条，${v.confirmed} 条已符合目标分类，${v.issues} 条需要检查`,
+  }) => `已更新 ${v.applied} 条，${v.confirmed} 条无需改动，${v.issues} 条待检查`,
   aiCategoryFailed: "归类未完成，请重试。",
-  aiCategoryBusy: "此账本已有一个归类任务在进行中。",
+  aiCategoryBusy: "已有归类任务在进行。",
   uncategorized: "未分类",
   setCurrency: "修改货币",
   setCurrencyShort: "货币",
-  loadedScope: "仅作用于当前已加载并已选中的项目。",
+  loadedScope: "仅限已加载的所选项。",
   setDate: "修改日期",
   setDateShort: "日期",
   split: "拆分",
@@ -50,22 +50,20 @@ export const batchActionsCopy = {
     entries: string | number;
     scope: string | number;
   }) => `将影响 ${v.documents} 张账单和 ${v.entries} 条明细。${v.scope}`,
-  dateImpactFailed: "无法计算受影响的账单和明细，请重试后再继续。",
+  dateImpactFailed: "无法预估影响范围，请重试。",
   retryImpact: "重试预览",
   deleted: (v: { count: string | number }) => `已删除 ${v.count} 张账单`,
   retried: (v: { count: string | number }) => `已重新处理 ${v.count} 张账单`,
   partialResult: (v: { succeeded: string | number; failed: string | number }) =>
     `成功 ${v.succeeded} 项，失败 ${v.failed} 项`,
-  loadedOnly: "仅选中已加载的部分",
   deleteTitleDocuments: "删除所选账单",
   deleteDescriptionDocuments: (v: { count: string | number; scope: string | number }) =>
-    `确定删除所选 ${v.count} 张账单吗？账单里的明细会一起删除。${v.scope} 此操作无法撤销。`,
-  selectAllLoadedCount: (v: { loaded: string | number }) => `全选已加载的 ${v.loaded} 条`,
-  selectAllItemCount: (v: { count: string | number }) => `全选 ${v.count} 项`,
-  selectedItemCount: (v: { selected: string | number }) => `已选 ${v.selected} 项`,
-  selectedLoadedCount: (v: { selected: string | number; loaded: string | number }) =>
-    `已选 ${v.selected} / 已加载 ${v.loaded} 条`,
-  unloadedExcluded: "尚未加载的明细不在本次选择中",
+    `将删除 ${v.count} 张账单及其明细，无法撤销。${v.scope}`,
+  selectAll: "全选",
+  selectedOfTotal: (v: { selected: string | number; total: string | number }) =>
+    `已选 ${v.selected} / ${v.total}`,
+  selectedOfLoaded: (v: { selected: string | number; loaded: string | number }) =>
+    `已选 ${v.selected} / 已加载 ${v.loaded}`,
   batchLimit: (v: { actions: string | number }) => `${v.actions}每次最多处理 100 条。`,
   categoryBatchUnlimited: "分类可处理当前全部选择。",
   batchLimitDate: "日期",
@@ -77,8 +75,7 @@ export const batchActionsCopy = {
   categorySelectAllCandidates: "选择全部分类",
   categoryClearCandidates: "清除候选选择",
   categoryClearChoice: "清空分类",
-  categoryAiStrictDescription:
-    "结合明细信息和原账单图片判断；成功部分会先保存，失败部分可单独重试。",
+  categoryAiStrictDescription: "结合明细和原图判断；成功的先保存，失败的可重试。",
   categorySelectionTooLarge: (v: { max: string | number }) =>
     `一次最多归类 ${v.max} 条，请缩小选择范围。`,
   categoryJobPending: "已创建，等待处理",
@@ -89,16 +86,16 @@ export const batchActionsCopy = {
   }) => `已处理 ${v.processed}/${v.total}；正在处理 ${v.active} 张账单`,
   categoryJobRetrying: (v: { count: string | number; seconds: string | number }) =>
     `${v.count} 张账单将在 ${v.seconds} 秒后重试`,
-  categoryJobReadFailed: "暂时无法获取进度，后台任务不一定失败",
+  categoryJobReadFailed: "暂时无法获取进度，任务可能仍在进行",
   categoryJobSucceeded: (v: { applied: string | number; confirmed: string | number }) =>
-    `已更新 ${v.applied} 条，${v.confirmed} 条已符合目标分类`,
+    `已更新 ${v.applied} 条，${v.confirmed} 条无需改动`,
   categoryJobPartial: "已完成部分分类，仍有失败或冲突",
   categoryJobFailed: "分类失败，已保存本次选择",
   categoryJobCancelled: "已停止；已完成结果保留",
   categoryRetryFailed: "重试失败部分",
   categoryRetryLatest: "按最新内容重新分类",
   categoryStopDescription: "停止后，已完成的分类会保留。",
-  categoryEvidenceIncomplete: "部分原图无法读取，本次使用了其余资料",
+  categoryEvidenceIncomplete: "部分原图无法读取，已用其余资料",
   categoryRefreshStatus: "刷新状态",
   categoryViewResults: "查看结果",
   categoryStop: "停止",
@@ -151,6 +148,6 @@ export const ledgerEntriesTabCopy = {
   loadMoreFailed: "加载更多失败，重试",
   noMore: "没有更多了",
   deleteConfirmTitle: "确认删除",
-  deleteConfirmDesc: "确定要删除这张账单吗？账单里的明细会一起删除，此操作无法撤销。",
+  deleteConfirmDesc: "将删除这张账单及其明细，无法撤销。",
   loadingMore: "加载更多…",
 };

@@ -12,11 +12,6 @@ import { batchActionsCopy } from "@/copy/workspace";
 export interface LedgerEntriesBatchActionToolbarProps {
   selectedCount: number;
   loadedCount?: number;
-  /**
-   * Every item is on screen — a record's own entries — so the counts speak of
-   * items, not of what has loaded so far.
-   */
-  wholeList?: boolean;
   isAllSelected: boolean;
   hasMoreData?: boolean;
   onSelectAll: () => void;
@@ -58,14 +53,13 @@ export interface LedgerEntriesBatchActionToolbarProps {
  * stream and details tabs put it inside their toolbar box, and the
  * source-document detail modal puts it in the entries card's header row.
  *
- * The band prints no number. Which rows are in is already on the rows — every
- * selected card draws its own outline — and the box's three states say the rest:
- * empty for none, a mixed mark for some, a tick for all. What is left worth
- * saying is what the control does, so the box carries the words and flips from
- * `selectAll` to `deselectAll` once everything loaded is in.
+ * The band says one number, the count beside the select-all box. Which rows
+ * are in is already on the rows — every selected card draws its own outline —
+ * and the box's three states say the rest: empty for none, a mixed mark for
+ * some, a tick for all.
  *
- * The control and the actions share one row, so the band reads as a single bar
- * next to whatever entered selection mode; only a narrow viewport wraps them.
+ * The control and the count share the first row and the actions take the
+ * second, so a phone reads the band as two lines however many actions there are.
  *
  * It renders for as long as selection mode is on, including with nothing
  * selected — otherwise the empty state has no way to select all, and the rows
@@ -74,7 +68,6 @@ export interface LedgerEntriesBatchActionToolbarProps {
 export function LedgerEntriesBatchActionToolbar({
   selectedCount,
   loadedCount = selectedCount,
-  wholeList = false,
   isAllSelected,
   hasMoreData = false,
   onSelectAll,
@@ -188,7 +181,6 @@ export function LedgerEntriesBatchActionToolbar({
       <SelectionBar
         selectedCount={selectedCount}
         loadedCount={loadedCount}
-        wholeList={wholeList}
         isAllSelected={isAllSelected}
         hasMoreData={hasMoreData}
         disabled={isProcessing}

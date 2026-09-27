@@ -36,7 +36,9 @@ export function BatchActionButton({
       size="sm"
       aria-busy={loading || undefined}
       disabled={disabled || loading}
-      className={cn(TOOLBAR_CONTROL_CLASS, className)}
+      // A phone row has to fit four actions beside the back button at 360px;
+      // the toolbar tier's padding would push the fourth onto its own line.
+      className={cn(TOOLBAR_CONTROL_CLASS, "gap-1 px-2 sm:gap-1.5 sm:px-2.5", className)}
       {...props}
     >
       {loading ? (

@@ -144,8 +144,10 @@ export function ServiceCredentialSection({
       ) : (
         <ul className="divide-y divide-border rounded-[var(--radius)] border border-border">
           {credentials.map((credential) => (
-            <li key={credential.id} className="flex items-center gap-3 p-3">
-              <div className="min-w-0 flex-1">
+            // On a phone the book picker drops under the key, which would
+            // otherwise leave the name and token about 60px.
+            <li key={credential.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+              <div className="w-full min-w-0 sm:w-auto sm:flex-1">
                 <span className={textRoleClassName("bodyStrong", "block truncate")}>
                   {credential.name}
                 </span>
@@ -161,7 +163,7 @@ export function ServiceCredentialSection({
                   })}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex w-full items-center gap-1 sm:w-auto sm:shrink-0">
                 {/* The picker names its own book, so the row states it once; a key
                     whose book is gone still names itself as archived here. */}
                 <Select
@@ -170,7 +172,7 @@ export function ServiceCredentialSection({
                   disabled={isCreating || isDeleting}
                 >
                   <SelectTrigger
-                    className="max-w-40"
+                    className="min-w-0 flex-1 sm:max-w-40 sm:flex-none"
                     aria-label={serviceCredentialsCopy.changeBook({ name: credential.name })}
                   >
                     <SelectValue>{bookName(credential.bookId)}</SelectValue>

@@ -18,7 +18,9 @@ export interface SelectableCardSurfaceProps {
   /**
    * When set, an expand/collapse control is rendered above the selection
    * overlay while in selection mode so cards with an expandable body keep
-   * their chevron interactive during batch selection.
+   * their chevron interactive during batch selection. `positionClassName`
+   * places it on the column where the card's own header draws its chevron;
+   * the header knows that column, so it is the card's to say.
    */
   expandable?:
     | {
@@ -26,19 +28,11 @@ export interface SelectableCardSurfaceProps {
         onToggleExpanded: () => void;
         expandLabel: string;
         contentId?: string;
+        positionClassName: string;
       }
     | undefined;
   children: ReactNode;
 }
-
-/**
- * Where the selection-mode expand control has to sit to land on the same pixel
- * column as the header's own chevron. The header insets from its content box,
- * which starts inside the card's 1px border; the overlay is positioned against
- * the card's outer edge, so it has to add that pixel back — without it the
- * arrow steps 1px sideways the moment selection mode starts.
- */
-const EXPAND_OVERLAY_INSET = "left-[calc(0.25rem+1px)] sm:left-[calc(0.5rem+1px)]";
 
 export const SelectableCardSurface = memo(function SelectableCardSurface({
   selectionMode,
@@ -94,7 +88,7 @@ export const SelectableCardSurface = memo(function SelectableCardSurface({
           onClick={expandable.onToggleExpanded}
           className={cn(
             "absolute top-[calc(var(--selectable-card-header-height)/2)] z-[1] flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color] duration-[var(--motion-feedback)] hover:bg-surface2",
-            EXPAND_OVERLAY_INSET
+            expandable.positionClassName
           )}
         >
           <ChevronDown

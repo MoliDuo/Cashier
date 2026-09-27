@@ -55,7 +55,7 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   await expect(status).toBeVisible();
   await openTab(page, "明细");
   await expect(status).toBeVisible();
-  await expect(status).toContainText(/已更新 1 条，0 条已符合目标分类/, { timeout: 20_000 });
+  await expect(status).toContainText(/已更新 1 条，0 条无需改动/, { timeout: 20_000 });
 
   await status.getByRole("button", { name: "查看结果", exact: true }).click();
   const results = page.getByRole("dialog");

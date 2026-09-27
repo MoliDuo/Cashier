@@ -118,7 +118,7 @@ export function DetailsTab({
           size="icon"
           onClick={tab.toggleSelectionMode}
           disabled={tab.isPending}
-          className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
+          className={cn("shrink-0 self-start", TOOLBAR_ICON_BUTTON_CLASS)}
           aria-label={tab.isSelectionMode ? detailsTabCopy.cancelSelect : detailsTabCopy.select}
         >
           {tab.isSelectionMode ? (
@@ -130,6 +130,9 @@ export function DetailsTab({
         {!tab.isSelectionMode ? (
           <>
             <PeriodBar
+              // On a phone the period takes the row and truncates, so 筛选 stays beside
+              // it instead of wrapping under a long week or range label.
+              className="min-w-0 flex-1 sm:flex-none"
               period={period}
               today={today}
               onChange={onPeriodChange}

@@ -85,7 +85,7 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
                   <p className={textRoleClassName("bodyStrong", "truncate")}>
                     {ledgerEntry.itemName}
                   </p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex min-w-0 items-center gap-1.5 mt-0.5">
                     {ledgerEntry.category && (
                       <div
                         className={textRoleClassName(
@@ -93,7 +93,7 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
                           "flex items-center gap-1.5 min-w-0 flex-1"
                         )}
                       >
-                        <span className="shrink-0">{ledgerEntry.category.name}</span>
+                        <span className="min-w-0 truncate">{ledgerEntry.category.name}</span>
                         {ledgerEntry.description != null && ledgerEntry.description !== "" && (
                           <span className="hidden sm:contents">
                             <span className="text-muted-foreground/60 ml-0.5 shrink-0">·</span>
@@ -115,6 +115,7 @@ export const LedgerEntryCard = memo(function LedgerEntryCard({
                 date={ledgerEntry.sourceDocument?.documentDate ?? ledgerEntry.createdAt}
                 persistedConvertedAmount={ledgerEntry.convertedAmount}
                 variant="item"
+                className="shrink-0"
               />
             </div>
           </div>

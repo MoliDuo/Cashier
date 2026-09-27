@@ -223,7 +223,7 @@ export function CalculatorInput({
             aria-invalid={inputError !== null}
             aria-describedby={inputError === null ? undefined : "calculator-input-error"}
             className={cn(
-              "w-32 border-0 bg-transparent p-0 text-center tabular-nums shadow-none",
+              "w-28 border-0 bg-transparent p-0 text-center tabular-nums shadow-none sm:w-32",
               displayClassName
             )}
           />

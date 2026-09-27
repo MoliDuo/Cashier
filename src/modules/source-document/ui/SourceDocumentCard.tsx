@@ -8,7 +8,7 @@ import { type SourceDocumentProcessingStatus } from "@/modules/source-document/c
 import type { SupportedSourceDocumentAction } from "@/modules/source-document/lifecycle";
 import { EntryCardShell, type EntryCardTone } from "@/components/entry-card-shell";
 import { SelectableCardSurface } from "@/components/selectable-card-surface";
-import { SourceDocumentCardHeader } from "./SourceDocumentCardHeader";
+import { SELECTION_EXPAND_POSITION, SourceDocumentCardHeader } from "./SourceDocumentCardHeader";
 import { sortSourceDocumentEntries } from "./source-document-card.utils";
 import { SourceDocumentCardEntries } from "./SourceDocumentCardEntries";
 import { ProcessingSweep } from "./processing-sweep";
@@ -112,6 +112,9 @@ function SourceDocumentCardBody({
                 ? sourceDocumentCardCopy.collapse
                 : sourceDocumentCardCopy.expand,
               contentId,
+              positionClassName: readOnly
+                ? SELECTION_EXPAND_POSITION.withoutMenu
+                : SELECTION_EXPAND_POSITION.withMenu,
             }
           : undefined
       }

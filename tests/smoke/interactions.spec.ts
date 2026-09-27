@@ -20,6 +20,11 @@ test("selection, instant edits and one-tap split navigation", async ({
   await expect(initialCard).toBeVisible();
   const id = await initialCard.getAttribute("data-source-document-id");
   const card = page.locator(`[data-source-document-id="${id}"]`);
+  const title = card.getByRole("button", { name, exact: true });
+  // The header's total comes before the entry rows, which repeat the amount.
+  const total = card.getByText(/12\.34/).first();
+  const chevronBefore = await card.getByRole("button", { name: "折叠", exact: true }).boundingBox();
+  const totalBefore = await total.boundingBox();
   await activate(page.getByRole("button", { name: "选择", exact: true }));
   const surface = page.locator('[data-selection-mode="true"]').filter({ has: card });
   const expand = surface.getByRole("button", { name: "折叠", exact: true });
@@ -27,6 +32,13 @@ test("selection, instant edits and one-tap split navigation", async ({
   const expandBox = await expand.boundingBox();
   expect(expandBox!.width + 0.001).toBeGreaterThanOrEqual(44);
   expect(expandBox!.height + 0.001).toBeGreaterThanOrEqual(44);
+  // Selecting keeps the chevron where it was, clear of the title, and the
+  // total does not move to fill its place.
+  const centre = (box: { x: number; width: number }) => box.x + box.width / 2;
+  expect(Math.abs(centre(expandBox!) - centre(chevronBefore!))).toBeLessThanOrEqual(2);
+  const titleText = await title.locator("span span").boundingBox();
+  expect(titleText!.x + titleText!.width).toBeLessThanOrEqual(expandBox!.x);
+  expect(Math.abs((await total.boundingBox())!.x - totalBefore!.x)).toBeLessThanOrEqual(1);
   await activate(surface.getByRole("checkbox"));
   await activate(expand);
   await expect(surface.getByRole("checkbox")).toBeChecked();
@@ -135,4 +147,21 @@ test("selection, instant edits and one-tap split navigation", async ({
   await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page).not.toHaveURL(/detail=/);
+});
+
+test("the period choices keep one line each at 360px", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone width only");
+  await page.setViewportSize({ width: 360, height: 780 });
+  await signIn(page);
+  await page
+    .getByRole("button", { name: /^区间：/ })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog", { name: "选择区间" });
+  // One line of 14px text sits inside the 36px control; a label that breaks
+  // onto a second line makes its button taller than that.
+  for (const label of ["周", "月", "年", "全部", "自定义"]) {
+    const box = await dialog.getByRole("button", { name: label, exact: true }).boundingBox();
+    expect(box!.height).toBeLessThanOrEqual(36.5);
+  }
 });

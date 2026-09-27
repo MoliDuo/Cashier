@@ -26,7 +26,9 @@ export function EntriesToolbarShell({
     >
       {children}
       {totalLabel != null && totalLabel !== "" ? (
-        <div className="ml-auto flex min-w-0 items-center whitespace-nowrap">
+        // A phone gives the total a row of its own, so the period label beside
+        // the filter keeps its room instead of being cut to fit the total.
+        <div className="flex min-w-0 basis-full items-center justify-end whitespace-nowrap sm:ml-auto sm:basis-auto">
           <AmountText variant="summary">{totalLabel}</AmountText>
         </div>
       ) : null}

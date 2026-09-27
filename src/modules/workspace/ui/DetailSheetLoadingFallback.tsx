@@ -18,7 +18,7 @@ export function DetailSheetLoadingFallback() {
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{commonCopy.loading}</DialogTitle>
-        <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-5">
+        <DialogHeader className="shrink-0 border-b px-12 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:py-3">
           <Skeleton className="h-5 w-40" />
         </DialogHeader>
         <div className="flex-1 space-y-3 p-3 sm:p-4" role="status" aria-busy="true">

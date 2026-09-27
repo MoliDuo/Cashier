@@ -39,7 +39,7 @@ export function SourceDocumentEntriesHeader({
           variant="ghost"
           size="icon"
           onClick={onToggleSelectionMode}
-          className="size-8 shrink-0"
+          className="size-8 shrink-0 self-start"
           aria-label={toggleLabel}
           title={toggleLabel}
         >
@@ -51,7 +51,7 @@ export function SourceDocumentEntriesHeader({
         </Button>
       ) : null}
       {selectionToolbar != null ? (
-        <div className="flex min-w-0 flex-1 items-center">{selectionToolbar}</div>
+        <div className="min-w-0 flex-1">{selectionToolbar}</div>
       ) : (
         <h3 className={textRoleClassName("bodyStrong", "min-w-0 flex-1 pl-1")}>
           {sourceDocumentDetailCopy.entriesTab}

@@ -44,7 +44,7 @@ export function ProcessingStatus({ status, label, className }: ProcessingStatusP
       ) : (
         <span
           className={cn(
-            textRoleClassName("meta", "max-w-32 truncate font-medium sm:max-w-48"),
+            textRoleClassName("meta", "max-w-24 truncate font-medium sm:max-w-48"),
             isFailure && "text-danger",
             status === "processing" && "text-primary",
             status === "cancelled" && "text-muted-foreground"

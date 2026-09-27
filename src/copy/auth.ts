@@ -9,7 +9,7 @@ export const authCopy = {
   reauthRequiredNotice: "请重新登录以继续此操作。",
   credentialsChangedNotice: "登录凭据已更新，请重新登录。",
   noAccountTitle: "还没有账户",
-  noAccountDesc: "在服务器上依次运行下面两条命令：先创建账户，再打开打印出的链接添加通行密钥。",
+  noAccountDesc: "在服务器上依次运行以下命令，再打开输出的链接添加通行密钥。",
   verifyCode: "验证验证码",
   verifyCodeDesc: (v: { email: string | number }) => `输入发送至 ${v.email} 的 6 位验证码`,
   sendVerificationCode: "发送验证码",
@@ -40,18 +40,18 @@ export const authCopy = {
   codeExpiredMessage: "验证码已过期，请重新获取。",
   errorConfigurationDesc: "服务器配置存在问题，请联系管理员。",
   devSignIn: "以开发身份进入",
-  devSignInDesc: "仅本地开发使用。无需邮件验证码，直接打开单账本工作台。",
+  devSignInDesc: "仅限本地开发，免验证码直接进入。",
   devSignInFailed: "开发会话启动失败",
   otpDigitLabel: (v: { index: string | number; length: string | number }) =>
     `第 ${v.index} 位，共 ${v.length} 位`,
   passkeySignIn: "使用通行密钥登录",
-  passkeyFailed: "无法用这个通行密钥登录，请重试或改用邮箱验证码。",
+  passkeyFailed: "通行密钥登录失败，请重试或改用邮箱验证码。",
   orDivider: "或",
 };
 
 export const enrollCopy = {
   title: "添加通行密钥",
-  description: "用这台设备的指纹、面容或设备密码创建通行密钥，之后用它登录。链接只能使用一次。",
+  description: "用本机的指纹、面容或密码创建通行密钥，链接仅可用一次。",
   submit: "创建通行密钥",
   passkeyName: "我的设备",
   unsupported: "当前浏览器不支持通行密钥，请换一个浏览器打开这个链接。",
@@ -62,7 +62,6 @@ export const enrollCopy = {
   rateLimitUnavailable: "登录保护服务暂时不可用，请稍后重试。",
   unexpected: "发生意外错误",
   invalidLinkTitle: "链接不可用",
-  invalidLinkDesc:
-    "这个链接已使用、已过期或不存在。请在服务器上重新运行 npm run account:enroll 获取新链接。",
+  invalidLinkDesc: "链接已失效，请在服务器上重新运行 npm run account:enroll。",
   backToLogin: "返回登录",
 };

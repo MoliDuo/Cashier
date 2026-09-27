@@ -94,7 +94,7 @@ export function CategoryAssignmentResultDialog({
         aria-describedby={undefined}
         className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-2xl sm:rounded-lg"
       >
-        <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
+        <DialogHeader className="shrink-0 border-b px-12 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <DialogTitle>{batchActionsCopy.categoryResultsTitle}</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">

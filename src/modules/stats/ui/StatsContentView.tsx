@@ -101,7 +101,7 @@ export function StatsContentView({
         size="sm"
         onClick={() => onChartViewChange("heatmap")}
         aria-pressed={chartView === "heatmap"}
-        className="h-7 px-2"
+        className="h-9 px-2.5 sm:h-7 sm:px-2"
       >
         <Grid3X3 aria-hidden="true" className="mr-1 h-4 w-4" />
         {statsTabCopy.heatmap}
@@ -111,7 +111,7 @@ export function StatsContentView({
         size="sm"
         onClick={() => onChartViewChange("trend")}
         aria-pressed={chartView === "trend"}
-        className="h-7 px-2"
+        className="h-9 px-2.5 sm:h-7 sm:px-2"
       >
         <BarChart3 aria-hidden="true" className="mr-1 h-4 w-4" />
         {statsTabCopy.trend}

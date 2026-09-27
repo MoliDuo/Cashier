@@ -180,7 +180,6 @@ function SourceDocumentDetailSheet({
     <LedgerEntriesBatchActionToolbar
       selectedCount={selection.selectedIds.length}
       loadedCount={ledgerEntries.length}
-      wholeList
       isAllSelected={selection.isAllSelected}
       onSelectAll={() => selection.handleSelectAll(true)}
       onClearSelection={() => selection.handleSelectAll(false)}
@@ -275,7 +274,10 @@ function SourceDocumentDetailSheet({
                   onValueChange={detail.assignBook}
                   disabled={status.readOnly || detail.isAssigningBook}
                 >
-                  <SelectTrigger className="h-8 w-auto min-w-28" aria-label={commonCopy.book}>
+                  <SelectTrigger
+                    className="h-8 w-auto min-w-28 max-w-40"
+                    aria-label={commonCopy.book}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">

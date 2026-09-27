@@ -285,7 +285,7 @@ export function BookSettings({ initialBooks }: BookSettingsProps) {
                         className="h-8"
                       />
                     ) : (
-                      <span className={textRoleClassName("bodyStrong", "truncate")}>
+                      <span className={textRoleClassName("bodyStrong", "block truncate")}>
                         {book.name}
                       </span>
                     )}

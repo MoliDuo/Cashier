@@ -91,7 +91,7 @@ function EditRetryDialogContent({
           if (isSubmitting) event.preventDefault();
         }}
       >
-        <DialogHeader className="shrink-0 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
+        <DialogHeader className="shrink-0 border-b px-12 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <DialogTitle>{sourceDocumentEditRetryDialogCopy.title}</DialogTitle>
         </DialogHeader>
         <div

@@ -55,6 +55,7 @@ export function EntryFilterPanel({
       variant="outline"
       className={cn(
         TOOLBAR_CONTROL_CLASS,
+        "shrink-0",
         activeFilterCount > 0 && "border-primary/50 text-primary"
       )}
       onClick={() => handleOpenChange(true)}

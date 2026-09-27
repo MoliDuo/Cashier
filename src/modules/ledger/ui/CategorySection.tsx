@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowDown, ArrowUp, CircleSlash, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  CircleSlash,
+  MoreVertical,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import type {
   EntryCategory,
   EntryCategoryWithCount,
@@ -10,6 +18,13 @@ import { textRoleClassName } from "@/components/typography";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DraftNotice } from "@/components/ui/draft-notice";
 import { Input } from "@/components/ui/input";
 import { useCategoryManagementDraft } from "@/modules/ledger/hooks/useCategoryManagementDraft";
@@ -168,43 +183,48 @@ export function CategorySection({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  disabled={index === 0 || isSaving}
-                  onClick={() => move(index, -1)}
-                  aria-label={settingsCopy.moveCategoryUp({ name: category.name })}
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={index === displayedCategories.length - 1 || isSaving}
-                  onClick={() => move(index, 1)}
-                  aria-label={settingsCopy.moveCategoryDown({ name: category.name })}
-                >
-                  <ArrowDown className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
                   disabled={isSaving}
                   onClick={() => startEditing(category)}
                   aria-label={settingsCopy.editCategory({ name: category.name })}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-danger"
-                  disabled={isSaving}
-                  onClick={() => setDeleteTarget(category)}
-                  aria-label={settingsCopy.deleteCategory({ name: category.name })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {/* Editing stays on the row; the rarer moves and the delete share
+                    one menu, so a phone keeps room for the name. */}
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={isSaving}
+                      aria-label={settingsCopy.categoryMoreActions({ name: category.name })}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem disabled={index === 0} onSelect={() => move(index, -1)}>
+                      <ArrowUp className="mr-2 h-4 w-4" />
+                      {settingsCopy.moveCategoryUp}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={index === displayedCategories.length - 1}
+                      onSelect={() => move(index, 1)}
+                    >
+                      <ArrowDown className="mr-2 h-4 w-4" />
+                      {settingsCopy.moveCategoryDown}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-danger focus:text-danger"
+                      onSelect={() => setDeleteTarget(category)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {commonCopy.delete}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : null}
           </div>

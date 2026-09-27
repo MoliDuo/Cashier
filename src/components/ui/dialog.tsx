@@ -116,7 +116,14 @@ const DialogContent = React.forwardRef<
         >
           {children}
           {hideCloseButton ? null : (
-            <DialogPrimitive.Close className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground sm:right-4 sm:top-4 sm:size-8">
+            <DialogPrimitive.Close
+              className={cn(
+                "absolute right-2 top-2 flex size-11 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground sm:right-4 sm:top-4 sm:size-8",
+                // A full-screen sheet pads its header below the status bar, so
+                // the close control follows it down instead of sitting under it.
+                variant === "detail" && "top-[max(0.5rem,calc(env(safe-area-inset-top)-0.5rem))]"
+              )}
+            >
               <X className="h-4 w-4" />
               <span className="sr-only">{commonCopy.close}</span>
             </DialogPrimitive.Close>

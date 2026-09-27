@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { textRoleClassName } from "@/components/typography";
+import { cn } from "@/lib/utils";
 import { useLedgerTimeZone } from "@/lib/ledger-time-zone";
 import {
   type DateRangeType,
@@ -117,6 +118,8 @@ export function StatsChart({
   }
 
   // Calculate chart dimensions (chart area height)
+  // At most twelve month labels at any width; the year view steps by one.
+  const yearLabelStep = Math.max(1, Math.ceil(chartPoints.length / 12));
   const chartHeight = 130; // pixels, matches h-full minus padding
   const paddingTop = 10; // 10% top padding
   const paddingBottom = 10; // 10% bottom padding
@@ -161,7 +164,14 @@ export function StatsChart({
           style={{ top: `calc(1.5rem + ${chartHeight}px * ${averageOffset / 100})` }}
         >
           <div className="border-t border-dashed border-primary/50" />
-          <span className="absolute right-0 -top-4 rounded bg-surface px-1 text-micro text-primary">
+          <span
+            className={cn(
+              "absolute right-0 rounded bg-surface px-1 text-micro text-primary",
+              // Near the top the tag would sit on the scale badge; it goes under
+              // the line there.
+              averageOffset < 20 ? "top-0.5" : "-top-4"
+            )}
+          >
             {statsTabCopy.dailyAverageLine}
           </span>
         </div>
@@ -293,9 +303,18 @@ export function StatsChart({
               {/* Tooltip */}
               {isHovered && (
                 <div
-                  className={textRoleClassName(
-                    "meta",
-                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-popover text-popover-foreground rounded shadow-lg border whitespace-nowrap z-tooltip pointer-events-none"
+                  className={cn(
+                    textRoleClassName(
+                      "meta",
+                      "absolute bottom-full mb-2 px-2 py-1.5 bg-popover text-popover-foreground rounded shadow-lg border whitespace-nowrap z-tooltip pointer-events-none"
+                    ),
+                    // Centred over an end point it would hang past the card, where
+                    // the page clips it; the ends open inward instead.
+                    leftPercent < 25
+                      ? "left-0"
+                      : leftPercent > 75
+                        ? "right-0"
+                        : "left-1/2 -translate-x-1/2"
                   )}
                 >
                   <div className="font-medium">{displayDate}</div>
@@ -315,8 +334,14 @@ export function StatsChart({
         {chartPoints.map((p, i) => {
           // Label Filtering
           let showLabel = false;
-          if (rangeType === "week" || rangeType === "year") {
+          let wideOnly = false;
+          if (rangeType === "week") {
             showLabel = true;
+          } else if (rangeType === "year") {
+            // Twelve month labels touch on a phone, so it keeps every other
+            // one; a range of several years steps further at every width.
+            showLabel = i % yearLabelStep === 0;
+            wideOnly = (i / yearLabelStep) % 2 === 1;
           } else if (rangeType === "month") {
             // Show 1, 6, 11, 16, 21, 26, 31 (Every 5 days + last day?)
             if (i === 0 || i === chartPoints.length - 1 || i % 5 === 0) {
@@ -331,7 +356,10 @@ export function StatsChart({
           return (
             <div
               key={i}
-              className="absolute text-micro text-muted-foreground transform -translate-x-1/2 text-center w-8"
+              className={cn(
+                "absolute text-micro text-muted-foreground transform -translate-x-1/2 text-center w-8",
+                wideOnly && "hidden sm:block"
+              )}
               style={{ left: `${leftPos}%` }}
             >
               {p.label}

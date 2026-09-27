@@ -56,8 +56,8 @@ describe("LedgerEntriesToolbar", () => {
   it("shows selection controls instead of totals and filters while selecting", () => {
     render(<LedgerEntriesToolbar {...defaultProps} isSelectionMode={true} selectedCount={3} />);
 
-    expect(screen.getByText("全选已加载的 5 条")).toBeInTheDocument();
-    expect(screen.getByText("已选 3 / 已加载 5 条")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "全选" })).toBeInTheDocument();
+    expect(screen.getByText(/^已选 3 \/ (已加载 )?5$/)).toBeInTheDocument();
     expect(screen.queryByText(/已选择/)).not.toBeInTheDocument();
     expect(screen.getByTitle("取消")).toBeInTheDocument();
     expect(screen.queryByText("¥123.45")).not.toBeInTheDocument();

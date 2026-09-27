@@ -32,34 +32,27 @@ describe("LedgerEntriesBatchActionToolbar", () => {
   it("offers select all, and says so, before anything is selected", () => {
     const { props } = renderToolbar();
 
-    expect(screen.getByText("全选已加载的 0 条")).toBeInTheDocument();
-    const master = screen.getByRole("checkbox", { name: "全选已加载的 0 条" });
+    expect(screen.getByText("全选")).toBeInTheDocument();
+    const master = screen.getByRole("checkbox", { name: "全选" });
     expect(master).toBeEnabled();
 
     fireEvent.click(master);
     expect(props.onSelectAll).toHaveBeenCalledOnce();
   });
 
-  it("names what the control does rather than how many rows are in", () => {
-    renderToolbar({ selectedCount: 3 });
+  it("names what the control does and counts beside it", () => {
+    renderToolbar({ selectedCount: 2, loadedCount: 5 });
 
-    expect(screen.getByText("全选已加载的 3 条")).toBeInTheDocument();
-    expect(screen.getByText("已选 3 / 已加载 3 条")).toBeInTheDocument();
-  });
-
-  it("counts items, not what has loaded, on a list that is whole", () => {
-    renderToolbar({ selectedCount: 2, loadedCount: 5, wholeList: true });
-
-    expect(screen.getByRole("checkbox", { name: "全选 5 项" })).toBeInTheDocument();
-    expect(screen.getByText("已选 2 项")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "全选" })).toBeInTheDocument();
+    expect(screen.getByText("已选 2 / 5")).toBeInTheDocument();
     expect(screen.queryByText(/已加载/)).not.toBeInTheDocument();
   });
 
   it("flips the control's words once everything loaded is selected", () => {
     renderToolbar({ selectedCount: 3, isAllSelected: true });
 
-    expect(screen.getByText("取消全选")).toBeInTheDocument();
-    expect(screen.queryByText(/全选已加载/)).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "取消全选" })).toBeInTheDocument();
+    expect(screen.queryByText("全选")).not.toBeInTheDocument();
   });
 
   it("marks a partial selection as mixed", () => {
@@ -68,10 +61,10 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(screen.getByRole("checkbox")).toHaveAttribute("data-state", "indeterminate");
   });
 
-  it("keeps the loaded-scope note, without a number in it", () => {
+  it("counts against what has loaded while more pages exist", () => {
     renderToolbar({ selectedCount: 3, isAllSelected: true, hasMoreData: true });
 
-    expect(screen.getByText("尚未加载的明细不在本次选择中")).toBeInTheDocument();
+    expect(screen.getByText("已选 3 / 已加载 3")).toBeInTheDocument();
   });
 
   it("keeps the actions visible but unavailable with nothing selected", () => {
@@ -214,7 +207,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       />
     );
 
-    expect(screen.getByText(/将把 5 条明细分别归入已选的 2 个分类之一/)).toBeInTheDocument();
+    expect(screen.getByText(/AI 将把 5 条明细归入这 2 个分类/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI 分类 5 条明细" })).toBeEnabled();
 
     rerender(
@@ -224,7 +217,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
       />
     );
 
-    expect(screen.getByText(/将把 5 条明细分别归入已选的 13 个分类之一/)).toBeInTheDocument();
+    expect(screen.getByText(/AI 将把 5 条明细归入这 13 个分类/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI 分类 5 条明细" })).toBeEnabled();
   });
 

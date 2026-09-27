@@ -30,7 +30,7 @@ export function LedgerQueryErrorBanner({ onRetry, empty = false }: LedgerQueryEr
             )
       }
     >
-      <span aria-hidden className="size-3 rounded-full bg-danger" />
+      <span aria-hidden className="size-3 shrink-0 rounded-full bg-danger" />
       <span>{description}</span>
       <Button
         type="button"

@@ -129,7 +129,7 @@ export function LedgerEntriesToolbar({
         size="icon"
         onClick={onToggleSelectionMode}
         disabled={isProcessing}
-        className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
+        className={cn("shrink-0 self-start", TOOLBAR_ICON_BUTTON_CLASS)}
         aria-label={
           isSelectionMode ? ledgerEntriesTabCopy.cancelSelect : ledgerEntriesTabCopy.select
         }
@@ -161,6 +161,9 @@ export function LedgerEntriesToolbar({
       {!isSelectionMode && (
         <>
           <PeriodBar
+            // On a phone the period takes the row and truncates, so 筛选 stays beside
+            // it instead of wrapping under a long week or range label.
+            className="min-w-0 flex-1 sm:flex-none"
             period={period}
             today={today}
             onChange={onPeriodChange}
