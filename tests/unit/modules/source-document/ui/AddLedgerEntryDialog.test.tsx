@@ -51,4 +51,27 @@ describe("AddLedgerEntryDialog", () => {
     expect(nameInput).toHaveValue("");
     expect(amountInput).toHaveValue("");
   });
+
+  it("submits an optional note with the entry", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+
+    render(
+      <AddLedgerEntryDialog
+        open
+        categories={[]}
+        isSubmitting={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("名称"), { target: { value: "Lunch" } });
+    fireEvent.change(screen.getByLabelText("备注（可选）"), { target: { value: " 加蛋 " } });
+    fireEvent.change(screen.getByLabelText("金额"), { target: { value: "12.50" } });
+    fireEvent.click(screen.getByRole("button", { name: "添加明细" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "加蛋" }))
+    );
+  });
 });

@@ -45,5 +45,5 @@ export const calendarCopy = {
   heatmapLevel5: "很多",
   dateFormat: (v: { year: string | number; month: string | number }) => `${v.year}年${v.month}月`,
   productName: "商品名称",
-  notes: "备注",
+  addNote: "添加备注",
 };

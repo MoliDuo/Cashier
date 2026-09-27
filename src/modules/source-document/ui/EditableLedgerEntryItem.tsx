@@ -99,7 +99,11 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
     amount: pendingChanges?.amount ?? ledgerEntry.amount,
     currency: pendingChanges?.currency ?? ledgerEntry.currency,
     categoryId: pendingChanges?.categoryId ?? ledgerEntry.categoryId,
-    description: pendingChanges?.description ?? ledgerEntry.description,
+    // A cleared note is a pending null, which must not fall back to the saved one.
+    description:
+      pendingChanges?.description !== undefined
+        ? pendingChanges.description
+        : ledgerEntry.description,
   };
 
   // Only convert live while amount, currency, or the source-document date has
@@ -114,6 +118,7 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
     !hasPendingValueChanges && !dateHasPendingChange ? ledgerEntry.convertedAmount : null;
 
   const category = categories.find((c) => c.id === displayData.categoryId);
+  const hasDescription = displayData.description != null && displayData.description !== "";
   const amountDecimals = getCurrencyDecimals(displayData.currency ?? mainCurrency);
 
   const sortedCurrencies = (() => {
@@ -151,17 +156,19 @@ export const EditableLedgerEntryItem = memo(function EditableLedgerEntryItem({
           />
         </div>
 
-        {(displayData.description != null || category != null) && (
+        {(hasDescription || category != null || !readOnly) && (
           <div className={textRoleClassName("meta", "flex items-center gap-1 mt-0.5")}>
             {category != null && <span className="shrink-0">{category.name}</span>}
-            {displayData.description != null && displayData.description !== "" && (
+            {/* An editable row always offers the note, so one that was never
+                written, or was cleared, can still be added. */}
+            {(hasDescription || !readOnly) && (
               <>
-                <span className="text-muted-foreground/60">·</span>
+                {category != null && <span className="text-muted-foreground/60">·</span>}
                 <EditableField
                   value={displayData.description ?? ""}
                   onChange={(v) => handleChange("description", v !== "" ? v : null)}
-                  placeholder={calendarCopy.notes}
-                  displayClassName={textRoleClassName("provisional", "truncate")}
+                  placeholder={calendarCopy.addNote}
+                  displayClassName="truncate"
                   inputClassName="text-micro"
                   disabled={readOnly}
                 />

@@ -107,3 +107,31 @@ describe("EditableLedgerEntryItem currency control", () => {
     ).toBeTruthy();
   });
 });
+
+describe("EditableLedgerEntryItem note", () => {
+  it("offers a note on an editable row that has none", () => {
+    renderItem(false);
+
+    expect(screen.getByText("添加备注")).toBeInTheDocument();
+  });
+
+  it("hides the empty note on a read-only row", () => {
+    renderItem(true);
+
+    expect(screen.queryByText("添加备注")).not.toBeInTheDocument();
+  });
+
+  it("shows a cleared note as cleared rather than the saved one", () => {
+    render(
+      <EditableLedgerEntryItem
+        ledgerEntry={{ ...entry, description: "加蛋" }}
+        categories={[]}
+        originalEntryDate="2026-09-10"
+        pendingChanges={{ description: null }}
+      />
+    );
+
+    expect(screen.queryByText("加蛋")).not.toBeInTheDocument();
+    expect(screen.getByText("添加备注")).toBeInTheDocument();
+  });
+});

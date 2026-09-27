@@ -49,6 +49,7 @@ export function AddLedgerEntryDialog({
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [currency, setCurrency] = useState<string>(mainCurrency);
+  const [description, setDescription] = useState("");
 
   const numericAmount = parseFloat(amount);
   const canSubmit = itemName.trim() !== "" && Number.isFinite(numericAmount) && numericAmount > 0;
@@ -62,12 +63,14 @@ export function AddLedgerEntryDialog({
         amount: Math.round(numericAmount * 100) / 100,
         ...(categoryId !== "" ? { categoryId } : {}),
         ...(currency !== "" ? { currency } : {}),
+        ...(description.trim() !== "" ? { description: description.trim() } : {}),
       });
       if (!submitted) return;
       setItemName("");
       setAmount("");
       setCategoryId("");
       setCurrency(mainCurrency);
+      setDescription("");
       onOpenChange(false);
     } catch {
       // The parent mutation owns failure feedback.
@@ -106,6 +109,21 @@ export function AddLedgerEntryDialog({
               autoFocus
               placeholder={sourceDocumentDetailCopy.addEntryNamePlaceholder}
               onChange={(event) => setItemName(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="add-entry-description">
+              {sourceDocumentDetailCopy.addEntryDescription}
+            </Label>
+            <Input
+              id="add-entry-description"
+              name="description"
+              autoComplete="off"
+              value={description}
+              maxLength={500}
+              disabled={isSubmitting}
+              placeholder={sourceDocumentDetailCopy.addEntryDescriptionPlaceholder}
+              onChange={(event) => setDescription(event.target.value)}
             />
           </div>
           <div className="grid gap-2">

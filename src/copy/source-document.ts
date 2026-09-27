@@ -79,6 +79,8 @@ export const sourceDocumentDetailCopy = {
   addEntryTitle: "添加明细",
   addEntryName: "名称",
   addEntryNamePlaceholder: "明细名称",
+  addEntryDescription: "备注（可选）",
+  addEntryDescriptionPlaceholder: "补充说明",
   addEntryAmount: "金额",
   addEntryCategory: "类别",
   addEntryNoCategory: "未选择",
