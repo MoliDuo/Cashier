@@ -253,9 +253,9 @@ describe("projection write shape", () => {
       })),
     });
 
-    // No archive INSERT; two set-based UPDATEs, independent of row count.
+    // No archive INSERT; one set-based UPDATE, independent of row count.
     expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(0);
-    expect(await readStatementCounter(db, "ledger_entries_update")).toBe(2);
+    expect(await readStatementCounter(db, "ledger_entries_update")).toBe(1);
 
     // The document's entries: input order, retained ids and created_at intact.
     const activeRows = await db
@@ -288,6 +288,46 @@ describe("projection write shape", () => {
         .where(eq(ledgerSyncState.ledgerId, ledgerId))
     )[0]?.version;
     expect(Number(versionAfterReplace)).toBe(Number(versionAfterCreate) + 1);
+  });
+
+  it("leaves entries a save does not change as they were", async () => {
+    const db = getTestDb();
+    const created = await createManualDocument({
+      ledgerId,
+      title: "Manual",
+      entryDate: "2026-05-01",
+      entries: [
+        entry("Kept", { id: "44444444-4444-4444-8444-444444444444" }),
+        entry("Edited", { id: "55555555-5555-4555-8555-555555555555" }),
+      ],
+      bookId: await testBookId(db, ledgerId),
+    });
+    const staleUpdatedAt = new Date("2026-01-01T00:00:00.000Z");
+    await db
+      .update(ledgerEntries)
+      .set({ updatedAt: staleUpdatedAt })
+      .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId));
+
+    await saveSourceDocumentChanges({
+      ledgerId,
+      sourceDocumentId: created.sourceDocumentId,
+      expectedVersion: 1,
+      entries: [
+        {
+          ledgerEntryId: "55555555-5555-4555-8555-555555555555",
+          data: { itemName: "Edited again" },
+        },
+      ],
+    });
+
+    const rows = await db
+      .select({ itemName: ledgerEntries.itemName, updatedAt: ledgerEntries.updatedAt })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId))
+      .orderBy(ledgerEntries.position);
+    expect(rows[0]).toEqual({ itemName: "Kept", updatedAt: staleUpdatedAt });
+    expect(rows[1]?.itemName).toBe("Edited again");
+    expect(rows[1]?.updatedAt).not.toEqual(staleUpdatedAt);
   });
 
   it("reuses positions across repeated removals and additions without creating attempts", async () => {

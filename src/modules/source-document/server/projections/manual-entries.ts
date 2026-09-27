@@ -67,22 +67,6 @@ export async function replaceManualProjection(
 
   const now = new Date();
   const retainedIds = new Set(requestedIds);
-  const retainedEntries = previousEntries.filter((previous) => retainedIds.has(previous.id));
-  if (retainedEntries.length > 0) {
-    // Move the kept entries past every current position before reordering.
-    await tx.execute(sql`
-      UPDATE ledger_entries entry
-      SET position = positions.position + ${Math.max(input.entries.length, ...previousEntries.map((entry) => entry.position + 1))},
-          updated_at = ${now}
-      FROM (VALUES ${sql.join(
-        retainedEntries.map((previous, index) => sql`(${previous.id}::uuid, ${index}::integer)`),
-        sql`, `
-      )}) AS positions(id, position)
-      WHERE entry.id = positions.id
-        AND entry.ledger_id = ${input.ledgerId}
-    `);
-  }
-
   const removedIds = previousEntries
     .filter((previous) => !retainedIds.has(previous.id))
     .map((previous) => previous.id);
@@ -160,6 +144,10 @@ export async function replaceManualProjection(
       )}) AS updates(id, position, category_id, amount, currency, item_name, description)
       WHERE entry.id = updates.id
         AND entry.ledger_id = ${input.ledgerId}
+        AND (entry.position, entry.category_id, entry.amount, entry.currency,
+             entry.item_name, entry.description)
+          IS DISTINCT FROM (updates.position, updates.category_id, updates.amount,
+             updates.currency, updates.item_name, updates.description)
     `);
   }
 }
