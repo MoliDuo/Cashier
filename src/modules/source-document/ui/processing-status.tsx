@@ -12,11 +12,11 @@ interface ProcessingStatusProps {
 }
 
 /**
- * A card's state, spoken rather than printed. The card's own surface carries it
- * — see the tone on `EntryCardShell` — so this keeps the state reachable
- * instead of visible: a live region names it for assistive tech, and a failure
- * still shows the one word that says what went wrong, because a colour cannot
- * name a reason.
+ * A card's state. The card's surface carries its tone (see `EntryCardShell`),
+ * but a tone alone cannot say what it means, so every state that is not the
+ * normal one is also printed: 处理中 while the AI works, 已取消 for a stopped
+ * run, and the failure's own reason. A completed card needs no word; its state
+ * stays reachable to assistive tech through the live region.
  */
 export function ProcessingStatus({ status, label, className }: ProcessingStatusProps) {
   const stateLabel =
@@ -38,16 +38,21 @@ export function ProcessingStatus({ status, label, className }: ProcessingStatusP
       aria-live={isFailure ? "assertive" : "polite"}
       aria-atomic="true"
     >
-      {isFailure ? (
+      {status === "completed" ? (
+        <span className="sr-only">{displayLabel}</span>
+      ) : (
         <span
-          className="max-w-32 truncate text-xs font-medium text-danger sm:max-w-48"
+          className={cn(
+            "max-w-32 truncate text-xs font-medium sm:max-w-48",
+            isFailure && "text-danger",
+            status === "processing" && "text-primary",
+            status === "cancelled" && "text-muted-foreground"
+          )}
           data-testid="status-label"
           title={displayLabel}
         >
           {displayLabel}
         </span>
-      ) : (
-        <span className="sr-only">{displayLabel}</span>
       )}
     </div>
   );

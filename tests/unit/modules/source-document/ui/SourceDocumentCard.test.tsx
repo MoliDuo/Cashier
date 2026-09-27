@@ -327,10 +327,33 @@ describe("SourceDocumentCard interactions", () => {
         />
       );
       expect(screen.queryByTestId("source-document-processing-sweep")).not.toBeInTheDocument();
-      // No words either: the surface is the whole message.
-      expect(screen.queryByTestId("status-label")).not.toBeInTheDocument();
       unmountOther();
     }
+  });
+
+  it("prints every state but the normal one", () => {
+    const expected = { processing: "处理中", cancelled: "已取消" } as const;
+    for (const [status, label] of Object.entries(expected)) {
+      const { unmount } = render(
+        <SourceDocumentCard
+          sourceDocument={{
+            ...sourceDocument,
+            processingStatus: status as keyof typeof expected,
+          }}
+          ledgerEntries={[]}
+        />
+      );
+      expect(screen.getByTestId("status-label")).toHaveTextContent(label);
+      unmount();
+    }
+
+    render(
+      <SourceDocumentCard
+        sourceDocument={{ ...sourceDocument, processingStatus: "completed" }}
+        ledgerEntries={[]}
+      />
+    );
+    expect(screen.queryByTestId("status-label")).not.toBeInTheDocument();
   });
 
   it("still shows the total of a document that is being processed again", () => {
