@@ -135,9 +135,6 @@ export function DetailsTab({
             preferredCurrencies={ledger?.settings.currencies ?? []}
             showStatus={false}
             {...(timeZone != null ? { timeZone } : {})}
-            // Deliberately unsized, like the stream's: the panel does not grow
-            // past its trigger, so the toolbar's middle stays free for the
-            // centred refresh hint instead of being reserved by empty space.
           />
         ) : null}
       </EntriesToolbarShell>

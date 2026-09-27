@@ -135,7 +135,7 @@ function SourceDocumentDetailEditor({
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            <div className="flex-1 min-w-0 pr-8">
+            <div className="min-w-0 flex-1">
               <EditableField
                 value={editor.displayTitle}
                 onChange={(v) => editor.handleSourceDocChange({ title: v })}
