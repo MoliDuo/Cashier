@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import { BookSwitcher } from "./BookSwitcher";
-import { LIST_CONTROLS_ID } from "./EntriesToolbarShell";
+import { LIST_CONTROLS_ID } from "./ListControlsDrop";
 import { ledgerPageCopy } from "@/copy/app";
 
 interface LedgerTopBarProps {
@@ -26,9 +26,10 @@ interface LedgerTopBarProps {
 
 /**
  * The ledger's top bar. On 账目 and 统计 it holds the book switcher and the
- * gear (and, from md up, the tabs and 记一笔; below md, the list's summary
- * between them, which drops the list's controls down); on 设置 it is a back arrow and
- * the page's name, since the book being viewed has no bearing there.
+ * gear (and, from md up, the tabs and 记一笔; below md, the page's summary
+ * between them — 账目's list or 统计's figures — which drops that page's
+ * controls down); on 设置 it is a back arrow and the page's name, since the
+ * book being viewed has no bearing there.
  */
 export function LedgerTopBar({
   activeTab,

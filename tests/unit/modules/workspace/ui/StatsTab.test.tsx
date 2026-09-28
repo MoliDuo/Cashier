@@ -7,6 +7,7 @@ import type { Ledger } from "@/modules/ledger/contracts";
 import { getDefaultLedger } from "tests/helpers/default-ledger";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
+import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
 
 const { searchParamsState } = vi.hoisted(() => ({
   searchParamsState: { current: new URLSearchParams() },
@@ -120,5 +121,32 @@ describe("StatsTab", () => {
     await waitFor(() =>
       expect(fetchEnhancedStats).toHaveBeenCalledWith({ period: { range: "week", offset: -1 } })
     );
+  });
+
+  it("prints its own period and total in the phone's top bar, and folds the period bar there", async () => {
+    searchParamsState.current = new URLSearchParams("range=year&offset=-1");
+    function TopBarProbe() {
+      const summary = useWorkspaceStore((state) => state.headerSummary);
+      return <output data-testid="top-bar-summary">{JSON.stringify(summary)}</output>;
+    }
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <TopBarProbe />
+          <StatsTab ledger={ledgerFixture} today="2026-08-24" timeZone="Asia/Shanghai" />
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("top-bar-summary").textContent ?? "null")).toEqual({
+        total: "¥120.00",
+        period: "2025年",
+        filtered: false,
+      })
+    );
+    // On a phone the period bar waits behind the summary until it is tapped.
+    expect(document.getElementById("ledger-list-controls")).toHaveClass("max-md:hidden");
   });
 });

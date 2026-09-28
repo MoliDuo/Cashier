@@ -6,7 +6,8 @@ import { fetchEnhancedStats } from "@/modules/stats/queries";
 import { StatsContentView, type StatsScale } from "@/modules/stats/ui/StatsContentView";
 import type { Ledger } from "@/modules/ledger/contracts";
 import { civilDaysBetween, resolveComparison, type Period } from "@/modules/ledger/domain/period";
-import { QUERY } from "@/lib/constants";
+import { DISPLAY_LOCALE, QUERY } from "@/lib/constants";
+import { formatCurrencyAmount } from "@/lib/format/currency";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import {
   readStatsView,
@@ -17,6 +18,8 @@ import { readPeriodParams, writePeriodParams } from "@/modules/workspace/period-
 import { pushLedgerUrl } from "@/modules/workspace/ledger-url-navigation";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { PeriodBar } from "./PeriodBar";
+import { ListControlsDrop } from "./ListControlsDrop";
+import { formatPeriodLabel } from "../period-label";
 import { statsTabCopy } from "@/copy/stats";
 
 const STATS_QUERY_DEBOUNCE_MS = 250;
@@ -130,12 +133,25 @@ export function StatsTab({
   // The figures carry the days they cover; before any arrive, the same
   // resolution the server makes names them.
   const range = stats?.range ?? resolveComparison(contentPeriod, today).range;
+  // A phone prints the period and the total between the book and the gear, as
+  // 账目 does; the period is 统计's own, so the two pages never move each other.
+  const total =
+    stats == null
+      ? null
+      : formatCurrencyAmount(stats.summary.total, stats.summary.currency, DISPLAY_LOCALE);
 
   return (
     <div className="space-y-4">
       <StatsContentView
         periodBar={
-          <PeriodBar period={period} today={today} onChange={setPeriod} timeZone={timeZone} />
+          <ListControlsDrop
+            summary={{ total, period: formatPeriodLabel(period, today), filtered: false }}
+            // Dropped down on a phone it needs a surface of its own; from md up
+            // it stays the bare bar it always was.
+            className="max-md:rounded-lg max-md:border max-md:border-border max-md:bg-surface max-md:p-2"
+          >
+            <PeriodBar period={period} today={today} onChange={setPeriod} timeZone={timeZone} />
+          </ListControlsDrop>
         }
         range={range}
         scale={scaleOf(range)}
