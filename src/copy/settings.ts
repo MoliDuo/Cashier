@@ -3,7 +3,8 @@ import type { CommonLucideIcon } from "@/config/icons";
 export const settingsCopy = {
   account: "账户",
   appearance: "外观",
-  bookkeepingRules: "记账规则",
+  timeZoneAndCurrency: "时区与货币",
+  aiParsing: "AI 解析",
   theme: "主题",
   themeAuto: "跟随系统",
   themeLight: "浅色模式",

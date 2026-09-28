@@ -6,18 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
 import { AccountSettings } from "./settings/AccountSettings";
 import { BookSettings } from "./settings/BookSettings";
-import { SettingsSection } from "@/components/SettingsSection";
-import { SettingsField } from "./settings/SettingsField";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { useLedgerSettings } from "@/modules/ledger/hooks/useLedgerSettings";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useTheme } from "next-themes";
 import { signOutAction } from "@/modules/auth/server-actions/sign-in";
 import { forgetLedgerDataOnThisDevice } from "@/lib/sign-out-cleanup";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { ledgerQueryErrorCopy } from "@/copy/app";
-import { settingsCopy } from "@/copy/settings";
 
 interface SettingsTabProps {
   ledger: Ledger;
@@ -46,7 +35,6 @@ export function SettingsTab({
   onGoToDetails,
 }: SettingsTabProps) {
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const {
@@ -73,16 +61,6 @@ export function SettingsTab({
     return latest;
   };
 
-  const themeLabel = (themeName: "system" | "light" | "dark") => {
-    switch (themeName) {
-      case "system":
-        return settingsCopy.themeAuto;
-      case "light":
-        return settingsCopy.themeLight;
-      case "dark":
-        return settingsCopy.themeDark;
-    }
-  };
   const signOutTo = async (callbackUrl: string) => {
     try {
       await signOutAction();
@@ -170,23 +148,6 @@ export function SettingsTab({
         onRequireReauthentication={handleRequireReauthentication}
         onAllSessionsEnded={handleAllSessionsEnded}
       />
-
-      <SettingsSection title={settingsCopy.appearance}>
-        <SettingsField title={settingsCopy.theme}>
-          <Select value={theme ?? "system"} onValueChange={setTheme}>
-            <SelectTrigger aria-label={settingsCopy.theme} className="w-full sm:w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(["system", "light", "dark"] as const).map((themeName) => (
-                <SelectItem key={themeName} value={themeName}>
-                  {themeLabel(themeName)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsField>
-      </SettingsSection>
     </div>
   );
 }

@@ -17,7 +17,7 @@ vi.mock("@/modules/ledger/ui/CategorySection", () => ({
 type BookkeepingProps = ComponentProps<typeof BookkeepingSettings>;
 
 /**
- * 记账规则 owns the AI fields too, so the draft cases render that one section
+ * 外观, 时区与货币 and AI 解析 share one save, so the cases render them together
  * and override only the props the case cares about.
  */
 const bookkeepingProps = (overrides: Partial<BookkeepingProps>): BookkeepingProps => ({

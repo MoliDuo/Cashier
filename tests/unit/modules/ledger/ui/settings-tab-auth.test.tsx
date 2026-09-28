@@ -127,6 +127,27 @@ describe("SettingsTab account authentication controls", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("runs from the short preferences to the lists, and ends with signing out", () => {
+    const ledger: Ledger = {
+      id: "ledger-1",
+      settings: { ...getDefaultLedger().settings },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    render(<SettingsTab ledger={ledger} initialCategories={[]} initialBooks={BOOKS} />);
+
+    // 分类 and API 密钥 are stubbed here, so their titles are not among these.
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)
+    ).toEqual(["外观", "时区与货币", "AI 解析", "分账", "账户", "通行密钥", "退出登录"]);
+    expect(
+      within(screen.getByRole("heading", { level: 2, name: "外观" }).closest("section")!)
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent)
+    ).toEqual(["主题", "默认折叠账单"]);
+  });
+
   it("clears this device's drafts and remembered book when the reader signs out", async () => {
     const assign = vi.fn();
     vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });

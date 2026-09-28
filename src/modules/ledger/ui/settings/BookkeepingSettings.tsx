@@ -10,6 +10,7 @@ import type {
 import { CurrencySection } from "../CurrencySection";
 import { CategorySection } from "../CategorySection";
 import { SettingsField } from "./SettingsField";
+import { ThemeField } from "./ThemeField";
 import { SettingsSection } from "@/components/SettingsSection";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,22 +91,13 @@ export function BookkeepingSettings({
   return (
     <>
       {/*
-        分类 saves through a draft of its own — 管理分类 holds the edit session and
-        its 保存 — so it is a card of its own. It leads the page: it is what the
-        ledger is adjusted most often for.
+        The page runs from the short, set-once preferences to the lists that
+        grow: 外观 first, then 时区与货币 and AI 解析, then 分类. The ledger's
+        fields share one save, so a field in one card waits for a save made in
+        another; 主题 belongs to this browser and never waits.
       */}
-      <CategorySection
-        categories={categories}
-        uncategorizedCount={uncategorizedCount}
-        onSaveCategories={onSaveCategories}
-        {...(onReloadCategories == null ? {} : { onReloadCategories })}
-        generatingCategoryIds={generatingCategoryIds}
-        failedCategoryIds={failedCategoryIds}
-        onRetryMetadata={onRetryMetadata}
-        isSaving={isSavingCategories}
-        {...(onGoToDetails == null ? {} : { onGoToDetails })}
-      />
-      <SettingsSection title={settingsCopy.bookkeepingRules}>
+      <SettingsSection title={settingsCopy.appearance}>
+        <ThemeField />
         <SettingsField
           title={settingsCopy.collapseEntries}
           description={settingsCopy.collapseEntriesDesc}
@@ -117,6 +109,8 @@ export function BookkeepingSettings({
             disabled={saving}
           />
         </SettingsField>
+      </SettingsSection>
+      <SettingsSection title={settingsCopy.timeZoneAndCurrency}>
         <SettingsField title={settingsCopy.timeZone} description={settingsCopy.timeZoneDesc}>
           <Select
             value={shown.timeZone}
@@ -135,6 +129,13 @@ export function BookkeepingSettings({
             </SelectContent>
           </Select>
         </SettingsField>
+        <CurrencySection
+          settings={shown}
+          onUpdateSettings={(patch) => void save(patch)}
+          disabled={saving}
+        />
+      </SettingsSection>
+      <SettingsSection title={settingsCopy.aiParsing}>
         <SettingsField title={settingsCopy.aiLanguage}>
           <Select
             value={shown.aiLanguage}
@@ -170,12 +171,21 @@ export function BookkeepingSettings({
             className="min-h-[100px] w-full resize-y"
           />
         </SettingsField>
-        <CurrencySection
-          settings={shown}
-          onUpdateSettings={(patch) => void save(patch)}
-          disabled={saving}
-        />
       </SettingsSection>
+      {/* 分类 saves through a draft of its own — 管理分类 holds the edit session
+          and its 保存 — so it is a card of its own, next to the prompt that
+          steers how entries land in it. */}
+      <CategorySection
+        categories={categories}
+        uncategorizedCount={uncategorizedCount}
+        onSaveCategories={onSaveCategories}
+        {...(onReloadCategories == null ? {} : { onReloadCategories })}
+        generatingCategoryIds={generatingCategoryIds}
+        failedCategoryIds={failedCategoryIds}
+        onRetryMetadata={onRetryMetadata}
+        isSaving={isSavingCategories}
+        {...(onGoToDetails == null ? {} : { onGoToDetails })}
+      />
     </>
   );
 }
