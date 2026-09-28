@@ -1,12 +1,11 @@
 "use server";
 import { withLedgerAccess } from "../access";
-import type { ApplyCategoryPresetInput, EntryCategoryDto } from "@/modules/ledger/contracts";
+import type { EntryCategoryDto } from "@/modules/ledger/contracts";
 import {
-  parseApplyCategoryPresetInput,
   parseSaveEntryCategoriesInput,
   type SaveEntryCategoriesInput,
 } from "@/modules/ledger/contract-schemas";
-import { applyCategoryPreset, saveEntryCategories } from "../server/categories";
+import { saveEntryCategories } from "../server/categories";
 
 export const saveEntryCategoriesAction = withLedgerAccess(
   async (ledgerId: string, input: SaveEntryCategoriesInput): Promise<EntryCategoryDto[]> => {
@@ -20,20 +19,6 @@ export const saveEntryCategoriesAction = withLedgerAccess(
         description: category.description,
         icon: category.icon,
       })),
-    });
-  }
-);
-
-export const applyCategoryPresetAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    input: ApplyCategoryPresetInput
-  ): Promise<import("@/modules/ledger/contracts").ApplyCategoryPresetResult> => {
-    const validated = parseApplyCategoryPresetInput(input);
-    return applyCategoryPreset(ledgerId, {
-      expectedRevision: validated.expectedRevision,
-      presetId: validated.presetId,
-      mappings: validated.mappings,
     });
   }
 );

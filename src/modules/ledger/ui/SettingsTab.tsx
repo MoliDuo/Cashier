@@ -24,7 +24,6 @@ interface SettingsTabProps {
   /** The switcher's books, hydrated by the page bootstrap. */
   initialBooks: readonly BookDto[];
   userEmail?: string;
-  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 export function SettingsTab({
@@ -32,7 +31,6 @@ export function SettingsTab({
   initialCategories,
   initialBooks,
   userEmail,
-  onGoToDetails,
 }: SettingsTabProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -125,7 +123,6 @@ export function SettingsTab({
         failedCategoryIds={failedCategoryIds}
         onRetryMetadata={retryCategoryMetadata}
         isSavingCategories={saveCategories.isPending}
-        {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
 
       <BookSettings />

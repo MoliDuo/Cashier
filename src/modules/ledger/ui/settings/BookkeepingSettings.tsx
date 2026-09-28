@@ -37,7 +37,6 @@ interface BookkeepingSettingsProps {
   failedCategoryIds: Set<string>;
   onRetryMetadata: (id: string) => void;
   isSavingCategories: boolean;
-  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 export function BookkeepingSettings({
@@ -51,7 +50,6 @@ export function BookkeepingSettings({
   failedCategoryIds,
   onRetryMetadata,
   isSavingCategories,
-  onGoToDetails,
 }: BookkeepingSettingsProps) {
   // Every change is saved as it is made. The field shows the value on its way
   // to the server until the answer lands, and the fields stay disabled while it
@@ -184,7 +182,6 @@ export function BookkeepingSettings({
         failedCategoryIds={failedCategoryIds}
         onRetryMetadata={onRetryMetadata}
         isSaving={isSavingCategories}
-        {...(onGoToDetails == null ? {} : { onGoToDetails })}
       />
     </>
   );

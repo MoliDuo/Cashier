@@ -1,22 +1,9 @@
-import { getCategoryPreset, type PresetCategory } from "@/config/category-presets";
+import { DEFAULT_CATEGORIES } from "@/config/default-categories";
 
 /**
- * The `default` category preset, plus the settings a new ledger starts with.
- * `getDefaultLedger` is the seeding shape `createDefault` expects; the category
- * text itself lives in `category-presets.ts` so the two presets have one home.
- *
- * Seeded rows are 1-based, which is what the pre-preset ledgers already hold.
- * `PresetCategory` carries no order of its own.
+ * The settings and categories a new ledger starts with, in the seeding shape
+ * `createDefault` expects. Rows are 0-based, as `saveEntryCategories` writes.
  */
-function seedCategories(preset: readonly PresetCategory[]) {
-  return preset.map(({ name, description, icon }, index) => ({
-    name,
-    description,
-    icon,
-    sortOrder: index + 1,
-  }));
-}
-
 const defaultLedger = {
   settings: {
     aiLanguage: "zh-CN",
@@ -26,7 +13,12 @@ const defaultLedger = {
     aiCustomPrompt: "",
     timeZone: "Asia/Shanghai",
   },
-  categories: seedCategories(getCategoryPreset("default")),
+  categories: DEFAULT_CATEGORIES.map(({ name, description, icon }, sortOrder) => ({
+    name,
+    description,
+    icon,
+    sortOrder,
+  })),
 };
 
 export function getDefaultLedger() {

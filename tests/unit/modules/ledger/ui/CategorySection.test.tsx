@@ -7,12 +7,7 @@ import { settingsCopy } from "@/copy/settings";
 import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import { CategorySection } from "@/modules/ledger/ui/CategorySection";
 
-const { applyPresetAction } = vi.hoisted(() => ({ applyPresetAction: vi.fn() }));
-
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock("@/modules/ledger/server-actions/categories", () => ({
-  applyCategoryPresetAction: applyPresetAction,
-}));
 vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => "ledger-1" }));
 vi.mock("@/modules/ledger/ui/category-assignment-context", () => ({
   useCategoryAssignment: () => ({
@@ -156,43 +151,13 @@ describe("CategorySection", () => {
     });
   });
 
-  it("blocks a preset switch until every category has a destination", async () => {
-    applyPresetAction.mockResolvedValue({
-      categories: [category],
-      changed: true,
-      movedEntryCount: 3,
-      createdCategoryCount: 6,
-      removedCategoryCount: 1,
-      retainedCategoryCount: 0,
-    });
+  it("offers managing categories as the section's only action", async () => {
     renderSection();
 
-    fireEvent.click(await screen.findByRole("button", { name: settingsCopy.switchPreset }));
-
-    // "Meals" is not a category in either preset, so nothing is preselected and
-    // the switch cannot be confirmed until the user picks a destination.
-    const apply = await screen.findByRole("button", { name: settingsCopy.presetApply });
-    expect(apply).toBeDisabled();
-    expect(screen.getByText(settingsCopy.presetSummaryNone)).toBeTruthy();
-
-    fireEvent.click(
-      screen.getByRole("radio", { name: new RegExp(settingsCopy.presetOptionConcise) })
-    );
-    fireEvent.click(screen.getByRole("combobox", { name: "Meals" }));
-    fireEvent.click(await screen.findByRole("option", { name: /吃喝/ }));
-
-    await waitFor(() => expect(apply).toBeEnabled());
-    fireEvent.click(apply);
-    // The confirm step is a second dialog with its own equally labelled button.
-    const confirmButtons = await screen.findAllByRole("button", { name: settingsCopy.presetApply });
-    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
-
-    await waitFor(() => expect(applyPresetAction).toHaveBeenCalledOnce());
-    expect(applyPresetAction).toHaveBeenCalledWith({
-      expectedRevision: expect.stringMatching(/^[0-9a-f]{64}$/),
-      presetId: "concise",
-      mappings: [{ fromCategoryId: "category-1", toPresetIndex: 0 }],
-    });
+    const manage = await screen.findByRole("button", { name: settingsCopy.manageCategories });
+    expect(manage).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "切换预设" })).toBeNull();
+    expect(screen.queryByText("切换预设")).toBeNull();
   });
 
   it("holds 未分类 in the last slot with nothing to press", async () => {

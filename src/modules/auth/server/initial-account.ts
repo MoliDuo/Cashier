@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, ValidationError } from "@/lib/errors";
 import { books, entryCategories, ledgers, loginEmails, users } from "@/persistence";
-import { getCategoryPreset } from "@/config/category-presets";
+import { DEFAULT_CATEGORIES } from "@/config/default-categories";
 
 export interface InitialAccountInput {
   bookNames: readonly string[];
@@ -38,7 +38,6 @@ export async function createInitialAccount(
     throw new ValidationError("Book names must be unique");
   }
   const email = input.email.trim().toLowerCase();
-  const categories = getCategoryPreset("default");
   const now = new Date();
 
   return db.transaction(async (tx) => {
@@ -70,10 +69,9 @@ export async function createInitialAccount(
       }))
     );
 
-    // 0-based, matching what `saveEntryCategories` writes and the order the
-    // preset dialog offers, so a later preset switch is a no-op not a merge.
+    // 0-based, matching what `saveEntryCategories` writes.
     await tx.insert(entryCategories).values(
-      categories.map((category, index) => ({
+      DEFAULT_CATEGORIES.map((category, index) => ({
         ledgerId: ledger.id,
         name: category.name,
         description: category.description,

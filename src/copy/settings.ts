@@ -23,57 +23,8 @@ export const settingsCopy = {
   preferredCurrenciesNoResults: "没有匹配的币种",
   categories: "分类",
   manageCategories: "管理分类",
-  switchPreset: "切换预设",
-  presetDialogTitle: "切换分类预设",
-  presetOptionDefault: "默认",
-  presetOptionConcise: "简洁",
-  presetOptionDefaultDesc: "13 个分类，分得更细。",
-  presetOptionConciseDesc: "6 个大类，只看大方向。",
-  presetMappingTitle: "旧分类的去向",
-  presetMappingUnset: "请选择",
-  presetMappingKeep: "保留，不迁移",
-  presetSummary: (v: { count: string | number; entries: string | number }) =>
-    `${v.count} 个分类直接迁移，涉及 ${v.entries} 条明细`,
-  presetSummaryUnset: (v: { count: string | number }) => `${v.count} 个分类暂未指定`,
-  presetSummaryNone: "请至少指定一个分类迁移",
-  presetApply: "确认切换",
-  presetConfirmTitle: (v: { preset: string | number }) => `切换到「${v.preset}」？`,
-  presetConfirmDescription: (v: {
-    entries: string | number;
-    merged: string | number;
-    created: string | number;
-    retained: string | number;
-  }) =>
-    `将迁移 ${v.entries} 条明细，合并 ${v.merged} 个旧分类，新增 ${v.created} 个分类，并保留 ${v.retained} 个额外分类。`,
-  presetApplyFailed: "未切换分类预设，请重试。",
-  presetWholeCategoryDescription: "本次按旧分类整体迁移，不会用 AI 逐条重新判断。",
-  presetUncategorizedDescription: "未分类的明细不会自动归类。",
-  presetAfterDescription: "需要 AI 重新分类时，到按明细里选择明细。",
-  presetMergeIrreversible: "合并后切回原预设也不会恢复原分类。",
-  presetDraftChanged: "分类已在后台变化，请重新加载后再提交。",
-  presetReloadCategories: "重新加载分类",
-  presetSuggested: "建议",
-  presetExpandDescription: "展开描述",
-  presetNoChanges: "已是此分类结构",
-  presetApplying: "正在切换…",
-  presetFinalStructure: "应用后的结果",
-  presetGoToDetails: "去明细重新分类",
-  categoryAssignmentActive: "分类任务进行中，结束后才能切换预设或修改分类。",
+  categoryAssignmentActive: "分类任务进行中，结束后才能修改分类。",
   categoryAssignmentViewTask: "查看任务",
-  presetImpactPreview: (v: {
-    entries: string | number;
-    merged: string | number;
-    created: string | number;
-    retained: string | number;
-  }) =>
-    `当前预估：迁移 ${v.entries} 条明细，合并 ${v.merged} 个旧分类，新增 ${v.created} 个分类，保留 ${v.retained} 个额外分类。`,
-  presetResultSummary: (v: {
-    entries: string | number;
-    created: string | number;
-    removed: string | number;
-    retained: string | number;
-  }) =>
-    `实际迁移 ${v.entries} 条明细，新增 ${v.created} 个分类，移除 ${v.removed} 个旧分类，保留 ${v.retained} 个额外分类。`,
   moveCategoryUp: "上移",
   moveCategoryDown: "下移",
   editCategory: (v: { name: string | number }) => `编辑分类 ${v.name}`,

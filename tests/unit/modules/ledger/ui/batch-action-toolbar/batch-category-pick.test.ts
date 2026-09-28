@@ -21,7 +21,7 @@ describe("resolveBatchCategoryPick", () => {
     ).toEqual({ kind: "ai", categoryIds: ["category-1", "category-2"] });
   });
 
-  it("accepts every category in the default preset", () => {
+  it("accepts every one of the 13 default categories", () => {
     const categories = Array.from({ length: 13 }, (_, i) => `c${i}`);
     expect(resolveBatchCategoryPick({ categoryIds: categories, clearPicked: false })).toEqual({
       kind: "ai",

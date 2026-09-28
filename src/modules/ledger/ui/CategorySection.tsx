@@ -28,16 +28,14 @@ import {
 import { DraftNotice } from "@/components/ui/draft-notice";
 import { Input } from "@/components/ui/input";
 import { useCategoryManagementDraft } from "@/modules/ledger/hooks/useCategoryManagementDraft";
-import { useCategoryPresetSwitch } from "@/modules/ledger/hooks/useCategoryPresetSwitch";
 import { CategoryEditDialog } from "./CategoryEditDialog";
-import { CategoryPresetDialog } from "./CategoryPresetDialog";
 import { SettingsSection } from "@/components/SettingsSection";
 import { useCategoryAssignment } from "./category-assignment-context";
 import { commonCopy } from "@/copy/common";
 import { settingsCopy } from "@/copy/settings";
 
 interface CategorySectionProps {
-  /** Carries `entryCount`; the preset dialog sums it for its impact summary. */
+  /** Carries `entryCount`, shown beside each category. */
   categories: EntryCategoryWithCount[];
   uncategorizedCount?: number;
   onSaveCategories: (input: SaveEntryCategoriesInput) => Promise<EntryCategory[]>;
@@ -46,7 +44,6 @@ interface CategorySectionProps {
   failedCategoryIds?: Set<string>;
   onRetryMetadata?: (id: string) => void;
   isSaving?: boolean;
-  onGoToDetails?: (validCategoryIds: readonly string[]) => void;
 }
 
 export function CategorySection({
@@ -58,9 +55,7 @@ export function CategorySection({
   failedCategoryIds = new Set(),
   onRetryMetadata,
   isSaving = false,
-  onGoToDetails,
 }: CategorySectionProps) {
-  const preset = useCategoryPresetSwitch({ categories });
   const { isActive: categoryAssignmentActive } = useCategoryAssignment();
 
   const {
@@ -98,24 +93,14 @@ export function CategorySection({
       title={settingsCopy.categories}
       actions={
         managing ? null : (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              disabled={isSaving || preset.isPending || categoryAssignmentActive}
-              onClick={preset.openDialog}
-            >
-              {settingsCopy.switchPreset}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={categoryAssignmentActive}
-              onClick={enterManagement}
-            >
-              {settingsCopy.manageCategories}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={categoryAssignmentActive}
+            onClick={enterManagement}
+          >
+            {settingsCopy.manageCategories}
+          </Button>
         )
       }
     >
@@ -341,8 +326,6 @@ export function CategorySection({
         onRequestClose={requestEditClose}
         onCommit={commitEdit}
       />
-
-      <CategoryPresetDialog preset={preset} {...(onGoToDetails == null ? {} : { onGoToDetails })} />
 
       <ConfirmDialog
         open={deleteTarget != null}

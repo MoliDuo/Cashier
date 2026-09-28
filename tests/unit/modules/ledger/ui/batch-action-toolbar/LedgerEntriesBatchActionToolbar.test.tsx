@@ -182,7 +182,7 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(screen.getByRole("button", { name: "设为「餐饮」" })).toBeEnabled();
   });
 
-  it("turns several picks into the model's question and accepts all 13 preset categories", () => {
+  it("turns several picks into the model's question and accepts all 13 default categories", () => {
     const categories = Array.from({ length: 13 }, (_, index) => ({
       ...dining,
       id: `category-${index + 1}`,

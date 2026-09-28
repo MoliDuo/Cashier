@@ -1,5 +1,3 @@
-import type { CategoryPresetId } from "@/config/category-presets";
-
 export interface LedgerSettings {
   aiLanguage: string;
   currencies: string[];
@@ -82,25 +80,6 @@ interface SaveEntryCategoryTargetDto {
 export interface SaveEntryCategoriesInput {
   expectedRevision: string;
   categories: SaveEntryCategoryTargetDto[];
-}
-
-/**
- * A preset switch. The preset's category text is resolved on the server from
- * `presetId`, so a client cannot invent categories; it only decides where each
- * existing category's entries land.
- */
-export interface ApplyCategoryPresetInput {
-  expectedRevision: string;
-  presetId: CategoryPresetId;
-  mappings: { fromCategoryId: string; toPresetIndex: number | null }[];
-}
-export interface ApplyCategoryPresetResult {
-  categories: EntryCategoryWithCount[];
-  changed: boolean;
-  movedEntryCount: number;
-  createdCategoryCount: number;
-  removedCategoryCount: number;
-  retainedCategoryCount: number;
 }
 
 export type CategoryAssignmentMode =

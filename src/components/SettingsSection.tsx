@@ -6,7 +6,7 @@ interface SettingsSectionProps {
   /** One line under the title saying what the section is for. */
   description?: string;
   /**
-   * The buttons that act on the whole section — 切换预设 / 管理分类 — so they sit
+   * The buttons that act on the whole section — such as 管理分类 — so they sit
    * on the title row, where the section's own actions belong, instead of
    * trailing the fields they cover.
    */

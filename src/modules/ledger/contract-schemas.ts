@@ -8,7 +8,6 @@ import {
 } from "@/lib/validation";
 import { MAX_BATCH_SIZE } from "@/lib/batch-ids";
 import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
-import { CATEGORY_PRESET_IDS } from "@/config/category-presets";
 import { isValidTimeZone } from "@/lib/date-utils";
 import { MAX_SEARCH_LENGTH, normalizeSearchTerm } from "@/lib/search";
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
@@ -121,24 +120,6 @@ const saveEntryCategoriesInputSchema = strictObjectSchema({
     .max(MAX_BATCH_SIZE)
     .superRefine((categories, context) => {
       const ids = categories.map((category) => category.id ?? category.clientId!);
-      if (new Set(ids).size !== ids.length) {
-        context.addIssue({ code: "custom", message: "Category IDs must be unique" });
-      }
-    }),
-});
-const applyCategoryPresetInputSchema = strictObjectSchema({
-  expectedRevision: categoryCollectionRevisionSchema,
-  presetId: z.enum(CATEGORY_PRESET_IDS),
-  mappings: z
-    .array(
-      strictObjectSchema({
-        fromCategoryId: uuidSchema,
-        toPresetIndex: z.number().int().nonnegative().nullable(),
-      })
-    )
-    .max(MAX_BATCH_SIZE)
-    .superRefine((mappings, context) => {
-      const ids = mappings.map((mapping) => mapping.fromCategoryId);
       if (new Set(ids).size !== ids.length) {
         context.addIssue({ code: "custom", message: "Category IDs must be unique" });
       }
@@ -272,8 +253,6 @@ export const parseUpdateLedgerInput = (input: unknown) =>
   parseLedgerContract(updateLedgerInputSchema, input);
 export const parseSaveEntryCategoriesInput = (input: unknown) =>
   parseLedgerContract(saveEntryCategoriesInputSchema, input);
-export const parseApplyCategoryPresetInput = (input: unknown) =>
-  parseLedgerContract(applyCategoryPresetInputSchema, input);
 export const parseEntryCategoryId = (input: unknown) =>
   parseLedgerContract(entryCategoryIdSchema, input);
 export const parseCreateLedgerEntryInput = (input: unknown) =>
