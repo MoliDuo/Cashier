@@ -12,6 +12,12 @@ describe("stats-url-params", () => {
     expect(writeStatsView(new URLSearchParams("view=trend"), "heatmap").toString()).toBe("");
   });
 
+  it("keeps the running total as a view of its own", () => {
+    expect(readStatsView(new URLSearchParams("view=cumulative"))).toBe("cumulative");
+    expect(writeStatsView(new URLSearchParams(), "cumulative").toString()).toBe("view=cumulative");
+    expect(normalizeStatsSearchParams(new URLSearchParams("view=cumulative"))).toBeNull();
+  });
+
   it("rewrites a query it cannot read into the canonical one", () => {
     expect(
       normalizeStatsSearchParams(new URLSearchParams("range=decade&offset=2&view=pie"))?.toString()

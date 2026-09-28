@@ -106,4 +106,35 @@ describe("buildEnhancedStatsDto", () => {
 
     expect(result.categories.map((category) => category.percent)).toEqual([0]);
   });
+
+  it("compares totals over the cut days and charts the previous period whole", () => {
+    const dto = build({
+      current: bucket({ "2026-09-01": { total: "50" } }),
+      previous: bucket({ "2026-08-01": { total: "40" } }),
+      previousWhole: bucket({ "2026-08-01": { total: "40" }, "2026-08-20": { total: "900" } }),
+      compareRange: { from: "2026-08-01", to: "2026-08-03" },
+      periodEnd: "2026-09-30",
+      previousWholeTo: "2026-08-31",
+    });
+
+    expect(dto.summary.comparison).toMatchObject({
+      previousTotal: "40",
+      amountDelta: "10",
+      wholeTo: "2026-08-31",
+      previousWholeTotal: "940",
+    });
+    expect(dto.previousChart).toEqual([
+      { date: "2026-08-01", total: "40" },
+      { date: "2026-08-20", total: "900" },
+    ]);
+    expect(dto.periodEnd).toBe("2026-09-30");
+  });
+
+  it("ends a period that is over where its days end", () => {
+    const dto = build();
+
+    expect(dto.periodEnd).toBe("2026-09-03");
+    expect(dto.summary.comparison.wholeTo).toBe("2026-08-03");
+    expect(dto.largestEntries).toEqual([]);
+  });
 });

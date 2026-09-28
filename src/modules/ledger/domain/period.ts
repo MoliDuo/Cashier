@@ -125,6 +125,14 @@ export interface ComparisonWindow {
   compareRange: CivilRange;
   /** "same_period" when the current period is cut at today and so is the one before it. */
   mode: "same_period" | "full_period";
+  /** The period's own last day, past `range.to` while it is still running. */
+  periodEnd: string;
+  /**
+   * The comparison period's own last day. Totals are compared up to
+   * `compareRange.to`; the charts and the forecast read on to here, so the
+   * reader can see where the previous period ended up.
+   */
+  previousWholeTo: string;
 }
 
 /**
@@ -154,7 +162,13 @@ export function resolveComparison(
     shiftedAnchor(period.range, today, period.offset - 1)
   );
   if (period.offset !== 0) {
-    return { range: whole, compareRange: previous, mode: "full_period" };
+    return {
+      range: whole,
+      compareRange: previous,
+      mode: "full_period",
+      periodEnd: whole.to,
+      previousWholeTo: previous.to,
+    };
   }
   const elapsed = civilDaysBetween(whole.from, today);
   const previousEnd = addCivilDays(previous.from, elapsed);
@@ -165,14 +179,24 @@ export function resolveComparison(
       to: previousEnd < previous.to ? previousEnd : previous.to,
     },
     mode: "same_period",
+    periodEnd: whole.to,
+    previousWholeTo: previous.to,
   };
 }
 
-function previousWindow(range: CivilRange): Pick<ComparisonWindow, "compareRange" | "mode"> {
+function previousWindow(
+  range: CivilRange
+): Pick<ComparisonWindow, "compareRange" | "mode" | "periodEnd" | "previousWholeTo"> {
   const days = civilDaysBetween(range.from, range.to) + 1;
+  const compareRange = {
+    from: addCivilDays(range.from, -days),
+    to: addCivilDays(range.from, -1),
+  };
   return {
-    compareRange: { from: addCivilDays(range.from, -days), to: addCivilDays(range.from, -1) },
+    compareRange,
     mode: "full_period",
+    periodEnd: range.to,
+    previousWholeTo: compareRange.to,
   };
 }
 

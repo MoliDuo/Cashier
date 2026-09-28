@@ -8,7 +8,7 @@ import {
   buildEnhancedStatsDto,
   type EnhancedStatsBucket,
 } from "@/modules/stats/domain/build-enhanced-stats";
-import type { EnhancedStatsDto } from "@/modules/stats/contracts";
+import type { EnhancedStatsDto, StatsLargestEntryDto } from "@/modules/stats/contracts";
 
 interface AggregatedRow {
   period: "current" | "previous";
@@ -48,7 +48,7 @@ async function fetchAggregatedRows(
         ('current'::text, ${current.from}::date, ${current.to}::date),
         ('previous'::text, ${previous.from}::date, ${previous.to}::date)
     )
-    SELECT ranges.period, documents.effective_date AS "effectiveDate",
+    SELECT ranges.period, documents.effective_date::text AS "effectiveDate",
       entries.currency, entries.category_id AS "categoryId",
       categories.name AS "categoryName", categories.icon AS "categoryIcon",
       sum(converted.amount)::text AS "totalAmount",
@@ -127,21 +127,102 @@ function addRowToBucket(
   }
 }
 
+/** How many of the period's entries 统计 lists by size. */
+const LARGEST_ENTRY_COUNT = 5;
+
+interface LargestEntryRow {
+  id: string;
+  sourceDocumentId: string;
+  name: string;
+  categoryName: string | null;
+  categoryIcon: string | null;
+  date: string;
+  amount: string;
+  originalAmount: string;
+  originalCurrency: string;
+}
+
+/**
+ * The period's biggest entries once converted. An entry with no rate for its
+ * day has no converted size to rank by, so it is left out here as it is from
+ * the totals; a refund is not spending and is left out too.
+ */
+async function fetchLargestEntries(
+  ledgerId: string,
+  range: { from: string; to: string },
+  bookId?: string
+): Promise<StatsLargestEntryDto[]> {
+  const result = await db.execute<LargestEntryRow & Record<string, unknown>>(sql`
+    SELECT entries.id, documents.id AS "sourceDocumentId", entries.item_name AS name,
+      categories.name AS "categoryName", categories.icon AS "categoryIcon",
+      documents.effective_date::text AS date, converted.amount::text AS amount,
+      entries.amount::text AS "originalAmount", entries.currency AS "originalCurrency"
+    FROM source_documents documents
+    JOIN ledger_entries entries
+      ON entries.ledger_id = documents.ledger_id
+      AND entries.source_document_id = documents.id
+    JOIN ledgers ON ledgers.id = documents.ledger_id
+    CROSS JOIN LATERAL (
+      SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
+        documents.effective_date) AS amount
+    ) converted
+    LEFT JOIN entry_categories categories
+      ON categories.id = entries.category_id
+      AND categories.ledger_id = entries.ledger_id
+    WHERE documents.ledger_id = ${ledgerId}
+      AND documents.effective_date BETWEEN ${range.from}::date AND ${range.to}::date
+      ${bookId == null ? sql`` : sql`AND documents.book_id = ${bookId}`}
+      AND converted.amount > 0
+    ORDER BY converted.amount DESC, documents.effective_date DESC, entries.id
+    LIMIT ${LARGEST_ENTRY_COUNT}
+  `);
+  return result.rows.map((row) => ({
+    id: row.id,
+    sourceDocumentId: row.sourceDocumentId,
+    name: row.name,
+    categoryName: row.categoryName,
+    categoryIcon: row.categoryIcon,
+    date: row.date,
+    // Written the way every other amount in the payload is, without the
+    // column's trailing zeros.
+    amount: new Decimal(row.amount).toFixed(),
+    originalAmount: new Decimal(row.originalAmount).toFixed(),
+    originalCurrency: row.originalCurrency,
+  }));
+}
+
 export async function queryEnhancedStats(
   ledgerId: string,
-  { queryRange, compareRange, comparisonMode, bookId }: GetEnhancedStatsInput
+  {
+    queryRange,
+    compareRange,
+    comparisonMode,
+    bookId,
+    periodEnd,
+    previousWholeTo,
+  }: GetEnhancedStatsInput
 ): Promise<EnhancedStatsDto> {
-  const rows = await fetchAggregatedRows(ledgerId, queryRange, compareRange, bookId);
+  const wholeTo = previousWholeTo ?? compareRange.to;
+  const [rows, largestEntries] = await Promise.all([
+    fetchAggregatedRows(ledgerId, queryRange, { from: compareRange.from, to: wholeTo }, bookId),
+    fetchLargestEntries(ledgerId, queryRange, bookId),
+  ]);
   const mainCurrency = rows[0]?.mainCurrency ?? "CNY";
   const current = emptyBucket();
+  // The previous period is read to its own end for the chart, and set against
+  // the current one only up to the day the comparison is cut at.
   const previous = emptyBucket();
+  const previousWhole = emptyBucket();
   let unconvertedCount = 0;
   for (const row of rows) {
     if (row.period === "current") {
       unconvertedCount += row.unconvertedCount;
       addRowToBucket(current, row, mainCurrency);
     } else {
-      addRowToBucket(previous, row, mainCurrency);
+      addRowToBucket(previousWhole, row, mainCurrency);
+      if (row.effectiveDate != null && row.effectiveDate <= compareRange.to) {
+        addRowToBucket(previous, row, mainCurrency);
+      }
     }
   }
   if (unconvertedCount > 0) {
@@ -155,8 +236,12 @@ export async function queryEnhancedStats(
     unconvertedCount,
     current,
     previous,
+    previousWhole,
     queryRange,
     compareRange,
     comparisonMode,
+    periodEnd,
+    previousWholeTo: wholeTo,
+    largestEntries,
   });
 }

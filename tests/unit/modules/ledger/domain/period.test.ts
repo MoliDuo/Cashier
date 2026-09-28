@@ -59,6 +59,19 @@ describe("comparison windows", () => {
       // February has fewer days, so its window stops at its own end.
       compareRange: { from: "2026-02-01", to: "2026-02-28" },
       mode: "same_period",
+      periodEnd: "2026-03-31",
+      previousWholeTo: "2026-02-28",
+    });
+  });
+
+  it("reads a running month's comparison on to the previous month's own end", () => {
+    // Totals are set against the first ten days of September; the chart and the
+    // forecast still see where September ended up.
+    expect(resolveComparison({ range: "month", offset: 0 }, "2026-10-10")).toMatchObject({
+      range: { from: "2026-10-01", to: "2026-10-10" },
+      compareRange: { from: "2026-09-01", to: "2026-09-10" },
+      periodEnd: "2026-10-31",
+      previousWholeTo: "2026-09-30",
     });
   });
 
@@ -67,6 +80,8 @@ describe("comparison windows", () => {
       range: { from: "2026-09-14", to: "2026-09-20" },
       compareRange: { from: "2026-09-07", to: "2026-09-13" },
       mode: "full_period",
+      periodEnd: "2026-09-20",
+      previousWholeTo: "2026-09-13",
     });
   });
 
@@ -77,6 +92,8 @@ describe("comparison windows", () => {
       range: { from: "2026-09-11", to: "2026-09-20" },
       compareRange: { from: "2026-09-01", to: "2026-09-10" },
       mode: "full_period",
+      periodEnd: "2026-09-20",
+      previousWholeTo: "2026-09-10",
     });
   });
 

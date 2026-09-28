@@ -1,9 +1,12 @@
 export const statsTabCopy = {
   expenseTrend: "支出趋势",
+  cumulativeExpense: "累计支出",
   expenseRanking: "支出排行",
   dailyHeatmap: "每日热力图",
-  trend: "趋势",
-  heatmap: "热力",
+  chartViews: "图表视图",
+  daily: "每日",
+  cumulative: "累计",
+  heatmap: "日历",
   averageDaily: "日均支出",
   totalExpense: "总支出",
   noStats: "暂无统计",
@@ -38,22 +41,21 @@ export const statsTabCopy = {
   loadFailed: "统计数据加载失败，请重试。",
   retry: "重试",
   entries: "笔数",
-  averageEntry: "单笔均值",
-  recordedDays: "记账天数",
-  recordedDaysValue: (v: { active: string | number; total: string | number }) =>
-    `${v.active} / ${v.total}`,
-  sparklineLabel: "本期日支出",
-  sparklinePrevious: "上期同期",
-  sparklineExpand: "查看趋势",
+  typicalDaily: "典型日支出",
+  typicalDailyHint: "每天支出的中位数，不受单笔大额影响",
+  forecast: "预计本期",
+  forecastHint: "已花 + 剩余天数 × 典型日支出",
+  thisPeriod: "本期",
+  previousSamePeriod: "上期同期",
+  previousPeriod: "上期",
+  forecastLine: "预计",
+  forecastEnd: (v: { amount: string | number }) => `预计 ${v.amount}`,
+  previousEnd: (v: { period: string | number; amount: string | number }) =>
+    `${v.period} ${v.amount}`,
   heatmapHint: "点日期查看当天的明细",
   dailyAverageLine: "日均",
-  weekdayRhythm: "星期节律",
-  weekdayAverage: (v: { weekday: string | number; amount: string | number }) =>
-    `周${v.weekday}平均 ${v.amount}`,
   highlights: "本期看点",
   busiestDay: "最大单日",
-  recordingStreak: "连续记账",
-  streakDays: (v: { days: string | number }) => `${v.days} 天`,
   topMoverUp: (v: {
     category: string | number;
     period: string | number;
@@ -64,6 +66,10 @@ export const statsTabCopy = {
     period: string | number;
     amount: string | number;
   }) => `${v.category} 比${v.period}少花了 ${v.amount}`,
+  rankingMore: (v: { amount: string | number }) => `较上期 ↑${v.amount}`,
+  rankingLess: (v: { amount: string | number }) => `较上期 ↓${v.amount}`,
+  largestEntries: "最大几笔",
+  largestEntryOriginal: (v: { amount: string | number }) => `原币 ${v.amount}`,
   showAllCategories: (v: { count: string | number }) => `显示全部（${v.count}）`,
   showFewerCategories: "收起",
   noShare: "无占比",

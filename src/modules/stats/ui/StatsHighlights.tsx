@@ -16,8 +16,8 @@ interface StatsHighlightsProps {
 }
 
 /**
- * The three sentences the heatmap and the ranking each half-answer: which day
- * cost the most, how long the run of recorded days is, and which category moved.
+ * The two sentences the heatmap and the ranking each half-answer: which day
+ * cost the most, and which category moved.
  *
  * The biggest day earns its place because a single outlying day is what drags
  * the headline comparison to figures like -97.9%; naming it turns a number that
@@ -30,9 +30,9 @@ export function StatsHighlights({
   onDateDrilldown,
 }: StatsHighlightsProps) {
   const locale = DISPLAY_LOCALE;
-  const { busiestDay, longestStreak, topMover } = insights;
+  const { busiestDay, topMover } = insights;
 
-  if (busiestDay == null && longestStreak === 0 && topMover == null) return null;
+  if (busiestDay == null && topMover == null) return null;
 
   return (
     <StatsPanel title={statsTabCopy.highlights}>
@@ -63,19 +63,15 @@ export function StatsHighlights({
             </dd>
           </div>
         ) : null}
-
-        {longestStreak > 0 ? (
-          <div className="flex items-baseline justify-between gap-3">
-            <dt className={textRoleClassName("bodyMuted")}>{statsTabCopy.recordingStreak}</dt>
-            <dd className={textRoleClassName("bodyStrong", "tabular-nums")}>
-              {statsTabCopy.streakDays({ days: longestStreak })}
-            </dd>
-          </div>
-        ) : null}
       </dl>
 
       {topMover != null ? (
-        <p className={textRoleClassName("bodyMuted", "border-t border-border pt-3")}>
+        <p
+          className={textRoleClassName(
+            "bodyMuted",
+            busiestDay != null ? "border-t border-border pt-3" : undefined
+          )}
+        >
           {/* Both keys are spelled out so the catalogue check can find them. */}
           {topMover.direction === "up"
             ? statsTabCopy.topMoverUp(moverValues(topMover, periodLabel, currencySymbol, locale))

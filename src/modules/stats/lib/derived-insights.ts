@@ -1,5 +1,5 @@
-import { abs, add, compare, divide, multiply } from "@/lib/money/decimal";
-import { parseDateString } from "@/lib/date-utils";
+import { abs, add, compare, multiply } from "@/lib/money/decimal";
+import { civilDaysBetween } from "@/modules/ledger/domain/period";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import { generateHeatmapDateKeys } from "./heatmap-range";
 
@@ -12,29 +12,28 @@ import { generateHeatmapDateKeys } from "./heatmap-range";
  */
 const TOP_MOVER_MINIMUM_SHARE = "0.05";
 
-export interface WeekdayAverage {
-  /** 0 = Monday … 6 = Sunday, matching `Calendar.weekDaysMon`. */
-  weekday: number;
-  /**
-   * Divided by how many times this weekday falls in the window, not by how
-   * many of those days had entries — otherwise every weekday averages out to
-   * roughly the daily average and the shape disappears.
-   */
-  average: string;
-  occurrences: number;
-}
+/**
+ * A forecast from one or two days is a guess at what the rest of the period
+ * looks like from its first coffee; it waits for a few days to go on.
+ */
+const FORECAST_MINIMUM_DAYS = 3;
 
 export interface StatsInsights {
   entryCount: number;
-  /** Null when nothing was recorded, so the surface can say so rather than show a zero. */
-  averageEntry: string | null;
-  activeDays: number;
-  periodDays: number;
+  /**
+   * What a day in the period usually costs: the middle of its daily totals,
+   * days with nothing recorded counted as nothing. Unlike the average, one rent
+   * payment does not move it.
+   */
+  typicalDaily: string;
+  /**
+   * Where a running period is heading: what has been spent, plus a typical day
+   * for every day still to come. Null for a period that is over, or too young
+   * to say.
+   */
+  forecast: string | null;
   /** Null only when the window holds no days at all; a period that nets out negative still has a biggest day. */
   busiestDay: { date: string; total: string } | null;
-  longestStreak: number;
-  /** Always seven entries, Monday first. */
-  weekdayAverages: WeekdayAverage[];
   topMover: {
     id: string | null;
     name: string;
@@ -43,65 +42,53 @@ export interface StatsInsights {
   } | null;
 }
 
-/** Monday-first weekday index, matching the heatmap grid's own leading offset. */
-function weekdayIndex(date: string): number {
-  return (parseDateString(date).getDay() + 6) % 7;
+/** The middle value; the mean of the two middle ones for an even count. */
+function median(values: string[]): string {
+  if (values.length === 0) return "0";
+  const sorted = values.toSorted(compare);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[middle]!
+    : multiply(add(sorted[middle - 1]!, sorted[middle]!), "0.5");
 }
 
 /**
  * Figures the statistics read already contains but does not spell out. Every
  * one of them is derived from the payload that is on screen, so they cannot
- * disagree with the heatmap and the ranking beside them.
+ * disagree with the charts and the ranking beside them.
  */
-export function deriveStatsInsights(
-  stats: EnhancedStatsDto,
-  queryRange: { startDate: string; endDate: string }
-): StatsInsights {
-  const dateKeys = generateHeatmapDateKeys(queryRange);
+export function deriveStatsInsights(stats: EnhancedStatsDto): StatsInsights {
+  const dateKeys = generateHeatmapDateKeys({
+    startDate: stats.range.from,
+    endDate: stats.range.to,
+  });
   // The day map is keyed on the entry date, and a row whose date is missing
   // reaches the categories but not the days. Counting entries through the
   // categories is the only place that sees all of them.
   const entryCount = stats.categories.reduce((sum, category) => sum + category.count, 0);
 
-  const dayByDate = new Map(stats.heatmap.days.map((day) => [day.date, day]));
-  // A day that nets out to zero because something was bought and returned is
-  // still a day that was recorded, so activity is counted in entries.
-  const activeDays = stats.heatmap.days.filter((day) => day.entryCount > 0).length;
+  const totalByDate = new Map(stats.chart.map((point) => [point.date, point.total]));
+  const typicalDaily = median(dateKeys.map((date) => totalByDate.get(date) ?? "0"));
 
-  let longestStreak = 0;
-  let runningStreak = 0;
-  const weekdayTotals = Array.from({ length: 7 }, () => ({ total: "0", occurrences: 0 }));
-  for (const date of dateKeys) {
-    const day = dayByDate.get(date);
-    runningStreak = (day?.entryCount ?? 0) > 0 ? runningStreak + 1 : 0;
-    if (runningStreak > longestStreak) longestStreak = runningStreak;
-
-    const weekday = weekdayTotals[weekdayIndex(date)];
-    if (weekday == null) continue;
-    weekday.occurrences += 1;
-    weekday.total = add(weekday.total, day?.totalAmount ?? "0");
-  }
+  const remainingDays = civilDaysBetween(stats.range.to, stats.periodEnd);
+  const forecast =
+    stats.summary.comparison.mode === "same_period" &&
+    remainingDays > 0 &&
+    dateKeys.length >= FORECAST_MINIMUM_DAYS
+      ? add(stats.summary.total, multiply(typicalDaily, String(remainingDays)))
+      : null;
 
   const busiestDay = stats.chart.reduce<{ date: string; total: string } | null>(
     (best, point) => (best == null || compare(point.total, best.total) > 0 ? point : best),
     null
   );
 
-  const topMover = pickTopMover(stats);
-
   return {
     entryCount,
-    averageEntry: entryCount > 0 ? divide(stats.summary.total, String(entryCount)) : null,
-    activeDays,
-    periodDays: dateKeys.length,
+    typicalDaily,
+    forecast,
     busiestDay,
-    longestStreak,
-    weekdayAverages: weekdayTotals.map((weekday, index) => ({
-      weekday: index,
-      occurrences: weekday.occurrences,
-      average: weekday.occurrences > 0 ? divide(weekday.total, String(weekday.occurrences)) : "0",
-    })),
-    topMover,
+    topMover: pickTopMover(stats),
   };
 }
 

@@ -3,19 +3,18 @@ import { deriveStatsInsights } from "@/modules/stats/lib/derived-insights";
 import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 
-type Day = { date: string; total: string; entryCount?: number };
+type Day = { date: string; total: string };
 
-function statsWithDays(days: Day[], overrides: Partial<EnhancedStatsDto> = {}) {
+/** A running September, read through the 10th. */
+function september(days: Day[], overrides: Partial<EnhancedStatsDto> = {}) {
+  const base = buildEnhancedStatsFixture();
   return buildEnhancedStatsFixture({
-    chart: days.map((day) => ({ date: day.date, total: day.total })),
-    heatmap: {
-      days: days.map((day) => ({
-        date: day.date,
-        totalAmount: day.total,
-        entryCount: day.entryCount ?? 1,
-        currencies: ["CNY"],
-      })),
-      stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
+    range: { from: "2026-09-01", to: "2026-09-10" },
+    periodEnd: "2026-09-30",
+    chart: days,
+    summary: {
+      ...base.summary,
+      total: days.reduce((sum, day) => sum + Number(day.total), 0).toString(),
     },
     ...overrides,
   });
@@ -35,90 +34,97 @@ function category(overrides: Partial<EnhancedStatsDto["categories"][number]> = {
   };
 }
 
-// 2026-09-07 is a Monday, so this window runs Monday to Sunday.
-const week = { startDate: "2026-09-07", endDate: "2026-09-13" };
+/** Ten days of ¥30, one of them also paying ¥3,000 of rent. */
+const tenDaysWithRent = Array.from({ length: 10 }, (_, index) => ({
+  date: `2026-09-${String(index + 1).padStart(2, "0")}`,
+  total: index === 4 ? "3030" : "30",
+}));
 
 describe("deriveStatsInsights", () => {
-  it("counts the window's days even when nothing was recorded in it", () => {
-    const insights = deriveStatsInsights(buildEnhancedStatsFixture(), week);
+  it("has nothing to say about a window with nothing recorded", () => {
+    const insights = deriveStatsInsights(september([]));
 
     expect(insights).toMatchObject({
       entryCount: 0,
-      averageEntry: null,
-      activeDays: 0,
-      periodDays: 7,
+      typicalDaily: "0",
       busiestDay: null,
-      longestStreak: 0,
       topMover: null,
     });
-    expect(insights.weekdayAverages.map((day) => day.occurrences)).toEqual([1, 1, 1, 1, 1, 1, 1]);
-    expect(insights.weekdayAverages.map((day) => day.average)).toEqual(Array(7).fill("0"));
   });
 
-  it("reports no average entry rather than a zero one when nothing was recorded", () => {
-    // A zero average reads as "you spent nothing per entry", which is a claim
-    // about entries that do not exist.
-    expect(deriveStatsInsights(buildEnhancedStatsFixture(), week).averageEntry).toBeNull();
-  });
-
-  it("averages an entry over the categories' counts, not over the days", () => {
-    const stats = statsWithDays([{ date: "2026-09-07", total: "120" }], {
-      summary: { ...buildEnhancedStatsFixture().summary, total: "120" },
-      categories: [category({ count: 3 })],
+  it("counts entries through the categories", () => {
+    const stats = september([{ date: "2026-09-01", total: "120" }], {
+      categories: [category({ count: 3 }), category({ id: "fun", count: 2 })],
     });
 
-    expect(deriveStatsInsights(stats, week)).toMatchObject({ entryCount: 3, averageEntry: "40" });
+    expect(deriveStatsInsights(stats).entryCount).toBe(5);
   });
 
-  it("counts a day that nets out to zero as recorded", () => {
-    // Something bought and returned the same day nets to zero, but the day was
-    // still worked on.
-    const insights = deriveStatsInsights(
-      statsWithDays([{ date: "2026-09-07", total: "0", entryCount: 2 }]),
-      week
-    );
-
-    expect(insights.activeDays).toBe(1);
-    expect(insights.longestStreak).toBe(1);
+  it("takes a typical day as the middle one, so one rent payment does not move it", () => {
+    // The average of these ten days is ¥330; the day as it usually goes is ¥30.
+    expect(deriveStatsInsights(september(tenDaysWithRent)).typicalDaily).toBe("30");
   });
 
-  it("breaks the streak on a gap instead of walking the recorded days in order", () => {
-    // The recorded days are sparse: reading them as a sequence would call the
-    // 7th and the 13th two consecutive days.
+  it("counts a day with nothing recorded as a day that cost nothing", () => {
+    // Four of the ten days had spending; the middle of the ten is still zero.
     const insights = deriveStatsInsights(
-      statsWithDays([
-        { date: "2026-09-07", total: "10" },
-        { date: "2026-09-11", total: "10" },
-        { date: "2026-09-12", total: "10" },
-        { date: "2026-09-13", total: "10" },
-      ]),
-      week
+      september([
+        { date: "2026-09-01", total: "10" },
+        { date: "2026-09-02", total: "20" },
+        { date: "2026-09-03", total: "30" },
+        { date: "2026-09-04", total: "40" },
+      ])
     );
 
-    expect(insights.longestStreak).toBe(3);
-    expect(insights.activeDays).toBe(4);
+    expect(insights.typicalDaily).toBe("0");
   });
 
-  it("divides a weekday by how often it falls in the window, not by its recorded days", () => {
-    // Two Mondays, one of them with nothing on it. Averaging over recorded days
-    // would report 100 and hide that half the Mondays were quiet.
-    const fortnight = { startDate: "2026-09-07", endDate: "2026-09-20" };
+  it("averages the two middle days of an even count", () => {
     const insights = deriveStatsInsights(
-      statsWithDays([{ date: "2026-09-07", total: "100" }]),
-      fortnight
+      september(
+        [
+          { date: "2026-09-01", total: "10" },
+          { date: "2026-09-02", total: "30" },
+        ],
+        { range: { from: "2026-09-01", to: "2026-09-02" } }
+      )
     );
 
-    const monday = insights.weekdayAverages[0]!;
-    expect(monday).toEqual({ weekday: 0, occurrences: 2, average: "50" });
+    expect(insights.typicalDaily).toBe("20");
+  });
+
+  it("forecasts a running period as what is spent plus a typical day for each day left", () => {
+    // ¥3,300 so far, and twenty days to go at ¥30.
+    expect(deriveStatsInsights(september(tenDaysWithRent)).forecast).toBe("3900");
+  });
+
+  it("does not forecast a period that is over", () => {
+    const base = buildEnhancedStatsFixture();
+    const stats = september(tenDaysWithRent, {
+      range: { from: "2026-09-01", to: "2026-09-30" },
+      summary: {
+        ...base.summary,
+        comparison: { ...base.summary.comparison, mode: "full_period" },
+      },
+    });
+
+    expect(deriveStatsInsights(stats).forecast).toBeNull();
+  });
+
+  it("waits a few days before forecasting", () => {
+    const stats = september([{ date: "2026-09-01", total: "80" }], {
+      range: { from: "2026-09-01", to: "2026-09-02" },
+    });
+
+    expect(deriveStatsInsights(stats).forecast).toBeNull();
   });
 
   it("keeps a biggest day for a period that nets out negative", () => {
     const insights = deriveStatsInsights(
-      statsWithDays([
+      september([
         { date: "2026-09-07", total: "-40" },
         { date: "2026-09-08", total: "-10" },
-      ]),
-      week
+      ])
     );
 
     expect(insights.busiestDay).toEqual({ date: "2026-09-08", total: "-10" });
@@ -134,7 +140,7 @@ describe("deriveStatsInsights", () => {
       ],
     });
 
-    expect(deriveStatsInsights(stats, week).topMover).toEqual({
+    expect(deriveStatsInsights(stats).topMover).toEqual({
       id: "rent",
       name: "Rent",
       amountDelta: "300",
@@ -149,7 +155,7 @@ describe("deriveStatsInsights", () => {
       categories: [category({ id: "gum", name: "Gum", trend: { percent: 100, amount: "3" } })],
     });
 
-    expect(deriveStatsInsights(stats, week).topMover).toBeNull();
+    expect(deriveStatsInsights(stats).topMover).toBeNull();
   });
 
   it("stays quiet when there is no previous period to compare against", () => {
@@ -164,7 +170,7 @@ describe("deriveStatsInsights", () => {
       categories: [category({ id: "rent", name: "Rent", trend: { percent: 100, amount: "900" } })],
     });
 
-    expect(deriveStatsInsights(stats, week).topMover).toBeNull();
+    expect(deriveStatsInsights(stats).topMover).toBeNull();
   });
 
   it("reads a drop as a drop", () => {
@@ -174,21 +180,9 @@ describe("deriveStatsInsights", () => {
       categories: [category({ id: "rent", name: "Rent", trend: { percent: -30, amount: "-300" } })],
     });
 
-    expect(deriveStatsInsights(stats, week).topMover).toMatchObject({
+    expect(deriveStatsInsights(stats).topMover).toMatchObject({
       amountDelta: "300",
       direction: "down",
     });
-  });
-
-  it("spans a window that crosses a month boundary", () => {
-    const insights = deriveStatsInsights(
-      statsWithDays([
-        { date: "2026-08-31", total: "10" },
-        { date: "2026-09-01", total: "10" },
-      ]),
-      { startDate: "2026-08-31", endDate: "2026-09-01" }
-    );
-
-    expect(insights).toMatchObject({ periodDays: 2, activeDays: 2, longestStreak: 2 });
   });
 });

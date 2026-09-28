@@ -1,12 +1,14 @@
 import { readPeriodParams, writePeriodParams } from "./period-url-params";
 
-export type StatsView = "heatmap" | "trend";
+/** The daily columns ("trend", the name older links carry), the running total, or the calendar. */
+export type StatsView = "heatmap" | "trend" | "cumulative";
 
 type SearchParamsLike = Pick<URLSearchParams, "get" | "toString">;
 
 /** 统计's own query beyond the shared period: which chart it shows, heatmap by default. */
 export function readStatsView(searchParams: Pick<URLSearchParams, "get">): StatsView {
-  return searchParams.get("view") === "trend" ? "trend" : "heatmap";
+  const view = searchParams.get("view");
+  return view === "trend" || view === "cumulative" ? view : "heatmap";
 }
 
 export function writeStatsView(current: SearchParamsLike, view: StatsView): URLSearchParams {

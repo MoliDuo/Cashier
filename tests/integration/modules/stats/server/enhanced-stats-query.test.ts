@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
 import {
   activateTestSourceDocumentProjection,
+  createTestBooks,
   createTestUserWithLedger,
 } from "tests/helpers/schema-setup";
 import {
@@ -485,5 +486,127 @@ describe("queryEnhancedStats", () => {
     // Decimal sort keeps the truly larger category first.
     expect(result.categories.map((category) => category.totalConverted)).toEqual([hugeB, hugeA]);
     expect(result.categories[0]?.trend.amount).toBe(hugeB);
+  });
+
+  describe("a running period", () => {
+    async function recordOn(
+      date: string,
+      entries: { amount: string; currency?: string; itemName: string }[],
+      targetLedgerId = ledgerId,
+      bookId?: string
+    ) {
+      const db = getTestDb();
+      const [doc] = await db
+        .insert(sourceDocuments)
+        .values({
+          ledgerId: targetLedgerId,
+          documentDate: date,
+          bookId:
+            bookId ??
+            sql`(SELECT id FROM books WHERE ledger_id = ${targetLedgerId} ORDER BY sort_order LIMIT 1)`,
+        })
+        .returning();
+      await db.insert(ledgerEntries).values(
+        entries.map((entry) => ({
+          ledgerId: targetLedgerId,
+          sourceDocumentId: doc!.id,
+          amount: entry.amount,
+          currency: entry.currency ?? "CNY",
+          itemName: entry.itemName,
+          ...(targetLedgerId === ledgerId ? { categoryId } : {}),
+        }))
+      );
+      return doc!.id;
+    }
+
+    const runningMarch = {
+      queryRange: { from: "2024-03-01", to: "2024-03-10" },
+      compareRange: { from: "2024-02-01", to: "2024-02-10" },
+      comparisonMode: "same_period" as const,
+      periodEnd: "2024-03-31",
+      previousWholeTo: "2024-02-29",
+    };
+
+    it("compares totals over the same days and charts the previous month whole", async () => {
+      await recordOn("2024-02-05", [{ amount: "40", itemName: "early February" }]);
+      await recordOn("2024-02-20", [{ amount: "900", itemName: "late February" }]);
+      await recordOn("2024-03-05", [{ amount: "60", itemName: "March" }]);
+
+      const result = await getTargetEnhancedStatsQuery({ ledgerId, ...runningMarch });
+
+      expect(result.periodEnd).toBe("2024-03-31");
+      expect(result.summary.comparison).toMatchObject({
+        previousTotal: "40",
+        amountDelta: "20",
+        wholeTo: "2024-02-29",
+        previousWholeTotal: "940",
+      });
+      expect(result.previousChart).toEqual([
+        { date: "2024-02-05", total: "40" },
+        { date: "2024-02-20", total: "900" },
+      ]);
+      // A category's change is measured over the same days as the total's.
+      expect(result.categories[0]?.trend.amount).toBe("20");
+    });
+
+    it("lists the biggest entries by converted amount and leaves out refunds and unrated ones", async () => {
+      const db = getTestDb();
+      await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
+      await insertExchangeRates("2024-03-03", { USD: 1, CNY: 7 });
+      const deposit = await recordOn("2024-03-03", [
+        { amount: "500", currency: "USD", itemName: "deposit" },
+        { amount: "-20", itemName: "refund" },
+      ]);
+      await recordOn("2024-03-04", [
+        { amount: "80", itemName: "groceries" },
+        { amount: "9999", currency: "JPY", itemName: "no rate" },
+      ]);
+      for (const day of ["05", "06", "07", "08", "09"]) {
+        await recordOn(`2024-03-${day}`, [{ amount: "10", itemName: `coffee ${day}` }]);
+      }
+      await recordOn("2024-02-15", [{ amount: "5000", itemName: "last month" }]);
+
+      const result = await getTargetEnhancedStatsQuery({ ledgerId, ...runningMarch });
+
+      expect(result.largestEntries.map((entry) => entry.name)).toEqual([
+        "deposit",
+        "groceries",
+        "coffee 09",
+        "coffee 08",
+        "coffee 07",
+      ]);
+      expect(result.largestEntries[0]).toMatchObject({
+        sourceDocumentId: deposit,
+        categoryName: "餐饮",
+        date: "2024-03-03",
+        amount: "3500",
+        originalAmount: "500",
+        originalCurrency: "USD",
+      });
+    });
+
+    it("keeps the biggest entries to the book and the ledger asked for", async () => {
+      const db = getTestDb();
+      const travel = (await createTestBooks(db, ledgerId, ["旅行"])).get("旅行")!;
+      await recordOn("2024-03-02", [{ amount: "70", itemName: "home" }]);
+      await recordOn("2024-03-03", [{ amount: "700", itemName: "flight" }], ledgerId, travel);
+      const other = await createTestUserWithLedger(
+        db,
+        "someone-else@example.com",
+        undefined,
+        "00000000-0000-4000-8000-00000000000b"
+      );
+      await recordOn("2024-03-04", [{ amount: "7000", itemName: "not ours" }], other.ledgerId);
+
+      const all = await getTargetEnhancedStatsQuery({ ledgerId, ...runningMarch });
+      expect(all.largestEntries.map((entry) => entry.name)).toEqual(["flight", "home"]);
+
+      const travelOnly = await getTargetEnhancedStatsQuery({
+        ledgerId,
+        ...runningMarch,
+        bookId: travel,
+      });
+      expect(travelOnly.largestEntries.map((entry) => entry.name)).toEqual(["flight"]);
+    });
   });
 });

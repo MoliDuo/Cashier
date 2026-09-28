@@ -1,25 +1,50 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { BarChart3, Grid3X3 } from "lucide-react";
+import { BarChart3, Grid3X3, TrendingUp } from "lucide-react";
 import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import { parseDateString, type DateRangeType } from "@/lib/date-utils";
+import type { DateRangeType } from "@/lib/date-utils";
+import { openLedgerEntrySourceDocument } from "@/lib/navigation/ledger-detail-navigation";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
-import { deriveStatsInsights } from "@/modules/stats/lib/derived-insights";
+import { deriveStatsInsights, type StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { CalendarHeatmapSection } from "./CalendarHeatmapSection";
 import { StatsChart } from "./StatsChart";
+import { StatsCumulativeChart } from "./StatsCumulativeChart";
 import { StatsHighlights } from "./StatsHighlights";
+import { StatsLargestEntries } from "./StatsLargestEntries";
 import { StatsPanel } from "./StatsPanel";
 import { StatsRanking } from "./StatsRanking";
 import { StatsSummary } from "./StatsSummary";
-import { StatsWeekdayRhythm } from "./StatsWeekdayRhythm";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { statsTabCopy } from "@/copy/stats";
 
 /** How finely the charts read the days: by day for a week or a month, by month beyond. */
 export type StatsScale = DateRangeType;
+
+/** The daily columns, the running total, or the calendar. */
+type StatsChartView = "trend" | "cumulative" | "heatmap";
+
+const CHART_VIEWS: { view: StatsChartView; label: string; icon: typeof BarChart3 }[] = [
+  { view: "trend", label: statsTabCopy.daily, icon: BarChart3 },
+  { view: "cumulative", label: statsTabCopy.cumulative, icon: TrendingUp },
+  { view: "heatmap", label: statsTabCopy.heatmap, icon: Grid3X3 },
+];
+
+const CHART_TITLES: Record<StatsChartView, string> = {
+  trend: statsTabCopy.expenseTrend,
+  cumulative: statsTabCopy.cumulativeExpense,
+  heatmap: statsTabCopy.dailyHeatmap,
+};
+
+const NO_INSIGHTS: StatsInsights = {
+  entryCount: 0,
+  typicalDaily: "0",
+  forecast: null,
+  busiestDay: null,
+  topMover: null,
+};
 
 interface StatsContentViewProps {
   /** The period control, owned by the route that owns the URL. */
@@ -33,8 +58,8 @@ interface StatsContentViewProps {
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
-  chartView: "trend" | "heatmap";
-  onChartViewChange: (view: "trend" | "heatmap") => void;
+  chartView: StatsChartView;
+  onChartViewChange: (view: StatsChartView) => void;
   fallbackCurrency?: string;
   onCategoryDrilldown?: (categoryId: string, startDate: string, endDate: string) => void;
   onDateDrilldown?: (date: string) => void;
@@ -60,20 +85,13 @@ export function StatsContentView({
   const periodLabel = comparisonLabel ?? "";
   const startDateStr = range.from;
   const endDateStr = range.to;
-  const startDate = parseDateString(startDateStr);
-  const endDate = parseDateString(endDateStr);
 
   // Derived once here rather than in each panel: they are all reading the same
-  // payload, and three copies of the walk would be three chances to disagree.
+  // payload, and several copies of the walk would be several chances to disagree.
   const insights = useMemo(
     () =>
-      stats == null
-        ? null
-        : withoutComparison(
-            deriveStatsInsights(stats, { startDate: startDateStr, endDate: endDateStr }),
-            comparisonLabel == null
-          ),
-    [comparisonLabel, endDateStr, startDateStr, stats]
+      stats == null ? null : withoutComparison(deriveStatsInsights(stats), comparisonLabel == null),
+    [comparisonLabel, stats]
   );
 
   if (isError && stats == null) {
@@ -95,29 +113,24 @@ export function StatsContentView({
   }
 
   const viewSwitch = (
-    <div className="flex items-center gap-1">
-      <Button
-        variant={chartView === "heatmap" ? "default" : "ghost"}
-        size="sm"
-        onClick={() => onChartViewChange("heatmap")}
-        aria-pressed={chartView === "heatmap"}
-        className="h-9 px-2.5 sm:h-7 sm:px-2"
-      >
-        <Grid3X3 aria-hidden="true" className="mr-1 h-4 w-4" />
-        {statsTabCopy.heatmap}
-      </Button>
-      <Button
-        variant={chartView === "trend" ? "default" : "ghost"}
-        size="sm"
-        onClick={() => onChartViewChange("trend")}
-        aria-pressed={chartView === "trend"}
-        className="h-9 px-2.5 sm:h-7 sm:px-2"
-      >
-        <BarChart3 aria-hidden="true" className="mr-1 h-4 w-4" />
-        {statsTabCopy.trend}
-      </Button>
+    <div role="group" aria-label={statsTabCopy.chartViews} className="flex items-center gap-1">
+      {CHART_VIEWS.map(({ view, label, icon: Icon }) => (
+        <Button
+          key={view}
+          variant={chartView === view ? "default" : "ghost"}
+          size="sm"
+          onClick={() => onChartViewChange(view)}
+          aria-pressed={chartView === view}
+          className="h-9 px-2.5 sm:h-7 sm:px-2"
+        >
+          <Icon aria-hidden="true" className="mr-1 h-4 w-4" />
+          {label}
+        </Button>
+      ))}
     </div>
   );
+
+  const comparison = stats?.summary.comparison;
 
   return (
     <div className="relative space-y-6" aria-busy={isLoading}>
@@ -144,23 +157,9 @@ export function StatsContentView({
         total={stats?.summary.total ?? "0"}
         dailyAverage={stats?.summary.dailyAverage ?? "0"}
         currencySymbol={currencySymbol}
-        comparison={comparisonLabel == null ? undefined : stats?.summary.comparison}
+        comparison={comparisonLabel == null ? undefined : comparison}
         periodLabel={periodLabel}
-        insights={
-          insights ?? {
-            entryCount: 0,
-            averageEntry: null,
-            activeDays: 0,
-            periodDays: 0,
-            busiestDay: null,
-            longestStreak: 0,
-            weekdayAverages: [],
-            topMover: null,
-          }
-        }
-        chart={stats?.chart ?? []}
-        previousChart={stats?.previousChart ?? []}
-        onExpandTrend={chartView === "trend" ? undefined : () => onChartViewChange("trend")}
+        insights={insights ?? NO_INSIGHTS}
         isLoading={isLoading && stats == null}
       />
 
@@ -176,10 +175,7 @@ export function StatsContentView({
        */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
         <div className="min-w-0 lg:col-span-7">
-          <StatsPanel
-            title={chartView === "trend" ? statsTabCopy.expenseTrend : statsTabCopy.dailyHeatmap}
-            actions={viewSwitch}
-          >
+          <StatsPanel title={CHART_TITLES[chartView]} actions={viewSwitch}>
             {stats == null ? (
               <div
                 className="h-64 animate-pulse rounded-lg border border-border bg-surface2/60"
@@ -190,12 +186,34 @@ export function StatsContentView({
             ) : chartView === "trend" ? (
               <StatsChart
                 data={stats.chart}
+                range={stats.range}
                 previousData={stats.previousChart}
+                previousRange={
+                  comparisonLabel == null || comparison == null
+                    ? null
+                    : { from: comparison.from, to: comparison.to }
+                }
                 dailyAverage={stats.summary.dailyAverage}
                 rangeType={scale}
-                startDate={startDate}
-                endDate={endDate}
-                isLoading={isLoading && stats == null}
+                currencySymbol={currencySymbol}
+              />
+            ) : chartView === "cumulative" ? (
+              <StatsCumulativeChart
+                data={stats.chart}
+                range={stats.range}
+                periodEnd={stats.periodEnd}
+                forecast={insights?.forecast ?? null}
+                previous={
+                  comparisonLabel == null
+                    ? null
+                    : {
+                        data: stats.previousChart,
+                        from: stats.summary.comparison.from,
+                        to: stats.summary.comparison.wholeTo,
+                        total: stats.summary.comparison.previousWholeTotal,
+                        label: comparisonLabel,
+                      }
+                }
                 currencySymbol={currencySymbol}
               />
             ) : (
@@ -216,6 +234,11 @@ export function StatsContentView({
             data={stats?.categories ?? []}
             isLoading={isLoading && stats == null}
             currencySymbol={currencySymbol}
+            showChange={
+              comparisonLabel != null &&
+              comparison != null &&
+              Number(comparison.previousTotal) !== 0
+            }
             {...(onCategoryDrilldown !== undefined
               ? {
                   onCategoryClick: (categoryId: string) =>
@@ -224,19 +247,20 @@ export function StatsContentView({
               : {})}
           />
 
+          {stats != null ? (
+            <StatsLargestEntries
+              entries={stats.largestEntries}
+              currencySymbol={currencySymbol}
+              onOpen={openLedgerEntrySourceDocument}
+            />
+          ) : null}
+
           {insights != null ? (
             <StatsHighlights
               insights={insights}
               currencySymbol={currencySymbol}
               periodLabel={periodLabel}
               {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
-            />
-          ) : null}
-
-          {insights != null && scale !== "week" ? (
-            <StatsWeekdayRhythm
-              weekdayAverages={insights.weekdayAverages}
-              currencySymbol={currencySymbol}
             />
           ) : null}
         </div>

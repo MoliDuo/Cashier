@@ -1,11 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { StatsSummary } from "@/modules/stats/ui/StatsSummary";
 import { deriveStatsInsights } from "@/modules/stats/lib/derived-insights";
 import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
 import { expectAmountVariant } from "tests/helpers/class-tables";
-
-const week = { startDate: "2026-09-07", endDate: "2026-09-13" };
 
 function propsFor(stats = buildEnhancedStatsFixture()) {
   return {
@@ -14,10 +12,32 @@ function propsFor(stats = buildEnhancedStatsFixture()) {
     currencySymbol: "CNY",
     comparison: stats.summary.comparison,
     periodLabel: "上月",
-    insights: deriveStatsInsights(stats, week),
-    chart: stats.chart,
-    previousChart: stats.previousChart,
+    insights: deriveStatsInsights(stats),
   };
+}
+
+/** Six days of August, ¥10 a day and a ¥600 day among them, with the month still running. */
+function augustWithOneBigDay() {
+  return buildEnhancedStatsFixture({
+    periodEnd: "2026-08-31",
+    summary: { ...buildEnhancedStatsFixture().summary, total: "650", dailyAverage: "108.33" },
+    categories: [
+      {
+        id: "home",
+        name: "Home",
+        icon: null,
+        totalConverted: "650",
+        currency: "CNY",
+        percent: 100,
+        count: 6,
+        trend: { percent: 0, amount: "0" },
+      },
+    ],
+    chart: ["01", "02", "03", "04", "05", "06"].map((day) => ({
+      date: `2026-08-${day}`,
+      total: day === "03" ? "600" : "10",
+    })),
+  });
 }
 
 describe("StatsSummary", () => {
@@ -27,58 +47,32 @@ describe("StatsSummary", () => {
     expectAmountVariant(screen.getByText("¥120.00"), "hero");
   });
 
-  it("puts the total in proportion with the figures behind it", () => {
-    const stats = buildEnhancedStatsFixture({
-      categories: [
-        {
-          id: "food",
-          name: "Food",
-          icon: null,
-          totalConverted: "120",
-          currency: "CNY",
-          percent: 100,
-          count: 4,
-          trend: { percent: 0, amount: "0" },
-        },
-      ],
-      chart: [{ date: "2026-09-07", total: "120" }],
-      heatmap: {
-        days: [{ date: "2026-09-07", totalAmount: "120", entryCount: 4, currencies: ["CNY"] }],
-        stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
-      },
-    });
+  it("sets the typical day beside the average, which one big day pulls up", () => {
+    render(<StatsSummary {...propsFor(augustWithOneBigDay())} />);
 
+    expect(screen.getByText("日均支出").nextElementSibling).toHaveTextContent("¥108.33");
+    expect(screen.getByText("典型日支出").nextElementSibling).toHaveTextContent("¥10.00");
+    expect(screen.getByText("笔数").nextElementSibling).toHaveTextContent("6");
+  });
+
+  it("forecasts where a running period is heading", () => {
+    // ¥650 so far, and 25 more days of August at a typical ¥10.
+    render(<StatsSummary {...propsFor(augustWithOneBigDay())} />);
+
+    expect(screen.getByText("预计本期").nextElementSibling).toHaveTextContent("¥900.00");
+  });
+
+  it("does not forecast a period that is over", () => {
+    const base = augustWithOneBigDay();
+    const stats = {
+      ...base,
+      summary: {
+        ...base.summary,
+        comparison: { ...base.summary.comparison, mode: "full_period" as const },
+      },
+    };
     render(<StatsSummary {...propsFor(stats)} />);
 
-    expect(screen.getByText("4")).toBeVisible();
-    expect(screen.getByText("¥30.00")).toBeVisible();
-    expect(screen.getByText("1 / 7")).toBeVisible();
-  });
-
-  it("says there is no average entry rather than showing a zero one", () => {
-    render(<StatsSummary {...propsFor()} />);
-
-    expect(screen.getByText("—")).toBeVisible();
-  });
-
-  it("offers the full trend beside the sparkline, and stops offering it once open", () => {
-    const stats = buildEnhancedStatsFixture({
-      chart: [
-        { date: "2026-09-07", total: "10" },
-        { date: "2026-09-08", total: "20" },
-      ],
-    });
-    const onExpandTrend = vi.fn();
-    const { rerender } = render(
-      <StatsSummary {...propsFor(stats)} onExpandTrend={onExpandTrend} />
-    );
-
-    // The line is a picture; the way to the chart is a button that says so.
-    expect(screen.getByRole("img", { name: "本期日支出" }).closest("button")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "查看趋势" }));
-    expect(onExpandTrend).toHaveBeenCalledOnce();
-
-    rerender(<StatsSummary {...propsFor(stats)} />);
-    expect(screen.queryByRole("button", { name: "查看趋势" })).not.toBeInTheDocument();
+    expect(screen.queryByText("预计本期")).not.toBeInTheDocument();
   });
 });

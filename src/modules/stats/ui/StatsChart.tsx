@@ -3,108 +3,84 @@ import { useMemo, useState } from "react";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { useLedgerTimeZone } from "@/lib/ledger-time-zone";
-import {
-  type DateRangeType,
-  formatDateTimeForApi,
-  formatRelativeDateLabel,
-} from "@/lib/date-utils";
+import { type DateRangeType, formatRelativeDateLabel } from "@/lib/date-utils";
 import { formatCompactCurrencyAmount, formatCurrencyAmount } from "@/lib/format/currency";
 import { buildChartPoints } from "@/modules/stats/lib/chart-points";
+import { niceScale } from "@/modules/stats/lib/chart-scale";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { statsChartCopy, statsTabCopy } from "@/copy/stats";
 
 interface StatsChartProps {
   data: { date: string; total: string }[];
-  /** The comparison window's daily totals, read off against `data` by position. */
+  /** The days charted, one bar each (one a month on the year scale). */
+  range: { from: string; to: string };
+  /** The comparison period's daily totals; read against `data` by position. */
   previousData?: { date: string; total: string }[];
+  /** The comparison period's compared days; null when there is nothing to compare. */
+  previousRange?: { from: string; to: string } | null;
   dailyAverage?: string;
   rangeType: DateRangeType;
-  startDate: Date;
-  endDate: Date;
-  isLoading?: boolean;
   currencySymbol?: string;
 }
 
+/** The plot's height; the axis labels sit in the padding around it. */
+const PLOT_HEIGHT = 140;
+
+/**
+ * Each day's spending as a column, with the same day of the comparison period
+ * as a dashed step behind it. Spending comes in separate amounts on separate
+ * days, which columns say plainly; a line through them implied a slope between
+ * days that was never there.
+ */
 export function StatsChart({
-  data = [],
+  data,
+  range,
   previousData = [],
+  previousRange = null,
   dailyAverage = "0",
   rangeType,
-  startDate,
-  endDate,
-  isLoading,
   currencySymbol = "CNY",
 }: StatsChartProps) {
   const locale = DISPLAY_LOCALE;
   const timeZone = useLedgerTimeZone();
-  // The queried range is already truncated to the ledger-timezone today by the
-  // stats state; do not re-clamp with the browser clock here.
-  const chartPoints = useMemo(() => {
-    if (isLoading) return [];
-    return buildChartPoints({
-      data,
-      rangeType,
-      startDate: formatDateTimeForApi(startDate)!,
-      endDate: formatDateTimeForApi(endDate)!,
-      locale,
-    });
-  }, [data, endDate, isLoading, locale, rangeType, startDate]);
-  // The comparison window covers different dates, so it is lined up against
-  // this one by position — its first day under this period's first day — and
-  // cut where this period ends rather than stretched across it.
+  const points = useMemo(
+    () => buildChartPoints({ data, rangeType, startDate: range.from, endDate: range.to, locale }),
+    [data, locale, range.from, range.to, rangeType]
+  );
+  // The comparison period covers other dates, so it is lined up by position —
+  // its first day under this period's first day, counted from the day it
+  // starts rather than its first record — and cut where this period ends.
   const previousValues = useMemo(() => {
-    if (isLoading || previousData.length === 0) return [];
+    if (previousRange == null) return [];
     return buildChartPoints({
       data: previousData,
       rangeType,
-      startDate: previousData[0]!.date,
-      endDate: previousData[previousData.length - 1]!.date,
+      startDate: previousRange.from,
+      endDate: previousRange.to,
       locale,
-    }).map((point) => point.value);
-  }, [isLoading, locale, previousData, rangeType]);
-  const [hoveredPoint, setHoveredPoint] = useState<{
-    index: number;
-    dataset: typeof chartPoints;
-  } | null>(null);
+    })
+      .slice(0, points.length)
+      .map((point) => point.value);
+  }, [locale, points.length, previousData, previousRange, rangeType]);
+  const [active, setActive] = useState<number | null>(null);
 
-  // 计算95th percentile作为Y轴显示上限，处理异常值
-  const { yAxisMax, hasOutliers } = useMemo(() => {
-    if (chartPoints.length === 0) return { yAxisMax: 1, hasOutliers: false };
+  // A few outlying days — rent, a deposit — would flatten every other column
+  // against the floor, so past the 90th percentile the scale is capped and the
+  // tall ones marked. Two such days in each of two months are still under a
+  // twentieth of the columns, which a 95th percentile would let through.
+  const { scale, capped } = useMemo(() => {
+    const values = [...points.map((point) => point.value), ...previousValues];
+    const maxValue = Math.max(0, ...values);
+    const sorted = values.toSorted((left, right) => left - right);
+    const p90 = sorted[Math.max(0, Math.ceil(sorted.length * 0.9) - 1)] ?? maxValue;
+    const cap = values.length >= 10 && maxValue - p90 >= maxValue * 0.2;
+    return {
+      scale: niceScale(cap ? Math.max(p90, maxValue * 0.2) : maxValue),
+      capped: cap,
+    };
+  }, [points, previousValues]);
 
-    const values = [...chartPoints.map((p) => p.value), ...previousValues];
-    const maxVal = Math.max(...values, 1);
-
-    // 数据点少于10个时，使用最大值（避免过度压缩）
-    if (values.length < 10) {
-      return { yAxisMax: maxVal, hasOutliers: false };
-    }
-
-    // 计算95th percentile
-    const sorted = [...values].sort((a, b) => a - b);
-    const p95Index = Math.ceil(sorted.length * 0.95) - 1;
-    const p95Value = sorted[p95Index] ?? maxVal;
-
-    // 如果95th percentile与最大值差距不大（<20%），直接使用最大值
-    if (maxVal - p95Value < maxVal * 0.2) {
-      return { yAxisMax: maxVal, hasOutliers: false };
-    }
-
-    // 确保封顶线至少是最大值的20%（避免过度拉伸）
-    const yAxisMax = Math.max(p95Value, maxVal * 0.2);
-    return { yAxisMax, hasOutliers: true };
-  }, [chartPoints, previousValues]);
-
-  if (isLoading) {
-    return (
-      <div
-        className="h-48 w-full animate-pulse rounded-lg bg-surface2/30"
-        role="status"
-        aria-busy="true"
-      />
-    );
-  }
-
-  if (chartPoints.length === 0) {
+  if (points.length === 0) {
     return (
       <div
         className={textRoleClassName(
@@ -117,252 +93,203 @@ export function StatsChart({
     );
   }
 
-  // Calculate chart dimensions (chart area height)
-  // At most twelve month labels at any width; the year view steps by one.
-  const yearLabelStep = Math.max(1, Math.ceil(chartPoints.length / 12));
-  const chartHeight = 130; // pixels, matches h-full minus padding
-  const paddingTop = 10; // 10% top padding
-  const paddingBottom = 10; // 10% bottom padding
-  const formatAmount = (value: string) => formatCurrencyAmount(value, currencySymbol, locale);
-  const formatAxisAmount = (value: number) =>
-    formatCompactCurrencyAmount(value, currencySymbol, locale);
-  const yAxisMin = Math.min(0, ...chartPoints.map((point) => point.value));
-  const yAxisRange = yAxisMax - yAxisMin;
-  const averageValue = Number(dailyAverage);
-  const averageOffset =
-    Number.isFinite(averageValue) && averageValue > yAxisMin && averageValue < yAxisMax
-      ? paddingTop +
-        (1 - (averageValue - yAxisMin) / yAxisRange) * (100 - paddingTop - paddingBottom)
+  const minValue = Math.min(0, ...points.map((point) => point.value));
+  const span = scale.max - minValue;
+  /** Distance from the top of the plot, as a percentage of its height. */
+  const top = (value: number) =>
+    ((scale.max - Math.max(minValue, Math.min(value, scale.max))) / span) * 100;
+  const zero = top(0);
+  const money = (value: string) => formatCurrencyAmount(value, currencySymbol, locale);
+  const average = Number(dailyAverage);
+  const averageTop =
+    rangeType !== "year" && Number.isFinite(average) && average > 0 && average < scale.max
+      ? top(average)
       : null;
-  const yAxisTicks = [
-    yAxisMax,
-    yAxisMin + (yAxisRange * 2) / 3,
-    yAxisMin + yAxisRange / 3,
-    yAxisMin,
-  ];
+  const count = points.length;
+  // At most twelve month labels at any width; the year view steps by one.
+  const yearLabelStep = Math.max(1, Math.ceil(count / 12));
+  const label = (fullDate: string) =>
+    rangeType === "year" ? fullDate : formatRelativeDateLabel(fullDate, locale, timeZone);
 
   return (
-    <div className="w-full h-52 relative pt-6 pb-6 select-none">
-      {/* Legend for the comparison line, which is otherwise an unexplained dash. */}
-      {previousValues.length > 1 ? (
-        <div className="absolute left-12 top-0 flex items-center gap-1.5 text-micro text-muted-foreground">
-          <span aria-hidden="true" className="h-px w-4 border-t border-dashed border-current" />
-          {statsTabCopy.sparklinePrevious}
-        </div>
-      ) : null}
-      {/* Outlier indicator */}
-      {hasOutliers && (
-        <div className="absolute top-0 right-2 text-micro text-muted-foreground bg-surface2/50 px-2 py-0.5 rounded-full">
-          {statsChartCopy.scaleAdjusted}
-        </div>
-      )}
-      {/* The period's own daily average, so a point reads as above or below par. */}
-      {averageOffset != null ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute left-12 right-2"
-          style={{ top: `calc(1.5rem + ${chartHeight}px * ${averageOffset / 100})` }}
-        >
-          <div className="border-t border-dashed border-primary/50" />
-          <span
-            className={cn(
-              "absolute right-0 rounded bg-surface px-1 text-micro text-primary",
-              // Near the top the tag would sit on the scale badge; it goes under
-              // the line there.
-              averageOffset < 20 ? "top-0.5" : "-top-4"
-            )}
-          >
-            {statsTabCopy.dailyAverageLine}
+    <div className="relative w-full select-none pt-7">
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 pl-12">
+        {previousValues.length > 0 ? (
+          <ul className="flex items-center gap-3 text-micro text-muted-foreground">
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-2.5 w-2 rounded-t-[2px] bg-primary" />
+              {statsTabCopy.thisPeriod}
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className="w-4 border-t-[1.5px] border-dashed border-muted-foreground"
+              />
+              {statsTabCopy.previousSamePeriod}
+            </li>
+          </ul>
+        ) : (
+          <span />
+        )}
+        {capped ? (
+          <span className="rounded-full bg-surface2/60 px-2 py-0.5 text-micro text-muted-foreground">
+            {statsChartCopy.scaleAdjusted}
           </span>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      {/* Grid Lines */}
-      <div className="pointer-events-none absolute bottom-8 left-12 right-2 top-6 flex flex-col justify-between">
-        {yAxisTicks.map((tick) => (
-          <div key={tick} className="relative h-px w-full border-b border-dashed border-border/40">
+      <div className="relative ml-12 mr-2" style={{ height: `${PLOT_HEIGHT}px` }}>
+        {/* Hairline gridlines at round values; the axis reads the columns nobody labels. */}
+        {scale.ticks.map((tick) => (
+          <div
+            key={tick}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 border-t border-border/60"
+            style={{ top: `${top(tick)}%` }}
+          >
             <span className="absolute right-full -translate-y-1/2 pr-2 text-micro tabular-nums text-muted-foreground">
-              {formatAxisAmount(tick)}
+              {formatCompactCurrencyAmount(tick, currencySymbol, locale)}
             </span>
           </div>
         ))}
-      </div>
 
-      {/* Chart Area - Using relative positioning for points */}
-      <div className="absolute left-12 right-2 top-6" style={{ height: `${chartHeight}px` }}>
-        {/* SVG for line only - stretched horizontally */}
-        <svg
-          role="img"
-          aria-label={statsTabCopy.expenseTrend}
-          className="absolute inset-0 w-full h-full overflow-visible"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
-          {/* Last period, for scale: the same days one period back. */}
-          {previousValues.length > 1 && (
-            <polyline
-              points={previousValues
-                .map((value, index) => {
-                  const xPercent =
-                    previousValues.length === 1 ? 50 : (index / (previousValues.length - 1)) * 100;
-                  const displayValue = Math.min(value, yAxisMax);
-                  const yPercent =
-                    paddingTop +
-                    (1 - (displayValue - yAxisMin) / yAxisRange) *
-                      (100 - paddingTop - paddingBottom);
-                  return `${xPercent},${yPercent}`;
-                })
-                .join(" ")}
-              fill="none"
-              stroke="var(--chart-5)"
-              strokeWidth="1.5"
-              strokeDasharray="4 4"
-              opacity="0.55"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
+        {averageTop != null ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-primary/50"
+            style={{ top: `${averageTop}%` }}
+          >
+            <span className="absolute -top-4 right-0 rounded bg-surface px-1 text-micro text-muted-foreground">
+              {statsTabCopy.dailyAverageLine}
+            </span>
+          </div>
+        ) : null}
 
-          {/* Line Path */}
-          {chartPoints.length > 1 && (
-            <polyline
-              points={chartPoints
-                .map((p, i) => {
-                  const xPercent =
-                    chartPoints.length === 1 ? 50 : (i / (chartPoints.length - 1)) * 100;
-                  // Calculate y position (inverted: 0 at top) using capped value
-                  const displayValue = Math.min(p.value, yAxisMax);
-                  const yPercent =
-                    paddingTop +
-                    (1 - (displayValue - yAxisMin) / yAxisRange) *
-                      (100 - paddingTop - paddingBottom);
-                  return `${xPercent},${yPercent}`;
-                })
-                .join(" ")}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-primary transition-[color,stroke] duration-[var(--motion-state)] ease-[var(--motion-state-ease)]"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-        </svg>
-
-        {/* Points - Using absolute positioning with CSS (no SVG distortion) */}
-        {chartPoints.map((p, i) => {
-          const leftPercent = chartPoints.length === 1 ? 50 : (i / (chartPoints.length - 1)) * 100;
-          // Calculate top position using capped value
-          const isCapped = p.value > yAxisMax;
-          const displayValue = Math.min(p.value, yAxisMax);
-          const topPercent =
-            paddingTop +
-            (1 - (displayValue - yAxisMin) / yAxisRange) * (100 - paddingTop - paddingBottom);
-
-          // Format display date based on range type
-          const displayDate =
-            rangeType === "year"
-              ? p.fullDate // YYYY-MM format
-              : formatRelativeDateLabel(p.fullDate, locale, timeZone);
-
-          const isHovered = hoveredPoint?.dataset === chartPoints && hoveredPoint.index === i;
-
-          return (
-            <div
-              key={i}
-              className="absolute"
-              style={{
-                left: `${leftPercent}%`,
-                top: `${topPercent}%`,
-              }}
-            >
-              {/* Data Point */}
-              <button
-                type="button"
-                aria-label={`${displayDate}, ${statsChartCopy.expense}: ${formatAmount(p.total)}`}
-                aria-current={isHovered ? "true" : undefined}
-                onMouseEnter={() => setHoveredPoint({ index: i, dataset: chartPoints })}
-                onMouseLeave={() => setHoveredPoint(null)}
-                onFocus={() => setHoveredPoint({ index: i, dataset: chartPoints })}
-                onBlur={() => setHoveredPoint(null)}
-                onClick={() =>
-                  setHoveredPoint(isHovered ? null : { index: i, dataset: chartPoints })
-                }
-                className={`
-                    w-[7px] h-[7px] rounded-full bg-bg -translate-x-1/2 -translate-y-1/2
-                    cursor-pointer transition-[color,background-color,border-color,opacity] duration-[var(--motion-feedback)]
-                    ${
-                      isCapped
-                        ? 'border-2 border-danger after:content-["↑"] after:absolute after:-top-4 after:left-1/2 after:-translate-x-1/2 after:text-micro after:text-danger'
-                        : "border-2 border-primary hover:border-primary/70"
-                    }
-                  `}
-              />
-
-              {/* Tooltip */}
-              {isHovered && (
-                <div
+        <div className="absolute inset-0 flex">
+          {points.map((point, index) => {
+            const previous = previousValues[index];
+            const isCapped = point.value > scale.max;
+            const valueTop = top(point.value);
+            const barTop = Math.min(valueTop, zero);
+            const barHeight = Math.abs(zero - valueTop);
+            const isActive = active === index;
+            const leftPercent = ((index + 0.5) / count) * 100;
+            return (
+              <div key={point.fullDate} className="relative h-full flex-1">
+                <button
+                  type="button"
+                  aria-label={[
+                    `${label(point.fullDate)}, ${statsChartCopy.expense}: ${money(point.total)}`,
+                    previous == null
+                      ? null
+                      : `${statsTabCopy.previousSamePeriod}: ${money(String(previous))}`,
+                  ]
+                    .filter((part) => part != null)
+                    .join(", ")}
+                  aria-current={isActive ? "true" : undefined}
+                  onPointerEnter={() => setActive(index)}
+                  onPointerLeave={() => setActive(null)}
+                  onFocus={() => setActive(index)}
+                  onBlur={() => setActive(null)}
+                  // A tap fires pointer-enter first, so toggling here would close
+                  // what the tap had just opened; a tap on another column moves it.
+                  onClick={() => setActive(index)}
                   className={cn(
-                    textRoleClassName(
-                      "meta",
-                      "absolute bottom-full mb-2 px-2 py-1.5 bg-popover text-popover-foreground rounded shadow-lg border whitespace-nowrap z-tooltip pointer-events-none"
-                    ),
-                    // Centred over an end point it would hang past the card, where
-                    // the page clips it; the ends open inward instead.
-                    leftPercent < 25
-                      ? "left-0"
-                      : leftPercent > 75
-                        ? "right-0"
-                        : "left-1/2 -translate-x-1/2"
+                    "absolute inset-0 rounded-sm transition-colors duration-[var(--motion-feedback)]",
+                    isActive && "bg-surface2/70"
                   )}
                 >
-                  <div className="font-medium">{displayDate}</div>
-                  <div className={isCapped ? "text-danger" : ""}>
-                    {statsChartCopy.expense}: {formatAmount(p.total)}
-                    {isCapped && statsChartCopy.exceedsLimit}
+                  {barHeight > 0 ? (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute left-1/2 -translate-x-1/2 bg-primary",
+                        point.value < 0 ? "rounded-b-[4px]" : "rounded-t-[4px]"
+                      )}
+                      style={{
+                        top: `${barTop}%`,
+                        height: `max(${barHeight}%, 1px)`,
+                        width: "min(24px, 64%)",
+                      }}
+                    />
+                  ) : null}
+                  {isCapped ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-4 left-1/2 -translate-x-1/2 text-micro text-muted-foreground"
+                    >
+                      ↑
+                    </span>
+                  ) : null}
+                  {previous != null ? (
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 border-t-[1.5px] border-dashed border-muted-foreground/70"
+                      style={{ top: `${top(previous)}%` }}
+                    />
+                  ) : null}
+                </button>
+
+                {isActive ? (
+                  <div
+                    role="tooltip"
+                    className={cn(
+                      textRoleClassName(
+                        "meta",
+                        "pointer-events-none absolute z-tooltip mb-1 whitespace-nowrap rounded border bg-popover px-2 py-1.5 text-popover-foreground shadow-lg"
+                      ),
+                      // Centred over an end column it would hang past the card,
+                      // where the page clips it; the ends open inward instead.
+                      leftPercent < 25
+                        ? "left-0"
+                        : leftPercent > 75
+                          ? "right-0"
+                          : "left-1/2 -translate-x-1/2"
+                    )}
+                    // It sits just above the taller of the column and the step.
+                    style={{
+                      bottom: `${100 - Math.min(barTop, previous == null ? 100 : top(previous))}%`,
+                    }}
+                  >
+                    <div className="font-medium text-text">{label(point.fullDate)}</div>
+                    <div className="tabular-nums">
+                      {statsTabCopy.thisPeriod} {money(point.total)}
+                      {isCapped ? statsChartCopy.exceedsLimit : null}
+                    </div>
+                    {previous != null ? (
+                      <div className="tabular-nums">
+                        {statsTabCopy.previousSamePeriod} {money(String(previous))}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* X Axis Labels */}
-      <div className="absolute bottom-0 left-12 right-2 h-6">
-        {chartPoints.map((p, i) => {
-          // Label Filtering
-          let showLabel = false;
+      <div className="relative ml-12 mr-2 h-6">
+        {points.map((point, index) => {
+          let show = false;
           let wideOnly = false;
-          if (rangeType === "week") {
-            showLabel = true;
-          } else if (rangeType === "year") {
-            // Twelve month labels touch on a phone, so it keeps every other
-            // one; a range of several years steps further at every width.
-            showLabel = i % yearLabelStep === 0;
-            wideOnly = (i / yearLabelStep) % 2 === 1;
-          } else if (rangeType === "month") {
-            // Show 1, 6, 11, 16, 21, 26, 31 (Every 5 days + last day?)
-            if (i === 0 || i === chartPoints.length - 1 || i % 5 === 0) {
-              showLabel = true;
-            }
-          }
-
-          if (!showLabel) return null;
-
-          const leftPos = chartPoints.length === 1 ? 50 : (i / (chartPoints.length - 1)) * 100;
-
+          if (rangeType === "week") show = true;
+          else if (rangeType === "year") {
+            // Twelve month labels touch on a phone, so it keeps every other one.
+            show = index % yearLabelStep === 0;
+            wideOnly = (index / yearLabelStep) % 2 === 1;
+          } else show = index === 0 || index === count - 1 || index % 5 === 0;
+          if (!show) return null;
           return (
             <div
-              key={i}
+              key={point.fullDate}
               className={cn(
-                "absolute text-micro text-muted-foreground transform -translate-x-1/2 text-center w-8",
+                "absolute top-1 w-8 -translate-x-1/2 text-center text-micro text-muted-foreground",
                 wideOnly && "hidden sm:block"
               )}
-              style={{ left: `${leftPos}%` }}
+              style={{ left: `${((index + 0.5) / count) * 100}%` }}
             >
-              {p.label}
+              {point.label}
             </div>
           );
         })}

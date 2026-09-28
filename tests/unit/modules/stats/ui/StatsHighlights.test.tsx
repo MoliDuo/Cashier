@@ -6,12 +6,9 @@ import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 function insights(overrides: Partial<StatsInsights> = {}): StatsInsights {
   return {
     entryCount: 0,
-    averageEntry: null,
-    activeDays: 0,
-    periodDays: 30,
+    typicalDaily: "0",
+    forecast: null,
     busiestDay: null,
-    longestStreak: 0,
-    weekdayAverages: [],
     topMover: null,
     ...overrides,
   };

@@ -7,7 +7,6 @@ import { AmountText } from "@/modules/currency/ui/amount-text";
 import type { EnhancedStatsDto } from "@/modules/stats/contracts";
 import type { StatsInsights } from "@/modules/stats/lib/derived-insights";
 import { StatsMetricStrip } from "./StatsMetricStrip";
-import { StatsSparkline } from "./StatsSparkline";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { statsTabCopy } from "@/copy/stats";
 
@@ -18,10 +17,6 @@ interface StatsSummaryProps {
   comparison: EnhancedStatsDto["summary"]["comparison"] | undefined;
   periodLabel: string;
   insights: StatsInsights;
-  chart: { date: string; total: string }[];
-  previousChart: { date: string; total: string }[];
-  onExpandTrend?: (() => void) | undefined;
-  readOnly?: boolean;
   isLoading?: boolean;
 }
 
@@ -32,10 +27,6 @@ export function StatsSummary({
   comparison,
   periodLabel,
   insights,
-  chart,
-  previousChart,
-  onExpandTrend,
-  readOnly = false,
   isLoading = false,
 }: StatsSummaryProps) {
   const locale = DISPLAY_LOCALE;
@@ -65,7 +56,7 @@ export function StatsSummary({
             : statsTabCopy.fullPeriodLess(comparisonValues);
 
   return (
-    <section className="space-y-4 rounded-lg border border-border bg-surface p-4">
+    <section className="rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
         <div className="min-w-0 space-y-1">
           <p className={textRoleClassName("bodyMuted")}>{statsTabCopy.totalExpense}</p>
@@ -104,15 +95,6 @@ export function StatsSummary({
           )}
         </div>
       </div>
-
-      {isLoading ? null : (
-        <StatsSparkline
-          current={chart}
-          previous={previousChart}
-          disabled={readOnly}
-          {...(onExpandTrend !== undefined ? { onExpand: onExpandTrend } : {})}
-        />
-      )}
     </section>
   );
 }

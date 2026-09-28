@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { formatCurrencyAmount } from "@/lib/format/currency";
-import { compare } from "@/lib/money/decimal";
+import { abs, compare } from "@/lib/money/decimal";
 import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { StatsPanel } from "./StatsPanel";
@@ -25,12 +25,16 @@ interface CategoryStat {
   /** Share of the period's spending; zero for a category that nets out at or below nothing. */
   percent: number;
   count: number;
+  /** The change from the comparison period's same days. */
+  trend: { amount: string };
 }
 
 interface StatsRankingProps {
   data: CategoryStat[];
   isLoading?: boolean;
   currencySymbol?: string;
+  /** Whether each row says how it moved; off when there is nothing to compare with. */
+  showChange?: boolean;
   onCategoryClick?: (categoryId: string) => void;
 }
 
@@ -38,6 +42,7 @@ export function StatsRanking({
   data,
   isLoading,
   currencySymbol = "CNY",
+  showChange = false,
   onCategoryClick,
 }: StatsRankingProps) {
   const locale = DISPLAY_LOCALE;
@@ -83,13 +88,33 @@ export function StatsRanking({
           const hasShare = compare(category.totalConverted, "0") > 0;
           const amount = formatCurrencyAmount(category.totalConverted, currencySymbol, locale);
           const share = `${category.percent.toFixed(0)}%`;
+          // Whole units: the line is about how far the category moved, not its cents.
+          // Less than half a unit would read as "↑¥0", so it counts as no change.
+          const change =
+            compare(abs(category.trend.amount), "0.5") < 0
+              ? 0
+              : compare(category.trend.amount, "0");
+          const changeAmount = formatCurrencyAmount(
+            abs(category.trend.amount),
+            currencySymbol,
+            locale,
+            { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+          );
+          const changeText =
+            !showChange || change === 0
+              ? null
+              : change > 0
+                ? statsTabCopy.rankingMore({ amount: changeAmount })
+                : statsTabCopy.rankingLess({ amount: changeAmount });
 
           return (
             <button
               type="button"
               key={category.id ?? "__uncategorized__"}
               disabled={onCategoryClick == null}
-              aria-label={`${displayName}, ${amount}, ${hasShare ? share : statsTabCopy.noShare}`}
+              aria-label={[displayName, amount, hasShare ? share : statsTabCopy.noShare, changeText]
+                .filter((part) => part != null)
+                .join(", ")}
               className={cn(
                 "group grid w-full items-center gap-3 text-left",
                 onCategoryClick != null
@@ -131,6 +156,19 @@ export function StatsRanking({
                 <span className={textRoleClassName("meta", "block tabular-nums")}>
                   {hasShare ? share : "—"}
                 </span>
+                {changeText != null ? (
+                  <span
+                    className={textRoleClassName(
+                      "meta",
+                      cn(
+                        "block whitespace-nowrap tabular-nums",
+                        change > 0 ? "text-destructive" : "text-primary"
+                      )
+                    )}
+                  >
+                    {changeText}
+                  </span>
+                ) : null}
               </span>
               {/* Says the row opens something: the category's entries. */}
               {onCategoryClick != null ? (

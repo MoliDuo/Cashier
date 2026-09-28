@@ -10,6 +10,7 @@ function category(overrides: Partial<Parameters<typeof StatsRanking>[0]["data"][
     totalConverted: "30",
     percent: 100,
     count: 2,
+    trend: { amount: "0" },
     ...overrides,
   };
 }
@@ -78,5 +79,39 @@ describe("StatsRanking", () => {
     render(<StatsRanking currencySymbol="CNY" data={data} />);
 
     expect(screen.queryByRole("button", { name: /显示全部/ })).not.toBeInTheDocument();
+  });
+
+  it("says how far each category moved since the last period, in whole units", () => {
+    render(
+      <StatsRanking
+        currencySymbol="CNY"
+        showChange
+        data={[
+          category({ id: "food", name: "Dining", trend: { amount: "120.4" } }),
+          category({ id: "fun", name: "Fun", trend: { amount: "-80" } }),
+        ]}
+      />
+    );
+
+    expect(
+      within(screen.getByRole("button", { name: /Dining/ })).getByText("较上期 ↑¥120")
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("button", { name: /Fun/ })).getByText("较上期 ↓¥80")
+    ).toBeVisible();
+  });
+
+  it("leaves out a change too small to read and any change without a comparison", () => {
+    const { rerender } = render(
+      <StatsRanking
+        currencySymbol="CNY"
+        showChange
+        data={[category({ trend: { amount: "0.3" } })]}
+      />
+    );
+    expect(screen.queryByText(/较上期/)).not.toBeInTheDocument();
+
+    rerender(<StatsRanking currencySymbol="CNY" data={[category({ trend: { amount: "500" } })]} />);
+    expect(screen.queryByText(/较上期/)).not.toBeInTheDocument();
   });
 });

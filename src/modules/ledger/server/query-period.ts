@@ -55,5 +55,7 @@ export async function withResolvedStatsPeriod(
     queryRange: window.range,
     compareRange: window.compareRange,
     comparisonMode: window.mode,
+    periodEnd: window.periodEnd,
+    previousWholeTo: window.previousWholeTo,
   };
 }

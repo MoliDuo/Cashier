@@ -197,10 +197,10 @@ export function StatsTabSkeleton() {
         <div className="flex items-center justify-between px-2">
           <div className="h-5 w-20 bg-surface2 rounded animate-pulse" />
           <div className="flex items-center gap-1">
-            {/* Heatmap button */}
-            <div className="h-7 w-16 bg-surface2 rounded animate-pulse" />
-            {/* Trend button */}
-            <div className="h-7 w-16 bg-surface2 rounded animate-pulse" />
+            {/* 每日, 累计 and 日历 */}
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-7 w-16 bg-surface2 rounded animate-pulse" />
+            ))}
           </div>
         </div>
 

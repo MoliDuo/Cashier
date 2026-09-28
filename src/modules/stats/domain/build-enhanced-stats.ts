@@ -1,6 +1,10 @@
 import Decimal from "decimal.js";
 import type { CalendarDayData, CalendarHeatmapStats } from "@/types/calendar";
-import type { EnhancedStatsDto, StatsComparisonMode } from "@/modules/stats/contracts";
+import type {
+  EnhancedStatsDto,
+  StatsComparisonMode,
+  StatsLargestEntryDto,
+} from "@/modules/stats/contracts";
 
 interface EnhancedStatsBucketCategory {
   id: string | null;
@@ -26,10 +30,16 @@ export interface BuildEnhancedStatsDtoInput {
   mainCurrency: string;
   unconvertedCount: number;
   current: EnhancedStatsBucket;
+  /** The comparison period through `compareRange.to`, which the totals are set against. */
   previous: EnhancedStatsBucket;
+  /** The comparison period through its own end, which the chart draws; `previous` when they coincide. */
+  previousWhole?: EnhancedStatsBucket | undefined;
   queryRange: { from: string; to: string };
   compareRange: { from: string; to: string };
   comparisonMode?: StatsComparisonMode | undefined;
+  periodEnd?: string | undefined;
+  previousWholeTo?: string | undefined;
+  largestEntries?: StatsLargestEntryDto[] | undefined;
 }
 
 function categoryKey(categoryId: string | null): string {
@@ -88,9 +98,13 @@ export function buildEnhancedStatsDto({
   unconvertedCount,
   current,
   previous,
+  previousWhole = previous,
   queryRange,
   compareRange,
   comparisonMode,
+  periodEnd = queryRange.to,
+  previousWholeTo = compareRange.to,
+  largestEntries = [],
 }: BuildEnhancedStatsDtoInput): EnhancedStatsDto {
   const growth = calculateDecimalGrowth(current.total, previous.total);
   const dayCount = civilDayCount(queryRange.from, queryRange.to);
@@ -137,7 +151,7 @@ export function buildEnhancedStatsDto({
 
   const sortedDays = sortedDaysOf(current);
   const chart = dailyTotals(sortedDays);
-  const previousChart = dailyTotals(sortedDaysOf(previous));
+  const previousChart = dailyTotals(sortedDaysOf(previousWhole));
   const heatmapDays: CalendarDayData[] = sortedDays.map(([date, day]) => ({
     date,
     totalAmount: day.total.toFixed(),
@@ -147,6 +161,7 @@ export function buildEnhancedStatsDto({
 
   return {
     range: { from: queryRange.from, to: queryRange.to },
+    periodEnd,
     unconvertedCount,
     summary: {
       total: current.total.toFixed(),
@@ -159,11 +174,14 @@ export function buildEnhancedStatsDto({
         previousTotal: previous.total.toFixed(),
         amountDelta: current.total.minus(previous.total).toFixed(),
         percent: growth.percent,
+        wholeTo: previousWholeTo,
+        previousWholeTotal: previousWhole.total.toFixed(),
       },
     },
     categories,
     chart,
     previousChart,
+    largestEntries,
     heatmap: {
       days: heatmapDays,
       stats: calculateHeatmapStats(heatmapDays.map((day) => day.totalAmount)),

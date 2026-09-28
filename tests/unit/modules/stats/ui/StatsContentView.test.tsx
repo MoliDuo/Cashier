@@ -1,6 +1,15 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+const { openLedgerEntrySourceDocumentMock } = vi.hoisted(() => ({
+  openLedgerEntrySourceDocumentMock: vi.fn(),
+}));
+
+vi.mock("@/lib/navigation/ledger-detail-navigation", () => ({
+  openLedgerEntrySourceDocument: openLedgerEntrySourceDocumentMock,
+}));
+
 import { StatsContentView } from "@/modules/stats/ui/StatsContentView";
 import { buildEnhancedStatsFixture } from "tests/helpers/stats-fixture";
 
@@ -44,9 +53,9 @@ describe("StatsContentView", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it("marks the active chart view toggle with aria-pressed", () => {
+  it("switches between the daily, running-total and calendar views", () => {
     function Harness() {
-      const [chartView, setChartView] = useState<"trend" | "heatmap">("heatmap");
+      const [chartView, setChartView] = useState<"trend" | "cumulative" | "heatmap">("heatmap");
       return (
         <StatsContentView
           {...baseProps}
@@ -58,14 +67,21 @@ describe("StatsContentView", () => {
     }
     render(<Harness />);
 
-    const heatmapButton = screen.getByRole("button", { name: "热力" });
-    const trendButton = screen.getByRole("button", { name: "趋势" });
-    expect(heatmapButton).toHaveAttribute("aria-pressed", "true");
-    expect(trendButton).toHaveAttribute("aria-pressed", "false");
+    const views = screen.getByRole("group", { name: "图表视图" });
+    const heatmap = within(views).getByRole("button", { name: "日历" });
+    const daily = within(views).getByRole("button", { name: "每日" });
+    const cumulative = within(views).getByRole("button", { name: "累计" });
+    expect(heatmap).toHaveAttribute("aria-pressed", "true");
+    expect(daily).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(trendButton);
-    expect(trendButton).toHaveAttribute("aria-pressed", "true");
-    expect(heatmapButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(daily);
+    expect(daily).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "支出趋势" })).toBeVisible();
+
+    fireEvent.click(cumulative);
+    expect(cumulative).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "累计支出" })).toBeVisible();
+    expect(heatmap).toHaveAttribute("aria-pressed", "false");
   });
 
   it("names the comparison it was given, and hides it when there is none", () => {
@@ -88,18 +104,36 @@ describe("StatsContentView", () => {
     expect(screen.getByRole("heading", { name: "支出排行" })).toBeVisible();
   });
 
-  it("holds the weekday breakdown back for a week, which has one of each day", () => {
+  it("lists the period's biggest entries and opens the record behind one", () => {
     const stats = buildEnhancedStatsFixture({
-      chart: [{ date: "2026-08-03", total: "120" }],
-      heatmap: {
-        days: [{ date: "2026-08-03", totalAmount: "120", entryCount: 1, currencies: ["CNY"] }],
-        stats: { minAmount: "0", maxAmount: "0", avgAmount: "0", p80Amount: "0" },
-      },
+      largestEntries: [
+        {
+          id: "e1",
+          sourceDocumentId: "d1",
+          name: "Deposit",
+          categoryName: "Home",
+          categoryIcon: null,
+          date: "2026-08-03",
+          amount: "3000",
+          originalAmount: "1800",
+          originalCurrency: "MYR",
+        },
+      ],
     });
-    const { rerender } = render(<StatsContentView {...baseProps} scale="week" stats={stats} />);
-    expect(screen.queryByRole("heading", { name: "星期节律" })).not.toBeInTheDocument();
+    render(<StatsContentView {...baseProps} stats={stats} />);
 
-    rerender(<StatsContentView {...baseProps} scale="month" stats={stats} />);
-    expect(screen.getByRole("heading", { name: "星期节律" })).toBeVisible();
+    const row = screen.getByRole("button", { name: /Deposit/ });
+    expect(row).toHaveAccessibleName(/¥3,000\.00/);
+    expect(within(row).getByText(/原币/)).toBeVisible();
+    fireEvent.click(row);
+    expect(openLedgerEntrySourceDocumentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceDocumentId: "d1" })
+    );
+  });
+
+  it("leaves the biggest entries out when there are none", () => {
+    render(<StatsContentView {...baseProps} stats={statsFixture} />);
+
+    expect(screen.queryByRole("heading", { name: "最大几笔" })).not.toBeInTheDocument();
   });
 });
