@@ -101,8 +101,6 @@ export function useLedgerSettings({
         return settingsCopy.unsupportedCurrency;
       case "validation_failed":
         return settingsCopy.validationFailed;
-      case "conflict":
-        return settingsCopy.updateConflict;
       case "unexpected":
         return settingsCopy.updateFailed;
     }
@@ -110,17 +108,9 @@ export function useLedgerSettings({
   const updateLedgerMutation = useLedgerMutation<Ledger, UpdateLedgerData>({
     mutationFn: async (data) => {
       const result = await updateLedgerSettingsAction({
-        expectedUpdatedAt: ledger.updatedAt,
         settings: omitUndefinedProperties(data),
       });
-      if (!result.ok) {
-        // Saved elsewhere since this page loaded: load what is there now, so
-        // the next change is made against it.
-        if (result.code === "conflict") {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.ledger(), exact: true });
-        }
-        throw new Error(translateUpdateError(result.code));
-      }
+      if (!result.ok) throw new Error(translateUpdateError(result.code));
       return result.ledger;
     },
     successMessage: settingsCopy.updateSuccess,

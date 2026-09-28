@@ -60,7 +60,6 @@ export async function getLedgerSettings(ledgerId: string): Promise<LedgerSetting
 
 async function updateSettingsRow(input: {
   ledgerId: string;
-  expectedUpdatedAt: string;
   settings: Partial<LedgerSettings>;
 }): Promise<{ ledger: LedgerDto; mainCurrencyChanged: boolean } | null> {
   return db.transaction(async (tx) => {
@@ -71,13 +70,6 @@ async function updateSettingsRow(input: {
       .for("update")
       .then((rows) => rows[0]);
     if (ledger == null) return null;
-    const expectedUpdatedAt = new Date(input.expectedUpdatedAt);
-    if (
-      !Number.isFinite(expectedUpdatedAt.getTime()) ||
-      expectedUpdatedAt.getTime() !== ledger.updatedAt.getTime()
-    ) {
-      throw new ConflictError("Ledger settings changed since they were loaded");
-    }
     const settings = { ...mapLedgerSettings(ledger), ...input.settings };
     const previousMainCurrency = ledger.mainCurrency;
     const nextMainCurrency = settings.mainCurrency.trim().toUpperCase();
@@ -143,7 +135,6 @@ export async function updateLedgerSettings(
 ): Promise<LedgerDto> {
   const updated = await updateSettingsRow({
     ledgerId,
-    expectedUpdatedAt: data.expectedUpdatedAt,
     settings: omitUndefinedProperties(data.settings ?? {}),
   });
   if (updated == null) throw new NotFoundError("Ledger");

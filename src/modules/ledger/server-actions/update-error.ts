@@ -1,4 +1,4 @@
-import { AppError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
+import { AppError, ValidationError } from "@/lib/errors";
 import type { UpdateLedgerActionErrorCode } from "@/modules/ledger/contracts";
 
 export function toUpdateLedgerActionErrorCode(error: unknown): UpdateLedgerActionErrorCode {
@@ -6,6 +6,5 @@ export function toUpdateLedgerActionErrorCode(error: unknown): UpdateLedgerActio
     return "unsupported_currency";
   }
   if (error instanceof ValidationError) return "validation_failed";
-  if (error instanceof ConflictError || error instanceof NotFoundError) return "conflict";
   return "unexpected";
 }

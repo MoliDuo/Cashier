@@ -14,17 +14,6 @@ import {
   createManualDocument,
 } from "@/modules/source-document/server/projections/writes";
 
-type UpdateLedgerData = Omit<Parameters<typeof updateLedgerSettings>[1], "expectedUpdatedAt">;
-
-const updateLedger = async (ledgerId: string, data: UpdateLedgerData) => {
-  const current = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
-  if (current == null) throw new Error("Expected ledger fixture");
-  return updateLedgerSettings(ledgerId, {
-    ...data,
-    expectedUpdatedAt: current.updatedAt.toISOString(),
-  });
-};
-
 describe("target Settings currency workflow", () => {
   let ledgerId = "";
   let sourceDocumentId: string;
@@ -60,7 +49,7 @@ describe("target Settings currency workflow", () => {
   });
 
   it("allows main currency change on empty ledger", async () => {
-    const updated = await updateLedger(ledgerId, {
+    const updated = await updateLedgerSettings(ledgerId, {
       settings: { mainCurrency: "USD" },
     });
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -73,7 +62,7 @@ describe("target Settings currency workflow", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
 
-    const updated = await updateLedger(ledgerId, {
+    const updated = await updateLedgerSettings(ledgerId, {
       settings: { mainCurrency: "USD" },
     });
     const [entry, document, stats] = await Promise.all([
@@ -96,7 +85,7 @@ describe("target Settings currency workflow", () => {
   it("allows other setting changes when entries exist", async () => {
     await createEntry();
 
-    const updated = await updateLedger(ledgerId, {
+    const updated = await updateLedgerSettings(ledgerId, {
       settings: { aiLanguage: "en" },
     });
     expect(updated.settings.aiLanguage).toBe("en");
@@ -109,7 +98,7 @@ describe("target Settings currency workflow", () => {
     const db = getTestDb();
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, sourceDocumentId));
 
-    const updated = await updateLedger(ledgerId, {
+    const updated = await updateLedgerSettings(ledgerId, {
       settings: { mainCurrency: "USD" },
     });
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -118,9 +107,9 @@ describe("target Settings currency workflow", () => {
   it("rejects an unsupported main currency and keeps the settings", async () => {
     await createEntry();
 
-    await expect(updateLedger(ledgerId, { settings: { mainCurrency: "ZZZ" } })).rejects.toThrow(
-      "Currency not found: ZZZ"
-    );
+    await expect(
+      updateLedgerSettings(ledgerId, { settings: { mainCurrency: "ZZZ" } })
+    ).rejects.toThrow("Currency not found: ZZZ");
 
     const ledger = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
     expect(ledger?.mainCurrency).toBe("CNY");
@@ -160,7 +149,7 @@ describe("target Settings currency workflow", () => {
         json: async () => ({ base: "EUR", rates: { "2026-07-14": { CNY: 8, USD: 1 } } }),
       } as Response);
 
-      const updated = await updateLedger(ledgerId, {
+      const updated = await updateLedgerSettings(ledgerId, {
         settings: { mainCurrency: "USD" },
       });
 
@@ -192,7 +181,7 @@ describe("target Settings currency workflow", () => {
         json: async () => ({}),
       } as Response);
 
-      const updated = await updateLedger(ledgerId, { settings: { mainCurrency: "USD" } });
+      const updated = await updateLedgerSettings(ledgerId, { settings: { mainCurrency: "USD" } });
 
       expect(updated.settings.mainCurrency).toBe("USD");
       const stats = await calculateLedgerStats(ledgerId, {});
@@ -201,28 +190,16 @@ describe("target Settings currency workflow", () => {
     });
   });
 
-  it("accepts exactly one of two concurrent settings writes", async () => {
-    const db = getTestDb();
-    const current = await db.query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
-    if (current == null) throw new Error("Expected ledger fixture");
-    const input = {
-      expectedUpdatedAt: current.updatedAt.toISOString(),
-      settings: { mainCurrency: "USD" },
-    } as const;
-
+  it("keeps both of two concurrent writes to different settings", async () => {
     const results = await Promise.allSettled([
-      updateLedgerSettings(ledgerId, input),
-      updateLedgerSettings(ledgerId, input),
+      updateLedgerSettings(ledgerId, { settings: { collapseEntriesDefault: true } }),
+      updateLedgerSettings(ledgerId, { settings: { timeZone: "Asia/Tokyo" } }),
     ]);
 
-    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
-    expect(results.find((result) => result.status === "rejected")?.reason).toMatchObject({
-      code: "CONFLICT",
-    });
-    expect(
-      (await db.query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) }))?.mainCurrency
-    ).toBe("USD");
+    expect(results.map((result) => result.status)).toEqual(["fulfilled", "fulfilled"]);
+    const saved = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
+    expect(saved?.collapseEntriesDefault).toBe(true);
+    expect(saved?.timeZone).toBe("Asia/Tokyo");
   });
 });
 
@@ -237,7 +214,7 @@ describe("settings concurrency invariants", () => {
     for (let i = 0; i < 5; i++) {
       // Run main-currency change and first entry creation concurrently on a fresh ledger.
       const results = await Promise.allSettled([
-        updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
+        updateLedgerSettings(ledgerId, { settings: { mainCurrency: "USD" } }),
         createManualDocument({
           ledgerId,
           entryDate: "2026-07-15",
@@ -338,7 +315,7 @@ describe("settings concurrency invariants", () => {
 
       // Run main-currency change and activateAttempt concurrently.
       const results = await Promise.allSettled([
-        updateLedger(ledgerId, { settings: { mainCurrency: "USD" } }),
+        updateLedgerSettings(ledgerId, { settings: { mainCurrency: "USD" } }),
         activateAttempt({
           lease,
           ledgerId,

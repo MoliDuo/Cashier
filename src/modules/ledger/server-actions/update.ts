@@ -16,9 +16,9 @@ export const updateLedgerSettingsAction = withLedgerAccess(
       };
     } catch (error) {
       const code = toUpdateLedgerActionErrorCode(error);
-      // This settings action intentionally returns a recovery-code result so
-      // callers can keep drafts on known conflicts. Other simple commands
-      // continue to throw their typed application errors at the boundary.
+      // This settings action intentionally returns a result code so callers
+      // can explain a rejected value. Other simple commands continue to throw
+      // their typed application errors at the boundary.
       if (code === "unexpected") logError("updateLedgerSettingsAction", error);
       return { ok: false, code };
     }

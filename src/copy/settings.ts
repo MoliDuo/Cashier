@@ -42,7 +42,6 @@ export const settingsCopy = {
   updateFailed: "更新失败，请稍后重试",
   unsupportedCurrency: "所选币种暂不受汇率数据支持",
   validationFailed: "设置内容无效，请检查后重试",
-  updateConflict: "设置已在别处更改并已刷新，请重新修改。",
   saving: "(保存中...)",
   mainCurrencyMustBeEnabled: "主货币必须包含在偏好货币中。",
   categoriesSaved: "分类已保存",

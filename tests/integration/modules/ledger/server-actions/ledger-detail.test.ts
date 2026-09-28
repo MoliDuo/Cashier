@@ -4,7 +4,6 @@ import { updateLedgerSettingsAction } from "@/modules/ledger/server-actions/upda
 import { getTestDb } from "tests/setup";
 import { ledgers } from "@/persistence";
 import { createTestUserWithLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
-import { eq } from "drizzle-orm";
 import { NotFoundError } from "@/lib/errors";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
@@ -22,12 +21,10 @@ describe("Ledger Actions", () => {
 
   it("should update ledger settings", async () => {
     const db = getTestDb();
-    const ledgerId = await setupTestLedger(db);
-    const initial = await db.query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
+    await setupTestLedger(db);
     await insertExchangeRates("2026-08-22", { USD: 1, CNY: 8 });
 
     const result = await updateLedgerSettingsAction({
-      expectedUpdatedAt: initial!.updatedAt.toISOString(),
       settings: {
         mainCurrency: "USD",
         aiLanguage: "en",
@@ -44,10 +41,7 @@ describe("Ledger Actions", () => {
 
   it("rejects when the account has no live ledger (Update)", async () => {
     await expect(
-      updateLedgerSettingsAction({
-        expectedUpdatedAt: new Date().toISOString(),
-        settings: { mainCurrency: "USD" },
-      })
+      updateLedgerSettingsAction({ settings: { mainCurrency: "USD" } })
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

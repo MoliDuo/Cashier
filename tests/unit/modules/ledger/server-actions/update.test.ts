@@ -7,8 +7,8 @@ describe("toUpdateLedgerActionErrorCode", () => {
     [new AppError("missing", "EXCHANGE_RATES_UNAVAILABLE"), "unexpected"],
     [new AppError("unsupported", "CURRENCY_NOT_FOUND"), "unsupported_currency"],
     [new ValidationError("invalid"), "validation_failed"],
-    [new ConflictError("conflict"), "conflict"],
-    [new NotFoundError("Ledger"), "conflict"],
+    [new ConflictError("conflict"), "unexpected"],
+    [new NotFoundError("Ledger"), "unexpected"],
     [new Error("internal detail"), "unexpected"],
   ])("maps application errors to stable client codes", (error, expected) => {
     expect(toUpdateLedgerActionErrorCode(error)).toBe(expected);

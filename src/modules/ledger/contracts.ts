@@ -17,7 +17,7 @@ export type LedgerDto = {
 export type Ledger = LedgerDto;
 
 export type UpdateLedgerActionErrorCode =
-  "unsupported_currency" | "validation_failed" | "conflict" | "unexpected";
+  "unsupported_currency" | "validation_failed" | "unexpected";
 
 export type UpdateLedgerActionResult =
   { ok: true; ledger: LedgerDto } | { ok: false; code: UpdateLedgerActionErrorCode };

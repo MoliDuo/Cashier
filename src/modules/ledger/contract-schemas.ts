@@ -84,7 +84,6 @@ function parseLedgerContract<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 const updateLedgerInputSchema = nonEmptyStrictObjectSchema({
-  expectedUpdatedAt: z.string().datetime({ offset: true }),
   settings: nonEmptyStrictObjectSchema({
     aiLanguage: aiLanguageSchema.optional(),
     currencies: z.array(currencyCodeSchema).max(32).optional(),

@@ -123,7 +123,6 @@ describe("useLedgerSettings", () => {
       );
 
       expect(updateLedgerSettingsAction).toHaveBeenCalledWith({
-        expectedUpdatedAt: ledger.updatedAt,
         settings: { collapseEntriesDefault: true },
       });
     });
@@ -137,7 +136,6 @@ describe("useLedgerSettings", () => {
       );
 
       expect(updateLedgerSettingsAction).toHaveBeenCalledWith({
-        expectedUpdatedAt: ledger.updatedAt,
         settings: { currencies: ["USD", "CNY"] },
       });
     });
