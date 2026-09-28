@@ -3,6 +3,7 @@ import {
   closeLedgerDetail,
   openLedgerDetail,
   openLedgerEntrySourceDocument,
+  restoreDetailReturnFocus,
 } from "@/lib/navigation/ledger-detail-navigation";
 
 const pushed = { cashier: { ledgerNavigation: true, kind: "detail" } };
@@ -77,5 +78,66 @@ describe("ledger detail navigation", () => {
 
     expect(back).not.toHaveBeenCalled();
     expect(window.location.search).toBe("?range=week");
+  });
+
+  describe("handing focus back", () => {
+    function button(label: string): HTMLButtonElement {
+      const element = document.createElement("button");
+      element.textContent = label;
+      document.body.append(element);
+      return element;
+    }
+
+    beforeEach(() => {
+      vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+        callback(0);
+        return 0;
+      });
+    });
+
+    afterEach(() => {
+      document.body.replaceChildren();
+    });
+
+    it("returns focus to the control that opened the record once it has gone", () => {
+      const card = button("card");
+      card.focus();
+      openLedgerDetail("document-1");
+      card.blur();
+
+      restoreDetailReturnFocus();
+
+      expect(document.activeElement).toBe(card);
+    });
+
+    it("leaves focus where the reader put it while the record was leaving", () => {
+      // The sheet finishes leaving a moment after it closes; a reader who
+      // tabbed to the gear in that moment keeps it.
+      const card = button("card");
+      const gear = button("gear");
+      card.focus();
+      openLedgerDetail("document-1");
+      gear.focus();
+
+      restoreDetailReturnFocus();
+
+      expect(document.activeElement).toBe(gear);
+    });
+
+    it("still takes focus back from inside the leaving sheet", () => {
+      const card = button("card");
+      card.focus();
+      openLedgerDetail("document-1");
+      const sheet = document.createElement("div");
+      sheet.setAttribute("role", "dialog");
+      document.body.append(sheet);
+      const close = document.createElement("button");
+      sheet.append(close);
+      close.focus();
+
+      restoreDetailReturnFocus();
+
+      expect(document.activeElement).toBe(card);
+    });
   });
 });

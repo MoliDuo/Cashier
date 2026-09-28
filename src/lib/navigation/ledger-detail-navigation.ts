@@ -74,11 +74,25 @@ export function closeLedgerDetail(): void {
   if (!leavePastOverlays(0, replaceAway)) replaceAway();
 }
 
-/** Hands focus back to the control that opened the sheet, once it has gone. */
+/**
+ * Hands focus back to the control that opened the sheet, once it has gone —
+ * unless the reader has already moved on. The sheet finishes leaving a moment
+ * after it stops answering, and a reader who tabbed to the gear in that moment
+ * would otherwise have focus pulled out from under the key they then press.
+ */
 export function restoreDetailReturnFocus(): void {
   const target = returnFocusTarget;
   returnFocusTarget = null;
   window.requestAnimationFrame(() => {
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      active.isConnected &&
+      active.closest('[role="dialog"]') == null
+    ) {
+      return;
+    }
     if (target?.isConnected === true) target.focus();
     else document.querySelector<HTMLElement>("[data-ledger-focus-fallback]")?.focus();
   });
