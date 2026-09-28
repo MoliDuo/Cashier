@@ -9,7 +9,7 @@ import type {
 } from "@/modules/ledger/contracts";
 import { CurrencySection } from "../CurrencySection";
 import { CategorySection } from "../CategorySection";
-import { SettingsField } from "./SettingsField";
+import { SettingsField } from "@/components/SettingsField";
 import { ThemeField } from "./ThemeField";
 import { SettingsSection } from "@/components/SettingsSection";
 import { Switch } from "@/components/ui/switch";

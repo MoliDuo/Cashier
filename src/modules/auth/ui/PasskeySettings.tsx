@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
 import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import { SettingsSection } from "@/components/SettingsSection";
+import { SettingsField } from "@/components/SettingsField";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -161,8 +161,9 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
 
   return (
     <>
-      <SettingsSection
+      <SettingsField
         title={settingsPasskeysCopy.title}
+        stacked
         description={
           supported ? settingsPasskeysCopy.description : settingsPasskeysCopy.unsupported
         }
@@ -295,7 +296,7 @@ export function PasskeySettings({ onRequireReauthentication }: PasskeySettingsPr
             {settingsPasskeysCopy.empty}
           </p>
         )}
-      </SettingsSection>
+      </SettingsField>
 
       <Dialog open={isAddOpen} onOpenChange={(open) => !pending && setIsAddOpen(open)}>
         <DialogContent variant="modal">

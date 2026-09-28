@@ -26,7 +26,7 @@ import {
   verifyLoginEmailCodeAction,
 } from "@/modules/auth/server-actions/login-emails";
 import type { LoginEmailErrorCode } from "@/modules/auth/server-actions/login-emails";
-import { SettingsField } from "./SettingsField";
+import { SettingsField } from "@/components/SettingsField";
 import { commonCopy } from "@/copy/common";
 import { settingsEmailsCopy } from "@/copy/settings";
 

@@ -140,12 +140,18 @@ describe("SettingsTab account authentication controls", () => {
     // 分类 and API 密钥 are stubbed here, so their titles are not among these.
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)
-    ).toEqual(["外观", "时区与货币", "AI 解析", "分账", "账户", "通行密钥", "退出登录"]);
+    ).toEqual(["外观", "时区与货币", "AI 解析", "分账", "账户"]);
     expect(
       within(screen.getByRole("heading", { level: 2, name: "外观" }).closest("section")!)
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent)
     ).toEqual(["主题", "默认折叠账单"]);
+    // One 账户 card: how this person signs in, and signing out at its end.
+    expect(
+      within(screen.getByRole("heading", { level: 2, name: "账户" }).closest("section")!)
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent)
+    ).toEqual(["登录邮箱", "通行密钥", "在这台设备上退出"]);
   });
 
   it("clears this device's drafts and remembered book when the reader signs out", async () => {

@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SettingsField } from "./SettingsField";
+import { SettingsField } from "@/components/SettingsField";
 import { settingsCopy } from "@/copy/settings";
 
 const THEME_LABELS = {

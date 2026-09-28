@@ -8,7 +8,7 @@ import type {
 import { EmailSettings } from "./EmailSettings";
 import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
-import { SettingsField } from "./SettingsField";
+import { SettingsField } from "@/components/SettingsField";
 import { SettingsSection } from "@/components/SettingsSection";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -52,16 +52,8 @@ export function AccountSettings({
 
   return (
     <>
-      {/* 账户 opens with who is signed in; 通行密钥 and API 密钥 each save on
-          their own, so each is a card of its own; signing out closes the group. */}
-      <SettingsSection title={settingsCopy.account}>
-        <EmailSettings
-          {...(userEmail !== undefined ? { userEmail } : {})}
-          onRequireReauthentication={onRequireReauthentication}
-          onAllSessionsEnded={onAllSessionsEnded}
-        />
-      </SettingsSection>
-      <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
+      {/* API 密钥 saves on its own and binds each key to a 分账, so it is a card
+          of its own right after them. */}
       <ServiceCredentialSection
         credentials={credentials}
         books={books}
@@ -70,9 +62,17 @@ export function AccountSettings({
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />
-      <SettingsSection title={settingsCopy.signOut}>
+      {/* 账户 is how this person signs in — the emails, then the passkeys — and
+          signing out closes it and the page. */}
+      <SettingsSection title={settingsCopy.account}>
+        <EmailSettings
+          {...(userEmail !== undefined ? { userEmail } : {})}
+          onRequireReauthentication={onRequireReauthentication}
+          onAllSessionsEnded={onAllSessionsEnded}
+        />
+        <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
         {/* The button sits on the heading row at every width, like 添加邮箱 and
-            新建密钥, instead of dropping under its own label on a phone. */}
+            添加通行密钥, instead of dropping under its own label on a phone. */}
         <SettingsField
           title={settingsCopy.signOutHere}
           stacked

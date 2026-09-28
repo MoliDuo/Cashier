@@ -47,7 +47,7 @@ import {
   type BookMutationErrorCode,
   type BookMutationResult,
 } from "@/modules/ledger/server-actions/books";
-import { SettingsField } from "./SettingsField";
+import { SettingsField } from "@/components/SettingsField";
 import { SettingsSection } from "@/components/SettingsSection";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { ledgerQueryErrorCopy } from "@/copy/app";
