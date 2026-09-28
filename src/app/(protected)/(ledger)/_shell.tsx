@@ -1,5 +1,5 @@
 "use client";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/modules/workspace/ui/AppShell";
 import { LedgerTopBar } from "@/modules/workspace/ui/LedgerTopBar";
@@ -9,7 +9,7 @@ import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigati
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import { openNewRecord } from "@/lib/navigation/ledger-new-record-navigation";
-import { readRecordsView, type LedgerTab } from "@/lib/ledger-tabs";
+import { LEDGER_ROUTES, readRecordsView, type LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
 import { readPeriodParams } from "@/modules/workspace/period-url-params";
 import {
@@ -32,6 +32,16 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
   const bookId = useWorkspaceStore((state) => state.bookId) ?? undefined;
   const { activeTab, hrefFor, navigate, prefetch } = useLedgerNavigation();
   useTabScrollRestoration(activeTab);
+
+  // The routes are dynamic, so a destination the router has not seen waits on
+  // the server before it switches. Warming every other route once the ledger
+  // is up lets the first tap on each switch at once, to its loading skeleton.
+  const warmed = useRef(false);
+  useEffect(() => {
+    if (!ready || warmed.current) return;
+    warmed.current = true;
+    for (const tab of LEDGER_ROUTES) if (tab !== activeTab) prefetch(hrefFor(tab));
+  }, [activeTab, hrefFor, prefetch, ready]);
 
   const changeTab = useCallback(
     (tab: LedgerTab) => {

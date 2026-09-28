@@ -17,6 +17,25 @@ export interface EntryFilters {
   search?: string | null;
 }
 
+/**
+ * How many of the filter's conditions narrow the list. The period has a bar of
+ * its own, so it is not one of them; a condition the surface does not offer is
+ * not counted either.
+ */
+export function countActiveEntryFilters(
+  filters: EntryFilters,
+  offered: { showCategory: boolean; showCurrency: boolean; showStatus: boolean }
+): number {
+  return [
+    filters.search != null && filters.search.trim() !== "",
+    offered.showStatus && (filters.statuses?.length ?? 0) > 0,
+    offered.showCategory && filters.categoryId != null && filters.categoryId !== "",
+    offered.showCurrency && filters.currency != null && filters.currency !== "",
+    filters.minAmount !== undefined && filters.minAmount !== null,
+    filters.maxAmount !== undefined && filters.maxAmount !== null,
+  ].filter((x): x is true => x === true).length;
+}
+
 export interface LedgerEntryFilterParams {
   bookId?: string;
   startDate?: string | null;

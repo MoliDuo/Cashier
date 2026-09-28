@@ -27,7 +27,7 @@ export function RecordsRoute() {
   return (
     <>
       <SegmentedControl
-        className="mb-3 sm:max-w-xs"
+        className="mb-3"
         label={ledgerPageCopy.recordsView}
         value={view}
         onChange={changeView}

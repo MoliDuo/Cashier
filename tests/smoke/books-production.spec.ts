@@ -482,7 +482,12 @@ test("books production files an API upload into the book its key is bound to", a
 
   await openTab(page, "流水");
   await selectBookByName(page, bookName);
-  await streamTotal(page).click();
+  // A neutral click away from the switcher; a phone folds the toolbar away, so
+  // it lands on the view already shown rather than on the toolbar.
+  await page
+    .getByRole("group", { name: "账目视图" })
+    .getByRole("button", { name: "按账单", exact: true })
+    .click();
   await expect(
     page.getByTestId("source-document-card-root").filter({ hasText: "Demo Receipt" })
   ).toHaveCount(1);

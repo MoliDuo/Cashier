@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { showListControls } from "./navigation";
 import { signIn } from "./sign-in";
 
 test("selection, instant edits and one-tap split navigation", async ({
@@ -25,6 +26,7 @@ test("selection, instant edits and one-tap split navigation", async ({
   const total = card.getByText(/12\.34/).first();
   const chevronBefore = await card.getByRole("button", { name: "折叠", exact: true }).boundingBox();
   const totalBefore = await total.boundingBox();
+  await showListControls(page);
   await activate(page.getByRole("button", { name: "选择", exact: true }));
   const surface = page.locator('[data-selection-mode="true"]').filter({ has: card });
   const expand = surface.getByRole("button", { name: "折叠", exact: true });
@@ -153,6 +155,7 @@ test("the period choices keep one line each at 360px", async ({ page, isMobile }
   test.skip(!isMobile, "phone width only");
   await page.setViewportSize({ width: 360, height: 780 });
   await signIn(page);
+  await showListControls(page);
   await page
     .getByRole("button", { name: /^区间：/ })
     .first()

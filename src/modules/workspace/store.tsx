@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { createStore, useStore, type StoreApi } from "zustand";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 
@@ -19,9 +27,30 @@ interface WorkspaceState {
   rememberRouteQuery: (tab: LedgerTab, query: string) => void;
   /** The tab 设置 was opened from, which its back arrow returns to. */
   lastBrowsedTab: BrowsedTab;
-  /** The list's total, which a phone's top bar prints between the book and the gear. */
-  headerTotal: string | null;
-  setHeaderTotal: (total: string | null) => void;
+  /**
+   * The list on screen as a phone's top bar prints it between the book and the
+   * gear, or null when no list is being browsed. Taking it down also folds the
+   * list's controls back up.
+   */
+  headerSummary: HeaderSummary | null;
+  setHeaderSummary: (summary: HeaderSummary | null) => void;
+  /** Whether a phone's list controls hang open under the top bar. */
+  listControlsOpen: boolean;
+  setListControlsOpen: (open: boolean) => void;
+}
+
+export interface HeaderSummary {
+  /** The list's total, or null until it has loaded. */
+  total: string | null;
+  /** The days the list covers. */
+  period: string;
+  /** Whether the filter narrows the list beyond the period. */
+  filtered: boolean;
+}
+
+function sameSummary(a: HeaderSummary | null, b: HeaderSummary | null): boolean {
+  if (a == null || b == null) return a === b;
+  return a.total === b.total && a.period === b.period && a.filtered === b.filtered;
 }
 
 type BrowsedTab = Exclude<LedgerTab, "settings">;
@@ -43,9 +72,22 @@ function createWorkspaceStore(initialBookId: string | null): WorkspaceStore {
           : { routeQueries: { ...state.routeQueries, [tab]: query }, lastBrowsedTab };
       }),
     lastBrowsedTab: "records",
-    headerTotal: null,
-    setHeaderTotal: (headerTotal) =>
-      set((state) => (state.headerTotal === headerTotal ? state : { headerTotal })),
+    headerSummary: null,
+    setHeaderSummary: (headerSummary) =>
+      set((state) => {
+        if (sameSummary(state.headerSummary, headerSummary)) return state;
+        return headerSummary == null
+          ? { headerSummary, listControlsOpen: false }
+          : { headerSummary };
+      }),
+    listControlsOpen: false,
+    setListControlsOpen: (listControlsOpen) =>
+      set((state) =>
+        state.listControlsOpen === listControlsOpen ||
+        (listControlsOpen && state.headerSummary == null)
+          ? state
+          : { listControlsOpen }
+      ),
   }));
 }
 
@@ -75,15 +117,34 @@ export function useWorkspaceStore<T>(selector: (state: WorkspaceState) => T): T 
 }
 
 /**
- * Puts a list's total in the top bar for as long as the list is on screen, and
- * takes it down when the list leaves. Outside the ledger's routes there is no
- * top bar to print it, so there it does nothing.
+ * Puts a list's summary in the top bar for as long as the list is browsed, and
+ * takes it down when the list leaves or turns to selecting; returns whether a
+ * phone has its controls dropped down, and how to fold them. Outside the
+ * ledger's routes there is no top bar, so there the controls stay put.
  */
-export function usePublishHeaderTotal(total: string | null) {
+export function useHeaderSummary(summary: HeaderSummary | null): {
+  open: boolean;
+  close: () => void;
+} {
   const store = useContext(WorkspaceStoreContext);
+  const total = summary?.total ?? null;
+  const period = summary?.period;
+  const filtered = summary?.filtered ?? false;
   useEffect(() => {
     if (store == null) return;
-    store.getState().setHeaderTotal(total);
-    return () => store.getState().setHeaderTotal(null);
-  }, [store, total]);
+    store.getState().setHeaderSummary(period == null ? null : { total, period, filtered });
+  }, [store, total, period, filtered]);
+  useEffect(() => {
+    if (store == null) return;
+    return () => store.getState().setHeaderSummary(null);
+  }, [store]);
+  const open = useSyncExternalStore(
+    store?.subscribe ?? noSubscription,
+    () => store?.getState().listControlsOpen ?? false,
+    () => false
+  );
+  const close = useCallback(() => store?.getState().setListControlsOpen(false), [store]);
+  return { open, close };
 }
+
+const noSubscription = () => () => {};

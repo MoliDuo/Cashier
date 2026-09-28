@@ -5,6 +5,7 @@ import { textRoleClassName } from "@/components/typography";
 import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
 import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
+import { countActiveEntryFilters } from "@/modules/ledger/filters";
 import { LedgerEntryGroupsView } from "@/modules/ledger/ui/LedgerEntryGroupsView";
 import {
   BatchDateDialog,
@@ -25,6 +26,7 @@ import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
 import { PeriodBar } from "./PeriodBar";
+import { formatPeriodLabel } from "../period-label";
 import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { commonCopy } from "@/copy/common";
 import { detailsTabCopy, entryFilterPanelCopy } from "@/copy/workspace";
@@ -80,6 +82,19 @@ export function DetailsTab({
               ),
             }
           : {})}
+        browsing={
+          tab.isSelectionMode
+            ? undefined
+            : {
+                period: formatPeriodLabel(period, today),
+                filtered:
+                  countActiveEntryFilters(filters, {
+                    showCategory: true,
+                    showCurrency: true,
+                    showStatus: false,
+                  }) > 0,
+              }
+        }
         batchActions={
           tab.isSelectionMode ? (
             <LedgerEntriesBatchActionToolbar

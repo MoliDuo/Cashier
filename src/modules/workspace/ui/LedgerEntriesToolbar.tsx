@@ -3,6 +3,7 @@ import { ArrowLeft, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
+import { countActiveEntryFilters } from "@/modules/ledger/filters";
 import {
   BatchDateDialog,
   batchDateImpactSummary,
@@ -15,6 +16,7 @@ import { formatCurrencyAmount } from "@/lib/format/currency";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { PeriodBar } from "./PeriodBar";
+import { formatPeriodLabel } from "../period-label";
 import { useBatchDatePreview } from "../hooks/useBatchDatePreview";
 import type { BatchEntryDateImpact, EntryCategory } from "@/modules/ledger/contracts";
 import { DISPLAY_LOCALE } from "@/lib/constants";
@@ -122,6 +124,19 @@ export function LedgerEntriesToolbar({
         !isSelectionMode && filteredTotal !== undefined
           ? formatCurrencyAmount(filteredTotal, mainCurrency, locale)
           : undefined
+      }
+      browsing={
+        isSelectionMode
+          ? undefined
+          : {
+              period: formatPeriodLabel(period, today),
+              filtered:
+                countActiveEntryFilters(filters, {
+                  showCategory: true,
+                  showCurrency: true,
+                  showStatus: true,
+                }) > 0,
+            }
       }
     >
       <Button

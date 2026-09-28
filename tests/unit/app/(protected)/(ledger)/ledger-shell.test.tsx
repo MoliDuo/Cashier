@@ -115,6 +115,18 @@ function destination(tab: Exclude<LedgerTab, "settings">) {
   });
 }
 
+/** A list's toolbar as 账目 renders it: browsed, or selected from. */
+function BrowsedList({ filtered = false, selecting = false }) {
+  return (
+    <EntriesToolbarShell
+      totalLabel={selecting ? undefined : "¥10,800.33"}
+      browsing={selecting ? undefined : { period: "2026年9月", filtered }}
+    >
+      {null}
+    </EntriesToolbarShell>
+  );
+}
+
 describe("LedgerShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -192,7 +204,15 @@ describe("LedgerShell", () => {
     expect(navigateMock).toHaveBeenCalledWith("records");
   });
 
-  it("prints the list's total in the top bar while the list is on screen", () => {
+  it("warms every other route once the ledger is up", async () => {
+    renderShell();
+
+    await waitFor(() => expect(routerPrefetchMock).toHaveBeenCalledWith("/stats"));
+    expect(routerPrefetchMock).toHaveBeenCalledWith("/settings");
+    expect(routerPrefetchMock).not.toHaveBeenCalledWith("/records");
+  });
+
+  it("prints the list's summary in the top bar while the list is browsed", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const renderWith = (list: ReactNode) => (
       <QueryClientProvider client={queryClient}>
@@ -201,25 +221,64 @@ describe("LedgerShell", () => {
         </WorkspaceStoreProvider>
       </QueryClientProvider>
     );
-    const { rerender } = render(
-      renderWith(<EntriesToolbarShell totalLabel="¥10,800.33">{null}</EntriesToolbarShell>)
-    );
+    const { rerender } = render(renderWith(<BrowsedList />));
+    const topBar = within(screen.getByTestId("top-bar"));
 
-    expect(within(screen.getByTestId("top-bar")).getByText("¥10,800.33")).toBeInTheDocument();
+    expect(topBar.getByText("¥10,800.33")).toBeInTheDocument();
+    expect(topBar.getByText("2026年9月")).toBeInTheDocument();
+
+    rerender(renderWith(<BrowsedList filtered />));
+    expect(topBar.getByText(`2026年9月 · ${ledgerPageCopy.filtered}`)).toBeInTheDocument();
+
+    // Selecting keeps its bar on the page, so the summary steps aside.
+    rerender(renderWith(<BrowsedList selecting />));
+    expect(topBar.queryByText("¥10,800.33")).not.toBeInTheDocument();
 
     rerender(renderWith(null));
-
-    expect(within(screen.getByTestId("top-bar")).queryByText("¥10,800.33")).not.toBeInTheDocument();
+    expect(topBar.queryByText("¥10,800.33")).not.toBeInTheDocument();
   });
 
-  it("leaves the total out of 设置's bar", () => {
+  it("drops the list's controls down from the summary and folds them again", async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>
+            <BrowsedList />
+          </LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+    const summary = within(screen.getByTestId("top-bar")).getByRole("button", {
+      name: /¥10,800\.33/,
+    });
+    const toolbar = screen.getByTestId("entries-toolbar");
+    expect(summary).toHaveAttribute("aria-controls", toolbar.id);
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(toolbar).toHaveClass("max-md:hidden");
+
+    await user.click(summary);
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    expect(toolbar).not.toHaveClass("max-md:hidden");
+    expect(toolbar).toHaveClass("max-md:fixed");
+
+    await user.keyboard("{Escape}");
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(summary);
+    await user.click(summary);
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("leaves the summary out of 设置's bar", () => {
     activeTabState.current = "settings";
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={queryClient}>
         <WorkspaceStoreProvider initialBookId={null}>
           <LedgerShell>
-            <EntriesToolbarShell totalLabel="¥10,800.33">{null}</EntriesToolbarShell>
+            <BrowsedList />
           </LedgerShell>
         </WorkspaceStoreProvider>
       </QueryClientProvider>

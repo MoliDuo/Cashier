@@ -1,12 +1,14 @@
 "use client";
 import type { MouseEvent, ReactNode } from "react";
-import { ArrowLeft, Plus, Settings, Wallet } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus, Settings, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import type { LedgerTab } from "@/lib/ledger-tabs";
+import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import { BookSwitcher } from "./BookSwitcher";
+import { LIST_CONTROLS_ID } from "./EntriesToolbarShell";
 import { ledgerPageCopy } from "@/copy/app";
 
 interface LedgerTopBarProps {
@@ -24,8 +26,8 @@ interface LedgerTopBarProps {
 
 /**
  * The ledger's top bar. On 账目 and 统计 it holds the book switcher and the
- * gear (and, from md up, the tabs and 记一笔; below md, the list's total
- * between them); on 设置 it is a back arrow and
+ * gear (and, from md up, the tabs and 记一笔; below md, the list's summary
+ * between them, which drops the list's controls down); on 设置 it is a back arrow and
  * the page's name, since the book being viewed has no bearing there.
  */
 export function LedgerTopBar({
@@ -39,7 +41,9 @@ export function LedgerTopBar({
   onLeaveSettings,
 }: LedgerTopBarProps) {
   const inSettings = activeTab === "settings";
-  const headerTotal = useWorkspaceStore((state) => state.headerTotal);
+  const headerSummary = useWorkspaceStore((state) => state.headerSummary);
+  const listControlsOpen = useWorkspaceStore((state) => state.listControlsOpen);
+  const setListControlsOpen = useWorkspaceStore((state) => state.setListControlsOpen);
   const openSettings = (event: MouseEvent<HTMLAnchorElement>) => {
     // A plain click moves within the app. A modified one opens the link as
     // usual, and so does a click before the page is ready: a plain link still
@@ -77,12 +81,43 @@ export function LedgerTopBar({
           </>
         )}
       </div>
-      {/* A phone's bar has no tabs, so the list's total sits in the middle;
-          the two sides share the rest equally, which keeps it centred. */}
-      {!inSettings && headerTotal != null ? (
-        <div className="flex shrink-0 justify-center whitespace-nowrap md:hidden">
-          <AmountText variant="summary">{headerTotal}</AmountText>
-        </div>
+      {/* A phone's bar has no tabs, so the list's summary sits in the middle;
+          the two sides share the rest equally, which keeps it centred. The
+          list's period and filter controls fold into it. */}
+      {!inSettings && headerSummary != null ? (
+        <button
+          type="button"
+          aria-expanded={listControlsOpen}
+          aria-controls={LIST_CONTROLS_ID}
+          onClick={() => setListControlsOpen(!listControlsOpen)}
+          className="flex min-w-0 max-w-[45vw] shrink-0 flex-col items-center rounded-md px-2 py-0.5 transition-colors hover:bg-surface2 md:hidden"
+        >
+          <span
+            className={textRoleClassName(
+              "micro",
+              cn(
+                "flex max-w-full items-center gap-0.5 whitespace-nowrap",
+                headerSummary.filtered && "text-primary"
+              )
+            )}
+          >
+            <span className="truncate">
+              {headerSummary.filtered
+                ? `${headerSummary.period} · ${ledgerPageCopy.filtered}`
+                : headerSummary.period}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "size-3 shrink-0 transition-transform",
+                listControlsOpen && "rotate-180"
+              )}
+            />
+          </span>
+          <AmountText variant="summary" className="whitespace-nowrap">
+            {headerSummary.total ?? ledgerPageCopy.totalPending}
+          </AmountText>
+        </button>
       ) : null}
       <div className="hidden h-full flex-1 justify-center md:flex">{navigation}</div>
       <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:gap-2">

@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
   // Evidence button sits underneath it. Development warnings still reach the
   // terminal and the browser console.
   devIndicators: false,
+  experimental: {
+    // The ledger's pages are dynamic but carry no data of their own on a
+    // client move — React Query holds it — so a page just left is safe to show
+    // again at once instead of waiting on the server for the same payload.
+    staleTimes: { dynamic: 300 },
+  },
   images: {
     unoptimized: true, // Disable Next.js image optimization - images are pre-processed on upload
     remotePatterns,

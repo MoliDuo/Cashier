@@ -44,3 +44,15 @@ export async function openTab(page: Page, destination: Destination) {
   if ((await view.getAttribute("aria-pressed")) !== "true") await view.click();
   await expect(view).toHaveAttribute("aria-pressed", "true");
 }
+
+/**
+ * A phone folds 账目's toolbar (选择, the period and 筛选) into the top bar's
+ * summary; this drops it down there. Wider screens keep it on the page.
+ */
+export async function showListControls(page: Page) {
+  if ((page.viewportSize()?.width ?? Infinity) >= 768) return;
+  const summary = page.locator('header [aria-controls="ledger-list-controls"]');
+  await expect(summary).toBeVisible();
+  if ((await summary.getAttribute("aria-expanded")) !== "true") await summary.click();
+  await expect(summary).toHaveAttribute("aria-expanded", "true");
+}

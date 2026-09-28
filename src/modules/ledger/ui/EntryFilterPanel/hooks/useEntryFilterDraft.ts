@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
-import type { EntryFilters } from "@/modules/ledger/filters";
+import { countActiveEntryFilters, type EntryFilters } from "@/modules/ledger/filters";
 import { compare, DECIMAL_STRING_PATTERN } from "@/lib/money/decimal";
 
 function normalizeAmountRange(filters: EntryFilters): EntryFilters {
@@ -54,16 +54,11 @@ export function useEntryFilterDraft({
     }
   };
 
-  // The period has a bar of its own beside the filter, so only what narrows
-  // the list is counted here.
-  const activeFilterCount = [
-    filters.search != null && filters.search.trim() !== "",
-    showStatus && (filters.statuses?.length ?? 0) > 0,
-    showCategory && filters.categoryId != null && filters.categoryId !== "",
-    showCurrency && filters.currency != null && filters.currency !== "",
-    filters.minAmount !== undefined && filters.minAmount !== null,
-    filters.maxAmount !== undefined && filters.maxAmount !== null,
-  ].filter((x): x is true => x === true).length;
+  const activeFilterCount = countActiveEntryFilters(filters, {
+    showCategory,
+    showCurrency,
+    showStatus,
+  });
 
   const handleApply = () => {
     const normalizedFilters = normalizeAmountRange(tempFilters);

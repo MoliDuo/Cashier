@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { showListControls } from "./navigation";
 import { signIn } from "./sign-in";
 
 test("账目 and 统计 are routes of their own, Back walks them, and old links land on them", async ({
@@ -78,6 +79,7 @@ test("Back closes the top dialog and leaves the page under it where it was", asy
   await expect(page).toHaveURL(/\/records$/);
 
   // Any other dialog is an entry of its own too.
+  await showListControls(page);
   await page
     .getByRole("button", { name: /^区间：/ })
     .first()

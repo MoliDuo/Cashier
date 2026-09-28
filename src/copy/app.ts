@@ -31,6 +31,8 @@ export const ledgerPageCopy = {
   recordsView: "账目视图",
   byDocument: "按账单",
   byEntry: "按明细",
+  filtered: "已筛选",
+  totalPending: "—",
   stats: "统计",
   back: "返回",
   newRecord: "记一笔",
