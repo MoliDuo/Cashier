@@ -13,7 +13,6 @@ const baseDocument: SourceDocument = {
   failureKind: "invalid_input",
   failureMessage: null,
   documentDate: "2026-07-28",
-  effectiveDate: "2026-07-28",
   createdAt: "2026-07-28T00:00:00.000Z",
   hasImages: false,
   ledgerEntries: [],

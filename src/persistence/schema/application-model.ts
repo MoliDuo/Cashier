@@ -56,6 +56,16 @@ export const extractionAttempts = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.sourceDocumentId],
+      foreignColumns: [sourceDocuments.id],
+      name: "fk_extraction_attempts_source_document",
+    }).onDelete("cascade"),
+    index("idx_extraction_attempts_due")
+      .on(table.nextAttemptAt)
+      .where(sql`${table.status} = 'processing'`),
+    // The target of the latest-attempt key on source_documents.
+    uniqueIndex("uq_extraction_attempts_document_id").on(table.sourceDocumentId, table.id),
     uniqueIndex("uq_extraction_attempts_one_processing")
       .on(table.sourceDocumentId)
       .where(sql`${table.status} = 'processing'`),
@@ -91,6 +101,17 @@ export const sourceDocumentFiles = pgTable(
     createdAt: rowTimestamp("created_at"),
   },
   (table) => [
+    foreignKey({
+      columns: [table.sourceDocumentId],
+      foreignColumns: [sourceDocuments.id],
+      name: "fk_source_document_files_source_document",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.storedFileId],
+      foreignColumns: [storedFiles.id],
+      name: "fk_source_document_files_stored_file",
+    }),
+    index("idx_source_document_files_stored_file").on(table.storedFileId),
     uniqueIndex("uq_source_document_files_document_position").on(
       table.sourceDocumentId,
       table.position
@@ -164,6 +185,12 @@ export const categoryAssignmentJobs = pgTable(
       foreignColumns: [table.id],
       name: "fk_category_assignment_jobs_retry_of_job",
     }).onDelete("set null"),
+    uniqueIndex("uq_category_assignment_jobs_request_key").on(table.requestKey),
+    // One run at a time: a double submit becomes a conflict instead of paying
+    // for the same model calls twice.
+    uniqueIndex("uq_category_assignment_jobs_active")
+      .on(sql`(true)`)
+      .where(sql`${table.status} IN ('pending', 'running')`),
     check("ck_category_assignment_jobs_mode", sql`${table.mode} IN ('ai', 'assign', 'clear')`),
   ]
 );
@@ -249,9 +276,11 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
 });
 
+/** The ledger's one row of change watermarks, kept by the change-log triggers. */
 export const ledgerSyncState = pgTable(
   "ledger_sync_state",
   {
+    id: boolean("id").primaryKey().default(true),
     version: bigint("version", { mode: "bigint" })
       .notNull()
       .default(sql`0`),
@@ -267,5 +296,8 @@ export const ledgerSyncState = pgTable(
       .default(sql`0`),
     updatedAt: rowTimestamp("updated_at"),
   },
-  (table) => [check("ck_ledger_sync_state_version", sql`${table.version} >= 0`)]
+  (table) => [
+    check("ck_ledger_sync_state_version", sql`${table.version} >= 0`),
+    check("ck_ledger_sync_state_singleton", sql`${table.id}`),
+  ]
 );

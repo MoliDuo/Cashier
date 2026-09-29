@@ -1,6 +1,6 @@
 {
-  "id": "2ad34401-af4f-4733-8eec-a1f4a978dafc",
-  "prevId": "2f13bcb0-42ad-4317-b71f-427be1e3c15b",
+  "id": "985d582d-6684-4324-8e32-e6c9f79b5547",
+  "prevId": "2ad34401-af4f-4733-8eec-a1f4a978dafc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -731,13 +731,6 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
-        },
         "name": {
           "name": "name",
           "type": "text",
@@ -773,36 +766,9 @@
         }
       },
       "indexes": {
-        "uq_books_ledger_id_id": {
-          "name": "uq_books_ledger_id_id",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_books_active_sort": {
           "name": "idx_books_active_sort",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "sort_order",
               "isExpression": false,
@@ -832,12 +798,6 @@
           "name": "uq_books_active_name",
           "columns": [
             {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
               "expression": "name",
               "isExpression": false,
               "asc": true,
@@ -851,21 +811,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "fk_books_ledger": {
-          "name": "fk_books_ledger",
-          "tableFrom": "books",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -887,13 +833,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "name": {
           "name": "name",
@@ -936,36 +875,9 @@
         }
       },
       "indexes": {
-        "uq_entry_categories_ledger_id_id": {
-          "name": "uq_entry_categories_ledger_id_id",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_entry_categories_sort": {
           "name": "idx_entry_categories_sort",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "sort_order",
               "isExpression": false,
@@ -991,28 +903,13 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "fk_entry_categories_ledger": {
-          "name": "fk_entry_categories_ledger",
-          "tableFrom": "entry_categories",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uq_entry_categories_ledger_name": {
-          "name": "uq_entry_categories_ledger_name",
+        "uq_entry_categories_name": {
+          "name": "uq_entry_categories_name",
           "nullsNotDistinct": false,
           "columns": [
-            "ledger_id",
             "name"
           ]
         }
@@ -1031,13 +928,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "category_id": {
           "name": "category_id",
@@ -1098,15 +988,24 @@
         }
       },
       "indexes": {
+        "idx_ledger_entries_search": {
+          "name": "idx_ledger_entries_search",
+          "columns": [
+            {
+              "expression": "lower(\"item_name\" || ' ' || COALESCE(\"description\", '')) public.gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
         "idx_ledger_entries_category": {
           "name": "idx_ledger_entries_category",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "category_id",
               "isExpression": false,
@@ -1122,12 +1021,6 @@
         "idx_ledger_entries_document_position": {
           "name": "idx_ledger_entries_document_position",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "source_document_id",
               "isExpression": false,
@@ -1151,50 +1044,20 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_ledger_entries_search": {
-          "name": "idx_ledger_entries_search",
-          "columns": [
-            {
-              "expression": "lower(\"item_name\" || ' ' || COALESCE(\"description\", '')) public.gin_trgm_ops",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "fk_ledger_entries_ledger": {
-          "name": "fk_ledger_entries_ledger",
-          "tableFrom": "ledger_entries",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "fk_ledger_entries_category": {
           "name": "fk_ledger_entries_category",
           "tableFrom": "ledger_entries",
           "tableTo": "entry_categories",
           "columnsFrom": [
-            "ledger_id",
             "category_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "fk_ledger_entries_source_document": {
@@ -1202,11 +1065,9 @@
           "tableFrom": "ledger_entries",
           "tableTo": "source_documents",
           "columnsFrom": [
-            "ledger_id",
             "source_document_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1370,13 +1231,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
-        },
         "book_id": {
           "name": "book_id",
           "type": "uuid",
@@ -1410,27 +1264,6 @@
         }
       },
       "indexes": {
-        "idx_service_credentials_ledger_book": {
-          "name": "idx_service_credentials_ledger_book",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "book_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "uq_service_credentials_token_hash": {
           "name": "uq_service_credentials_token_hash",
           "columns": [
@@ -1446,32 +1279,32 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_service_credentials_book": {
+          "name": "idx_service_credentials_book",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "fk_service_credentials_ledger": {
-          "name": "fk_service_credentials_ledger",
-          "tableFrom": "service_credentials",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "fk_service_credentials_book": {
           "name": "fk_service_credentials_book",
           "tableFrom": "service_credentials",
           "tableTo": "books",
           "columnsFrom": [
-            "ledger_id",
             "book_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
           "onDelete": "no action",
@@ -1500,13 +1333,6 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
-        },
         "book_id": {
           "name": "book_id",
           "type": "uuid",
@@ -1529,7 +1355,7 @@
           "name": "document_date",
           "type": "date",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "effective_date": {
           "name": "effective_date",
@@ -1594,23 +1420,17 @@
         }
       },
       "indexes": {
-        "uq_source_documents_ledger_id_id": {
-          "name": "uq_source_documents_ledger_id_id",
+        "idx_source_documents_latest_attempt": {
+          "name": "idx_source_documents_latest_attempt",
           "columns": [
             {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
+              "expression": "latest_attempt_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1619,13 +1439,7 @@
           "name": "idx_source_documents_feed",
           "columns": [
             {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "effective_date",
+              "expression": "document_date",
               "isExpression": false,
               "asc": false,
               "nulls": "last"
@@ -1652,19 +1466,13 @@
           "name": "idx_source_documents_book_feed",
           "columns": [
             {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
               "expression": "book_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "effective_date",
+              "expression": "document_date",
               "isExpression": false,
               "asc": false,
               "nulls": "last"
@@ -1687,30 +1495,9 @@
           "method": "btree",
           "with": {}
         },
-        "idx_source_documents_latest_attempt": {
-          "name": "idx_source_documents_latest_attempt",
-          "columns": [
-            {
-              "expression": "latest_attempt_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "uq_source_documents_idempotency": {
           "name": "uq_source_documents_idempotency",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "idempotency_source",
               "isExpression": false,
@@ -1731,29 +1518,14 @@
         }
       },
       "foreignKeys": {
-        "fk_source_documents_ledger": {
-          "name": "fk_source_documents_ledger",
-          "tableFrom": "source_documents",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "fk_source_documents_book": {
           "name": "fk_source_documents_book",
           "tableFrom": "source_documents",
           "tableTo": "books",
           "columnsFrom": [
-            "ledger_id",
             "book_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
           "onDelete": "no action",
@@ -1764,12 +1536,10 @@
           "tableFrom": "source_documents",
           "tableTo": "extraction_attempts",
           "columnsFrom": [
-            "ledger_id",
             "id",
             "latest_attempt_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "source_document_id",
             "id"
           ],
@@ -1801,13 +1571,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "source_document_id": {
           "name": "source_document_id",
@@ -1879,27 +1642,6 @@
         }
       },
       "indexes": {
-        "idx_category_assignment_documents_ledger_job": {
-          "name": "idx_category_assignment_documents_ledger_job",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_category_assignment_documents_source_document": {
           "name": "idx_category_assignment_documents_source_document",
           "columns": [
@@ -1923,19 +1665,6 @@
           "tableTo": "category_assignment_jobs",
           "columnsFrom": [
             "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_category_assignment_documents_ledger": {
-          "name": "fk_category_assignment_documents_ledger",
-          "tableFrom": "category_assignment_documents",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
           ],
           "columnsTo": [
             "id"
@@ -1980,13 +1709,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "ledger_entry_id": {
           "name": "ledger_entry_id",
@@ -2074,27 +1796,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_category_assignment_entries_ledger_job": {
-          "name": "idx_category_assignment_entries_ledger_job",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -2104,19 +1805,6 @@
           "tableTo": "category_assignment_jobs",
           "columnsFrom": [
             "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_category_assignment_entries_ledger": {
-          "name": "fk_category_assignment_entries_ledger",
-          "tableFrom": "category_assignment_entries",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
           ],
           "columnsTo": [
             "id"
@@ -2164,13 +1852,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "status": {
           "name": "status",
@@ -2256,12 +1937,6 @@
           "name": "uq_category_assignment_jobs_request_key",
           "columns": [
             {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
               "expression": "request_key",
               "isExpression": false,
               "asc": true,
@@ -2277,9 +1952,9 @@
           "name": "uq_category_assignment_jobs_active",
           "columns": [
             {
-              "expression": "ledger_id",
-              "isExpression": false,
+              "expression": "(true)",
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
@@ -2291,19 +1966,6 @@
         }
       },
       "foreignKeys": {
-        "fk_category_assignment_jobs_ledger": {
-          "name": "fk_category_assignment_jobs_ledger",
-          "tableFrom": "category_assignment_jobs",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "fk_category_assignment_jobs_retry_of_job": {
           "name": "fk_category_assignment_jobs_retry_of_job",
           "tableFrom": "category_assignment_jobs",
@@ -2339,13 +2001,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "source_document_id": {
           "name": "source_document_id",
@@ -2432,31 +2087,9 @@
         }
       },
       "indexes": {
-        "uq_extraction_attempts_one_processing": {
-          "name": "uq_extraction_attempts_one_processing",
-          "columns": [
-            {
-              "expression": "source_document_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"extraction_attempts\".\"status\" = 'processing'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_extraction_attempts_due": {
           "name": "idx_extraction_attempts_due",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "next_attempt_at",
               "isExpression": false,
@@ -2470,15 +2103,9 @@
           "method": "btree",
           "with": {}
         },
-        "uq_extraction_attempts_ledger_document_id": {
-          "name": "uq_extraction_attempts_ledger_document_id",
+        "uq_extraction_attempts_document_id": {
+          "name": "uq_extraction_attempts_document_id",
           "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "source_document_id",
               "isExpression": false,
@@ -2496,6 +2123,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "uq_extraction_attempts_one_processing": {
+          "name": "uq_extraction_attempts_one_processing",
+          "columns": [
+            {
+              "expression": "source_document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"extraction_attempts\".\"status\" = 'processing'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2504,11 +2147,9 @@
           "tableFrom": "extraction_attempts",
           "tableTo": "source_documents",
           "columnsFrom": [
-            "ledger_id",
             "source_document_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -2525,11 +2166,12 @@
       "name": "ledger_sync_state",
       "schema": "",
       "columns": {
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
+        "id": {
+          "name": "id",
+          "type": "boolean",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": true
         },
         "version": {
           "name": "version",
@@ -2574,21 +2216,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "fk_ledger_sync_state_ledger": {
-          "name": "fk_ledger_sync_state_ledger",
-          "tableFrom": "ledger_sync_state",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2596,6 +2224,10 @@
         "ck_ledger_sync_state_version": {
           "name": "ck_ledger_sync_state_version",
           "value": "\"ledger_sync_state\".\"version\" >= 0"
+        },
+        "ck_ledger_sync_state_singleton": {
+          "name": "ck_ledger_sync_state_singleton",
+          "value": "\"ledger_sync_state\".\"id\""
         }
       },
       "isRLSEnabled": false
@@ -2643,13 +2275,6 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
-        },
         "source_document_id": {
           "name": "source_document_id",
           "type": "uuid",
@@ -2677,6 +2302,21 @@
         }
       },
       "indexes": {
+        "idx_source_document_files_stored_file": {
+          "name": "idx_source_document_files_stored_file",
+          "columns": [
+            {
+              "expression": "stored_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "uq_source_document_files_document_position": {
           "name": "uq_source_document_files_document_position",
           "columns": [
@@ -2718,27 +2358,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_source_document_files_ledger_file": {
-          "name": "idx_source_document_files_ledger_file",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stored_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -2747,11 +2366,9 @@
           "tableFrom": "source_document_files",
           "tableTo": "source_documents",
           "columnsFrom": [
-            "ledger_id",
             "source_document_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -2762,11 +2379,9 @@
           "tableFrom": "source_document_files",
           "tableTo": "stored_files",
           "columnsFrom": [
-            "ledger_id",
             "stored_file_id"
           ],
           "columnsTo": [
-            "ledger_id",
             "id"
           ],
           "onDelete": "no action",
@@ -2794,13 +2409,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "ledger_id": {
-          "name": "ledger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "current_ledger_id()"
         },
         "storage_key": {
           "name": "storage_key",
@@ -2847,27 +2455,6 @@
         }
       },
       "indexes": {
-        "uq_stored_files_ledger_id_id": {
-          "name": "uq_stored_files_ledger_id_id",
-          "columns": [
-            {
-              "expression": "ledger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "uq_stored_files_storage_key": {
           "name": "uq_stored_files_storage_key",
           "columns": [
@@ -2884,21 +2471,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "fk_stored_files_ledger": {
-          "name": "fk_stored_files_ledger",
-          "tableFrom": "stored_files",
-          "tableTo": "ledgers",
-          "columnsFrom": [
-            "ledger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

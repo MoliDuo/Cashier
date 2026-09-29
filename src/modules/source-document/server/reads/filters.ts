@@ -60,10 +60,10 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
     );
   }
   if (input.startDate != null && input.startDate !== "") {
-    conditions.push(sql`${sourceDocuments.effectiveDate} >= ${input.startDate}::date`);
+    conditions.push(sql`${sourceDocuments.documentDate} >= ${input.startDate}::date`);
   }
   if (input.endDate != null && input.endDate !== "") {
-    conditions.push(sql`${sourceDocuments.effectiveDate} <= ${input.endDate}::date`);
+    conditions.push(sql`${sourceDocuments.documentDate} <= ${input.endDate}::date`);
   }
   const searchPattern =
     input.search != null && input.search !== "" ? escapedLikeContains(input.search) : null;
@@ -72,7 +72,7 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
       amount: sql`matched_entries.amount`,
       currency: sql`matched_entries.currency`,
       mainCurrency: documentMainCurrency,
-      date: sourceDocuments.effectiveDate,
+      date: sourceDocuments.documentDate,
     });
     conditions.push(sql`EXISTS (
       SELECT 1
@@ -111,7 +111,7 @@ export async function calculateCompletedSourceDocumentTotal(
     amount: ledgerEntries.amount,
     currency: ledgerEntries.currency,
     mainCurrency: documentMainCurrency,
-    date: sourceDocuments.effectiveDate,
+    date: sourceDocuments.documentDate,
   });
   const matchedEntryConditions: SQL<unknown>[] = [];
   if (input.minAmount !== undefined) {

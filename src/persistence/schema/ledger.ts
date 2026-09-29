@@ -3,7 +3,9 @@ import {
   text,
   integer,
   index,
+  unique,
   uniqueIndex,
+  foreignKey,
   timestamp,
   boolean,
   check,
@@ -15,13 +17,15 @@ import { type InferSelectModel, sql } from "drizzle-orm";
 import { rowTimestamp } from "./columns";
 
 /*
- * The ledger is a singleton, so no other table names it. Until migration 0024
- * the database still carries a `ledger_id` column on every ledger table, filled
- * by `DEFAULT current_ledger_id()`, together with the composite keys and
- * indexes built on it. The model leaves all of them out, so this release
- * neither reads nor writes the column; the schema contract test lists their
- * names as retired.
+ * The ledger is a singleton, so no other table names it: every row belongs to
+ * the one ledger, and keys between tables are plain single-column keys.
  */
+
+// These declarations only provide physical target columns to FK builders.
+// The complete table remains uniquely exported from its owning module.
+const sourceDocumentsReference = pgTable("source_documents", {
+  id: uuid("id").notNull(),
+});
 
 export const ledgers = pgTable(
   "ledgers",
@@ -75,20 +79,38 @@ export const books = pgTable(
     createdAt: rowTimestamp("created_at"),
     updatedAt: rowTimestamp("updated_at"),
   },
-  (table) => [check("ck_books_name_length", sql`length(btrim(${table.name})) BETWEEN 1 AND 20`)]
+  (table) => [
+    index("idx_books_active_sort")
+      .on(table.sortOrder, table.createdAt, table.id)
+      .where(sql`${table.archivedAt} IS NULL`),
+    uniqueIndex("uq_books_active_name")
+      .on(table.name)
+      .where(sql`${table.archivedAt} IS NULL`),
+    check("ck_books_name_length", sql`length(btrim(${table.name})) BETWEEN 1 AND 20`),
+  ]
 );
 
 export type Book = InferSelectModel<typeof books>;
 
-export const entryCategories = pgTable("entry_categories", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  description: text("description"),
-  icon: text("icon"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: rowTimestamp("created_at"),
-  updatedAt: rowTimestamp("updated_at"),
-});
+export const entryCategories = pgTable(
+  "entry_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: text("description"),
+    icon: text("icon"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: rowTimestamp("created_at"),
+    updatedAt: rowTimestamp("updated_at"),
+  },
+  (table) => [
+    index("idx_entry_categories_sort").on(table.sortOrder, table.createdAt, table.id),
+    // The database declares this DEFERRABLE INITIALLY IMMEDIATE, which Drizzle
+    // cannot express: it is checked when a statement ends, so one UPDATE can
+    // swap names.
+    unique("uq_entry_categories_name").on(table.name),
+  ]
+);
 
 export type EntryCategory = InferSelectModel<typeof entryCategories>;
 
@@ -111,6 +133,22 @@ export const ledgerEntries = pgTable(
       "gin",
       sql`lower(${table.itemName} || ' ' || COALESCE(${table.description}, '')) public.gin_trgm_ops`
     ),
+    index("idx_ledger_entries_category").on(table.categoryId),
+    index("idx_ledger_entries_document_position").on(
+      table.sourceDocumentId,
+      table.position,
+      table.id
+    ),
+    foreignKey({
+      columns: [table.categoryId],
+      foreignColumns: [entryCategories.id],
+      name: "fk_ledger_entries_category",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.sourceDocumentId],
+      foreignColumns: [sourceDocumentsReference.id],
+      name: "fk_ledger_entries_source_document",
+    }).onDelete("cascade"),
     check("ck_ledger_entries_currency", sql`${table.currency} ~ '^[A-Z]{3}$'`),
     check("ck_ledger_entries_position", sql`${table.position} >= 0`),
   ]
@@ -136,6 +174,12 @@ export const serviceCredentials = pgTable(
     uniqueIndex("uq_service_credentials_token_hash")
       .on(table.tokenHash)
       .where(sql`${table.tokenHash} IS NOT NULL`),
+    index("idx_service_credentials_book").on(table.bookId),
+    foreignKey({
+      columns: [table.bookId],
+      foreignColumns: [books.id],
+      name: "fk_service_credentials_book",
+    }),
     check(
       "ck_service_credentials_active_hashed",
       sql`${table.revokedAt} IS NOT NULL OR (${table.tokenHash} IS NOT NULL AND ${table.tokenPrefix} IS NOT NULL AND ${table.tokenSuffix} IS NOT NULL)`

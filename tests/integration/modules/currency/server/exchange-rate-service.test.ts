@@ -167,7 +167,7 @@ describe("refreshExchangeRates", () => {
     );
     const convert = () =>
       db.execute<{ converted: string | null }>(sql`
-        SELECT convert_amount(10, 'USD', 'CNY', effective_date)::text AS converted
+        SELECT convert_amount(10, 'USD', 'CNY', document_date)::text AS converted
         FROM source_documents WHERE id = ${document!.id}
       `);
 

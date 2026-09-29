@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { ledgers, entryCategories as categories, ledgerEntries } from "@/persistence";
+import { entryCategories as categories, ledgerEntries, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, createTestSourceDocument } from "tests/helpers/schema-setup";
 
 /**
@@ -12,7 +12,7 @@ import { createTestUserWithLedger, createTestSourceDocument } from "tests/helper
  * in tests/integration/modules/ledger/server{,-actions}/ledger-entries*.test.ts
  */
 describe("LedgerEntries FK Constraints", () => {
-  it("should cascade delete ledger entries when ledger is deleted", async () => {
+  it("should cascade delete ledger entries when their source document is deleted", async () => {
     const db = getTestDb();
     await createTestUserWithLedger(db, "test8@example.com", "Test Ledger");
 
@@ -28,7 +28,7 @@ describe("LedgerEntries FK Constraints", () => {
       })
       .returning({ id: ledgerEntries.id });
 
-    await db.delete(ledgers);
+    await db.delete(sourceDocuments).where(eq(sourceDocuments.id, sourceDocId));
 
     const orphaned = await db.query.ledgerEntries.findMany({
       where: eq(ledgerEntries.id, entry!.id),

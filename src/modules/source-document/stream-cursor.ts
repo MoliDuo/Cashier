@@ -1,5 +1,5 @@
 interface SourceDocumentPageCursor {
-  effectiveDate: string;
+  documentDate: string;
   createdAt: string;
   id: string;
 }
@@ -22,23 +22,23 @@ export function decodeSourceDocumentPageCursor(
   cursor: string | null | undefined
 ): SourceDocumentPageCursor | null {
   if (cursor == null || cursor === "") return null;
-  const [effectiveDate, createdAt, id, ...rest] = cursor.split("|");
+  const [documentDate, createdAt, id, ...rest] = cursor.split("|");
   if (
     rest.length > 0 ||
-    effectiveDate == null ||
+    documentDate == null ||
     createdAt == null ||
     id == null ||
     id === "" ||
-    !validDate(effectiveDate) ||
+    !validDate(documentDate) ||
     !validTimestamp(createdAt)
   ) {
     return null;
   }
-  return { effectiveDate, createdAt, id };
+  return { documentDate, createdAt, id };
 }
 
 export function encodeSourceDocumentPageCursor(cursor: SourceDocumentPageCursor): string {
-  return `${cursor.effectiveDate}|${cursor.createdAt}|${cursor.id}`;
+  return `${cursor.documentDate}|${cursor.createdAt}|${cursor.id}`;
 }
 
 export function decodeSourceDocumentStreamCursor(

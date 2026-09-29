@@ -29,7 +29,7 @@ function largeGroup(count: number): UnifiedStreamGroup {
         status: "completed",
       },
       ledgerEntries: [],
-      effectiveDate: "2026-07-15",
+      documentDate: "2026-07-15",
     })),
   } as unknown as UnifiedStreamGroup;
 }
@@ -50,7 +50,7 @@ describe("LedgerEntriesUnifiedGroups", () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
           ledgerEntries: [],
-          effectiveDate: "2026-07-15",
+          documentDate: "2026-07-15",
         },
       ],
     };
@@ -81,7 +81,7 @@ describe("LedgerEntriesUnifiedGroups", () => {
         {
           sourceDocument: { id: "document-1", status: "processing" },
           ledgerEntries: [],
-          effectiveDate: "2026-07-15",
+          documentDate: "2026-07-15",
         },
       ],
     } as unknown as UnifiedStreamGroup;
@@ -113,7 +113,7 @@ describe("LedgerEntriesUnifiedGroups", () => {
         {
           sourceDocument: { id: "document-1", status: "completed" },
           ledgerEntries: [],
-          effectiveDate: "2026-07-15",
+          documentDate: "2026-07-15",
         },
       ],
     } as unknown as UnifiedStreamGroup;
@@ -143,12 +143,12 @@ describe("LedgerEntriesUnifiedGroups", () => {
         {
           sourceDocument: { id: "document-1", status: "completed" },
           ledgerEntries: [],
-          effectiveDate: "2026-07-15",
+          documentDate: "2026-07-15",
         },
         {
           sourceDocument: { id: "document-2", status: "completed" },
           ledgerEntries: [],
-          effectiveDate: "2026-07-15",
+          documentDate: "2026-07-15",
         },
       ],
     } as unknown as UnifiedStreamGroup;
@@ -179,12 +179,12 @@ describe("LedgerEntriesUnifiedGroups", () => {
     const firstItem = {
       sourceDocument: { id: "document-1", status: "completed" },
       ledgerEntries: [],
-      effectiveDate: "2026-07-15",
+      documentDate: "2026-07-15",
     };
     const secondItem = {
       sourceDocument: { id: "document-2", status: "completed" },
       ledgerEntries: [],
-      effectiveDate: "2026-07-15",
+      documentDate: "2026-07-15",
     };
     const groups = [
       {
@@ -249,7 +249,7 @@ describe("LedgerEntriesUnifiedGroups", () => {
               status: "failed",
             },
             ledgerEntries: [],
-            effectiveDate: "2026-07-15",
+            documentDate: "2026-07-15",
           },
           {
             sourceDocument: {
@@ -258,7 +258,7 @@ describe("LedgerEntriesUnifiedGroups", () => {
               status: "failed",
             },
             ledgerEntries: [],
-            effectiveDate: "2026-07-15",
+            documentDate: "2026-07-15",
           },
         ],
       },

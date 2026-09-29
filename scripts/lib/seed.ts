@@ -242,7 +242,8 @@ export interface SeedSourceDocument {
   bookId: string | SQL;
   title?: string | null;
   inputText?: string | null;
-  documentDate?: string | null;
+  /** The day the record counts on. */
+  documentDate: string;
   dateOrganizationSuggestion?: DateOrganizationSuggestion | null;
   /** Oldest first; the last one becomes the document's latest submission. */
   attempts?: readonly SeedAttempt[];
@@ -267,7 +268,7 @@ export async function seedSourceDocument(
     bookId: input.bookId,
     title: input.title ?? null,
     inputText: input.inputText ?? null,
-    documentDate: input.documentDate ?? null,
+    documentDate: input.documentDate,
     version: 1,
     dateOrganizationSuggestion: input.dateOrganizationSuggestion ?? null,
     createdAt: at,

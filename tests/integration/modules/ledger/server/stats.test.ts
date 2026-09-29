@@ -8,6 +8,7 @@ import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
+  todayUtc,
 } from "tests/helpers/schema-setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
@@ -24,7 +25,7 @@ async function seedEntry(
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      documentDate: opts.entryDate ?? null,
+      documentDate: opts.entryDate ?? todayUtc(),
       bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
@@ -283,28 +284,6 @@ describe("getLedgerStatsAction", () => {
     expect(result.convertedTotal?.currency).toBe("CNY");
   });
 
-  it("includes undated documents on their effective (UTC creation) date", async () => {
-    const db = getTestDb();
-    await seedEntry(db, { amount: "75.00", currency: "CNY" });
-    // Point the undated document at a fixed UTC creation date.
-    await db.update(sourceDocuments).set({ createdAt: new Date("2024-04-08T20:00:00Z") });
-
-    const unfiltered = await getLedgerStatsAction({});
-    expect(unfiltered.convertedTotal?.total).toBe("75");
-    expect(unfiltered.trend).toEqual([{ date: "2024-04-08", total: "75" }]);
-
-    const filtered = await getLedgerStatsAction({
-      startDate: "2024-04-08",
-      endDate: "2024-04-08",
-    });
-    const cny = filtered.totals.find((total) => total.currency === "CNY");
-    expect(cny?.count).toBe(1);
-
-    const outside = await getLedgerStatsAction({ startDate: "2024-04-09" });
-    expect(outside.totals).toHaveLength(0);
-    expect(outside.trend).toHaveLength(0);
-  });
-
   it("executes the summary as a single SQL statement", async () => {
     const db = getTestDb();
     await seedEntry(db, { amount: "10.00", currency: "CNY", entryDate: "2024-01-01" });
@@ -401,31 +380,6 @@ describe("getLedgerStatsAction", () => {
 
       expect(stats.convertedTotal?.currency).toBe("CNY");
       expect(stats.convertedTotal?.total).toBeCloseTo(617.11, 1);
-    });
-
-    it("converts an undated document by its UTC creation day's rates", async () => {
-      const db = getTestDb();
-      await insertExchangeRates("2024-02-10", { CNY: 8, USD: 1 });
-      await insertExchangeRates("2024-02-11", { CNY: 9, USD: 1 });
-      const [sourceDoc] = await db
-        .insert(sourceDocuments)
-        .values({
-          documentDate: null,
-          createdAt: new Date("2024-02-10T23:30:00Z"),
-          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-        })
-        .returning();
-      await db.insert(ledgerEntries).values({
-        sourceDocumentId: sourceDoc!.id,
-        amount: "10.00",
-        currency: "USD",
-        itemName: "Undated USD Item",
-      });
-      await activateTestSourceDocumentProjection(db, sourceDoc!.id);
-
-      const stats = await getLedgerStatsAction({});
-
-      expect(stats.convertedTotal).toEqual({ total: "80", currency: "CNY" });
     });
   });
 });

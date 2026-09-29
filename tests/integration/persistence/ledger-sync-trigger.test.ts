@@ -122,15 +122,13 @@ describe("record_ledger_change trigger", () => {
     expect(afterZone.stats).toBe(afterZone.version);
   });
 
-  it("creates a ledger's sync row on its first change and lets the ledger go", async () => {
+  it("creates the sync row on the first change", async () => {
     const db = getTestDb();
     await createTestUserWithLedger(db);
     await db.delete(ledgerSyncState);
 
     await createTestSourceDocument(db);
     expect((await syncState()).version).toBeGreaterThan(BigInt(0));
-
-    await expect(db.delete(ledgers)).resolves.toBeDefined();
-    await expect(db.query.ledgerSyncState.findFirst()).resolves.toBeUndefined();
+    await expect(db.select().from(ledgerSyncState)).resolves.toHaveLength(1);
   });
 });

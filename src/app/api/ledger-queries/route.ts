@@ -30,7 +30,7 @@ import {
 } from "@/modules/ledger/server/get-category-assignment-job";
 import { scheduleCategoryAssignmentRecoveryAfter } from "@/server/category-assignment/schedule";
 import {
-  findEarliestEffectiveDate,
+  findEarliestDocumentDate,
   queryEnhancedStats,
 } from "@/modules/stats/server/enhanced-stats-query";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       case "stats": {
         const { ledger } = await requireLedgerAccess();
         const resolved = await withResolvedStatsPeriod(input, ledger.settings.timeZone, (bookId) =>
-          findEarliestEffectiveDate(bookId)
+          findEarliestDocumentDate(bookId)
         );
         result = await queryEnhancedStats(parseEnhancedStatsInput(resolved));
         break;

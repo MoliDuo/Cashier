@@ -117,9 +117,9 @@ async function updateSettingsRow(
  */
 async function ensureExchangeRatesForLedger(): Promise<void> {
   const rows = await db
-    .selectDistinct({ effectiveDate: sourceDocuments.effectiveDate })
+    .selectDistinct({ documentDate: sourceDocuments.documentDate })
     .from(sourceDocuments);
-  await ensureExchangeRates(rows.map((row) => row.effectiveDate));
+  await ensureExchangeRates(rows.map((row) => row.documentDate));
 }
 
 export async function updateLedgerSettings(data: UpdateLedgerInput): Promise<LedgerDto> {

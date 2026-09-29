@@ -118,36 +118,6 @@ describe("queryEnhancedStats", () => {
     expect(result.previousChart).toEqual([]);
   });
 
-  it("counts documents with a null entry date by their effective date", async () => {
-    const db = getTestDb();
-
-    const insertedDoc = await db
-      .insert(sourceDocuments)
-      .values({
-        documentDate: null,
-        createdAt: new Date("2024-03-10T12:00:00Z"),
-        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-      })
-      .returning();
-    const doc = requireFirst(insertedDoc, "document");
-
-    await db.insert(ledgerEntries).values({
-      sourceDocumentId: doc.id,
-      amount: "40",
-      currency: "CNY",
-      itemName: "null entry date item",
-      categoryId,
-    });
-
-    const result = await getTargetEnhancedStatsQuery({
-      queryRange: { from: "2024-03-01", to: "2024-03-31" },
-      compareRange: { from: "2024-02-01", to: "2024-02-29" },
-    });
-
-    expect(result.summary.total).toBe("40");
-    expect(result.chart).toEqual([{ date: "2024-03-10", total: "40" }]);
-  });
-
   it("counts active projections even while the document is pending", async () => {
     const db = getTestDb();
 

@@ -241,7 +241,7 @@ describe("session ledger query transport", () => {
 
       const stream = await (await POST(request("stream", [{ period }]))).json();
       expect(stream.items.map((item: { title: string }) => item.title)).toEqual(["October"]);
-      expect(stream.items[0]).toMatchObject({ effectiveDate: "2026-10-01" });
+      expect(stream.items[0]).toMatchObject({ documentDate: "2026-10-01" });
 
       const entries = await (await POST(request("entries", [{ period }]))).json();
       expect(entries.items.map((item: { itemName: string }) => item.itemName)).toEqual(["October"]);

@@ -22,7 +22,7 @@ export interface UseConvertedAmountOptions {
 const supportedCurrencySet = new Set<string>(SUPPORTED_CURRENCIES);
 const CIVIL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function resolveEffectiveDate(date?: string | null): string | null {
+function resolveConversionDate(date?: string | null): string | null {
   if (date == null || date === "") return formatDateTimeForApi(new Date());
   if (CIVIL_DATE_PATTERN.test(date)) {
     const parsed = new Date(`${date}T00:00:00`);
@@ -41,7 +41,7 @@ export function useConvertedAmount(
 ): UseConvertedAmountReturn {
   const normalizedFrom = from != null && supportedCurrencySet.has(from) ? from : null;
   const normalizedTo = to != null && supportedCurrencySet.has(to) ? to : null;
-  const effectiveDate = resolveEffectiveDate(date);
+  const conversionDate = resolveConversionDate(date);
   const localToday = formatDateTimeForApi(new Date());
 
   const isSameCurrency = normalizedFrom != null && normalizedFrom === normalizedTo;
@@ -49,7 +49,7 @@ export function useConvertedAmount(
     !isValidDecimal(amount) ||
     normalizedFrom == null ||
     normalizedTo == null ||
-    effectiveDate == null;
+    conversionDate == null;
   const canConvert = options.enabled !== false && !isSameCurrency && !isMissingInfo;
 
   const { data, isLoading, error } = useQuery<ConvertCurrencyResult>({
@@ -57,7 +57,7 @@ export function useConvertedAmount(
       amount,
       normalizedFrom ?? "__missing_from__",
       normalizedTo ?? "__missing_to__",
-      effectiveDate ?? "__invalid_date__"
+      conversionDate ?? "__invalid_date__"
     ),
     queryFn: async () => {
       if (normalizedFrom == null || normalizedTo == null) {
@@ -68,7 +68,7 @@ export function useConvertedAmount(
         amount,
         from: normalizedFrom,
         to: normalizedTo,
-        ...(effectiveDate != null ? { date: effectiveDate } : {}),
+        ...(conversionDate != null ? { date: conversionDate } : {}),
       });
       if (typeof result.converted !== "string" || !isValidDecimal(result.converted)) {
         throw new Error("Invalid currency conversion result");
@@ -78,7 +78,7 @@ export function useConvertedAmount(
     enabled: canConvert,
     // Historical dates are immutable; only today's "live" conversion may
     // change within a day, so it is kept fresh for one hour.
-    staleTime: effectiveDate === localToday ? 1000 * 60 * 60 : Infinity,
+    staleTime: conversionDate === localToday ? 1000 * 60 * 60 : Infinity,
   });
 
   if (!canConvert) {

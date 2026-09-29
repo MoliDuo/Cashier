@@ -18,8 +18,7 @@ export interface SourceDocumentListRow {
   id: string;
   title: string | null;
   bookId?: string | null;
-  documentDate: string | null;
-  effectiveDate: string;
+  documentDate: string;
   latestAttemptId: string | null;
   version: number;
   createdAt: Date;
@@ -137,7 +136,6 @@ export function mapListItem(
     failureKind: hydration.failureKind,
     failureMessage: hydration.failureMessage,
     documentDate: row.documentDate,
-    effectiveDate: row.effectiveDate,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     hasImages: hydration.hasImages,
@@ -180,7 +178,6 @@ export function mapSourceDocumentDetail(
     failureKind: hydration.failureKind,
     failureMessage: hydration.failureMessage,
     documentDate: row.documentDate,
-    effectiveDate: row.effectiveDate,
     dateOrganizationSuggestion: row.dateOrganizationSuggestion,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

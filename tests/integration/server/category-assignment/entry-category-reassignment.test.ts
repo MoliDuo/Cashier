@@ -43,7 +43,7 @@ describe("loadDocumentGroups", () => {
   async function setupDocument(
     input: {
       title?: string | null;
-      documentDate?: string | null;
+      documentDate?: string;
       inputText?: string;
       imageUrls?: string[];
     } = {}
@@ -51,7 +51,7 @@ describe("loadDocumentGroups", () => {
     const db = getTestDb();
     const documentId = await createTestSourceDocument(db, {
       title: input.title ?? null,
-      entryDate: input.documentDate ?? null,
+      ...(input.documentDate == null ? {} : { entryDate: input.documentDate }),
       ...(input.inputText == null ? {} : { text: input.inputText }),
       imageUrls: input.imageUrls ?? [],
     });
@@ -107,6 +107,7 @@ describe("loadDocumentGroups", () => {
   it("keeps a text-only document in the run without any evidence attached", async () => {
     await setupEmptyLedger();
     const { documentId } = await setupDocument({
+      documentDate: "2026-09-11",
       inputText: "打车 18 元",
     });
     const entryId = await seedProjectedEntry({
@@ -123,7 +124,7 @@ describe("loadDocumentGroups", () => {
     expect(groups[0]).toMatchObject({
       sourceDocumentId: documentId,
       title: null,
-      documentDate: null,
+      documentDate: "2026-09-11",
       inputText: "打车 18 元",
       storedFileIds: [],
     });

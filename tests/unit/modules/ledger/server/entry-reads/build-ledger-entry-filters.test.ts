@@ -14,7 +14,7 @@ describe("buildLedgerEntryCursorCondition", () => {
   it("binds valid cursors to the query", () => {
     const cursor = encodeLedgerEntryCursor(
       {
-        effectiveDate: "2026-03-01",
+        documentDate: "2026-03-01",
         documentCreatedAt: "2026-03-01T08:00:00.000Z",
         documentId: "22222222-2222-4222-8222-222222222222",
         position: 0,

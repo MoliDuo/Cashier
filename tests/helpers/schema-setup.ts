@@ -11,6 +11,11 @@ import {
 
 type TestDatabase = NodePgDatabase<typeof schema>;
 
+/** The day a record created now counts on when a fixture does not date it. */
+export function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 /**
@@ -111,7 +116,7 @@ export async function createTestSourceDocument(
     text: string;
     status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
     imageUrls: string[];
-    entryDate: string | null;
+    entryDate: string;
     title: string | null;
   }> = {}
 ): Promise<string> {
@@ -119,7 +124,7 @@ export async function createTestSourceDocument(
   return db.transaction((tx) =>
     seedSourceDocument(tx, {
       bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-      documentDate: overrides.entryDate ?? null,
+      documentDate: overrides.entryDate ?? todayUtc(),
       title: overrides.title ?? null,
       inputText: overrides.text ?? "Test document",
       attempts: [
@@ -152,7 +157,7 @@ export async function createTestRecord(
   input: {
     bookId: string;
     title?: string | null;
-    entryDate?: string | null;
+    entryDate?: string;
     inputText?: string | null;
     entries: readonly {
       id?: string;
@@ -169,7 +174,7 @@ export async function createTestRecord(
     seedSourceDocument(tx, {
       bookId: input.bookId,
       title: input.title ?? null,
-      documentDate: input.entryDate ?? null,
+      documentDate: input.entryDate ?? todayUtc(),
       inputText: input.inputText ?? null,
       entries: input.entries.map((entry) => ({
         ...(entry.id === undefined ? {} : { id: entry.id }),

@@ -9,6 +9,7 @@ import { getEntryCategoriesAction } from "@/modules/ledger/server/list-categorie
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
+  todayUtc,
 } from "tests/helpers/schema-setup";
 
 async function getTargetEntryCategoriesAction() {
@@ -53,6 +54,7 @@ describe("getEntryCategoriesAction", () => {
     const [doc] = await db
       .insert(sourceDocuments)
       .values({
+        documentDate: todayUtc(),
         id: randomUUID(),
         bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })

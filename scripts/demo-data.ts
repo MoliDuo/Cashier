@@ -334,10 +334,16 @@ export async function insertFixture(
   const now = new Date(`${asOf}T12:00:00.000Z`);
   if (reset) {
     // The dedicated demo database holds one account and one ledger. A reset
-    // removes both, so it restores the fixture instead of layering onto
-    // whatever the last session left behind. The file links go first: they
-    // reference stored files without cascading.
-    await db.delete(schema.sourceDocumentFiles);
+    // removes both and everything in the ledger, so it restores the fixture
+    // instead of layering onto whatever the last session left behind. A
+    // record takes its attempts, entries and file links with it.
+    await db.delete(schema.categoryAssignmentJobs);
+    await db.delete(schema.sourceDocuments);
+    await db.delete(schema.storedFiles);
+    await db.delete(schema.entryCategories);
+    await db.delete(schema.serviceCredentials);
+    await db.delete(schema.books);
+    await db.delete(schema.ledgerSyncState);
     await db.delete(schema.ledgers);
     await db.delete(schema.users).where(
       inArray(
@@ -358,8 +364,8 @@ export async function insertFixture(
   });
   const bookIds = await seedBooks(db, fixture.books, now);
 
-  // The reset above deletes the ledger, so cascade already removed any earlier
-  // credentials for this workspace; these rows are recreated with it.
+  // The reset above deleted any earlier credentials for this workspace; these
+  // rows are recreated with it.
   for (const credential of fixture.serviceCredentials) {
     const token = fixtureCredentialToken(credential);
     const { prefix, suffix } = prefixSuffix(token);

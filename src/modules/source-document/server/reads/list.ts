@@ -131,7 +131,6 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
       title: sourceDocuments.title,
       bookId: sourceDocuments.bookId,
       documentDate: sourceDocuments.documentDate,
-      effectiveDate: sourceDocuments.effectiveDate,
       latestAttemptId: sourceDocuments.latestAttemptId,
       version: sourceDocuments.version,
       createdAt: sourceDocuments.createdAt,
@@ -158,7 +157,7 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
     )
     .where(and(...conditions))
     .orderBy(
-      desc(sourceDocuments.effectiveDate),
+      desc(sourceDocuments.documentDate),
       desc(sourceDocuments.createdAt),
       desc(sourceDocuments.id)
     )

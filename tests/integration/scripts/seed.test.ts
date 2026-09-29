@@ -79,7 +79,7 @@ describe("seed", () => {
     const latest = attempts.find((attempt) => attempt.status === "completed");
     expect(attempts).toHaveLength(2);
     expect(document?.latestAttemptId).toBe(latest?.id);
-    expect(document?.effectiveDate).toBe("2026-03-04");
+    expect(document?.documentDate).toBe("2026-03-04");
 
     const [file] = await db
       .select({ id: schema.storedFiles.id, storageKey: schema.storedFiles.storageKey })

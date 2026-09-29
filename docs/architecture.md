@@ -37,8 +37,7 @@
    先停写，再停读，最后才删。Vercel 先构建再迁移，所有待执行的迁移在一个事务里完成，构建或迁移失败都不会动库。模型不再提到、库里还没删的名字登记在 `schema-contract.test.ts` 的
    `retiredNames` 里。
 9. **账本是数据库保证的单例。** `ledgers` 只有一行（`uq_ledgers_singleton`），其余表不按账本区分：
-   登录即授权，查询不带账本过滤，账本设置直接读这一行。残留的 `ledger_id` 列由数据库默认值填写，
-   Drizzle 模型里已经没有它和建在它上面的键（名字登记在 `retiredNames`），迁移 0024 删除。
+   登录即授权，查询不带账本过滤，账本设置直接读这一行。表之间只有单列外键，没有 `ledger_id`。
 
 ## 3. 分层与目录
 
@@ -106,23 +105,22 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 | 批量分类：`category_assignment_jobs`、`category_assignment_documents`、`category_assignment_entries` | 租约放在 job 行上，进度在读取时统计；`ai` 任务的候选分类就是 `candidate_snapshot`                                                                                                  |
 | 认证                                                                                                 | `users`、`login_emails`、`sessions`、`passkeys`、`webauthn_challenges`、`sign_in_challenges`（登录验证码）、`login_email_challenges`（添加登录邮箱的验证码）、`rate_limit_buckets` |
 | API 密钥：`service_credentials`                                                                      | 吊销时写 `revoked_at`，行留作审计                                                                                                                                                  |
-| `ledger_sync_state`                                                                                  | 客户端刷新用的水位线，由行级触发器 `record_ledger_change` 维护：每改一行一条 UPDATE，同一事务复用一个版本号                                                                        |
+| `ledger_sync_state`（单行）                                                                          | 客户端刷新用的水位线，由行级触发器 `record_ledger_change` 维护：每改一行一条 UPDATE，同一事务复用一个版本号                                                                        |
 
 语义约定：
 
-- **日期挂在票据上。** 一张票据一个日期（`document_date`，缺省时 `effective_date` 取 UTC 创建日）。
-  每条写入路径都按账本时区写入日期，新票据在创建的事务里就写入提交请求的日期，不等提取成功，
-  所以处理中、失败或已取消的票据也按账本时区归日。迁移 0019 和 0022 回填了此前缺日期的行，
-  `effective_date` 的 UTC 兜底只剩理论上的可能。
+- **日期挂在票据上。** 一张票据一个日期（`document_date`，必填）。每条写入路径都按账本时区写入日期，
+  新票据在创建的事务里就写入提交请求的日期，不等提取成功，所以处理中、失败或已取消的票据也有日期。
+  不带日期的重新提交沿用票据已有的日期。
 - **一个账本、一个时区。** "今天"、周期的起止、新记录的默认日期都按 `ledgers.time_zone` 计算，
   不看设备、不看分账，也不看服务端的 `TZ`。服务端用 `ledgerToday`（`src/modules/ledger/server/query-period.ts`）取今天。
 - **周期由服务端解析。** 浏览器只发语义周期 `{range, offset}` 或自定义的起止日，
   `withResolvedPeriod` / `withResolvedStatsPeriod` 按账本的今天换成日期区间。周期的纯计算（自然周从周一起、
   自然月、自然年、同期对比）只有 `src/modules/ledger/domain/period.ts` 一份；客户端只用它给标签命名。
-  所有列表和统计的 DTO 都带 `effectiveDate`，客户端直接按它分组，不自己推导。
+  所有列表和统计的 DTO 都带 `documentDate`，客户端直接按它分组，不自己推导。
   一次输入里出现多个日期时，由"日期整理"和"拆分"处理。条目自带日期的方案评估过，代价约 53 个文件，
   而多日期输入并不常见，所以不做。
-- **折算在读取时完成。** 只有 SQL 函数 `convert_amount` 这一份实现，按票据的 `effective_date` 精确匹配
+- **折算在读取时完成。** 只有 SQL 函数 `convert_amount` 这一份实现，按票据的 `document_date` 精确匹配
   当天的汇率行；没有汇率行就显示为未折算，不回退到别的日期，也不做跨币种 1:1 兜底。汇率行按自然日存放，
   周末取服务商给出的上一个工作日。服务商还没发布当天汇率时先存一行临时值，之后由维护流程刷新。
   改主币种只是改一个设置。
@@ -452,8 +450,11 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   按账本限定的查询从未隔离过任何东西，却让每个函数、每条查询和每个测试都带着它。单例改由
   `uq_ledgers_singleton` 保证，授权就是登录（或 API 凭证）。按 expand/contract 分三次发布：迁移 0023 让数据库
   用 `current_ledger_id()` 默认值继续填这一列，模型删掉这一列——Drizzle 的插入会列出模型里的每一列，
-  留着它，0024 删列时正在服务的这一版就会插入失败；0024 删列并把复合外键改成单列外键；
-  之后把旧前缀下的图片搬到 `stored/`。
+  留着它，0024 删列时正在服务的这一版就会插入失败；0024 删列并把复合外键改成单列外键，
+  `ledger_sync_state` 改为单行；之后把旧前缀下的图片搬到 `stored/`。
+  顺带让 `document_date` 必填：此前缺日期时由生成列 `effective_date` 退回 UTC 创建日，迁移 0019、0022、
+  0023 三次回填后这条兜底已无行可用，0024 设为 NOT NULL，读取全部改读 `document_date`，
+  `effective_date` 留到下一次发布删除。
 
 ### 不做
 

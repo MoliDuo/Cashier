@@ -18,7 +18,7 @@ import { toCategoryAssignmentJobDto } from "@/modules/ledger/server/category-ass
 import { getLatestCategoryAssignmentJob } from "@/server/category-assignment/jobs";
 import { getLedgerSettingsView } from "@/modules/ledger/server/get-ledger-settings";
 import {
-  findEarliestEffectiveDate,
+  findEarliestDocumentDate,
   queryEnhancedStats,
 } from "@/modules/stats/server/enhanced-stats-query";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
@@ -306,7 +306,7 @@ export async function getLedgerRouteBootstrap(
       queryEnhancedStats(
         parseEnhancedStatsInput(
           await withResolvedStatsPeriod(descriptor.input, timeZone, (scopeBookId) =>
-            findEarliestEffectiveDate(scopeBookId)
+            findEarliestDocumentDate(scopeBookId)
           )
         )
       ),

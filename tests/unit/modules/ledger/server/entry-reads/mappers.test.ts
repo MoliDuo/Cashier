@@ -25,8 +25,7 @@ describe("mapLedgerEntryDto", () => {
       id: "document-1",
       version: 1,
       title: null,
-      documentDate: null,
-      effectiveDate: "2026-03-19",
+      documentDate: "2026-03-19",
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     };

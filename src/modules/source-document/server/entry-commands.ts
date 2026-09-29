@@ -69,7 +69,7 @@ async function prepareCreate(input: {
   const context = await db
     .select({
       mainCurrency: ledgers.mainCurrency,
-      effectiveDate: sourceDocuments.effectiveDate,
+      documentDate: sourceDocuments.documentDate,
     })
     .from(sourceDocuments)
     .crossJoin(ledgers)
@@ -77,7 +77,7 @@ async function prepareCreate(input: {
     .then((rows) => rows[0]);
   if (context == null) throw new NotFoundError("Source document");
   if (input.currency != null && input.currency !== context.mainCurrency) {
-    await ensureExchangeRates([context.effectiveDate]);
+    await ensureExchangeRates([context.documentDate]);
   }
 }
 
@@ -96,7 +96,7 @@ async function prepareBatchUpdate(input: {
   const rows = await db
     .select({
       mainCurrency: ledgers.mainCurrency,
-      effectiveDate: sourceDocuments.effectiveDate,
+      documentDate: sourceDocuments.documentDate,
       amount: ledgerEntries.amount,
       currency: ledgerEntries.currency,
     })
@@ -118,7 +118,7 @@ async function prepareBatchUpdate(input: {
     const nextCurrency = input.currency !== undefined ? input.currency : entry.currency;
     const effectiveCurrency = nextCurrency ?? entry.mainCurrency;
     assertExpenseAmountDirection(entry.amount, input.amount ?? entry.amount, effectiveCurrency);
-    if (effectiveCurrency !== entry.mainCurrency) foreignDates.push(entry.effectiveDate);
+    if (effectiveCurrency !== entry.mainCurrency) foreignDates.push(entry.documentDate);
   }
   // A foreign amount is converted on write, so its day's rate has to be there,
   // whether the edit changed the currency or only the amount.

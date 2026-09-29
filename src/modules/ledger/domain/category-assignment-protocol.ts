@@ -41,7 +41,7 @@ export interface CategoryAssignmentSubject {
 export interface CategoryAssignmentDocumentGroup {
   sourceDocumentId: string;
   title: string | null;
-  documentDate: string | null;
+  documentDate: string;
   /** The text the user typed when submitting the document. */
   inputText: string | null;
   storedFileIds: readonly string[];
@@ -127,7 +127,7 @@ ${customSection}`;
 function documentHeaderLines(group: CategoryAssignmentDocumentGroup): string[] {
   const lines: string[] = [];
   if (group.title != null && group.title !== "") lines.push(`document_title: ${group.title}`);
-  if (group.documentDate != null) lines.push(`document_date: ${group.documentDate}`);
+  lines.push(`document_date: ${group.documentDate}`);
   if (group.inputText != null && group.inputText !== "") {
     lines.push(`submitted_text: ${group.inputText}`);
   }

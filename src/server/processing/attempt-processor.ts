@@ -30,10 +30,7 @@ import {
 import { loadAttemptProcessingContext } from "./context";
 import { getLedgerSettings } from "@/modules/ledger/server/settings";
 import { ledgerToday } from "@/modules/ledger/server/query-period";
-import {
-  ensureExchangeRates,
-  formatExchangeRateDate,
-} from "@/modules/currency/server/exchange-rates";
+import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import { createAIContext } from "@/lib/tasks/ai-context";
@@ -192,7 +189,7 @@ export async function processAttempt(
   // Cache the rates for the day the entries will be read on, so they show
   // converted as soon as they appear. Without them the entries still save and
   // show unconverted until maintenance fills the day.
-  await ensureExchangeRates([attempt.requestedDate ?? formatExchangeRateDate(document.createdAt)]);
+  await ensureExchangeRates([attempt.requestedDate ?? document.documentDate]);
   throwIfProcessingCancelled(signal);
   const activated = await activateAttempt({
     ...request,

@@ -22,6 +22,7 @@ import {
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
+  todayUtc,
 } from "tests/helpers/schema-setup";
 
 async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
@@ -29,7 +30,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      documentDate: entryDate ?? null,
+      documentDate: entryDate ?? todayUtc(),
       bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();

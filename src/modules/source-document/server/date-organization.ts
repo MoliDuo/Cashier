@@ -85,7 +85,8 @@ export async function applyDateOrganization(
         .sort((a, b) => b.entryDate!.localeCompare(a.entryDate!))[0] ?? null;
   }
   const destinationGroups = appliedGroups.filter(
-    (group) => group.entryDate != null && group !== originalGroup
+    (group): group is typeof group & { entryDate: string } =>
+      group.entryDate != null && group !== originalGroup
   );
   const redatedForeignDates = appliedGroups.flatMap((group) =>
     group.entryDate != null &&
@@ -132,7 +133,7 @@ export async function applyDateOrganization(
         toDocumentId: id,
       });
       for (const entryId of group.ledgerEntryIds)
-        destinationByEntry.set(entryId, { documentId: id, entryDate: group.entryDate! });
+        destinationByEntry.set(entryId, { documentId: id, entryDate: group.entryDate });
     }
 
     // Every entry takes its place in its (possibly new) document, in one statement.

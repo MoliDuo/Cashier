@@ -147,7 +147,7 @@ export function useDetailsTab({
   const groupedItems = useMemo(() => {
     const groups = new Map<string, EntryDateGroup>();
     for (const entry of entries) {
-      const dateStr = entry.sourceDocument.effectiveDate;
+      const dateStr = entry.sourceDocument.documentDate;
       let group = groups.get(dateStr);
       if (group == null) {
         group = {

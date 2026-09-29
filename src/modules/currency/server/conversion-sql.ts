@@ -31,7 +31,7 @@ const entryOperands = () => ({
   amount: ledgerEntries.amount,
   currency: ledgerEntries.currency,
   mainCurrency: sql`(SELECT entry_ledger.main_currency FROM ledgers entry_ledger)`,
-  date: sql`(SELECT entry_document.effective_date FROM source_documents entry_document
+  date: sql`(SELECT entry_document.document_date FROM source_documents entry_document
     WHERE entry_document.id = ${ledgerEntries.sourceDocumentId})`,
 });
 

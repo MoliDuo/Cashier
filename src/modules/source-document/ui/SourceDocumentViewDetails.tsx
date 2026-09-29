@@ -142,7 +142,7 @@ export const SourceDocumentViewDetails = memo(function SourceDocumentViewDetails
             onEntryChange={onEntryChange}
             onSelectEntry={onSelectEntry}
             documentDate={documentDate}
-            savedDocumentDate={sourceDocument.documentDate ?? ""}
+            savedDocumentDate={sourceDocument.documentDate}
             onAddEntry={onAddEntry}
             onDeleteEntry={onDeleteEntry}
           />

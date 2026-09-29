@@ -14,13 +14,13 @@ export function cursorCondition(cursor: string | null | undefined): SQL<unknown>
   const createdAt = new Date(decoded.createdAt);
   return (
     or(
-      sql`${sourceDocuments.effectiveDate} < ${decoded.effectiveDate}::date`,
+      sql`${sourceDocuments.documentDate} < ${decoded.documentDate}::date`,
       and(
-        sql`${sourceDocuments.effectiveDate} = ${decoded.effectiveDate}::date`,
+        sql`${sourceDocuments.documentDate} = ${decoded.documentDate}::date`,
         lt(sourceDocuments.createdAt, createdAt)
       ),
       and(
-        sql`${sourceDocuments.effectiveDate} = ${decoded.effectiveDate}::date`,
+        sql`${sourceDocuments.documentDate} = ${decoded.documentDate}::date`,
         eq(sourceDocuments.createdAt, createdAt),
         sql`${sourceDocuments.id} < ${decoded.id}`
       )
@@ -30,7 +30,7 @@ export function cursorCondition(cursor: string | null | undefined): SQL<unknown>
 
 export function encodeCursor(row: SourceDocumentListRow): string {
   return encodeSourceDocumentPageCursor({
-    effectiveDate: row.effectiveDate,
+    documentDate: row.documentDate,
     createdAt: row.createdAt.toISOString(),
     id: row.id,
   });

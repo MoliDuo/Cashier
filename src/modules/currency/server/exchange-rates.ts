@@ -236,12 +236,12 @@ export async function ensureExchangeRates(dates: readonly (string | null)[]): Pr
 export async function refreshExchangeRates(now = new Date()): Promise<void> {
   const today = formatExchangeRateDate(now);
   const wanted = await db.execute<{ rate_date: string }>(sql`
-    SELECT DISTINCT documents.effective_date::text AS rate_date
+    SELECT DISTINCT documents.document_date::text AS rate_date
     FROM source_documents documents
-    WHERE documents.effective_date <= ${today}::date
+    WHERE documents.document_date <= ${today}::date
       AND NOT EXISTS (
         SELECT 1 FROM exchange_rates rates
-        WHERE rates.rate_date = documents.effective_date AND rates.currency = 'EUR'
+        WHERE rates.rate_date = documents.document_date AND rates.currency = 'EUR'
       )
     UNION
     SELECT rates.rate_date::text

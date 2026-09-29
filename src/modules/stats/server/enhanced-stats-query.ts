@@ -12,7 +12,7 @@ import type { EnhancedStatsDto, StatsLargestEntryDto } from "@/modules/stats/con
 
 interface AggregatedRow {
   period: "current" | "previous";
-  effectiveDate: string | null;
+  documentDate: string | null;
   currency: string | null;
   categoryId: string | null;
   categoryName: string | null;
@@ -24,9 +24,9 @@ interface AggregatedRow {
 }
 
 /** The first day any record in the scope is dated, so 全部 knows where to start. */
-export async function findEarliestEffectiveDate(bookId?: string): Promise<string | null> {
+export async function findEarliestDocumentDate(bookId?: string): Promise<string | null> {
   const result = await db.execute<{ earliest: string | null }>(sql`
-    SELECT min(effective_date)::text AS earliest FROM source_documents
+    SELECT min(document_date)::text AS earliest FROM source_documents
     ${bookId == null ? sql`` : sql`WHERE book_id = ${bookId}`}
   `);
   return result.rows[0]?.earliest ?? null;
@@ -43,7 +43,7 @@ async function fetchAggregatedRows(
         ('current'::text, ${current.from}::date, ${current.to}::date),
         ('previous'::text, ${previous.from}::date, ${previous.to}::date)
     )
-    SELECT ranges.period, documents.effective_date::text AS "effectiveDate",
+    SELECT ranges.period, documents.document_date::text AS "documentDate",
       entries.currency, entries.category_id AS "categoryId",
       categories.name AS "categoryName", categories.icon AS "categoryIcon",
       sum(converted.amount)::text AS "totalAmount",
@@ -52,18 +52,18 @@ async function fetchAggregatedRows(
       count(*) FILTER (WHERE converted.amount IS NULL)::int AS "unconvertedCount"
     FROM ranges
     JOIN source_documents documents
-      ON documents.effective_date BETWEEN ranges.from_date AND ranges.to_date
+      ON documents.document_date BETWEEN ranges.from_date AND ranges.to_date
       ${bookId == null ? sql`` : sql`AND documents.book_id = ${bookId}`}
     JOIN ledger_entries entries
       ON entries.source_document_id = documents.id
     CROSS JOIN ledgers
     CROSS JOIN LATERAL (
       SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
-        documents.effective_date) AS amount
+        documents.document_date) AS amount
     ) converted
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
-    GROUP BY ranges.period, documents.effective_date, entries.currency, entries.category_id,
+    GROUP BY ranges.period, documents.document_date, entries.currency, entries.category_id,
       categories.name, categories.icon, ledgers.main_currency
     UNION ALL
     SELECT 'current', NULL, NULL, NULL, NULL, NULL, NULL, 0, main_currency, 0
@@ -105,7 +105,7 @@ function addRowToBucket(
   category.count += row.entryCount;
   bucket.categories.set(categoryKey, category);
 
-  const date = row.effectiveDate ?? "";
+  const date = row.documentDate ?? "";
   if (date !== "") {
     const day = bucket.days.get(date) ?? {
       total: new Decimal(0),
@@ -146,7 +146,7 @@ async function fetchLargestEntries(
   const result = await db.execute<LargestEntryRow & Record<string, unknown>>(sql`
     SELECT entries.id, documents.id AS "sourceDocumentId", entries.item_name AS name,
       categories.name AS "categoryName", categories.icon AS "categoryIcon",
-      documents.effective_date::text AS date, converted.amount::text AS amount,
+      documents.document_date::text AS date, converted.amount::text AS amount,
       entries.amount::text AS "originalAmount", entries.currency AS "originalCurrency"
     FROM source_documents documents
     JOIN ledger_entries entries
@@ -154,14 +154,14 @@ async function fetchLargestEntries(
     CROSS JOIN ledgers
     CROSS JOIN LATERAL (
       SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
-        documents.effective_date) AS amount
+        documents.document_date) AS amount
     ) converted
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
-    WHERE documents.effective_date BETWEEN ${range.from}::date AND ${range.to}::date
+    WHERE documents.document_date BETWEEN ${range.from}::date AND ${range.to}::date
       ${bookId == null ? sql`` : sql`AND documents.book_id = ${bookId}`}
       AND converted.amount > 0
-    ORDER BY converted.amount DESC, documents.effective_date DESC, entries.id
+    ORDER BY converted.amount DESC, documents.document_date DESC, entries.id
     LIMIT ${LARGEST_ENTRY_COUNT}
   `);
   return result.rows.map((row) => ({
@@ -205,7 +205,7 @@ export async function queryEnhancedStats({
       addRowToBucket(current, row, mainCurrency);
     } else {
       addRowToBucket(previousWhole, row, mainCurrency);
-      if (row.effectiveDate != null && row.effectiveDate <= compareRange.to) {
+      if (row.documentDate != null && row.documentDate <= compareRange.to) {
         addRowToBucket(previous, row, mainCurrency);
       }
     }

@@ -22,7 +22,6 @@ function makeItem(
     failureKind: null,
     failureMessage: null,
     documentDate: "2026-07-01",
-    effectiveDate: "2026-07-01",
     createdAt: "2026-07-01T10:00:00.000Z",
     updatedAt: "2026-07-01T10:00:00.000Z",
     hasImages: false,
@@ -57,23 +56,20 @@ function makeEntry(
 // ---------------------------------------------------------------------------
 
 describe("buildUnifiedStreamGroups", () => {
-  it("groups consecutive items by effective date preserving server order", () => {
+  it("groups consecutive items by document date preserving server order", () => {
     const c1 = makeItem("c1", {
       processingStatus: "completed",
       documentDate: "2026-07-15",
-      effectiveDate: "2026-07-15",
       ledgerEntries: [makeEntry({ amount: "5.00", convertedAmount: "5.00" })],
     });
     const c2 = makeItem("c2", {
       processingStatus: "completed",
       documentDate: "2026-07-10",
-      effectiveDate: "2026-07-10",
       ledgerEntries: [makeEntry({ amount: "3.00", convertedAmount: "3.00" })],
     });
     const c3 = makeItem("c3", {
       processingStatus: "completed",
       documentDate: "2026-07-20",
-      effectiveDate: "2026-07-20",
       ledgerEntries: [makeEntry({ amount: "7.00", convertedAmount: "7.00" })],
     });
 
@@ -87,7 +83,6 @@ describe("buildUnifiedStreamGroups", () => {
     const completed = makeItem("c1", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       ledgerEntries: [
         makeEntry({ amount: "10.00", convertedAmount: "10.00" }),
         makeEntry({ amount: "5.00", convertedAmount: "5.00" }),
@@ -102,12 +97,10 @@ describe("buildUnifiedStreamGroups", () => {
     const pending = makeItem("p1", {
       processingStatus: "processing",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
     });
     const completed = makeItem("c1", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       ledgerEntries: [makeEntry({ amount: "10.00", convertedAmount: "10.00" })],
     });
 
@@ -121,7 +114,6 @@ describe("buildUnifiedStreamGroups", () => {
     const att = makeItem("q1", {
       processingStatus: "processing",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
     });
 
     const groups = buildUnifiedStreamGroups([att]);
@@ -132,14 +124,12 @@ describe("buildUnifiedStreamGroups", () => {
     const a1 = makeItem("a1", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       createdAt: "2026-07-01T10:00:00.000Z",
       ledgerEntries: [makeEntry()],
     });
     const a2 = makeItem("a2", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       createdAt: "2026-07-01T09:00:00.000Z",
       ledgerEntries: [makeEntry()],
     });
@@ -155,25 +145,21 @@ describe("buildUnifiedStreamGroups", () => {
     const candidate = makeItem("cand", {
       processingStatus: "cancelled",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       createdAt: "2026-07-01T12:00:00.000Z",
     });
     const invalid = makeItem("anom", {
       processingStatus: "failed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       createdAt: "2026-07-01T11:00:00.000Z",
     });
     const failed = makeItem("fail", {
       processingStatus: "failed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       createdAt: "2026-07-01T10:00:00.000Z",
     });
     const completed = makeItem("comp", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       createdAt: "2026-07-01T09:00:00.000Z",
       ledgerEntries: [makeEntry()],
     });
@@ -185,23 +171,20 @@ describe("buildUnifiedStreamGroups", () => {
     expect(statuses).toEqual(["cancelled", "failed", "failed", "completed"]);
   });
 
-  it("groups items with same effective date together", () => {
+  it("groups items with same document date together", () => {
     const a1 = makeItem("a1", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       ledgerEntries: [makeEntry()],
     });
     const a2 = makeItem("a2", {
       processingStatus: "completed",
       documentDate: "2026-07-01",
-      effectiveDate: "2026-07-01",
       ledgerEntries: [makeEntry()],
     });
     const b1 = makeItem("b1", {
       processingStatus: "completed",
       documentDate: "2026-06-30",
-      effectiveDate: "2026-06-30",
       ledgerEntries: [makeEntry()],
     });
 
@@ -211,25 +194,6 @@ describe("buildUnifiedStreamGroups", () => {
     expect(groups).toHaveLength(2);
     expect(groups[0]!.items).toHaveLength(2);
     expect(groups[1]!.items).toHaveLength(1);
-  });
-
-  it("groups by the day the server gives, not the record's own date", () => {
-    // A record without a date of its own counts on the day the server keeps
-    // for it; the client never works that day out.
-    const undated = makeItem("u1", {
-      processingStatus: "processing",
-      documentDate: null,
-      effectiveDate: "2026-07-16",
-      createdAt: "2026-07-15T17:00:00.000Z",
-    });
-    const dated = makeItem("k1", {
-      documentDate: "2026-07-15",
-      effectiveDate: "2026-07-15",
-      ledgerEntries: [makeEntry()],
-    });
-
-    const groups = buildUnifiedStreamGroups([undated, dated]);
-    expect(groups.map((group) => group.date)).toEqual(["2026-07-16", "2026-07-15"]);
   });
 
   it("returns empty array when passed empty items", () => {

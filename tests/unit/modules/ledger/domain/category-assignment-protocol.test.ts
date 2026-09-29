@@ -34,7 +34,7 @@ function group(
   return {
     sourceDocumentId: "doc-1",
     title: null,
-    documentDate: null,
+    documentDate: "2026-09-10",
     inputText: null,
     storedFileIds: [],
     subjects: [
@@ -133,7 +133,6 @@ describe("buildCategoryAssignmentDocumentMessage", () => {
     );
 
     expect(body).not.toContain("document_title:");
-    expect(body).not.toContain("document_date:");
     expect(body).not.toContain("submitted_text:");
     expect(body).not.toContain("attached_images:");
   });

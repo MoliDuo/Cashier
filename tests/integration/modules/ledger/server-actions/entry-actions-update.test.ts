@@ -9,6 +9,7 @@ import { getTestDb } from "tests/setup";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
+  todayUtc,
 } from "tests/helpers/schema-setup";
 import { createCategoryData } from "tests/helpers/factories";
 
@@ -32,6 +33,7 @@ describe("single-entry update", () => {
     await db.insert(ledgers).values({ id: crypto.randomUUID(), mainCurrency: "CNY" });
     await ensureTestLedgerBooks(db);
     await db.insert(sourceDocuments).values({
+      documentDate: todayUtc(),
       id: sourceDocumentId,
       bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
@@ -125,7 +127,7 @@ describe("single-entry update", () => {
 
     try {
       await updateEntry(sourceDocumentId, entryId, { amount: "12" });
-      expect(ensure).toHaveBeenCalledWith([document?.effectiveDate]);
+      expect(ensure).toHaveBeenCalledWith([document?.documentDate]);
     } finally {
       ensure.mockRestore();
     }

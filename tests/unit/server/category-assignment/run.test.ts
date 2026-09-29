@@ -57,7 +57,7 @@ const adapters = vi.hoisted(() => ({
     {
       sourceDocumentId: input.ledgerEntryIds[0]!.replace("entry-", ""),
       title: null,
-      documentDate: null,
+      documentDate: "2026-09-10",
       inputText: null,
       storedFileIds: [],
       subjects: subjects(1),
@@ -195,7 +195,7 @@ describe("category assignment run", () => {
       {
         sourceDocumentId: "document-1",
         title: null,
-        documentDate: null,
+        documentDate: "2026-09-10",
         inputText: null,
         storedFileIds: [],
         subjects: subjects(120),
@@ -218,7 +218,7 @@ describe("category assignment run", () => {
       {
         sourceDocumentId: "document-1",
         title: null,
-        documentDate: null,
+        documentDate: "2026-09-10",
         inputText: null,
         storedFileIds: [],
         subjects: subjects(200),

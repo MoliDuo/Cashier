@@ -23,12 +23,8 @@ interface SourceDocumentSummaryDto {
   processingStatus: SourceDocumentProcessingStatus | null;
   failureKind: AttemptFailureKind | null;
   failureMessage: string | null;
-  documentDate: string | null;
-  /**
-   * The day the record counts on, as the server keeps it: its own date, or its
-   * creation day. Lists group by it, so no client has to work it out.
-   */
-  effectiveDate: string;
+  /** The day the record counts on, in the ledger's zone. */
+  documentDate: string;
   createdAt: string;
   updatedAt: string;
   supportedActions: SupportedSourceDocumentAction[];

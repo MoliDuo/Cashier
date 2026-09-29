@@ -23,7 +23,7 @@ export async function loadAttemptProcessingContext(
         referenceDate: extractionAttempts.referenceDate,
         processingStatus: extractionAttempts.status,
         latestAttemptId: sourceDocuments.latestAttemptId,
-        createdAt: sourceDocuments.createdAt,
+        documentDate: sourceDocuments.documentDate,
       })
       .from(extractionAttempts)
       .innerJoin(sourceDocuments, eq(sourceDocuments.id, extractionAttempts.sourceDocumentId))
@@ -70,7 +70,7 @@ export async function loadAttemptProcessingContext(
         ? null
         : {
             latestAttemptId: identity.latestAttemptId,
-            createdAt: identity.createdAt,
+            documentDate: identity.documentDate,
           },
     storedFileIds: files.map((file) => file.id),
     categories,

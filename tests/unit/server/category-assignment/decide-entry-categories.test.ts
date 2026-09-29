@@ -25,7 +25,7 @@ function group(
   return {
     sourceDocumentId: "doc-1",
     title: null,
-    documentDate: null,
+    documentDate: "2026-09-10",
     inputText: null,
     storedFileIds: [],
     subjects: [

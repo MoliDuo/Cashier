@@ -12,7 +12,6 @@ function makeItem(overrides: Partial<SourceDocumentListItemDto> = {}): SourceDoc
     failureKind: null,
     failureMessage: null,
     documentDate: "2026-08-05",
-    effectiveDate: "2026-08-05",
     createdAt: "2026-08-06T00:00:00.000Z",
     updatedAt: "2026-08-06T00:00:00.000Z",
     hasImages: false,

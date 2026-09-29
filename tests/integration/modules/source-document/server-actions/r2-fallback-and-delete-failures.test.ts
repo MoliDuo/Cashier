@@ -4,7 +4,7 @@ import { NotFoundError } from "@/lib/errors";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 import { getTestDb } from "tests/setup";
 import { ledgers, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, TEST_USER_ID } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, TEST_USER_ID, todayUtc } from "tests/helpers/schema-setup";
 
 vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
 import { getCurrentSession } from "@/modules/auth/server/current-session";
@@ -26,6 +26,7 @@ describe("source-document delete tolerance", () => {
     const [document] = await db
       .insert(sourceDocuments)
       .values({
+        documentDate: todayUtc(),
         bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();

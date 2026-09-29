@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { getTestDb, getTestPool } from "tests/setup";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
-import { entryCategories, ledgerEntries, ledgers } from "@/persistence";
+import { extractionAttempts, ledgerSyncState, ledgers, sourceDocuments } from "@/persistence";
 import * as schema from "@/persistence";
 import { getTableConfig, type AnyPgTable } from "drizzle-orm/pg-core";
 
@@ -112,7 +112,7 @@ async function fetchColumns(tableName: string): Promise<ColumnRow[]> {
 describe("PostgreSQL schema contract", () => {
   const compact = (definition: string | undefined) => definition?.replace(/[\s()]/g, "") ?? "";
 
-  it("keeps every tenant-scoped composite foreign key", async () => {
+  it("keeps every foreign key between the ledger's tables", async () => {
     const byName = new Map((await fetchConstraints()).map((row) => [row.conname, row.definition]));
     const expected = [
       "fk_ledger_entries_source_document",
@@ -126,13 +126,36 @@ describe("PostgreSQL schema contract", () => {
       expect(byName.has(name), `missing foreign key ${name}`).toBe(true);
     }
 
-    // The category FK must be ledger-scoped and keep the set-null behavior.
-    expect(byName.get("fk_ledger_entries_category")).toContain(
-      "FOREIGN KEY (ledger_id, category_id)"
+    expect(byName.get("fk_ledger_entries_category")).toBe(
+      "FOREIGN KEY (category_id) REFERENCES entry_categories(id) ON DELETE SET NULL"
     );
-    expect(byName.get("fk_ledger_entries_category")).toContain("ON DELETE SET NULL (category_id)");
-    // The legacy single-column FK must be gone.
+    expect(byName.get("fk_source_documents_latest_attempt")).toBe(
+      "FOREIGN KEY (id, latest_attempt_id) REFERENCES extraction_attempts(source_document_id, id)"
+    );
     expect(byName.has("ledger_entries_category_id_entry_categories_id_fk")).toBe(false);
+  });
+
+  it("keeps a record's latest attempt among its own attempts", async () => {
+    const db = getTestDb();
+    await createTestUserWithLedger(db);
+    const first = await createTestSourceDocument(db);
+    const second = await createTestSourceDocument(db);
+    const [otherAttempt] = await db
+      .select({ id: extractionAttempts.id })
+      .from(extractionAttempts)
+      .where(sql`${extractionAttempts.sourceDocumentId} = ${second}`);
+
+    await expect(
+      db
+        .update(sourceDocuments)
+        .set({ latestAttemptId: otherAttempt!.id })
+        .where(sql`${sourceDocuments.id} = ${first}`)
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        code: "23503",
+        constraint: "fk_source_documents_latest_attempt",
+      }),
+    });
   });
 
   it("keeps sync version guards", async () => {
@@ -178,21 +201,24 @@ describe("PostgreSQL schema contract", () => {
     expect(await fetchColumns("ledger_change_items")).toEqual([]);
   });
 
-  it("keeps effective_date as a generated UTC-fallback column", async () => {
-    const effective = (await fetchColumns("source_documents")).find(
-      (column) => column.columnName === "effective_date"
-    );
-    expect(effective).toBeDefined();
-    expect(effective?.isGenerated).toBe("ALWAYS");
-    expect(effective?.generationExpression ?? "").toContain("document_date");
-    expect(effective?.generationExpression ?? "").toContain("created_at");
-    expect(effective?.generationExpression ?? "").toContain("UTC");
+  it("keeps a single change-log row", async () => {
+    const db = getTestDb();
+    await createTestUserWithLedger(db);
+    await createTestSourceDocument(db);
+    await expect(db.insert(ledgerSyncState).values({})).rejects.toMatchObject({
+      cause: expect.objectContaining({ code: "23505", constraint: "ledger_sync_state_pkey" }),
+    });
+    await expect(db.insert(ledgerSyncState).values({ id: false })).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        code: "23514",
+        constraint: "ck_ledger_sync_state_singleton",
+      }),
+    });
   });
 
   it("keeps the key indexes and tenant unique keys", async () => {
     const byName = new Map((await fetchIndexes()).map((row) => [row.indexname, row.indexdef]));
     for (const name of [
-      "uq_entry_categories_ledger_id_id",
       "idx_ledger_entries_document_position",
       "idx_source_documents_feed",
       "idx_source_documents_book_feed",
@@ -202,8 +228,8 @@ describe("PostgreSQL schema contract", () => {
     ]) {
       expect(byName.has(name), `missing index ${name}`).toBe(true);
     }
-    expect(byName.get("idx_source_documents_feed")).toContain("effective_date");
-    expect(byName.get("idx_source_documents_book_feed")).toContain("book_id, effective_date");
+    expect(byName.get("idx_source_documents_feed")).toContain("(document_date DESC");
+    expect(byName.get("idx_source_documents_book_feed")).toContain("(book_id, document_date DESC");
     expect(byName.get("idx_ledger_entries_search")).toContain("gin");
   });
 
@@ -253,7 +279,7 @@ describe("PostgreSQL schema contract", () => {
     expect(misnamed).toEqual([]);
   });
 
-  it("keeps entries tied to a document and attempt dates as dates", async () => {
+  it("keeps entries tied to a document and every record dated", async () => {
     const columns = await getTestDb().execute<{
       table: string;
       column: string;
@@ -267,6 +293,7 @@ describe("PostgreSQL schema contract", () => {
           ('ledger_entries', 'source_document_id'),
           ('extraction_attempts', 'requested_date'),
           ('extraction_attempts', 'claim_token'),
+          ('source_documents', 'document_date'),
           ('login_emails', 'verified_at')
         )
       ORDER BY table_name, column_name
@@ -281,6 +308,7 @@ describe("PostgreSQL schema contract", () => {
         nullable: "NO",
         type: "timestamp with time zone",
       },
+      { table: "source_documents", column: "document_date", nullable: "NO", type: "date" },
     ]);
   });
 
@@ -290,16 +318,16 @@ describe("PostgreSQL schema contract", () => {
     expect(await fetchColumns("setup_state")).toEqual([]);
   });
 
-  it("checks category names per ledger when a statement ends", async () => {
+  it("checks category names when a statement ends", async () => {
     const result = await getTestDb().execute<{ definition: string; deferrable: boolean }>(sql`
       SELECT pg_get_constraintdef(oid) AS definition, condeferrable AS deferrable
       FROM pg_constraint
-      WHERE conname = 'uq_entry_categories_ledger_name'
+      WHERE conname = 'uq_entry_categories_name'
         AND connamespace = current_schema()::regnamespace
     `);
     expect(result.rows).toEqual([
       {
-        definition: "UNIQUE (ledger_id, name) DEFERRABLE",
+        definition: "UNIQUE (name) DEFERRABLE",
         deferrable: true,
       },
     ]);
@@ -313,31 +341,12 @@ describe("PostgreSQL schema contract", () => {
     });
   });
 
-  it("fills the retired ledger_id from the one ledger, so the tenant keys still hold", async () => {
-    const db = getTestDb();
-    await createTestUserWithLedger(db);
-    const [category] = await db.insert(entryCategories).values({ name: "Food" }).returning();
-    const sourceDocumentId = await createTestSourceDocument(db);
-    await db.insert(ledgerEntries).values({
-      sourceDocumentId,
-      categoryId: category!.id,
-      amount: "1.00",
-      currency: "CNY",
-      itemName: "Noodles",
-    });
-
-    const unfilled = await db.execute<{ table_name: string }>(sql`
-      SELECT 'books' AS table_name FROM books WHERE ledger_id IS DISTINCT FROM current_ledger_id()
-      UNION ALL SELECT 'entry_categories' FROM entry_categories
-        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
-      UNION ALL SELECT 'source_documents' FROM source_documents
-        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
-      UNION ALL SELECT 'extraction_attempts' FROM extraction_attempts
-        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
-      UNION ALL SELECT 'ledger_entries' FROM ledger_entries
-        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
+  it("keeps no ledger_id column", async () => {
+    const result = await getTestDb().execute<{ table: string }>(sql`
+      SELECT table_name AS table FROM information_schema.columns
+      WHERE table_schema = current_schema() AND column_name = 'ledger_id'
     `);
-    expect(unfilled.rows).toEqual([]);
+    expect(result.rows).toEqual([]);
   });
 
   it("refuses to migrate a database that holds more than one ledger", async () => {
@@ -362,50 +371,8 @@ describe("PostgreSQL schema contract", () => {
   });
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
-    // Names a later contract migration drops once the model has let go of
-    // them: the keys and indexes built on `ledger_id`, which 0024 drops or
-    // rebuilds without it.
-    const retiredNames = new Set<string>([
-      "fk_books_ledger",
-      "uq_books_ledger_id_id",
-      "idx_books_active_sort",
-      "uq_books_active_name",
-      "fk_entry_categories_ledger",
-      "uq_entry_categories_ledger_id_id",
-      "idx_entry_categories_sort",
-      "uq_entry_categories_ledger_name",
-      "fk_ledger_entries_ledger",
-      "fk_ledger_entries_category",
-      "fk_ledger_entries_source_document",
-      "idx_ledger_entries_category",
-      "idx_ledger_entries_document_position",
-      "fk_service_credentials_ledger",
-      "fk_service_credentials_book",
-      "idx_service_credentials_ledger_book",
-      "fk_source_documents_ledger",
-      "fk_source_documents_book",
-      "fk_source_documents_latest_attempt",
-      "uq_source_documents_ledger_id_id",
-      "uq_source_documents_idempotency",
-      "idx_source_documents_feed",
-      "idx_source_documents_book_feed",
-      "fk_extraction_attempts_source_document",
-      "uq_extraction_attempts_ledger_document_id",
-      "idx_extraction_attempts_due",
-      "fk_stored_files_ledger",
-      "uq_stored_files_ledger_id_id",
-      "fk_source_document_files_source_document",
-      "fk_source_document_files_stored_file",
-      "idx_source_document_files_ledger_file",
-      "fk_category_assignment_jobs_ledger",
-      "uq_category_assignment_jobs_request_key",
-      "uq_category_assignment_jobs_active",
-      "fk_category_assignment_documents_ledger",
-      "idx_category_assignment_documents_ledger_job",
-      "fk_category_assignment_entries_ledger",
-      "idx_category_assignment_entries_ledger_job",
-      "fk_ledger_sync_state_ledger",
-    ]);
+    // Names a later contract migration drops once the model has let go of them.
+    const retiredNames = new Set<string>();
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(

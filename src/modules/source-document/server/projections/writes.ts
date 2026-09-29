@@ -66,7 +66,8 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
       .update(sourceDocuments)
       .set({
         version: sql`${sourceDocuments.version} + 1`,
-        documentDate: attempt.requestedDate,
+        // A submission without a date keeps the day the record already has.
+        ...(attempt.requestedDate == null ? {} : { documentDate: attempt.requestedDate }),
         ...(input.title == null || input.title === "" ? {} : { title: input.title }),
         dateOrganizationSuggestion: input.dateOrganizationSuggestion ?? null,
         updatedAt: now,

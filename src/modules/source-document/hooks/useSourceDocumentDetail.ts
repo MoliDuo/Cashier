@@ -258,7 +258,7 @@ export function useSourceDocumentDetail({
   const updateDocument = async (patch: DocumentPatch) => {
     if (sourceDocument == null || readOnly) return;
     const changed = changedFields<DocumentPatch>(
-      { title: sourceDocument.title ?? "", documentDate: sourceDocument.documentDate ?? "" },
+      { title: sourceDocument.title ?? "", documentDate: sourceDocument.documentDate },
       patch
     );
     if (changed.title !== undefined && changed.title.trim() === "") return;

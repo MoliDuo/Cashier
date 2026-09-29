@@ -573,8 +573,8 @@ describe("new-record submission against a concurrent archive or ledger delete", 
         travel,
       ]);
       await holder.query(
-        "INSERT INTO source_documents (id, book_id, created_at, updated_at)" +
-          " VALUES ($1, $2, now(), now())",
+        "INSERT INTO source_documents (id, book_id, document_date, created_at, updated_at)" +
+          " VALUES ($1, $2, CURRENT_DATE, now(), now())",
         [documentId, travel]
       );
 
@@ -641,7 +641,7 @@ describe("the day a new record is filed under", () => {
     const document = await getTestDb().query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
-    return document?.effectiveDate;
+    return document?.documentDate;
   }
 
   it("is the ledger's today while it processes and after its processing fails", async () => {

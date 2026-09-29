@@ -10,10 +10,7 @@ import type {
 
 type DateFields = { createdAt: Date; updatedAt: Date };
 type EntryCategoryRow = Omit<EntryCategoryDto, "createdAt" | "updatedAt"> & DateFields;
-type SourceDocumentRow = Pick<
-  SourceDocumentReferenceDto,
-  "id" | "title" | "documentDate" | "effectiveDate"
-> &
+type SourceDocumentRow = Pick<SourceDocumentReferenceDto, "id" | "title" | "documentDate"> &
   DateFields & {
     version: number;
   };
@@ -47,7 +44,7 @@ function mapEntryCategoryDto(category: EntryCategoryRow): EntryCategoryDto {
 function mapSourceDocumentReferenceDto(
   doc: Pick<
     SourceDocumentRow,
-    "id" | "version" | "title" | "documentDate" | "effectiveDate" | "createdAt" | "updatedAt"
+    "id" | "version" | "title" | "documentDate" | "createdAt" | "updatedAt"
   >
 ): SourceDocumentReferenceDto {
   return {
@@ -55,7 +52,6 @@ function mapSourceDocumentReferenceDto(
     version: doc.version,
     title: doc.title,
     documentDate: doc.documentDate,
-    effectiveDate: doc.effectiveDate,
     createdAt: toIso(doc.createdAt)!,
     updatedAt: toIso(doc.updatedAt)!,
     hasImages: false,

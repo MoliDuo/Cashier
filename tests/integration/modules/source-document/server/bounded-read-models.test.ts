@@ -22,7 +22,6 @@ const SOURCE_LIST_KEYS = [
   "canEdit",
   "createdAt",
   "documentDate",
-  "effectiveDate",
   "errorCode",
   "hasImages",
   "id",

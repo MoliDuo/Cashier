@@ -74,18 +74,17 @@ export function buildLedgerEntryValueConditions(
 }
 
 /**
- * Accounting-date range conditions over the generated `effective_date`
- * column. Callers must join `source_documents` under the `documents` alias.
+ * Accounting-date range conditions over the `document_date` column. Callers must join `source_documents` under the `documents` alias.
  */
-export function buildLedgerEntryEffectiveDateConditions(
+export function buildLedgerEntryDocumentDateConditions(
   filters: LedgerEntryFilterParams
 ): SQL<unknown>[] {
   const conditions: SQL<unknown>[] = [];
   if (filters.startDate != null && filters.startDate !== "") {
-    conditions.push(sql`documents.effective_date >= ${filters.startDate}::date`);
+    conditions.push(sql`documents.document_date >= ${filters.startDate}::date`);
   }
   if (filters.endDate != null && filters.endDate !== "") {
-    conditions.push(sql`documents.effective_date <= ${filters.endDate}::date`);
+    conditions.push(sql`documents.document_date <= ${filters.endDate}::date`);
   }
   return conditions;
 }
@@ -98,7 +97,7 @@ function queryFingerprint(filters: LedgerEntryFilterParams): string {
 }
 
 interface LedgerEntryCursor {
-  effectiveDate: string;
+  documentDate: string;
   documentCreatedAt: string;
   documentId: string;
   position: number;
@@ -117,7 +116,7 @@ export function encodeLedgerEntryCursor(
 
 const ledgerEntryCursorSchema = z
   .object({
-    effectiveDate: dateStringSchema,
+    documentDate: dateStringSchema,
     documentCreatedAt: z.string().datetime({ offset: true }),
     documentId: z.string().regex(UUID_REGEX),
     position: z.number().int().nonnegative(),
@@ -127,7 +126,7 @@ const ledgerEntryCursorSchema = z
   .strict();
 
 export interface LedgerEntryCursorColumns {
-  effectiveDate: SQL;
+  documentDate: SQL;
   documentCreatedAt: SQL;
   documentId: SQL;
   position: SQL;
@@ -138,7 +137,7 @@ export interface LedgerEntryCursorColumns {
 // listLedgerEntryPage. Callers that place the predicate inside the CTE body
 // must pass the underlying qualified columns instead.
 const cursorColumns = (): LedgerEntryCursorColumns => ({
-  effectiveDate: sql`effective_date`,
+  documentDate: sql`document_date`,
   documentCreatedAt: sql`document_created_at`,
   documentId: sql`document_id`,
   position: sql`position`,
@@ -170,17 +169,17 @@ export function buildLedgerEntryCursorCondition(
   }
 
   return sql`(
-    ${columns.effectiveDate} < ${value.effectiveDate}
-    OR (${columns.effectiveDate} = ${value.effectiveDate}
+    ${columns.documentDate} < ${value.documentDate}
+    OR (${columns.documentDate} = ${value.documentDate}
       AND ${columns.documentCreatedAt} < ${new Date(value.documentCreatedAt)})
-    OR (${columns.effectiveDate} = ${value.effectiveDate}
+    OR (${columns.documentDate} = ${value.documentDate}
       AND ${columns.documentCreatedAt} = ${new Date(value.documentCreatedAt)}
       AND ${columns.documentId} < ${value.documentId})
-    OR (${columns.effectiveDate} = ${value.effectiveDate}
+    OR (${columns.documentDate} = ${value.documentDate}
       AND ${columns.documentCreatedAt} = ${new Date(value.documentCreatedAt)}
       AND ${columns.documentId} = ${value.documentId}
       AND ${columns.position} > ${value.position})
-    OR (${columns.effectiveDate} = ${value.effectiveDate}
+    OR (${columns.documentDate} = ${value.documentDate}
       AND ${columns.documentCreatedAt} = ${new Date(value.documentCreatedAt)}
       AND ${columns.documentId} = ${value.documentId}
       AND ${columns.position} = ${value.position}

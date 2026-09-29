@@ -6,7 +6,7 @@ import {
 } from "@/modules/source-document/stream-cursor";
 
 const page = {
-  effectiveDate: "2026-08-05",
+  documentDate: "2026-08-05",
   createdAt: "2026-08-06T01:02:03.000Z",
   id: "00000000-0000-4000-8000-000000000001",
 };

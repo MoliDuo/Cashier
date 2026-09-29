@@ -88,7 +88,7 @@ export function createSourceDocumentData(
     imageUrls: string[];
     metadata: Record<string, unknown>;
     status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
-    documentDate: string | null;
+    documentDate: string;
     createdAt: Date;
     updatedAt: Date;
   }> = {}
@@ -104,7 +104,8 @@ export function createSourceDocumentData(
   return {
     id: randomUUID(),
     title: null,
-    documentDate: null,
+    // Unless a test dates it, a record counts on the day it was created.
+    documentDate: (overrides.createdAt ?? now).toISOString().slice(0, 10),
     createdAt: now,
     updatedAt: now,
     ...canonicalOverrides,

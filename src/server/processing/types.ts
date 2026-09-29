@@ -51,7 +51,7 @@ export interface AttemptProcessingContextContract {
   } | null;
   document: {
     latestAttemptId: string | null;
-    createdAt: Date;
+    documentDate: string;
   } | null;
   storedFileIds: string[];
   categories: Array<{ id: string; name: string; description: string | null }>;

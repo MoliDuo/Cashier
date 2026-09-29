@@ -7,18 +7,18 @@ import { add } from "@/lib/money/decimal";
  *
  * This module intentionally keeps no React, query, or mutation dependencies.
  * No filtering, deduplication, or sorting is performed — items arrive in canonical
- * server order and are grouped consecutively by effective date.
+ * server order and are grouped consecutively by document date.
  */
 
 interface UnifiedStreamItem {
   sourceDocument: SourceDocumentListItemDto;
   ledgerEntries: SourceDocumentLedgerEntryDto[];
   /** The day the record counts on, as the server keeps it (yyyy-MM-dd). */
-  effectiveDate: string;
+  documentDate: string;
 }
 
 export interface UnifiedStreamGroup {
-  /** Effective date key shared by items in this group. */
+  /** Document date key shared by items in this group. */
   date: string;
   /** Sum of active ledger-entry amounts across accounting-valid items in this group. */
   total: string;
@@ -59,7 +59,7 @@ function addEntries(
 
 /**
  * Build stream groups from canonical server-ordered items.
- * Groups consecutive items by effective date without re-sorting.
+ * Groups consecutive items by document date without re-sorting.
  */
 export function buildUnifiedStreamGroups(
   items: readonly SourceDocumentListItemDto[],
@@ -71,16 +71,16 @@ export function buildUnifiedStreamGroups(
     const item: UnifiedStreamItem = {
       sourceDocument,
       ledgerEntries: entries,
-      effectiveDate: sourceDocument.effectiveDate,
+      documentDate: sourceDocument.documentDate,
     };
     const lastGroup = groups.at(-1);
     let group: UnifiedStreamGroup;
-    if (lastGroup != null && lastGroup.date === item.effectiveDate) {
+    if (lastGroup != null && lastGroup.date === item.documentDate) {
       lastGroup.items.push(item);
       group = lastGroup;
     } else {
       group = {
-        date: item.effectiveDate,
+        date: item.documentDate,
         total: "0",
         unconvertedCount: 0,
         currencyTotals: {},

@@ -65,7 +65,7 @@ describe("source-document-queries", () => {
     let cursor: string | undefined;
     let totalItems = 0;
     const seenIds = new Set<string>();
-    const allItems: Array<{ id: string; effectiveDate: string | null }> = [];
+    const allItems: Array<{ id: string; documentDate: string }> = [];
 
     for (let pageNum = 0; pageNum < 20; pageNum++) {
       const page = await listStreamPage({
@@ -78,9 +78,7 @@ describe("source-document-queries", () => {
       for (const item of page.items) {
         expect(seenIds.has(item.id)).toBe(false);
         seenIds.add(item.id);
-        // Build effective date for assertion
-        const effectiveDate = item.documentDate ?? item.createdAt.slice(0, 10);
-        allItems.push({ id: item.id, effectiveDate });
+        allItems.push({ id: item.id, documentDate: item.documentDate });
       }
 
       cursor = page.nextCursor ?? undefined;
@@ -91,66 +89,12 @@ describe("source-document-queries", () => {
     expect(totalItems).toBe(45);
     expect(seenIds.size).toBe(45);
 
-    // Verify descending order by effective date, then createdAt (implied by insertion order within same date)
+    // Verify descending order by document date, then createdAt (implied by insertion order within same date)
     for (let i = 1; i < allItems.length; i++) {
       const prev = allItems[i - 1]!;
       const curr = allItems[i]!;
-      expect(prev.effectiveDate!.localeCompare(curr.effectiveDate!)).toBeGreaterThanOrEqual(0);
+      expect(prev.documentDate.localeCompare(curr.documentDate)).toBeGreaterThanOrEqual(0);
     }
-  });
-
-  it("sorts null documentDate records by createdAt calendar date", async () => {
-    const db = getTestDb();
-    const today = new Date("2026-03-20T08:00:00Z");
-    const yesterday = new Date("2026-03-19T10:00:00Z");
-
-    const inserted = await db
-      .insert(sourceDocuments)
-      .values([
-        {
-          title: "null-date-older",
-          documentDate: null,
-          createdAt: today,
-          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-        },
-        {
-          title: "null-date-newer",
-          documentDate: "2026-03-18",
-          createdAt: yesterday,
-          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-        },
-        {
-          title: "has-explicit-date",
-          documentDate: "2026-03-19",
-          createdAt: new Date("2026-03-19T12:00:00Z"),
-          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-        },
-      ])
-      .returning();
-    for (const doc of inserted) {
-      await activateTestSourceDocumentProjection(db, doc.id);
-    }
-
-    const page = await listStreamPage({ limit: 10 });
-
-    const nullDateOlder = page.items.find((i) => i.title === "null-date-older");
-    const nullDateNewer = page.items.find((i) => i.title === "null-date-newer");
-    const explicitDate = page.items.find((i) => i.title === "has-explicit-date");
-
-    expect(nullDateOlder).toBeDefined();
-    expect(nullDateNewer).toBeDefined();
-    expect(explicitDate).toBeDefined();
-
-    const idxNullOlder = page.items.indexOf(nullDateOlder!);
-    const idxNullNewer = page.items.indexOf(nullDateNewer!);
-    const idxExplicit = page.items.indexOf(explicitDate!);
-
-    // null-date-older has effective date 2026-03-20 (from createdAt), should come first
-    expect(idxNullOlder).toBeLessThan(idxExplicit);
-    // null-date-newer has effective date 2026-03-19 (from createdAt), should sort after explicit 2026-03-19
-    // because within same effective date, order is by createdAt DESC (null-date-newer has createdAt 2026-03-19T10:00:00Z)
-    // and explicit has createdAt 2026-03-19T12:00:00Z, so explicit comes first
-    expect(idxExplicit).toBeLessThan(idxNullNewer);
   });
 
   it("resolves equal ordering tuples (same date, same createdAt) by ID descending", async () => {
@@ -190,7 +134,7 @@ describe("source-document-queries", () => {
     const page = await listStreamPage({ limit: 10 });
 
     const ids = page.items.map((i) => i.id);
-    // Since order is DESC by effectiveDate, createdAt, then id,
+    // Since order is DESC by documentDate, createdAt, then id,
     // equal dates and createdAt should sort by id DESC:
     // idC ("c...") > idB ("b...") > idA ("a...")
     expect(ids.indexOf(idC)).toBeLessThan(ids.indexOf(idB));

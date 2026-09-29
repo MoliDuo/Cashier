@@ -112,7 +112,7 @@ describe("Enhanced Stats Actions", () => {
       ).rejects.toThrow(ValidationError);
     });
 
-    it("should filter by effective date (entry date with createdAt fallback)", async () => {
+    it("should filter by document date, not by creation day", async () => {
       const db = getTestDb();
 
       // Create source document with documentDate in Jan but created in March
@@ -201,46 +201,8 @@ describe("Enhanced Stats Actions", () => {
       expect(entryQueries).toHaveLength(1);
       const query = entryQueries[0]!;
       expect(query).toContain(
-        "documents.effective_date between ranges.from_date and ranges.to_date"
+        "documents.document_date between ranges.from_date and ranges.to_date"
       );
-    });
-
-    it("includes undated documents on their effective (UTC creation) date", async () => {
-      const db = getTestDb();
-
-      // No explicit entry_date: effective_date falls back to the UTC creation date.
-      const createdDoc = await db
-        .insert(sourceDocuments)
-        .values({
-          documentDate: null,
-          createdAt: new Date("2024-03-10T22:30:00Z"),
-          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
-        })
-        .returning();
-      const doc = requireFirst(createdDoc, "source document");
-
-      await db.insert(ledgerEntries).values({
-        sourceDocumentId: doc.id,
-        amount: "120",
-        currency: "CNY",
-        itemName: "Undated Item",
-        categoryId: testCategoryId,
-      });
-
-      const result = await getTargetEnhancedStats({
-        queryRange: { from: "2024-03-01", to: "2024-03-31" },
-        compareRange: { from: "2024-02-01", to: "2024-02-29" },
-      });
-
-      expect(result.summary.total).toBe("120");
-      expect(result.chart).toHaveLength(1);
-      expect(requireFirst(result.chart, "chart point").date).toBe("2024-03-10");
-
-      const outside = await getTargetEnhancedStats({
-        queryRange: { from: "2024-03-11", to: "2024-03-31" },
-        compareRange: { from: "2024-02-01", to: "2024-02-29" },
-      });
-      expect(outside.summary.total).toBe("0");
     });
 
     it("keeps current and previous range boundaries inclusive", async () => {

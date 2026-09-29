@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  buildLedgerEntryEffectiveDateConditions,
+  buildLedgerEntryDocumentDateConditions,
   buildLedgerEntryValueConditions,
 } from "./build-ledger-entry-filters";
 import type { LedgerEntryFilterParams } from "@/modules/ledger/filters";
@@ -34,10 +34,10 @@ export async function calculateLedgerEntryStats({
 }: CalculateLedgerEntryStatsInput): Promise<LedgerEntrySummary> {
   const { currency, ...filtersWithoutCurrency } = filters;
   const conditions = [
-    ...buildLedgerEntryEffectiveDateConditions(filters),
+    ...buildLedgerEntryDocumentDateConditions(filters),
     ...buildLedgerEntryValueConditions(filtersWithoutCurrency, {
       mainCurrency: sql`settings.main_currency`,
-      date: sql`documents.effective_date`,
+      date: sql`documents.document_date`,
     }),
     ...(currency == null || currency === "" ? [] : [sql`ledger_entries.currency = ${currency}`]),
   ];
@@ -53,8 +53,8 @@ export async function calculateLedgerEntryStats({
         ledger_entries.currency,
         ledger_entries.amount,
         convert_amount(ledger_entries.amount, ledger_entries.currency,
-          settings.main_currency, documents.effective_date) AS converted_amount,
-        documents.effective_date,
+          settings.main_currency, documents.document_date) AS converted_amount,
+        documents.document_date,
         ledger_entries.category_id,
         categories.name AS category_name,
         categories.icon AS category_icon
@@ -73,9 +73,9 @@ export async function calculateLedgerEntryStats({
       GROUP BY currency
     ),
     trend AS (
-      SELECT effective_date::text AS date, sum(converted_amount)::text AS total
+      SELECT document_date::text AS date, sum(converted_amount)::text AS total
       FROM visible_entries
-      GROUP BY effective_date
+      GROUP BY document_date
     ),
     converted_total AS (
       SELECT coalesce(sum(converted_amount), 0)::text AS total

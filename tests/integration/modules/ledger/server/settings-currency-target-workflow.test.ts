@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { exchangeRates } from "@/persistence/schema/currency";
-import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
+import {
+  createTestUserWithLedger,
+  testBookId,
+  createTestRecord,
+  todayUtc,
+} from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
@@ -202,6 +207,7 @@ describe("settings concurrency invariants", () => {
       await db
         .insert(sourceDocuments)
         .values({
+          documentDate: todayUtc(),
           id: sourceDocumentId,
           bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })

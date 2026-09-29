@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, todayUtc } from "tests/helpers/schema-setup";
 import { sourceDocumentFiles, sourceDocuments, storedFiles } from "@/persistence";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
@@ -36,6 +36,7 @@ async function createLinkedStoredFile() {
   const [document] = await db
     .insert(sourceDocuments)
     .values({
+      documentDate: todayUtc(),
       bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();

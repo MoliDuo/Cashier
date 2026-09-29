@@ -4,7 +4,7 @@ import { AppError } from "@/lib/errors";
 import { mapLedgerEntryDto } from "./mappers";
 import {
   buildLedgerEntryCursorCondition,
-  buildLedgerEntryEffectiveDateConditions,
+  buildLedgerEntryDocumentDateConditions,
   buildLedgerEntryValueConditions,
   encodeLedgerEntryCursor,
   type LedgerEntryFilterParams,
@@ -24,7 +24,7 @@ interface ListLedgerEntryPageInput {
 interface VisibleEntryRow {
   id: string;
   position: number;
-  effectiveDate: string;
+  documentDate: string;
   // Drizzle raw executes return timestamptz as strings.
   documentCreatedAt: string;
   documentId: string;
@@ -38,17 +38,17 @@ export async function listLedgerEntryPage({
   return db.transaction(
     async (tx) => {
       const cursorCondition = buildLedgerEntryCursorCondition(cursor, filters, {
-        effectiveDate: sql`documents.effective_date`,
+        documentDate: sql`documents.document_date`,
         documentCreatedAt: sql`documents.created_at`,
         documentId: sql`documents.id`,
         position: sql`ledger_entries.position`,
         entryId: sql`ledger_entries.id`,
       });
       const whereConditions = [
-        ...buildLedgerEntryEffectiveDateConditions(filters),
+        ...buildLedgerEntryDocumentDateConditions(filters),
         ...buildLedgerEntryValueConditions(filters, {
           mainCurrency: sql`(SELECT main_currency FROM ledgers)`,
-          date: sql`documents.effective_date`,
+          date: sql`documents.document_date`,
         }),
         cursorCondition,
       ].filter((condition): condition is SQL<unknown> => condition != null);
@@ -63,7 +63,7 @@ export async function listLedgerEntryPage({
         ledger_entries.id,
         ledger_entries.position,
         ledger_entries.source_document_id,
-        documents.effective_date,
+        documents.document_date,
         documents.created_at AS document_created_at,
         documents.id AS document_id
       FROM ledger_entries
@@ -72,10 +72,10 @@ export async function listLedgerEntryPage({
        ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
       ${whereConditions.length === 0 ? sql`` : sql`WHERE ${sql.join(whereConditions, sql` AND `)}`}
     )
-    SELECT id, position, effective_date::text AS "effectiveDate",
+    SELECT id, position, document_date::text AS "documentDate",
       document_created_at AS "documentCreatedAt", document_id AS "documentId"
     FROM visible_entries
-    ORDER BY effective_date DESC, document_created_at DESC, document_id DESC,
+    ORDER BY document_date DESC, document_created_at DESC, document_id DESC,
       position ASC, id ASC
     LIMIT ${limit + 1}
   `);
@@ -91,7 +91,7 @@ export async function listLedgerEntryPage({
         }
         nextCursor = encodeLedgerEntryCursor(
           {
-            effectiveDate: lastItem.effectiveDate,
+            documentDate: lastItem.documentDate,
             documentCreatedAt: new Date(lastItem.documentCreatedAt).toISOString(),
             documentId: lastItem.documentId,
             position: lastItem.position,
@@ -121,7 +121,6 @@ export async function listLedgerEntryPage({
                       version: true,
                       title: true,
                       documentDate: true,
-                      effectiveDate: true,
                       createdAt: true,
                       updatedAt: true,
                     },

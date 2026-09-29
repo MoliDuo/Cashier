@@ -17,7 +17,7 @@ describe("source-document contract types", () => {
   });
 
   it("keeps ledger source-document references source-agnostic", () => {
-    expectTypeOf<SourceDocumentReferenceDto["documentDate"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<SourceDocumentReferenceDto["documentDate"]>().toEqualTypeOf<string>();
     expectTypeOf<SourceDocumentReferenceDto>().not.toHaveProperty("type");
   });
 

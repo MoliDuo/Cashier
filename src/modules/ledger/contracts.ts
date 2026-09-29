@@ -148,9 +148,8 @@ export type SourceDocumentReferenceDto = {
   id: string;
   version: number;
   title: string | null;
-  documentDate: string | null;
-  /** The day the record counts on, as the server keeps it. */
-  effectiveDate: string;
+  /** The day the record counts on, in the ledger's zone. */
+  documentDate: string;
   createdAt: string;
   updatedAt: string;
   hasImages?: boolean;

@@ -13,6 +13,7 @@ import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
+  todayUtc,
 } from "tests/helpers/schema-setup";
 
 async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
@@ -20,7 +21,7 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      documentDate: entryDate ?? null,
+      documentDate: entryDate ?? todayUtc(),
       bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
@@ -164,33 +165,6 @@ describe("getLedgerEntriesAction", () => {
         categoryId: randomUUID(),
       })
     ).rejects.toThrow("Ledger entry cursor does not match the query");
-  });
-
-  it("includes undated documents on their effective (UTC creation) date", async () => {
-    const db = getTestDb();
-    const doc = await seedDoc(db);
-    await db
-      .update(sourceDocuments)
-      .set({ createdAt: new Date("2026-06-12T18:00:00.000Z") })
-      .where(eq(sourceDocuments.id, doc.id));
-    await db.insert(ledgerEntries).values({
-      id: randomUUID(),
-      sourceDocumentId: doc.id,
-      itemName: "Undated",
-      amount: "10.00",
-      currency: "CNY",
-    });
-
-    const inRange = await getTargetLedgerEntriesAction({
-      startDate: "2026-06-12",
-      endDate: "2026-06-12",
-    });
-    expect(inRange.items.map((item) => item.itemName)).toEqual(["Undated"]);
-
-    const outside = await getTargetLedgerEntriesAction({
-      startDate: "2026-06-13",
-    });
-    expect(outside.items).toHaveLength(0);
   });
 
   it("filters by categoryId", async () => {
