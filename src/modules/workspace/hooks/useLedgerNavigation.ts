@@ -39,7 +39,7 @@ export function useLedgerNavigation() {
   const navigate = useCallback(
     (tab: LedgerTab, query?: URLSearchParams) => {
       const href = query == null ? hrefFor(tab) : ledgerTabHref(tab, query.toString());
-      // An open detail's or 记一笔's history entry is replaced, so Back cannot
+      // An open detail's or 记账's history entry is replaced, so Back cannot
       // reopen it.
       const current = new URLSearchParams(window.location.search);
       if (

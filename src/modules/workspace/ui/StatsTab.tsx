@@ -146,11 +146,21 @@ export function StatsTab({
         periodBar={
           <ListControlsDrop
             summary={{ total, period: formatPeriodLabel(period, today), filtered: false }}
-            // Dropped down on a phone it needs a surface of its own; from md up
-            // it stays the bare bar it always was.
+            period={period}
+            today={today}
+            onPeriodChange={setPeriod}
+            timeZone={timeZone}
+            // Dropped down on a phone it needs a surface of its own and holds
+            // only the picker; from md up it stays the bare bar it always was.
             className="max-md:rounded-lg max-md:border max-md:border-border max-md:bg-surface max-md:p-2"
           >
-            <PeriodBar period={period} today={today} onChange={setPeriod} timeZone={timeZone} />
+            <PeriodBar
+              className="max-md:hidden"
+              period={period}
+              today={today}
+              onChange={setPeriod}
+              timeZone={timeZone}
+            />
           </ListControlsDrop>
         }
         range={range}

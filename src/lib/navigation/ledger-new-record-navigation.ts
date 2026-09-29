@@ -3,7 +3,7 @@
 import { writeLedgerHistory } from "@/lib/navigation/ledger-history";
 import { leavePastOverlays } from "@/lib/navigation/overlay-history";
 
-/** The open 记一笔 dialog, as `?new=1` on whichever ledger route it was opened from. */
+/** The open 记账 sheet, as `?new=1` on whichever ledger route it was opened from. */
 export const LEDGER_NEW_RECORD_PARAM = "new";
 
 export function readNewRecordParam(params: Pick<URLSearchParams, "get">): boolean {
@@ -24,8 +24,8 @@ function newRecordWasPushed(): boolean {
 }
 
 /**
- * Opens 记一笔 as a history entry of its own, the way a record's sheet opens,
- * so the system back gesture closes the dialog instead of leaving the page
+ * Opens 记账 as a history entry of its own, the way a record's sheet opens,
+ * so the system back gesture closes the sheet instead of leaving the page
  * underneath it.
  */
 export function openNewRecord(): void {
@@ -34,7 +34,7 @@ export function openNewRecord(): void {
 }
 
 /**
- * Closes 记一笔 the way Back would: an entry the dialog pushed is popped, and
+ * Closes 记账 the way Back would: an entry the sheet pushed is popped, and
  * one reached by a link or a reload has its parameter replaced away.
  */
 export function closeNewRecord(): void {

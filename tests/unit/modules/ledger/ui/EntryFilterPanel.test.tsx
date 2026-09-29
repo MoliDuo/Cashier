@@ -6,11 +6,33 @@ import { EntryFilterPanel } from "@/modules/ledger/ui/EntryFilterPanel";
 // The panel is one dialog at every width, so nothing inside it exists until the
 // trigger opens it — the same way it works in the app.
 async function openPanel() {
-  await userEvent.click(screen.getByRole("button", { name: /筛选/ }));
+  await userEvent.click(screen.getByRole("button", { name: /^(筛选|已启用)/ }));
   return screen.getByRole("dialog", { name: "筛选" });
 }
 
 describe("EntryFilterPanel", () => {
+  it("clears every filter at once beside the trigger, only while one is on", async () => {
+    const onFiltersChange = vi.fn();
+    const view = render(<EntryFilterPanel filters={{}} onFiltersChange={onFiltersChange} />);
+    expect(screen.queryByRole("button", { name: "清除筛选" })).not.toBeInTheDocument();
+
+    view.rerender(
+      <EntryFilterPanel
+        filters={{ search: "咖啡", currency: "USD" }}
+        onFiltersChange={onFiltersChange}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    expect(onFiltersChange).toHaveBeenCalledWith({
+      categoryId: null,
+      currency: null,
+      minAmount: null,
+      maxAmount: null,
+      statuses: [],
+      search: null,
+    });
+  });
+
   it("counts the filters that narrow the list", () => {
     const view = render(
       <EntryFilterPanel

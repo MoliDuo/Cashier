@@ -1,0 +1,75 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { PeriodPicker } from "@/modules/workspace/ui/PeriodPicker";
+
+const TODAY = "2026-09-27";
+
+describe("PeriodPicker", () => {
+  it("names the months of the period's year and picks one", async () => {
+    const onChange = vi.fn();
+    render(
+      <PeriodPicker period={{ range: "month", offset: -3 }} today={TODAY} onChange={onChange} />
+    );
+
+    expect(screen.getByRole("button", { name: "月" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "2026年6月" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    // A month still to come has nothing to read.
+    expect(screen.getByRole("button", { name: "2026年10月" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "上一年" }));
+    await userEvent.click(screen.getByRole("button", { name: "2025年12月" }));
+    expect(onChange).toHaveBeenCalledWith({ range: "month", offset: -9 });
+  });
+
+  it("steps the shown year no further than a period reaches", async () => {
+    render(
+      <PeriodPicker period={{ range: "month", offset: 0 }} today={TODAY} onChange={vi.fn()} />
+    );
+
+    expect(screen.getByRole("button", { name: "下一年" })).toBeDisabled();
+    const back = screen.getByRole("button", { name: "上一年" });
+    for (let step = 0; step < 10; step += 1) await userEvent.click(back);
+    expect(screen.getByText("2016年")).toBeInTheDocument();
+    expect(back).toBeDisabled();
+    expect(screen.getByRole("button", { name: "2016年9月" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "2016年10月" })).toBeEnabled();
+  });
+
+  it("switches the kind of period without applying it until one is picked", async () => {
+    const onChange = vi.fn();
+    render(
+      <PeriodPicker period={{ range: "month", offset: 0 }} today={TODAY} onChange={onChange} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "周" }));
+    expect(onChange).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "9月14日 – 20日" }));
+    expect(onChange).toHaveBeenCalledWith({ range: "week", offset: -1 });
+
+    await userEvent.click(screen.getByRole("button", { name: "年" }));
+    expect(screen.getByRole("button", { name: "2017年" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "2016年" })).not.toBeInTheDocument();
+  });
+
+  it("applies 全部 at once, and two named days from their own apply", async () => {
+    const onChange = vi.fn();
+    render(
+      <PeriodPicker period={{ range: "month", offset: 0 }} today={TODAY} onChange={onChange} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "全部" }));
+    expect(onChange).toHaveBeenLastCalledWith({ range: "all" });
+
+    await userEvent.click(screen.getByRole("button", { name: "自定义" }));
+    await userEvent.click(screen.getByRole("button", { name: "应用" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      range: "custom",
+      from: "2026-09-01",
+      to: "2026-09-30",
+    });
+  });
+});

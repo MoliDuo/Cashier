@@ -58,6 +58,7 @@ import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
 import { EntriesToolbarShell } from "@/modules/workspace/ui/EntriesToolbarShell";
 import { ledgerPageCopy } from "@/copy/app";
 import type { LedgerTab } from "@/lib/ledger-tabs";
+import type { Period } from "@/modules/ledger/domain/period";
 import {
   WorkspaceStoreProvider,
   useHeaderSelection,
@@ -120,15 +121,33 @@ function destination(tab: LedgerTab) {
 }
 
 /** A list's toolbar as 账目 renders it: browsed, or selected from. */
-function BrowsedList({ filtered = false, selecting = false }) {
+function BrowsedList({
+  filtered = false,
+  selecting = false,
+  period = { range: "month", offset: 0 },
+  onPeriodChange = () => {},
+}: {
+  filtered?: boolean;
+  selecting?: boolean;
+  period?: Period;
+  onPeriodChange?: (period: Period) => void;
+}) {
   return (
     <EntriesToolbarShell
       totalLabel={selecting ? undefined : "¥10,800.33"}
       browsing={selecting ? undefined : { period: "2026年9月", filtered }}
+      periodControl={{ period, today: "2026-09-27", onChange: onPeriodChange }}
     >
       {null}
     </EntriesToolbarShell>
   );
+}
+
+/** Marks the ledger's content mounted, which enables the bars. */
+function ReadyContent() {
+  const setReady = useWorkspaceStore((state) => state.setReady);
+  useEffect(() => setReady(true), [setReady]);
+  return null;
 }
 
 /** A list that can be selected from, as 账目 and 明细 publish themselves. */
@@ -301,6 +320,66 @@ describe("LedgerShell", () => {
 
     await user.click(summary);
     await user.click(summary);
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("steps the period from the arrows beside the summary", async () => {
+    const user = userEvent.setup();
+    const onPeriodChange = vi.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const renderWith = (period: Period) => (
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>
+            <ReadyContent />
+            <BrowsedList period={period} onPeriodChange={onPeriodChange} />
+          </LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(renderWith({ range: "month", offset: -1 }));
+    const topBar = within(screen.getByTestId("top-bar"));
+
+    await user.click(topBar.getByRole("button", { name: "上一期" }));
+    await user.click(topBar.getByRole("button", { name: "下一期" }));
+    expect(onPeriodChange.mock.calls).toEqual([
+      [{ range: "month", offset: -2 }],
+      [{ range: "month", offset: 0 }],
+    ]);
+
+    // The current period is as far forward as a period goes.
+    rerender(renderWith({ range: "month", offset: 0 }));
+    expect(topBar.getByRole("button", { name: "下一期" })).toBeDisabled();
+    expect(topBar.getByRole("button", { name: "上一期" })).toBeEnabled();
+
+    // 全部 has nothing to step through.
+    rerender(renderWith({ range: "all" }));
+    expect(topBar.queryByRole("button", { name: "上一期" })).not.toBeInTheDocument();
+  });
+
+  it("picks a period from the dropped controls and folds them", async () => {
+    const user = userEvent.setup();
+    const onPeriodChange = vi.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>
+            <BrowsedList onPeriodChange={onPeriodChange} />
+          </LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+    const summary = within(screen.getByTestId("top-bar")).getByRole("button", {
+      name: /¥10,800\.33/,
+    });
+    const toolbar = within(screen.getByTestId("entries-toolbar"));
+    expect(toolbar.queryByRole("button", { name: "2026年6月" })).not.toBeInTheDocument();
+
+    await user.click(summary);
+    await user.click(toolbar.getByRole("button", { name: "2026年6月" }));
+
+    expect(onPeriodChange).toHaveBeenCalledWith({ range: "month", offset: -3 });
     expect(summary).toHaveAttribute("aria-expanded", "false");
   });
 

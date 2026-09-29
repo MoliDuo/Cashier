@@ -45,7 +45,7 @@ test("@demo shows a record in its own book and moves it to another", async ({ pa
 
   // Recording from 总账 opens the picker on the first book in 设置 order,
   // 共同支出, unless it is changed for that one record.
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
+  await page.getByRole("button", { name: "记账", exact: true }).click();
   const create = page.getByRole("dialog");
   await expect(create.getByLabel("分账", { exact: true })).toHaveText(/共同支出/);
   await page.keyboard.press("Escape");
@@ -161,7 +161,7 @@ test("@demo the record picker remembers the book a record was saved into", async
   await expect(page).not.toHaveURL(/\/login/);
 
   const openDialog = async () => {
-    await page.getByRole("button", { name: "记一笔", exact: true }).click();
+    await page.getByRole("button", { name: "记账", exact: true }).click();
     return page.getByRole("dialog");
   };
 

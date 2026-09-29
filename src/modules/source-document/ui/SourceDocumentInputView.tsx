@@ -56,6 +56,8 @@ export interface SourceDocumentInputViewProps {
   onImageClose: () => void;
   /** Shown at the start of the footer, beside the submit — the book picker. */
   footerStart?: ReactNode;
+  /** Shown at the end of the date row — the new-record sheet's close control. */
+  dateEnd?: ReactNode;
 }
 
 export function SourceDocumentInputView({
@@ -90,6 +92,7 @@ export function SourceDocumentInputView({
   onImageOpen,
   onImageClose,
   footerStart,
+  dateEnd,
 }: SourceDocumentInputViewProps) {
   const drop = useFileDropZone({ enabled: isDropEnabled, onFiles: onAddImageFiles });
   const showsViewfinder =
@@ -98,13 +101,33 @@ export function SourceDocumentInputView({
     camera.status !== "unavailable" &&
     camera.status !== "unsupported" &&
     camera.status !== "insecure";
+  // Closed, the camera is one button beside 图片; open, or unable to open, it
+  // takes a full-width row of its own under them.
+  const cameraInRow =
+    isCameraAvailable &&
+    !isCameraOpen &&
+    camera.status !== "insecure" &&
+    camera.status !== "unsupported";
+  const cameraPanel = isCameraAvailable ? (
+    <SourceDocumentCameraPanel
+      videoRef={camera.videoRef}
+      status={camera.status}
+      canSwitch={camera.canSwitch}
+      isMirrored={camera.isMirrored}
+      isOpen={isCameraOpen}
+      isBusy={isSubmitting}
+      remaining={remainingImageSlots}
+      onCapture={camera.capture}
+      onSwitchFacing={camera.switchFacing}
+      onOpen={onCameraOpen}
+      onCollapse={onCameraCollapse}
+      onRetry={camera.retry}
+    />
+  ) : null;
 
   return (
     <div
-      className={cn(
-        "flex flex-1 flex-col gap-4",
-        drop.isDragging && "rounded-md ring-1 ring-primary"
-      )}
+      className={cn("flex flex-col gap-3", drop.isDragging && "rounded-md ring-1 ring-primary")}
       {...drop.dropProps}
     >
       {drop.isDragging ? (
@@ -113,31 +136,43 @@ export function SourceDocumentInputView({
         </p>
       ) : null}
 
-      <DateFilter
-        value={entryDate}
-        onChange={(date) => onEntryDateChange(date ?? new Date())}
-        placeholder={sourceDocumentInputCopy.entryDate}
-        size="sm"
-        className="w-full"
-        disabled={isPending}
-      />
-
-      {isCameraAvailable ? (
-        <SourceDocumentCameraPanel
-          videoRef={camera.videoRef}
-          status={camera.status}
-          canSwitch={camera.canSwitch}
-          isMirrored={camera.isMirrored}
-          isOpen={isCameraOpen}
-          isBusy={isSubmitting}
-          remaining={remainingImageSlots}
-          onCapture={camera.capture}
-          onSwitchFacing={camera.switchFacing}
-          onOpen={onCameraOpen}
-          onCollapse={onCameraCollapse}
-          onRetry={camera.retry}
+      <div className="flex items-center gap-2">
+        <DateFilter
+          value={entryDate}
+          onChange={(date) => onEntryDateChange(date ?? new Date())}
+          placeholder={sourceDocumentInputCopy.entryDate}
+          size="sm"
+          className="min-w-0 flex-1"
+          disabled={isPending}
         />
-      ) : null}
+        {dateEnd}
+      </div>
+
+      <div className={cn("grid gap-2", cameraInRow && "grid-cols-2")}>
+        {cameraInRow ? cameraPanel : null}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={onFileInputChange}
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          multiple
+          aria-label={sourceDocumentInputCopy.image}
+          className="hidden"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cameraInRow ? undefined : "justify-self-start"}
+          onClick={onSelectImages}
+          disabled={isPending}
+        >
+          <ImagePlus className="h-4 w-4" />
+          {sourceDocumentInputCopy.image}
+        </Button>
+      </div>
+
+      {cameraInRow ? null : cameraPanel}
 
       {images.length > 0 && (
         <div className="grid grid-cols-4 gap-2">
@@ -170,28 +205,6 @@ export function SourceDocumentInputView({
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={onFileInputChange}
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          multiple
-          aria-label={sourceDocumentInputCopy.image}
-          className="hidden"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onSelectImages}
-          disabled={isPending}
-        >
-          <ImagePlus className="mr-2 h-4 w-4" />
-          {sourceDocumentInputCopy.image}
-        </Button>
-      </div>
-
       <Textarea
         value={text}
         onChange={(event) => onTextChange(event.target.value)}
@@ -199,7 +212,7 @@ export function SourceDocumentInputView({
         placeholder={sourceDocumentInputCopy.placeholder}
         aria-label={sourceDocumentInputCopy.inputLabel}
         className="resize-none"
-        rows={5}
+        rows={4}
         autoFocus={!showsViewfinder}
         disabled={isPending}
       />

@@ -47,11 +47,13 @@ interface NewRecordFormsProps {
   activeTab: LedgerTab;
   committedView: CommittedView;
   timeZone?: string;
-  /** Closes the dialog once a record is saved. */
+  /** Closes the sheet once a record is saved. */
   onSaved: () => void;
   onPendingChange: (pending: boolean) => void;
   /** The record's book picker, shown in the form's footer. */
   bookPicker: ReactNode;
+  /** The sheet's close control, at the end of the date row. */
+  closeControl: ReactNode;
 }
 
 export function NewRecordForms({
@@ -64,6 +66,7 @@ export function NewRecordForms({
   onSaved,
   onPendingChange,
   bookPicker,
+  closeControl,
 }: NewRecordFormsProps) {
   const handleSuccess = useCallback(
     (result: CreatedRecordResult) => {
@@ -79,17 +82,18 @@ export function NewRecordForms({
         savedBook,
       });
 
-      // A saved record closes the dialog.
+      // A saved record closes the sheet.
       onSaved();
     },
     [activeTab, committedView, onSaved, savedBook, viewedBookId]
   );
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-col">
       <SourceDocumentInput
         bookId={bookId}
         footerStart={bookPicker}
+        dateEnd={closeControl}
         onPendingChange={onPendingChange}
         {...(timeZone != null ? { timeZone } : {})}
         onSuccess={handleSuccess}

@@ -32,7 +32,7 @@ function apiBase(): string {
 
 async function login(page: Page) {
   await signIn(page);
-  await expect(page.getByRole("button", { name: "记一笔", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "记账", exact: true })).toBeEnabled();
 }
 
 /** The 分账 row that names `name`, matched exactly so one book cannot shadow another. */
@@ -273,8 +273,8 @@ test("books production starts a record in the viewed book", async ({ page }, tes
   await openTab(page, "账目");
   await selectBookByName(page, bookA);
 
-  // Viewing a book, 记一笔 starts in that book.
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
+  // Viewing a book, 记账 starts in that book.
+  await page.getByRole("button", { name: "记账", exact: true }).click();
   let dialog = page.getByRole("dialog").last();
   await expect(dialog.getByLabel("分账", { exact: true })).toContainText(bookA);
 
@@ -290,7 +290,7 @@ test("books production starts a record in the viewed book", async ({ page }, tes
   // in the book being viewed.
   await expect(currentBookOption(page)).toHaveText(bookA);
   await expect(page.getByText(PARSED_TITLE, { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
+  await page.getByRole("button", { name: "记账", exact: true }).click();
   dialog = page.getByRole("dialog").last();
   await expect(dialog.getByLabel("分账", { exact: true })).toContainText(bookA);
   await page.keyboard.press("Escape");

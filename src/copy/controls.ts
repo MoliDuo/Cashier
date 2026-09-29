@@ -52,4 +52,8 @@ export const periodBarCopy = {
   apply: "应用",
   from: "开始日期",
   to: "结束日期",
+  previousYear: "上一年",
+  nextYear: "下一年",
+  yearName: ({ year }: { year: number }) => `${year}年`,
+  monthName: ({ month }: { month: number }) => `${month}月`,
 };

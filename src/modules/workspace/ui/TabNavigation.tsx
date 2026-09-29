@@ -15,7 +15,7 @@ interface TabNavigationProps {
   refreshing?: boolean;
   /** Called with the open tab too: a tap on it refreshes it. */
   onTabChange: (tab: LedgerTab) => void;
-  /** Opens 记一笔; the bottom bar carries it between the tabs. */
+  /** Opens 记账; the bottom bar carries it between the tabs. */
   onOpenInput?: () => void;
   onInputIntent?: () => void;
   /** Called when an inactive destination receives pointer or keyboard focus. */
@@ -37,7 +37,7 @@ const TAB_LABELS: Record<LedgerTab, string> = {
 };
 
 /**
- * 账目, 明细, 统计 and 设置; a phone's bar carries 记一笔 between the first two and
+ * 账目, 明细, 统计 and 设置; a phone's bar carries 记账 between the first two and
  * the rest. Tapping the open tab refreshes it, and its icon turns while it does.
  */
 export function TabNavigation({

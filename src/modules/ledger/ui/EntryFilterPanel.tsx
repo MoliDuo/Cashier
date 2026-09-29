@@ -6,7 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TOOLBAR_CONTROL_CLASS } from "@/components/toolbar-control";
 import { cn } from "@/lib/utils";
 import type { EntryCategory } from "@/modules/ledger/contracts";
-import { useEntryFilterDraft } from "./EntryFilterPanel/hooks/useEntryFilterDraft";
+import {
+  CLEARED_ENTRY_FILTERS,
+  useEntryFilterDraft,
+} from "./EntryFilterPanel/hooks/useEntryFilterDraft";
 import { EntryFilterContent } from "./EntryFilterPanel/components/EntryFilterContent";
 import type { EntryFilters } from "@/modules/ledger/filters";
 import { entryFilterPanelCopy } from "@/copy/workspace";
@@ -91,6 +94,15 @@ export function EntryFilterPanel({
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {trigger}
+      {activeFilterCount > 0 ? (
+        <Button
+          variant="ghost"
+          className={cn(TOOLBAR_CONTROL_CLASS, "shrink-0 text-muted-foreground")}
+          onClick={() => onFiltersChange(CLEARED_ENTRY_FILTERS)}
+        >
+          {entryFilterPanelCopy.clearFilters}
+        </Button>
+      ) : null}
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           variant="modal"

@@ -61,6 +61,7 @@ const baseProps = {
   onSaved: vi.fn(),
   onPendingChange: vi.fn(),
   bookPicker: null,
+  closeControl: null,
 };
 
 describe("NewRecordForms picker memory", () => {

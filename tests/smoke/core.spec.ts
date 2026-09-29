@@ -28,7 +28,7 @@ test("protected redirect, default ledger, create, edit, delete and sign out", as
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
   await signIn(page);
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
+  await page.getByRole("button", { name: "记账", exact: true }).click();
   const create = page.getByRole("dialog");
   await create.getByRole("textbox", { name: /收支内容/ }).fill(`${item} 12.34`);
   await create.getByRole("button", { name: "发送", exact: true }).click();

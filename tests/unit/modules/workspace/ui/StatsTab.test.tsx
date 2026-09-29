@@ -144,6 +144,8 @@ describe("StatsTab", () => {
         total: "¥120.00",
         period: "2025年",
         filtered: false,
+        // Last year steps both ways from the top bar.
+        steps: { back: true, forward: true },
       })
     );
     // On a phone the period bar waits behind the summary until it is tapped.

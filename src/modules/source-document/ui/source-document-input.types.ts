@@ -9,6 +9,8 @@ interface SourceDocumentInputBaseProps {
   timeZone?: string;
   /** Shown at the start of the form's footer, beside the submit — the book picker. */
   footerStart?: ReactNode;
+  /** Shown at the end of the date row — the new-record sheet's close control. */
+  dateEnd?: ReactNode;
   initialData?: {
     text?: string;
     images?: Array<{ data: string; mimeType: string; storedFileId?: string }>;

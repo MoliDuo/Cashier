@@ -43,15 +43,15 @@ test("Back closes the top dialog and leaves the page under it where it was", asy
   const navigation = page.getByRole("navigation", { name: "账本导航" });
   const destination = (name: string) => navigation.getByRole("button", { name, exact: true });
   await expect(destination("账目")).toBeEnabled();
-  // 统计 sits under 账目 in history, where a swipe back from 记一笔 used to land.
+  // 统计 sits under 账目 in history, where a swipe back from 记账 used to land.
   await destination("统计").click();
   await expect(page).toHaveURL(/\/stats$/);
   await destination("账目").click();
   await expect(page).toHaveURL(/\/records$/);
 
-  const openNewRecord = page.getByRole("button", { name: "记一笔", exact: true }).first();
+  const openNewRecord = page.getByRole("button", { name: "记账", exact: true }).first();
   await openNewRecord.click();
-  const dialog = page.getByRole("dialog", { name: "记一笔" });
+  const dialog = page.getByRole("dialog", { name: "记账" });
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(/\/records\?new=1$/);
   await page.goBack();
@@ -68,14 +68,11 @@ test("Back closes the top dialog and leaves the page under it where it was", asy
 
   // Any other dialog is an entry of its own too.
   await showListControls(page);
-  await page
-    .getByRole("button", { name: /^区间：/ })
-    .first()
-    .click();
-  const period = page.getByRole("dialog", { name: "选择区间" });
-  await expect(period).toBeVisible();
+  await page.getByRole("button", { name: "筛选", exact: true }).first().click();
+  const filter = page.getByRole("dialog", { name: "筛选" });
+  await expect(filter).toBeVisible();
   await page.goBack();
-  await expect(period).toHaveCount(0);
+  await expect(filter).toHaveCount(0);
   await expect(page).toHaveURL(/\/records$/);
 
   await page.goBack();

@@ -14,8 +14,8 @@ export function readLedgerDetailParam(params: Pick<URLSearchParams, "get">): str
 
 function detailUrl(id: string | null): string {
   const params = new URLSearchParams(window.location.search);
-  // A record opened from 记一笔's success toast replaces nothing of the dialog:
-  // the dialog has closed, even if its Back has not landed yet.
+  // A record opened from 记账's success toast replaces nothing of the sheet:
+  // the sheet has closed, even if its Back has not landed yet.
   params.delete(LEDGER_NEW_RECORD_PARAM);
   if (id == null) params.delete(LEDGER_DETAIL_PARAM);
   else params.set(LEDGER_DETAIL_PARAM, id);

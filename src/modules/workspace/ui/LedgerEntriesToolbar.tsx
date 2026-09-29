@@ -156,6 +156,7 @@ export function LedgerEntriesToolbar({
   return (
     <>
       <EntriesToolbarShell
+        periodControl={{ period, today, onChange: onPeriodChange, timeZone }}
         totalLabel={
           !isSelectionMode && filteredTotal !== undefined
             ? formatCurrencyAmount(filteredTotal, mainCurrency, locale)
@@ -198,9 +199,9 @@ export function LedgerEntriesToolbar({
         {!isSelectionMode && (
           <>
             <PeriodBar
-              // On a phone the period takes the row and truncates, so 筛选 stays beside
-              // it instead of wrapping under a long week or range label.
-              className="min-w-0 flex-1 sm:flex-none"
+              // A phone steps the period from the top bar and picks it from the
+              // controls dropped down, so there the row keeps only 筛选.
+              className="min-w-0 max-md:hidden"
               period={period}
               today={today}
               onChange={onPeriodChange}
@@ -211,7 +212,8 @@ export function LedgerEntriesToolbar({
               onFiltersChange={onFiltersChange}
               categories={categories}
               preferredCurrencies={preferredCurrencies}
-              className="w-auto"
+              // Dropped down on a phone the filter row sits under the picker.
+              className="w-auto max-md:w-full max-md:border-t max-md:border-border max-md:pt-2"
             />
           </>
         )}

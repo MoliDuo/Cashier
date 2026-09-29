@@ -14,7 +14,7 @@ describe("new-record navigation", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("opens 记一笔 as a history entry of its own, so Back closes it", () => {
+  it("opens 记账 as a history entry of its own, so Back closes it", () => {
     const pushState = vi.spyOn(window.history, "pushState");
 
     openNewRecord();

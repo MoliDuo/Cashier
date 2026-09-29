@@ -32,5 +32,5 @@ export const ledgerPageCopy = {
   filtered: "已筛选",
   totalPending: "—",
   stats: "统计",
-  newRecord: "记一笔",
+  newRecord: "记账",
 };

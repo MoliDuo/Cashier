@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 
 interface AppShellProps {
-  /** The bar along the top: the desktop tabs, 记一笔 and the book switcher. */
+  /** The bar along the top: the desktop tabs, 记账 and the book switcher. */
   topBar: ReactNode;
   /**
    * The phone's bar along the bottom; wider screens keep everything on top.

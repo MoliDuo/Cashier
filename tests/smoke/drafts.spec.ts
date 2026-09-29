@@ -8,14 +8,14 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
   await signIn(page);
 
   // A typed record survives closing the dialog and a reload.
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
+  await page.getByRole("button", { name: "记账", exact: true }).click();
   let dialog = page.getByRole("dialog");
   const input = dialog.getByRole("textbox", { name: /收支内容/ });
   await input.fill(text);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.reload();
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
+  await page.getByRole("button", { name: "记账", exact: true }).click();
   dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("textbox", { name: /收支内容/ })).toHaveValue(text);
   const notice = dialog.getByRole("status").filter({ hasText: "有未保存的修改" }).first();

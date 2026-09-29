@@ -15,6 +15,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
     onPendingChange: (pending: boolean) => void;
     onSaved: () => void;
     bookPicker: ReactNode;
+    closeControl: ReactNode;
   }) => (
     <div
       data-testid="record-forms"
@@ -25,6 +26,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
       }
       data-time-zone={props.timeZone ?? ""}
     >
+      {props.closeControl}
       {props.bookPicker}
       <button type="button" onClick={() => props.onPendingChange(true)}>
         start submit
@@ -68,7 +70,7 @@ vi.mock("@/components/ui/select", () => ({
   SelectValue: () => null,
 }));
 
-import { NewRecordDialog } from "@/modules/workspace/ui/NewRecordDialog";
+import { NewRecordSheet } from "@/modules/workspace/ui/NewRecordSheet";
 
 const ledgerId = "ledger-1";
 const BOOK_A = "10000000-0000-4000-8000-000000000001";
@@ -94,7 +96,7 @@ const defaultBooks: BookDto[] = [
   }),
 ];
 
-type DialogProps = Parameters<typeof NewRecordDialog>[0];
+type DialogProps = Parameters<typeof NewRecordSheet>[0];
 
 const onClose = vi.fn();
 
@@ -112,7 +114,7 @@ function UrlBackedDialog({ open, ...props }: DialogProps) {
     setIsOpen(open);
   }
   return (
-    <NewRecordDialog
+    <NewRecordSheet
       {...props}
       open={isOpen}
       onClose={() => {
@@ -157,7 +159,7 @@ function formsAttrs() {
   };
 }
 
-describe("NewRecordDialog book picker", () => {
+describe("NewRecordSheet book picker", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
@@ -239,9 +241,17 @@ describe("NewRecordDialog book picker", () => {
   });
 });
 
-describe("NewRecordDialog state", () => {
+describe("NewRecordSheet state", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  it("is named 记账 without a visible title", () => {
+    const { open } = renderDialog();
+    open();
+
+    expect(screen.getByRole("dialog", { name: "记账" })).toBeInTheDocument();
+    expect(screen.getByText("记账")).toHaveClass("sr-only");
   });
 
   it("cannot be closed while the form is submitting", () => {

@@ -135,6 +135,7 @@ export const entryFilterPanelCopy = {
   allCategories: "全部类别",
   allCurrencies: "全部货币",
   reset: "清除全部",
+  clearFilters: "清除筛选",
   apply: "应用筛选",
   status: "状态",
   statusProcessing: "处理中",

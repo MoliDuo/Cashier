@@ -120,6 +120,27 @@ export function stepPeriod(period: Period, step: number): Period {
   return { range: period.range, offset };
 }
 
+function calendarOffset(range: CalendarRange, offset: number): Period | null {
+  return offset > 0 || offset < MIN_PERIOD_OFFSET[range] ? null : { range, offset };
+}
+
+/**
+ * The month period for `month` (1–12) of `year`, or null when it is after the
+ * current month or further back than a period steps.
+ */
+export function monthPeriod(today: string, year: number, month: number): Period | null {
+  const now = toUtc(today);
+  return calendarOffset(
+    "month",
+    (year - now.getUTCFullYear()) * 12 + (month - 1 - now.getUTCMonth())
+  );
+}
+
+/** The year period for `year`, or null outside the years a period reaches. */
+export function yearPeriod(today: string, year: number): Period | null {
+  return calendarOffset("year", year - toUtc(today).getUTCFullYear());
+}
+
 export interface ComparisonWindow {
   range: CivilRange;
   compareRange: CivilRange;

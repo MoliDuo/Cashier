@@ -1,21 +1,13 @@
 "use client";
 import { useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { textRoleClassName } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import { DateFilter } from "@/components/ui/date-filter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
-import { formatDateTimeForApi } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
-import {
-  CALENDAR_RANGES,
-  resolvePeriod,
-  stepPeriod,
-  type Period,
-  type PeriodRange,
-} from "@/modules/ledger/domain/period";
+import { stepPeriod, type Period } from "@/modules/ledger/domain/period";
 import { formatPeriodLabel } from "../period-label";
+import { PeriodPicker } from "./PeriodPicker";
 import { periodBarCopy } from "@/copy/controls";
 
 interface PeriodBarProps {
@@ -29,16 +21,11 @@ interface PeriodBarProps {
   className?: string;
 }
 
-const RANGE_CHOICES: readonly PeriodRange[] = [...CALENDAR_RANGES, "all", "custom"];
-
-function rangeLabel(range: PeriodRange): string {
-  return periodBarCopy[range];
-}
-
 /**
  * Which days a view reads: ‹ 2026年9月 › steps through calendar periods, and the
- * name in the middle opens the choice of 周, 月, 年, 全部 or two named days.
- * 账目 and 统计 carry the same bar, so a period means the same days on both.
+ * name in the middle opens the period picker. 账目, 明细 and 统计 carry the same
+ * bar from md up, so a period means the same days on all three; a phone steps
+ * from the top bar and picks from the controls it drops down.
  */
 export function PeriodBar({
   period,
@@ -124,91 +111,18 @@ function PeriodDialog({
   onOpenChange: (open: boolean) => void;
   onChange: (period: Period) => void;
 }) {
-  const current = resolvePeriod(period, today);
-  const [custom, setCustom] = useState(period.range === "custom");
-  const [from, setFrom] = useState(current?.from ?? today);
-  const [to, setTo] = useState(current?.to ?? today);
-  const customValid = from <= to;
-
-  const choose = (range: PeriodRange) => {
-    if (range === "custom") {
-      setCustom(true);
-      return;
-    }
-    onChange(range === "all" ? { range: "all" } : { range, offset: 0 });
-  };
-
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent variant="modal" className="sm:max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{periodBarCopy.choose}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex gap-1 rounded-lg bg-surface2 p-1" role="group">
-            {RANGE_CHOICES.map((range) => {
-              const active = custom ? range === "custom" : period.range === range;
-              return (
-                <button
-                  key={range}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => choose(range)}
-                  className={cn(
-                    textRoleClassName(
-                      "bodyStrong",
-                      "min-h-9 flex-1 whitespace-nowrap rounded-md px-1 transition-colors duration-[var(--motion-feedback)] sm:px-2"
-                    ),
-                    active
-                      ? "bg-surface text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-text"
-                  )}
-                >
-                  {rangeLabel(range)}
-                </button>
-              );
-            })}
-          </div>
-          {custom ? (
-            <div className="space-y-3">
-              {/* Side by side the two dates get about 130px each on a phone,
-                  which cuts the date short, so they stack there. */}
-              <div className="grid gap-2 sm:flex sm:items-center">
-                <DateFilter
-                  value={from}
-                  onChange={(date) => date != null && setFrom(formatDateTimeForApi(date))}
-                  size="sm"
-                  className="h-9 w-full sm:flex-1"
-                  showClear={false}
-                  showClearShortcut={false}
-                  ariaLabel={periodBarCopy.from}
-                  {...(timeZone != null ? { timeZone } : {})}
-                />
-                <span aria-hidden="true" className="hidden text-muted-foreground sm:inline">
-                  –
-                </span>
-                <DateFilter
-                  value={to}
-                  onChange={(date) => date != null && setTo(formatDateTimeForApi(date))}
-                  size="sm"
-                  className="h-9 w-full sm:flex-1"
-                  showClear={false}
-                  showClearShortcut={false}
-                  ariaLabel={periodBarCopy.to}
-                  {...(timeZone != null ? { timeZone } : {})}
-                />
-              </div>
-              <Button
-                type="button"
-                className="w-full"
-                disabled={!customValid}
-                onClick={() => onChange({ range: "custom", from, to })}
-              >
-                {periodBarCopy.apply}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <PeriodPicker
+          period={period}
+          today={today}
+          onChange={onChange}
+          {...(timeZone != null ? { timeZone } : {})}
+        />
       </DialogContent>
     </Dialog>
   );

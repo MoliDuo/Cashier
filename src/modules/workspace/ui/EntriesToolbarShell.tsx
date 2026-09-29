@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import type { Period } from "@/modules/ledger/domain/period";
 import { AmountText } from "@/modules/currency/ui/amount-text";
 import { ListControlsDrop } from "./ListControlsDrop";
 
@@ -14,6 +15,13 @@ interface EntriesToolbarShellProps {
    */
   browsing?: { period: string; filtered: boolean } | undefined;
   batchActions?: ReactNode | undefined;
+  /** The period the list reads, which a phone steps and picks from the top bar. */
+  periodControl: {
+    period: Period;
+    today: string;
+    onChange: (period: Period) => void;
+    timeZone?: string | undefined;
+  };
   className?: string;
 }
 
@@ -22,6 +30,7 @@ export function EntriesToolbarShell({
   totalLabel,
   browsing,
   batchActions,
+  periodControl,
   className = "",
 }: EntriesToolbarShellProps) {
   const total = totalLabel != null && totalLabel !== "" ? totalLabel : null;
@@ -29,6 +38,10 @@ export function EntriesToolbarShell({
   return (
     <ListControlsDrop
       summary={browsing == null ? null : { total, ...browsing }}
+      period={periodControl.period}
+      today={periodControl.today}
+      onPeriodChange={periodControl.onChange}
+      timeZone={periodControl.timeZone}
       data-testid="entries-toolbar"
       // The right inset is one row's own: the box's 1px border plus `pr-3`
       // lands the total on the same column as the amounts in the cards below,

@@ -17,7 +17,7 @@ describe("TabNavigation", () => {
     for (const button of screen.getAllByRole("button")) expect(button).toBeDisabled();
   });
 
-  it("puts 记一笔 between the first two tabs and the last two on the bottom bar", async () => {
+  it("puts 记账 between the first two tabs and the last two on the bottom bar", async () => {
     const user = userEvent.setup();
     const onTabChange = vi.fn();
     const onOpenInput = vi.fn();
@@ -43,7 +43,7 @@ describe("TabNavigation", () => {
     await user.click(screen.getByRole("button", { name: "统计" }));
     expect(onTabChange).toHaveBeenCalledWith("stats");
 
-    await user.click(screen.getByRole("button", { name: "记一笔" }));
+    await user.click(screen.getByRole("button", { name: "记账" }));
     expect(onOpenInput).toHaveBeenCalledOnce();
   });
 

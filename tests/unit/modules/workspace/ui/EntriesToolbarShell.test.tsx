@@ -2,10 +2,16 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { EntriesToolbarShell } from "@/modules/workspace/ui/EntriesToolbarShell";
 
+const periodControl = {
+  period: { range: "month", offset: 0 } as const,
+  today: "2026-09-27",
+  onChange: () => {},
+};
+
 describe("EntriesToolbarShell", () => {
   it("carries the browsing controls and the total", () => {
     render(
-      <EntriesToolbarShell totalLabel="¥12.00">
+      <EntriesToolbarShell totalLabel="¥12.00" periodControl={periodControl}>
         <span>filters</span>
       </EntriesToolbarShell>
     );
@@ -15,13 +21,17 @@ describe("EntriesToolbarShell", () => {
   });
 
   it("offers no refresh of its own", () => {
-    render(<EntriesToolbarShell totalLabel="¥12.00">{null}</EntriesToolbarShell>);
+    render(
+      <EntriesToolbarShell totalLabel="¥12.00" periodControl={periodControl}>
+        {null}
+      </EntriesToolbarShell>
+    );
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("hides on a phone while selecting, when the top bar and action bar take over", () => {
-    render(<EntriesToolbarShell>{null}</EntriesToolbarShell>);
+    render(<EntriesToolbarShell periodControl={periodControl}>{null}</EntriesToolbarShell>);
     expect(screen.getByTestId("entries-toolbar")).toHaveClass("max-md:hidden");
   });
 });

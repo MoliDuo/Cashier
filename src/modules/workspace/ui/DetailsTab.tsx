@@ -123,6 +123,7 @@ export function DetailsTab({
     <>
       {tab.queryStatus === "error" && <LedgerQueryErrorBanner empty={false} onRetry={tab.retry} />}
       <EntriesToolbarShell
+        periodControl={{ period, today, onChange: onPeriodChange, timeZone }}
         {...(!tab.isSelectionMode && monthStats.mainTotal != null
           ? {
               totalLabel: formatCurrencyAmount(
@@ -168,9 +169,9 @@ export function DetailsTab({
         {!tab.isSelectionMode ? (
           <>
             <PeriodBar
-              // On a phone the period takes the row and truncates, so 筛选 stays beside
-              // it instead of wrapping under a long week or range label.
-              className="min-w-0 flex-1 sm:flex-none"
+              // A phone steps the period from the top bar and picks it from the
+              // controls dropped down, so there the row keeps only 筛选.
+              className="min-w-0 max-md:hidden"
               period={period}
               today={today}
               onChange={onPeriodChange}
@@ -182,6 +183,8 @@ export function DetailsTab({
               categories={categories}
               preferredCurrencies={ledger?.settings.currencies ?? []}
               showStatus={false}
+              // Dropped down on a phone the filter row sits under the picker.
+              className="max-md:w-full max-md:border-t max-md:border-border max-md:pt-2"
             />
           </>
         ) : null}

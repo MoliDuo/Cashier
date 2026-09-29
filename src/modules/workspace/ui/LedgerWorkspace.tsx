@@ -18,7 +18,7 @@ import { readPeriodParams } from "../period-url-params";
 import { useLedgerToday } from "../hooks/useLedgerToday";
 import { useLedgerSync } from "../hooks/useLedgerSync";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
-import { NewRecordDialog } from "./NewRecordDialog";
+import { NewRecordSheet } from "./NewRecordSheet";
 import { DetailSheetHost } from "./DetailSheetHost";
 import { LedgerWorkspaceContext, type LedgerWorkspaceValue } from "./ledger-workspace-context";
 import { ledgerPageCopy } from "@/copy/app";
@@ -107,7 +107,7 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
               has not loaded yet shows a neutral icon until it does. */}
           <div className="min-w-0 max-w-full overflow-x-clip">{children}</div>
 
-          <NewRecordDialog
+          <NewRecordSheet
             open={readNewRecordParam(searchParams)}
             onClose={closeNewRecord}
             scope={recordScope}

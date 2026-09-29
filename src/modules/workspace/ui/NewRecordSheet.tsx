@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
@@ -17,8 +19,8 @@ import {
 import { ledgerPageCopy } from "@/copy/app";
 import { bookPickerCopy, commonCopy } from "@/copy/common";
 
-interface NewRecordDialogProps {
-  /** Whether the URL names the dialog open (`?new=1`). */
+interface NewRecordSheetProps {
+  /** Whether the URL names the sheet open (`?new=1`). */
   open: boolean;
   /** Closes it the way Back would; the URL then says it is closed. */
   onClose: () => void;
@@ -33,11 +35,14 @@ interface NewRecordDialogProps {
 }
 
 /**
- * The "new record" dialog: the form, and a footer pinned to the bottom with the
- * book on the left and the submit on the right. Closing it never asks: the form
- * keeps its unsaved input as a draft and restores it on the next opening.
+ * 记账: the new-record form as a sheet as tall as its content — at the bottom
+ * of a phone's screen, centred from sm up — with no title, since what it is
+ * for is plain. The date row carries the close control, and a footer pinned to
+ * the bottom holds the book on the left and the submit on the right. Closing
+ * it never asks: the form keeps its unsaved input as a draft and restores it
+ * on the next opening.
  */
-export function NewRecordDialog({
+export function NewRecordSheet({
   open: isOpen,
   onClose,
   scope,
@@ -45,8 +50,8 @@ export function NewRecordDialog({
   activeTab,
   committedView,
   timeZone,
-}: NewRecordDialogProps) {
-  // The dialog opens from every tab, so the picker labels live in the shell
+}: NewRecordSheetProps) {
+  // The sheet opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
   // The shell's + button opens it from outside the page, so whether it is open
   // lives in the URL, where the system back gesture can close it.
@@ -60,7 +65,7 @@ export function NewRecordDialog({
   // record updates the memory.
   const [bookId, setBookId] = useState("");
   // Every opening starts the per-record pick over. A books refetch while the
-  // dialog stays open must not overwrite what the user chose for this record,
+  // sheet stays open must not overwrite what the user chose for this record,
   // so the pick is only reset on the closed-to-open edge.
   const [lastOpen, setLastOpen] = useState(isOpen);
   if (isOpen !== lastOpen) {
@@ -81,10 +86,10 @@ export function NewRecordDialog({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange} closeOnBack={false}>
       <DialogContent
-        variant="detail"
-        className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-md sm:rounded-lg"
+        variant="sheet"
+        className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[90dvh] sm:max-w-md"
         aria-describedby={undefined}
-        hideCloseButton={isSubmitting}
+        hideCloseButton
         onEscapeKeyDown={(event) => {
           if (isSubmitting) event.preventDefault();
         }}
@@ -92,10 +97,9 @@ export function NewRecordDialog({
           if (isSubmitting) event.preventDefault();
         }}
       >
-        <DialogHeader className="shrink-0 border-b px-12 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <DialogTitle>{ledgerPageCopy.newRecord}</DialogTitle>
-        </DialogHeader>
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 sm:flex-none sm:px-6 sm:pt-6">
+        {/* Named for assistive technology only; it also takes the first focus. */}
+        <DialogTitle className="sr-only">{ledgerPageCopy.newRecord}</DialogTitle>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 sm:px-6 sm:pt-6">
           <NewRecordForms
             bookId={selectedBookId}
             viewedBookId={scope}
@@ -105,6 +109,22 @@ export function NewRecordDialog({
             onSaved={onClose}
             onPendingChange={setIsSubmitting}
             timeZone={timeZone}
+            closeControl={
+              isSubmitting ? null : (
+                <DialogClose asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-11 shrink-0 text-muted-foreground sm:size-9"
+                    aria-label={commonCopy.close}
+                    title={commonCopy.close}
+                  >
+                    <X aria-hidden="true" />
+                  </Button>
+                </DialogClose>
+              )
+            }
             bookPicker={
               <Select value={selectedBookId} onValueChange={setBookId} disabled={isSubmitting}>
                 <SelectTrigger

@@ -68,11 +68,28 @@ export interface HeaderSummary {
   period: string;
   /** Whether the filter narrows the list beyond the period. */
   filtered: boolean;
+  /**
+   * Which ways the top bar's arrows can step the period, or null when it does
+   * not step (全部, or two named days).
+   */
+  steps: { back: boolean; forward: boolean } | null;
+  /** Steps the period one back (-1) or forward (1). */
+  onStep: (by: -1 | 1) => void;
 }
 
 function sameSummary(a: HeaderSummary | null, b: HeaderSummary | null): boolean {
   if (a == null || b == null) return a === b;
-  return a.total === b.total && a.period === b.period && a.filtered === b.filtered;
+  const sameSteps =
+    a.steps == null || b.steps == null
+      ? a.steps === b.steps
+      : a.steps.back === b.steps.back && a.steps.forward === b.steps.forward;
+  return (
+    a.total === b.total &&
+    a.period === b.period &&
+    a.filtered === b.filtered &&
+    sameSteps &&
+    a.onStep === b.onStep
+  );
 }
 
 function sameSelection(a: HeaderSelection | null, b: HeaderSelection | null): boolean {
@@ -157,7 +174,9 @@ export function useWorkspaceStore<T>(selector: (state: WorkspaceState) => T): T 
  * Puts a list's summary in the top bar for as long as the list is browsed, and
  * takes it down when the list leaves or turns to selecting; returns whether a
  * phone has its controls dropped down, and how to fold them. Outside the
- * ledger's routes there is no top bar, so there the controls stay put.
+ * ledger's routes there is no top bar, so there the controls stay put. The step
+ * command is read through a ref, so a page's inline closure does not churn the
+ * store.
  */
 export function useHeaderSummary(summary: HeaderSummary | null): {
   open: boolean;
@@ -167,10 +186,28 @@ export function useHeaderSummary(summary: HeaderSummary | null): {
   const total = summary?.total ?? null;
   const period = summary?.period;
   const filtered = summary?.filtered ?? false;
+  const back = summary?.steps?.back;
+  const forward = summary?.steps?.forward;
+  const step = useRef(summary?.onStep);
+  const latestStep = summary?.onStep;
+  useLayoutEffect(() => {
+    step.current = latestStep;
+  }, [latestStep]);
+  const [onStep] = useState(() => (by: -1 | 1) => step.current?.(by));
   useEffect(() => {
     if (store == null) return;
-    store.getState().setHeaderSummary(period == null ? null : { total, period, filtered });
-  }, [store, total, period, filtered]);
+    store.getState().setHeaderSummary(
+      period == null
+        ? null
+        : {
+            total,
+            period,
+            filtered,
+            steps: back == null || forward == null ? null : { back, forward },
+            onStep,
+          }
+    );
+  }, [store, total, period, filtered, back, forward, onStep]);
   useEffect(() => {
     if (store == null) return;
     return () => store.getState().setHeaderSummary(null);

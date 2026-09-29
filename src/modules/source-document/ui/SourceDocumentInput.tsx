@@ -12,7 +12,7 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
   const input = useSourceDocumentInput(props);
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-3">
+    <div className="flex flex-col gap-3">
       {input.restoredFromDraft ? (
         <DraftNotice disabled={input.isPending} onDiscard={input.discardDraft} />
       ) : null}
@@ -48,6 +48,7 @@ function SourceDocumentInputSession(props: SourceDocumentInputProps) {
         onImageOpen={input.openImage}
         onImageClose={input.closeImage}
         footerStart={props.footerStart}
+        dateEnd={props.dateEnd}
       />
     </div>
   );

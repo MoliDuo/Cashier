@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   calendarRangeOf,
+  monthPeriod,
   parsePeriod,
   periodKey,
   resolveComparison,
   resolvePeriod,
   stepPeriod,
+  yearPeriod,
 } from "@/modules/ledger/domain/period";
 
 describe("calendar periods", () => {
@@ -49,6 +51,17 @@ describe("calendar periods", () => {
     expect(stepPeriod({ range: "month", offset: 0 }, 1)).toEqual({ range: "month", offset: 0 });
     expect(stepPeriod({ range: "month", offset: 0 }, -1)).toEqual({ range: "month", offset: -1 });
     expect(stepPeriod({ range: "all" }, -1)).toEqual({ range: "all" });
+  });
+
+  it("names a month or year by its offset from today, within the reach of a step", () => {
+    expect(monthPeriod("2026-09-29", 2026, 9)).toEqual({ range: "month", offset: 0 });
+    expect(monthPeriod("2026-09-29", 2025, 12)).toEqual({ range: "month", offset: -9 });
+    expect(monthPeriod("2026-09-29", 2016, 10)).toEqual({ range: "month", offset: -119 });
+    expect(monthPeriod("2026-09-29", 2016, 9)).toBeNull();
+    expect(monthPeriod("2026-09-29", 2026, 10)).toBeNull();
+    expect(yearPeriod("2026-09-29", 2017)).toEqual({ range: "year", offset: -9 });
+    expect(yearPeriod("2026-09-29", 2016)).toBeNull();
+    expect(yearPeriod("2026-09-29", 2027)).toBeNull();
   });
 });
 

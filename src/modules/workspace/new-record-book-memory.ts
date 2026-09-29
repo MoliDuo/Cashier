@@ -4,7 +4,7 @@ import { isValidUuid } from "@/lib/validation";
 const LAST_NEW_RECORD_BOOK_KEY = "cashier:new-record-book";
 
 /**
- * The book the reader last picked in the 记一笔 picker, on this device and this
+ * The book the reader last picked in the 记账 picker, on this device and this
  * browser only — a picker default, not a preference the server needs, so
  * localStorage rather than a cookie. Storage can be unavailable (private mode,
  * disabled, quota); every failure reads as "no memory", and the picker falls

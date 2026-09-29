@@ -42,7 +42,9 @@ describe("PeriodBar", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "区间：2026年6月" }));
     await userEvent.click(screen.getByRole("button", { name: "年" }));
-    expect(onChange).toHaveBeenCalledWith({ range: "year", offset: 0 });
+    expect(onChange).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "2025年" }));
+    expect(onChange).toHaveBeenCalledWith({ range: "year", offset: -1 });
   });
 
   it("applies a hand-picked range starting from the days shown", async () => {

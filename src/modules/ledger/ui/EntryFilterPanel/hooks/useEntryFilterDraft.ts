@@ -33,6 +33,16 @@ interface UseEntryFilterDraftOptions {
 }
 
 /** Owns the filter dialog's draft state, independent from the applied `filters` prop. */
+/** Every filter off, as 清除全部 drafts it and 清除筛选 applies it. */
+export const CLEARED_ENTRY_FILTERS: EntryFilters = {
+  categoryId: null,
+  currency: null,
+  minAmount: null,
+  maxAmount: null,
+  statuses: [],
+  search: null,
+};
+
 export function useEntryFilterDraft({
   filters,
   onFiltersChange,
@@ -67,14 +77,7 @@ export function useEntryFilterDraft({
   };
 
   const handleReset = () => {
-    setTempFilters({
-      categoryId: null,
-      currency: null,
-      minAmount: null,
-      maxAmount: null,
-      statuses: [],
-      search: null,
-    });
+    setTempFilters(CLEARED_ENTRY_FILTERS);
   };
 
   const toggleStatus = (status: SourceDocumentProcessingStatus) => {

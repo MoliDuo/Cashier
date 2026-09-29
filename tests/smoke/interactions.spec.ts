@@ -159,16 +159,13 @@ test("the period choices keep one line each at 360px", async ({ page, isMobile }
   test.skip(!isMobile, "phone width only");
   await page.setViewportSize({ width: 360, height: 780 });
   await signIn(page);
+  // A phone picks the period from the controls the top bar drops down.
   await showListControls(page);
-  await page
-    .getByRole("button", { name: /^区间：/ })
-    .first()
-    .click();
-  const dialog = page.getByRole("dialog", { name: "选择区间" });
-  // One line of 14px text sits inside the 36px control; a label that breaks
+  const controls = page.locator("#ledger-list-controls");
+  // One line of 14px text sits inside the 44px control; a label that breaks
   // onto a second line makes its button taller than that.
   for (const label of ["周", "月", "年", "全部", "自定义"]) {
-    const box = await dialog.getByRole("button", { name: label, exact: true }).boundingBox();
-    expect(box!.height).toBeLessThanOrEqual(36.5);
+    const box = await controls.getByRole("button", { name: label, exact: true }).boundingBox();
+    expect(box!.height).toBeLessThanOrEqual(44.5);
   }
 });
