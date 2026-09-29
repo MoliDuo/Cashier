@@ -52,7 +52,11 @@ async function LedgerShellData({
   const { ledgerDto } = view.context;
   let state: DehydratedState | undefined;
   try {
-    state = await getLedgerShellBootstrap({ ledgerDto, categories: view.categories });
+    state = await getLedgerShellBootstrap({
+      ledgerDto,
+      categories: view.categories,
+      categoryAssignmentJob: view.categoryAssignmentJob,
+    });
   } catch (error) {
     logger.error(
       { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id) },

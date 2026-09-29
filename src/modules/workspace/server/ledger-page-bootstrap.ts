@@ -15,6 +15,8 @@ import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { listCategoriesWithCount } from "@/modules/ledger/server/categories";
 import { listBooks } from "@/modules/ledger/server/books";
+import { toCategoryAssignmentJobDto } from "@/modules/ledger/server/category-assignment-job-dto";
+import { getLatestCategoryAssignmentJob } from "@/server/category-assignment/jobs";
 import { getLedgerSettingsView } from "@/modules/ledger/server/get-ledger-settings";
 import {
   findEarliestEffectiveDate,
@@ -44,7 +46,12 @@ import {
 } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { SOURCE_DOC_STALE_TIME_MS } from "@/config/tuning";
 
-import type { BookDto, EntryCategoryWithCount, LedgerDto } from "@/modules/ledger/contracts";
+import type {
+  BookDto,
+  CategoryAssignmentJobDto,
+  EntryCategoryWithCount,
+  LedgerDto,
+} from "@/modules/ledger/contracts";
 import { BOOK_SCOPE_COOKIE, parseBookScopeCookie } from "@/lib/book-scope-cookie";
 import {
   resolveAuthenticatedHome,
@@ -91,6 +98,12 @@ export interface LedgerView extends LedgerViewScope {
    * The shell's bootstrap awaits it and handles its failure.
    */
   categories: Promise<EntryCategoryWithCount[]>;
+  /**
+   * The ledger's latest assignment run, or null when it has had none; started
+   * with the categories and awaited by the shell's bootstrap, which drops it on
+   * failure.
+   */
+  categoryAssignmentJob: Promise<CategoryAssignmentJobDto | null>;
 }
 
 /**
@@ -104,6 +117,10 @@ export const loadLedgerView = cache(async (): Promise<LedgerView> => {
   const rememberedBookId = parseBookScopeCookie(cookieStore.get(BOOK_SCOPE_COOKIE)?.value ?? null);
   const categories = listCategoriesWithCount(context.ledgerId);
   categories.catch(() => {});
+  const categoryAssignmentJob = getLatestCategoryAssignmentJob({ ledgerId: context.ledgerId }).then(
+    (job) => (job == null ? null : toCategoryAssignmentJobDto(job))
+  );
+  categoryAssignmentJob.catch(() => {});
   let books: readonly BookDto[] | null;
   try {
     books = await listBooks(context.ledgerId);
@@ -120,6 +137,7 @@ export const loadLedgerView = cache(async (): Promise<LedgerView> => {
     rememberedBookId,
     ledgerToday: ledgerToday(context.ledgerDto.settings.timeZone),
     categories,
+    categoryAssignmentJob,
     ...resolveLedgerViewScope({ books, rememberedBookId }),
   };
 });
@@ -137,14 +155,29 @@ export function getLedgerBooksBootstrap(books: readonly BookDto[] | null): Dehyd
   return dehydrate(queryClient);
 }
 
-/** The ledger and its categories: what the workspace inside the layout renders from. */
+/**
+ * The ledger, its categories and its latest assignment run: what the workspace
+ * inside the layout renders from. The run is read above the page for the same
+ * reason as the books: read later, a run that is moving would change the
+ * workspace's context under a page still streaming in. Without it the client
+ * reads the run itself, as it does anyway to drive recovery.
+ */
 export async function getLedgerShellBootstrap(input: {
   ledgerDto: LedgerDto;
   categories: Promise<EntryCategoryWithCount[]>;
+  categoryAssignmentJob: Promise<CategoryAssignmentJobDto | null>;
 }): Promise<DehydratedState> {
   const queryClient = new QueryClient();
   queryClient.setQueryData(queryKeys.ledger(), input.ledgerDto);
   queryClient.setQueryData(queryKeys.entryCategories(), await input.categories);
+  try {
+    queryClient.setQueryData(queryKeys.categoryAssignment(), await input.categoryAssignmentJob);
+  } catch (error) {
+    logger.error(
+      { error, ledgerSubject: logIdentifier("ledger", input.ledgerDto.id) },
+      "Category assignment run failed to load; falling back to the client read"
+    );
+  }
   return dehydrate(queryClient);
 }
 

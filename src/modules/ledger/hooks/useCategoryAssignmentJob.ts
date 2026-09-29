@@ -94,6 +94,10 @@ export function useCategoryAssignmentJob(): CategoryAssignmentJobState {
       const job = query.state.data;
       return isCategoryAssignmentJobActive(job ?? null) ? ACTIVE_POLL_INTERVAL_MS : false;
     },
+    // The layout hydrates the run, but this read is also what restarts a run
+    // whose worker died, so a page still asks once on arrival; an unchanged
+    // answer keeps the same data, and with it the context above the page.
+    refetchOnMount: "always",
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     retry: false,

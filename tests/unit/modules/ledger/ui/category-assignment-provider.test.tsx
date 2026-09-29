@@ -80,9 +80,10 @@ function SubmitProbe({ run }: { run: CategoryAssignmentJob }) {
   );
 }
 
-function setup() {
+/** `staleTime` is the app's own five minutes when a case depends on it. */
+function setup({ staleTime = 0 }: { staleTime?: number } = {}) {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime } },
   });
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={queryClient}>
@@ -211,6 +212,38 @@ describe("CategoryAssignmentProvider", () => {
 
     expect(queryClient.getQueryData(["ledger", "category-assignment"])).not.toBeNull();
     expect(seen.at(-1)).toBe(first);
+  });
+
+  it("reads a run the layout hydrated once more on arrival, keeping its readers' value", async () => {
+    // The same run again, as a fresh object from the network.
+    getJob.mockImplementation(async () => job());
+    const seen: unknown[] = [];
+    function ValueProbe() {
+      seen.push(useCategoryAssignment());
+      return null;
+    }
+    // Under the app's five-minute staleTime the hydrated run is fresh, so only
+    // the hook's own setting makes the page ask again.
+    const { queryClient, wrapper } = setup({ staleTime: 5 * 60 * 1000 });
+    queryClient.setQueryData(["ledger", "category-assignment"], job());
+    render(<ValueProbe />, { wrapper });
+    const first = seen[0];
+
+    await waitFor(() => expect(getJob).toHaveBeenCalled());
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+    expect(first).toMatchObject({ isActive: true });
+    expect(seen.at(-1)).toBe(first);
+  });
+
+  it("still asks on arrival when the layout hydrated that there is no run", async () => {
+    // This read is what restarts a run whose worker died, so a fresh "none"
+    // from the server must not stand in for it.
+    const { queryClient, wrapper } = setup({ staleTime: 5 * 60 * 1000 });
+    queryClient.setQueryData(["ledger", "category-assignment"], null);
+    render(<SubmitProbe run={job()} />, { wrapper });
+
+    await waitFor(() => expect(getJob).toHaveBeenCalledOnce());
   });
 
   it("refuses to be read outside the provider", () => {

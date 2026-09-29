@@ -6,7 +6,14 @@ import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
 } from "tests/helpers/schema-setup";
-import { books, entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import {
+  books,
+  categoryAssignmentJobs,
+  entryCategories,
+  ledgerEntries,
+  ledgers,
+  sourceDocuments,
+} from "@/persistence";
 import {
   getLedgerRouteBootstrap,
   getLedgerBooksBootstrap,
@@ -63,7 +70,11 @@ async function loadPage(input: PageInput) {
   const view = await loadLedgerView();
   const { ledgerDto } = await resolveAuthenticatedHome();
   const [shell, route] = await Promise.all([
-    getLedgerShellBootstrap({ ledgerDto, categories: view.categories }),
+    getLedgerShellBootstrap({
+      ledgerDto,
+      categories: view.categories,
+      categoryAssignmentJob: view.categoryAssignmentJob,
+    }),
     getLedgerRouteBootstrap({
       page: input.page,
       ledgerDto,
@@ -168,6 +179,40 @@ describe("ledger page bootstrap", () => {
       expect.objectContaining({ name: "吃喝" }),
     ]);
     expect(view.books).toHaveLength(2);
+    // A ledger that never had a run says so, rather than leaving the read to the client.
+    const run = query(shell, "ledger", "category-assignment");
+    expect(run).toBeDefined();
+    expect(run?.state.data).toBeNull();
+  });
+
+  it("dehydrates the ledger's latest assignment run for the shell", async () => {
+    const [job] = await getTestDb()
+      .insert(categoryAssignmentJobs)
+      .values({ ledgerId, mode: "clear", status: "running" })
+      .returning();
+
+    const { shell } = await loadPage({ page: "records" });
+
+    expect(query(shell, "ledger", "category-assignment")?.state.data).toMatchObject({
+      id: job!.id,
+      status: "running",
+    });
+  });
+
+  it("leaves the run to the client when it cannot be read, and keeps the rest", async () => {
+    const view = await loadLedgerView();
+    const { ledgerDto } = await resolveAuthenticatedHome();
+    const failed = Promise.reject(new Error("runs are down"));
+    failed.catch(() => {});
+
+    const shell = await getLedgerShellBootstrap({
+      ledgerDto,
+      categories: view.categories,
+      categoryAssignmentJob: failed,
+    });
+
+    expect(query(shell, "ledger", "category-assignment")).toBeUndefined();
+    expect(query(shell, "ledger", "categories")?.state.data).toHaveLength(1);
   });
 
   it("prefetches the ledger's month of the stream, its total and the refresh baseline", async () => {
