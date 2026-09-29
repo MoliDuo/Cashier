@@ -35,8 +35,8 @@ import { recordProcessingFailure } from "@/modules/source-document/server/extrac
 const objectStore = vi.hoisted(() => ({ current: undefined as ObjectStore | undefined }));
 vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
 
-async function finalizedFile(ledgerId: string, body: Buffer) {
-  const [id] = await storeProcessedImages(ledgerId, [{ bytes: body, contentType: "image/jpeg" }]);
+async function finalizedFile(body: Buffer) {
+  const [id] = await storeProcessedImages([{ bytes: body, contentType: "image/jpeg" }]);
   return { id: id! };
 }
 
@@ -62,10 +62,9 @@ const entry = {
 describe("target source-document submissions", () => {
   it("creates one document, attempt, and job for concurrent user submissions", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const bookId = await testBookId(db, ledgerId);
+    await createTestUserWithLedger(db);
+    const bookId = await testBookId(db);
     const submission = {
-      ledgerId,
       bookId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
     };
@@ -98,12 +97,11 @@ describe("target source-document submissions", () => {
 
   it("refuses a key reused with other content and scopes keys to their sender", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const bookId = await testBookId(db, ledgerId);
+    await createTestUserWithLedger(db);
+    const bookId = await testBookId(db);
     const credentialId = crypto.randomUUID();
     await db.insert(serviceCredentials).values({
       id: credentialId,
-      ledgerId,
       name: "idempotency-test",
       tokenHash: "f".repeat(64),
       tokenPrefix: "cashier_test",
@@ -111,7 +109,6 @@ describe("target source-document submissions", () => {
       bookId,
     });
     const submission = {
-      ledgerId,
       bookId,
       input: { text: "receipt", storedFileIds: [], documentDate: null },
     };
@@ -150,24 +147,21 @@ describe("target source-document submissions", () => {
 
   it("atomically creates text, image, and mixed pending attempts with durable intents", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
-    const image = await finalizedFile(ledgerId, Buffer.from("image"));
+    const image = await finalizedFile(Buffer.from("image"));
 
     const text = await submitSourceDocument({
-      ledgerId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const imageOnly = await submitSourceDocument({
-      ledgerId,
       input: { text: null, storedFileIds: [image.id], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const mixed = await submitSourceDocument({
-      ledgerId,
       input: { text: "Mixed", storedFileIds: [image.id], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
     expect(new Set([text.document.id, imageOnly.document.id, mixed.document.id]).size).toBe(3);
@@ -182,12 +176,11 @@ describe("target source-document submissions", () => {
 
   it("rolls back the document, attempt, and job when evidence is not finalized", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const [unfinalized] = await db
       .insert(storedFiles)
       .values({
-        ledgerId,
-        storageKey: `${ledgerId}/unfinalized`,
+        storageKey: "temporary/unfinalized",
         contentType: "image/jpeg",
         byteSize: 1,
       })
@@ -195,9 +188,8 @@ describe("target source-document submissions", () => {
 
     await expect(
       submitSourceDocument({
-        ledgerId,
         input: { text: null, storedFileIds: [unfinalized!.id], documentDate: null },
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(await db.select().from(sourceDocuments)).toHaveLength(0);
@@ -211,17 +203,15 @@ describe("target source-document submissions", () => {
     "keeps a first %s failure without ledger entries, open to retry or editing by hand",
     async (failureKind, failureCode) => {
       const db = getTestDb();
-      const { ledgerId } = await createTestUserWithLedger(db);
+      await createTestUserWithLedger(db);
       const pending = await submitSourceDocument({
-        ledgerId,
         input: { text: "first parse evidence", storedFileIds: [], documentDate: null },
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
       });
 
       await expect(
         recordProcessingFailure({
           lease: await claimAttemptForTest(pending.attempt.id),
-          ledgerId,
           sourceDocumentId: pending.document.id,
           attemptId: pending.attempt.id,
           failureKind,
@@ -237,51 +227,49 @@ describe("target source-document submissions", () => {
         inputText: "first parse evidence",
         latestAttemptId: pending.attempt.id,
       });
-      expect(
-        (await getTargetSourceDocument(ledgerId, pending.document.id))?.supportedActions
-      ).toEqual(["split_entries", "retry", "edit_retry", "delete"]);
+      expect((await getTargetSourceDocument(pending.document.id))?.supportedActions).toEqual([
+        "split_entries",
+        "retry",
+        "edit_retry",
+        "delete",
+      ]);
       expect(await db.select().from(ledgerEntries)).toHaveLength(0);
     }
   );
 
   it("preserves active results across failed/anomalous retries and rejects stale activation", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const active = await createTestRecord(getTestDb(), {
-      ledgerId,
       entries: [entry],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const activeEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentId, active.sourceDocumentId),
     });
 
     const failed = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
       inheritInput: false,
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const failedLease = await claimAttemptForTest(failed.attempt.id);
     await recordProcessingFailure({
       lease: failedLease,
-      ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       attemptId: failed.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
     const anomalous = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       input: { text: "anomalous edit retry", storedFileIds: [], documentDate: null },
       inheritInput: false,
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(anomalous.attempt.id),
-      ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       attemptId: anomalous.attempt.id,
       failureKind: "invalid_input",
@@ -291,7 +279,6 @@ describe("target source-document submissions", () => {
     expect(
       await activateAttempt({
         lease: failedLease,
-        ledgerId,
         sourceDocumentId: active.sourceDocumentId,
         attemptId: failed.attempt.id,
         entries: [{ ...entry, amount: "99.00" }],
@@ -300,7 +287,6 @@ describe("target source-document submissions", () => {
     expect(
       await recordProcessingFailure({
         lease: failedLease,
-        ledgerId,
         sourceDocumentId: active.sourceDocumentId,
         attemptId: failed.attempt.id,
         failureKind: "processing_error",
@@ -321,27 +307,24 @@ describe("target source-document submissions", () => {
 
   it("inherits immutable evidence on retry and queues only the retry attempt", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
-    const image = await finalizedFile(ledgerId, Buffer.from("image"));
+    const image = await finalizedFile(Buffer.from("image"));
     const initial = await submitSourceDocument({
-      ledgerId,
       input: { text: "original", storedFileIds: [image.id], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(initial.attempt.id),
-      ledgerId,
       sourceDocumentId: initial.document.id,
       attemptId: initial.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
     const retry = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: initial.document.id,
       inheritInput: true,
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
     const retryAttempt = await db.query.extractionAttempts.findFirst({
@@ -365,28 +348,26 @@ describe("target source-document submissions", () => {
 
   it("rejects inherited evidence retry when the document input exceeds MAX_FILES", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
 
     // Create MAX_FILES + 1 finalized stored files
     const body = Buffer.from("tiny");
     const files = await Promise.all(
-      Array.from({ length: MAX_FILES + 1 }, () => finalizedFile(ledgerId, body))
+      Array.from({ length: MAX_FILES + 1 }, () => finalizedFile(body))
     );
 
     // Create an attempt with MAX_FILES files via the normal path (this succeeds)
     const initial = await submitSourceDocument({
-      ledgerId,
       input: {
         text: "initial",
         storedFileIds: files.slice(0, MAX_FILES).map((f) => f.id),
         documentDate: null,
       },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(initial.attempt.id),
-      ledgerId,
       sourceDocumentId: initial.document.id,
       attemptId: initial.attempt.id,
       failureKind: "processing_error",
@@ -397,7 +378,6 @@ describe("target source-document submissions", () => {
     // overflow that predates the aggregate file-count check.
     const overflowFileId = files[MAX_FILES]!.id;
     await db.insert(sourceDocumentFiles).values({
-      ledgerId,
       sourceDocumentId: initial.document.id,
       storedFileId: overflowFileId,
       position: MAX_FILES,
@@ -407,62 +387,29 @@ describe("target source-document submissions", () => {
     // enforces the MAX_FILES limit.
     await expect(
       submitSourceDocument({
-        ledgerId,
         sourceDocumentId: initial.document.id,
         inheritInput: true,
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
       })
     ).rejects.toThrow(ValidationError);
   });
 
-  it("returns ordered stored-file identities and rejects cross-workspace retry evidence", async () => {
+  it("returns ordered stored-file identities without storage details", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    );
+    await createTestUserWithLedger(db);
     objectStore.current = new MemoryObjectStore();
-    const first = await finalizedFile(ledgerId, Buffer.from("first"));
-    const second = await finalizedFile(ledgerId, Buffer.from("second"));
-    const other = await finalizedFile(otherLedgerId, Buffer.from("other"));
+    const first = await finalizedFile(Buffer.from("first"));
+    const second = await finalizedFile(Buffer.from("second"));
     const submitted = await submitSourceDocument({
-      ledgerId,
       input: { text: null, storedFileIds: [second.id, first.id], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
-    const detail = await getTargetSourceDocument(ledgerId, submitted.document.id);
+    const detail = await getTargetSourceDocument(submitted.document.id);
     expect(detail?.files.map((file) => file.id)).toEqual([second.id, first.id]);
     expect(detail).not.toHaveProperty("imageUrls");
     expect(JSON.stringify(detail)).not.toContain("/api/uploads/");
     expect(JSON.stringify(detail)).not.toContain("storageKey");
-    await recordProcessingFailure({
-      lease: await claimAttemptForTest(submitted.attempt.id),
-      ledgerId,
-      sourceDocumentId: submitted.document.id,
-      attemptId: submitted.attempt.id,
-      failureKind: "processing_error",
-      failureMessage: "processing failed",
-    });
-    await expect(
-      submitSourceDocument({
-        ledgerId,
-        sourceDocumentId: submitted.document.id,
-        input: { text: null, storedFileIds: [other.id], documentDate: null },
-        bookId: await testBookId(db, ledgerId),
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(
-      submitSourceDocument({
-        ledgerId: otherLedgerId,
-        sourceDocumentId: submitted.document.id,
-        inheritInput: true,
-        bookId: await testBookId(db, ledgerId),
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
 
@@ -480,9 +427,9 @@ function racePool(): Pool {
  * rather than `pg_current_xact_id()` because only the former is the same 32-bit
  * value a waiter's lock entry names.
  */
-async function lockLedgerRow(client: PoolClient, ledgerId: string): Promise<string> {
+async function lockLedgerRow(client: PoolClient): Promise<string> {
   await client.query("BEGIN");
-  await client.query("SELECT id FROM ledgers WHERE id = $1 FOR UPDATE", [ledgerId]);
+  await client.query("SELECT id FROM ledgers FOR UPDATE");
   const held = await client.query<{ xid: string }>(
     `SELECT transactionid::text AS xid
        FROM pg_locks
@@ -526,15 +473,14 @@ async function expectNoRecordRows(db: ReturnType<typeof getTestDb>): Promise<voi
 describe("new-record submission against a concurrent archive or ledger delete", () => {
   it("refuses a new record for a book archived before the insert", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
-    expect(await archiveBook(ledgerId, travel)).toMatchObject({
+    await createTestUserWithLedger(db);
+    const travel = (await createTestBooks(db, ["旅行支出"])).get("旅行支出")!;
+    expect(await archiveBook(travel)).toMatchObject({
       status: "archived",
     });
 
     await expect(
       submitSourceDocument({
-        ledgerId,
         bookId: travel,
         input: { text: "late", storedFileIds: [], documentDate: null },
       })
@@ -544,13 +490,12 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("refuses a new record for a ledger deleted before the insert", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const bookId = await testBookId(db, ledgerId);
-    await db.delete(ledgers).where(eq(ledgers.id, ledgerId));
+    await createTestUserWithLedger(db);
+    const bookId = await testBookId(db);
+    await db.delete(ledgers);
 
     await expect(
       submitSourceDocument({
-        ledgerId,
         bookId,
         input: { text: "late", storedFileIds: [], documentDate: null },
       })
@@ -558,41 +503,19 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     await expectNoRecordRows(db);
   });
 
-  it("refuses a book that belongs to another ledger", async () => {
-    const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const other = await createTestUserWithLedger(
-      db,
-      "other@example.com",
-      undefined,
-      crypto.randomUUID()
-    );
-    const foreignBookId = await testBookId(db, ledgerId);
-
-    await expect(
-      submitSourceDocument({
-        ledgerId: other.ledgerId,
-        bookId: foreignBookId,
-        input: { text: "cross-ledger", storedFileIds: [], documentDate: null },
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND", message: "Book not found" });
-    expect(await db.select().from(sourceDocuments)).toHaveLength(0);
-  });
-
   it("refuses the insert an archive that already holds the ledger lock", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
+    await createTestUserWithLedger(db);
+    const travel = (await createTestBooks(db, ["旅行支出"])).get("旅行支出")!;
     const pool = racePool();
     const blocker = await pool.connect();
     try {
-      const holderXid = await lockLedgerRow(blocker, ledgerId);
+      const holderXid = await lockLedgerRow(blocker);
       await blocker.query(
-        "UPDATE books SET archived_at = now(), updated_at = now() WHERE ledger_id = $1 AND id = $2",
-        [ledgerId, travel]
+        "UPDATE books SET archived_at = now(), updated_at = now() WHERE id = $1",
+        [travel]
       );
       const insert = submitSourceDocument({
-        ledgerId,
         bookId: travel,
         input: { text: "late", storedFileIds: [], documentDate: null },
       }).then(
@@ -611,15 +534,14 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("refuses the insert a ledger delete that already holds the lock", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const bookId = await testBookId(db, ledgerId);
+    await createTestUserWithLedger(db);
+    const bookId = await testBookId(db);
     const pool = racePool();
     const blocker = await pool.connect();
     try {
-      const holderXid = await lockLedgerRow(blocker, ledgerId);
-      await blocker.query("DELETE FROM ledgers WHERE id = $1", [ledgerId]);
+      const holderXid = await lockLedgerRow(blocker);
+      await blocker.query("DELETE FROM ledgers");
       const insert = submitSourceDocument({
-        ledgerId,
         bookId,
         input: { text: "late", storedFileIds: [], documentDate: null },
       }).then(
@@ -638,26 +560,25 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("makes an archive wait for the insert and still retries the existing record", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const travel = (await createTestBooks(db, ledgerId, ["旅行支出"])).get("旅行支出")!;
+    await createTestUserWithLedger(db);
+    const travel = (await createTestBooks(db, ["旅行支出"])).get("旅行支出")!;
     const pool = racePool();
     const holder = await pool.connect();
     const documentId = crypto.randomUUID();
     try {
       // The lock sequence a new submission takes, held open on purpose so the
       // archive is the transaction that has to wait.
-      const holderXid = await lockLedgerRow(holder, ledgerId);
+      const holderXid = await lockLedgerRow(holder);
+      await holder.query("SELECT id FROM books WHERE id = $1 AND archived_at IS NULL FOR SHARE", [
+        travel,
+      ]);
       await holder.query(
-        "SELECT id FROM books WHERE ledger_id = $1 AND id = $2 AND archived_at IS NULL FOR SHARE",
-        [ledgerId, travel]
-      );
-      await holder.query(
-        "INSERT INTO source_documents (id, ledger_id, book_id, created_at, updated_at)" +
-          " VALUES ($1, $2, $3, now(), now())",
-        [documentId, ledgerId, travel]
+        "INSERT INTO source_documents (id, book_id, created_at, updated_at)" +
+          " VALUES ($1, $2, now(), now())",
+        [documentId, travel]
       );
 
-      const archive = archiveBook(ledgerId, travel).then(
+      const archive = archiveBook(travel).then(
         (result) => result,
         (error: unknown) => error
       );
@@ -670,7 +591,6 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     }
 
     const retry = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: documentId,
       input: { text: "retry", storedFileIds: [], documentDate: null },
     });
@@ -682,8 +602,8 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 
   it("replays a completed idempotent submission without a second document", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const bookId = await testBookId(db, ledgerId);
+    await createTestUserWithLedger(db);
+    const bookId = await testBookId(db);
     const idempotency = {
       principalType: "user" as const,
       principalId: crypto.randomUUID(),
@@ -691,7 +611,6 @@ describe("new-record submission against a concurrent archive or ledger delete", 
       contentFingerprint: null,
     };
     const submission = {
-      ledgerId,
       bookId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
     };
@@ -708,10 +627,9 @@ describe("new-record submission against a concurrent archive or ledger delete", 
 });
 
 describe("the day a new record is filed under", () => {
-  async function failProcessing(ledgerId: string, sourceDocumentId: string, attemptId: string) {
+  async function failProcessing(sourceDocumentId: string, attemptId: string) {
     await recordProcessingFailure({
       lease: await claimAttemptForTest(attemptId),
-      ledgerId,
       sourceDocumentId,
       attemptId,
       failureKind: "invalid_input",
@@ -728,19 +646,18 @@ describe("the day a new record is filed under", () => {
 
   it("is the ledger's today while it processes and after its processing fails", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    await db.update(ledgers).set({ timeZone: "Asia/Shanghai" }).where(eq(ledgers.id, ledgerId));
+    await createTestUserWithLedger(db);
+    await db.update(ledgers).set({ timeZone: "Asia/Shanghai" });
     // 07:00 in Shanghai is still the previous day in UTC.
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-03-01T23:00:00.000Z") });
     try {
       const created = await submitSourceDocument({
-        ledgerId,
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
         input: { text: "Breakfast 12", storedFileIds: [], documentDate: null },
       });
 
       expect(await filedDay(created.document.id)).toBe("2026-03-02");
-      await failProcessing(ledgerId, created.document.id, created.attempt.id);
+      await failProcessing(created.document.id, created.attempt.id);
       expect(await filedDay(created.document.id)).toBe("2026-03-02");
     } finally {
       vi.useRealTimers();
@@ -749,21 +666,19 @@ describe("the day a new record is filed under", () => {
 
   it("stays the ledger's today after its processing succeeds", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    await db.update(ledgers).set({ timeZone: "Asia/Shanghai" }).where(eq(ledgers.id, ledgerId));
+    await createTestUserWithLedger(db);
+    await db.update(ledgers).set({ timeZone: "Asia/Shanghai" });
     // 07:00 in Shanghai is still the previous day in UTC.
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-03-01T23:00:00.000Z") });
     try {
       const created = await submitSourceDocument({
-        ledgerId,
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
         input: { text: "Breakfast 12", storedFileIds: [], documentDate: null },
       });
 
       expect(
         await activateAttempt({
           lease: await claimAttemptForTest(created.attempt.id),
-          ledgerId,
           sourceDocumentId: created.document.id,
           attemptId: created.attempt.id,
           entries: [entry],
@@ -777,15 +692,14 @@ describe("the day a new record is filed under", () => {
 
   it("is the day the submission asked for, even when processing fails", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const created = await submitSourceDocument({
-      ledgerId,
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
       input: { text: "Breakfast 12", storedFileIds: [], documentDate: "2026-03-02" },
     });
 
     expect(await filedDay(created.document.id)).toBe("2026-03-02");
-    await failProcessing(ledgerId, created.document.id, created.attempt.id);
+    await failProcessing(created.document.id, created.attempt.id);
     expect(await filedDay(created.document.id)).toBe("2026-03-02");
   });
 });

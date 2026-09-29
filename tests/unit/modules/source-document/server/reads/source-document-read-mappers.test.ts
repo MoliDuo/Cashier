@@ -8,7 +8,6 @@ import {
 
 const row: SourceDocumentRow = {
   id: "doc",
-  ledgerId: "ledger",
   title: null,
   bookId: "book",
   documentDate: null,
@@ -31,7 +30,6 @@ const hydration: SourceDocumentHydrationRow = {
   ledgerEntries: [
     {
       id: "entry",
-      ledgerId: "ledger",
       categoryId: null,
       sourceDocumentId: "doc",
       amount: "100",

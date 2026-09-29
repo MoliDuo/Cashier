@@ -1,7 +1,7 @@
 /**
  * The one place non-production data is written: the smoke account, the demo
  * workspace and the integration-test fixtures all insert their users, login
- * addresses, ledgers, books, categories, API keys, records and files through
+ * addresses, the ledger, books, categories, API keys, records and files through
  * these functions, so a schema change has one seed to follow.
  *
  * Every function takes a drizzle database or transaction and writes only what
@@ -42,24 +42,24 @@ export async function seedUser(
   return id;
 }
 
-/** A ledger with the given settings; anything left out keeps the column default. */
+/**
+ * The ledger with the given settings; anything left out keeps the column
+ * default. There is only one, so a second call leaves the first in place.
+ */
 export async function seedLedger(
   db: SeedDatabase,
   input: {
-    id?: string;
     mainCurrency?: string;
     preferredCurrencies?: string[];
     aiLanguage?: string;
     timeZone?: string;
     at?: Date;
   } = {}
-): Promise<string> {
+): Promise<void> {
   const at = timestamp(input.at);
-  const id = input.id ?? crypto.randomUUID();
   await db
     .insert(schema.ledgers)
     .values({
-      id,
       ...(input.mainCurrency == null ? {} : { mainCurrency: input.mainCurrency }),
       ...(input.preferredCurrencies == null
         ? {}
@@ -70,7 +70,6 @@ export async function seedLedger(
       updatedAt: at,
     })
     .onConflictDoNothing();
-  return id;
 }
 
 export interface SeedBook {
@@ -80,10 +79,9 @@ export interface SeedBook {
   sortOrder?: number;
 }
 
-/** A ledger's books, in switcher order. Returns each book's id by name. */
+/** Books, in switcher order. Returns each book's id by name. */
 export async function seedBooks(
   db: SeedDatabase,
-  ledgerId: string,
   books: readonly (string | SeedBook)[],
   at?: Date
 ): Promise<Map<string, string>> {
@@ -92,7 +90,6 @@ export async function seedBooks(
     const spec: SeedBook = typeof book === "string" ? { name: book } : book;
     return {
       id: spec.id ?? crypto.randomUUID(),
-      ledgerId,
       name: spec.name,
       sortOrder: spec.sortOrder ?? index + 1,
       createdAt,
@@ -112,17 +109,15 @@ export interface SeedCategory {
   sortOrder?: number;
 }
 
-/** A ledger's entry categories. Returns each category's id by name. */
+/** Entry categories. Returns each category's id by name. */
 export async function seedCategories(
   db: SeedDatabase,
-  ledgerId: string,
   categories: readonly SeedCategory[],
   at?: Date
 ): Promise<Map<string, string>> {
   const createdAt = timestamp(at);
   const rows = categories.map((category, index) => ({
     id: category.id ?? crypto.randomUUID(),
-    ledgerId,
     name: category.name,
     description: category.description ?? null,
     icon: category.icon ?? null,
@@ -139,7 +134,6 @@ export async function seedServiceCredential(
   db: SeedDatabase,
   input: {
     id?: string;
-    ledgerId: string;
     bookId: string;
     name: string;
     tokenHash: string;
@@ -153,7 +147,6 @@ export async function seedServiceCredential(
     .insert(schema.serviceCredentials)
     .values({
       id,
-      ledgerId: input.ledgerId,
       bookId: input.bookId,
       name: input.name,
       tokenHash: input.tokenHash,
@@ -179,16 +172,14 @@ export interface SeedStoredFile {
  */
 export async function seedStoredFile(
   db: SeedDatabase,
-  ledgerId: string,
   file: SeedStoredFile,
   at?: Date
 ): Promise<{ id: string; storageKey: string }> {
   const createdAt = timestamp(at);
   const id = file.id ?? crypto.randomUUID();
-  const storageKey = durableKey(ledgerId, id);
+  const storageKey = durableKey(id);
   await db.insert(schema.storedFiles).values({
     id,
-    ledgerId,
     storageKey,
     contentType: file.contentType ?? "image/jpeg",
     byteSize: file.byteSize,
@@ -203,17 +194,16 @@ export async function seedStoredFile(
 /** Files attached to a document's input, in upload order. */
 export async function seedDocumentFiles(
   db: SeedDatabase,
-  document: { ledgerId: string; id: string },
+  sourceDocumentId: string,
   files: readonly SeedStoredFile[],
   at?: Date
 ): Promise<string[]> {
   const createdAt = timestamp(at);
   const ids: string[] = [];
   for (const [position, file] of files.entries()) {
-    const stored = await seedStoredFile(db, document.ledgerId, file, createdAt);
+    const stored = await seedStoredFile(db, file, createdAt);
     await db.insert(schema.sourceDocumentFiles).values({
-      ledgerId: document.ledgerId,
-      sourceDocumentId: document.id,
+      sourceDocumentId,
       storedFileId: stored.id,
       position,
       createdAt,
@@ -248,7 +238,6 @@ export interface SeedEntry {
 
 export interface SeedSourceDocument {
   id?: string;
-  ledgerId: string;
   /** A book id, or a subquery for one. */
   bookId: string | SQL;
   title?: string | null;
@@ -273,10 +262,8 @@ export async function seedSourceDocument(
 ): Promise<string> {
   const at = timestamp(input.at);
   const id = input.id ?? crypto.randomUUID();
-  const { ledgerId } = input;
   await db.insert(schema.sourceDocuments).values({
     id,
-    ledgerId,
     bookId: input.bookId,
     title: input.title ?? null,
     inputText: input.inputText ?? null,
@@ -298,7 +285,6 @@ export async function seedSourceDocument(
           : at;
     await db.insert(schema.extractionAttempts).values({
       id: latestAttemptId,
-      ledgerId,
       sourceDocumentId: id,
       requestedDate: attempt.requestedDate ?? null,
       referenceDate: attempt.requestedDate ?? null,
@@ -311,14 +297,13 @@ export async function seedSourceDocument(
     });
   }
 
-  await seedDocumentFiles(db, { ledgerId, id }, input.files ?? [], at);
+  await seedDocumentFiles(db, id, input.files ?? [], at);
 
   const entries = input.entries ?? [];
   if (entries.length > 0) {
     await db.insert(schema.ledgerEntries).values(
       entries.map((entry, position) => ({
         id: entry.id ?? crypto.randomUUID(),
-        ledgerId,
         categoryId: entry.categoryId ?? null,
         sourceDocumentId: id,
         position,

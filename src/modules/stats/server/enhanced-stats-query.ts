@@ -24,20 +24,15 @@ interface AggregatedRow {
 }
 
 /** The first day any record in the scope is dated, so 全部 knows where to start. */
-export async function findEarliestEffectiveDate(
-  ledgerId: string,
-  bookId?: string
-): Promise<string | null> {
+export async function findEarliestEffectiveDate(bookId?: string): Promise<string | null> {
   const result = await db.execute<{ earliest: string | null }>(sql`
     SELECT min(effective_date)::text AS earliest FROM source_documents
-    WHERE ledger_id = ${ledgerId}
-    ${bookId == null ? sql`` : sql`AND book_id = ${bookId}`}
+    ${bookId == null ? sql`` : sql`WHERE book_id = ${bookId}`}
   `);
   return result.rows[0]?.earliest ?? null;
 }
 
 async function fetchAggregatedRows(
-  ledgerId: string,
   current: { from: string; to: string },
   previous: { from: string; to: string },
   bookId?: string
@@ -57,25 +52,22 @@ async function fetchAggregatedRows(
       count(*) FILTER (WHERE converted.amount IS NULL)::int AS "unconvertedCount"
     FROM ranges
     JOIN source_documents documents
-      ON documents.ledger_id = ${ledgerId}
-      AND documents.effective_date BETWEEN ranges.from_date AND ranges.to_date
+      ON documents.effective_date BETWEEN ranges.from_date AND ranges.to_date
       ${bookId == null ? sql`` : sql`AND documents.book_id = ${bookId}`}
     JOIN ledger_entries entries
-      ON entries.ledger_id = documents.ledger_id
-      AND entries.source_document_id = documents.id
-    JOIN ledgers ON ledgers.id = documents.ledger_id
+      ON entries.source_document_id = documents.id
+    CROSS JOIN ledgers
     CROSS JOIN LATERAL (
       SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
         documents.effective_date) AS amount
     ) converted
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
-      AND categories.ledger_id = entries.ledger_id
     GROUP BY ranges.period, documents.effective_date, entries.currency, entries.category_id,
       categories.name, categories.icon, ledgers.main_currency
     UNION ALL
     SELECT 'current', NULL, NULL, NULL, NULL, NULL, NULL, 0, main_currency, 0
-    FROM ledgers WHERE id = ${ledgerId}
+    FROM ledgers
   `);
   return result.rows.map((row) => ({
     ...row,
@@ -148,7 +140,6 @@ interface LargestEntryRow {
  * the totals; a refund is not spending and is left out too.
  */
 async function fetchLargestEntries(
-  ledgerId: string,
   range: { from: string; to: string },
   bookId?: string
 ): Promise<StatsLargestEntryDto[]> {
@@ -159,18 +150,15 @@ async function fetchLargestEntries(
       entries.amount::text AS "originalAmount", entries.currency AS "originalCurrency"
     FROM source_documents documents
     JOIN ledger_entries entries
-      ON entries.ledger_id = documents.ledger_id
-      AND entries.source_document_id = documents.id
-    JOIN ledgers ON ledgers.id = documents.ledger_id
+      ON entries.source_document_id = documents.id
+    CROSS JOIN ledgers
     CROSS JOIN LATERAL (
       SELECT convert_amount(entries.amount, entries.currency, ledgers.main_currency,
         documents.effective_date) AS amount
     ) converted
     LEFT JOIN entry_categories categories
       ON categories.id = entries.category_id
-      AND categories.ledger_id = entries.ledger_id
-    WHERE documents.ledger_id = ${ledgerId}
-      AND documents.effective_date BETWEEN ${range.from}::date AND ${range.to}::date
+    WHERE documents.effective_date BETWEEN ${range.from}::date AND ${range.to}::date
       ${bookId == null ? sql`` : sql`AND documents.book_id = ${bookId}`}
       AND converted.amount > 0
     ORDER BY converted.amount DESC, documents.effective_date DESC, entries.id
@@ -191,21 +179,18 @@ async function fetchLargestEntries(
   }));
 }
 
-export async function queryEnhancedStats(
-  ledgerId: string,
-  {
-    queryRange,
-    compareRange,
-    comparisonMode,
-    bookId,
-    periodEnd,
-    previousWholeTo,
-  }: GetEnhancedStatsInput
-): Promise<EnhancedStatsDto> {
+export async function queryEnhancedStats({
+  queryRange,
+  compareRange,
+  comparisonMode,
+  bookId,
+  periodEnd,
+  previousWholeTo,
+}: GetEnhancedStatsInput): Promise<EnhancedStatsDto> {
   const wholeTo = previousWholeTo ?? compareRange.to;
   const [rows, largestEntries] = await Promise.all([
-    fetchAggregatedRows(ledgerId, queryRange, { from: compareRange.from, to: wholeTo }, bookId),
-    fetchLargestEntries(ledgerId, queryRange, bookId),
+    fetchAggregatedRows(queryRange, { from: compareRange.from, to: wholeTo }, bookId),
+    fetchLargestEntries(queryRange, bookId),
   ]);
   const mainCurrency = rows[0]?.mainCurrency ?? "CNY";
   const current = emptyBucket();

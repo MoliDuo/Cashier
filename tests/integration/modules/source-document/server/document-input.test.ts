@@ -6,7 +6,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import {
-  ledgerSyncState,
   sourceDocumentFiles,
   extractionAttempts,
   sourceDocuments,
@@ -31,19 +30,14 @@ const entry = {
 } as const;
 
 async function newLedger() {
-  const { ledgerId } = await createTestUserWithLedger(
-    getTestDb(),
-    `document-input-${crypto.randomUUID()}`
-  );
-  return ledgerId;
+  await createTestUserWithLedger(getTestDb(), `document-input-${crypto.randomUUID()}`);
 }
 
-async function storeFile(ledgerId: string) {
+async function storeFile() {
   const [file] = await getTestDb()
     .insert(storedFiles)
     .values({
-      ledgerId,
-      storageKey: `${ledgerId}/stored/${crypto.randomUUID()}`,
+      storageKey: `stored/${crypto.randomUUID()}`,
       contentType: "image/jpeg",
       byteSize: 7,
       finalizedAt: new Date(),
@@ -66,9 +60,8 @@ async function documentInput(sourceDocumentId: string) {
   return { text: document?.inputText ?? null, fileIds: files.map((file) => file.id) };
 }
 
-async function syncVersion(ledgerId: string) {
+async function syncVersion() {
   const row = await getTestDb().query.ledgerSyncState.findFirst({
-    where: eq(ledgerSyncState.ledgerId, ledgerId),
     columns: { version: true },
   });
   return row?.version;
@@ -76,16 +69,11 @@ async function syncVersion(ledgerId: string) {
 
 describe("source document input", () => {
   it("follows each submission: a first upload, an inherited retry, and an edited retry", async () => {
-    const ledgerId = await newLedger();
-    const [first, second, replacement] = await Promise.all([
-      storeFile(ledgerId),
-      storeFile(ledgerId),
-      storeFile(ledgerId),
-    ]);
+    await newLedger();
+    const [first, second, replacement] = await Promise.all([storeFile(), storeFile(), storeFile()]);
 
     const submitted = await submitSourceDocument({
-      ledgerId,
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
       input: { text: "Receipt", storedFileIds: [second, first], documentDate: null },
     });
     const sourceDocumentId = submitted.document.id;
@@ -95,7 +83,6 @@ describe("source document input", () => {
     });
 
     await submitSourceDocument({
-      ledgerId,
       sourceDocumentId,
       inheritInput: true,
       supersedeProcessing: true,
@@ -106,7 +93,6 @@ describe("source document input", () => {
     });
 
     await submitSourceDocument({
-      ledgerId,
       sourceDocumentId,
       inheritInput: false,
       input: { text: "Edited", storedFileIds: [replacement], documentDate: null },
@@ -119,10 +105,9 @@ describe("source document input", () => {
   });
 
   it("gives a record typed in by hand and the bill split from it the same input", async () => {
-    const ledgerId = await newLedger();
+    await newLedger();
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
       inputText: "Typed by hand",
       entries: [entry, { ...entry, itemName: "Second" }],
     });
@@ -136,7 +121,6 @@ describe("source document input", () => {
       orderBy: (row, { asc: ascending }) => [ascending(row.position)],
     });
     const split = await splitSourceDocumentAtomically({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       ledgerEntryIds: [entries[1]!.id],
       entryDate: "2026-08-05",
@@ -148,16 +132,14 @@ describe("source document input", () => {
   });
 
   it("keeps a file only the document lists out of the unused-file sweep", async () => {
-    const ledgerId = await newLedger();
+    await newLedger();
     // The second file is on no document, so the sweep takes it.
-    const [listed] = await Promise.all([storeFile(ledgerId), storeFile(ledgerId)]);
+    const [listed] = await Promise.all([storeFile(), storeFile()]);
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
       entries: [entry],
     });
     await getTestDb().insert(sourceDocumentFiles).values({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       storedFileId: listed,
       position: 0,
@@ -168,7 +150,6 @@ describe("source document input", () => {
     const files = await getTestDb()
       .update(storedFiles)
       .set({ createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) })
-      .where(eq(storedFiles.ledgerId, ledgerId))
       .returning({ id: storedFiles.id, key: storedFiles.storageKey });
     for (const file of files) await storage.upload(file.key, Buffer.from("fixture"));
 
@@ -177,25 +158,19 @@ describe("source document input", () => {
     const keyById = new Map(files.map((file) => [file.id, file.key]));
     expect([...storage.files.keys()]).toEqual([keyById.get(listed)]);
     expect(
-      (
-        await getTestDb()
-          .select({ id: storedFiles.id })
-          .from(storedFiles)
-          .where(eq(storedFiles.ledgerId, ledgerId))
-      ).map((file) => file.id)
+      (await getTestDb().select({ id: storedFiles.id }).from(storedFiles)).map((file) => file.id)
     ).toEqual([listed]);
   });
 
   it("leaves the ledger sync version alone when only a processing lease moves", async () => {
-    const ledgerId = await newLedger();
+    await newLedger();
     const submitted = await submitSourceDocument({
-      ledgerId,
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
       input: { text: "Receipt", storedFileIds: [], documentDate: null },
     });
     const attemptId = submitted.attempt.id;
     const db = getTestDb();
-    const before = await syncVersion(ledgerId);
+    const before = await syncVersion();
 
     await db
       .update(extractionAttempts)
@@ -206,25 +181,23 @@ describe("source document input", () => {
         nextAttemptAt: new Date(Date.now() + 60_000),
       })
       .where(eq(extractionAttempts.id, attemptId));
-    expect(await syncVersion(ledgerId)).toBe(before);
+    expect(await syncVersion()).toBe(before);
 
     await db
       .update(extractionAttempts)
       .set({ status: "cancelled", finishedAt: new Date() })
       .where(eq(extractionAttempts.id, attemptId));
-    expect(await syncVersion(ledgerId)).toBe(before! + BigInt(1));
+    expect(await syncVersion()).toBe(before! + BigInt(1));
   });
 
   it("allows only one processing attempt per document", async () => {
-    const ledgerId = await newLedger();
+    await newLedger();
     const submitted = await submitSourceDocument({
-      ledgerId,
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
       input: { text: "Receipt", storedFileIds: [], documentDate: null },
     });
     await expect(
       getTestDb().insert(extractionAttempts).values({
-        ledgerId,
         sourceDocumentId: submitted.document.id,
         status: "processing",
       })

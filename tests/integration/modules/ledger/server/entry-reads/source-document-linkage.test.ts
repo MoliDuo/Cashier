@@ -16,7 +16,6 @@ import {
 import { listLedgerEntryViewsBySourceDocumentIds } from "@/modules/ledger/server/entry-reads/list-ledger-entry-views-by-source-document-ids";
 
 describe("ledger source-document linkage", () => {
-  let ledgerId = "";
   let sourceDocumentIds: string[] = [];
 
   beforeEach(async () => {
@@ -25,66 +24,51 @@ describe("ledger source-document linkage", () => {
     await createTestUser(db, undefined, secondUserId);
 
     const ledger = createLedgerData();
-    ledgerId = ledger.id;
-    const otherLedger = createLedgerData();
-    const category = createCategoryData(ledgerId);
-    const firstDoc = createSourceDocumentData(ledgerId);
-    const secondDoc = createSourceDocumentData(ledgerId);
-    const otherDoc = createSourceDocumentData(otherLedger.id);
+    const category = createCategoryData();
+    const firstDoc = createSourceDocumentData();
+    const secondDoc = createSourceDocumentData();
 
     sourceDocumentIds = [firstDoc.id, secondDoc.id];
 
-    await db.insert(ledgers).values([ledger, otherLedger]);
-    await ensureTestLedgerBooks(db, ledger.id);
-    await ensureTestLedgerBooks(db, otherLedger.id);
+    await db.insert(ledgers).values(ledger);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values(category);
     await db.insert(sourceDocuments).values([
       {
         ...firstDoc,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${firstDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       },
       {
         ...secondDoc,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${secondDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
-      },
-      {
-        ...otherDoc,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${otherDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       },
     ]);
     await db.insert(ledgerEntries).values([
-      createLedgerEntryData(ledgerId, {
+      createLedgerEntryData({
         sourceDocumentId: firstDoc.id,
         categoryId: category.id,
         itemName: "first entry",
       }),
-      createLedgerEntryData(ledgerId, {
+      createLedgerEntryData({
         sourceDocumentId: secondDoc.id,
         categoryId: category.id,
         itemName: "second entry",
       }),
-      createLedgerEntryData(otherLedger.id, {
-        sourceDocumentId: otherDoc.id,
-        itemName: "other ledger entry",
-      }),
     ]);
     await activateTestSourceDocumentProjection(db, firstDoc.id);
     await activateTestSourceDocumentProjection(db, secondDoc.id);
-    await activateTestSourceDocumentProjection(db, otherDoc.id);
   });
 
   it("returns an empty map when source document ids are empty", async () => {
     const result = await listLedgerEntryViewsBySourceDocumentIds({
-      ledgerId,
       sourceDocumentIds: [],
     });
 
     expect(result.size).toBe(0);
   });
 
-  it("groups active entries by source document id and excludes deleted or foreign-ledger entries", async () => {
+  it("groups active entries by source document id", async () => {
     const result = await listLedgerEntryViewsBySourceDocumentIds({
-      ledgerId,
       sourceDocumentIds,
     });
 

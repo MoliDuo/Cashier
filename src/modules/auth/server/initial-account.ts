@@ -12,7 +12,6 @@ export interface InitialAccountInput {
 
 export interface InitialAccountResult {
   userId: string;
-  ledgerId: string;
 }
 
 /** True once the instance has an account, which is what a sign-in needs. */
@@ -50,20 +49,23 @@ export async function createInitialAccount(
     const existing = await tx.select({ id: users.id }).from(users).limit(1);
     if (existing.length > 0) throw new ConflictError("An account already exists");
     // The app reads exactly one ledger; a second would lock the account out.
-    const existingLedger = await tx.select({ id: ledgers.id }).from(ledgers).limit(1);
-    if (existingLedger.length > 0) throw new ConflictError("A ledger already exists");
+    const existingLedger = await tx.execute(sql`SELECT 1 FROM ${ledgers} LIMIT 1`);
+    if (existingLedger.rows.length > 0) throw new ConflictError("A ledger already exists");
 
     const [user] = await tx.insert(users).values({}).returning();
     if (user == null) throw new AppError("Failed to create the account", "ACCOUNT_FAILED", 500);
 
     await tx.insert(loginEmails).values({ userId: user.id, email, verifiedAt: now });
 
-    const [ledger] = await tx.insert(ledgers).values({}).returning();
+    // The books and categories take the ledger from the row inserted here.
+    const [ledger] = await tx
+      .insert(ledgers)
+      .values({})
+      .returning({ createdAt: ledgers.createdAt });
     if (ledger == null) throw new AppError("Failed to create the ledger", "ACCOUNT_FAILED", 500);
 
     await tx.insert(books).values(
       bookNames.map((name, index) => ({
-        ledgerId: ledger.id,
         name,
         sortOrder: index + 1,
       }))
@@ -72,7 +74,6 @@ export async function createInitialAccount(
     // 0-based, matching what `saveEntryCategories` writes.
     await tx.insert(entryCategories).values(
       DEFAULT_CATEGORIES.map((category, index) => ({
-        ledgerId: ledger.id,
         name: category.name,
         description: category.description,
         icon: category.icon,
@@ -80,6 +81,6 @@ export async function createInitialAccount(
       }))
     );
 
-    return { userId: user.id, ledgerId: ledger.id };
+    return { userId: user.id };
   });
 }

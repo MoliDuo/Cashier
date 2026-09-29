@@ -9,19 +9,15 @@ import { listLedgerEntryPage } from "./entry-reads/list-ledger-entry-page";
  * the query — the session route and the server-side prefetch both reach it — so
  * it validates its own input.
  */
-export async function listLedgerEntries(
-  ledgerId: string,
-  params: unknown
-): Promise<LedgerEntryPageDto> {
+export async function listLedgerEntries(params: unknown): Promise<LedgerEntryPageDto> {
   const validated = parseListLedgerEntriesInput(params);
   return listLedgerEntryPage({
-    ledgerId,
     limit: validated.limit,
     cursor: validated.cursor ?? null,
     filters: toLedgerEntryFilters(validated),
   });
 }
 
-export const getLedgerEntriesAction = withLedgerAccess((ledgerId: string, params: unknown) =>
-  listLedgerEntries(ledgerId, params)
+export const getLedgerEntriesAction = withLedgerAccess((params: unknown) =>
+  listLedgerEntries(params)
 );

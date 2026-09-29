@@ -15,7 +15,6 @@ import type { PreparedInlineImage } from "@/modules/source-document/api-v1-polic
 import { prepareInlineImages } from "./prepare-inline-images";
 
 export interface CreateAndQueueSourceDocumentInput {
-  ledgerId: string;
   /** The book the new record is filed under. */
   bookId: string;
   input:
@@ -53,7 +52,7 @@ export async function createAndQueueSourceDocument(
 
   // A repeated request finds its document before any image is processed.
   if (input.idempotency != null) {
-    const existing = await findIdempotentSubmission(input.ledgerId, input.idempotency);
+    const existing = await findIdempotentSubmission(input.idempotency);
     if (existing != null) return existing;
   }
 
@@ -61,10 +60,9 @@ export async function createAndQueueSourceDocument(
   try {
     const resolvedDate = resolveDocumentDate(input.documentDate, input.timeZone);
     if (inlineImages.length > 0) {
-      storedImageIds = (await prepareInlineImages(inlineImages, input.ledgerId)).storedFileIds;
+      storedImageIds = (await prepareInlineImages(inlineImages)).storedFileIds;
     }
     const submission = {
-      ledgerId: input.ledgerId,
       bookId: input.bookId,
       input: {
         text: storedInput?.text ?? null,
@@ -80,7 +78,7 @@ export async function createAndQueueSourceDocument(
       const result = await submitSourceDocumentIdempotently(submission, input.idempotency);
       if (result.replayed) {
         // A concurrent repeat created the document first; these images are unused.
-        await discardUnusedFiles(input.ledgerId, storedImageIds);
+        await discardUnusedFiles(storedImageIds);
         return result.existing;
       }
       pending = result.submission;
@@ -93,7 +91,7 @@ export async function createAndQueueSourceDocument(
     };
   } catch (error) {
     // Images stored for a submission that did not happen are nobody's.
-    await discardUnusedFiles(input.ledgerId, storedImageIds);
+    await discardUnusedFiles(storedImageIds);
     throw error;
   }
 }

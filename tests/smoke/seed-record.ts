@@ -26,34 +26,33 @@ export async function seedRecord(
   await client.connect();
   try {
     await client.query("BEGIN");
-    const ledger = await client.query<{ id: string; today: string }>(
-      `SELECT id, (now() AT TIME ZONE time_zone)::date::text AS today FROM ledgers LIMIT 1`
+    const ledger = await client.query<{ today: string }>(
+      `SELECT (now() AT TIME ZONE time_zone)::date::text AS today FROM ledgers`
     );
-    const ledgerId = ledger.rows[0]?.id;
-    if (ledgerId == null) throw new Error("The smoke ledger is not seeded");
+    const today = ledger.rows[0]?.today;
+    if (today == null) throw new Error("The smoke ledger is not seeded");
     const books = await client.query<{ id: string }>(
       `SELECT id FROM books
-       WHERE ledger_id = $1 AND archived_at IS NULL AND ($2::text IS NULL OR name = $2)
+       WHERE archived_at IS NULL AND ($1::text IS NULL OR name = $1)
        ORDER BY sort_order LIMIT 1`,
-      [ledgerId, book ?? null]
+      [book ?? null]
     );
     const bookId = books.rows[0]?.id;
     if (bookId == null) throw new Error(`The book ${book ?? ""} does not exist`);
     const categories = await client.query<{ id: string }>(
-      `SELECT id FROM entry_categories WHERE ledger_id = $1 ORDER BY sort_order LIMIT 1`,
-      [ledgerId]
+      `SELECT id FROM entry_categories ORDER BY sort_order LIMIT 1`
     );
     const documentId = randomUUID();
     await client.query(
-      `INSERT INTO source_documents (id, ledger_id, book_id, title, document_date)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [documentId, ledgerId, bookId, item, ledger.rows[0]!.today]
+      `INSERT INTO source_documents (id, book_id, title, document_date)
+       VALUES ($1, $2, $3, $4)`,
+      [documentId, bookId, item, today]
     );
     await client.query(
       `INSERT INTO ledger_entries
-         (id, ledger_id, category_id, source_document_id, position, amount, currency, item_name)
-       VALUES ($1, $2, $3, $4, 0, $5, 'CNY', $6)`,
-      [randomUUID(), ledgerId, categories.rows[0]?.id ?? null, documentId, amount, item]
+         (id, category_id, source_document_id, position, amount, currency, item_name)
+       VALUES ($1, $2, $3, 0, $4, 'CNY', $5)`,
+      [randomUUID(), categories.rows[0]?.id ?? null, documentId, amount, item]
     );
     await client.query("COMMIT");
   } catch (error) {

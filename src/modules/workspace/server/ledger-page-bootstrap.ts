@@ -8,7 +8,6 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
-import { logIdentifier } from "@/lib/security/log-identifier";
 import { queryKeys } from "@/lib/query-keys";
 import { LEDGER, QUERY } from "@/lib/constants";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
@@ -115,20 +114,17 @@ export const loadLedgerView = cache(async (): Promise<LedgerView> => {
   const context = await resolveAuthenticatedHome();
   const cookieStore = await cookies();
   const rememberedBookId = parseBookScopeCookie(cookieStore.get(BOOK_SCOPE_COOKIE)?.value ?? null);
-  const categories = listCategoriesWithCount(context.ledgerId);
+  const categories = listCategoriesWithCount();
   categories.catch(() => {});
-  const categoryAssignmentJob = getLatestCategoryAssignmentJob({ ledgerId: context.ledgerId }).then(
-    (job) => (job == null ? null : toCategoryAssignmentJobDto(job))
+  const categoryAssignmentJob = getLatestCategoryAssignmentJob().then((job) =>
+    job == null ? null : toCategoryAssignmentJobDto(job)
   );
   categoryAssignmentJob.catch(() => {});
   let books: readonly BookDto[] | null;
   try {
-    books = await listBooks(context.ledgerId);
+    books = await listBooks();
   } catch (error) {
-    logger.error(
-      { error, ledgerSubject: logIdentifier("ledger", context.ledgerId) },
-      "Ledger books failed to load; falling back to client queries"
-    );
+    logger.error({ error }, "Ledger books failed to load; falling back to client queries");
     books = null;
   }
   return {
@@ -174,7 +170,7 @@ export async function getLedgerShellBootstrap(input: {
     queryClient.setQueryData(queryKeys.categoryAssignment(), await input.categoryAssignmentJob);
   } catch (error) {
     logger.error(
-      { error, ledgerSubject: logIdentifier("ledger", input.ledgerDto.id) },
+      { error },
       "Category assignment run failed to load; falling back to the client read"
     );
   }
@@ -198,7 +194,6 @@ export interface GetLedgerRouteBootstrapInput {
 export async function getLedgerRouteBootstrap(
   input: GetLedgerRouteBootstrapInput
 ): Promise<DehydratedState> {
-  const ledgerId = input.ledgerDto.id;
   const { mainCurrency, timeZone } = input.ledgerDto.settings;
   const { bookId } = input.scope;
   const period = input.period ?? DEFAULT_PERIOD;
@@ -207,7 +202,7 @@ export async function getLedgerRouteBootstrap(
   if (input.page === "settings") {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.ledgerSettings(),
-      queryFn: () => getLedgerSettingsView(ledgerId),
+      queryFn: () => getLedgerSettingsView(),
       staleTime: LEDGER.STALE_TIME_MS,
     });
     return dehydrate(queryClient);
@@ -232,9 +227,9 @@ export async function getLedgerRouteBootstrap(
             withResolvedPeriod(descriptor.getPageInput(pageParam as string | undefined), timeZone)
           );
           const pageInput = { ...omitUndefinedProperties(parsed), limit: parsed.limit };
-          let page = await listStreamPage(ledgerId, pageInput);
+          let page = await listStreamPage(pageInput);
           if (pageParam == null && page.restartRequired) {
-            page = await listStreamPage(ledgerId, pageInput);
+            page = await listStreamPage(pageInput);
             if (page.restartRequired) {
               throw new Error("Stream restart did not produce a valid first page");
             }
@@ -249,7 +244,6 @@ export async function getLedgerRouteBootstrap(
         queryKey: descriptor.totalQueryKey,
         queryFn: () =>
           getStreamTotal(
-            ledgerId,
             omitUndefinedProperties(
               streamTotalInputSchema.parse(withResolvedPeriod(descriptor.totalInput, timeZone))
             )
@@ -280,15 +274,13 @@ export async function getLedgerRouteBootstrap(
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: descriptor.summaryQueryKey,
-        queryFn: () =>
-          calculateLedgerStats(ledgerId, withResolvedPeriod(descriptor.summaryInput, timeZone)),
+        queryFn: () => calculateLedgerStats(withResolvedPeriod(descriptor.summaryInput, timeZone)),
         staleTime: QUERY.DEFAULT_STALE_TIME_MS,
       }),
       queryClient.prefetchInfiniteQuery({
         queryKey: descriptor.entriesQueryKey,
         queryFn: ({ pageParam }) =>
           listLedgerEntries(
-            ledgerId,
             withResolvedPeriod(
               descriptor.getEntriesInput(pageParam as string | undefined),
               timeZone
@@ -312,10 +304,9 @@ export async function getLedgerRouteBootstrap(
     queryKey: descriptor.queryKey,
     queryFn: async () =>
       queryEnhancedStats(
-        ledgerId,
         parseEnhancedStatsInput(
           await withResolvedStatsPeriod(descriptor.input, timeZone, (scopeBookId) =>
-            findEarliestEffectiveDate(ledgerId, scopeBookId)
+            findEarliestEffectiveDate(scopeBookId)
           )
         )
       ),

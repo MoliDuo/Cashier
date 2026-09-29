@@ -1,5 +1,4 @@
 import "server-only";
-import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { ledgers, sourceDocuments } from "@/persistence";
@@ -43,9 +42,8 @@ function settingsColumns(settings: Partial<LedgerSettings>) {
   };
 }
 
-export async function getLedgerSettings(ledgerId: string): Promise<LedgerSettings | null> {
+export async function getLedgerSettings(): Promise<LedgerSettings | null> {
   const ledger = await db.query.ledgers.findFirst({
-    where: eq(ledgers.id, ledgerId),
     columns: {
       aiLanguage: true,
       preferredCurrencies: true,
@@ -58,19 +56,17 @@ export async function getLedgerSettings(ledgerId: string): Promise<LedgerSetting
   return ledger == null ? null : mapLedgerSettings(ledger);
 }
 
-async function updateSettingsRow(input: {
-  ledgerId: string;
-  settings: Partial<LedgerSettings>;
-}): Promise<{ ledger: LedgerDto; mainCurrencyChanged: boolean } | null> {
+async function updateSettingsRow(
+  changes: Partial<LedgerSettings>
+): Promise<{ ledger: LedgerDto; mainCurrencyChanged: boolean } | null> {
   return db.transaction(async (tx) => {
     const ledger = await tx
       .select()
       .from(ledgers)
-      .where(eq(ledgers.id, input.ledgerId))
       .for("update")
       .then((rows) => rows[0]);
     if (ledger == null) return null;
-    const settings = { ...mapLedgerSettings(ledger), ...input.settings };
+    const settings = { ...mapLedgerSettings(ledger), ...changes };
     const previousMainCurrency = ledger.mainCurrency;
     const nextMainCurrency = settings.mainCurrency.trim().toUpperCase();
     const nextCurrencies = settings.currencies.map((currency) => currency.trim().toUpperCase());
@@ -83,7 +79,7 @@ async function updateSettingsRow(input: {
       }
     }
     if (
-      (input.settings.mainCurrency !== undefined || input.settings.currencies !== undefined) &&
+      (changes.mainCurrency !== undefined || changes.currencies !== undefined) &&
       !nextCurrencies.includes(nextMainCurrency)
     ) {
       throw new ValidationError("Main currency must be included in preferred currencies");
@@ -99,13 +95,11 @@ async function updateSettingsRow(input: {
         }),
         updatedAt,
       })
-      .where(eq(ledgers.id, input.ledgerId))
       .returning()
       .then((rows) => rows[0]);
     if (updated == null) throw new ConflictError("Failed to update ledger settings");
     return {
       ledger: {
-        id: updated.id,
         settings: mapLedgerSettings(updated),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
@@ -121,23 +115,16 @@ async function updateSettingsRow(input: {
  * rates for all its document days are fetched. Best effort: a day still
  * missing reads as unconverted until maintenance fills it.
  */
-async function ensureExchangeRatesForLedger(ledgerId: string): Promise<void> {
+async function ensureExchangeRatesForLedger(): Promise<void> {
   const rows = await db
     .selectDistinct({ effectiveDate: sourceDocuments.effectiveDate })
-    .from(sourceDocuments)
-    .where(eq(sourceDocuments.ledgerId, ledgerId));
+    .from(sourceDocuments);
   await ensureExchangeRates(rows.map((row) => row.effectiveDate));
 }
 
-export async function updateLedgerSettings(
-  ledgerId: string,
-  data: UpdateLedgerInput
-): Promise<LedgerDto> {
-  const updated = await updateSettingsRow({
-    ledgerId,
-    settings: omitUndefinedProperties(data.settings ?? {}),
-  });
+export async function updateLedgerSettings(data: UpdateLedgerInput): Promise<LedgerDto> {
+  const updated = await updateSettingsRow(omitUndefinedProperties(data.settings ?? {}));
   if (updated == null) throw new NotFoundError("Ledger");
-  if (updated.mainCurrencyChanged) await ensureExchangeRatesForLedger(ledgerId);
+  if (updated.mainCurrencyChanged) await ensureExchangeRatesForLedger();
   return updated.ledger;
 }

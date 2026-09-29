@@ -16,7 +16,6 @@ function makeItem(
   return {
     id,
     version: 1,
-    ledgerId: "ledger-1",
     title: `Doc ${id}`,
     text: null,
     processingStatus: "completed",
@@ -39,7 +38,6 @@ function makeEntry(
 ): SourceDocumentLedgerEntryDto {
   return {
     id: "entry-1",
-    ledgerId: "ledger-1",
     categoryId: null,
     sourceDocumentId: "document-1",
     amount: "10.00",

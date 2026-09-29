@@ -72,14 +72,12 @@ vi.mock("@/components/ui/select", () => ({
 
 import { NewRecordSheet } from "@/modules/workspace/ui/NewRecordSheet";
 
-const ledgerId = "ledger-1";
 const BOOK_A = "10000000-0000-4000-8000-000000000001";
 const BOOK_B = "10000000-0000-4000-8000-000000000002";
 
 function createBook(overrides: Partial<BookDto>): BookDto {
   return {
     id: BOOK_A,
-    ledgerId,
     name: "Daily",
     sortOrder: 0,
     archivedAt: null,

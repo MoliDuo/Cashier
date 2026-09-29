@@ -42,10 +42,8 @@ vi.mock("sonner", () => ({ toast: { error: toastError, success: toastSuccess } }
 
 import { BookSettings } from "@/modules/ledger/ui/settings/BookSettings";
 
-const LEDGER_ID = "ledger-1";
 const LIVE: BookDto = {
   id: "book-1",
-  ledgerId: LEDGER_ID,
   name: "共同支出",
   sortOrder: 1,
   archivedAt: null,
@@ -53,7 +51,6 @@ const LIVE: BookDto = {
 const RENAME_LIVE = settingsBooksCopy.rename({ name: LIVE.name });
 const ARCHIVED: BookDto = {
   id: "book-2",
-  ledgerId: LEDGER_ID,
   name: "旧旅行账本",
   sortOrder: 2,
   archivedAt: "2026-02-01T00:00:00.000Z",

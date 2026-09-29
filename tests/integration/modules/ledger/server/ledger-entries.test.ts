@@ -10,7 +10,6 @@ import {
 } from "tests/helpers/schema-setup";
 
 describe("getLedgerEntriesAction", () => {
-  let testLedgerId: string;
   let testCategoryId: string;
   let testSourceDocId: string;
 
@@ -19,13 +18,11 @@ describe("getLedgerEntriesAction", () => {
 
     // Clean up existing ledger for TEST_USER_ID to avoid unique constraint
     await db.delete(ledgers);
-    const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
-    testLedgerId = ledgerId;
+    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
 
     const [category] = await db
       .insert(entryCategories)
       .values({
-        ledgerId: testLedgerId,
         name: "餐饮",
         sortOrder: 1,
       })
@@ -37,7 +34,7 @@ describe("getLedgerEntriesAction", () => {
     testCategoryId = category.id;
 
     // Create a test source document for entries
-    testSourceDocId = await createTestSourceDocument(db, testLedgerId);
+    testSourceDocId = await createTestSourceDocument(db);
   });
 
   it("should return empty array when no ledger entries exist", async () => {
@@ -50,7 +47,6 @@ describe("getLedgerEntriesAction", () => {
   it("should return ledger entries with category relation", async () => {
     const db = getTestDb();
     await db.insert(ledgerEntries).values({
-      ledgerId: testLedgerId,
       categoryId: testCategoryId,
       sourceDocumentId: testSourceDocId,
       amount: "25.50",
@@ -73,7 +69,7 @@ describe("getLedgerEntriesAction", () => {
     const db = getTestDb();
     const [otherCategory] = await db
       .insert(entryCategories)
-      .values({ ledgerId: testLedgerId, name: "交通", sortOrder: 2 })
+      .values({ name: "交通", sortOrder: 2 })
       .returning();
     expect(otherCategory).toBeDefined();
     if (otherCategory === undefined) {
@@ -82,7 +78,6 @@ describe("getLedgerEntriesAction", () => {
 
     await db.insert(ledgerEntries).values([
       {
-        ledgerId: testLedgerId,
         categoryId: testCategoryId,
         sourceDocumentId: testSourceDocId,
         amount: "10",
@@ -90,7 +85,6 @@ describe("getLedgerEntriesAction", () => {
         itemName: "餐饮交易",
       },
       {
-        ledgerId: testLedgerId,
         categoryId: otherCategory.id,
         sourceDocumentId: testSourceDocId,
         amount: "20",

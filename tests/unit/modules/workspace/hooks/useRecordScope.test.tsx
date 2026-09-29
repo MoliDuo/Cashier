@@ -10,7 +10,6 @@ const BOOK_GONE = "10000000-0000-4000-8000-000000000002";
 
 const liveBook: BookDto = {
   id: BOOK_LIVE,
-  ledgerId: "ledger-1",
   name: "共同支出",
   sortOrder: 1,
   archivedAt: null,

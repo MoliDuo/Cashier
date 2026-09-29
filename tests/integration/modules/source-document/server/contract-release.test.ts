@@ -21,11 +21,10 @@ const projectionEntry = {
 describe("local contract release", () => {
   it("writes only target attempt, processing, and ledger projections", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const pending = await submitSourceDocument({
-      ledgerId,
       input: { text: "Lunch 12.50", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const created = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, pending.document.id),
@@ -36,7 +35,6 @@ describe("local contract release", () => {
     await expect(
       activateAttempt({
         lease: await claimAttemptForTest(pending.attempt.id),
-        ledgerId,
         sourceDocumentId: pending.document.id,
         attemptId: pending.attempt.id,
         title: "Target title",
@@ -61,17 +59,14 @@ describe("local contract release", () => {
 
   it("derives a manual document without submission processing state", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       inputText: "target attempt text",
       entries: [projectionEntry],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
-    await expect(
-      getTargetSourceDocument(ledgerId, created.sourceDocumentId)
-    ).resolves.toMatchObject({
+    await expect(getTargetSourceDocument(created.sourceDocumentId)).resolves.toMatchObject({
       id: created.sourceDocumentId,
       processingStatus: null,
     });

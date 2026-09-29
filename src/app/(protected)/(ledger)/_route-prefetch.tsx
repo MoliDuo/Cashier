@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import { HydrationBoundary, type DehydratedState } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
-import { logIdentifier } from "@/lib/security/log-identifier";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
 import { readPeriodParams } from "@/modules/workspace/period-url-params";
@@ -55,7 +54,7 @@ export async function RoutePrefetch({
     });
   } catch (error) {
     logger.error(
-      { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id), page: tab },
+      { error, page: tab },
       "Ledger route bootstrap failed; falling back to client queries"
     );
   }

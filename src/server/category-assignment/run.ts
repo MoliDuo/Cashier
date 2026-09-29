@@ -70,18 +70,14 @@ async function processDocument(
   try {
     if (job.mode.kind === "ai") {
       const entryIds = await loadCategoryAssignmentSelection({
-        ledgerId: job.ledgerId,
         jobId: job.jobId,
         sourceDocumentId,
       });
-      const groups = await loadCategoryAssignmentDocumentGroups({
-        ledgerId: job.ledgerId,
-        ledgerEntryIds: entryIds,
-      });
+      const groups = await loadCategoryAssignmentDocumentGroups({ ledgerEntryIds: entryIds });
       // A document that no longer holds these entries is settled by the apply.
       const group = groups.find((candidate) => candidate.sourceDocumentId === sourceDocumentId);
       if (group != null) {
-        const loaded = await loadStoredFilesForAI(job.ledgerId, [...group.storedFileIds]);
+        const loaded = await loadStoredFilesForAI([...group.storedFileIds]);
         const images = loaded
           .filter(isSuccessfulLoadImageResult)
           .map((image) => ({ dataUrl: image.dataUrl }));
@@ -205,7 +201,7 @@ async function runJob(job: ClaimedCategoryAssignmentJob, deadlineAt: number): Pr
   await releaseCategoryAssignmentJob(job);
 }
 
-async function runClaimed(scope: { jobId?: string; ledgerId?: string }): Promise<boolean> {
+async function runClaimed(scope: { jobId?: string }): Promise<boolean> {
   const deadlineAt = Date.now() + CATEGORY_RUN_BUDGET_MS;
   let ran = false;
   while (Date.now() < deadlineAt) {
@@ -221,10 +217,6 @@ export async function runCategoryAssignmentJob(jobId: string): Promise<boolean> 
   return runClaimed({ jobId });
 }
 
-export async function recoverLedgerCategoryAssignments(ledgerId: string): Promise<void> {
-  await runClaimed({ ledgerId });
-}
-
-export async function drainDueCategoryAssignments(): Promise<void> {
+export async function recoverCategoryAssignments(): Promise<void> {
   await runClaimed({});
 }

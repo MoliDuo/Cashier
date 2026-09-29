@@ -20,12 +20,11 @@ import {
 async function seedOwnedEntry() {
   const db = getTestDb();
   await db.delete(ledgers);
-  const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
-  const sourceDocumentId = await createTestSourceDocument(db, ledgerId);
+  await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
+  const sourceDocumentId = await createTestSourceDocument(db);
   const [entry] = await db
     .insert(ledgerEntries)
     .values({
-      ledgerId,
       sourceDocumentId,
       amount: "100.00",
       currency: "CNY",
@@ -34,7 +33,7 @@ async function seedOwnedEntry() {
     .returning();
   if (entry == null) throw new Error("Expected the seeded ledger entry");
   await activateTestSourceDocumentProjection(db, sourceDocumentId);
-  return { ledgerId, sourceDocumentId, entryId: entry.id };
+  return { sourceDocumentId, entryId: entry.id };
 }
 
 describe("ledger entry update transport validation", () => {

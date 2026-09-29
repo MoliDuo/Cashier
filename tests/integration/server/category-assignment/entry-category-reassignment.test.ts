@@ -14,7 +14,6 @@ import { loadCategoryAssignmentDocumentGroups } from "@/server/category-assignme
 
 /** A document entry used to verify evidence grouping, at its own `position`. */
 async function seedProjectedEntry(input: {
-  ledgerId: string;
   categoryId: string | null;
   documentId: string;
   position?: number;
@@ -24,7 +23,6 @@ async function seedProjectedEntry(input: {
   const id = crypto.randomUUID();
   await db.insert(ledgerEntries).values({
     id,
-    ledgerId: input.ledgerId,
     sourceDocumentId: input.documentId,
     position: input.position ?? 0,
     amount: "10.00",
@@ -38,21 +36,20 @@ async function seedProjectedEntry(input: {
 describe("loadDocumentGroups", () => {
   async function setupEmptyLedger() {
     const db = getTestDb();
-    const ledger = createLedgerData();
-    await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
-    return ledger;
+    await db.insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(db);
   }
 
-  async function setupDocument(input: {
-    ledgerId: string;
-    title?: string | null;
-    documentDate?: string | null;
-    inputText?: string;
-    imageUrls?: string[];
-  }): Promise<{ documentId: string }> {
+  async function setupDocument(
+    input: {
+      title?: string | null;
+      documentDate?: string | null;
+      inputText?: string;
+      imageUrls?: string[];
+    } = {}
+  ): Promise<{ documentId: string }> {
     const db = getTestDb();
-    const documentId = await createTestSourceDocument(db, input.ledgerId, {
+    const documentId = await createTestSourceDocument(db, {
       title: input.title ?? null,
       entryDate: input.documentDate ?? null,
       ...(input.inputText == null ? {} : { text: input.inputText }),
@@ -63,23 +60,20 @@ describe("loadDocumentGroups", () => {
 
   it("groups one document's entries together and carries the document's own evidence", async () => {
     const db = getTestDb();
-    const ledger = await setupEmptyLedger();
+    await setupEmptyLedger();
     const { documentId } = await setupDocument({
-      ledgerId: ledger.id,
       title: "全家便利店",
       documentDate: "2026-09-10",
       inputText: "楼下买的",
       imageUrls: ["a", "b", "c"],
     });
     const second = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId,
       position: 1,
       itemName: "面包",
     });
     const first = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId,
       position: 0,
@@ -87,7 +81,6 @@ describe("loadDocumentGroups", () => {
     });
 
     const groups = await loadCategoryAssignmentDocumentGroups({
-      ledgerId: ledger.id,
       // A dead id and an out-of-order pair: the grouping must survive both.
       ledgerEntryIds: [second, crypto.randomUUID(), first],
     });
@@ -112,20 +105,17 @@ describe("loadDocumentGroups", () => {
   });
 
   it("keeps a text-only document in the run without any evidence attached", async () => {
-    const ledger = await setupEmptyLedger();
+    await setupEmptyLedger();
     const { documentId } = await setupDocument({
-      ledgerId: ledger.id,
       inputText: "打车 18 元",
     });
     const entryId = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId,
       itemName: "打车",
     });
 
     const groups = await loadCategoryAssignmentDocumentGroups({
-      ledgerId: ledger.id,
       ledgerEntryIds: [entryId],
     });
 
@@ -141,22 +131,19 @@ describe("loadDocumentGroups", () => {
   });
 
   it("puts entries from different documents in their own groups", async () => {
-    const ledger = await setupEmptyLedger();
-    const receipt = await setupDocument({ ledgerId: ledger.id, imageUrls: ["a"] });
-    const note = await setupDocument({ ledgerId: ledger.id, inputText: "一张手写便签" });
+    await setupEmptyLedger();
+    const receipt = await setupDocument({ imageUrls: ["a"] });
+    const note = await setupDocument({ inputText: "一张手写便签" });
     const receiptEntry = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId: receipt.documentId,
     });
     const noteEntry = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId: note.documentId,
     });
 
     const groups = await loadCategoryAssignmentDocumentGroups({
-      ledgerId: ledger.id,
       ledgerEntryIds: [noteEntry, receiptEntry],
     });
 
@@ -170,31 +157,27 @@ describe("loadDocumentGroups", () => {
 
   it("leaves out deleted entries and the entries of a deleted document", async () => {
     const db = getTestDb();
-    const ledger = await setupEmptyLedger();
-    const { documentId } = await setupDocument({ ledgerId: ledger.id });
+    await setupEmptyLedger();
+    const { documentId } = await setupDocument();
     const liveEntryId = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId,
     });
     // A later parse deletes the entries it replaces.
     const replacedEntryId = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId,
       position: 1,
     });
     await db.delete(ledgerEntries).where(eq(ledgerEntries.id, replacedEntryId));
-    const deleted = await setupDocument({ ledgerId: ledger.id });
+    const deleted = await setupDocument();
     const deletedDocumentEntryId = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: null,
       documentId: deleted.documentId,
     });
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, deleted.documentId));
 
     const groups = await loadCategoryAssignmentDocumentGroups({
-      ledgerId: ledger.id,
       ledgerEntryIds: [liveEntryId, replacedEntryId, deletedDocumentEntryId],
     });
 
@@ -204,18 +187,16 @@ describe("loadDocumentGroups", () => {
 
   it("still reports where each entry sits today", async () => {
     const db = getTestDb();
-    const ledger = await setupEmptyLedger();
-    const category = createCategoryData(ledger.id, { name: "吃喝", sortOrder: 0 });
+    await setupEmptyLedger();
+    const category = createCategoryData({ name: "吃喝", sortOrder: 0 });
     await db.insert(entryCategories).values(category);
-    const { documentId } = await setupDocument({ ledgerId: ledger.id });
+    const { documentId } = await setupDocument();
     const entryId = await seedProjectedEntry({
-      ledgerId: ledger.id,
       categoryId: category.id,
       documentId,
     });
 
     const groups = await loadCategoryAssignmentDocumentGroups({
-      ledgerId: ledger.id,
       ledgerEntryIds: [entryId],
     });
 

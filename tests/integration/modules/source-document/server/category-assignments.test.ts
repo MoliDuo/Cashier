@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
   categoryAssignmentEntries,
@@ -37,19 +37,18 @@ import {
 } from "@/server/category-assignment/assignments";
 import { getCategoryAssignmentJob } from "@/server/category-assignment/jobs";
 
-async function addDocument(ledgerId: string, itemNames: string[]) {
+async function addDocument(itemNames: string[]) {
   const db = getTestDb();
-  const document = createSourceDocumentData(ledgerId);
+  const document = createSourceDocumentData();
   await db.insert(sourceDocuments).values({
     ...document,
-    bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+    bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
   });
   await activateTestSourceDocumentProjection(db, document.id);
   const entryIds = itemNames.map(() => crypto.randomUUID());
   await db.insert(ledgerEntries).values(
     itemNames.map((itemName, position) => ({
       id: entryIds[position]!,
-      ledgerId,
       sourceDocumentId: document.id,
       position,
       amount: "12.00",
@@ -63,21 +62,20 @@ async function addDocument(ledgerId: string, itemNames: string[]) {
 async function seedLedger() {
   const db = getTestDb();
   const ledger = createLedgerData();
-  const category = createCategoryData(ledger.id, { name: "Meals", sortOrder: 0 });
+  const category = createCategoryData({ name: "Meals", sortOrder: 0 });
   await db.insert(ledgers).values(ledger);
-  await ensureTestLedgerBooks(db, ledger.id);
+  await ensureTestLedgerBooks(db);
   await db.insert(entryCategories).values(category);
-  const document = await addDocument(ledger.id, ["Lunch"]);
-  return { ledger, category, ...document };
+  const document = await addDocument(["Lunch"]);
+  return { category, ...document };
 }
 
 async function startAssign(
-  fixture: { ledger: { id: string }; category: { id: string } },
+  fixture: { category: { id: string } },
   ledgerEntryIds: string[],
   requestKey: string = crypto.randomUUID()
 ) {
   return startCategoryAssignment({
-    ledgerId: fixture.ledger.id,
     requestKey,
     mode: { kind: "assign", categoryId: fixture.category.id },
     ledgerEntryIds,
@@ -103,7 +101,7 @@ async function storedJob(jobId: string) {
 describe("starting a category assignment", () => {
   it("registers the job, its documents and its entries in one call", async () => {
     const fixture = await seedLedger();
-    const second = await addDocument(fixture.ledger.id, ["Coffee", "Tea"]);
+    const second = await addDocument(["Coffee", "Tea"]);
     const started = await startAssign(fixture, [
       second.entryIds[1]!,
       fixture.entryIds[0]!,
@@ -140,9 +138,7 @@ describe("starting a category assignment", () => {
       { id: fixture.entryIds[0], order: 1, target: fixture.category.id, decided: true },
       { id: second.entryIds[0], order: 2, target: fixture.category.id, decided: true },
     ]);
-    await expect(
-      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toMatchObject({
+    await expect(getCategoryAssignmentJob({ jobId: started.id })).resolves.toMatchObject({
       status: "pending",
       entryCount: 3,
       documentTotal: 2,
@@ -157,7 +153,7 @@ describe("starting a category assignment", () => {
     const started = await startAssign(fixture, fixture.entryIds, requestKey);
 
     await expect(startAssign(fixture, fixture.entryIds, requestKey)).resolves.toEqual(started);
-    const other = await addDocument(fixture.ledger.id, ["Dinner"]);
+    const other = await addDocument(["Dinner"]);
     await expect(startAssign(fixture, other.entryIds, requestKey)).rejects.toMatchObject({
       code: "CONFLICT",
     });
@@ -186,15 +182,16 @@ describe("running a category assignment", () => {
     const started = await startAssign(fixture, fixture.entryIds);
 
     const first = await claimCategoryAssignmentJob({ jobId: started.id });
-    expect(first).toMatchObject({ jobId: started.id, ledgerId: fixture.ledger.id });
+    expect(first).toMatchObject({ jobId: started.id });
     await expect(claimCategoryAssignmentJob({ jobId: started.id })).resolves.toBeNull();
-    await expect(
-      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toMatchObject({ status: "running", activeDocumentCount: 1 });
+    await expect(getCategoryAssignmentJob({ jobId: started.id })).resolves.toMatchObject({
+      status: "running",
+      activeDocumentCount: 1,
+    });
 
     await expireJobLease(started.id);
     await expect(renewCategoryAssignmentLease(first!)).resolves.toBe(false);
-    const second = await claimCategoryAssignmentJob({ ledgerId: fixture.ledger.id });
+    const second = await claimCategoryAssignmentJob();
     expect(second?.claimToken).not.toBe(first!.claimToken);
     await expect(renewCategoryAssignmentLease(second!)).resolves.toBe(true);
   });
@@ -240,16 +237,16 @@ describe("running a category assignment", () => {
     const job = await claimCategoryAssignmentJob({ jobId: started.id });
     await nextCategoryAssignmentDocument(job!);
 
-    await expect(
-      cancelCategoryAssignment({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toBe(true);
+    await expect(cancelCategoryAssignment({ jobId: started.id })).resolves.toBe(true);
     await expect(
       applyCategoryAssignments({ lease: job!, sourceDocumentId: fixture.documentId })
     ).resolves.toEqual({ status: "claim_lost" });
     await releaseCategoryAssignmentJob(job!);
-    await expect(
-      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toMatchObject({ status: "cancelled", cancelledCount: 1, documentCompleted: 1 });
+    await expect(getCategoryAssignmentJob({ jobId: started.id })).resolves.toMatchObject({
+      status: "cancelled",
+      cancelledCount: 1,
+      documentCompleted: 1,
+    });
   });
 
   it("waits out a transient failure and counts only real attempts", async () => {
@@ -272,9 +269,10 @@ describe("running a category assignment", () => {
     const waiting = await nextCategoryAssignmentDocument(job!);
     expect(waiting.kind).toBe("wait");
     expect(waiting.kind === "wait" && waiting.delayMs).toBeGreaterThan(55_000);
-    await expect(
-      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toMatchObject({ retryingDocumentCount: 1, activeDocumentCount: 0 });
+    await expect(getCategoryAssignmentJob({ jobId: started.id })).resolves.toMatchObject({
+      retryingDocumentCount: 1,
+      activeDocumentCount: 0,
+    });
 
     // Not due: released, the job is not claimable until the retry comes due.
     await releaseCategoryAssignmentJob(job!);
@@ -298,7 +296,7 @@ describe("running a category assignment", () => {
 
   it("settles the job when its last document gets an outcome", async () => {
     const fixture = await seedLedger();
-    const second = await addDocument(fixture.ledger.id, ["Coffee"]);
+    const second = await addDocument(["Coffee"]);
     const started = await startAssign(fixture, [fixture.entryIds[0]!, second.entryIds[0]!]);
     const job = await claimCategoryAssignmentJob({ jobId: started.id });
 
@@ -320,9 +318,7 @@ describe("running a category assignment", () => {
       claimToken: null,
       claimExpiresAt: null,
     });
-    await expect(
-      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toMatchObject({
+    await expect(getCategoryAssignmentJob({ jobId: started.id })).resolves.toMatchObject({
       entryCount: 2,
       appliedCount: 1,
       failedCount: 1,
@@ -341,7 +337,7 @@ describe("running a category assignment", () => {
     // The worker dies before releasing the job.
     await expireJobLease(started.id);
 
-    const recovered = await claimCategoryAssignmentJob({ ledgerId: fixture.ledger.id });
+    const recovered = await claimCategoryAssignmentJob();
     await expect(nextCategoryAssignmentDocument(recovered!)).resolves.toEqual({ kind: "done" });
     await releaseCategoryAssignmentJob(recovered!);
     expect(await storedJob(started.id)).toMatchObject({ status: "succeeded" });
@@ -349,17 +345,14 @@ describe("running a category assignment", () => {
 
   it("drops a document deleted mid-run and settles the job on what is left", async () => {
     const fixture = await seedLedger();
-    const second = await addDocument(fixture.ledger.id, ["Coffee"]);
+    const second = await addDocument(["Coffee"]);
     const started = await startAssign(fixture, [fixture.entryIds[0]!, second.entryIds[0]!]);
     const job = await claimCategoryAssignmentJob({ jobId: started.id });
     await expect(nextCategoryAssignmentDocument(job!)).resolves.toMatchObject({
       document: { sourceDocumentId: fixture.documentId },
     });
 
-    await deleteSourceDocumentAtomically({
-      ledgerId: fixture.ledger.id,
-      sourceDocumentId: fixture.documentId,
-    });
+    await deleteSourceDocumentAtomically({ sourceDocumentId: fixture.documentId });
     await expect(
       applyCategoryAssignments({ lease: job!, sourceDocumentId: fixture.documentId })
     ).resolves.toEqual({ status: "skipped" });
@@ -370,9 +363,11 @@ describe("running a category assignment", () => {
     await releaseCategoryAssignmentJob(job!);
 
     expect(await storedJob(started.id)).toMatchObject({ status: "succeeded" });
-    await expect(
-      getCategoryAssignmentJob({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toMatchObject({ entryCount: 1, appliedCount: 1, documentTotal: 1 });
+    await expect(getCategoryAssignmentJob({ jobId: started.id })).resolves.toMatchObject({
+      entryCount: 1,
+      appliedCount: 1,
+      documentTotal: 1,
+    });
   });
 
   it("marks only an entry recategorized after selection as a conflict", async () => {
@@ -380,12 +375,11 @@ describe("running a category assignment", () => {
     const db = getTestDb();
     const [other] = await db
       .insert(entryCategories)
-      .values(createCategoryData(fixture.ledger.id, { name: "Travel", sortOrder: 1 }))
+      .values(createCategoryData({ name: "Travel", sortOrder: 1 }))
       .returning();
     const secondEntryId = crypto.randomUUID();
     await db.insert(ledgerEntries).values({
       id: secondEntryId,
-      ledgerId: fixture.ledger.id,
       sourceDocumentId: fixture.documentId,
       position: 1,
       amount: "8.00",
@@ -431,9 +425,7 @@ describe("running a category assignment", () => {
     );
     expect(await storedJob(started.id)).toMatchObject({ status: "partial" });
 
-    await expect(
-      resolveLatestConflictSelection({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).resolves.toEqual({
+    await expect(resolveLatestConflictSelection({ jobId: started.id })).resolves.toEqual({
       mode: { kind: "assign", categoryId: fixture.category.id },
       retryOfJobId: started.id,
       ledgerEntryIds: [secondEntryId],
@@ -448,18 +440,13 @@ describe("running a category assignment", () => {
     await applyCategoryAssignments({ lease: job!, sourceDocumentId: fixture.documentId });
     await releaseCategoryAssignmentJob(job!);
 
-    await expect(
-      resolveLatestConflictSelection({ ledgerId: fixture.ledger.id, jobId: started.id })
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(resolveLatestConflictSelection({ jobId: started.id })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
     const stored = await getTestDb()
       .select({ outcome: categoryAssignmentEntries.outcome })
       .from(categoryAssignmentEntries)
-      .where(
-        and(
-          eq(categoryAssignmentEntries.jobId, started.id),
-          eq(categoryAssignmentEntries.ledgerId, fixture.ledger.id)
-        )
-      );
+      .where(eq(categoryAssignmentEntries.jobId, started.id));
     expect(stored).toEqual([{ outcome: "applied" }]);
   });
 });

@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { HydrationBoundary, type DehydratedState } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
-import { logIdentifier } from "@/lib/security/log-identifier";
 import {
   getLedgerBooksBootstrap,
   getLedgerShellBootstrap,
@@ -25,7 +24,7 @@ export default async function LedgerLayout({ children }: { children: React.React
   // Authenticated request boundary for processing recovery: the reads stay
   // side-effect free, but every document load still gets a recovery pass
   // after the response finishes.
-  scheduleProcessingRecoveryAfter(view.context.ledgerId);
+  scheduleProcessingRecoveryAfter();
 
   return (
     <WorkspaceStoreProvider initialBookId={view.bookId}>
@@ -58,10 +57,7 @@ async function LedgerShellData({
       categoryAssignmentJob: view.categoryAssignmentJob,
     });
   } catch (error) {
-    logger.error(
-      { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id) },
-      "Ledger shell bootstrap failed; falling back to client queries"
-    );
+    logger.error({ error }, "Ledger shell bootstrap failed; falling back to client queries");
   }
 
   return (

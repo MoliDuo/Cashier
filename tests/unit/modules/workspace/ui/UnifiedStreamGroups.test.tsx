@@ -24,7 +24,6 @@ function largeGroup(count: number): UnifiedStreamGroup {
     items: Array.from({ length: count }, (_, index) => ({
       sourceDocument: {
         id: `document-${index}`,
-        ledgerId: "ledger-1",
         version: 1,
         updatedAt: "2026-07-15T00:00:00.000Z",
         status: "completed",
@@ -47,7 +46,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
         {
           sourceDocument: {
             id: "document-1",
-            ledgerId: "ledger-1",
             status: "completed",
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
@@ -81,7 +79,7 @@ describe("LedgerEntriesUnifiedGroups", () => {
       currencyTotals: {},
       items: [
         {
-          sourceDocument: { id: "document-1", ledgerId: "ledger-1", status: "processing" },
+          sourceDocument: { id: "document-1", status: "processing" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
         },
@@ -143,12 +141,12 @@ describe("LedgerEntriesUnifiedGroups", () => {
       currencyTotals: {},
       items: [
         {
-          sourceDocument: { id: "document-1", ledgerId: "ledger-1", status: "completed" },
+          sourceDocument: { id: "document-1", status: "completed" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
         },
         {
-          sourceDocument: { id: "document-2", ledgerId: "ledger-1", status: "completed" },
+          sourceDocument: { id: "document-2", status: "completed" },
           ledgerEntries: [],
           effectiveDate: "2026-07-15",
         },
@@ -179,12 +177,12 @@ describe("LedgerEntriesUnifiedGroups", () => {
 
   it("only rerenders the stream row whose selected state changed", () => {
     const firstItem = {
-      sourceDocument: { id: "document-1", ledgerId: "ledger-1", status: "completed" },
+      sourceDocument: { id: "document-1", status: "completed" },
       ledgerEntries: [],
       effectiveDate: "2026-07-15",
     };
     const secondItem = {
-      sourceDocument: { id: "document-2", ledgerId: "ledger-1", status: "completed" },
+      sourceDocument: { id: "document-2", status: "completed" },
       ledgerEntries: [],
       effectiveDate: "2026-07-15",
     };
@@ -247,7 +245,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
           {
             sourceDocument: {
               id: "document-1",
-              ledgerId: "ledger-1",
               version: 1,
               status: "failed",
             },
@@ -257,7 +254,6 @@ describe("LedgerEntriesUnifiedGroups", () => {
           {
             sourceDocument: {
               id: "document-2",
-              ledgerId: "ledger-1",
               version: 1,
               status: "failed",
             },

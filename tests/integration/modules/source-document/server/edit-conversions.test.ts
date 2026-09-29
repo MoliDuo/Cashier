@@ -11,10 +11,9 @@ afterEach(() => vi.restoreAllMocks());
 
 async function fixture() {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(db);
-  const bookId = await testBookId(db, ledgerId);
+  await createTestUserWithLedger(db);
+  const bookId = await testBookId(db);
   const created = await createTestRecord(getTestDb(), {
-    ledgerId,
     bookId: bookId,
     title: "Original",
     entryDate: "2026-01-01",
@@ -31,23 +30,21 @@ async function fixture() {
     .from(ledgerEntries)
     .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId))
     .orderBy(ledgerEntries.position);
-  return { db, ledgerId, ...created, entries };
+  return { db, ...created, entries };
 }
 
 describe("document edit rate caching", () => {
   it("asks for no rates when only titles and entry metadata change", async () => {
-    const { db, ledgerId, sourceDocumentId, entries } = await fixture();
+    const { db, sourceDocumentId, entries } = await fixture();
     const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates");
     await expect(
       updateSourceDocuments({
-        ledgerId,
         sourceDocumentIds: [sourceDocumentId],
         data: { title: "Renamed" },
       })
     ).resolves.toMatchObject({ updatedCount: 1 });
     await expect(
       batchUpdateLedgerEntries({
-        ledgerId,
         sourceDocumentIds: [sourceDocumentId],
         ledgerEntryIds: [entries[0]!.id],
         description: "Note",
@@ -63,10 +60,9 @@ describe("document edit rate caching", () => {
   });
 
   it("asks for the new day when the document date changes", async () => {
-    const { ledgerId, sourceDocumentId } = await fixture();
+    const { sourceDocumentId } = await fixture();
     const ensure = vi.spyOn(exchangeRates, "ensureExchangeRates");
     await updateSourceDocuments({
-      ledgerId,
       sourceDocumentIds: [sourceDocumentId],
       data: { documentDate: "2026-01-02" },
     });

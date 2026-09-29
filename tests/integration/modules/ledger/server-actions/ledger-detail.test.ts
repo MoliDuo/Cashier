@@ -10,8 +10,7 @@ import { insertExchangeRates } from "tests/helpers/exchange-rates";
 // Helper to clean up and create test ledger for current user
 async function setupTestLedger(db: ReturnType<typeof getTestDb>) {
   await db.delete(ledgers);
-  const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, TEST_USER_ID);
-  return ledgerId;
+  await createTestUserWithLedger(db, undefined, undefined, TEST_USER_ID);
 }
 
 describe("Ledger Actions", () => {

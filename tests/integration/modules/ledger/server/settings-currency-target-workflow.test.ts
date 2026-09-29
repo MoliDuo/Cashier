@@ -12,12 +12,10 @@ import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 
 describe("target Settings currency workflow", () => {
-  let ledgerId = "";
   let sourceDocumentId: string;
 
   async function createEntry() {
     const result = await createTestRecord(getTestDb(), {
-      ledgerId,
       entryDate: "2026-07-15",
       entries: [
         {
@@ -29,7 +27,7 @@ describe("target Settings currency workflow", () => {
           description: null,
         },
       ],
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
     });
     sourceDocumentId = result.sourceDocumentId;
   }
@@ -37,16 +35,13 @@ describe("target Settings currency workflow", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
-    await db
-      .update(ledgers)
-      .set({ preferredCurrencies: ["CNY", "USD"] })
-      .where(eq(ledgers.id, ledgerId));
+    await createTestUserWithLedger(db);
+    await db.update(ledgers).set({ preferredCurrencies: ["CNY", "USD"] });
     await insertExchangeRates("2026-07-15", { CNY: 8, USD: 1 });
   });
 
   it("allows main currency change on empty ledger", async () => {
-    const updated = await updateLedgerSettings(ledgerId, {
+    const updated = await updateLedgerSettings({
       settings: { mainCurrency: "USD" },
     });
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -59,17 +54,15 @@ describe("target Settings currency workflow", () => {
       where: eq(sourceDocuments.id, sourceDocumentId),
     });
 
-    const updated = await updateLedgerSettings(ledgerId, {
+    const updated = await updateLedgerSettings({
       settings: { mainCurrency: "USD" },
     });
     const [entry, document, stats] = await Promise.all([
-      getTestDb().query.ledgerEntries.findFirst({
-        where: eq(ledgerEntries.ledgerId, ledgerId),
-      }),
+      getTestDb().query.ledgerEntries.findFirst(),
       getTestDb().query.sourceDocuments.findFirst({
         where: eq(sourceDocuments.id, sourceDocumentId),
       }),
-      calculateLedgerStats(ledgerId, {}),
+      calculateLedgerStats({}),
     ]);
 
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -82,7 +75,7 @@ describe("target Settings currency workflow", () => {
   it("allows other setting changes when entries exist", async () => {
     await createEntry();
 
-    const updated = await updateLedgerSettings(ledgerId, {
+    const updated = await updateLedgerSettings({
       settings: { aiLanguage: "en" },
     });
     expect(updated.settings.aiLanguage).toBe("en");
@@ -95,7 +88,7 @@ describe("target Settings currency workflow", () => {
     const db = getTestDb();
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, sourceDocumentId));
 
-    const updated = await updateLedgerSettings(ledgerId, {
+    const updated = await updateLedgerSettings({
       settings: { mainCurrency: "USD" },
     });
     expect(updated.settings.mainCurrency).toBe("USD");
@@ -104,11 +97,11 @@ describe("target Settings currency workflow", () => {
   it("rejects an unsupported main currency and keeps the settings", async () => {
     await createEntry();
 
-    await expect(
-      updateLedgerSettings(ledgerId, { settings: { mainCurrency: "ZZZ" } })
-    ).rejects.toThrow("Currency not found: ZZZ");
+    await expect(updateLedgerSettings({ settings: { mainCurrency: "ZZZ" } })).rejects.toThrow(
+      "Currency not found: ZZZ"
+    );
 
-    const ledger = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
+    const ledger = await getTestDb().query.ledgers.findFirst();
     expect(ledger?.mainCurrency).toBe("CNY");
   });
 
@@ -123,12 +116,10 @@ describe("target Settings currency workflow", () => {
       const sourceDocumentId = crypto.randomUUID();
       await db.insert(sourceDocuments).values({
         id: sourceDocumentId,
-        ledgerId,
         documentDate: entryDate,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       });
       await db.insert(ledgerEntries).values({
-        ledgerId,
         sourceDocumentId,
         amount: "40.00",
         currency: "CNY",
@@ -146,7 +137,7 @@ describe("target Settings currency workflow", () => {
         json: async () => ({ base: "EUR", rates: { "2026-07-14": { CNY: 8, USD: 1 } } }),
       } as Response);
 
-      const updated = await updateLedgerSettings(ledgerId, {
+      const updated = await updateLedgerSettings({
         settings: { mainCurrency: "USD" },
       });
 
@@ -160,7 +151,7 @@ describe("target Settings currency workflow", () => {
           where: eq(exchangeRates.rateDate, "2026-07-14"),
         })
       ).toBeDefined();
-      expect((await calculateLedgerStats(ledgerId, {})).convertedTotal).toEqual({
+      expect((await calculateLedgerStats({})).convertedTotal).toEqual({
         total: "15",
         currency: "USD",
       });
@@ -178,10 +169,10 @@ describe("target Settings currency workflow", () => {
         json: async () => ({}),
       } as Response);
 
-      const updated = await updateLedgerSettings(ledgerId, { settings: { mainCurrency: "USD" } });
+      const updated = await updateLedgerSettings({ settings: { mainCurrency: "USD" } });
 
       expect(updated.settings.mainCurrency).toBe("USD");
-      const stats = await calculateLedgerStats(ledgerId, {});
+      const stats = await calculateLedgerStats({});
       expect(stats.convertedTotal).toEqual({ total: "10", currency: "USD" });
       expect(stats.unconvertedCount).toBe(1);
     });
@@ -189,12 +180,12 @@ describe("target Settings currency workflow", () => {
 
   it("keeps both of two concurrent writes to different settings", async () => {
     const results = await Promise.allSettled([
-      updateLedgerSettings(ledgerId, { settings: { collapseEntriesDefault: true } }),
-      updateLedgerSettings(ledgerId, { settings: { timeZone: "Asia/Tokyo" } }),
+      updateLedgerSettings({ settings: { collapseEntriesDefault: true } }),
+      updateLedgerSettings({ settings: { timeZone: "Asia/Tokyo" } }),
     ]);
 
     expect(results.map((result) => result.status)).toEqual(["fulfilled", "fulfilled"]);
-    const saved = await getTestDb().query.ledgers.findFirst({ where: eq(ledgers.id, ledgerId) });
+    const saved = await getTestDb().query.ledgers.findFirst();
     expect(saved?.collapseEntriesDefault).toBe(true);
     expect(saved?.timeZone).toBe("Asia/Tokyo");
   });
@@ -203,7 +194,7 @@ describe("target Settings currency workflow", () => {
 describe("settings concurrency invariants", () => {
   it("concurrent main-currency change and first activateAttempt are serialised by the ledger lock", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db, "settings-race-activate-attempt");
+    await createTestUserWithLedger(db, "settings-race-activate-attempt");
 
     for (let i = 0; i < 5; i++) {
       // Create a pending attempt first (this creates the document but not the active projection).
@@ -212,8 +203,7 @@ describe("settings concurrency invariants", () => {
         .insert(sourceDocuments)
         .values({
           id: sourceDocumentId,
-          ledgerId,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning()
         .then((rows) => rows[0]!);
@@ -222,7 +212,6 @@ describe("settings concurrency invariants", () => {
         const { createProcessingAttemptInTransaction: createProcessingAttempt } =
           await import("@/modules/source-document/server/extraction-attempts");
         return createProcessingAttempt(tx, {
-          ledgerId,
           sourceDocumentId,
           input: { text: "Race test", storedFileIds: [], documentDate: null },
         });
@@ -232,10 +221,9 @@ describe("settings concurrency invariants", () => {
 
       // Run main-currency change and activateAttempt concurrently.
       const results = await Promise.allSettled([
-        updateLedgerSettings(ledgerId, { settings: { mainCurrency: "USD" } }),
+        updateLedgerSettings({ settings: { mainCurrency: "USD" } }),
         activateAttempt({
           lease,
-          ledgerId,
           sourceDocumentId,
           attemptId: attempt.id,
           entries: [
@@ -251,12 +239,8 @@ describe("settings concurrency invariants", () => {
       ]);
 
       // The lock serialises the two operations — no deadlock, no partial state.
-      const ledger = await db.query.ledgers.findFirst({
-        where: eq(ledgers.id, ledgerId),
-      });
-      const activeEntries = await db.query.ledgerEntries.findMany({
-        where: eq(ledgerEntries.ledgerId, ledgerId),
-      });
+      const ledger = await db.query.ledgers.findFirst();
+      const activeEntries = await db.query.ledgerEntries.findMany();
       expect(ledger).not.toBeNull();
 
       // Verify main-currency/entry consistency invariant.
@@ -284,10 +268,10 @@ describe("settings concurrency invariants", () => {
       // Clean up
       if (activateResult.status === "fulfilled" && activateResult.value === true) {
         // Deleting the documents takes their entries with them.
-        await db.delete(sourceDocuments).where(eq(sourceDocuments.ledgerId, ledgerId));
+        await db.delete(sourceDocuments);
       }
       if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
-        await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
+        await db.update(ledgers).set({ mainCurrency: "CNY" });
       }
     }
   });

@@ -16,7 +16,6 @@ import type { SourceDocumentProcessingStatus } from "@/modules/source-document/t
 /** The document columns a list item shows; the stream never reads the input or the suggestion. */
 export interface SourceDocumentListRow {
   id: string;
-  ledgerId: string;
   title: string | null;
   bookId?: string | null;
   documentDate: string | null;
@@ -56,7 +55,6 @@ export interface SourceDocumentStoredFileAggregateRow {
 
 interface SourceDocumentEntryCategoryAggregateRow {
   id: string;
-  ledgerId: string;
   name: string;
   description: string | null;
   icon: string | null;
@@ -67,7 +65,6 @@ interface SourceDocumentEntryCategoryAggregateRow {
 
 export interface SourceDocumentLedgerEntryAggregateRow {
   id: string;
-  ledgerId: string;
   categoryId: string | null;
   sourceDocumentId: string;
   amount: string;
@@ -100,7 +97,6 @@ function mapLedgerEntryAggregateDto(
 ): SourceDocumentLedgerEntryDto {
   return {
     id: entry.id,
-    ledgerId: entry.ledgerId,
     categoryId: entry.categoryId,
     sourceDocumentId: entry.sourceDocumentId,
     amount: entry.amount,
@@ -135,7 +131,6 @@ export function mapListItem(
     id: row.id,
     bookId: row.bookId ?? null,
     version: row.version,
-    ledgerId: row.ledgerId,
     title: displayTitle(row.title),
     text: null,
     processingStatus: hydration.processingStatus,
@@ -177,7 +172,6 @@ export function mapSourceDocumentDetail(
     id: row.id,
     bookId: row.bookId ?? null,
     version: row.version,
-    ledgerId: row.ledgerId,
     title: displayTitle(row.title),
     text: hydration.inputText,
     files: hydration.files.map(mapStoredFileDto),

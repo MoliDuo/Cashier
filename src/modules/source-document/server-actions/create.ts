@@ -17,7 +17,7 @@ import { sourceDocumentFingerprint } from "@/modules/source-document/source-docu
  */
 export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
-    { ledgerId, userId, ledger },
+    { userId, ledger },
     input: CreateSourceDocumentInputContract,
     clientSubmissionId: string
   ): Promise<CreateSourceDocumentResponseDto> => {
@@ -26,9 +26,8 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     const payload = omitUndefinedProperties(validated);
     // Resolved before the write, never in it. The ledger's zone dates the
     // record; where the reader happened to be does not.
-    const book = await resolveRecordBook(ledgerId, validated.bookId);
+    const book = await resolveRecordBook(validated.bookId);
     const result = await createAndQueueSourceDocument({
-      ledgerId,
       bookId: book.id,
       input: {
         kind: "stored",
@@ -46,7 +45,7 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
     });
 
     // Also recover any missed processing intents
-    scheduleProcessingRecoveryAfter(ledgerId);
+    scheduleProcessingRecoveryAfter();
 
     return { sourceDocumentId: result.sourceDocumentId, version: 1, status: "processing" };
   }

@@ -24,13 +24,11 @@ const activeEntry = {
  */
 async function setupDocumentWithFailedRetry(
   db: ReturnType<typeof getTestDb>,
-  ledgerId: string,
   failureKind: "invalid_input" | "processing_error"
 ) {
   // Step 1: Create a document with entries
-  const bookId = await testBookId(db, ledgerId);
+  const bookId = await testBookId(db);
   const created = await createTestRecord(getTestDb(), {
-    ledgerId,
     title: "Original",
     entryDate: "2026-07-15",
     inputText: "Original text",
@@ -41,7 +39,6 @@ async function setupDocumentWithFailedRetry(
   // Step 2: Create a pending attempt (processing)
   const pending = await db.transaction(async (tx) => {
     return createProcessingAttemptInTransaction(tx, {
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       input: { text: "Retry text", storedFileIds: [], documentDate: null },
     });
@@ -50,7 +47,6 @@ async function setupDocumentWithFailedRetry(
   // Step 3: Set the pending attempt outcome to invalid/failed
   await recordProcessingFailure({
     lease: await claimAttemptForTest(pending.attempt.id),
-    ledgerId,
     sourceDocumentId: created.sourceDocumentId,
     attemptId: pending.attempt.id,
     failureKind,
@@ -69,20 +65,17 @@ async function setupDocumentWithFailedRetry(
  */
 async function setupDocumentWithFirstParseFailure(
   db: ReturnType<typeof getTestDb>,
-  ledgerId: string,
   failureKind: "invalid_input" | "processing_error"
 ) {
-  const bookId = await testBookId(db, ledgerId);
+  const bookId = await testBookId(db);
   const pending = await db.transaction((tx) =>
     createProcessingAttemptInTransaction(tx, {
-      ledgerId,
       bookId,
       input: { text: "First parse", storedFileIds: [], documentDate: null },
     })
   );
   await recordProcessingFailure({
     lease: await claimAttemptForTest(pending.attempt.id),
-    ledgerId,
     sourceDocumentId: pending.document.id,
     attemptId: pending.attempt.id,
     failureKind,
@@ -94,16 +87,11 @@ async function setupDocumentWithFirstParseFailure(
 describe("retry active result summary", () => {
   it("includes the active result summary for terminal retries", async () => {
     const db = getTestDb();
+    await createTestUserWithLedger(db);
     for (const failureKind of ["invalid_input", "processing_error"] as const) {
-      const { ledgerId } = await createTestUserWithLedger(
-        db,
-        `retry-${failureKind}-detail@example.com`,
-        undefined,
-        crypto.randomUUID()
-      );
-      const { sourceDocumentId } = await setupDocumentWithFailedRetry(db, ledgerId, failureKind);
+      const { sourceDocumentId } = await setupDocumentWithFailedRetry(db, failureKind);
 
-      const detail = await getTargetSourceDocument(ledgerId, sourceDocumentId);
+      const detail = await getTargetSourceDocument(sourceDocumentId);
       expect(detail).toMatchObject({
         processingStatus: "failed",
         failureKind,
@@ -114,20 +102,11 @@ describe("retry active result summary", () => {
 
   it("omits the active result summary when the failed first parse left no entries", async () => {
     const db = getTestDb();
+    await createTestUserWithLedger(db);
     for (const failureKind of ["invalid_input", "processing_error"] as const) {
-      const { ledgerId } = await createTestUserWithLedger(
-        db,
-        `retry-first-${failureKind}@example.com`,
-        undefined,
-        crypto.randomUUID()
-      );
-      const { sourceDocumentId } = await setupDocumentWithFirstParseFailure(
-        db,
-        ledgerId,
-        failureKind
-      );
+      const { sourceDocumentId } = await setupDocumentWithFirstParseFailure(db, failureKind);
 
-      const detail = await getTargetSourceDocument(ledgerId, sourceDocumentId);
+      const detail = await getTargetSourceDocument(sourceDocumentId);
       expect(detail).toMatchObject({ processingStatus: "failed", failureKind });
       expect(detail?.activeResultSummary).toBeUndefined();
     }
@@ -135,24 +114,19 @@ describe("retry active result summary", () => {
 
   it("lets a document whose first parse failed be completed by hand", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { sourceDocumentId } = await setupDocumentWithFirstParseFailure(
-      db,
-      ledgerId,
-      "processing_error"
-    );
-    const failed = await getTargetSourceDocument(ledgerId, sourceDocumentId);
+    await createTestUserWithLedger(db);
+    const { sourceDocumentId } = await setupDocumentWithFirstParseFailure(db, "processing_error");
+    const failed = await getTargetSourceDocument(sourceDocumentId);
     expect(failed).toMatchObject({ processingStatus: "failed", canEdit: true, ledgerEntries: [] });
 
     const { ledgerEntryId } = await addLedgerEntry({
-      ledgerId,
       sourceDocumentId,
       amount: "18",
       currency: "CNY",
       itemName: "Taxi",
     });
 
-    const edited = await getTargetSourceDocument(ledgerId, sourceDocumentId);
+    const edited = await getTargetSourceDocument(sourceDocumentId);
     expect(edited).toMatchObject({
       processingStatus: "failed",
       canEdit: true,
@@ -165,27 +139,24 @@ describe("retry active result summary", () => {
 
   it("keeps the previous entries when an edit-retry fails while showing its input and failure", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Original",
       entryDate: "2026-07-15",
       inputText: "Original text",
       entries: [activeEntry],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const [file] = await db
       .insert(storedFiles)
       .values({
-        ledgerId,
-        storageKey: `${ledgerId}/stored/edited-evidence`,
+        storageKey: "stored/edited-evidence",
         contentType: "image/jpeg",
         byteSize: 7,
         finalizedAt: new Date(),
       })
       .returning();
     const editRetry = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       inheritInput: false,
       supersedeProcessing: true,
@@ -193,18 +164,17 @@ describe("retry active result summary", () => {
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(editRetry.attempt.id),
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       attemptId: editRetry.attempt.id,
       failureKind: "processing_error",
       failureMessage: "Processing failed",
     });
 
-    const stream = await listLedgerEntries(ledgerId, { limit: 20 });
+    const stream = await listLedgerEntries({ limit: 20 });
     expect(stream.items).toEqual([
       expect.objectContaining({ itemName: "Lunch", amount: "12.500" }),
     ]);
-    const detail = await getTargetSourceDocument(ledgerId, created.sourceDocumentId);
+    const detail = await getTargetSourceDocument(created.sourceDocumentId);
     expect(detail).toMatchObject({
       text: "Edited text",
       files: [expect.objectContaining({ id: file!.id })],
@@ -214,22 +184,19 @@ describe("retry active result summary", () => {
       ledgerEntries: [expect.objectContaining({ itemName: "Lunch" })],
       activeResultSummary: { entryCount: 1, total: "12.50" },
     });
-    await expect(getSourceDocumentInput(ledgerId, created.sourceDocumentId)).resolves.toMatchObject(
-      {
-        text: "Edited text",
-        files: [expect.objectContaining({ id: file!.id })],
-        processingStatus: "failed",
-      }
-    );
+    await expect(getSourceDocumentInput(created.sourceDocumentId)).resolves.toMatchObject({
+      text: "Edited text",
+      files: [expect.objectContaining({ id: file!.id })],
+      processingStatus: "failed",
+    });
   });
 
   it("activeResultSummary reflects accurate count and total with multiple entries", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db, "retry-multi-entry");
+    await createTestUserWithLedger(db, "retry-multi-entry");
 
     // Create a manual document with multiple entries
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Multi-entry",
       entryDate: "2026-07-15",
       inputText: "Multi entry doc",
@@ -256,27 +223,25 @@ describe("retry active result summary", () => {
           description: null,
         },
       ],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
     // Create a failed pending attempt
     const pending = await db.transaction(async (tx) => {
       return createProcessingAttemptInTransaction(tx, {
-        ledgerId,
         sourceDocumentId: created.sourceDocumentId,
         input: { text: "Failed retry", storedFileIds: [], documentDate: null },
       });
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(pending.attempt.id),
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       attemptId: pending.attempt.id,
       failureKind: "processing_error",
       failureMessage: "Processing failed",
     });
 
-    const detail = await getTargetSourceDocument(ledgerId, created.sourceDocumentId);
+    const detail = await getTargetSourceDocument(created.sourceDocumentId);
     expect(detail?.processingStatus).toBe("failed");
     expect(detail?.activeResultSummary).toBeDefined();
     expect(detail?.activeResultSummary?.entryCount).toBe(3);

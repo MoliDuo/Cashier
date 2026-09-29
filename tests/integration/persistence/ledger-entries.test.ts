@@ -14,23 +14,24 @@ import { createTestUserWithLedger, createTestSourceDocument } from "tests/helper
 describe("LedgerEntries FK Constraints", () => {
   it("should cascade delete ledger entries when ledger is deleted", async () => {
     const db = getTestDb();
-    const { ledgerId: id } = await createTestUserWithLedger(db, "test8@example.com", "Test Ledger");
-    const ledger = { id };
+    await createTestUserWithLedger(db, "test8@example.com", "Test Ledger");
 
-    const sourceDocId = await createTestSourceDocument(db, ledger.id);
+    const sourceDocId = await createTestSourceDocument(db);
 
-    await db.insert(ledgerEntries).values({
-      ledgerId: ledger.id,
-      sourceDocumentId: sourceDocId,
-      amount: "25.00",
-      currency: "CNY",
-      itemName: "Will Be Deleted",
-    });
+    const [entry] = await db
+      .insert(ledgerEntries)
+      .values({
+        sourceDocumentId: sourceDocId,
+        amount: "25.00",
+        currency: "CNY",
+        itemName: "Will Be Deleted",
+      })
+      .returning({ id: ledgerEntries.id });
 
-    await db.delete(ledgers).where(eq(ledgers.id, ledger.id));
+    await db.delete(ledgers);
 
     const orphaned = await db.query.ledgerEntries.findMany({
-      where: eq(ledgerEntries.ledgerId, ledger.id),
+      where: eq(ledgerEntries.id, entry!.id),
     });
 
     expect(orphaned).toHaveLength(0);
@@ -38,19 +39,17 @@ describe("LedgerEntries FK Constraints", () => {
 
   it("should set categoryId to null when category is deleted", async () => {
     const db = getTestDb();
-    const { ledgerId: id } = await createTestUserWithLedger(db, "test9@example.com", "Test Ledger");
-    const ledger = { id };
+    await createTestUserWithLedger(db, "test9@example.com", "Test Ledger");
 
     const [category] = await db
       .insert(categories)
       .values({
-        ledgerId: ledger.id,
         name: "餐饮",
         sortOrder: 1,
       })
       .returning();
 
-    const sourceDocId = await createTestSourceDocument(db, ledger.id);
+    const sourceDocId = await createTestSourceDocument(db);
 
     expect(category).toBeDefined();
     if (category == null) {
@@ -60,7 +59,6 @@ describe("LedgerEntries FK Constraints", () => {
     const [tx] = await db
       .insert(ledgerEntries)
       .values({
-        ledgerId: ledger.id,
         sourceDocumentId: sourceDocId,
         categoryId: category.id,
         amount: "25.00",

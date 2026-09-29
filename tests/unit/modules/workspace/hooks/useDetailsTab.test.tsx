@@ -98,7 +98,6 @@ function entry(
 ): ActiveLedgerEntryDto {
   return {
     id,
-    ledgerId: "ledger-1",
     categoryId: null,
     sourceDocumentId,
     amount: "1",
@@ -112,7 +111,6 @@ function entry(
     sourceDocument: {
       id: sourceDocumentId,
       version: 1,
-      ledgerId: "ledger-1",
       title: null,
       documentDate: date,
       effectiveDate: date ?? "2026-09-04",

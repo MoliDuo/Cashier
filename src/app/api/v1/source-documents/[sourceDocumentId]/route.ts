@@ -10,11 +10,11 @@ export async function GET(
 ) {
   return handleApiV1Route(request, {
     logContext: "api/v1/source-documents/[sourceDocumentId]",
-    handler: async ({ credential }) => {
+    handler: async () => {
       const { sourceDocumentId: rawId } = await context.params;
       const parsed = sourceDocumentIdSchema.safeParse(rawId);
       if (!parsed.success) throw new NotFoundError("Source document");
-      const status = await getCredentialSourceDocumentStatus(credential.ledgerId, parsed.data);
+      const status = await getCredentialSourceDocumentStatus(parsed.data);
       if (status == null) throw new NotFoundError("Source document");
       const response = NextResponse.json(status);
       if (status.status === "processing") response.headers.set("Retry-After", "5");

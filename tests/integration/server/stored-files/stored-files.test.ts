@@ -38,16 +38,15 @@ function sha256(bytes: Buffer): string {
 /** Plans one upload of `bytes` and puts them where the plan says. */
 async function plannedUpload(
   storage: DirectMemoryObjectStore,
-  ledgerId: string,
   bytes: Buffer,
   contentType = "image/jpeg"
 ) {
   const digest = sha256(bytes);
-  const plan = await planDirectUpload(ledgerId, [
+  const plan = await planDirectUpload([
     { contentType, byteSize: bytes.length, originalFilename: "receipt.jpg", checksum: digest },
   ]);
   const id = plan.targets[0]!.id;
-  storage.put(`temporary/${ledgerId}/${id}`, bytes, contentType, digest);
+  storage.put(`temporary/${id}`, bytes, contentType, digest);
   return { plan, id };
 }
 
@@ -58,12 +57,12 @@ describe("stored-file uploads and reads", () => {
 
   it("plans pending files that point the browser at a temporary object", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
     const digest = "a".repeat(64);
 
-    const plan = await planDirectUpload(ledgerId, [
+    const plan = await planDirectUpload([
       {
         contentType: "image/jpeg",
         byteSize: 10,
@@ -73,15 +72,14 @@ describe("stored-file uploads and reads", () => {
     ]);
 
     const target = plan.targets[0]!;
-    expect(target.url).toBe(`https://r2.test/temporary/${ledgerId}/${target.id}`);
+    expect(target.url).toBe(`https://r2.test/temporary/${target.id}`);
     expect(storage.presignTtlSeconds).toEqual([
       Math.floor((UPLOAD_PLAN_EXPIRY_MS - DIRECT_UPLOAD_FINALIZE_BUFFER_MS) / 1000),
     ]);
     expect(await db.select().from(storedFiles)).toEqual([
       expect.objectContaining({
         id: target.id,
-        ledgerId,
-        storageKey: `${ledgerId}/stored/${target.id}`,
+        storageKey: `stored/${target.id}`,
         contentType: "image/jpeg",
         byteSize: 10,
         originalFilename: "receipt.jpg",
@@ -93,7 +91,7 @@ describe("stored-file uploads and reads", () => {
 
   it("refuses plans that break the upload policy before recording anything", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     objectStore.current = new DirectMemoryObjectStore();
     const checksum = "a".repeat(64);
     const file = { contentType: "image/jpeg", byteSize: 1, originalFilename: null, checksum };
@@ -108,16 +106,16 @@ describe("stored-file uploads and reads", () => {
         () => ({ ...file, byteSize: MAX_ORIGINAL_BYTES_PER_FILE })
       ),
     ]) {
-      await expect(planDirectUpload(ledgerId, files)).rejects.toMatchObject({
+      await expect(planDirectUpload(files)).rejects.toMatchObject({
         code: "VALIDATION_ERROR",
       });
     }
     expect(await db.select().from(storedFiles)).toEqual([]);
   });
 
-  it("plans uploads without a per-ledger quota", async () => {
+  it("plans uploads without a quota", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     objectStore.current = new DirectMemoryObjectStore();
     const file = {
       contentType: "image/jpeg",
@@ -127,10 +125,7 @@ describe("stored-file uploads and reads", () => {
     };
     // Well past the 20 pending files the removed quota allowed.
     for (let planned = 0; planned < 24; planned += MAX_FILES) {
-      await planDirectUpload(
-        ledgerId,
-        Array.from({ length: MAX_FILES }, () => file)
-      );
+      await planDirectUpload(Array.from({ length: MAX_FILES }, () => file));
     }
 
     expect(await db.select().from(storedFiles)).toHaveLength(24);
@@ -138,26 +133,20 @@ describe("stored-file uploads and reads", () => {
 
   it("verifies, normalizes and readies uploaded files, and a retry changes nothing", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    );
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
     const bytes = await receiptJpeg();
-    const { id } = await plannedUpload(storage, ledgerId, bytes);
+    const { id } = await plannedUpload(storage, bytes);
 
     await expect(
-      finalizeDirectUpload({ ledgerId: otherLedgerId, storedFileIds: [id] })
+      finalizeDirectUpload({ storedFileIds: [crypto.randomUUID()] })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(readAuthorizedFile(ledgerId, id)).resolves.toBeNull();
+    await expect(readAuthorizedFile(id)).resolves.toBeNull();
 
-    const [file] = await finalizeDirectUpload({ ledgerId, storedFileIds: [id] });
+    const [file] = await finalizeDirectUpload({ storedFileIds: [id] });
 
-    const storedBytes = storage.files.get(`${ledgerId}/stored/${id}`);
+    const storedBytes = storage.files.get(`stored/${id}`);
     expect(storedBytes).toBeDefined();
     expect(storedBytes).not.toEqual(bytes);
     expect(file).toMatchObject({
@@ -170,34 +159,32 @@ describe("stored-file uploads and reads", () => {
       },
     });
     expect(file).not.toHaveProperty("storageKey");
-    expect(storage.files.has(`temporary/${ledgerId}/${id}`)).toBe(false);
+    expect(storage.files.has(`temporary/${id}`)).toBe(false);
 
     const before = await db.execute(sql`SELECT xmin::text FROM stored_files WHERE id = ${id}`);
-    await expect(finalizeDirectUpload({ ledgerId, storedFileIds: [id] })).resolves.toEqual([file]);
+    await expect(finalizeDirectUpload({ storedFileIds: [id] })).resolves.toEqual([file]);
     const after = await db.execute(sql`SELECT xmin::text FROM stored_files WHERE id = ${id}`);
     expect(after.rows).toEqual(before.rows);
-    expect(storage.readKeys).toEqual([`temporary/${ledgerId}/${id}`]);
+    expect(storage.readKeys).toEqual([`temporary/${id}`]);
 
     const pending = await createPendingAttempt({
-      ledgerId,
       input: { text: null, storedFileIds: [id], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     expect(pending.document.latestAttemptId).toBe(pending.attempt.id);
-    await expect(readAuthorizedFile(ledgerId, id)).resolves.toMatchObject({ file: { id } });
-    await expect(readAuthorizedFile(otherLedgerId, id)).resolves.toBeNull();
+    await expect(readAuthorizedFile(id)).resolves.toMatchObject({ file: { id } });
   });
 
   it("lets two finalizations of the same files agree on one result", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
-    const { id } = await plannedUpload(storage, ledgerId, await receiptJpeg());
+    const { id } = await plannedUpload(storage, await receiptJpeg());
 
     const results = await Promise.allSettled([
-      finalizeDirectUpload({ ledgerId, storedFileIds: [id] }),
-      finalizeDirectUpload({ ledgerId, storedFileIds: [id] }),
+      finalizeDirectUpload({ storedFileIds: [id] }),
+      finalizeDirectUpload({ storedFileIds: [id] }),
     ]);
 
     const settled = results.flatMap((result) =>
@@ -218,46 +205,45 @@ describe("stored-file uploads and reads", () => {
 
   it("never lets a document take a file that is still pending", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
-    const { id } = await plannedUpload(storage, ledgerId, await receiptJpeg());
+    const { id } = await plannedUpload(storage, await receiptJpeg());
 
     await expect(
       createPendingAttempt({
-        ledgerId,
         input: { text: null, storedFileIds: [id], documentDate: null },
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("refuses a plan finalized after it expired", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-07-15T00:00:00.000Z") });
-    const { id, plan } = await plannedUpload(storage, ledgerId, await receiptJpeg());
+    const { id, plan } = await plannedUpload(storage, await receiptJpeg());
     expect(plan.expiresAt).toBe(
       new Date(Date.parse("2026-07-15T00:00:00.000Z") + UPLOAD_PLAN_EXPIRY_MS).toISOString()
     );
 
     vi.setSystemTime(Date.parse(plan.expiresAt));
-    await expect(finalizeDirectUpload({ ledgerId, storedFileIds: [id] })).rejects.toMatchObject({
+    await expect(finalizeDirectUpload({ storedFileIds: [id] })).rejects.toMatchObject({
       code: "CONFLICT",
     });
-    expect(storage.files.has(`${ledgerId}/stored/${id}`)).toBe(false);
+    expect(storage.files.has(`stored/${id}`)).toBe(false);
   });
 
   it("discards files whose bytes break the plan", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
     const expected = await receiptJpeg();
     const tampered = Buffer.concat([expected, Buffer.from([0])]);
-    const plan = await planDirectUpload(ledgerId, [
+    const plan = await planDirectUpload([
       {
         contentType: "image/jpeg",
         byteSize: tampered.length,
@@ -268,9 +254,9 @@ describe("stored-file uploads and reads", () => {
     const id = plan.targets[0]!.id;
     // The browser's own checksum header claims the planned digest, but the
     // bytes are not the planned ones.
-    storage.put(`temporary/${ledgerId}/${id}`, tampered, "image/jpeg", sha256(expected));
+    storage.put(`temporary/${id}`, tampered, "image/jpeg", sha256(expected));
 
-    await expect(finalizeDirectUpload({ ledgerId, storedFileIds: [id] })).rejects.toMatchObject({
+    await expect(finalizeDirectUpload({ storedFileIds: [id] })).rejects.toMatchObject({
       code: "CONFLICT",
     });
 
@@ -280,7 +266,7 @@ describe("stored-file uploads and reads", () => {
 
   it("keeps files pending when their normalized total is over the attempt limit", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
     const width = 1600;
@@ -294,7 +280,6 @@ describe("stored-file uploads and reads", () => {
       .toBuffer();
     const digest = sha256(bytes);
     const plan = await planDirectUpload(
-      ledgerId,
       Array.from({ length: 3 }, () => ({
         contentType: "image/jpeg",
         byteSize: bytes.length,
@@ -303,31 +288,29 @@ describe("stored-file uploads and reads", () => {
       }))
     );
     for (const target of plan.targets) {
-      storage.put(`temporary/${ledgerId}/${target.id}`, bytes, "image/jpeg", digest);
+      storage.put(`temporary/${target.id}`, bytes, "image/jpeg", digest);
     }
 
     await expect(
-      finalizeDirectUpload({ ledgerId, storedFileIds: plan.targets.map((target) => target.id) })
+      finalizeDirectUpload({ storedFileIds: plan.targets.map((target) => target.id) })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
     const rows = await db.select().from(storedFiles);
     expect(rows).toHaveLength(3);
     expect(rows.every((row) => row.finalizedAt == null)).toBe(true);
-    expect(
-      plan.targets.some((target) => storage.files.has(`${ledgerId}/stored/${target.id}`))
-    ).toBe(false);
+    expect(plan.targets.some((target) => storage.files.has(`stored/${target.id}`))).toBe(false);
   });
 
   it("stores server-held images as ready files without a temporary object", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     objectStore.current = storage;
     const bytes = Buffer.from("normalized-image");
 
-    const [id] = await storeProcessedImages(ledgerId, [{ bytes, contentType: "image/webp" }]);
+    const [id] = await storeProcessedImages([{ bytes, contentType: "image/webp" }]);
 
-    expect([...storage.files.keys()]).toEqual([`${ledgerId}/stored/${id}`]);
+    expect([...storage.files.keys()]).toEqual([`stored/${id}`]);
     expect(await db.query.storedFiles.findFirst({ where: eq(storedFiles.id, id!) })).toMatchObject({
       contentType: "image/webp",
       byteSize: bytes.length,
@@ -338,7 +321,7 @@ describe("stored-file uploads and reads", () => {
 
   it("leaves nothing behind when a server-held image cannot be stored", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const storage = new DirectMemoryObjectStore();
     storage.upload = async () => {
       throw new Error("storage unavailable");
@@ -346,7 +329,7 @@ describe("stored-file uploads and reads", () => {
     objectStore.current = storage;
 
     await expect(
-      storeProcessedImages(ledgerId, [{ bytes: Buffer.from("image"), contentType: "image/webp" }])
+      storeProcessedImages([{ bytes: Buffer.from("image"), contentType: "image/webp" }])
     ).rejects.toThrow("storage unavailable");
 
     expect(await db.select().from(storedFiles)).toEqual([]);

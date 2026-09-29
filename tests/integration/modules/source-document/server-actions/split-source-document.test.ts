@@ -28,10 +28,7 @@ describe("splitSourceDocumentAction", () => {
   it("converts moved entries at the split document's day and returns the next split baseline", async () => {
     const fixture = await seed();
     await insertExchangeRates("2026-08-16", { USD: "1.25", MYR: "5" });
-    await fixture.db
-      .update(ledgerEntries)
-      .set({ currency: "MYR", amount: "10.00" })
-      .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
+    await fixture.db.update(ledgerEntries).set({ currency: "MYR", amount: "10.00" });
     for (const [index, id] of fixture.ids.slice(0, 2).entries()) {
       const result = await splitSourceDocumentAction({
         sourceDocumentId: fixture.document.id,
@@ -41,7 +38,7 @@ describe("splitSourceDocumentAction", () => {
       expect(result).toMatchObject({ sourceDocument: { version: index + 2 } });
       expect(result.sourceDocument.ledgerEntries).toHaveLength(2 - index);
     }
-    const split = await listStreamPage(fixture.ledger.id, { limit: 20 });
+    const split = await listStreamPage({ limit: 20 });
     const movedEntries = split.items
       .filter((item) => item.documentDate === "2026-08-16")
       .flatMap((item) => item.ledgerEntries ?? []);
@@ -59,18 +56,17 @@ describe("splitSourceDocumentAction", () => {
   async function seed(entryCount = 3) {
     const db = getTestDb();
     const ledger = createLedgerData({ mainCurrency: "USD" });
-    const document = createSourceDocumentData(ledger.id, { status: "completed" });
+    const document = createSourceDocumentData({ status: "completed" });
     const ids = Array.from({ length: entryCount }, () => crypto.randomUUID());
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(sourceDocuments).values({
       ...document,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values(
       ids.map((id, position) => ({
         id,
-        ledgerId: ledger.id,
         sourceDocumentId: document.id,
         position,
         amount: `${position + 1}0.00`,
@@ -79,7 +75,7 @@ describe("splitSourceDocumentAction", () => {
       }))
     );
     await activateTestSourceDocumentProjection(db, document.id);
-    return { db, ledger, document, ids };
+    return { db, document, ids };
   }
 
   it("moves live rows without changing entry IDs and versions both documents correctly", async () => {
@@ -95,10 +91,7 @@ describe("splitSourceDocumentAction", () => {
       splitVersion: 1,
       movedEntryCount: 2,
     });
-    const live = await fixture.db
-      .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
+    const live = await fixture.db.select().from(ledgerEntries);
     expect(
       live
         .filter((entry) => entry.sourceDocumentId === result.splitSourceDocumentId)
@@ -121,8 +114,7 @@ describe("splitSourceDocumentAction", () => {
       .insert(storedFiles)
       .values(
         [0, 1].map((index) => ({
-          ledgerId: fixture.ledger.id,
-          storageKey: `${fixture.ledger.id}/stored/split-evidence-${index}`,
+          storageKey: `stored/split-evidence-${index}`,
           contentType: "image/jpeg",
           byteSize: 1,
           finalizedAt: new Date(),
@@ -131,7 +123,6 @@ describe("splitSourceDocumentAction", () => {
       .returning();
     await fixture.db.insert(sourceDocumentFiles).values(
       files.map((file, position) => ({
-        ledgerId: fixture.ledger.id,
         sourceDocumentId: fixture.document.id,
         storedFileId: file.id,
         position,
@@ -149,21 +140,15 @@ describe("splitSourceDocumentAction", () => {
     });
 
     const fileIds = files.map((file) => file.id);
-    const splitDetail = await getTargetSourceDocument(
-      fixture.ledger.id,
-      result.splitSourceDocumentId
-    );
+    const splitDetail = await getTargetSourceDocument(result.splitSourceDocumentId);
     expect(splitDetail).toMatchObject({ text: "Long receipt", hasImages: true });
     expect(splitDetail?.files.map((file) => file.id)).toEqual(fileIds);
     expect(splitDetail?.ledgerEntries.map((entry) => entry.id)).toEqual([fixture.ids[1]]);
-    const splitInput = await getSourceDocumentInput(
-      fixture.ledger.id,
-      result.splitSourceDocumentId
-    );
+    const splitInput = await getSourceDocumentInput(result.splitSourceDocumentId);
     expect(splitInput).toMatchObject({ text: "Long receipt" });
     expect(splitInput?.files.map((file) => file.id)).toEqual(fileIds);
     // The original keeps its own input as well.
-    const originalDetail = await getTargetSourceDocument(fixture.ledger.id, fixture.document.id);
+    const originalDetail = await getTargetSourceDocument(fixture.document.id);
     expect(originalDetail).toMatchObject({ text: "Long receipt" });
     expect(originalDetail?.files.map((file) => file.id)).toEqual(fileIds);
   });
@@ -179,11 +164,7 @@ describe("splitSourceDocumentAction", () => {
       movedEntryCount: 1,
     });
     await expect(splitSourceDocumentAction(input)).rejects.toThrow(/not in the source document/);
-    expect(
-      await fixture.db.query.sourceDocuments.findMany({
-        where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
-      })
-    ).toHaveLength(2);
+    expect(await fixture.db.query.sourceDocuments.findMany()).toHaveLength(2);
   });
 
   it("moves an entry edited after it was selected as it is now", async () => {
@@ -225,11 +206,7 @@ describe("splitSourceDocumentAction", () => {
         where: eq(sourceDocuments.id, fixture.document.id),
       })
     ).toMatchObject({ version: 1 });
-    expect(
-      await fixture.db.query.sourceDocuments.findMany({
-        where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
-      })
-    ).toHaveLength(1);
+    expect(await fixture.db.query.sourceDocuments.findMany()).toHaveLength(1);
   });
 
   it("serializes concurrent splits of different entries", async () => {
@@ -249,11 +226,7 @@ describe("splitSourceDocumentAction", () => {
         where: eq(sourceDocuments.id, fixture.document.id),
       })
     ).toMatchObject({ version: 3 });
-    expect(
-      await fixture.db.query.sourceDocuments.findMany({
-        where: eq(sourceDocuments.ledgerId, fixture.ledger.id),
-      })
-    ).toHaveLength(3);
+    expect(await fixture.db.query.sourceDocuments.findMany()).toHaveLength(3);
   });
 
   it("moves a 100-entry batch with contiguous positions", async () => {
@@ -266,10 +239,7 @@ describe("splitSourceDocumentAction", () => {
     });
     expect(result).toMatchObject({ movedEntryCount: 100 });
 
-    const live = await fixture.db
-      .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.ledgerId, fixture.ledger.id));
+    const live = await fixture.db.select().from(ledgerEntries);
     const splitEntries = live
       .filter((entry) => entry.sourceDocumentId === result.splitSourceDocumentId)
       .sort((left, right) => left.position - right.position);

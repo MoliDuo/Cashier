@@ -35,7 +35,6 @@ vi.mock("@/modules/currency/hooks/useAmountDisplay", () => ({
 
 const entry: LedgerEntryEmbeddedViewDto = {
   id: "33333333-3333-4333-8333-333333333333",
-  ledgerId: "11111111-1111-4111-8111-111111111111",
   categoryId: null,
   sourceDocumentId: "22222222-2222-4222-8222-222222222222",
   amount: "18.00",
@@ -93,7 +92,6 @@ describe("SourceDocumentDateOrganization", () => {
       categoryId: "55555555-5555-4555-8555-555555555555",
       category: {
         id: "55555555-5555-4555-8555-555555555555",
-        ledgerId: entry.ledgerId,
         name: "餐饮",
         description: null,
         icon: "Utensils",
@@ -149,7 +147,6 @@ describe("SourceDocumentDateOrganization", () => {
       categoryId: "55555555-5555-4555-8555-555555555555",
       category: {
         id: "55555555-5555-4555-8555-555555555555",
-        ledgerId: entry.ledgerId,
         name: "会员",
         description: null,
         icon: "Crown",

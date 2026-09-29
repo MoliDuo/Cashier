@@ -26,16 +26,15 @@ describe("handleApiV1Route", () => {
 
     const db = getTestDb();
     await db.delete(ledgers);
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     credentialKey = `sk_pipeline_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);
     const [credential] = await db
       .insert(serviceCredentials)
       .values({
-        ledgerId,
         name: "Pipeline Credential",
         tokenHash: computeHash(credentialKey),
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })

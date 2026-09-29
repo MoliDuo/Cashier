@@ -22,25 +22,21 @@ function updateEntry(
 }
 
 describe("single-entry update", () => {
-  let ledgerId: string;
   let sourceDocumentId: string;
   let entryId: string;
 
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = crypto.randomUUID();
     sourceDocumentId = crypto.randomUUID();
     entryId = crypto.randomUUID();
-    await db.insert(ledgers).values({ id: ledgerId, mainCurrency: "CNY" });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await db.insert(ledgers).values({ id: crypto.randomUUID(), mainCurrency: "CNY" });
+    await ensureTestLedgerBooks(db);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
-      ledgerId,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values({
       id: entryId,
-      ledgerId,
       sourceDocumentId,
       itemName: "Lunch",
       amount: "50.000",
@@ -91,7 +87,7 @@ describe("single-entry update", () => {
 
   it("keeps a category another writer set while the edit was in flight", async () => {
     const db = getTestDb();
-    const category = createCategoryData(ledgerId, { name: "Meals", sortOrder: 0 });
+    const category = createCategoryData({ name: "Meals", sortOrder: 0 });
     await db.insert(entryCategories).values(category);
     // A category assignment commits between the edit's rate lookup and its
     // write, without advancing the document version.

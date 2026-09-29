@@ -5,19 +5,15 @@ import { logIdentifier } from "@/lib/security/log-identifier";
 import { validateStoredImageBytes } from "@/lib/storage/image-processing";
 import { readAuthorizedFile } from "@/server/stored-files/reads";
 
-async function loadStoredFileForAI(ledgerId: string, storedFileId: string): Promise<string> {
+async function loadStoredFileForAI(storedFileId: string): Promise<string> {
   try {
-    const read = await readAuthorizedFile(ledgerId, storedFileId);
+    const read = await readAuthorizedFile(storedFileId);
     if (read == null) throw new ValidationError("Stored image is not available for this attempt");
     await validateStoredImageBytes(Buffer.from(read.body), read.file.metadata.contentType);
     return `data:${read.file.metadata.contentType};base64,${Buffer.from(read.body).toString("base64")}`;
   } catch (error) {
     logger.error(
-      {
-        error,
-        ledgerSubject: logIdentifier("ledger", ledgerId),
-        storedFileSubject: logIdentifier("stored-file", storedFileId),
-      },
+      { error, storedFileSubject: logIdentifier("stored-file", storedFileId) },
       "Failed to load stored image evidence for AI"
     );
     throw new AppError("Failed to load stored image evidence", "IMAGE_LOAD_FAILED");
@@ -52,16 +48,13 @@ export function isFailedLoadImageResult(result: LoadImageResult): result is Fail
   return !result.success;
 }
 
-export async function loadStoredFilesForAI(
-  ledgerId: string,
-  storedFileIds: string[]
-): Promise<LoadImageResult[]> {
+export async function loadStoredFilesForAI(storedFileIds: string[]): Promise<LoadImageResult[]> {
   return Promise.all(
     storedFileIds.map(async (storedFileId) => {
       try {
         return {
           url: storedFileId,
-          dataUrl: await loadStoredFileForAI(ledgerId, storedFileId),
+          dataUrl: await loadStoredFileForAI(storedFileId),
           success: true as const,
         };
       } catch (error) {

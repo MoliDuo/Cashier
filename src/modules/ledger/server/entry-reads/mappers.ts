@@ -12,7 +12,7 @@ type DateFields = { createdAt: Date; updatedAt: Date };
 type EntryCategoryRow = Omit<EntryCategoryDto, "createdAt" | "updatedAt"> & DateFields;
 type SourceDocumentRow = Pick<
   SourceDocumentReferenceDto,
-  "id" | "ledgerId" | "title" | "documentDate" | "effectiveDate"
+  "id" | "title" | "documentDate" | "effectiveDate"
 > &
   DateFields & {
     version: number;
@@ -35,7 +35,6 @@ function mapExchangeRate(value: string | null): string | null {
 function mapEntryCategoryDto(category: EntryCategoryRow): EntryCategoryDto {
   return {
     id: category.id,
-    ledgerId: category.ledgerId,
     name: category.name,
     description: category.description,
     icon: category.icon,
@@ -48,20 +47,12 @@ function mapEntryCategoryDto(category: EntryCategoryRow): EntryCategoryDto {
 function mapSourceDocumentReferenceDto(
   doc: Pick<
     SourceDocumentRow,
-    | "id"
-    | "version"
-    | "ledgerId"
-    | "title"
-    | "documentDate"
-    | "effectiveDate"
-    | "createdAt"
-    | "updatedAt"
+    "id" | "version" | "title" | "documentDate" | "effectiveDate" | "createdAt" | "updatedAt"
   >
 ): SourceDocumentReferenceDto {
   return {
     id: doc.id,
     version: doc.version,
-    ledgerId: doc.ledgerId,
     title: doc.title,
     documentDate: doc.documentDate,
     effectiveDate: doc.effectiveDate,
@@ -75,7 +66,6 @@ export function mapLedgerEntryEmbeddedViewDto(
   entry: Pick<
     LedgerEntryRow,
     | "id"
-    | "ledgerId"
     | "categoryId"
     | "sourceDocumentId"
     | "amount"
@@ -95,7 +85,6 @@ export function mapLedgerEntryEmbeddedViewDto(
   }
   return {
     id: entry.id,
-    ledgerId: entry.ledgerId,
     categoryId: entry.categoryId,
     sourceDocumentId: entry.sourceDocumentId,
     amount: entry.amount,
@@ -114,7 +103,6 @@ export function mapLedgerEntryDto(
   entry: Pick<
     LedgerEntryRow,
     | "id"
-    | "ledgerId"
     | "categoryId"
     | "sourceDocumentId"
     | "amount"
@@ -130,11 +118,7 @@ export function mapLedgerEntryDto(
     sourceDocument?: SourceDocumentRow | null;
   }
 ): ActiveLedgerEntryDto {
-  if (
-    entry.sourceDocument == null ||
-    entry.sourceDocument.id !== entry.sourceDocumentId ||
-    entry.sourceDocument.ledgerId !== entry.ledgerId
-  ) {
+  if (entry.sourceDocument == null || entry.sourceDocument.id !== entry.sourceDocumentId) {
     throw new AppError("Active entry has no matching source document", "INVARIANT_VIOLATION");
   }
   return {

@@ -31,8 +31,8 @@ export interface Draft<T> {
 
 const memory = new Map<string, unknown>();
 
-export function draftKey(ledgerId: string, kind: DraftKind, id: string): string {
-  return `draft:${ledgerId}:${kind}:${id}`;
+export function draftKey(kind: DraftKind, id: string): string {
+  return `draft:${kind}:${id}`;
 }
 
 function isStoredDraft(value: unknown): value is StoredDraft {
@@ -103,7 +103,7 @@ export function clearDraft(key: string): void {
   }
 }
 
-/** Every draft on this device, for every ledger, gone — what signing out leaves. */
+/** Every draft on this device gone — what signing out leaves. */
 export function clearAllDrafts(): void {
   memory.clear();
   try {

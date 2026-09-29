@@ -15,7 +15,7 @@ describe("forgetLedgerDataOnThisDevice", () => {
   });
 
   it("clears drafts, the remembered books and nothing of the device's own", () => {
-    const key = draftKey("ledger-1", "new-record-ai", "new");
+    const key = draftKey("new-record-ai", "new");
     writeDraft(key, { text: "午饭 35" });
     keepDraftInMemory(key, ["image"]);
     window.localStorage.setItem("cashier:new-record-book", "book-1");

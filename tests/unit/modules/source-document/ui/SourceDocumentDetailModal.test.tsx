@@ -243,7 +243,6 @@ vi.mock("@/lib/navigation/ledger-detail-navigation", () => ({
 
 const entry: LedgerEntry = {
   id: "entry-1",
-  ledgerId: "ledger-1",
   sourceDocumentId: "doc-1",
   categoryId: null,
   amount: "12.00",
@@ -267,7 +266,6 @@ const secondEntry: LedgerEntry = {
 const sourceDocument: SourceDocument = {
   id: "doc-1",
   version: 1,
-  ledgerId: "ledger-1",
   title: "Receipt",
   text: null,
   files: [],

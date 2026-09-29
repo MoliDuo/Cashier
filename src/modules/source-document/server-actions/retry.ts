@@ -8,6 +8,7 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { withSourceDocumentLedgerAccess } from "./access";
+import { withLedgerAccess } from "@/modules/ledger/access";
 import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 
 /**
@@ -19,15 +20,14 @@ import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
  * Direct retry never accepts input overrides — it always inherits evidence.
  * For editing evidence before retry, use `editRetrySourceDocumentAction`.
  */
-export const retrySourceDocumentAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, sourceDocumentId: string): Promise<RetrySourceDocumentResponseDto> => {
+export const retrySourceDocumentAction = withLedgerAccess(
+  async (sourceDocumentId: string): Promise<RetrySourceDocumentResponseDto> => {
     const result = await retrySourceDocument({
-      ledgerId,
       sourceDocumentId: parseSourceDocumentId(sourceDocumentId),
     });
 
     // Also recover any missed processing intents
-    scheduleProcessingRecoveryAfter(ledgerId);
+    scheduleProcessingRecoveryAfter();
 
     return result;
   }
@@ -43,7 +43,7 @@ export const retrySourceDocumentAction = withSourceDocumentLedgerAccess(
  */
 export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
   async (
-    { ledgerId, ledger },
+    { ledger },
     sourceDocumentId: string,
     input: RetrySourceDocumentInputContract
   ): Promise<RetrySourceDocumentResponseDto> => {
@@ -58,13 +58,12 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
     };
 
     const result = await retrySourceDocument({
-      ledgerId,
       sourceDocumentId: validatedSourceDocumentId,
       input: validatedInput,
     });
 
     // Also recover any missed processing intents
-    scheduleProcessingRecoveryAfter(ledgerId);
+    scheduleProcessingRecoveryAfter();
 
     return result;
   }

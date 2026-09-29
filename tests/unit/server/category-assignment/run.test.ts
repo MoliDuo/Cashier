@@ -39,7 +39,6 @@ const adapters = vi.hoisted(() => ({
     return state.claims === 1
       ? {
           jobId: "job-1",
-          ledgerId: "ledger-1",
           claimToken: "token-1",
           mode: { kind: "ai" as const, candidateCategoryIds: ["category-1", "category-2"] },
           candidates: [

@@ -10,18 +10,15 @@ interface SourceDocumentRetryPayload {
 }
 
 interface RetrySourceDocumentInput {
-  ledgerId: string;
   sourceDocumentId: string;
   input?: SourceDocumentRetryPayload;
 }
 
 export async function retrySourceDocument({
-  ledgerId,
   sourceDocumentId,
   input,
 }: RetrySourceDocumentInput): Promise<RetrySourceDocumentResponseDto> {
   const pending = await submitSourceDocument({
-    ledgerId,
     sourceDocumentId,
     inheritInput: input == null,
     supersedeProcessing: true,

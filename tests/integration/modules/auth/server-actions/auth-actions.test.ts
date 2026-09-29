@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "tests/setup";
 import { signInChallenges } from "@/persistence";
 import { eq } from "drizzle-orm";
-import { ensureTestLedgerBooks } from "tests/helpers/schema-setup";
 
 // Mock Resend before importing actions
 vi.mock("resend", () => ({
@@ -34,7 +33,6 @@ describe("Auth Actions - sendOTPAction", () => {
   beforeEach(async () => {
     // Clean up
     const db = getTestDb();
-    await ensureTestLedgerBooks(db, crypto.randomUUID());
     await db.delete(signInChallenges).where(eq(signInChallenges.email, TEST_EMAIL));
   });
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   entryCategories,
@@ -18,7 +18,6 @@ import type {
  * so a document's input text is read once rather than per entry and image.
  */
 export async function loadCategoryAssignmentDocumentGroups(input: {
-  ledgerId: string;
   ledgerEntryIds: readonly string[];
 }): Promise<readonly CategoryAssignmentDocumentGroup[]> {
   if (input.ledgerEntryIds.length === 0) return [];
@@ -35,19 +34,8 @@ export async function loadCategoryAssignmentDocumentGroups(input: {
       sourceDocumentId: ledgerEntries.sourceDocumentId,
     })
     .from(ledgerEntries)
-    .leftJoin(
-      entryCategories,
-      and(
-        eq(entryCategories.id, ledgerEntries.categoryId),
-        eq(entryCategories.ledgerId, input.ledgerId)
-      )
-    )
-    .where(
-      and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        inArray(ledgerEntries.id, input.ledgerEntryIds)
-      )
-    );
+    .leftJoin(entryCategories, eq(entryCategories.id, ledgerEntries.categoryId))
+    .where(inArray(ledgerEntries.id, input.ledgerEntryIds));
   if (entries.length === 0) return [];
 
   const documentIds = [...new Set(entries.map((entry) => entry.sourceDocumentId))];
@@ -60,9 +48,7 @@ export async function loadCategoryAssignmentDocumentGroups(input: {
         inputText: sourceDocuments.inputText,
       })
       .from(sourceDocuments)
-      .where(
-        and(eq(sourceDocuments.ledgerId, input.ledgerId), inArray(sourceDocuments.id, documentIds))
-      ),
+      .where(inArray(sourceDocuments.id, documentIds)),
     // A text-only record has no files; its entries still take part.
     db
       .select({
@@ -70,12 +56,7 @@ export async function loadCategoryAssignmentDocumentGroups(input: {
         storedFileId: sourceDocumentFiles.storedFileId,
       })
       .from(sourceDocumentFiles)
-      .where(
-        and(
-          eq(sourceDocumentFiles.ledgerId, input.ledgerId),
-          inArray(sourceDocumentFiles.sourceDocumentId, documentIds)
-        )
-      )
+      .where(inArray(sourceDocumentFiles.sourceDocumentId, documentIds))
       .orderBy(sourceDocumentFiles.position, sourceDocumentFiles.storedFileId),
   ]);
 

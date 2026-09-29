@@ -11,10 +11,9 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
-async function getTargetEntryCategoriesAction(ledgerId: string) {
+async function getTargetEntryCategoriesAction() {
   const db = getTestDb();
   const documents = await db.query.sourceDocuments.findMany({
-    where: (documents, { eq }) => eq(documents.ledgerId, ledgerId),
     columns: { id: true },
   });
   for (const document of documents) {
@@ -24,26 +23,21 @@ async function getTargetEntryCategoriesAction(ledgerId: string) {
 }
 
 describe("getEntryCategoriesAction", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = randomUUID();
-    await db.insert(ledgers).values({
-      id: ledgerId,
-    });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await db.insert(ledgers).values({});
+    await ensureTestLedgerBooks(db);
   });
 
   it("returns categories sorted by sortOrder", async () => {
     const db = getTestDb();
     await db.insert(entryCategories).values([
-      { id: randomUUID(), ledgerId, name: "B", sortOrder: 2 },
-      { id: randomUUID(), ledgerId, name: "A", sortOrder: 1 },
-      { id: randomUUID(), ledgerId, name: "C", sortOrder: 3 },
+      { id: randomUUID(), name: "B", sortOrder: 2 },
+      { id: randomUUID(), name: "A", sortOrder: 1 },
+      { id: randomUUID(), name: "C", sortOrder: 3 },
     ]);
 
-    const result = await getTargetEntryCategoriesAction(ledgerId);
+    const result = await getTargetEntryCategoriesAction();
     expect(result.map((c) => c.name)).toEqual(["A", "B", "C"]);
   });
 
@@ -52,7 +46,6 @@ describe("getEntryCategoriesAction", () => {
     const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
-      ledgerId,
       name: "餐饮",
       sortOrder: 1,
     });
@@ -61,8 +54,7 @@ describe("getEntryCategoriesAction", () => {
       .insert(sourceDocuments)
       .values({
         id: randomUUID(),
-        ledgerId,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(doc).toBeDefined();
@@ -73,7 +65,6 @@ describe("getEntryCategoriesAction", () => {
     await db.insert(ledgerEntries).values([
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Item 1",
         amount: "10.00",
@@ -82,7 +73,6 @@ describe("getEntryCategoriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Item 2",
         amount: "20.00",
@@ -91,7 +81,7 @@ describe("getEntryCategoriesAction", () => {
       },
     ]);
 
-    const result = await getTargetEntryCategoriesAction(ledgerId);
+    const result = await getTargetEntryCategoriesAction();
     const firstCategory = result[0];
     expect(firstCategory).toBeDefined();
     expect(firstCategory?.entryCount).toBe(2);

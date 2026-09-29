@@ -6,11 +6,11 @@ import type {
   SplitSourceDocumentResultDto,
 } from "@/modules/source-document/contracts";
 import { splitSourceDocumentInputSchema } from "@/modules/source-document/contract-schemas";
-import { withSourceDocumentLedgerAccess } from "./access";
+import { withLedgerAccess } from "@/modules/ledger/access";
 
-export const splitSourceDocumentAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, input: SplitSourceDocumentInput): Promise<SplitSourceDocumentResultDto> => {
+export const splitSourceDocumentAction = withLedgerAccess(
+  async (input: SplitSourceDocumentInput): Promise<SplitSourceDocumentResultDto> => {
     const validated = splitSourceDocumentInputSchema.parse(input);
-    return splitSourceDocumentAtomically({ ledgerId, ...validated });
+    return splitSourceDocumentAtomically(validated);
   }
 );

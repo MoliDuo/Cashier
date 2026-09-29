@@ -18,19 +18,15 @@ function requireDefined<T>(value: T | undefined, label: string): T {
 }
 
 describe("source-document-queries", () => {
-  let ledgerId = "";
-
   let categoryId = "";
 
   beforeEach(async () => {
     const db = getTestDb();
-    const setup = await createTestUserWithLedger(db);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(db);
 
     const categories = await db
       .insert(entryCategories)
       .values({
-        ledgerId,
         name: "Food",
         sortOrder: 1,
       })
@@ -43,16 +39,14 @@ describe("source-document-queries", () => {
     const [document] = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         title: "Coffee and cake",
         documentDate: "2026-03-20",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     const sourceDocument = requireDefined(document, "filtered subtotal document");
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: sourceDocument.id,
         amount: "20.00",
         // No USD rate is stored for the day, so the entry has no converted amount.
@@ -61,7 +55,6 @@ describe("source-document-queries", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: sourceDocument.id,
         amount: "80.00",
         currency: "CNY",
@@ -71,9 +64,9 @@ describe("source-document-queries", () => {
     ]);
     await activateTestSourceDocumentProjection(db, sourceDocument.id);
 
-    const stream = await listStreamPage(ledgerId, { maxAmount: "30", limit: 10 });
+    const stream = await listStreamPage({ maxAmount: "30", limit: 10 });
     expect(stream.items).toHaveLength(0);
-    await expect(getStreamTotal(ledgerId, { maxAmount: "30" })).resolves.toEqual({
+    await expect(getStreamTotal({ maxAmount: "30" })).resolves.toEqual({
       total: "0",
       unconvertedCount: 0,
     });
@@ -87,19 +80,18 @@ describe("source-document-queries", () => {
 
   it("narrows bills and their shown entries by category and currency, on one entry", async () => {
     const db = getTestDb();
-    const bookId = sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`;
+    const bookId = sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`;
     const docs = await db
       .insert(sourceDocuments)
       .values([
-        { ledgerId, title: "Mixed", documentDate: "2026-03-20", bookId },
-        { ledgerId, title: "Plain", documentDate: "2026-03-21", bookId },
+        { title: "Mixed", documentDate: "2026-03-20", bookId },
+        { title: "Plain", documentDate: "2026-03-21", bookId },
       ])
       .returning();
     const mixed = requireDefined(docs[0], "mixed document");
     const plain = requireDefined(docs[1], "plain document");
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: mixed.id,
         amount: "30.00",
         currency: "CNY",
@@ -107,14 +99,12 @@ describe("source-document-queries", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: mixed.id,
         amount: "5.00",
         currency: "CNY",
         itemName: "Bag",
       },
       {
-        ledgerId,
         sourceDocumentId: plain.id,
         amount: "12.00",
         currency: "CNY",
@@ -125,30 +115,30 @@ describe("source-document-queries", () => {
     await activateTestSourceDocumentProjection(db, plain.id);
 
     // A bill matches when one of its entries does, and shows only those entries.
-    const byCategory = await listStreamPage(ledgerId, { categoryId, limit: 10 });
+    const byCategory = await listStreamPage({ categoryId, limit: 10 });
     expect(byCategory.items.map((item) => item.id)).toEqual([mixed.id]);
     expect(byCategory.items[0]?.ledgerEntries?.map((entry) => entry.itemName)).toEqual(["Noodles"]);
-    await expect(getStreamTotal(ledgerId, { categoryId })).resolves.toMatchObject({
+    await expect(getStreamTotal({ categoryId })).resolves.toMatchObject({
       total: "30",
     });
 
-    const uncategorized = await listStreamPage(ledgerId, {
+    const uncategorized = await listStreamPage({
       categoryId: "__uncategorized__",
       limit: 10,
     });
     expect(uncategorized.items.map((item) => item.id).sort()).toEqual([mixed.id, plain.id].sort());
-    await expect(
-      getStreamTotal(ledgerId, { categoryId: "__uncategorized__" })
-    ).resolves.toMatchObject({ total: "17" });
+    await expect(getStreamTotal({ categoryId: "__uncategorized__" })).resolves.toMatchObject({
+      total: "17",
+    });
 
     // Every entry filter applies to the same entry, as the entry view reads them.
-    const noMatch = await listStreamPage(ledgerId, {
+    const noMatch = await listStreamPage({
       categoryId,
       currency: "USD",
       limit: 10,
     });
     expect(noMatch.items).toEqual([]);
-    const byCurrency = await listStreamPage(ledgerId, {
+    const byCurrency = await listStreamPage({
       currency: "CNY",
       search: "tape",
       limit: 10,
@@ -162,22 +152,19 @@ describe("source-document-queries", () => {
       .insert(sourceDocuments)
       .values([
         {
-          ledgerId,
           title: "completed-total",
           documentDate: "2026-03-15",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "failed-with-active-result",
           documentDate: "2026-03-16",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "completed-out-of-range",
           documentDate: "2026-02-01",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
       ])
       .returning();
@@ -187,7 +174,6 @@ describe("source-document-queries", () => {
 
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: completed.id,
         amount: "125.25",
         currency: "CNY",
@@ -195,7 +181,6 @@ describe("source-document-queries", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: failed.id,
         amount: "75.00",
         currency: "CNY",
@@ -203,7 +188,6 @@ describe("source-document-queries", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: outOfRange.id,
         amount: "200.00",
         currency: "CNY",
@@ -221,7 +205,6 @@ describe("source-document-queries", () => {
         await db
           .insert(extractionAttempts)
           .values({
-            ledgerId,
             sourceDocumentId: failed.id,
             status: "failed",
             finishedAt: new Date(),
@@ -236,24 +219,22 @@ describe("source-document-queries", () => {
       .where(eq(sourceDocuments.id, failed.id));
 
     await expect(
-      getStreamTotal(ledgerId, {
+      getStreamTotal({
         startDate: "2026-03-01",
         endDate: "2026-03-31",
       })
     ).resolves.toEqual({ total: "200.25", unconvertedCount: 0 });
-    await expect(getStreamTotal(ledgerId, { statuses: ["processing"] })).resolves.toEqual({
+    await expect(getStreamTotal({ statuses: ["processing"] })).resolves.toEqual({
       total: "0",
       unconvertedCount: 0,
     });
-    await expect(getStreamTotal(ledgerId, { statuses: ["completed", "failed"] })).resolves.toEqual({
+    await expect(getStreamTotal({ statuses: ["completed", "failed"] })).resolves.toEqual({
       total: "400.25",
       unconvertedCount: 0,
     });
-    await expect(getStreamTotal(ledgerId, { minAmount: "100", maxAmount: "150" })).resolves.toEqual(
-      {
-        total: "125.25",
-        unconvertedCount: 0,
-      }
-    );
+    await expect(getStreamTotal({ minAmount: "100", maxAmount: "150" })).resolves.toEqual({
+      total: "125.25",
+      unconvertedCount: 0,
+    });
   });
 });

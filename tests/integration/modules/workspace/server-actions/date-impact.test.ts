@@ -5,17 +5,15 @@ import { ledgerEntries, ledgers } from "@/persistence";
 import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/server-actions/date-impact";
 
 describe("previewSourceDocumentDateImpactAction", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
+    await createTestUserWithLedger(db);
   });
 
   async function documentWithEntries(count: number) {
     const db = getTestDb();
-    const sourceDocumentId = await createTestSourceDocument(db, ledgerId, { status: "completed" });
+    const sourceDocumentId = await createTestSourceDocument(db, { status: "completed" });
     const entries =
       count === 0
         ? []
@@ -23,7 +21,6 @@ describe("previewSourceDocumentDateImpactAction", () => {
             .insert(ledgerEntries)
             .values(
               Array.from({ length: count }, (_, index) => ({
-                ledgerId,
                 sourceDocumentId,
                 itemName: `Item ${index}`,
                 amount: "10.00",

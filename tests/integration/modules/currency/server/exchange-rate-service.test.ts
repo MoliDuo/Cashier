@@ -5,7 +5,7 @@ import {
   refreshExchangeRates,
   spreadToCalendarDays,
 } from "@/modules/currency/server/exchange-rates";
-import { ledgerSyncState, sourceDocuments } from "@/persistence";
+import { sourceDocuments } from "@/persistence";
 import { exchangeRates } from "@/persistence/schema/currency";
 import { getTestDb } from "tests/setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
@@ -90,16 +90,12 @@ describe("ensureExchangeRates", () => {
 
   it("tells every ledger to refresh when a day's rates arrive", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const before = await db.query.ledgerSyncState.findFirst({
-      where: eq(ledgerSyncState.ledgerId, ledgerId),
-    });
+    await createTestUserWithLedger(db);
+    const before = await db.query.ledgerSyncState.findFirst();
 
     await insertExchangeRates("2024-01-22", { USD: 1.1 });
 
-    const after = await db.query.ledgerSyncState.findFirst({
-      where: eq(ledgerSyncState.ledgerId, ledgerId),
-    });
+    const after = await db.query.ledgerSyncState.findFirst();
     expect(after!.version).toBeGreaterThan(before?.version ?? BigInt(0));
     expect(after!.statsVersion).toBeGreaterThan(before?.statsVersion ?? BigInt(0));
   });
@@ -112,11 +108,10 @@ describe("refreshExchangeRates", () => {
 
   it("fills document days, replaces provisional days, and keeps final ones", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     await db.insert(sourceDocuments).values({
-      ledgerId,
       documentDate: "2024-03-05",
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await insertExchangeRates(
       "2024-03-02",
@@ -153,9 +148,8 @@ describe("refreshExchangeRates", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
     await db.insert(sourceDocuments).values({
-      ledgerId,
       documentDate: "2024-03-06",
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await refreshExchangeRates(new Date(now.getTime() + 5 * 60_000));
     expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -163,10 +157,10 @@ describe("refreshExchangeRates", () => {
 
   it("converts entries of a day once refresh fills its rates", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const [document] = await db
       .insert(sourceDocuments)
-      .values({ ledgerId, documentDate: "2024-03-05", bookId: await testBookId(db, ledgerId) })
+      .values({ documentDate: "2024-03-05", bookId: await testBookId(db) })
       .returning();
     vi.spyOn(global, "fetch").mockResolvedValue(
       providerResponse({ "2024-03-05": { USD: 1.25, CNY: 7.5 } })

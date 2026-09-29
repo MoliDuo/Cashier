@@ -12,7 +12,6 @@ import { assignSourceDocumentBookAction } from "@/modules/source-document/server
  * nothing at all for a record that is gone.
  */
 describe("assignSourceDocumentBookAction", () => {
-  let ledgerId = "";
   let documentId = "";
   let targetBookId = "";
 
@@ -26,11 +25,11 @@ describe("assignSourceDocumentBookAction", () => {
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
-    documentId = await createTestSourceDocument(db, ledgerId);
+    await createTestUserWithLedger(db);
+    documentId = await createTestSourceDocument(db);
     const [target] = await db
       .insert(books)
-      .values({ ledgerId, name: "哞哞的", sortOrder: 2 })
+      .values({ name: "哞哞的", sortOrder: 2 })
       .returning({ id: books.id });
     targetBookId = target!.id;
   });

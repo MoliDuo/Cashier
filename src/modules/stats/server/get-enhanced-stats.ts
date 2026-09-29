@@ -5,6 +5,6 @@ import { queryEnhancedStats } from "./enhanced-stats-query";
 
 export async function getEnhancedStats(input: GetEnhancedStatsInput): Promise<EnhancedStatsDto> {
   const validatedInput = parseEnhancedStatsInput(input);
-  const { ledger } = await requireLedgerAccess();
-  return queryEnhancedStats(ledger.id, validatedInput);
+  await requireLedgerAccess();
+  return queryEnhancedStats(validatedInput);
 }

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
@@ -40,14 +40,13 @@ function nextDateOrganizationSuggestion(
 export async function replaceManualProjection(
   tx: PostgresTransaction,
   input: {
-    ledgerId: string;
     sourceDocumentId: string;
     entries: readonly LedgerProjectionEntryContract[];
     previousEntries: readonly (typeof ledgerEntries.$inferSelect)[];
   }
 ): Promise<void> {
   assertEntryValues(input.entries);
-  await assertCategoryOwnership(tx, input.ledgerId, input.entries);
+  await assertCategoryOwnership(tx, input.entries);
   const requestedIds = input.entries.flatMap((entry) => (entry.id == null ? [] : [entry.id]));
   if (new Set(requestedIds).size !== requestedIds.length) {
     throw new ValidationError("A ledger entry may only appear once per source document");
@@ -70,11 +69,7 @@ export async function replaceManualProjection(
     .filter((previous) => !retainedIds.has(previous.id))
     .map((previous) => previous.id);
   if (removedIds.length > 0) {
-    await tx
-      .delete(ledgerEntries)
-      .where(
-        and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, removedIds))
-      );
+    await tx.delete(ledgerEntries).where(inArray(ledgerEntries.id, removedIds));
   }
 
   const newEntries = input.entries.flatMap((entry, position) => {
@@ -83,7 +78,6 @@ export async function replaceManualProjection(
       ? [
           {
             id: entry.id ?? crypto.randomUUID(),
-            ledgerId: input.ledgerId,
             sourceDocumentId: input.sourceDocumentId,
             position,
             categoryId: entry.categoryId,
@@ -142,7 +136,6 @@ export async function replaceManualProjection(
         sql`, `
       )}) AS updates(id, position, category_id, amount, currency, item_name, description)
       WHERE entry.id = updates.id
-        AND entry.ledger_id = ${input.ledgerId}
         AND (entry.position, entry.category_id, entry.amount, entry.currency,
              entry.item_name, entry.description)
           IS DISTINCT FROM (updates.position, updates.category_id, updates.amount,
@@ -159,7 +152,6 @@ export async function replaceManualProjection(
 export async function replaceDocumentEntriesInTransaction(
   tx: PostgresTransaction,
   input: {
-    ledgerId: string;
     document: LockedSourceDocument;
     previousEntries: readonly (typeof ledgerEntries.$inferSelect)[];
     sourceDocumentId: string;
@@ -174,7 +166,6 @@ export async function replaceDocumentEntriesInTransaction(
 
   await replaceManualProjection(tx, {
     previousEntries: input.previousEntries,
-    ledgerId: input.ledgerId,
     sourceDocumentId: input.sourceDocumentId,
     entries: input.entries,
   });
@@ -200,7 +191,7 @@ export async function replaceDocumentEntriesInTransaction(
         : {}),
       updatedAt: new Date(),
     })
-    .where(activeDocumentWhere(input.ledgerId, input.sourceDocumentId))
+    .where(activeDocumentWhere(input.sourceDocumentId))
     .returning({ id: sourceDocuments.id })
     .then((rows) => rows[0]);
   if (updated == null) throw new ConflictError("Source document changed during the edit");

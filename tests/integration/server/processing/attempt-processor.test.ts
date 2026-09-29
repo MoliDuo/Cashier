@@ -40,13 +40,12 @@ function modelReply(
 }
 
 describe("processAttempt", () => {
-  let ledgerId = "";
   let ensureRates: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
+    await createTestUserWithLedger(db);
     // The day's rates come from the network; here only the day asked for matters.
     ensureRates = vi.spyOn(exchangeRates, "ensureExchangeRates").mockResolvedValue(undefined);
   });
@@ -58,9 +57,8 @@ describe("processAttempt", () => {
   async function process(content: string, documentDate: string | null = "2026-09-01") {
     const db = getTestDb();
     const pending = await createPendingAttempt({
-      ledgerId,
       input: { text: "receipt", storedFileIds: [], documentDate },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const sourceDocumentId = pending.document.id;
     const attemptId = pending.attempt.id;
@@ -74,7 +72,6 @@ describe("processAttempt", () => {
 
     const outcome = await attemptProcessor(() => ({ generate })).process({
       signal: new AbortController().signal,
-      ledgerId,
       sourceDocumentId,
       attemptId,
       lease,

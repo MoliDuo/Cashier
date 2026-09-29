@@ -1,12 +1,6 @@
 import { relations } from "drizzle-orm";
 import { users, loginEmails } from "./schema/auth";
-import {
-  books,
-  ledgers,
-  entryCategories,
-  ledgerEntries,
-  serviceCredentials,
-} from "./schema/ledger";
+import { books, entryCategories, ledgerEntries, serviceCredentials } from "./schema/ledger";
 import { sourceDocuments } from "./schema/source-document";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -20,36 +14,16 @@ export const loginEmailsRelations = relations(loginEmails, ({ one }) => ({
   }),
 }));
 
-export const booksRelations = relations(books, ({ one, many }) => ({
-  ledger: one(ledgers, {
-    fields: [books.ledgerId],
-    references: [ledgers.id],
-  }),
+export const booksRelations = relations(books, ({ many }) => ({
   sourceDocuments: many(sourceDocuments),
   serviceCredentials: many(serviceCredentials),
 }));
 
-export const ledgersRelations = relations(ledgers, ({ many }) => ({
-  books: many(books),
-  ledgerEntries: many(ledgerEntries),
-  sourceDocuments: many(sourceDocuments),
-  entryCategories: many(entryCategories),
-  serviceCredentials: many(serviceCredentials),
-}));
-
-export const entryCategoriesRelations = relations(entryCategories, ({ one, many }) => ({
-  ledger: one(ledgers, {
-    fields: [entryCategories.ledgerId],
-    references: [ledgers.id],
-  }),
+export const entryCategoriesRelations = relations(entryCategories, ({ many }) => ({
   ledgerEntries: many(ledgerEntries),
 }));
 
 export const sourceDocumentsRelations = relations(sourceDocuments, ({ one, many }) => ({
-  ledger: one(ledgers, {
-    fields: [sourceDocuments.ledgerId],
-    references: [ledgers.id],
-  }),
   book: one(books, {
     fields: [sourceDocuments.bookId],
     references: [books.id],
@@ -58,10 +32,6 @@ export const sourceDocumentsRelations = relations(sourceDocuments, ({ one, many 
 }));
 
 export const ledgerEntriesRelations = relations(ledgerEntries, ({ one }) => ({
-  ledger: one(ledgers, {
-    fields: [ledgerEntries.ledgerId],
-    references: [ledgers.id],
-  }),
   category: one(entryCategories, {
     fields: [ledgerEntries.categoryId],
     references: [entryCategories.id],
@@ -73,10 +43,6 @@ export const ledgerEntriesRelations = relations(ledgerEntries, ({ one }) => ({
 }));
 
 export const serviceCredentialsRelations = relations(serviceCredentials, ({ one }) => ({
-  ledger: one(ledgers, {
-    fields: [serviceCredentials.ledgerId],
-    references: [ledgers.id],
-  }),
   book: one(books, {
     fields: [serviceCredentials.bookId],
     references: [books.id],

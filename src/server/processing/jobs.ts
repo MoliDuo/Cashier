@@ -25,7 +25,6 @@ export async function claimProcessingJob(
 ): Promise<ProcessingClaimContract | null> {
   const token = crypto.randomUUID();
   const claimed = await db.execute<{
-    ledger_id: string;
     source_document_id: string;
     id: string;
     submitted_at: Date | string;
@@ -35,8 +34,7 @@ export async function claimProcessingJob(
     WITH candidate AS (
       SELECT attempt.id FROM extraction_attempts attempt
       JOIN source_documents document
-        ON document.ledger_id = attempt.ledger_id
-       AND document.id = attempt.source_document_id
+        ON document.id = attempt.source_document_id
        AND document.latest_attempt_id = attempt.id
       WHERE attempt.id = ${attemptId}
         AND attempt.status = 'processing'
@@ -48,13 +46,12 @@ export async function claimProcessingJob(
     SET claim_token = ${token}, claim_expires_at = ${leaseExpiry()},
         attempt_count = attempt.attempt_count + 1
     FROM candidate WHERE attempt.id = candidate.id
-    RETURNING attempt.ledger_id, attempt.source_document_id, attempt.id,
+    RETURNING attempt.source_document_id, attempt.id,
       attempt.submitted_at, attempt.attempt_count, attempt.claim_expires_at
   `);
   const row = claimed.rows[0];
   if (row == null) return null;
   return {
-    ledgerId: row.ledger_id,
     job: {
       sourceDocumentId: row.source_document_id,
       attemptId: row.id,
@@ -67,12 +64,11 @@ export async function claimProcessingJob(
 }
 
 /**
- * The ledger's processing attempts that are due but that no run holds: their
+ * The processing attempts that are due but that no run holds: their
  * `after()` was lost, their function was killed, or their retry came due.
  * Nothing is written; a duplicate schedule just finds the attempt claimed.
  */
 export async function recoverProcessingJobs(
-  ledgerId: string,
   maxBatch: number
 ): Promise<readonly RecoverableProcessingJobContract[]> {
   const due = await db.execute<{
@@ -89,11 +85,9 @@ export async function recoverProcessingJobs(
       attempt.next_attempt_at AS "nextAttemptAt"
     FROM extraction_attempts attempt
     JOIN source_documents document
-      ON document.ledger_id = attempt.ledger_id
-     AND document.id = attempt.source_document_id
+      ON document.id = attempt.source_document_id
      AND document.latest_attempt_id = attempt.id
-    WHERE attempt.ledger_id = ${ledgerId}
-      AND attempt.status = 'processing'
+    WHERE attempt.status = 'processing'
       AND attempt.next_attempt_at <= clock_timestamp()
       AND ${leaseFree(claimToken, claimExpiresAt)}
     ORDER BY attempt.next_attempt_at, attempt.submitted_at, attempt.id

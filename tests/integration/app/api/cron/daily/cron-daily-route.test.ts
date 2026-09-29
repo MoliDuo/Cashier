@@ -67,14 +67,13 @@ describe("GET /api/cron/daily", () => {
     expect(stale.rows).toHaveLength(0);
   });
 
-  it("schedules processing attempts whose run was lost, in every ledger", async () => {
+  it("schedules processing attempts whose run was lost", async () => {
     vi.stubEnv("CRON_SECRET", SECRET);
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const pending = await createPendingAttempt({
-      ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
     await GET(cronRequest(`Bearer ${SECRET}`));

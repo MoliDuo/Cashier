@@ -29,7 +29,6 @@ const userId = "00000000-0000-0000-0000-000000000000";
 
 /** Entries the model can be asked about, each on the live document. */
 async function seedEntries(input: {
-  ledgerId: string;
   documentId: string;
   categoryId: string | null;
   count: number;
@@ -39,7 +38,6 @@ async function seedEntries(input: {
   await db.insert(ledgerEntries).values(
     ids.map((id, position) => ({
       id,
-      ledgerId: input.ledgerId,
       categoryId: input.categoryId,
       sourceDocumentId: input.documentId,
       position,
@@ -54,24 +52,24 @@ async function seedEntries(input: {
 async function setupLedger() {
   const db = getTestDb();
   const ledger = createLedgerData();
-  const food = createCategoryData(ledger.id, { name: "吃喝", sortOrder: 0 });
-  const home = createCategoryData(ledger.id, { name: "居家", sortOrder: 1 });
-  const document = createSourceDocumentData(ledger.id);
+  const food = createCategoryData({ name: "吃喝", sortOrder: 0 });
+  const home = createCategoryData({ name: "居家", sortOrder: 1 });
+  const document = createSourceDocumentData();
   await db.insert(ledgers).values(ledger);
-  await ensureTestLedgerBooks(db, ledger.id);
+  await ensureTestLedgerBooks(db);
   await db.insert(entryCategories).values([food, home]);
   await db.insert(sourceDocuments).values({
     ...document,
-    bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+    bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
   });
   await activateTestSourceDocumentProjection(db, document.id);
-  return { ledger, food, home, document };
+  return { food, home, document };
 }
 
-async function submitSelection(
-  _ledgerId: string,
-  input: { ledgerEntryIds: string[]; candidateCategoryIds: string[] }
-) {
+async function submitSelection(input: {
+  ledgerEntryIds: string[];
+  candidateCategoryIds: string[];
+}) {
   return startCategoryAssignmentAction({
     requestKey: crypto.randomUUID(),
     mode: { kind: "ai", candidateCategoryIds: input.candidateCategoryIds },
@@ -89,9 +87,8 @@ describe("submitSelection", () => {
 
   it("runs the whole chain and reports what it moved", async () => {
     const db = getTestDb();
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 2,
@@ -105,7 +102,7 @@ describe("submitSelection", () => {
       }),
     });
 
-    const job = await submitSelection(ledger.id, {
+    const job = await submitSelection({
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -122,15 +119,13 @@ describe("submitSelection", () => {
     });
     const rows = await db
       .select({ id: ledgerEntries.id, categoryId: ledgerEntries.categoryId })
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.ledgerId, ledger.id));
+      .from(ledgerEntries);
     expect(rows.every((row) => row.categoryId === food.id)).toBe(true);
   });
 
   it("fails incomplete model output instead of leaving entries undecided", async () => {
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: home.id,
       count: 3,
@@ -145,7 +140,7 @@ describe("submitSelection", () => {
       }),
     });
 
-    await submitSelection(ledger.id, {
+    await submitSelection({
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -161,9 +156,8 @@ describe("submitSelection", () => {
   });
 
   it("counts an entry the model left in place as confirmed", async () => {
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: food.id,
       count: 1,
@@ -172,7 +166,7 @@ describe("submitSelection", () => {
       content: JSON.stringify({ decisions: [{ entry_index: 1, category_index: 1 }] }),
     });
 
-    await submitSelection(ledger.id, {
+    await submitSelection({
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -186,15 +180,14 @@ describe("submitSelection", () => {
   });
 
   it("accepts selections above 100 but rejects a candidate set that is too small", async () => {
-    const { ledger, food, document } = await setupLedger();
+    const { food, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 3,
     });
     await expect(
-      submitSelection(ledger.id, {
+      submitSelection({
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id],
       })
@@ -202,16 +195,15 @@ describe("submitSelection", () => {
   });
 
   it("rejects a candidate category that is not in the ledger", async () => {
-    const { ledger, food, document } = await setupLedger();
+    const { food, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 1,
     });
 
     await expect(
-      submitSelection(ledger.id, {
+      submitSelection({
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id, crypto.randomUUID()],
       })
@@ -221,9 +213,8 @@ describe("submitSelection", () => {
 
   it("rejects a candidate set that is no longer live before registering anything", async () => {
     const db = getTestDb();
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 1,
@@ -231,7 +222,7 @@ describe("submitSelection", () => {
     await db.delete(entryCategories).where(eq(entryCategories.id, home.id));
 
     await expect(
-      submitSelection(ledger.id, {
+      submitSelection({
         ledgerEntryIds: entryIds,
         candidateCategoryIds: [food.id, home.id],
       })
@@ -240,16 +231,15 @@ describe("submitSelection", () => {
   });
 
   it("reports a provider failure without losing the run", async () => {
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 1,
     });
     generateContent.mockResolvedValue({ content: "not json at all" });
 
-    await submitSelection(ledger.id, {
+    await submitSelection({
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
@@ -262,9 +252,8 @@ describe("submitSelection", () => {
   });
 
   it("refuses a second run while one is active", async () => {
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 1,
@@ -274,14 +263,14 @@ describe("submitSelection", () => {
     const held = Promise.withResolvers<never>();
     held.promise.catch(() => {});
     generateContent.mockReturnValue(held.promise);
-    await submitSelection(ledger.id, {
+    await submitSelection({
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
 
     try {
       await expect(
-        submitSelection(ledger.id, {
+        submitSelection({
           ledgerEntryIds: entryIds,
           candidateCategoryIds: [food.id, home.id],
         })
@@ -292,9 +281,8 @@ describe("submitSelection", () => {
   });
 
   it("returns the started run when the same request is sent again", async () => {
-    const { ledger, food, home, document } = await setupLedger();
+    const { food, home, document } = await setupLedger();
     const entryIds = await seedEntries({
-      ledgerId: ledger.id,
       documentId: document.id,
       categoryId: null,
       count: 2,

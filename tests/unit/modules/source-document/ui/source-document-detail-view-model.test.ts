@@ -4,7 +4,6 @@ import { buildSourceDocumentDetailViewModel } from "@/modules/source-document/ui
 
 const entry: LedgerEntry = {
   id: "entry-1",
-  ledgerId: "ledger-1",
   categoryId: null,
   sourceDocumentId: "document-1",
   amount: "10",

@@ -12,14 +12,13 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
-async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entryDate?: string) {
+async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      ledgerId,
       documentDate: entryDate ?? null,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -31,25 +30,21 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
 }
 
 describe("deleteLedgerEntryAction", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = randomUUID();
     await db.insert(ledgers).values({
-      id: ledgerId,
+      id: randomUUID(),
     });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await ensureTestLedgerBooks(db);
   });
 
   it("soft-deletes an entry", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     const [entry] = await db
       .insert(ledgerEntries)
       .values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Test",
         amount: "10.00",

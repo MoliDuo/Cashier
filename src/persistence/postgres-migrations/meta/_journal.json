@@ -162,6 +162,13 @@
       "when": 1790666438033,
       "tag": "0022_date_new_records_in_ledger_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790698235277,
+      "tag": "0023_ledger_singleton",
+      "breakpoints": true
     }
   ]
 }

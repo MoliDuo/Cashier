@@ -25,12 +25,7 @@ async function submitInTransaction(
         latestAttemptId: sourceDocuments.latestAttemptId,
       })
       .from(sourceDocuments)
-      .where(
-        and(
-          eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, input.sourceDocumentId)
-        )
-      )
+      .where(eq(sourceDocuments.id, input.sourceDocumentId))
       .for("update")
       .then((rows) => rows[0]);
     if (document == null) throw new NotFoundError("Source document");
@@ -49,7 +44,6 @@ async function submitInTransaction(
         .from(extractionAttempts)
         .where(
           and(
-            eq(extractionAttempts.ledgerId, input.ledgerId),
             eq(extractionAttempts.id, inputAttemptId),
             eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId)
           )
@@ -60,12 +54,7 @@ async function submitInTransaction(
         await tx
           .select({ id: sourceDocumentFiles.storedFileId })
           .from(sourceDocumentFiles)
-          .where(
-            and(
-              eq(sourceDocumentFiles.ledgerId, input.ledgerId),
-              eq(sourceDocumentFiles.sourceDocumentId, input.sourceDocumentId)
-            )
-          )
+          .where(eq(sourceDocumentFiles.sourceDocumentId, input.sourceDocumentId))
           .orderBy(asc(sourceDocumentFiles.position))
       ).map((file) => file.id);
       attemptInput = { ...previousInput, text: document.inputText, storedFileIds };
@@ -77,7 +66,6 @@ async function submitInTransaction(
         .set({ status: "cancelled", finishedAt: new Date() })
         .where(
           and(
-            eq(extractionAttempts.ledgerId, input.ledgerId),
             eq(extractionAttempts.id, document.latestAttemptId),
             eq(extractionAttempts.status, "processing")
           )
@@ -97,7 +85,6 @@ async function submitInTransaction(
     tx,
     input.sourceDocumentId == null
       ? {
-          ledgerId: input.ledgerId,
           bookId: input.bookId!,
           input: attemptInput,
           ...(idempotency == null
@@ -111,7 +98,6 @@ async function submitInTransaction(
               }),
         }
       : {
-          ledgerId: input.ledgerId,
           sourceDocumentId: input.sourceDocumentId,
           input: attemptInput,
         }
@@ -131,12 +117,10 @@ function idempotencySource(idempotency: SourceDocumentIdempotencyInput): string 
 }
 
 /**
- * The document an earlier create request with this key made in the ledger, or
- * null. Keys never expire; one reused with other content is refused rather
+ * The document an earlier create request with this key made, or null. Keys never expire; one reused with other content is refused rather
  * than replayed.
  */
 export async function findIdempotentSubmission(
-  ledgerId: string,
   idempotency: SourceDocumentIdempotencyInput,
   executor: PostgresTransaction | typeof db = db
 ): Promise<SourceDocumentSubmissionContract | null> {
@@ -153,7 +137,6 @@ export async function findIdempotentSubmission(
     .from(sourceDocuments)
     .where(
       and(
-        eq(sourceDocuments.ledgerId, ledgerId),
         eq(sourceDocuments.idempotencySource, idempotencySource(idempotency)),
         eq(sourceDocuments.idempotencyKey, key)
       )
@@ -179,8 +162,8 @@ export async function submitSourceDocument(
 
 /**
  * Creates a document that carries the request's idempotency key, or replays
- * the one an earlier request with the key created. Creations in a ledger queue
- * on its lock, so a concurrent repeat waits for the first to commit and then
+ * the one an earlier request with the key created. Creations queue on the
+ * ledger lock, so a concurrent repeat waits for the first to commit and then
  * finds its document.
  */
 export async function submitSourceDocumentIdempotently(
@@ -191,8 +174,8 @@ export async function submitSourceDocumentIdempotently(
   | { replayed: true; existing: SourceDocumentSubmissionContract }
 > {
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    const existing = await findIdempotentSubmission(input.ledgerId, idempotency, tx);
+    await lockLedgerForUpdate(tx);
+    const existing = await findIdempotentSubmission(idempotency, tx);
     if (existing != null) return { replayed: true, existing };
     return { replayed: false, submission: await submitInTransaction(tx, input, idempotency) };
   });
@@ -212,7 +195,6 @@ export interface SourceDocumentSubmissionResult {
 
 /** Atomically persists submitted evidence as a processing attempt ready to be claimed. */
 export type SourceDocumentSubmissionInput = {
-  ledgerId: string;
   input?: SourceDocumentInputContract;
   inheritInput?: boolean;
   supersedeProcessing?: boolean;

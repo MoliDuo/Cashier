@@ -41,11 +41,10 @@ export async function createSourceDocumentFromCredentialRequest(input: {
 }): Promise<SourceDocumentSubmissionContract> {
   const { credential, payload } = input;
   // An upload without a day of its own is dated today in the ledger's zone.
-  const settings = await getLedgerSettings(credential.ledgerId);
+  const settings = await getLedgerSettings();
   if (settings == null) throw new NotFoundError("Ledger");
 
   const result = await createAndQueueSourceDocument({
-    ledgerId: credential.ledgerId,
     bookId: credential.bookId,
     input: { kind: "inline", images: payload.images },
     ...(payload.entryDate == null ? {} : { documentDate: payload.entryDate }),
@@ -63,9 +62,9 @@ export async function createSourceDocumentFromCredentialRequest(input: {
     ...(input.requestId == null ? {} : { requestId: input.requestId }),
   });
 
-  // Also recover older pending intents for the ledger. The claim CAS makes
+  // Also recover older pending intents. The claim CAS makes
   // duplicate scheduling harmless.
-  scheduleProcessingRecoveryAfter(credential.ledgerId, input.requestId);
+  scheduleProcessingRecoveryAfter(input.requestId);
 
   return result;
 }

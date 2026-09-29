@@ -11,20 +11,17 @@ import {
 } from "tests/helpers/schema-setup";
 
 describe("createLedgerEntryAction", () => {
-  let ledgerId: string;
   let sourceDocumentId: string;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     const db = getTestDb();
-    ledgerId = crypto.randomUUID();
     sourceDocumentId = crypto.randomUUID();
-    await db.insert(ledgers).values({ id: ledgerId, mainCurrency: "CNY" });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await db.insert(ledgers).values({ id: crypto.randomUUID(), mainCurrency: "CNY" });
+    await ensureTestLedgerBooks(db);
     await db.insert(sourceDocuments).values({
       id: sourceDocumentId,
-      ledgerId,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, sourceDocumentId);
   });
@@ -51,7 +48,7 @@ describe("createLedgerEntryAction", () => {
 
   it("fills an entry given only an amount and a name from the ledger's defaults", async () => {
     const db = getTestDb();
-    await db.update(ledgers).set({ mainCurrency: "JPY" }).where(eq(ledgers.id, ledgerId));
+    await db.update(ledgers).set({ mainCurrency: "JPY" });
 
     const result = await createLedgerEntryAction({
       sourceDocumentId,

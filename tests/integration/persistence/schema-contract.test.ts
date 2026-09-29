@@ -1,8 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { getTestDb } from "tests/setup";
+import { getTestDb, getTestPool } from "tests/setup";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
-import { entryCategories, ledgerEntries } from "@/persistence";
+import { entryCategories, ledgerEntries, ledgers } from "@/persistence";
 import * as schema from "@/persistence";
 import { getTableConfig, type AnyPgTable } from "drizzle-orm/pg-core";
 
@@ -304,40 +305,107 @@ describe("PostgreSQL schema contract", () => {
     ]);
   });
 
-  it("rejects cross-ledger category assignment with an FK violation", async () => {
+  it("keeps a single ledger", async () => {
     const db = getTestDb();
-    const { ledgerId: firstLedger } = await createTestUserWithLedger(db);
-    const { ledgerId: secondLedger } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      "22222222-2222-4222-8222-222222222222"
-    );
-    const category = (
-      await db
-        .insert(entryCategories)
-        .values({ ledgerId: firstLedger, name: "Other Ledger" })
-        .returning()
-    )[0];
-    if (category == null) throw new Error("Expected category insert to return a row");
+    await createTestUserWithLedger(db);
+    await expect(db.insert(ledgers).values({})).rejects.toMatchObject({
+      cause: expect.objectContaining({ code: "23505", constraint: "uq_ledgers_singleton" }),
+    });
+  });
 
-    const sourceDocumentId = await createTestSourceDocument(db, secondLedger);
-    await expect(
-      db.insert(ledgerEntries).values({
-        ledgerId: secondLedger,
-        sourceDocumentId,
-        categoryId: category.id,
-        amount: "1.00",
-        currency: "CNY",
-        itemName: "Cross-ledger category",
-      })
-    ).rejects.toMatchObject({ cause: expect.objectContaining({ code: "23503" }) });
+  it("fills the retired ledger_id from the one ledger, so the tenant keys still hold", async () => {
+    const db = getTestDb();
+    await createTestUserWithLedger(db);
+    const [category] = await db.insert(entryCategories).values({ name: "Food" }).returning();
+    const sourceDocumentId = await createTestSourceDocument(db);
+    await db.insert(ledgerEntries).values({
+      sourceDocumentId,
+      categoryId: category!.id,
+      amount: "1.00",
+      currency: "CNY",
+      itemName: "Noodles",
+    });
+
+    const unfilled = await db.execute<{ table_name: string }>(sql`
+      SELECT 'books' AS table_name FROM books WHERE ledger_id IS DISTINCT FROM current_ledger_id()
+      UNION ALL SELECT 'entry_categories' FROM entry_categories
+        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
+      UNION ALL SELECT 'source_documents' FROM source_documents
+        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
+      UNION ALL SELECT 'extraction_attempts' FROM extraction_attempts
+        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
+      UNION ALL SELECT 'ledger_entries' FROM ledger_entries
+        WHERE ledger_id IS DISTINCT FROM current_ledger_id()
+    `);
+    expect(unfilled.rows).toEqual([]);
+  });
+
+  it("refuses to migrate a database that holds more than one ledger", async () => {
+    const migration = readFileSync(
+      "src/persistence/postgres-migrations/0023_ledger_singleton.sql",
+      "utf8"
+    );
+    const guard = migration.split("--> statement-breakpoint")[0]!;
+    const client = await getTestPool().connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DROP INDEX uq_ledgers_singleton");
+      await client.query("INSERT INTO ledgers DEFAULT VALUES");
+      await client.query("INSERT INTO ledgers DEFAULT VALUES");
+      await expect(client.query(guard)).rejects.toThrow(
+        "Cashier expects at most one ledger, found 2"
+      );
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
   });
 
   it("has no named constraint or index drift from the Drizzle model", async () => {
     // Names a later contract migration drops once the model has let go of
-    // them; empty while the model and the database agree.
-    const retiredNames = new Set<string>([]);
+    // them: the keys and indexes built on `ledger_id`, which 0024 drops or
+    // rebuilds without it.
+    const retiredNames = new Set<string>([
+      "fk_books_ledger",
+      "uq_books_ledger_id_id",
+      "idx_books_active_sort",
+      "uq_books_active_name",
+      "fk_entry_categories_ledger",
+      "uq_entry_categories_ledger_id_id",
+      "idx_entry_categories_sort",
+      "uq_entry_categories_ledger_name",
+      "fk_ledger_entries_ledger",
+      "fk_ledger_entries_category",
+      "fk_ledger_entries_source_document",
+      "idx_ledger_entries_category",
+      "idx_ledger_entries_document_position",
+      "fk_service_credentials_ledger",
+      "fk_service_credentials_book",
+      "idx_service_credentials_ledger_book",
+      "fk_source_documents_ledger",
+      "fk_source_documents_book",
+      "fk_source_documents_latest_attempt",
+      "uq_source_documents_ledger_id_id",
+      "uq_source_documents_idempotency",
+      "idx_source_documents_feed",
+      "idx_source_documents_book_feed",
+      "fk_extraction_attempts_source_document",
+      "uq_extraction_attempts_ledger_document_id",
+      "idx_extraction_attempts_due",
+      "fk_stored_files_ledger",
+      "uq_stored_files_ledger_id_id",
+      "fk_source_document_files_source_document",
+      "fk_source_document_files_stored_file",
+      "idx_source_document_files_ledger_file",
+      "fk_category_assignment_jobs_ledger",
+      "uq_category_assignment_jobs_request_key",
+      "uq_category_assignment_jobs_active",
+      "fk_category_assignment_documents_ledger",
+      "idx_category_assignment_documents_ledger_job",
+      "fk_category_assignment_entries_ledger",
+      "idx_category_assignment_entries_ledger_job",
+      "fk_ledger_sync_state_ledger",
+    ]);
     const model = getDrizzleContractNames();
     const constraintRows = await fetchConstraints();
     const databaseConstraints = new Set(

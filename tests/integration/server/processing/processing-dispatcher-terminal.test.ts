@@ -25,23 +25,21 @@ afterEach(() => {
 
 /**
  * Creates a pending attempt + job for a single source document.
- * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions
+ * Each call uses a fresh user to avoid unique-constraint collisions
  * when called multiple times within one test.
  */
 async function pendingIntent(
   requestedAt = "2026-07-15T00:00:00.000Z",
   userId = crypto.randomUUID()
-): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
+): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
-  const bookId = await testBookId(db, ledgerId);
+  await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
-    ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
   });
   return {
-    ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,
@@ -173,7 +171,7 @@ describe("executeProcessingJob — standalone function with real adapter/process
 
   it("does not run a job whose attempt was superseded", async () => {
     const db = getTestDb();
-    const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
     const generate = vi.fn().mockRejectedValue(new Error("AI service unavailable"));
     vi.mocked(createAIContext).mockReturnValue({ generate });
@@ -187,7 +185,6 @@ describe("executeProcessingJob — standalone function with real adapter/process
     const newAttemptId = crypto.randomUUID();
     await db.insert(extractionAttempts).values({
       id: newAttemptId,
-      ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       status: "processing",
     });

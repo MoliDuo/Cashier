@@ -24,7 +24,6 @@ import { computeCategoryCollectionRevision } from "@/modules/ledger/category-col
 function mapCategory(row: typeof entryCategories.$inferSelect): EntryCategoryDto {
   return {
     id: row.id,
-    ledgerId: row.ledgerId,
     name: row.name,
     description: row.description,
     icon: row.icon,
@@ -36,7 +35,6 @@ function mapCategory(row: typeof entryCategories.$inferSelect): EntryCategoryDto
 
 async function assertCategoryCandidatesMutable(
   tx: PostgresTransaction,
-  ledgerId: string,
   categoryIds: readonly string[]
 ): Promise<void> {
   if (categoryIds.length === 0) return;
@@ -45,7 +43,6 @@ async function assertCategoryCandidatesMutable(
     .from(categoryAssignmentJobs)
     .where(
       and(
-        eq(categoryAssignmentJobs.ledgerId, ledgerId),
         inArray(categoryAssignmentJobs.status, ["pending", "running"]),
         sql`(
           EXISTS (
@@ -62,46 +59,30 @@ async function assertCategoryCandidatesMutable(
   if (active != null) throw new ConflictError("CATEGORY_ASSIGNMENT_ACTIVE");
 }
 
-export async function listCategories(ledgerId: string): Promise<EntryCategoryDto[]> {
+export async function listCategories(): Promise<EntryCategoryDto[]> {
   const rows = await db
     .select()
     .from(entryCategories)
-    .where(eq(entryCategories.ledgerId, ledgerId))
     .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
   return rows.map(mapCategory);
 }
 
-export async function getCategory(
-  ledgerId: string,
-  categoryId: string
-): Promise<EntryCategoryDto | null> {
+export async function getCategory(categoryId: string): Promise<EntryCategoryDto | null> {
   const row = await db.query.entryCategories.findFirst({
-    where: and(eq(entryCategories.ledgerId, ledgerId), eq(entryCategories.id, categoryId)),
+    where: eq(entryCategories.id, categoryId),
   });
   return row == null ? null : mapCategory(row);
 }
 
-export async function listCategoriesWithCount(
-  ledgerId: string
-): Promise<EntryCategoryWithCountDto[]> {
+export async function listCategoriesWithCount(): Promise<EntryCategoryWithCountDto[]> {
   const rows = await db
     .select({
       category: entryCategories,
       entryCount: sql<number>`count(${sourceDocuments.id})`,
     })
     .from(entryCategories)
-    .leftJoin(
-      ledgerEntries,
-      and(eq(ledgerEntries.ledgerId, ledgerId), eq(ledgerEntries.categoryId, entryCategories.id))
-    )
-    .leftJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId)
-      )
-    )
-    .where(eq(entryCategories.ledgerId, ledgerId))
+    .leftJoin(ledgerEntries, eq(ledgerEntries.categoryId, entryCategories.id))
+    .leftJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
     .groupBy(entryCategories.id)
     .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
   return rows.map(({ category, entryCount }) => ({
@@ -111,7 +92,6 @@ export async function listCategoriesWithCount(
 }
 
 export async function updateMissingCategoryMetadata(
-  ledgerId: string,
   categoryId: string,
   input: { icon: string; description: string; expectedName: string }
 ): Promise<{
@@ -120,7 +100,7 @@ export async function updateMissingCategoryMetadata(
   wroteDescription: boolean;
 }> {
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
+    await lockLedgerForUpdate(tx);
     const category = await tx
       .select({
         name: entryCategories.name,
@@ -128,7 +108,7 @@ export async function updateMissingCategoryMetadata(
         description: entryCategories.description,
       })
       .from(entryCategories)
-      .where(and(eq(entryCategories.id, categoryId), eq(entryCategories.ledgerId, ledgerId)))
+      .where(eq(entryCategories.id, categoryId))
       .for("update")
       .then((rows) => rows[0]);
     if (category == null) {
@@ -142,7 +122,7 @@ export async function updateMissingCategoryMetadata(
     if (!wroteIcon && !wroteDescription) {
       return { status: "updated" as const, wroteIcon: false, wroteDescription: false };
     }
-    if (wroteDescription) await assertCategoryCandidatesMutable(tx, ledgerId, [categoryId]);
+    if (wroteDescription) await assertCategoryCandidatesMutable(tx, [categoryId]);
     await tx
       .update(entryCategories)
       .set({
@@ -150,23 +130,21 @@ export async function updateMissingCategoryMetadata(
         ...(wroteDescription ? { description: input.description } : {}),
         updatedAt: new Date(),
       })
-      .where(and(eq(entryCategories.id, categoryId), eq(entryCategories.ledgerId, ledgerId)));
+      .where(eq(entryCategories.id, categoryId));
     return { status: "updated" as const, wroteIcon, wroteDescription };
   });
 }
 
 export async function saveEntryCategories(
-  ledgerId: string,
   input: SaveEntryCategoriesInput
 ): Promise<EntryCategoryDto[]> {
   const { expectedRevision } = input;
   const targets = input.categories.map((category, sortOrder) => ({ ...category, sortOrder }));
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
+    await lockLedgerForUpdate(tx);
     const current = await tx
       .select()
       .from(entryCategories)
-      .where(eq(entryCategories.ledgerId, ledgerId))
       .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id)
       .for("update");
     const actualRevision = await computeCategoryCollectionRevision(current);
@@ -195,7 +173,7 @@ export async function saveEntryCategories(
           : [];
       }),
     ];
-    await assertCategoryCandidatesMutable(tx, ledgerId, candidateAffectingIds);
+    await assertCategoryCandidatesMutable(tx, candidateAffectingIds);
 
     const now = new Date();
     const removedIds = removed.map((category) => category.id);
@@ -203,38 +181,24 @@ export async function saveEntryCategories(
       const affectedDocumentIds = await tx
         .selectDistinct({ id: sourceDocuments.id })
         .from(ledgerEntries)
-        .innerJoin(
-          sourceDocuments,
-          and(
-            eq(sourceDocuments.ledgerId, ledgerId),
-            eq(sourceDocuments.id, ledgerEntries.sourceDocumentId)
-          )
-        )
-        .where(
-          and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.categoryId, removedIds))
-        )
+        .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+        .where(inArray(ledgerEntries.categoryId, removedIds))
         .then((rows) => rows.map((row) => row.id).sort());
-      const documents = await lockSourceDocumentsForUpdate(tx, ledgerId, affectedDocumentIds);
+      const documents = await lockSourceDocumentsForUpdate(tx, affectedDocumentIds);
       await assertSourceDocumentsNotProcessing(tx, documents);
       await tx
         .update(ledgerEntries)
         .set({ categoryId: null, updatedAt: now })
-        .where(
-          and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.categoryId, removedIds))
-        );
-      await tx
-        .delete(entryCategories)
-        .where(
-          and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, removedIds))
-        );
+        .where(inArray(ledgerEntries.categoryId, removedIds));
+      await tx.delete(entryCategories).where(inArray(entryCategories.id, removedIds));
     }
 
     const existingTargets = targets.filter((target) =>
       currentById.has(target.id ?? target.clientId!)
     );
-    // One statement renames them all. Names are unique per ledger through a
-    // deferrable constraint, checked when the statement ends rather than row by
-    // row, so a save may swap or rotate names among its categories.
+    // One statement renames them all. Names are unique through a deferrable
+    // constraint, checked when the statement ends rather than row by row, so a
+    // save may swap or rotate names among its categories.
     if (existingTargets.length > 0) {
       const updates = JSON.stringify(
         existingTargets.map((target) => ({
@@ -263,7 +227,6 @@ export async function saveEntryCategories(
             updated_at = ${now}
         FROM changes
         WHERE category.id = changes.id
-          AND category.ledger_id = ${ledgerId}
         RETURNING category.id
       `);
       if (updated.rows.length !== existingTargets.length) {
@@ -276,7 +239,6 @@ export async function saveEntryCategories(
       await tx.insert(entryCategories).values(
         newTargets.map((target) => ({
           id: target.id ?? target.clientId!,
-          ledgerId,
           name: target.name,
           description: target.description,
           icon: target.icon,
@@ -291,7 +253,7 @@ export async function saveEntryCategories(
     const saved = await tx
       .select()
       .from(entryCategories)
-      .where(and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, savedIds)))
+      .where(inArray(entryCategories.id, savedIds))
       .orderBy(entryCategories.sortOrder, entryCategories.createdAt, entryCategories.id);
     if (saved.length !== savedIds.length) {
       throw new ConflictError("Category save changed during update");
@@ -300,18 +262,12 @@ export async function saveEntryCategories(
   });
 }
 
-export async function countUncategorizedEntries(ledgerId: string): Promise<number> {
+export async function countUncategorizedEntries(): Promise<number> {
   const row = await db
     .select({ count: sql<number>`count(*)` })
     .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId)
-      )
-    )
-    .where(and(eq(ledgerEntries.ledgerId, ledgerId), isNull(ledgerEntries.categoryId)))
+    .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+    .where(isNull(ledgerEntries.categoryId))
     .then((rows) => rows[0]);
   return Number(row?.count ?? 0);
 }

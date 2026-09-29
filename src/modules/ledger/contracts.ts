@@ -9,7 +9,6 @@ export interface LedgerSettings {
 }
 
 export type LedgerDto = {
-  id: string;
   settings: LedgerSettings;
   createdAt: string;
   updatedAt: string;
@@ -24,7 +23,6 @@ export type UpdateLedgerActionResult =
 
 export type BookDto = {
   id: string;
-  ledgerId: string;
   name: string;
   sortOrder: number;
   /** Set while the book is retired; the switcher hides those rows. */
@@ -34,7 +32,6 @@ export type BookDto = {
 /** What an API request authenticates as: the key, its ledger and the book it files into. */
 export interface AuthenticatedServiceCredential {
   id: string;
-  ledgerId: string;
   bookId: string;
 }
 
@@ -43,7 +40,6 @@ export type ServiceCredentialDto = {
   bookId: string;
   tokenPrefix: string;
   tokenSuffix: string;
-  ledgerId: string;
   name: string;
   createdAt: string;
   lastUsedAt: string | null;
@@ -56,7 +52,6 @@ export type CreatedServiceCredential = CreatedServiceCredentialDto;
 
 export type EntryCategoryDto = {
   id: string;
-  ledgerId: string;
   name: string;
   description: string | null;
   icon: string | null;
@@ -152,7 +147,6 @@ export interface CategoryAssignmentResultPageDto {
 export type SourceDocumentReferenceDto = {
   id: string;
   version: number;
-  ledgerId: string;
   title: string | null;
   documentDate: string | null;
   /** The day the record counts on, as the server keeps it. */
@@ -164,7 +158,6 @@ export type SourceDocumentReferenceDto = {
 
 export type LedgerEntryDto = {
   id: string;
-  ledgerId: string;
   categoryId: string | null;
   sourceDocumentId: string;
   amount: string;

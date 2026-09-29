@@ -18,7 +18,6 @@ export interface ProcessingLeaseContract {
 }
 
 export interface ProcessingClaimContract {
-  ledgerId: string;
   job: ProcessingJobContract;
   claimToken: string;
   /** Runs this attempt has been given, this one included. */
@@ -32,7 +31,6 @@ export interface RecoverableProcessingJobContract extends ProcessingJobContract 
 }
 
 export interface AttemptProcessingRequestContract {
-  ledgerId: string;
   sourceDocumentId: string;
   attemptId: string;
   signal: AbortSignal;

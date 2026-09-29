@@ -19,9 +19,8 @@ import {
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 
-const findVisibleEntry = async (id: string, ledgerId: string) => {
+const findVisibleEntry = async (id: string) => {
   const page = await listLedgerEntryPage({
-    ledgerId,
     limit: 100,
     filters: {},
   });
@@ -48,35 +47,31 @@ const entry = {
 describe("target upper workflows", () => {
   it("uses persisted list state and paginates without skips", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const completed = await createTestRecord(getTestDb(), {
-      ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const pending = await createPendingAttempt({
-      ledgerId,
       input: { text: "pending", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const failedSubmission = await createPendingAttempt({
-      ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
       input: { text: "failed retry", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(failedSubmission.attempt.id),
-      ledgerId,
       sourceDocumentId: completed.sourceDocumentId,
       attemptId: failedSubmission.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
 
-    const first = await listStreamPage(ledgerId, { limit: 1 });
-    const second = await listStreamPage(ledgerId, {
+    const first = await listStreamPage({ limit: 1 });
+    const second = await listStreamPage({
       limit: 1,
       cursor: first.nextCursor,
     });
@@ -96,42 +91,36 @@ describe("target upper workflows", () => {
 
   it("keeps Stream, Details, and Stats on the same active projection", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const [category] = await db
-      .insert(entryCategories)
-      .values({ ledgerId, name: "Food" })
-      .returning();
+    await createTestUserWithLedger(db);
+    const [category] = await db.insert(entryCategories).values({ name: "Food" }).returning();
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       entryDate: "2026-07-15",
       entries: [{ ...entry, categoryId: category!.id }],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const activeEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     });
     const failedPending = await createPendingAttempt({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       input: { text: "failed replacement", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await recordProcessingFailure({
       lease: await claimAttemptForTest(failedPending.attempt.id),
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       attemptId: failedPending.attempt.id,
       failureKind: "processing_error",
       failureMessage: "processing failed",
     });
 
-    const stream = await listLedgerEntries(ledgerId, { limit: 20 });
-    const detail = await findVisibleEntry(activeEntry!.id, ledgerId);
-    const summary = await calculateLedgerStats(ledgerId, {
+    const stream = await listLedgerEntries({ limit: 20 });
+    const detail = await findVisibleEntry(activeEntry!.id);
+    const summary = await calculateLedgerStats({
       startDate: "2026-07-15",
       endDate: "2026-07-15",
     });
-    const enhanced = await queryEnhancedStats(ledgerId, {
+    const enhanced = await queryEnhancedStats({
       queryRange: { from: "2026-07-15", to: "2026-07-15" },
       compareRange: { from: "2026-07-14", to: "2026-07-14" },
     });
@@ -159,26 +148,21 @@ describe("target upper workflows", () => {
 
     await expect(
       deleteSourceDocumentAtomically({
-        ledgerId,
         sourceDocumentId: created.sourceDocumentId,
       })
     ).resolves.toMatchObject({ deleted: true });
-    await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
-    await expect(findVisibleEntry(activeEntry!.id, ledgerId)).resolves.toBeNull();
+    await expect(listLedgerEntries({ limit: 20 })).resolves.toMatchObject({ items: [] });
+    await expect(findVisibleEntry(activeEntry!.id)).resolves.toBeNull();
   });
 
   it("preserves decimal adjustments, dates, categories, currencies, and exchange-rate facts atomically", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const [category] = await db
-      .insert(entryCategories)
-      .values({ ledgerId, name: "Food" })
-      .returning();
+    await createTestUserWithLedger(db);
+    const [category] = await db.insert(entryCategories).values({ name: "Food" }).returning();
     await insertExchangeRates("2026-07-14", { USD: 1, CNY: 8 });
     const transactionAt = "2026-07-14T12:30:00.000Z";
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const;
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Receipt with adjustments",
       entryDate: "2026-07-14",
       entries: [
@@ -210,12 +194,12 @@ describe("target upper workflows", () => {
           createdAt: transactionAt,
         },
       ],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
-    const stream = await listLedgerEntries(ledgerId, { limit: 20 });
-    const detail = await findVisibleEntry(ids[0]!, ledgerId);
-    const stats = await calculateLedgerStats(ledgerId, {
+    const stream = await listLedgerEntries({ limit: 20 });
+    const detail = await findVisibleEntry(ids[0]!);
+    const stats = await calculateLedgerStats({
       startDate: "2026-07-14",
       endDate: "2026-07-14",
     });
@@ -249,7 +233,6 @@ describe("target upper workflows", () => {
 
     await expect(
       batchUpdateLedgerEntries({
-        ledgerId,
         sourceDocumentIds: [created.sourceDocumentId],
         ledgerEntryIds: [ids[0]!, crypto.randomUUID()],
         itemName: "Must roll back",
@@ -271,61 +254,13 @@ describe("target upper workflows", () => {
     expect(new Set(targetLinks.map((link) => link.id))).toEqual(new Set(ids));
   });
 
-  it("prevents cross-workspace reads and rolls back a batch update to a foreign category", async () => {
-    const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    );
-    const [otherCategory] = await db
-      .insert(entryCategories)
-      .values({ ledgerId: otherLedgerId, name: "Other" })
-      .returning();
-    const created = await createTestRecord(getTestDb(), {
-      ledgerId,
-      entries: [entry],
-      bookId: await testBookId(db, ledgerId),
-    });
-    const beforeDocument = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
-    const beforeAttemptCount = await db.select().from(extractionAttempts);
-    const beforeEntryCount = await db.select().from(ledgerEntries);
-
-    await expect(listStreamPage(otherLedgerId, { limit: 20 })).resolves.toMatchObject({
-      items: [],
-    });
-    await expect(listLedgerEntries(otherLedgerId, { limit: 20 })).resolves.toMatchObject({
-      items: [],
-    });
-    await expect(
-      batchUpdateLedgerEntries({
-        ledgerId,
-        sourceDocumentIds: [created.sourceDocumentId],
-        ledgerEntryIds: [beforeEntryCount[0]!.id],
-        categoryId: otherCategory!.id,
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-
-    const afterDocument = await db.query.sourceDocuments.findFirst({
-      where: eq(sourceDocuments.id, created.sourceDocumentId),
-    });
-    expect(afterDocument?.version).toBe(beforeDocument?.version);
-    expect(await db.select().from(extractionAttempts)).toHaveLength(beforeAttemptCount.length);
-    expect(await db.select().from(ledgerEntries)).toHaveLength(beforeEntryCount.length);
-  });
-
   it("edits a manual entry in place while keeping its id and creating no attempt", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const original = await db.query.ledgerEntries.findFirst({
       where: and(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)),
@@ -333,7 +268,6 @@ describe("target upper workflows", () => {
     const initialVersion = await currentVersion(created.sourceDocumentId);
 
     const updated = await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [created.sourceDocumentId],
       ledgerEntryIds: [original!.id],
       amount: "18",
@@ -360,25 +294,13 @@ describe("target upper workflows", () => {
 
   it("mutates parsed entries in place with rollback and read consistency", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    );
-    const [otherCategory] = await db
-      .insert(entryCategories)
-      .values({ ledgerId: otherLedgerId, name: "Other" })
-      .returning();
+    await createTestUserWithLedger(db);
     const pending = await createPendingAttempt({
-      ledgerId,
       input: { text: "Lunch", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     await activateAttempt({
       lease: await claimAttemptForTest(pending.attempt.id),
-      ledgerId,
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,
       entries: [entry],
@@ -388,7 +310,6 @@ describe("target upper workflows", () => {
     });
 
     await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [pending.document.id],
       ledgerEntryIds: [original!.id],
       amount: "18",
@@ -397,19 +318,18 @@ describe("target upper workflows", () => {
       where: eq(sourceDocuments.id, pending.document.id),
     });
     const attemptCount = (await db.select().from(extractionAttempts)).length;
-    const stream = await listLedgerEntries(ledgerId, { limit: 20 });
-    const detail = await findVisibleEntry(original!.id, ledgerId);
-    const stats = await calculateLedgerStats(ledgerId, {});
+    const stream = await listLedgerEntries({ limit: 20 });
+    const detail = await findVisibleEntry(original!.id);
+    const stats = await calculateLedgerStats({});
     expect(stream.items[0]).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(detail).toMatchObject({ id: original!.id, amount: "18.000" });
     expect(stats.convertedTotal).toEqual({ total: "18", currency: "CNY" });
 
     await expect(
       batchUpdateLedgerEntries({
-        ledgerId,
         sourceDocumentIds: [pending.document.id],
         ledgerEntryIds: [original!.id],
-        categoryId: otherCategory!.id,
+        categoryId: crypto.randomUUID(),
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     const afterRollback = await db.query.sourceDocuments.findFirst({
@@ -418,24 +338,14 @@ describe("target upper workflows", () => {
     expect(afterRollback?.version).toBe(afterUpdate?.version);
     expect(await db.select().from(extractionAttempts)).toHaveLength(attemptCount);
     await expect(
-      batchUpdateLedgerEntries({
-        ledgerId: otherLedgerId,
-        sourceDocumentIds: [pending.document.id],
-        ledgerEntryIds: [original!.id],
-        amount: "99",
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-
-    await expect(
       deleteLedgerEntry({
-        ledgerId,
         sourceDocumentId: pending.document.id,
         ledgerEntryId: original!.id,
       })
     ).resolves.toEqual({ ledgerEntryId: original!.id, deleted: true });
-    await expect(listLedgerEntries(ledgerId, { limit: 20 })).resolves.toMatchObject({ items: [] });
-    await expect(findVisibleEntry(original!.id, ledgerId)).resolves.toBeNull();
-    await expect(calculateLedgerStats(ledgerId, {})).resolves.toMatchObject({
+    await expect(listLedgerEntries({ limit: 20 })).resolves.toMatchObject({ items: [] });
+    await expect(findVisibleEntry(original!.id)).resolves.toBeNull();
+    await expect(calculateLedgerStats({})).resolves.toMatchObject({
       convertedTotal: { total: "0", currency: "CNY" },
     });
   });

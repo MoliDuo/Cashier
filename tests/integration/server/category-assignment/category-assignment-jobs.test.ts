@@ -17,24 +17,21 @@ import { createLedgerData, createSourceDocumentData } from "tests/helpers/factor
 import { ensureTestLedgerBooks } from "tests/helpers/schema-setup";
 
 describe("category assignment job reads", () => {
-  it("counts progress from the rows and scopes both lookup paths to the ledger", async () => {
+  it("counts progress from the rows through both lookup paths", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData();
-    const other = createLedgerData();
-    await db.insert(ledgers).values([ledger, other]);
-    await ensureTestLedgerBooks(db, ledger.id);
-    const documents = [createSourceDocumentData(ledger.id), createSourceDocumentData(ledger.id)];
+    await db.insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(db);
+    const documents = [createSourceDocumentData(), createSourceDocumentData()];
     for (const document of documents) {
       await db.insert(sourceDocuments).values({
         ...document,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledger.id} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       });
     }
     const entryIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
     await db.insert(ledgerEntries).values(
       entryIds.map((id, position) => ({
         id,
-        ledgerId: ledger.id,
         sourceDocumentId: documents[position === 2 ? 1 : 0]!.id,
         position,
         amount: "1.00",
@@ -44,12 +41,11 @@ describe("category assignment job reads", () => {
     );
     const [job] = await db
       .insert(categoryAssignmentJobs)
-      .values({ ledgerId: ledger.id, mode: "clear", status: "running" })
+      .values({ mode: "clear", status: "running" })
       .returning();
     await db.insert(categoryAssignmentDocuments).values([
       {
         jobId: job!.id,
-        ledgerId: ledger.id,
         sourceDocumentId: documents[0]!.id,
         selectionOrder: 0,
         status: "succeeded",
@@ -57,7 +53,6 @@ describe("category assignment job reads", () => {
       },
       {
         jobId: job!.id,
-        ledgerId: ledger.id,
         sourceDocumentId: documents[1]!.id,
         selectionOrder: 2,
         status: "pending",
@@ -69,7 +64,6 @@ describe("category assignment job reads", () => {
     await db.insert(categoryAssignmentEntries).values(
       entryIds.map((id, index) => ({
         jobId: job!.id,
-        ledgerId: ledger.id,
         ledgerEntryId: id,
         sourceDocumentId: documents[index === 2 ? 1 : 0]!.id,
         selectionOrder: index,
@@ -77,7 +71,7 @@ describe("category assignment job reads", () => {
       }))
     );
 
-    const read = await getCategoryAssignmentJob({ ledgerId: ledger.id, jobId: job!.id });
+    const read = await getCategoryAssignmentJob({ jobId: job!.id });
     expect(read).toMatchObject({
       id: job!.id,
       mode: { kind: "clear" },
@@ -93,10 +87,9 @@ describe("category assignment job reads", () => {
       evidenceIncomplete: true,
     });
     expect(read?.nextRetryAt).not.toBeNull();
-    expect(await getLatestCategoryAssignmentJob({ ledgerId: ledger.id })).toMatchObject({
+    expect(await getLatestCategoryAssignmentJob()).toMatchObject({
       id: job!.id,
     });
-    expect(await getCategoryAssignmentJob({ ledgerId: other.id, jobId: job!.id })).toBeNull();
-    expect(await getLatestCategoryAssignmentJob({ ledgerId: other.id })).toBeNull();
+    expect(await getCategoryAssignmentJob({ jobId: crypto.randomUUID() })).toBeNull();
   });
 });

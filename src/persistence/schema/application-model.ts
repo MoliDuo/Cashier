@@ -16,7 +16,6 @@ import {
   boolean,
   date,
 } from "drizzle-orm/pg-core";
-import { ledgers } from "./ledger";
 import { sourceDocuments } from "./source-document";
 import { rowTimestamp } from "./columns";
 
@@ -40,7 +39,6 @@ export const extractionAttempts = pgTable(
   "extraction_attempts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
     /** The document date the submission asked for, if any. */
     requestedDate: date("requested_date", { mode: "string" }),
@@ -58,22 +56,9 @@ export const extractionAttempts = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    foreignKey({
-      columns: [table.ledgerId, table.sourceDocumentId],
-      foreignColumns: [sourceDocuments.ledgerId, sourceDocuments.id],
-      name: "fk_extraction_attempts_source_document",
-    }).onDelete("cascade"),
     uniqueIndex("uq_extraction_attempts_one_processing")
       .on(table.sourceDocumentId)
       .where(sql`${table.status} = 'processing'`),
-    index("idx_extraction_attempts_due")
-      .on(table.ledgerId, table.nextAttemptAt)
-      .where(sql`${table.status} = 'processing'`),
-    uniqueIndex("uq_extraction_attempts_ledger_document_id").on(
-      table.ledgerId,
-      table.sourceDocumentId,
-      table.id
-    ),
   ]
 );
 
@@ -81,7 +66,6 @@ export const storedFiles = pgTable(
   "stored_files",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
     storageKey: text("storage_key").notNull(),
     contentType: text("content_type").notNull(),
     byteSize: bigint("byte_size", { mode: "number" }).notNull(),
@@ -91,12 +75,6 @@ export const storedFiles = pgTable(
     finalizedAt: timestamp("finalized_at", { withTimezone: true }),
   },
   (table) => [
-    foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "fk_stored_files_ledger",
-    }).onDelete("cascade"),
-    uniqueIndex("uq_stored_files_ledger_id_id").on(table.ledgerId, table.id),
     uniqueIndex("uq_stored_files_storage_key").on(table.storageKey),
     check("ck_stored_files_byte_size", sql`${table.byteSize} >= 0`),
   ]
@@ -107,23 +85,12 @@ export const sourceDocumentFiles = pgTable(
   "source_document_files",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
     storedFileId: uuid("stored_file_id").notNull(),
     position: integer("position").notNull(),
     createdAt: rowTimestamp("created_at"),
   },
   (table) => [
-    foreignKey({
-      columns: [table.ledgerId, table.sourceDocumentId],
-      foreignColumns: [sourceDocuments.ledgerId, sourceDocuments.id],
-      name: "fk_source_document_files_source_document",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId, table.storedFileId],
-      foreignColumns: [storedFiles.ledgerId, storedFiles.id],
-      name: "fk_source_document_files_stored_file",
-    }),
     uniqueIndex("uq_source_document_files_document_position").on(
       table.sourceDocumentId,
       table.position
@@ -132,7 +99,6 @@ export const sourceDocumentFiles = pgTable(
       table.sourceDocumentId,
       table.storedFileId
     ),
-    index("idx_source_document_files_ledger_file").on(table.ledgerId, table.storedFileId),
     check("ck_source_document_files_position", sql`${table.position} >= 0`),
   ]
 );
@@ -171,7 +137,6 @@ export const categoryAssignmentJobs = pgTable(
   "category_assignment_jobs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ledgerId: uuid("ledger_id").notNull(),
     status: categoryAssignmentJobStatusEnum("status").notNull().default("pending"),
     mode: text("mode").$type<"ai" | "assign" | "clear">().notNull().default("ai"),
     /** The category an `assign` run sets on every selected entry. */
@@ -195,21 +160,10 @@ export const categoryAssignmentJobs = pgTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "fk_category_assignment_jobs_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
       columns: [table.retryOfJobId],
       foreignColumns: [table.id],
       name: "fk_category_assignment_jobs_retry_of_job",
     }).onDelete("set null"),
-    uniqueIndex("uq_category_assignment_jobs_request_key").on(table.ledgerId, table.requestKey),
-    // One run per ledger at a time: a double submit becomes a conflict instead
-    // of paying for the same model calls twice.
-    uniqueIndex("uq_category_assignment_jobs_active")
-      .on(table.ledgerId)
-      .where(sql`${table.status} IN ('pending', 'running')`),
     check("ck_category_assignment_jobs_mode", sql`${table.mode} IN ('ai', 'assign', 'clear')`),
   ]
 );
@@ -218,7 +172,6 @@ export const categoryAssignmentDocuments = pgTable(
   "category_assignment_documents",
   {
     jobId: uuid("job_id").notNull(),
-    ledgerId: uuid("ledger_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
     /** The position of the document's first selected entry in the selection. */
     selectionOrder: integer("selection_order").notNull(),
@@ -242,16 +195,10 @@ export const categoryAssignmentDocuments = pgTable(
       name: "fk_category_assignment_documents_job",
     }).onDelete("cascade"),
     foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "fk_category_assignment_documents_ledger",
-    }).onDelete("cascade"),
-    foreignKey({
       columns: [table.sourceDocumentId],
       foreignColumns: [sourceDocuments.id],
       name: "fk_category_assignment_documents_source_document",
     }).onDelete("cascade"),
-    index("idx_category_assignment_documents_ledger_job").on(table.ledgerId, table.jobId),
     index("idx_category_assignment_documents_source_document").on(table.sourceDocumentId),
   ]
 );
@@ -260,7 +207,6 @@ export const categoryAssignmentEntries = pgTable(
   "category_assignment_entries",
   {
     jobId: uuid("job_id").notNull(),
-    ledgerId: uuid("ledger_id").notNull(),
     ledgerEntryId: uuid("ledger_entry_id").notNull(),
     sourceDocumentId: uuid("source_document_id").notNull(),
     selectionOrder: integer("selection_order").notNull(),
@@ -281,16 +227,10 @@ export const categoryAssignmentEntries = pgTable(
       table.jobId,
       table.selectionOrder
     ),
-    index("idx_category_assignment_entries_ledger_job").on(table.ledgerId, table.jobId),
     foreignKey({
       columns: [table.jobId],
       foreignColumns: [categoryAssignmentJobs.id],
       name: "fk_category_assignment_entries_job",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "fk_category_assignment_entries_ledger",
     }).onDelete("cascade"),
     foreignKey({
       columns: [table.jobId, table.sourceDocumentId],
@@ -312,7 +252,6 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
 export const ledgerSyncState = pgTable(
   "ledger_sync_state",
   {
-    ledgerId: uuid("ledger_id").primaryKey(),
     version: bigint("version", { mode: "bigint" })
       .notNull()
       .default(sql`0`),
@@ -328,12 +267,5 @@ export const ledgerSyncState = pgTable(
       .default(sql`0`),
     updatedAt: rowTimestamp("updated_at"),
   },
-  (table) => [
-    foreignKey({
-      columns: [table.ledgerId],
-      foreignColumns: [ledgers.id],
-      name: "fk_ledger_sync_state_ledger",
-    }).onDelete("cascade"),
-    check("ck_ledger_sync_state_version", sql`${table.version} >= 0`),
-  ]
+  (table) => [check("ck_ledger_sync_state_version", sql`${table.version} >= 0`)]
 );

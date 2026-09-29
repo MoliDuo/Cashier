@@ -7,13 +7,12 @@ import { accountingTotal } from "@/lib/money/accounting-total";
 import type { CredentialSourceDocumentStatusResult } from "@/modules/source-document/contracts";
 
 export async function getCredentialSourceDocumentStatus(
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<CredentialSourceDocumentStatusResult | null> {
   // Load the document, its latest attempt, its entries and the ledger's main
   // currency in a single query so status polling does not fan out into
-  // sequential reads. The attempt must belong to both the document and the
-  // same ledger; a record entered by hand has none.
+  // sequential reads. The attempt must belong to the document; a record
+  // entered by hand has none.
   const rows = await db
     .select({
       document: {
@@ -54,7 +53,6 @@ export async function getCredentialSourceDocumentStatus(
           FROM ledger_entries entry
           LEFT JOIN entry_categories category ON category.id = entry.category_id
           WHERE entry.source_document_id = ${sourceDocuments.id}
-            AND entry.ledger_id = ${ledgerId}
         ), '[]'::jsonb)`,
     })
     .from(sourceDocuments)
@@ -62,12 +60,11 @@ export async function getCredentialSourceDocumentStatus(
       extractionAttempts,
       and(
         eq(extractionAttempts.id, sourceDocuments.latestAttemptId),
-        eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
-        eq(extractionAttempts.ledgerId, ledgerId)
+        eq(extractionAttempts.sourceDocumentId, sourceDocuments.id)
       )
     )
-    .innerJoin(ledgers, eq(ledgers.id, sourceDocuments.ledgerId))
-    .where(and(eq(sourceDocuments.id, sourceDocumentId), eq(sourceDocuments.ledgerId, ledgerId)))
+    .crossJoin(ledgers)
+    .where(eq(sourceDocuments.id, sourceDocumentId))
     .limit(1);
   const row = rows[0];
   if (row == null) return null;

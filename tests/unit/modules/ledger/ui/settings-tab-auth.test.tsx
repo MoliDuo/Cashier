@@ -9,7 +9,6 @@ const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
   BOOKS: [
     {
       id: "book-1",
-      ledgerId: "ledger-1",
       name: "共同支出",
       timeZone: null,
       sortOrder: 1,
@@ -98,7 +97,6 @@ describe("SettingsTab account authentication controls", () => {
   });
   it("lists the login emails and sign-out, but no destructive account mutations", () => {
     const ledger: Ledger = {
-      id: "ledger-1",
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -129,7 +127,6 @@ describe("SettingsTab account authentication controls", () => {
 
   it("runs from the short preferences to the lists, and ends with signing out", () => {
     const ledger: Ledger = {
-      id: "ledger-1",
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -158,7 +155,6 @@ describe("SettingsTab account authentication controls", () => {
     const assign = vi.fn();
     vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });
     const ledger: Ledger = {
-      id: "ledger-1",
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -183,7 +179,6 @@ describe("SettingsTab account authentication controls", () => {
   it("keeps loaded settings visible when a query fails and exposes a local retry", () => {
     queryState.status = "error";
     const ledger: Ledger = {
-      id: "ledger-1",
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",

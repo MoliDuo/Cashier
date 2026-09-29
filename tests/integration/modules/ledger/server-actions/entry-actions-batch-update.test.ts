@@ -24,14 +24,13 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
-async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entryDate?: string) {
+async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      ledgerId,
       documentDate: entryDate ?? null,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -43,15 +42,12 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
 }
 
 describe("batchUpdateLedgerEntriesAction", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = randomUUID();
     await db.insert(ledgers).values({
-      id: ledgerId,
+      id: randomUUID(),
     });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await ensureTestLedgerBooks(db);
   });
 
   it("batch updates categoryId for multiple entries", async () => {
@@ -59,12 +55,11 @@ describe("batchUpdateLedgerEntriesAction", () => {
     const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
-      ledgerId,
       name: "餐饮",
       sortOrder: 1,
     });
 
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     const ids: string[] = [];
 
     for (let i = 0; i < 2; i++) {
@@ -72,7 +67,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
         .insert(ledgerEntries)
         .values({
           id: randomUUID(),
-          ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Item ${i}`,
           amount: "10.00",
@@ -109,13 +103,12 @@ describe("batchUpdateLedgerEntriesAction", () => {
   it("changes only the fields a batch names", async () => {
     const db = getTestDb();
     const catId = randomUUID();
-    await db.insert(entryCategories).values({ id: catId, ledgerId, name: "餐饮", sortOrder: 1 });
-    const doc = await seedDoc(db, ledgerId);
+    await db.insert(entryCategories).values({ id: catId, name: "餐饮", sortOrder: 1 });
+    const doc = await seedDoc(db);
     const [entry] = await db
       .insert(ledgerEntries)
       .values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Lunch",
         amount: "10.00",
@@ -144,12 +137,11 @@ describe("batchUpdateLedgerEntriesAction", () => {
     const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
-      ledgerId,
       name: "餐饮",
       sortOrder: 1,
     });
 
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     const ids: string[] = [];
 
     for (let i = 0; i < 2; i++) {
@@ -157,7 +149,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
         .insert(ledgerEntries)
         .values({
           id: randomUUID(),
-          ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Item ${i}`,
           amount: "10.00",
@@ -187,14 +178,13 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   it("asks once for the rates of a batch moved to a foreign currency", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId, "2026-09-01");
+    const doc = await seedDoc(db, "2026-09-01");
     const ids = (
       await db
         .insert(ledgerEntries)
         .values(
           Array.from({ length: 20 }, (_, index) => ({
             id: randomUUID(),
-            ledgerId,
             sourceDocumentId: doc.id,
             itemName: `Converted ${index}`,
             amount: "10.00",
@@ -219,18 +209,16 @@ describe("batchUpdateLedgerEntriesAction", () => {
     const categoryId = randomUUID();
     await db.insert(entryCategories).values({
       id: categoryId,
-      ledgerId,
       name: "Dining",
       sortOrder: 1,
     });
-    const documents = await Promise.all([seedDoc(db, ledgerId), seedDoc(db, ledgerId)]);
+    const documents = await Promise.all([seedDoc(db), seedDoc(db)]);
     const entries = await Promise.all(
       documents.map(async (document, index) => {
         const [created] = await db
           .insert(ledgerEntries)
           .values({
             id: randomUUID(),
-            ledgerId,
             sourceDocumentId: document.id,
             itemName: `Batch ${index}`,
             amount: "10.00",
@@ -279,14 +267,13 @@ describe("batchUpdateLedgerEntriesAction", () => {
 
   it("commits the date change and returns the locked impact", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId, "2026-01-01");
+    const doc = await seedDoc(db, "2026-01-01");
     const ids = (
       await db
         .insert(ledgerEntries)
         .values([
           {
             id: randomUUID(),
-            ledgerId,
             sourceDocumentId: doc.id,
             itemName: "First",
             amount: "10",
@@ -294,7 +281,6 @@ describe("batchUpdateLedgerEntriesAction", () => {
           },
           {
             id: randomUUID(),
-            ledgerId,
             sourceDocumentId: doc.id,
             itemName: "Second",
             amount: "20",

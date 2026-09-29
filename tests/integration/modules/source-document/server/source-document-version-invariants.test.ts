@@ -49,11 +49,7 @@ const entry = {
 } as const;
 
 async function newLedger() {
-  const { ledgerId } = await createTestUserWithLedger(
-    getTestDb(),
-    `version-invariants-${crypto.randomUUID()}`
-  );
-  return ledgerId;
+  await createTestUserWithLedger(getTestDb(), `version-invariants-${crypto.randomUUID()}`);
 }
 
 async function readDocument(sourceDocumentId: string) {
@@ -79,10 +75,9 @@ async function readEntry(ledgerEntryId: string) {
 }
 
 /** An active, completed document with `count` entries — version 1. */
-async function createActiveDocument(ledgerId: string, count = 1) {
+async function createActiveDocument(count = 1) {
   const created = await createTestRecord(getTestDb(), {
-    ledgerId,
-    bookId: await testBookId(getTestDb(), ledgerId),
+    bookId: await testBookId(getTestDb()),
     title: "Original",
     entryDate: "2026-08-01",
     entries: Array.from({ length: count }, (_, index) => ({
@@ -97,9 +92,9 @@ async function createActiveDocument(ledgerId: string, count = 1) {
   return { sourceDocumentId: created.sourceDocumentId, entryIds: entries.map((row) => row.id) };
 }
 
-async function insertCategory(ledgerId: string, name: string) {
+async function insertCategory(name: string) {
   const id = crypto.randomUUID();
-  await getTestDb().insert(entryCategories).values({ id, ledgerId, name, sortOrder: 0 });
+  await getTestDb().insert(entryCategories).values({ id, name, sortOrder: 0 });
   return id;
 }
 
@@ -136,13 +131,11 @@ async function setDateSuggestion(sourceDocumentId: string, entryIds: string[]) {
 
 /** Runs a category-assignment job that moves `ledgerEntryId` into `categoryId`. */
 async function runCategoryAssignment(input: {
-  ledgerId: string;
   sourceDocumentId: string;
   ledgerEntryId: string;
   categoryId: string;
 }) {
   const started = await startCategoryAssignment({
-    ledgerId: input.ledgerId,
     requestKey: crypto.randomUUID(),
     mode: { kind: "assign", categoryId: input.categoryId },
     ledgerEntryIds: [input.ledgerEntryId],
@@ -162,11 +155,10 @@ async function runCategoryAssignment(input: {
 
 describe("source document version — content writes advance it by one", () => {
   it("title and date together: +1 once, a replay of applied values is a no-op", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId } = await createActiveDocument(ledgerId);
+    await newLedger();
+    const { sourceDocumentId } = await createActiveDocument();
     const edit = () =>
       updateSourceDocuments({
-        ledgerId,
         sourceDocumentIds: [sourceDocumentId],
         data: { title: "Updated", documentDate: "2026-08-03" },
       });
@@ -177,11 +169,10 @@ describe("source document version — content writes advance it by one", () => {
   });
 
   it("batch title and date: +1 on change, unchanged values write nothing", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
+    await newLedger();
+    const { sourceDocumentId, entryIds } = await createActiveDocument();
     const retitle = () =>
       updateSourceDocuments({
-        ledgerId,
         sourceDocumentIds: [sourceDocumentId],
         data: { title: "Batch title" },
       });
@@ -192,7 +183,6 @@ describe("source document version — content writes advance it by one", () => {
 
     const redate = () =>
       updateLedgerEntryDates({
-        ledgerId,
         sourceDocumentIds: [sourceDocumentId],
         ledgerEntryIds: entryIds,
         entryDate: "2026-08-02",
@@ -204,15 +194,14 @@ describe("source document version — content writes advance it by one", () => {
   });
 
   it("entry add, edit and delete: +1 each, an edit to applied values is a no-op", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 3);
+    await newLedger();
+    const { sourceDocumentId, entryIds } = await createActiveDocument(3);
 
-    await addLedgerEntry({ ledgerId, sourceDocumentId, amount: "5.00", itemName: "New item" });
+    await addLedgerEntry({ sourceDocumentId, amount: "5.00", itemName: "New item" });
     expect(await currentVersion(sourceDocumentId)).toBe(2);
 
     const rename = () =>
       batchUpdateLedgerEntries({
-        ledgerId,
         sourceDocumentIds: [sourceDocumentId],
         ledgerEntryIds: [entryIds[0]!],
         itemName: "Renamed",
@@ -221,11 +210,10 @@ describe("source document version — content writes advance it by one", () => {
     expect(await rename()).toMatchObject({ affectedCount: 0 });
     expect(await currentVersion(sourceDocumentId)).toBe(3);
 
-    await deleteLedgerEntry({ ledgerId, sourceDocumentId, ledgerEntryId: entryIds[1]! });
+    await deleteLedgerEntry({ sourceDocumentId, ledgerEntryId: entryIds[1]! });
     expect(await currentVersion(sourceDocumentId)).toBe(4);
 
     const deleted = await batchDeleteLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [sourceDocumentId],
       ledgerEntryIds: [entryIds[2]!],
     });
@@ -234,11 +222,10 @@ describe("source document version — content writes advance it by one", () => {
   });
 
   it("split and date organization: +1 on the source document", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 3);
+    await newLedger();
+    const { sourceDocumentId, entryIds } = await createActiveDocument(3);
 
     const split = await splitSourceDocumentAtomically({
-      ledgerId,
       sourceDocumentId,
       ledgerEntryIds: [entryIds[0]!],
       entryDate: "2026-08-05",
@@ -249,7 +236,6 @@ describe("source document version — content writes advance it by one", () => {
     const remaining = entryIds.slice(1);
     const suggestionId = await setDateSuggestion(sourceDocumentId, remaining);
     await applyDateOrganization({
-      ledgerId,
       sourceDocumentId,
       suggestionId,
       groups: [{ id: "yesterday", entryDate: "2026-08-01", ledgerEntryIds: [remaining[0]!] }],
@@ -261,24 +247,25 @@ describe("source document version — content writes advance it by one", () => {
 
 describe("source document version — other writes leave it alone", () => {
   it("book assignment moves the record without a bump and refuses an archived book", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId } = await createActiveDocument(ledgerId);
+    await newLedger();
+    const { sourceDocumentId } = await createActiveDocument();
     const db = getTestDb();
     const targetBookId = crypto.randomUUID();
     const archivedBookId = crypto.randomUUID();
     await db.insert(books).values([
-      { id: targetBookId, ledgerId, name: "梁梁的", sortOrder: 2 },
-      { id: archivedBookId, ledgerId, name: "已归档的", sortOrder: 3, archivedAt: new Date() },
+      { id: targetBookId, name: "梁梁的", sortOrder: 2 },
+      { id: archivedBookId, name: "已归档的", sortOrder: 3, archivedAt: new Date() },
     ]);
 
-    expect(
-      await assignSourceDocumentBook({ ledgerId, sourceDocumentId, bookId: targetBookId })
-    ).toEqual({ ok: true });
+    expect(await assignSourceDocumentBook({ sourceDocumentId, bookId: targetBookId })).toEqual({
+      ok: true,
+    });
     // A book archived while the form sat open must not receive the record: the
     // composite key would accept it, so the check has to be here.
-    expect(
-      await assignSourceDocumentBook({ ledgerId, sourceDocumentId, bookId: archivedBookId })
-    ).toEqual({ ok: false, reason: "book_unavailable" });
+    expect(await assignSourceDocumentBook({ sourceDocumentId, bookId: archivedBookId })).toEqual({
+      ok: false,
+      reason: "book_unavailable",
+    });
     expect(await readDocument(sourceDocumentId)).toMatchObject({
       bookId: targetBookId,
       version: 1,
@@ -286,11 +273,11 @@ describe("source document version — other writes leave it alone", () => {
   });
 
   it("dismissing a date suggestion clears it without a bump", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
+    await newLedger();
+    const { sourceDocumentId, entryIds } = await createActiveDocument();
     const suggestionId = await setDateSuggestion(sourceDocumentId, entryIds);
 
-    expect(await dismissDateOrganization({ ledgerId, sourceDocumentId, suggestionId })).toEqual({
+    expect(await dismissDateOrganization({ sourceDocumentId, suggestionId })).toEqual({
       dismissed: true,
     });
     const row = await getTestDb().query.sourceDocuments.findFirst({
@@ -301,11 +288,10 @@ describe("source document version — other writes leave it alone", () => {
   });
 
   it("retry submission, processing failure and cancel leave it alone", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId } = await createActiveDocument(ledgerId);
+    await newLedger();
+    const { sourceDocumentId } = await createActiveDocument();
 
     const failed = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId,
       inheritInput: false,
       input: { text: "retry", storedFileIds: [], documentDate: null },
@@ -315,7 +301,6 @@ describe("source document version — other writes leave it alone", () => {
     expect(
       await recordProcessingFailure({
         lease: await claimAttemptForTest(failed.attempt.id),
-        ledgerId,
         sourceDocumentId,
         attemptId: failed.attempt.id,
         failureKind: "processing_error",
@@ -325,38 +310,34 @@ describe("source document version — other writes leave it alone", () => {
     expect(await currentVersion(sourceDocumentId)).toBe(1);
 
     await submitSourceDocument({
-      ledgerId,
       sourceDocumentId,
       inheritInput: true,
       supersedeProcessing: true,
     });
-    expect(await cancelSourceDocumentProcessing(ledgerId, sourceDocumentId)).toEqual({
+    expect(await cancelSourceDocumentProcessing(sourceDocumentId)).toEqual({
       processingStatus: "cancelled",
     });
     expect(await currentVersion(sourceDocumentId)).toBe(1);
   });
 
   it("delete removes the document and a replay is not found", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId } = await createActiveDocument(ledgerId);
+    await newLedger();
+    const { sourceDocumentId } = await createActiveDocument();
 
-    expect(await deleteSourceDocumentAtomically({ ledgerId, sourceDocumentId })).toEqual({
+    expect(await deleteSourceDocumentAtomically({ sourceDocumentId })).toEqual({
       sourceDocumentId,
       deleted: true,
     });
-    await expect(deleteSourceDocumentAtomically({ ledgerId, sourceDocumentId })).rejects.toThrow(
-      "not found"
-    );
+    await expect(deleteSourceDocumentAtomically({ sourceDocumentId })).rejects.toThrow("not found");
   });
 
   it("an AI category assignment leaves it alone and survives a later entry edit", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId, 2);
-    const categoryId = await insertCategory(ledgerId, "Meals");
+    await newLedger();
+    const { sourceDocumentId, entryIds } = await createActiveDocument(2);
+    const categoryId = await insertCategory("Meals");
 
     expect(
       await runCategoryAssignment({
-        ledgerId,
         sourceDocumentId,
         ledgerEntryId: entryIds[0]!,
         categoryId,
@@ -366,13 +347,11 @@ describe("source document version — other writes leave it alone", () => {
 
     // Neither edit names a category, so the assigned one survives.
     await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [sourceDocumentId],
       ledgerEntryIds: [entryIds[0]!],
       itemName: "Edited lunch",
     });
     await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [sourceDocumentId],
       ledgerEntryIds: [entryIds[1]!],
       amount: "20",
@@ -385,24 +364,21 @@ describe("source document version — other writes leave it alone", () => {
   });
 
   it("a category deletion leaves it alone and the entry stays uncategorized", async () => {
-    const ledgerId = await newLedger();
-    const { sourceDocumentId, entryIds } = await createActiveDocument(ledgerId);
-    const categoryId = await insertCategory(ledgerId, "Retired");
+    await newLedger();
+    const { sourceDocumentId, entryIds } = await createActiveDocument();
+    const categoryId = await insertCategory("Retired");
     const db = getTestDb();
     await db.update(ledgerEntries).set({ categoryId }).where(eq(ledgerEntries.id, entryIds[0]!));
 
-    await saveEntryCategories(ledgerId, {
+    await saveEntryCategories({
       expectedRevision: await computeCategoryCollectionRevision(
-        await db.query.entryCategories.findMany({
-          where: eq(entryCategories.ledgerId, ledgerId),
-        })
+        await db.query.entryCategories.findMany()
       ),
       categories: [],
     });
     expect(await currentVersion(sourceDocumentId)).toBe(1);
 
     await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [sourceDocumentId],
       ledgerEntryIds: [entryIds[0]!],
       itemName: "Edited",

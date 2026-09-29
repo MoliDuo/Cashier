@@ -6,11 +6,8 @@ import { createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { entryCategories } from "@/persistence";
 
 describe("category metadata backfill", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
-    const { ledgerId: createdLedgerId } = await createTestUserWithLedger(getTestDb());
-    ledgerId = createdLedgerId;
+    await createTestUserWithLedger(getTestDb());
   });
 
   async function createCategory(
@@ -21,7 +18,6 @@ describe("category metadata backfill", () => {
       await db
         .insert(entryCategories)
         .values({
-          ledgerId,
           name: "Backfill",
           icon: overrides.icon ?? null,
           description: overrides.description ?? null,
@@ -45,7 +41,7 @@ describe("category metadata backfill", () => {
   it("backfills only missing fields and reports wrote flags from the update", async () => {
     const category = await createCategory({ icon: "existing-icon" });
 
-    const result = await updateMissingCategoryMetadata(ledgerId, category.id, {
+    const result = await updateMissingCategoryMetadata(category.id, {
       icon: "new-icon",
       description: "new-description",
       expectedName: category.name,
@@ -64,7 +60,7 @@ describe("category metadata backfill", () => {
   it("is a no-op when nothing is missing", async () => {
     const category = await createCategory({ icon: "icon", description: "description" });
 
-    const result = await updateMissingCategoryMetadata(ledgerId, category.id, {
+    const result = await updateMissingCategoryMetadata(category.id, {
       icon: "other-icon",
       description: "other-description",
       expectedName: category.name,
@@ -79,12 +75,12 @@ describe("category metadata backfill", () => {
     const category = await createCategory();
 
     const [first, second] = await Promise.all([
-      updateMissingCategoryMetadata(ledgerId, category.id, {
+      updateMissingCategoryMetadata(category.id, {
         icon: "icon-a",
         description: "description-a",
         expectedName: category.name,
       }),
-      updateMissingCategoryMetadata(ledgerId, category.id, {
+      updateMissingCategoryMetadata(category.id, {
         icon: "icon-b",
         description: "description-b",
         expectedName: category.name,

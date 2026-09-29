@@ -10,22 +10,17 @@ import type { PostgresTransaction } from "@/lib/db/transaction-locks";
  */
 export async function assertSourceDocumentsNotProcessing(
   tx: PostgresTransaction,
-  documents: readonly Pick<typeof sourceDocuments.$inferSelect, "ledgerId" | "latestAttemptId">[]
+  documents: readonly Pick<typeof sourceDocuments.$inferSelect, "latestAttemptId">[]
 ): Promise<void> {
   const attemptIds = documents.flatMap((document) =>
     document.latestAttemptId == null ? [] : [document.latestAttemptId]
   );
   if (attemptIds.length === 0) return;
-  const ledgerIds = [...new Set(documents.map((document) => document.ledgerId))];
   const processing = await tx
     .select({ id: extractionAttempts.id })
     .from(extractionAttempts)
     .where(
-      and(
-        inArray(extractionAttempts.ledgerId, ledgerIds),
-        inArray(extractionAttempts.id, attemptIds),
-        eq(extractionAttempts.status, "processing")
-      )
+      and(inArray(extractionAttempts.id, attemptIds), eq(extractionAttempts.status, "processing"))
     )
     .limit(1);
   if (processing.length > 0) {

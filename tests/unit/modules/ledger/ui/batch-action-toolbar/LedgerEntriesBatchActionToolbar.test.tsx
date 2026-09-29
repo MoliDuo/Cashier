@@ -6,7 +6,6 @@ import { LedgerEntriesBatchActionToolbar } from "@/modules/ledger/ui/batch-actio
 
 const dining: EntryCategory = {
   id: "category-1",
-  ledgerId: "ledger-1",
   name: "餐饮",
   description: null,
   icon: "Utensils",

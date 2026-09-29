@@ -1,7 +1,7 @@
 import "server-only";
 import { UnauthorizedError } from "@/lib/errors";
 import type { AuthenticatedPrincipal } from "@/modules/auth/contracts";
-import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
+import { getLedger } from "@/modules/ledger/server/live-ledger";
 
 /**
  * Complete the cross-domain part of an interactive sign-in.
@@ -12,7 +12,7 @@ import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
 export async function completeInteractiveSignIn(
   principal: AuthenticatedPrincipal
 ): Promise<AuthenticatedPrincipal> {
-  const ledger = await getLiveLedger(principal.id);
+  const ledger = await getLedger();
   if (ledger == null) throw new UnauthorizedError("Shared ledger is unavailable");
   return principal;
 }

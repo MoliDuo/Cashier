@@ -1,7 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { ledgerEntries, sourceDocuments } from "@/persistence";
 import type { SplitSourceDocumentResultDto } from "@/modules/source-document/contracts";
 import { ensureExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { getSourceDocumentInTransaction } from "./reads/list";
@@ -12,7 +12,6 @@ import { assertSourceDocumentsNotProcessing } from "./write-guards";
 import { copyDocumentInput } from "./document-input";
 
 export async function splitSourceDocumentAtomically(input: {
-  ledgerId: string;
   sourceDocumentId: string;
   ledgerEntryIds: string[];
   entryDate: string;
@@ -20,23 +19,14 @@ export async function splitSourceDocumentAtomically(input: {
   const startedAt = performance.now();
   const requestId = crypto.randomUUID();
   const [ledger, document] = await Promise.all([
-    db.query.ledgers.findFirst({
-      where: eq(ledgers.id, input.ledgerId),
-      columns: { mainCurrency: true },
-    }),
+    db.query.ledgers.findFirst({ columns: { mainCurrency: true } }),
     db.query.sourceDocuments.findFirst({
-      where: and(
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.id, input.sourceDocumentId)
-      ),
+      where: eq(sourceDocuments.id, input.sourceDocumentId),
     }),
   ]);
   if (ledger == null || document == null) throw new NotFoundError("Source document");
   const initialEntries = await db.query.ledgerEntries.findMany({
-    where: and(
-      eq(ledgerEntries.ledgerId, input.ledgerId),
-      eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
-    ),
+    where: eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
     orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
   });
   const selectedIds = new Set(input.ledgerEntryIds);
@@ -56,18 +46,11 @@ export async function splitSourceDocumentAtomically(input: {
 
   const splitSourceDocumentId = crypto.randomUUID();
   const outcome = await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    const lockedDocument = await lockSourceDocumentForUpdate(
-      tx,
-      input.ledgerId,
-      input.sourceDocumentId
-    );
+    await lockLedgerForUpdate(tx);
+    const lockedDocument = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
     await assertSourceDocumentsNotProcessing(tx, [lockedDocument]);
     const currentEntries = await tx.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
-      ),
+      where: eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
       orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
     });
     // The split moves the selected entries as they are now, so an edit to any
@@ -83,7 +66,6 @@ export async function splitSourceDocumentAtomically(input: {
 
     await tx.insert(sourceDocuments).values({
       id: splitSourceDocumentId,
-      ledgerId: input.ledgerId,
       bookId: lockedDocument.bookId,
       title: lockedDocument.title?.trim() || null,
       version: 1,
@@ -91,7 +73,6 @@ export async function splitSourceDocumentAtomically(input: {
     });
     // The new record keeps the evidence the entries were read from.
     await copyDocumentInput(tx, {
-      ledgerId: input.ledgerId,
       fromDocumentId: input.sourceDocumentId,
       toDocumentId: splitSourceDocumentId,
     });
@@ -121,7 +102,6 @@ export async function splitSourceDocumentAtomically(input: {
           updated_at = ${now}
       FROM patches
       WHERE entry.id = patches.id
-        AND entry.ledger_id = ${input.ledgerId}
       RETURNING entry.id
     `);
     if (updatedEntries.rows.length !== currentEntries.length) {
@@ -134,17 +114,8 @@ export async function splitSourceDocumentAtomically(input: {
         version: sql`${sourceDocuments.version} + 1`,
         updatedAt: now,
       })
-      .where(
-        and(
-          eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, input.sourceDocumentId)
-        )
-      );
-    const sourceDocument = await getSourceDocumentInTransaction(
-      tx,
-      input.ledgerId,
-      input.sourceDocumentId
-    );
+      .where(eq(sourceDocuments.id, input.sourceDocumentId));
+    const sourceDocument = await getSourceDocumentInTransaction(tx, input.sourceDocumentId);
     if (sourceDocument == null) throw new NotFoundError("Source document");
     return { movedEntryCount: movedEntries.length, sourceDocument } as const;
   });

@@ -1,6 +1,5 @@
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { ledgerEntries } from "@/persistence";
 import {
   buildLedgerEntryEffectiveDateConditions,
   buildLedgerEntryValueConditions,
@@ -15,7 +14,6 @@ import { normalize as decimalNormalize } from "@/lib/money/decimal";
 // so the summary never fans out across parallel queries.
 
 interface CalculateLedgerEntryStatsInput {
-  ledgerId: string;
   filters: LedgerEntryFilterParams;
 }
 
@@ -31,29 +29,24 @@ interface StatsRow {
   category_icon: string | null;
 }
 
-function joinConditions(conditions: ReturnType<typeof buildLedgerEntryValueConditions>) {
-  return conditions.length === 0 ? sql`` : sql`AND ${sql.join(conditions, sql` AND `)}`;
-}
-
 export async function calculateLedgerEntryStats({
-  ledgerId,
   filters,
 }: CalculateLedgerEntryStatsInput): Promise<LedgerEntrySummary> {
-  const tenantCondition = and(eq(ledgerEntries.ledgerId, ledgerId));
   const { currency, ...filtersWithoutCurrency } = filters;
-  const valueConditions = joinConditions(
-    buildLedgerEntryValueConditions(filtersWithoutCurrency, {
+  const conditions = [
+    ...buildLedgerEntryEffectiveDateConditions(filters),
+    ...buildLedgerEntryValueConditions(filtersWithoutCurrency, {
       mainCurrency: sql`settings.main_currency`,
       date: sql`documents.effective_date`,
-    })
-  );
-  const dateConditions = joinConditions(buildLedgerEntryEffectiveDateConditions(filters));
-  const currencyCondition =
-    currency == null || currency === "" ? sql`` : sql`AND ledger_entries.currency = ${currency}`;
+    }),
+    ...(currency == null || currency === "" ? [] : [sql`ledger_entries.currency = ${currency}`]),
+  ];
+  const whereClause =
+    conditions.length === 0 ? sql`` : sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
   const result = await db.execute<StatsRow & Record<string, unknown>>(sql`
     WITH settings AS (
-      SELECT main_currency FROM ledgers WHERE id = ${ledgerId}
+      SELECT main_currency FROM ledgers
     ),
     visible_entries AS (
       SELECT
@@ -68,16 +61,11 @@ export async function calculateLedgerEntryStats({
       FROM ledger_entries
       CROSS JOIN settings
       INNER JOIN source_documents documents
-        ON documents.ledger_id = ledger_entries.ledger_id
-       AND documents.id = ledger_entries.source_document_id
+        ON documents.id = ledger_entries.source_document_id
        ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
       LEFT JOIN entry_categories categories
-        ON categories.ledger_id = ledger_entries.ledger_id
-       AND categories.id = ledger_entries.category_id
-      WHERE ${tenantCondition}
-        ${dateConditions}
-        ${valueConditions}
-        ${currencyCondition}
+        ON categories.id = ledger_entries.category_id
+      ${whereClause}
     ),
     currency_totals AS (
       SELECT currency, sum(amount)::text AS total, count(*)::int AS count

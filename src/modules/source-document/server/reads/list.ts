@@ -31,7 +31,6 @@ import {
 
 async function loadSourceDocumentDetailSnapshot(
   tx: PostgresTransaction,
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<{ row: SourceDocumentRow; hydration: SourceDocumentHydrationRow } | null> {
   const baseRow = await tx
@@ -44,16 +43,15 @@ async function loadSourceDocumentDetailSnapshot(
       failureCode: extractionAttempts.failureCode,
     })
     .from(sourceDocuments)
-    .innerJoin(ledgers, eq(ledgers.id, sourceDocuments.ledgerId))
+    .crossJoin(ledgers)
     .leftJoin(
       extractionAttempts,
       and(
-        eq(extractionAttempts.ledgerId, ledgerId),
         eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
         eq(extractionAttempts.id, sourceDocuments.latestAttemptId)
       )
     )
-    .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)))
+    .where(eq(sourceDocuments.id, sourceDocumentId))
     .then((rows) => rows[0]);
   if (baseRow == null) return null;
 
@@ -65,25 +63,13 @@ async function loadSourceDocumentDetailSnapshot(
       originalFilename: storedFiles.originalFilename,
     })
     .from(sourceDocumentFiles)
-    .innerJoin(
-      storedFiles,
-      and(
-        eq(storedFiles.ledgerId, sourceDocumentFiles.ledgerId),
-        eq(storedFiles.id, sourceDocumentFiles.storedFileId)
-      )
-    )
-    .where(
-      and(
-        eq(sourceDocumentFiles.ledgerId, ledgerId),
-        eq(sourceDocumentFiles.sourceDocumentId, sourceDocumentId)
-      )
-    )
+    .innerJoin(storedFiles, eq(storedFiles.id, sourceDocumentFiles.storedFileId))
+    .where(eq(sourceDocumentFiles.sourceDocumentId, sourceDocumentId))
     .orderBy(asc(sourceDocumentFiles.position));
 
   const entryRows = await tx
     .select({
       id: ledgerEntries.id,
-      ledgerId: ledgerEntries.ledgerId,
       categoryId: ledgerEntries.categoryId,
       sourceDocumentId: ledgerEntries.sourceDocumentId,
       amount: ledgerEntries.amount,
@@ -97,23 +83,11 @@ async function loadSourceDocumentDetailSnapshot(
       category: entryCategories,
     })
     .from(ledgerEntries)
-    .leftJoin(
-      entryCategories,
-      and(
-        eq(entryCategories.ledgerId, ledgerEntries.ledgerId),
-        eq(entryCategories.id, ledgerEntries.categoryId)
-      )
-    )
-    .where(
-      and(
-        eq(ledgerEntries.ledgerId, ledgerId),
-        eq(ledgerEntries.sourceDocumentId, sourceDocumentId)
-      )
-    )
+    .leftJoin(entryCategories, eq(entryCategories.id, ledgerEntries.categoryId))
+    .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId))
     .orderBy(asc(ledgerEntries.position), asc(ledgerEntries.id));
   const activeEntries: SourceDocumentLedgerEntryAggregateRow[] = entryRows.map((entry) => ({
     id: entry.id,
-    ledgerId: entry.ledgerId,
     categoryId: entry.categoryId,
     sourceDocumentId,
     amount: entry.amount,
@@ -154,7 +128,6 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
   const rows = await db
     .select({
       id: sourceDocuments.id,
-      ledgerId: sourceDocuments.ledgerId,
       title: sourceDocuments.title,
       bookId: sourceDocuments.bookId,
       documentDate: sourceDocuments.documentDate,
@@ -171,17 +144,14 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
             SELECT 1
             FROM ${sourceDocumentFiles} list_document_file
             INNER JOIN ${storedFiles} list_stored_file
-              ON list_stored_file.ledger_id = list_document_file.ledger_id
-             AND list_stored_file.id = list_document_file.stored_file_id
-            WHERE list_document_file.ledger_id = ${input.ledgerId}
-              AND list_document_file.source_document_id = ${sourceDocuments.id}
+              ON list_stored_file.id = list_document_file.stored_file_id
+            WHERE list_document_file.source_document_id = ${sourceDocuments.id}
           )`,
     })
     .from(sourceDocuments)
     .leftJoin(
       extractionAttempts,
       and(
-        eq(extractionAttempts.ledgerId, input.ledgerId),
         eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
         eq(extractionAttempts.id, sourceDocuments.latestAttemptId)
       )
@@ -212,10 +182,9 @@ export async function listTargetSourceDocuments(input: TargetSourceDocumentListI
 }
 
 export async function getTargetSourceDocument(
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<SourceDocumentDetailDto | null> {
-  return db.transaction((tx) => getSourceDocumentInTransaction(tx, ledgerId, sourceDocumentId), {
+  return db.transaction((tx) => getSourceDocumentInTransaction(tx, sourceDocumentId), {
     isolationLevel: "repeatable read",
     accessMode: "read only",
   });
@@ -223,9 +192,8 @@ export async function getTargetSourceDocument(
 
 export async function getSourceDocumentInTransaction(
   tx: PostgresTransaction,
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<SourceDocumentDetailDto | null> {
-  const snapshot = await loadSourceDocumentDetailSnapshot(tx, ledgerId, sourceDocumentId);
+  const snapshot = await loadSourceDocumentDetailSnapshot(tx, sourceDocumentId);
   return snapshot == null ? null : mapSourceDocumentDetail(snapshot.row, snapshot.hydration);
 }

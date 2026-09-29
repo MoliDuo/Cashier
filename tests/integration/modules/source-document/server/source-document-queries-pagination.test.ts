@@ -16,19 +16,15 @@ function requireDefined<T>(value: T | undefined, label: string): T {
 }
 
 describe("source-document-queries", () => {
-  let ledgerId = "";
-
   let categoryId = "";
 
   beforeEach(async () => {
     const db = getTestDb();
-    const setup = await createTestUserWithLedger(db);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(db);
 
     const categories = await db
       .insert(entryCategories)
       .values({
-        ledgerId,
         name: "Food",
         sortOrder: 1,
       })
@@ -52,12 +48,11 @@ describe("source-document-queries", () => {
       const inserted = await db
         .insert(sourceDocuments)
         .values({
-          ledgerId,
           documentDate: `2026-03-${String(day).padStart(2, "0")}`,
           createdAt: new Date(
             `2026-03-${String(day).padStart(2, "0")}T${String(10 + (i % 10)).padStart(2, "0")}:00:00Z`
           ),
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
       docs.push({ id: inserted[0]!.id, status });
@@ -73,7 +68,7 @@ describe("source-document-queries", () => {
     const allItems: Array<{ id: string; effectiveDate: string | null }> = [];
 
     for (let pageNum = 0; pageNum < 20; pageNum++) {
-      const page = await listStreamPage(ledgerId, {
+      const page = await listStreamPage({
         cursor,
         limit: 5,
       });
@@ -113,25 +108,22 @@ describe("source-document-queries", () => {
       .insert(sourceDocuments)
       .values([
         {
-          ledgerId,
           title: "null-date-older",
           documentDate: null,
           createdAt: today,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "null-date-newer",
           documentDate: "2026-03-18",
           createdAt: yesterday,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "has-explicit-date",
           documentDate: "2026-03-19",
           createdAt: new Date("2026-03-19T12:00:00Z"),
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
       ])
       .returning();
@@ -139,7 +131,7 @@ describe("source-document-queries", () => {
       await activateTestSourceDocumentProjection(db, doc.id);
     }
 
-    const page = await listStreamPage(ledgerId, { limit: 10 });
+    const page = await listStreamPage({ limit: 10 });
 
     const nullDateOlder = page.items.find((i) => i.title === "null-date-older");
     const nullDateNewer = page.items.find((i) => i.title === "null-date-newer");
@@ -174,31 +166,28 @@ describe("source-document-queries", () => {
     await db.insert(sourceDocuments).values([
       {
         id: idA,
-        ledgerId,
         documentDate: sameDate,
         createdAt: sameCreatedAt,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       },
       {
         id: idB,
-        ledgerId,
         documentDate: sameDate,
         createdAt: sameCreatedAt,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       },
       {
         id: idC,
-        ledgerId,
         documentDate: sameDate,
         createdAt: sameCreatedAt,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       },
     ]);
     for (const id of [idA, idB, idC]) {
       await activateTestSourceDocumentProjection(db, id);
     }
 
-    const page = await listStreamPage(ledgerId, { limit: 10 });
+    const page = await listStreamPage({ limit: 10 });
 
     const ids = page.items.map((i) => i.id);
     // Since order is DESC by effectiveDate, createdAt, then id,
@@ -214,28 +203,24 @@ describe("source-document-queries", () => {
       .insert(sourceDocuments)
       .values([
         {
-          ledgerId,
           title: "completed-in-range",
           documentDate: "2026-03-15",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "completed-outside-range",
           documentDate: "2026-03-01",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "processing-in-range",
           documentDate: "2026-03-16",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           title: "invalid-in-range",
           documentDate: "2026-03-14",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
       ])
       .returning();
@@ -246,7 +231,6 @@ describe("source-document-queries", () => {
     // Insert ledger entries BEFORE activation so the fixture numbers their positions
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: completedInRange.id,
         amount: "50.00",
         currency: "CNY",
@@ -254,7 +238,6 @@ describe("source-document-queries", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: completedOutOfRange.id,
         amount: "200.00",
         currency: "CNY",
@@ -271,7 +254,7 @@ describe("source-document-queries", () => {
     }
 
     // Filter by status = completed, date range, and amount
-    const page = await listStreamPage(ledgerId, {
+    const page = await listStreamPage({
       statuses: ["completed"],
       startDate: "2026-03-10",
       endDate: "2026-03-20",

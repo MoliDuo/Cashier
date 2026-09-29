@@ -17,21 +17,15 @@ import {
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
-async function getTargetEnhancedStatsQuery({
-  ledgerId,
-  ...input
-}: Parameters<typeof queryEnhancedStats>[1] & { ledgerId: string }): ReturnType<
-  typeof queryEnhancedStats
-> {
+async function getTargetEnhancedStatsQuery(
+  input: Parameters<typeof queryEnhancedStats>[0]
+): ReturnType<typeof queryEnhancedStats> {
   const db = getTestDb();
-  const documents = await db.query.sourceDocuments.findMany({
-    where: (documents, { eq }) => eq(documents.ledgerId, ledgerId),
-    columns: { id: true },
-  });
+  const documents = await db.query.sourceDocuments.findMany({ columns: { id: true } });
   for (const document of documents) {
     await activateTestSourceDocumentProjection(db, document.id);
   }
-  return queryEnhancedStats(ledgerId, input);
+  return queryEnhancedStats(input);
 }
 
 function requireFirst<T>(rows: readonly T[], label: string): T {
@@ -43,18 +37,15 @@ function requireFirst<T>(rows: readonly T[], label: string): T {
 }
 
 describe("queryEnhancedStats", () => {
-  let ledgerId = "";
   let categoryId = "";
 
   beforeEach(async () => {
     const db = getTestDb();
-    const setup = await createTestUserWithLedger(db);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(db);
 
     const insertedCategories = await db
       .insert(entryCategories)
       .values({
-        ledgerId,
         name: "餐饮",
         sortOrder: 1,
       })
@@ -64,7 +55,7 @@ describe("queryEnhancedStats", () => {
 
   it("converts mixed currencies by effective date using ledger main currency", async () => {
     const db = getTestDb();
-    await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
+    await db.update(ledgers).set({ mainCurrency: "CNY" });
 
     await insertExchangeRates("2024-03-01", { USD: 2, CNY: 4 });
     await insertExchangeRates("2024-03-02", { USD: 2, CNY: 4 });
@@ -73,14 +64,12 @@ describe("queryEnhancedStats", () => {
       .insert(sourceDocuments)
       .values([
         {
-          ledgerId,
           documentDate: "2024-03-01",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
-          ledgerId,
           documentDate: "2024-03-02",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
       ])
       .returning();
@@ -93,7 +82,6 @@ describe("queryEnhancedStats", () => {
 
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: firstDoc.id,
         amount: "20",
         currency: "USD",
@@ -101,7 +89,6 @@ describe("queryEnhancedStats", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: secondDoc.id,
         amount: "30",
         currency: "CNY",
@@ -111,7 +98,6 @@ describe("queryEnhancedStats", () => {
     ]);
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-03-01", to: "2024-03-31" },
       compareRange: { from: "2024-02-01", to: "2024-02-29" },
     });
@@ -138,16 +124,14 @@ describe("queryEnhancedStats", () => {
     const insertedDoc = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: null,
         createdAt: new Date("2024-03-10T12:00:00Z"),
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
 
     await db.insert(ledgerEntries).values({
-      ledgerId,
       sourceDocumentId: doc.id,
       amount: "40",
       currency: "CNY",
@@ -156,7 +140,6 @@ describe("queryEnhancedStats", () => {
     });
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-03-01", to: "2024-03-31" },
       compareRange: { from: "2024-02-01", to: "2024-02-29" },
     });
@@ -171,15 +154,13 @@ describe("queryEnhancedStats", () => {
     const insertedDoc = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2024-03-12",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
 
     await db.insert(ledgerEntries).values({
-      ledgerId,
       sourceDocumentId: doc.id,
       amount: "55",
       currency: "CNY",
@@ -192,7 +173,6 @@ describe("queryEnhancedStats", () => {
     const [latestSubmission] = await db
       .insert(extractionAttempts)
       .values({
-        ledgerId,
         sourceDocumentId: doc.id,
         status: "processing",
       })
@@ -203,7 +183,6 @@ describe("queryEnhancedStats", () => {
       .where(eq(sourceDocuments.id, doc.id));
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-03-01", to: "2024-03-31" },
       compareRange: { from: "2024-02-01", to: "2024-02-29" },
     });
@@ -213,23 +192,21 @@ describe("queryEnhancedStats", () => {
 
   it("excludes entries when rates are missing", async () => {
     const db = getTestDb();
-    await db.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
+    await db.update(ledgers).set({ mainCurrency: "USD" });
 
     await insertExchangeRates("2024-04-01", { CNY: 7.8 });
 
     const insertedDoc = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2024-04-01",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
 
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: doc.id,
         amount: "50",
         currency: "JPY",
@@ -237,7 +214,6 @@ describe("queryEnhancedStats", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: doc.id,
         amount: "25",
         currency: "USD",
@@ -247,7 +223,6 @@ describe("queryEnhancedStats", () => {
     ]);
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-04-01", to: "2024-04-30" },
       compareRange: { from: "2024-03-01", to: "2024-03-31" },
     });
@@ -263,15 +238,13 @@ describe("queryEnhancedStats", () => {
     const insertedDoc = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2024-05-01",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
 
     await db.insert(ledgerEntries).values({
-      ledgerId,
       sourceDocumentId: doc.id,
       amount: "10",
       currency: "CNY",
@@ -280,7 +253,6 @@ describe("queryEnhancedStats", () => {
     });
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-05-01", to: "2024-05-31" },
       compareRange: { from: "2024-04-01", to: "2024-04-30" },
     });
@@ -298,14 +270,12 @@ describe("queryEnhancedStats", () => {
       const [doc] = await db
         .insert(sourceDocuments)
         .values({
-          ledgerId,
           documentDate: `2024-06-${day}`,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
 
       await db.insert(ledgerEntries).values({
-        ledgerId,
         sourceDocumentId: doc!.id,
         amount: String(amount),
         currency: "CNY",
@@ -315,7 +285,6 @@ describe("queryEnhancedStats", () => {
     }
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-06-01", to: "2024-06-30" },
       compareRange: { from: "2024-05-01", to: "2024-05-31" },
     });
@@ -330,7 +299,6 @@ describe("queryEnhancedStats", () => {
     const insertedSecondCategory = await db
       .insert(entryCategories)
       .values({
-        ledgerId,
         name: "交通",
         sortOrder: 2,
       })
@@ -340,16 +308,14 @@ describe("queryEnhancedStats", () => {
     const [doc] = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2024-07-01",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
 
     await db.insert(ledgerEntries).values([
       // 3 entries with first category
       {
-        ledgerId,
         sourceDocumentId: doc!.id,
         amount: "100",
         currency: "CNY",
@@ -357,7 +323,6 @@ describe("queryEnhancedStats", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: doc!.id,
         amount: "200",
         currency: "CNY",
@@ -365,7 +330,6 @@ describe("queryEnhancedStats", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: doc!.id,
         amount: "300",
         currency: "CNY",
@@ -374,7 +338,6 @@ describe("queryEnhancedStats", () => {
       },
       // 2 entries with second category (different aggregate group, same date)
       {
-        ledgerId,
         sourceDocumentId: doc!.id,
         amount: "50",
         currency: "CNY",
@@ -382,7 +345,6 @@ describe("queryEnhancedStats", () => {
         categoryId: secondCategoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: doc!.id,
         amount: "150",
         currency: "CNY",
@@ -392,7 +354,6 @@ describe("queryEnhancedStats", () => {
     ]);
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-07-01", to: "2024-07-31" },
       compareRange: { from: "2024-06-01", to: "2024-06-30" },
     });
@@ -439,7 +400,6 @@ describe("queryEnhancedStats", () => {
     const insertedSecondCategory = await db
       .insert(entryCategories)
       .values({
-        ledgerId,
         name: "大额",
         sortOrder: 9,
       })
@@ -449,16 +409,14 @@ describe("queryEnhancedStats", () => {
     const insertedDoc = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2024-08-01",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     const doc = requireFirst(insertedDoc, "document");
 
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: doc.id,
         amount: hugeA,
         currency: "CNY",
@@ -466,7 +424,6 @@ describe("queryEnhancedStats", () => {
         categoryId,
       },
       {
-        ledgerId,
         sourceDocumentId: doc.id,
         amount: hugeB,
         currency: "CNY",
@@ -476,7 +433,6 @@ describe("queryEnhancedStats", () => {
     ]);
 
     const result = await getTargetEnhancedStatsQuery({
-      ledgerId,
       queryRange: { from: "2024-08-01", to: "2024-08-31" },
       compareRange: { from: "2024-07-01", to: "2024-07-31" },
     });
@@ -492,28 +448,23 @@ describe("queryEnhancedStats", () => {
     async function recordOn(
       date: string,
       entries: { amount: string; currency?: string; itemName: string }[],
-      targetLedgerId = ledgerId,
       bookId?: string
     ) {
       const db = getTestDb();
       const [doc] = await db
         .insert(sourceDocuments)
         .values({
-          ledgerId: targetLedgerId,
           documentDate: date,
-          bookId:
-            bookId ??
-            sql`(SELECT id FROM books WHERE ledger_id = ${targetLedgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: bookId ?? sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
       await db.insert(ledgerEntries).values(
         entries.map((entry) => ({
-          ledgerId: targetLedgerId,
           sourceDocumentId: doc!.id,
           amount: entry.amount,
           currency: entry.currency ?? "CNY",
           itemName: entry.itemName,
-          ...(targetLedgerId === ledgerId ? { categoryId } : {}),
+          categoryId,
         }))
       );
       return doc!.id;
@@ -532,7 +483,7 @@ describe("queryEnhancedStats", () => {
       await recordOn("2024-02-20", [{ amount: "900", itemName: "late February" }]);
       await recordOn("2024-03-05", [{ amount: "60", itemName: "March" }]);
 
-      const result = await getTargetEnhancedStatsQuery({ ledgerId, ...runningMarch });
+      const result = await getTargetEnhancedStatsQuery(runningMarch);
 
       expect(result.periodEnd).toBe("2024-03-31");
       expect(result.summary.comparison).toMatchObject({
@@ -551,7 +502,7 @@ describe("queryEnhancedStats", () => {
 
     it("lists the biggest entries by converted amount and leaves out refunds and unrated ones", async () => {
       const db = getTestDb();
-      await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
+      await db.update(ledgers).set({ mainCurrency: "CNY" });
       await insertExchangeRates("2024-03-03", { USD: 1, CNY: 7 });
       const deposit = await recordOn("2024-03-03", [
         { amount: "500", currency: "USD", itemName: "deposit" },
@@ -566,7 +517,7 @@ describe("queryEnhancedStats", () => {
       }
       await recordOn("2024-02-15", [{ amount: "5000", itemName: "last month" }]);
 
-      const result = await getTargetEnhancedStatsQuery({ ledgerId, ...runningMarch });
+      const result = await getTargetEnhancedStatsQuery(runningMarch);
 
       expect(result.largestEntries.map((entry) => entry.name)).toEqual([
         "deposit",
@@ -585,24 +536,16 @@ describe("queryEnhancedStats", () => {
       });
     });
 
-    it("keeps the biggest entries to the book and the ledger asked for", async () => {
+    it("keeps the biggest entries to the book asked for", async () => {
       const db = getTestDb();
-      const travel = (await createTestBooks(db, ledgerId, ["旅行"])).get("旅行")!;
+      const travel = (await createTestBooks(db, ["旅行"])).get("旅行")!;
       await recordOn("2024-03-02", [{ amount: "70", itemName: "home" }]);
-      await recordOn("2024-03-03", [{ amount: "700", itemName: "flight" }], ledgerId, travel);
-      const other = await createTestUserWithLedger(
-        db,
-        "someone-else@example.com",
-        undefined,
-        "00000000-0000-4000-8000-00000000000b"
-      );
-      await recordOn("2024-03-04", [{ amount: "7000", itemName: "not ours" }], other.ledgerId);
+      await recordOn("2024-03-03", [{ amount: "700", itemName: "flight" }], travel);
 
-      const all = await getTargetEnhancedStatsQuery({ ledgerId, ...runningMarch });
+      const all = await getTargetEnhancedStatsQuery(runningMarch);
       expect(all.largestEntries.map((entry) => entry.name)).toEqual(["flight", "home"]);
 
       const travelOnly = await getTargetEnhancedStatsQuery({
-        ledgerId,
         ...runningMarch,
         bookId: travel,
       });

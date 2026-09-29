@@ -22,7 +22,6 @@ import {
 } from "tests/helpers/factories";
 import {
   activateTestSourceDocumentProjection,
-  createTestUserWithLedger,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 import { eq } from "drizzle-orm";
@@ -37,12 +36,9 @@ import {
 } from "@/modules/ledger/server-actions/entries";
 import { deleteSourceDocumentAction } from "@/modules/source-document/server-actions/delete";
 
-async function getTargetEntryCategoriesAction(ledgerId: string) {
+async function getTargetEntryCategoriesAction() {
   const db = getTestDb();
-  const documents = await db.query.sourceDocuments.findMany({
-    where: (documents, { eq }) => eq(documents.ledgerId, ledgerId),
-    columns: { id: true },
-  });
+  const documents = await db.query.sourceDocuments.findMany({ columns: { id: true } });
   for (const document of documents) {
     await activateTestSourceDocumentProjection(db, document.id);
   }
@@ -50,67 +46,44 @@ async function getTargetEntryCategoriesAction(ledgerId: string) {
 }
 
 /**
- * Helper function to create a complete test ledger with categories and entries
- * Creates a unique user for each ledger to avoid unique constraint violations
+ * Helper function to create the test ledger for the default test user
  */
-async function createTestLedger(db: ReturnType<typeof getTestDb>, useCurrentUser = false) {
-  if (useCurrentUser) {
-    // Use the default test user (TEST_USER_ID)
-    // First clean up any existing ledger for this user to avoid unique constraint
-    await db.delete(ledgers);
+async function createTestLedger(db: ReturnType<typeof getTestDb>) {
+  // Clean up any existing ledger to avoid the singleton constraint
+  await db.delete(ledgers);
 
-    const ledgerData = createLedgerData();
-    await db.insert(ledgers).values(ledgerData);
-    await ensureTestLedgerBooks(db, ledgerData.id);
-    const ledger = await db.query.ledgers.findFirst({
-      where: eq(ledgers.id, ledgerData.id),
-    });
-    if (!ledger) throw new Error("Ledger not found after creation");
-    return ledger;
-  }
-
-  // Create a unique user and ledger to avoid single-ledger-per-user constraint
-  const { ledgerId } = await createTestUserWithLedger(db);
-  const ledger = await db.query.ledgers.findFirst({
-    where: eq(ledgers.id, ledgerId),
-  });
-  if (!ledger) throw new Error("Ledger not found after creation");
-  return ledger;
+  await db.insert(ledgers).values(createLedgerData());
+  await ensureTestLedgerBooks(db);
 }
 
-async function createTestCategory(
-  db: ReturnType<typeof getTestDb>,
-  ledgerId: string,
-  name = "餐饮"
-) {
-  const category = createCategoryData(ledgerId, { name });
+async function createTestCategory(db: ReturnType<typeof getTestDb>, name = "餐饮") {
+  const category = createCategoryData({ name });
   await db.insert(entryCategories).values(category);
   return category;
 }
 
 async function createTestEntry(
   db: ReturnType<typeof getTestDb>,
-  ledgerId: string,
   opts: { categoryId?: string | null; sourceDocumentId?: string } = {}
 ) {
   // If no sourceDocumentId provided, create a source document
   let sourceDocumentId = opts.sourceDocumentId;
   if (sourceDocumentId == null) {
-    const sourceDoc = await createTestSourceDocument(db, ledgerId);
+    const sourceDoc = await createTestSourceDocument(db);
     sourceDocumentId = sourceDoc.id;
   }
 
-  const entry = createLedgerEntryData(ledgerId, { ...opts, sourceDocumentId });
+  const entry = createLedgerEntryData({ ...opts, sourceDocumentId });
   await db.insert(ledgerEntries).values(entry);
   await activateTestSourceDocumentProjection(db, sourceDocumentId);
   return entry;
 }
 
-async function createTestSourceDocument(db: ReturnType<typeof getTestDb>, ledgerId: string) {
-  const doc = createSourceDocumentData(ledgerId);
+async function createTestSourceDocument(db: ReturnType<typeof getTestDb>) {
+  const doc = createSourceDocumentData();
   await db.insert(sourceDocuments).values({
     ...doc,
-    bookId: sql`(SELECT id FROM books WHERE ledger_id = ${doc.ledgerId} ORDER BY sort_order LIMIT 1)`,
+    bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
   });
   await activateTestSourceDocumentProjection(db, doc.id);
   return doc;
@@ -126,22 +99,22 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
 
     // Setup: Ledger with category and 3 entries in that category
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const category = await createTestCategory(db, ledger.id);
+    await createTestLedger(db);
+    const category = await createTestCategory(db);
 
-    const entry1 = await createTestEntry(db, ledger.id, { categoryId: category.id });
-    const entry2 = await createTestEntry(db, ledger.id, { categoryId: category.id });
-    const entry3 = await createTestEntry(db, ledger.id, { categoryId: category.id });
+    const entry1 = await createTestEntry(db, { categoryId: category.id });
+    const entry2 = await createTestEntry(db, { categoryId: category.id });
+    const entry3 = await createTestEntry(db, { categoryId: category.id });
 
     // Verify initial state
     const initialCount = await readUncategorizedCount();
     expect(initialCount).toBe(0);
 
     // Action: Delete the category
-    await removeCategoryFromCollection(ledger.id, category.id);
+    await removeCategoryFromCollection(category.id);
 
     // Verify: Category no longer appears in list
-    const categories = await getTargetEntryCategoriesAction(ledger.id);
+    const categories = await getTargetEntryCategoriesAction();
     expect(categories.find((c) => c.id === category.id)).toBeUndefined();
 
     // Verify: All 3 entries now have categoryId = null (are "uncategorized")
@@ -168,15 +141,15 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const categoryA = await createTestCategory(db, ledger.id, "餐饮");
-    const categoryB = await createTestCategory(db, ledger.id, "交通");
+    await createTestLedger(db);
+    const categoryA = await createTestCategory(db, "餐饮");
+    const categoryB = await createTestCategory(db, "交通");
 
-    const entryInA = await createTestEntry(db, ledger.id, { categoryId: categoryA.id });
-    const entryInB = await createTestEntry(db, ledger.id, { categoryId: categoryB.id });
+    const entryInA = await createTestEntry(db, { categoryId: categoryA.id });
+    const entryInB = await createTestEntry(db, { categoryId: categoryB.id });
 
     // Delete category A
-    await removeCategoryFromCollection(ledger.id, categoryA.id);
+    await removeCategoryFromCollection(categoryA.id);
 
     // Verify: Entry in category B is unchanged
     const updatedEntryInB = await db.query.ledgerEntries.findFirst({
@@ -197,13 +170,13 @@ describe("C1: Delete Category → Entries Become Uncategorized", () => {
 // ============================================================================
 
 describe("E1: Create Entry → Data Association Correct", () => {
-  it("should correctly associate entry with ledger and category", async () => {
+  it("should correctly associate entry with its category", async () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const category = await createTestCategory(db, ledger.id);
-    const sourceDoc = await createTestSourceDocument(db, ledger.id);
+    await createTestLedger(db);
+    const category = await createTestCategory(db);
+    const sourceDoc = await createTestSourceDocument(db);
 
     // Create entry via action (amount must be a number, sourceDocumentId is required)
     const entry = await createLedgerEntryAction({
@@ -218,11 +191,10 @@ describe("E1: Create Entry → Data Association Correct", () => {
     const createdEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.id, entry.ledgerEntryId),
     });
-    expect(createdEntry?.ledgerId).toBe(ledger.id);
     expect(createdEntry?.categoryId).toBe(category.id);
 
     // Verify category entry count
-    const categories = await getTargetEntryCategoriesAction(ledger.id);
+    const categories = await getTargetEntryCategoriesAction();
     const targetCategory = categories.find((c) => c.id === category.id);
     expect(targetCategory?.entryCount).toBe(1);
   });
@@ -231,8 +203,8 @@ describe("E1: Create Entry → Data Association Correct", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const sourceDoc = await createTestSourceDocument(db, ledger.id);
+    await createTestLedger(db);
+    const sourceDoc = await createTestSourceDocument(db);
 
     // Create entry without category (amount must be a number, sourceDocumentId is required)
     const entry = await createLedgerEntryAction({
@@ -262,22 +234,22 @@ describe("E2: Delete Entry → Related Counts Update", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const category = await createTestCategory(db, ledger.id);
+    await createTestLedger(db);
+    const category = await createTestCategory(db);
 
     // Create 2 entries in the category
-    const entry1 = await createTestEntry(db, ledger.id, { categoryId: category.id });
-    await createTestEntry(db, ledger.id, { categoryId: category.id });
+    const entry1 = await createTestEntry(db, { categoryId: category.id });
+    await createTestEntry(db, { categoryId: category.id });
 
     // Verify initial count
-    let categories = await getTargetEntryCategoriesAction(ledger.id);
+    let categories = await getTargetEntryCategoriesAction();
     expect(categories.find((c) => c.id === category.id)?.entryCount).toBe(2);
 
     // Delete one entry
     await deleteLedgerEntryAction(entry1.sourceDocumentId!, entry1.id);
 
     // Verify count decreased
-    categories = await getTargetEntryCategoriesAction(ledger.id);
+    categories = await getTargetEntryCategoriesAction();
     expect(categories.find((c) => c.id === category.id)?.entryCount).toBe(1);
   });
 
@@ -285,9 +257,9 @@ describe("E2: Delete Entry → Related Counts Update", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const sourceDoc = await createTestSourceDocument(db, ledger.id);
-    const entry = await createTestEntry(db, ledger.id, { sourceDocumentId: sourceDoc.id });
+    await createTestLedger(db);
+    const sourceDoc = await createTestSourceDocument(db);
+    const entry = await createTestEntry(db, { sourceDocumentId: sourceDoc.id });
 
     // Delete entry
     await deleteLedgerEntryAction(entry.sourceDocumentId!, entry.id);
@@ -309,15 +281,15 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const categoryA = await createTestCategory(db, ledger.id, "餐饮");
-    const categoryB = await createTestCategory(db, ledger.id, "交通");
+    await createTestLedger(db);
+    const categoryA = await createTestCategory(db, "餐饮");
+    const categoryB = await createTestCategory(db, "交通");
 
     // Create entry in category A
-    const entry = await createTestEntry(db, ledger.id, { categoryId: categoryA.id });
+    const entry = await createTestEntry(db, { categoryId: categoryA.id });
 
     // Verify initial counts
-    let categories = await getTargetEntryCategoriesAction(ledger.id);
+    let categories = await getTargetEntryCategoriesAction();
     expect(categories.find((c) => c.id === categoryA.id)?.entryCount).toBe(1);
     expect(categories.find((c) => c.id === categoryB.id)?.entryCount).toBe(0);
 
@@ -327,7 +299,7 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     });
 
     // Verify counts updated
-    categories = await getTargetEntryCategoriesAction(ledger.id);
+    categories = await getTargetEntryCategoriesAction();
     expect(categories.find((c) => c.id === categoryA.id)?.entryCount).toBe(0);
     expect(categories.find((c) => c.id === categoryB.id)?.entryCount).toBe(1);
   });
@@ -336,9 +308,9 @@ describe("E3: Update Entry Category → Counts Update Correctly", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const category = await createTestCategory(db, ledger.id);
-    const entry = await createTestEntry(db, ledger.id, { categoryId: category.id });
+    await createTestLedger(db);
+    const category = await createTestCategory(db);
+    const entry = await createTestEntry(db, { categoryId: category.id });
 
     // Initial state: 0 uncategorized
     expect(await readUncategorizedCount()).toBe(0);
@@ -362,12 +334,12 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const sourceDoc = await createTestSourceDocument(db, ledger.id);
+    await createTestLedger(db);
+    const sourceDoc = await createTestSourceDocument(db);
 
     // Create entries linked to this source document
-    const entry1 = await createTestEntry(db, ledger.id, { sourceDocumentId: sourceDoc.id });
-    const entry2 = await createTestEntry(db, ledger.id, { sourceDocumentId: sourceDoc.id });
+    const entry1 = await createTestEntry(db, { sourceDocumentId: sourceDoc.id });
+    const entry2 = await createTestEntry(db, { sourceDocumentId: sourceDoc.id });
 
     // Delete source document
     await deleteSourceDocumentAction(sourceDoc.id);
@@ -395,12 +367,12 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
     const db = getTestDb();
 
     // Use current user (TEST_USER_ID) because this test uses auth-dependent actions
-    const ledger = await createTestLedger(db, true);
-    const docA = await createTestSourceDocument(db, ledger.id);
-    const docB = await createTestSourceDocument(db, ledger.id);
+    await createTestLedger(db);
+    const docA = await createTestSourceDocument(db);
+    const docB = await createTestSourceDocument(db);
 
-    await createTestEntry(db, ledger.id, { sourceDocumentId: docA.id });
-    const entryB = await createTestEntry(db, ledger.id, { sourceDocumentId: docB.id });
+    await createTestEntry(db, { sourceDocumentId: docA.id });
+    const entryB = await createTestEntry(db, { sourceDocumentId: docB.id });
 
     // Delete only doc A
     await deleteSourceDocumentAction(docA.id);
@@ -413,8 +385,8 @@ describe("D1: Delete Source Document → Related Entries Deleted", () => {
   });
 });
 
-async function removeCategoryFromCollection(ledgerId: string, categoryId: string) {
-  const categories = await listCategories(ledgerId);
+async function removeCategoryFromCollection(categoryId: string) {
+  const categories = await listCategories();
   return saveEntryCategoriesAction({
     expectedRevision: await computeCategoryCollectionRevision(categories),
     categories: categories

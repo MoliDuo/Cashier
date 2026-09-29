@@ -4,7 +4,6 @@ import type { CategoryInfo, ParsedLedgerEntry } from "@/lib/ai/types";
 
 export interface EntryToInsert {
   id: string;
-  ledgerId: string;
   categoryId: string | null;
   sourceDocumentId: string;
   amount: string;
@@ -19,7 +18,6 @@ export interface BuildEntriesParams {
   validEntries: ParsedLedgerEntry[];
   categories: CategoryInfo[];
   sourceDocumentId: string;
-  ledgerId: string;
   fallbackDate: string;
 }
 
@@ -31,7 +29,6 @@ export function buildEntriesForInsert({
   validEntries,
   categories,
   sourceDocumentId,
-  ledgerId,
   fallbackDate,
 }: BuildEntriesParams): EntryToInsert[] {
   return validEntries.map((entry) => {
@@ -45,7 +42,6 @@ export function buildEntriesForInsert({
 
     return {
       id: crypto.randomUUID(),
-      ledgerId,
       categoryId,
       sourceDocumentId,
       amount: roundToCurrency(String(entry.amount), entryCurrency),

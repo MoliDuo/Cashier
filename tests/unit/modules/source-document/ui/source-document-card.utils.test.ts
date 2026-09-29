@@ -5,7 +5,6 @@ import { calculateSourceDocumentCardTotal } from "@/modules/source-document/ui/s
 
 const defaultCategory: EntryCategory = {
   id: "cat-food",
-  ledgerId: "ledger-1",
   name: "餐饮",
   description: null,
   icon: "Utensils",
@@ -17,7 +16,6 @@ const defaultCategory: EntryCategory = {
 function createEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
     id: "entry-1",
-    ledgerId: "ledger-1",
     categoryId: defaultCategory.id,
     category: defaultCategory,
     itemName: "默认条目",

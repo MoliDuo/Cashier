@@ -5,7 +5,6 @@ import { filterStreamEntries } from "@/modules/source-document/stream-filter-pol
 function makeItem(overrides: Partial<SourceDocumentListItemDto> = {}): SourceDocumentListItemDto {
   return {
     id: "00000000-0000-4000-8000-000000000001",
-    ledgerId: "00000000-0000-4000-8000-000000000002",
     version: 1,
     title: "Coffee receipt",
     text: null,
@@ -30,7 +29,6 @@ function makeEntry(
 ) {
   return {
     id: "00000000-0000-4000-8000-000000000003",
-    ledgerId: "00000000-0000-4000-8000-000000000002",
     categoryId: null,
     sourceDocumentId: "00000000-0000-4000-8000-000000000001",
     amount: "50.00",

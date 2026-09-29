@@ -57,7 +57,6 @@ vi.mock("sonner", () => ({
 }));
 
 const ledger: Ledger = {
-  id: "ledger-1",
   settings: { ...getDefaultLedger().settings, currencies: ["USD", "CNY"] },
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
@@ -65,7 +64,6 @@ const ledger: Ledger = {
 
 const category: EntryCategory = {
   id: "category-1",
-  ledgerId: "ledger-1",
   name: "Food",
   sortOrder: 0,
   icon: null,
@@ -77,7 +75,6 @@ const category: EntryCategory = {
 const createdCredential: CreatedServiceCredentialDto = {
   bookId: "user-1",
   id: "credential-1",
-  ledgerId: "ledger-1",
   name: "CLI",
   tokenPrefix: "cashier_",
   tokenSuffix: "abcd",

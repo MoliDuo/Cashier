@@ -28,7 +28,7 @@ const logIdentifierImport = 'import { logIdentifier } from "@/lib/security/log-i
 describe("log identifier rule", () => {
   it.each([
     ["a shorthand identifier", "logger.info({ userId }, 'x');"],
-    ["a raw identifier value", "logger.error({ ledgerId: ledger.id }, 'x');"],
+    ["a raw identifier value", "logger.error({ fileId: file.id }, 'x');"],
     ["a quoted identifier key", "console.warn({ 'documentId': id });"],
     ["a fatal log", "logger.fatal({ storedFileId: id });"],
   ])("reports %s", async (_label, call) => {

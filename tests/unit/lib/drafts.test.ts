@@ -14,7 +14,7 @@ const parseText = (data: unknown) =>
     : null;
 
 describe("drafts", () => {
-  const key = draftKey("ledger-1", "new-record-ai", "new");
+  const key = draftKey("new-record-ai", "new");
 
   beforeEach(() => window.localStorage.clear());
   afterEach(() => {
@@ -22,9 +22,9 @@ describe("drafts", () => {
     vi.restoreAllMocks();
   });
 
-  it("scopes a key by ledger, kind and record", () => {
-    expect(key).toBe("draft:ledger-1:new-record-ai:new");
-    expect(draftKey("ledger-2", "retry", "doc-1")).toBe("draft:ledger-2:retry:doc-1");
+  it("scopes a key by kind and record", () => {
+    expect(key).toBe("draft:new-record-ai:new");
+    expect(draftKey("retry", "doc-1")).toBe("draft:retry:doc-1");
   });
 
   it("reads back what was written, with its basis", () => {

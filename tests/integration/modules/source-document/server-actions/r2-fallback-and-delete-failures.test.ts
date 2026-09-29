@@ -11,8 +11,6 @@ import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
 
 describe("source-document delete tolerance", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.mocked(getCurrentSession).mockResolvedValue(
@@ -20,12 +18,7 @@ describe("source-document delete tolerance", () => {
     );
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      "Source Document Ledger",
-      TEST_USER_ID
-    ));
+    await createTestUserWithLedger(db, undefined, "Source Document Ledger", TEST_USER_ID);
   });
 
   it("returns deleted false instead of throwing when the document is already soft deleted", async () => {
@@ -33,8 +26,7 @@ describe("source-document delete tolerance", () => {
     const [document] = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     await expect(deleteSourceDocumentAction(document!.id)).resolves.toEqual({

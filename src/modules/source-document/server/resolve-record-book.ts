@@ -10,15 +10,14 @@ import { ValidationError } from "@/lib/errors";
  * silent default.
  */
 export async function resolveRecordBook(
-  ledgerId: string,
   requestedBookId: string | null | undefined
 ): Promise<{ id: string }> {
   if (requestedBookId != null) {
-    const requested = await getBook(ledgerId, requestedBookId);
+    const requested = await getBook(requestedBookId);
     if (requested == null) throw new ValidationError("Unknown book");
     return { id: requested.id };
   }
-  const live = await listBooks(ledgerId);
+  const live = await listBooks();
   const fallback = live[0] ?? null;
   if (fallback == null) throw new ValidationError("A book is required");
   return { id: fallback.id };

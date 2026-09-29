@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTestDb } from "tests/setup";
-import { ledgers, loginEmails, users } from "@/persistence";
+import { ledgers } from "@/persistence";
 import { randomUUID } from "node:crypto";
 import { ensureTestLedgerBooks } from "tests/helpers/schema-setup";
 
@@ -22,43 +22,28 @@ function mockNoSession() {
 }
 
 describe("requireLedgerAccess", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     mockSession();
     const db = getTestDb();
-    ledgerId = randomUUID();
 
-    // Clean up any existing ledgers for this user first (due to unique constraint)
+    // Clean up any existing ledgers first (due to unique constraint)
     await db.delete(ledgers);
 
     await db.insert(ledgers).values({
-      id: ledgerId,
+      id: randomUUID(),
     });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await ensureTestLedgerBooks(db);
   });
 
-  it("returns userId and ledger when user owns the ledger", async () => {
+  it("returns userId and ledger when the ledger exists", async () => {
     const result = await requireLedgerAccess();
     expect(result.userId).toBe(TEST_USER_ID);
-    expect(result.ledger.id).toBe(ledgerId);
+    expect(result.ledger.settings).toBeDefined();
   });
 
-  it("returns 404 error when ledger belongs to another user", async () => {
+  it("returns 404 error when no ledger exists yet", async () => {
     const db = getTestDb();
-    const otherUserId = randomUUID();
-
-    await db.insert(users).values({ id: otherUserId }).onConflictDoNothing();
-    await db.insert(loginEmails).values({
-      userId: otherUserId,
-      email: "other@example.com",
-      verifiedAt: new Date(),
-    });
-
-    const otherLedgerId = randomUUID();
-    await db.insert(ledgers).values({
-      id: otherLedgerId,
-    });
+    await db.delete(ledgers);
 
     await expect(requireLedgerAccess()).rejects.toThrow(NotFoundError);
   });

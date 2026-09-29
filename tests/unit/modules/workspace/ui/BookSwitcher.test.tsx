@@ -14,14 +14,12 @@ import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/s
 
 const shared: BookDto = {
   id: "10000000-0000-4000-8000-000000000001",
-  ledgerId: "20000000-0000-4000-8000-000000000001",
   name: "共同支出",
   sortOrder: 0,
   archivedAt: null,
 };
 const travel: BookDto = {
   id: "10000000-0000-4000-8000-000000000002",
-  ledgerId: "20000000-0000-4000-8000-000000000001",
   name: "旅行支出",
   sortOrder: 1,
   archivedAt: null,

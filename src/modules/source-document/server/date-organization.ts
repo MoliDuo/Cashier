@@ -2,7 +2,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { compare } from "@/lib/money/decimal";
-import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
+import { ledgerEntries, sourceDocuments } from "@/persistence";
 import type {
   ApplyDateOrganizationInput,
   ApplyDateOrganizationResultDto,
@@ -24,13 +24,10 @@ function normalizeCurrency(value: string | null) {
  * date and entries), so the version is left alone.
  */
 export async function dismissDateOrganization(
-  input: DismissDateOrganizationInput & { ledgerId: string }
+  input: DismissDateOrganizationInput
 ): Promise<{ dismissed: true }> {
   const current = await db.query.sourceDocuments.findFirst({
-    where: and(
-      eq(sourceDocuments.ledgerId, input.ledgerId),
-      eq(sourceDocuments.id, input.sourceDocumentId)
-    ),
+    where: eq(sourceDocuments.id, input.sourceDocumentId),
     columns: { id: true },
   });
   if (current == null) throw new NotFoundError("Source document");
@@ -39,7 +36,6 @@ export async function dismissDateOrganization(
     .set({ dateOrganizationSuggestion: null })
     .where(
       and(
-        eq(sourceDocuments.ledgerId, input.ledgerId),
         eq(sourceDocuments.id, input.sourceDocumentId),
         sql`${sourceDocuments.dateOrganizationSuggestion}->>'id' = ${input.suggestionId}`
       )
@@ -48,28 +44,19 @@ export async function dismissDateOrganization(
 }
 
 export async function applyDateOrganization(
-  input: ApplyDateOrganizationInput & { ledgerId: string }
+  input: ApplyDateOrganizationInput
 ): Promise<ApplyDateOrganizationResultDto> {
   const [ledger, document] = await Promise.all([
-    db.query.ledgers.findFirst({
-      where: eq(ledgers.id, input.ledgerId),
-      columns: { mainCurrency: true },
-    }),
+    db.query.ledgers.findFirst({ columns: { mainCurrency: true } }),
     db.query.sourceDocuments.findFirst({
-      where: and(
-        eq(sourceDocuments.ledgerId, input.ledgerId),
-        eq(sourceDocuments.id, input.sourceDocumentId)
-      ),
+      where: eq(sourceDocuments.id, input.sourceDocumentId),
     }),
   ]);
   if (ledger == null || document == null) throw new NotFoundError("Source document");
   if (document.dateOrganizationSuggestion?.id !== input.suggestionId)
     throw new ConflictError("Date organization suggestion is no longer current");
   const entries = await db.query.ledgerEntries.findMany({
-    where: and(
-      eq(ledgerEntries.ledgerId, input.ledgerId),
-      eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
-    ),
+    where: eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
     orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
   });
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
@@ -110,20 +97,13 @@ export async function applyDateOrganization(
   if (redatedForeignDates.length > 0) await ensureExchangeRates(redatedForeignDates);
   const createdIds = destinationGroups.map(() => crypto.randomUUID());
   const outcome = await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    const lockedDocument = await lockSourceDocumentForUpdate(
-      tx,
-      input.ledgerId,
-      input.sourceDocumentId
-    );
+    await lockLedgerForUpdate(tx);
+    const lockedDocument = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
     if (lockedDocument.dateOrganizationSuggestion?.id !== input.suggestionId)
       throw new ConflictError("Source document changed before date organization");
     await assertSourceDocumentsNotProcessing(tx, [lockedDocument]);
     const currentEntries = await tx.query.ledgerEntries.findMany({
-      where: and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
-      ),
+      where: eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId),
       columns: { id: true, position: true },
       orderBy: [asc(ledgerEntries.position), asc(ledgerEntries.id)],
     });
@@ -141,7 +121,6 @@ export async function applyDateOrganization(
       const id = createdIds[index]!;
       await tx.insert(sourceDocuments).values({
         id,
-        ledgerId: input.ledgerId,
         bookId: lockedDocument.bookId,
         title: lockedDocument.title,
         version: 1,
@@ -149,7 +128,6 @@ export async function applyDateOrganization(
       });
       // Each new record keeps the evidence its entries were read from.
       await copyDocumentInput(tx, {
-        ledgerId: input.ledgerId,
         fromDocumentId: input.sourceDocumentId,
         toDocumentId: id,
       });
@@ -171,7 +149,7 @@ export async function applyDateOrganization(
         SET source_document_id = move.source_document_id, position = move.position,
             updated_at = ${new Date()}
         FROM (VALUES ${sql.join(moves, sql`, `)}) AS move(id, source_document_id, position)
-        WHERE entry.id = move.id AND entry.ledger_id = ${input.ledgerId}
+        WHERE entry.id = move.id
       `);
     }
     const remainingItems = lockedDocument.dateOrganizationSuggestion.items.filter(
@@ -190,11 +168,7 @@ export async function applyDateOrganization(
         updatedAt: new Date(),
       })
       .where(eq(sourceDocuments.id, input.sourceDocumentId));
-    const sourceDocument = await getSourceDocumentInTransaction(
-      tx,
-      input.ledgerId,
-      input.sourceDocumentId
-    );
+    const sourceDocument = await getSourceDocumentInTransaction(tx, input.sourceDocumentId);
     if (sourceDocument == null) throw new NotFoundError("Source document");
     return { sourceDocument } as const;
   });

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { extractionAttempts, sourceDocuments } from "@/persistence";
 import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/transaction-locks";
-import { ledgerScopedAttemptWhere } from "./projections/attempt-guards";
+import { documentAttemptWhere } from "./projections/attempt-guards";
 import { activeDocumentWhere } from "./projections/shared";
 
 /**
@@ -12,12 +12,11 @@ import { activeDocumentWhere } from "./projections/shared";
  * alone.
  */
 export async function cancelSourceDocumentProcessing(
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<{ processingStatus: "cancelled" }> {
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
-    const document = await lockSourceDocumentForUpdate(tx, ledgerId, sourceDocumentId);
+    await lockLedgerForUpdate(tx);
+    const document = await lockSourceDocumentForUpdate(tx, sourceDocumentId);
     const attemptId = document.latestAttemptId;
     if (attemptId == null) throw new ConflictError("Source document has no submitted input");
 
@@ -27,7 +26,7 @@ export async function cancelSourceDocumentProcessing(
       .set({ status: "cancelled", finishedAt: now })
       .where(
         and(
-          ledgerScopedAttemptWhere(ledgerId, sourceDocumentId, attemptId),
+          documentAttemptWhere(sourceDocumentId, attemptId),
           eq(extractionAttempts.status, "processing")
         )
       )
@@ -39,10 +38,7 @@ export async function cancelSourceDocumentProcessing(
       .update(sourceDocuments)
       .set({ updatedAt: now })
       .where(
-        and(
-          activeDocumentWhere(ledgerId, sourceDocumentId),
-          eq(sourceDocuments.latestAttemptId, attemptId)
-        )
+        and(activeDocumentWhere(sourceDocumentId), eq(sourceDocuments.latestAttemptId, attemptId))
       )
       .returning({ id: sourceDocuments.id })
       .then((rows) => rows[0]);

@@ -17,7 +17,6 @@ import { getTestDb } from "../../setup";
 const fixture = JSON.parse(
   readFileSync(new URL("../../../scripts/fixtures/demo-workspace.json", import.meta.url), "utf8")
 ) as {
-  ledger: { id: string };
   documents: Array<{ image?: { fileId: string; filename: string } }>;
   serviceCredentials: Array<{ id: string; tokenBody: string }>;
 };
@@ -27,11 +26,10 @@ describe("seed", () => {
     const db = getTestDb();
     const at = new Date("2026-03-04T12:00:00.000Z");
     const userId = await seedUser(db, { email: "seed@example.com", at });
-    const ledgerId = await seedLedger(db, { mainCurrency: "USD", at });
-    const books = await seedBooks(db, ledgerId, ["共同支出", "旅行"]);
-    const categories = await seedCategories(db, ledgerId, [{ name: "Food", icon: "Utensils" }]);
+    await seedLedger(db, { mainCurrency: "USD", at });
+    const books = await seedBooks(db, ["共同支出", "旅行"]);
+    const categories = await seedCategories(db, [{ name: "Food", icon: "Utensils" }]);
     const documentId = await seedSourceDocument(db, {
-      ledgerId,
       bookId: books.get("旅行")!,
       title: "Harbor Coffee",
       documentDate: "2026-03-04",
@@ -58,13 +56,12 @@ describe("seed", () => {
       .from(schema.loginEmails)
       .where(eq(schema.loginEmails.userId, userId));
     expect(email).toMatchObject({ email: "seed@example.com", verifiedAt: at });
-    const [ledger] = await db.select().from(schema.ledgers).where(eq(schema.ledgers.id, ledgerId));
+    const [ledger] = await db.select().from(schema.ledgers);
     expect(ledger).toMatchObject({ mainCurrency: "USD", aiLanguage: "zh-CN" });
     expect(
       await db
         .select({ name: schema.books.name, sortOrder: schema.books.sortOrder })
         .from(schema.books)
-        .where(eq(schema.books.ledgerId, ledgerId))
         .orderBy(asc(schema.books.sortOrder))
     ).toEqual([
       { name: "共同支出", sortOrder: 1 },
@@ -92,7 +89,7 @@ describe("seed", () => {
         eq(schema.sourceDocumentFiles.storedFileId, schema.storedFiles.id)
       )
       .where(eq(schema.sourceDocumentFiles.sourceDocumentId, documentId));
-    expect(file?.storageKey).toBe(`${ledgerId}/stored/${file?.id}`);
+    expect(file?.storageKey).toBe(`stored/${file?.id}`);
 
     expect(
       await db
@@ -126,7 +123,6 @@ describe("seed", () => {
     );
     const workspace = {
       userId: "10000000-0000-4000-8000-000000000001",
-      ledgerId: fixture.ledger.id,
       uploadedImages: images,
     };
 
@@ -162,7 +158,7 @@ describe("seed", () => {
       .from(schema.storedFiles);
     expect(keys).toHaveLength(images.length);
     for (const { id, storageKey } of keys) {
-      expect(storageKey).toBe(`${fixture.ledger.id}/stored/${id}`);
+      expect(storageKey).toBe(`stored/${id}`);
     }
 
     // The keys the demo banner prints authenticate against the stored hashes.

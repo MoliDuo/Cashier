@@ -10,7 +10,6 @@ import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { logIdentifier } from "@/lib/security/log-identifier";
 import { processImage } from "@/lib/storage/image-processing";
 import {
   DIRECT_UPLOAD_FINALIZE_BUFFER_MS,
@@ -31,16 +30,11 @@ interface PendingFile {
 }
 
 /** Records files as pending; finalization or the daily sweep settles them. */
-async function reservePendingFiles(
-  ledgerId: string,
-  files: readonly PendingFile[],
-  now: Date
-): Promise<void> {
+async function reservePendingFiles(files: readonly PendingFile[], now: Date): Promise<void> {
   await db.insert(storedFiles).values(
     files.map((file) => ({
       id: file.id,
-      ledgerId,
-      storageKey: durableKey(ledgerId, file.id),
+      storageKey: durableKey(file.id),
       contentType: file.contentType,
       byteSize: file.byteSize,
       originalFilename: file.originalFilename,
@@ -55,28 +49,19 @@ async function reservePendingFiles(
  * first, so a file a document took in the meantime keeps both. Best effort:
  * whatever is left is swept by the daily cron.
  */
-export async function discardUnusedFiles(
-  ledgerId: string,
-  storedFileIds: readonly string[]
-): Promise<void> {
+export async function discardUnusedFiles(storedFileIds: readonly string[]): Promise<void> {
   if (storedFileIds.length === 0) return;
   try {
     const deleted = await db
       .delete(storedFiles)
       .where(
         and(
-          eq(storedFiles.ledgerId, ledgerId),
           inArray(storedFiles.id, [...storedFileIds]),
           notExists(
             db
               .select({ id: sourceDocumentFiles.id })
               .from(sourceDocumentFiles)
-              .where(
-                and(
-                  eq(sourceDocumentFiles.ledgerId, storedFiles.ledgerId),
-                  eq(sourceDocumentFiles.storedFileId, storedFiles.id)
-                )
-              )
+              .where(eq(sourceDocumentFiles.storedFileId, storedFiles.id))
           )
         )
       )
@@ -85,14 +70,11 @@ export async function discardUnusedFiles(
     await Promise.all(
       deleted.flatMap((file) => [
         storage.delete(file.storageKey),
-        storage.delete(temporaryKey(ledgerId, file.id)),
+        storage.delete(temporaryKey(file.id)),
       ])
     );
   } catch {
-    logger.warn(
-      { ledgerSubject: logIdentifier("ledger", ledgerId) },
-      "Discarding unused stored files was incomplete"
-    );
+    logger.warn({ count: storedFileIds.length }, "Discarding unused stored files was incomplete");
   }
 }
 
@@ -102,7 +84,6 @@ export async function discardUnusedFiles(
  * on the pending row until finalization checks the bytes against them.
  */
 export async function planDirectUpload(
-  ledgerId: string,
   files: readonly UploadFileRequestContract[]
 ): Promise<DirectUploadPlanContract> {
   validateRequests(files);
@@ -121,13 +102,13 @@ export async function planDirectUpload(
     originalFilename: file.originalFilename,
     checksum: file.checksum!,
   }));
-  await reservePendingFiles(ledgerId, pending, now);
+  await reservePendingFiles(pending, now);
   try {
     const targets = await Promise.all(
       pending.map(async (file) => ({
         id: file.id,
         ...(await getS3Storage().presignUpload(
-          temporaryKey(ledgerId, file.id),
+          temporaryKey(file.id),
           file.contentType,
           file.checksum,
           Math.floor((UPLOAD_PLAN_EXPIRY_MS - DIRECT_UPLOAD_FINALIZE_BUFFER_MS) / 1000)
@@ -141,10 +122,7 @@ export async function planDirectUpload(
       maxBytesPerFile: MAX_ORIGINAL_BYTES_PER_FILE,
     };
   } catch (error) {
-    await discardUnusedFiles(
-      ledgerId,
-      pending.map((file) => file.id)
-    );
+    await discardUnusedFiles(pending.map((file) => file.id));
     throw error;
   }
 }
@@ -155,17 +133,16 @@ export async function planDirectUpload(
  * unchanged, so a retried request is harmless.
  */
 export async function finalizeDirectUpload(input: {
-  ledgerId: string;
   storedFileIds: readonly string[];
 }): Promise<readonly StoredFileContract[]> {
-  const { ledgerId, storedFileIds } = input;
+  const { storedFileIds } = input;
   if (storedFileIds.length === 0 || new Set(storedFileIds).size !== storedFileIds.length) {
     throw new ValidationError("Finalization requires unique stored files");
   }
   const rows = await db
     .select()
     .from(storedFiles)
-    .where(and(eq(storedFiles.ledgerId, ledgerId), inArray(storedFiles.id, [...storedFileIds])));
+    .where(inArray(storedFiles.id, [...storedFileIds]));
   if (rows.length !== storedFileIds.length) throw new NotFoundError("Stored file");
   const now = new Date();
   const pending = rows.filter((row) => row.finalizedAt == null);
@@ -179,7 +156,7 @@ export async function finalizeDirectUpload(input: {
     try {
       const uploaded = await Promise.all(
         pending.map(async (row) => {
-          const { metadata, bytes } = await storage.readObject(temporaryKey(ledgerId, row.id));
+          const { metadata, bytes } = await storage.readObject(temporaryKey(row.id));
           if (
             metadata.byteSize !== row.byteSize ||
             bytes.length !== row.byteSize ||
@@ -205,10 +182,7 @@ export async function finalizeDirectUpload(input: {
       // Bytes that break the plan never become usable; bytes still on their
       // way leave the files pending for another try.
       if (error instanceof ConflictError) {
-        await discardUnusedFiles(
-          ledgerId,
-          pending.map((row) => row.id)
-        );
+        await discardUnusedFiles(pending.map((row) => row.id));
       }
       throw error;
     }
@@ -236,22 +210,16 @@ export async function finalizeDirectUpload(input: {
             checksum: file.checksum,
             finalizedAt: now,
           })
-          .where(
-            and(
-              eq(storedFiles.ledgerId, ledgerId),
-              eq(storedFiles.id, row.id),
-              isNull(storedFiles.finalizedAt)
-            )
-          );
+          .where(and(eq(storedFiles.id, row.id), isNull(storedFiles.finalizedAt)));
       })
     );
-    await Promise.all(pending.map((row) => storage.delete(temporaryKey(ledgerId, row.id))));
+    await Promise.all(pending.map((row) => storage.delete(temporaryKey(row.id))));
   }
 
   const ready = await db
     .select()
     .from(storedFiles)
-    .where(and(eq(storedFiles.ledgerId, ledgerId), inArray(storedFiles.id, [...storedFileIds])));
+    .where(inArray(storedFiles.id, [...storedFileIds]));
   const byId = new Map(ready.map((row) => [row.id, row]));
   return storedFileIds.map((id) => mapStoredFile(byId.get(id)!));
 }
@@ -262,7 +230,6 @@ export async function finalizeDirectUpload(input: {
  * objects, then the rows are marked ready. Returns ids in input order.
  */
 export async function storeProcessedImages(
-  ledgerId: string,
   images: readonly { bytes: Buffer; contentType: string }[]
 ): Promise<string[]> {
   const files = images.map((image) => ({
@@ -280,27 +247,19 @@ export async function storeProcessedImages(
       `Total stored bytes ${totalBytes} exceeds attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
     );
   }
-  await reservePendingFiles(ledgerId, files, new Date());
+  await reservePendingFiles(files, new Date());
   const ids = files.map((file) => file.id);
   try {
     const storage = getS3Storage();
     await Promise.all(
-      files.map((file) =>
-        storage.upload(durableKey(ledgerId, file.id), file.bytes, file.contentType)
-      )
+      files.map((file) => storage.upload(durableKey(file.id), file.bytes, file.contentType))
     );
     await db
       .update(storedFiles)
       .set({ finalizedAt: new Date() })
-      .where(
-        and(
-          eq(storedFiles.ledgerId, ledgerId),
-          inArray(storedFiles.id, ids),
-          isNull(storedFiles.finalizedAt)
-        )
-      );
+      .where(and(inArray(storedFiles.id, ids), isNull(storedFiles.finalizedAt)));
   } catch (error) {
-    await discardUnusedFiles(ledgerId, ids);
+    await discardUnusedFiles(ids);
     throw error;
   }
   return ids;

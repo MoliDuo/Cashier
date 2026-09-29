@@ -51,10 +51,15 @@ export function validateRequests(files: readonly UploadFileRequestContract[]): v
 }
 
 /** Where the browser puts a pending file's bytes before finalization reads them. */
-export function temporaryKey(ledgerId: string, storedFileId: string): string {
-  return `temporary/${ledgerId}/${storedFileId}`;
+export function temporaryKey(storedFileId: string): string {
+  return `temporary/${storedFileId}`;
 }
 
-export function durableKey(ledgerId: string, storedFileId: string): string {
-  return `${ledgerId}/stored/${storedFileId}`;
+/**
+ * Where a ready file's bytes live. Files stored before the ledger id was
+ * retired sit under `<ledger id>/stored/`; every read goes through the row's
+ * `storage_key`, so both layouts resolve.
+ */
+export function durableKey(storedFileId: string): string {
+  return `stored/${storedFileId}`;
 }

@@ -8,7 +8,6 @@ import type { CreatedServiceCredentialDto, ServiceCredentialDto } from "@/module
 const books = [
   {
     id: "book-1",
-    ledgerId: "ledger-1",
     name: "Shared",
     timeZone: null,
     sortOrder: 1,
@@ -16,7 +15,6 @@ const books = [
   },
   {
     id: "book-2",
-    ledgerId: "ledger-1",
     name: "Mine",
     timeZone: null,
     sortOrder: 2,
@@ -27,7 +25,6 @@ const books = [
 const credentialFixture = (
   overrides: Pick<ServiceCredentialDto, "id" | "bookId">
 ): ServiceCredentialDto => ({
-  ledgerId: "ledger-1",
   name: "Automation",
   tokenPrefix: "sec",
   tokenSuffix: "ret",
@@ -72,7 +69,6 @@ describe("ServiceCredentialSection", () => {
     resolveCreate({
       id: "credential-1",
       bookId: "book-1",
-      ledgerId: "ledger-1",
       name: "Automation",
       token: "secret",
       tokenPrefix: "sec",
@@ -105,7 +101,6 @@ describe("ServiceCredentialSection", () => {
           {
             id: "credential-1",
             bookId: "book-1",
-            ledgerId: "ledger-1",
             name: "Automation",
             tokenPrefix: "sec",
             tokenSuffix: "ret",
@@ -149,7 +144,6 @@ describe("ServiceCredentialSection", () => {
           {
             id: "credential-1",
             bookId: "book-1",
-            ledgerId: "ledger-1",
             name: "Automation",
             tokenPrefix: "sec",
             tokenSuffix: "ret",

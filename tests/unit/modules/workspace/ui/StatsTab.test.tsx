@@ -15,7 +15,7 @@ const { searchParamsState } = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParamsState.current,
-  usePathname: () => "/ledgers/ledger-1",
+  usePathname: () => "/stats",
 }));
 
 vi.mock("@/modules/stats/queries", () => ({
@@ -23,7 +23,6 @@ vi.mock("@/modules/stats/queries", () => ({
 }));
 
 const ledgerFixture: Ledger = {
-  id: "ledger-1",
   settings: { ...getDefaultLedger().settings, mainCurrency: "CNY" },
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",

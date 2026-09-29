@@ -19,7 +19,6 @@ interface SourceDocumentSummaryDto {
   id: string;
   bookId?: string | null;
   version: number;
-  ledgerId: string;
   title: string | null;
   processingStatus: SourceDocumentProcessingStatus | null;
   failureKind: AttemptFailureKind | null;

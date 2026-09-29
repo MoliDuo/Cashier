@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { eq, inArray, sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import type { DateOrganizationSuggestion } from "@/lib/ai/date-organization";
@@ -59,7 +59,7 @@ export interface FixtureCredential {
 
 interface DemoFixture {
   user: { id: string; email: string };
-  ledger: { id: string; mainCurrency: string; preferredCurrencies: string[]; aiLanguage: string };
+  ledger: { mainCurrency: string; preferredCurrencies: string[]; aiLanguage: string };
   exchangeRates?: Record<string, string>;
   books: Array<{ id: string; name: string; sortOrder: number }>;
   categories: Array<{
@@ -81,7 +81,6 @@ export interface UploadedImage {
 
 interface DemoTarget {
   user_id: string;
-  ledger_id: string | null;
 }
 
 type Environment = Partial<NodeJS.ProcessEnv>;
@@ -202,8 +201,7 @@ function activeEntries(document: FixtureDocument): FixtureEntry[] {
 
 async function uploadFixtureImages(
   storage: S3Client,
-  environment: Environment,
-  ledgerId: string
+  environment: Environment
 ): Promise<UploadedImage[]> {
   const uploaded: UploadedImage[] = [];
   for (const document of fixture.documents) {
@@ -212,7 +210,7 @@ async function uploadFixtureImages(
     await storage.send(
       new PutObjectCommand({
         Bucket: environment.S3_BUCKET,
-        Key: durableKey(ledgerId, document.image.fileId),
+        Key: durableKey(document.image.fileId),
         Body: bytes,
         ContentType: "image/jpeg",
       })
@@ -251,9 +249,9 @@ export async function resetDemoSchema(environment: Environment = process.env): P
 }
 
 async function findDemoTarget(client: pg.Client): Promise<DemoTarget | null> {
-  // The account is found through its login address; the one ledger belongs to it.
+  // The account is found through its login address.
   const result = await client.query<DemoTarget>(
-    `SELECT u.id AS user_id, (SELECT id FROM ledgers ORDER BY created_at, id LIMIT 1) AS ledger_id
+    `SELECT u.id AS user_id
        FROM users u
        JOIN login_emails e ON e.user_id = u.id
       WHERE lower(e.email) = $1
@@ -277,20 +275,15 @@ async function inspectDemoTarget(client: pg.Client): Promise<DemoInspection> {
   const counts = await client.query<DemoInspection["counts"]>(
     `SELECT
        (SELECT count(*)::int FROM ledgers) AS ledgers,
-       (SELECT count(*)::int FROM source_documents WHERE ledger_id = $1) AS documents,
-       (SELECT count(*)::int FROM ledger_entries WHERE ledger_id = $1) AS entries,
-       (SELECT count(*)::int FROM stored_files WHERE ledger_id = $1) AS files`,
-    [target.ledger_id]
+       (SELECT count(*)::int FROM source_documents) AS documents,
+       (SELECT count(*)::int FROM ledger_entries) AS entries,
+       (SELECT count(*)::int FROM stored_files) AS files`
   );
-  const keys =
-    target.ledger_id == null
-      ? []
-      : (
-          await client.query<{ storage_key: string }>(
-            "SELECT storage_key FROM stored_files WHERE ledger_id = $1 ORDER BY storage_key",
-            [target.ledger_id]
-          )
-        ).rows.map((row) => row.storage_key);
+  const keys = (
+    await client.query<{ storage_key: string }>(
+      "SELECT storage_key FROM stored_files ORDER BY storage_key"
+    )
+  ).rows.map((row) => row.storage_key);
   const [countRow] = counts.rows;
   if (countRow == null) throw new Error("Demo target counts are missing");
   return { target, counts: countRow, keys };
@@ -333,10 +326,9 @@ export async function insertFixture(
   environment: Environment,
   {
     userId,
-    ledgerId,
     uploadedImages,
     reset,
-  }: { userId: string; ledgerId: string; uploadedImages: UploadedImage[]; reset: boolean }
+  }: { userId: string; uploadedImages: UploadedImage[]; reset: boolean }
 ): Promise<void> {
   const asOf = anchorDate(environment);
   const now = new Date(`${asOf}T12:00:00.000Z`);
@@ -359,13 +351,12 @@ export async function insertFixture(
   }
   await seedUser(db, { id: userId, email: fixture.user.email, at: now });
   await seedLedger(db, {
-    id: ledgerId,
     aiLanguage: fixture.ledger.aiLanguage,
     preferredCurrencies: fixture.ledger.preferredCurrencies,
     mainCurrency: fixture.ledger.mainCurrency,
     at: now,
   });
-  const bookIds = await seedBooks(db, ledgerId, fixture.books, now);
+  const bookIds = await seedBooks(db, fixture.books, now);
 
   // The reset above deletes the ledger, so cascade already removed any earlier
   // credentials for this workspace; these rows are recreated with it.
@@ -374,7 +365,6 @@ export async function insertFixture(
     const { prefix, suffix } = prefixSuffix(token);
     await seedServiceCredential(db, {
       id: credential.id,
-      ledgerId,
       bookId: requireBookId(bookIds, credential.book),
       name: credential.name,
       tokenHash: computeHash(token),
@@ -387,12 +377,10 @@ export async function insertFixture(
   // A seed over an existing ledger keeps the categories it already has.
   const existing = await db
     .select({ id: schema.entryCategories.id, name: schema.entryCategories.name })
-    .from(schema.entryCategories)
-    .where(eq(schema.entryCategories.ledgerId, ledgerId));
+    .from(schema.entryCategories);
   const categoryIds = new Map(existing.map((row) => [row.name, row.id]));
   const seeded = await seedCategories(
     db,
-    ledgerId,
     fixture.categories.filter((category) => !categoryIds.has(category.name)),
     now
   );
@@ -426,7 +414,6 @@ export async function insertFixture(
     const entries = activeEntries(document);
     await seedSourceDocument(db, {
       id: document.id,
-      ledgerId,
       bookId: requireBookId(bookIds, document.book),
       // A failed retry keeps the title of the result it left in place.
       title: document.title ?? document.retainedResult?.title ?? null,
@@ -690,17 +677,13 @@ async function runDemoData({
 
     const reset = mode === "reset";
     const userId = reset || inspection.target == null ? fixture.user.id : inspection.target.user_id;
-    const ledgerId =
-      reset || inspection.target?.ledger_id == null
-        ? fixture.ledger.id
-        : inspection.target.ledger_id;
-    const uploadedImages = await uploadFixtureImages(storage, environment, ledgerId);
+    const uploadedImages = await uploadFixtureImages(storage, environment);
     await drizzle(client, { schema }).transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${1_536_335_661})`);
-      await insertFixture(tx, environment, { userId, ledgerId, uploadedImages, reset });
+      await insertFixture(tx, environment, { userId, uploadedImages, reset });
     });
 
-    const fixtureKeys = new Set(uploadedImages.map((image) => durableKey(ledgerId, image.fileId)));
+    const fixtureKeys = new Set(uploadedImages.map((image) => durableKey(image.fileId)));
     const staleKeys = inspection.keys.filter((key) => !fixtureKeys.has(key));
     if (reset && staleKeys.length > 0) {
       try {
@@ -729,7 +712,7 @@ async function runDemoData({
         credentials: fixture.serviceCredentials.length,
       })
     );
-    return { status: "complete", userId, ledgerId };
+    return { status: "complete", userId };
   } finally {
     storage.destroy();
     await client.end();

@@ -10,7 +10,7 @@ import {
   createLedgerEntryData,
 } from "tests/helpers/factories";
 import { randomUUID } from "node:crypto";
-import { NotFoundError, UnauthorizedError } from "@/lib/errors";
+import { UnauthorizedError } from "@/lib/errors";
 import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
@@ -35,15 +35,15 @@ describe("getSourceDocumentDetailAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
-    await ensureTestLedgerBooks(db, ledgerData.id);
+    await ensureTestLedgerBooks(db);
 
-    const docData = createSourceDocumentData(ledgerData.id, {
+    const docData = createSourceDocumentData({
       title: "Test Receipt",
       text: "Lunch for 25.50",
     });
     await db.insert(sourceDocuments).values({
       ...docData,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, docData.id, { text: "Lunch for 25.50" });
 
@@ -51,7 +51,6 @@ describe("getSourceDocumentDetailAction", () => {
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe(docData.id);
-    expect(result!.ledgerId).toBe(ledgerData.id);
     expect(result!.title).toBe("Test Receipt");
     expect(result!.text).toBe("Lunch for 25.50");
     expect(result!.hasImages).toBe(false);
@@ -62,14 +61,14 @@ describe("getSourceDocumentDetailAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
-    await ensureTestLedgerBooks(db, ledgerData.id);
+    await ensureTestLedgerBooks(db);
 
-    const docData = createSourceDocumentData(ledgerData.id, {
+    const docData = createSourceDocumentData({
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
     });
     await db.insert(sourceDocuments).values({
       ...docData,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, docData.id, {
       imageUrls: ["data:image/jpeg;base64,/9j/4AAQ..."],
@@ -89,18 +88,18 @@ describe("getSourceDocumentDetailAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
-    await ensureTestLedgerBooks(db, ledgerData.id);
+    await ensureTestLedgerBooks(db);
 
-    const categoryData = createCategoryData(ledgerData.id);
+    const categoryData = createCategoryData();
     await db.insert(entryCategories).values(categoryData);
 
-    const docData = createSourceDocumentData(ledgerData.id);
+    const docData = createSourceDocumentData();
     await db.insert(sourceDocuments).values({
       ...docData,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
 
-    const entryData = createLedgerEntryData(ledgerData.id, {
+    const entryData = createLedgerEntryData({
       sourceDocumentId: docData.id,
       categoryId: categoryData.id,
       itemName: "Test Entry",
@@ -128,7 +127,7 @@ describe("getSourceDocumentDetailAction", () => {
     const db = getTestDb();
     const ledgerData = createLedgerData();
     await db.insert(ledgers).values(ledgerData);
-    await ensureTestLedgerBooks(db, ledgerData.id);
+    await ensureTestLedgerBooks(db);
 
     const result = await getSourceDocumentDetailAction(randomUUID());
     expect(result).toBeNull();
@@ -143,24 +142,5 @@ describe("getSourceDocumentDetailAction", () => {
     await expect(getSourceDocumentDetailAction(randomUUID())).rejects.toBeInstanceOf(
       UnauthorizedError
     );
-  });
-
-  it("surfaces NotFoundError for a ledger that is not the single live one", async () => {
-    const db = getTestDb();
-    const { ledgerId: liveLedgerId } = await createTestUserWithLedger(db);
-    await ensureTestLedgerBooks(db, liveLedgerId);
-
-    // A second ledger row that is not live: the access wrapper answers NotFound
-    // rather than revealing that the row (and its documents) exist.
-    const otherLedgerId = randomUUID();
-    await db.insert(ledgers).values({ id: otherLedgerId });
-    await ensureTestLedgerBooks(db, otherLedgerId);
-    const docData = createSourceDocumentData(otherLedgerId);
-    await db.insert(sourceDocuments).values({
-      ...docData,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
-    });
-
-    await expect(getSourceDocumentDetailAction(docData.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

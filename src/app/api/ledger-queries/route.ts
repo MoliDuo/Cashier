@@ -90,9 +90,9 @@ export async function POST(request: Request) {
       case "stats": {
         const { ledger } = await requireLedgerAccess();
         const resolved = await withResolvedStatsPeriod(input, ledger.settings.timeZone, (bookId) =>
-          findEarliestEffectiveDate(ledger.id, bookId)
+          findEarliestEffectiveDate(bookId)
         );
-        result = await queryEnhancedStats(ledger.id, parseEnhancedStatsInput(resolved));
+        result = await queryEnhancedStats(parseEnhancedStatsInput(resolved));
         break;
       }
       case "detail":
@@ -103,11 +103,11 @@ export async function POST(request: Request) {
         const parsed = streamPageInputSchema.parse(
           withResolvedPeriod(input, ledger.settings.timeZone)
         );
-        result = await listStreamPage(ledger.id, {
+        result = await listStreamPage({
           ...omitUndefinedProperties(parsed),
           limit: parsed.limit,
         });
-        scheduleProcessingRecoveryAfter(ledger.id);
+        scheduleProcessingRecoveryAfter();
         break;
       }
       case "total": {
@@ -115,23 +115,23 @@ export async function POST(request: Request) {
         const parsed = omitUndefinedProperties(
           streamTotalInputSchema.parse(withResolvedPeriod(input, ledger.settings.timeZone))
         );
-        result = await getStreamTotal(ledger.id, parsed);
+        result = await getStreamTotal(parsed);
         break;
       }
       case "refresh": {
         const parsed = z.object({ afterVersion: z.string().regex(/^\d+$/) }).parse(input);
-        const { ledger } = await requireLedgerAccess();
-        result = await getStreamRefresh(ledger.id, parsed);
-        scheduleProcessingRecoveryAfter(ledger.id);
+        await requireLedgerAccess();
+        result = await getStreamRefresh(parsed);
+        scheduleProcessingRecoveryAfter();
         break;
       }
       case "source-document-input": {
         const id = sourceDocumentIdSchema.parse(input);
-        const { ledger } = await requireLedgerAccess();
-        const document = await getSourceDocumentInput(ledger.id, id);
+        await requireLedgerAccess();
+        const document = await getSourceDocumentInput(id);
         if (document == null) throw new NotFoundError("Source document");
         result = document;
-        scheduleProcessingRecoveryAfter(ledger.id);
+        scheduleProcessingRecoveryAfter();
         break;
       }
       case "convert-currency":
@@ -150,10 +150,7 @@ export async function POST(request: Request) {
         break;
       case "entries": {
         const { ledger } = await requireLedgerAccess();
-        result = await listLedgerEntries(
-          ledger.id,
-          withResolvedPeriod(input, ledger.settings.timeZone)
-        );
+        result = await listLedgerEntries(withResolvedPeriod(input, ledger.settings.timeZone));
         break;
       }
       case "ledger":
@@ -178,7 +175,6 @@ export async function POST(request: Request) {
       case "summary": {
         const { ledger } = await requireLedgerAccess();
         result = await calculateLedgerStats(
-          ledger.id,
           withResolvedPeriod(input ?? {}, ledger.settings.timeZone)
         );
         break;
@@ -189,11 +185,10 @@ export async function POST(request: Request) {
         break;
       case "category-assignment": {
         noArgumentsSchema.parse(payload.args);
-        const { ledger } = await requireLedgerAccess();
         result = await getCategoryAssignmentJobAction();
         // This poll is the recovery trigger: there is no cron, so a run
         // whose after() callback died is restarted on the next poll.
-        scheduleCategoryAssignmentRecoveryAfter(ledger.id);
+        scheduleCategoryAssignmentRecoveryAfter();
         break;
       }
       case "category-assignment-results":

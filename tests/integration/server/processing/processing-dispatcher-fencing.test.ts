@@ -18,23 +18,21 @@ afterEach(() => {
 
 /**
  * Creates a pending attempt + job for a single source document.
- * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions
+ * Each call uses a fresh user to avoid unique-constraint collisions
  * when called multiple times within one test.
  */
 async function pendingIntent(
   requestedAt = "2026-07-15T00:00:00.000Z",
   userId = crypto.randomUUID()
-): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
+): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
-  const bookId = await testBookId(db, ledgerId);
+  await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
-    ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
   });
   return {
-    ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,
@@ -61,7 +59,7 @@ describe("leased processor fencing", () => {
 
   it("does not commit a projection after the worker lease is reclaimed", async () => {
     const db = getTestDb();
-    const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const { firstToken } = await reclaimedLease(job);
 
     const generate = vi.fn(async () => ({
@@ -90,7 +88,6 @@ describe("leased processor fencing", () => {
     await expect(
       processor.process({
         signal: new AbortController().signal,
-        ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         attemptId: job.attemptId,
         lease: { attemptId: job.attemptId, claimToken: firstToken },
@@ -111,7 +108,7 @@ describe("leased processor fencing", () => {
 
   it("does not persist a terminal outcome after the worker lease is reclaimed", async () => {
     const db = getTestDb();
-    const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const { firstToken } = await reclaimedLease(job);
 
     const generate = vi.fn(async () => ({
@@ -140,7 +137,6 @@ describe("leased processor fencing", () => {
     await expect(
       processor.process({
         signal: new AbortController().signal,
-        ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         attemptId: job.attemptId,
         lease: { attemptId: job.attemptId, claimToken: firstToken },

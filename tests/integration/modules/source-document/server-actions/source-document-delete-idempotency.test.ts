@@ -12,12 +12,10 @@ import {
 import { getTestDb } from "tests/setup";
 
 describe("SourceDocument delete idempotency", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID));
+    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
   });
 
   async function createDocument() {
@@ -25,9 +23,8 @@ describe("SourceDocument delete idempotency", () => {
     const [document] = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2024-03-17",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     if (document == null) throw new Error("Expected source document");

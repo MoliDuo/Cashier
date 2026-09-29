@@ -30,11 +30,9 @@ export function exchangeRateSql(operands: Omit<ConversionOperands, "amount">): S
 const entryOperands = () => ({
   amount: ledgerEntries.amount,
   currency: ledgerEntries.currency,
-  mainCurrency: sql`(SELECT entry_ledger.main_currency FROM ledgers entry_ledger
-    WHERE entry_ledger.id = ${ledgerEntries.ledgerId})`,
+  mainCurrency: sql`(SELECT entry_ledger.main_currency FROM ledgers entry_ledger)`,
   date: sql`(SELECT entry_document.effective_date FROM source_documents entry_document
-    WHERE entry_document.ledger_id = ${ledgerEntries.ledgerId}
-      AND entry_document.id = ${ledgerEntries.sourceDocumentId})`,
+    WHERE entry_document.id = ${ledgerEntries.sourceDocumentId})`,
 });
 
 /** convertedAmountSql for a ledger_entries row, looking up its ledger and document. */

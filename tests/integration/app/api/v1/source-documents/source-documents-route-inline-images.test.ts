@@ -72,8 +72,6 @@ vi.mock("@/lib/storage/s3", () => ({
 }));
 
 describe("API v1 source-documents route", () => {
-  let ledgerId: string;
-
   let credentialKey: string;
 
   beforeEach(async () => {
@@ -82,18 +80,16 @@ describe("API v1 source-documents route", () => {
     mockR2.setUploadError(null);
 
     await db.delete(ledgers);
-    const setup = await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
 
     credentialKey = `sk_route_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);
     await db
       .insert(serviceCredentials)
       .values({
-        ledgerId,
         name: "Route Credential",
         tokenHash: computeHash(credentialKey),
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -296,18 +292,12 @@ describe("API v1 source-documents route", () => {
       expect(secondBody).toEqual(firstBody);
 
       const db = getTestDb();
-      const documents = await db
-        .select({ id: sourceDocuments.id })
-        .from(sourceDocuments)
-        .where(eq(sourceDocuments.ledgerId, ledgerId));
+      const documents = await db.select({ id: sourceDocuments.id }).from(sourceDocuments);
       const attempts = await db
         .select({ id: extractionAttempts.id })
         .from(extractionAttempts)
         .where(eq(extractionAttempts.sourceDocumentId, firstBody.sourceDocumentId));
-      const storedFilesRows = await db
-        .select({ id: storedFiles.id })
-        .from(storedFiles)
-        .where(eq(storedFiles.ledgerId, ledgerId));
+      const storedFilesRows = await db.select({ id: storedFiles.id }).from(storedFiles);
       const documentFilesRows = await db
         .select({ id: sourceDocumentFiles.id })
         .from(sourceDocumentFiles)
@@ -320,7 +310,7 @@ describe("API v1 source-documents route", () => {
       expect(attempts).toHaveLength(1);
       expect(storedFilesRows).toHaveLength(1);
       expect(documentFilesRows).toHaveLength(1);
-      expect([...mockR2.files.keys()]).toEqual([`${ledgerId}/stored/${storedFilesRows[0]!.id}`]);
+      expect([...mockR2.files.keys()]).toEqual([`stored/${storedFilesRows[0]!.id}`]);
       expect(queued).toEqual([{ attemptId: firstBody.revisionId }]);
     });
 
@@ -349,10 +339,7 @@ describe("API v1 source-documents route", () => {
       } finally {
         mockR2.setUploadError(null);
       }
-      const storedFilesRows = await getTestDb()
-        .select({ id: storedFiles.id })
-        .from(storedFiles)
-        .where(eq(storedFiles.ledgerId, ledgerId));
+      const storedFilesRows = await getTestDb().select({ id: storedFiles.id }).from(storedFiles);
       expect(storedFilesRows).toHaveLength(1);
     });
   });

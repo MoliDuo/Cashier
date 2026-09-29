@@ -20,13 +20,12 @@ const projectionEntry = {
 describe("current-runtime target adapters", () => {
   it("creates and edits manual projections, and deletes through the aggregate", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Manual",
       entryDate: "2026-07-15",
       entries: [projectionEntry],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const originalEntry = await db.query.ledgerEntries.findFirst({
       where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
@@ -40,14 +39,12 @@ describe("current-runtime target adapters", () => {
 
     await expect(
       updateSourceDocuments({
-        ledgerId,
         sourceDocumentIds: [created.sourceDocumentId],
         data: { title: "Edited" },
       })
     ).resolves.toMatchObject({ updatedCount: 1 });
     await expect(
       batchUpdateLedgerEntries({
-        ledgerId,
         sourceDocumentIds: [created.sourceDocumentId],
         ledgerEntryIds: [originalEntry!.id],
         amount: "18.00",
@@ -65,7 +62,6 @@ describe("current-runtime target adapters", () => {
 
     await expect(
       deleteSourceDocumentAtomically({
-        ledgerId,
         sourceDocumentId: created.sourceDocumentId,
       })
     ).resolves.toMatchObject({ deleted: true });

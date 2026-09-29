@@ -14,58 +14,46 @@ type TestDatabase = NodePgDatabase<typeof schema>;
 export const TEST_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 /**
- * Ensures a ledger has books at all. Fixtures that create their ledger by hand
+ * Ensures the ledger has books at all. Fixtures that create the ledger by hand
  * call this instead of the retired couple-configuration helper.
  */
 export async function ensureTestLedgerBooks(
   db: TestDatabase,
-  ledgerId: string,
   names: readonly string[] = ["共同支出"]
 ): Promise<Map<string, string>> {
-  // A fixture may call this for a ledger it deleted in its own setup; there is
-  // nothing to hang a book on then, and the FK rightly refuses.
-  const ledger = await db
-    .select({ id: schema.ledgers.id })
-    .from(schema.ledgers)
-    .where(eq(schema.ledgers.id, ledgerId))
-    .limit(1);
+  // A fixture may call this after deleting the ledger in its own setup; there
+  // is nothing to hang a book on then, and the FK rightly refuses.
+  const ledger = await db.select({ id: schema.ledgers.id }).from(schema.ledgers);
   if (ledger.length === 0) return new Map();
   const existing = await db
     .select({ id: schema.books.id, name: schema.books.name })
-    .from(schema.books)
-    .where(eq(schema.books.ledgerId, ledgerId));
+    .from(schema.books);
   if (existing.length > 0) return new Map(existing.map((row) => [row.name, row.id]));
-  return createTestBooks(db, ledgerId, names);
+  return createTestBooks(db, names);
 }
 
-/**
- * Gives an existing ledger its first book, for fixtures that insert the ledger
- * themselves rather than going through `createTestUserWithLedger`.
- */
 /**
  * The books a test ledger starts with, in switcher order.
  */
 export async function createTestBooks(
   db: TestDatabase,
-  ledgerId: string,
   names: readonly string[] = ["共同支出"]
 ): Promise<Map<string, string>> {
-  return seedBooks(db, ledgerId, names);
+  return seedBooks(db, names);
 }
 
 /**
- * The id of a ledger's first book, for fixtures that drive a port directly and
- * need a plain string rather than an insert-time subquery.
+ * The id of the ledger's first book, for fixtures that drive a port directly
+ * and need a plain string rather than an insert-time subquery.
  */
-export async function testBookId(db: TestDatabase, ledgerId: string): Promise<string> {
+export async function testBookId(db: TestDatabase): Promise<string> {
   const row = await db
     .select({ id: schema.books.id })
     .from(schema.books)
-    .where(eq(schema.books.ledgerId, ledgerId))
     .orderBy(schema.books.sortOrder)
     .limit(1)
     .then((rows) => rows[0]);
-  if (row == null) throw new Error(`Ledger ${ledgerId} has no book fixture`);
+  if (row == null) throw new Error("The ledger has no book fixture");
   return row.id;
 }
 
@@ -99,13 +87,13 @@ export async function createTestUserWithLedger(
   email?: string,
   _ledgerName?: string,
   userId?: string
-): Promise<{ userId: string; ledgerId: string }> {
+): Promise<{ userId: string }> {
   const finalUserId = await createTestUser(db, email, userId ?? TEST_USER_ID);
 
-  const ledgerId = await seedLedger(db);
-  await createTestBooks(db, ledgerId);
+  await seedLedger(db);
+  await createTestBooks(db);
 
-  return { userId: finalUserId, ledgerId };
+  return { userId: finalUserId };
 }
 
 /** One single-byte JPEG stored file per image a fixture names. */
@@ -119,7 +107,6 @@ function testImageFiles(imageUrls: readonly string[]) {
  */
 export async function createTestSourceDocument(
   db: TestDatabase,
-  ledgerId: string,
   overrides: Partial<{
     text: string;
     status: "processing" | "completed" | "invalid" | "failed" | "cancelled";
@@ -131,8 +118,7 @@ export async function createTestSourceDocument(
   const status = overrides.status ?? "completed";
   return db.transaction((tx) =>
     seedSourceDocument(tx, {
-      ledgerId,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       documentDate: overrides.entryDate ?? null,
       title: overrides.title ?? null,
       inputText: overrides.text ?? "Test document",
@@ -164,7 +150,6 @@ export async function createTestSourceDocument(
 export async function createTestRecord(
   db: TestDatabase,
   input: {
-    ledgerId: string;
     bookId: string;
     title?: string | null;
     entryDate?: string | null;
@@ -182,7 +167,6 @@ export async function createTestRecord(
 ): Promise<{ sourceDocumentId: string }> {
   const sourceDocumentId = await db.transaction((tx) =>
     seedSourceDocument(tx, {
-      ledgerId: input.ledgerId,
       bookId: input.bookId,
       title: input.title ?? null,
       documentDate: input.entryDate ?? null,
@@ -237,13 +221,12 @@ export async function activateTestSourceDocumentProjection(
       .where(eq(schema.sourceDocumentFiles.sourceDocumentId, sourceDocumentId))
       .limit(1);
     if (existingFiles.length === 0) {
-      await seedDocumentFiles(tx, document, testImageFiles(content.imageUrls ?? []));
+      await seedDocumentFiles(tx, sourceDocumentId, testImageFiles(content.imageUrls ?? []));
     }
     if (content.parsed === true && document.latestAttemptId == null) {
       const [attempt] = await tx
         .insert(schema.extractionAttempts)
         .values({
-          ledgerId: document.ledgerId,
           sourceDocumentId,
           status: "completed",
           finishedAt: new Date(),

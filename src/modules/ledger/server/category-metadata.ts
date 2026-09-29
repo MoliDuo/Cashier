@@ -66,10 +66,9 @@ Only the category description is user-visible in this response; apply the mandat
  * racing the AI call reports `stale` instead of attaching the wrong text.
  */
 export async function generateEntryCategoryMetadata(input: {
-  ledgerId: string;
   categoryId: string;
 }): Promise<CategoryMetadataResult> {
-  const category = await getCategory(input.ledgerId, input.categoryId);
+  const category = await getCategory(input.categoryId);
   if (category == null) throw new NotFoundError("Category");
   const categoryComplete =
     category.icon != null &&
@@ -86,10 +85,7 @@ export async function generateEntryCategoryMetadata(input: {
       wroteDescription: false,
     };
   }
-  const [settings, existingCategories] = await Promise.all([
-    getLedgerSettings(input.ledgerId),
-    listCategories(input.ledgerId),
-  ]);
+  const [settings, existingCategories] = await Promise.all([getLedgerSettings(), listCategories()]);
   if (settings == null) throw new NotFoundError("Ledger");
 
   const metadata = await generateCategoryMetadata({
@@ -98,7 +94,7 @@ export async function generateEntryCategoryMetadata(input: {
     language: settings.aiLanguage,
     customPrompt: settings.aiCustomPrompt,
   });
-  const written = await updateMissingCategoryMetadata(input.ledgerId, input.categoryId, {
+  const written = await updateMissingCategoryMetadata(input.categoryId, {
     ...metadata,
     expectedName: category.name,
   });

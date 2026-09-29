@@ -7,7 +7,6 @@ describe("mapLedgerEntryDto", () => {
     // Reads select the converted amount and rate beside the stored columns.
     const entry: LedgerEntry & { convertedAmount: string | null; exchangeRate: string | null } = {
       id: "entry-1",
-      ledgerId: "ledger-1",
       categoryId: null,
       sourceDocumentId: "document-1",
       position: 0,
@@ -24,7 +23,6 @@ describe("mapLedgerEntryDto", () => {
     expect(() => mapLedgerEntryDto(entry)).toThrow("Active entry has no matching source document");
     const sourceDocument = {
       id: "document-1",
-      ledgerId: "ledger-1",
       version: 1,
       title: null,
       documentDate: null,
@@ -38,7 +36,7 @@ describe("mapLedgerEntryDto", () => {
     expect(() =>
       mapLedgerEntryDto({
         ...entry,
-        sourceDocument: { ...sourceDocument, ledgerId: "other-ledger" },
+        sourceDocument: { ...sourceDocument, id: "document-2" },
       })
     ).toThrow("Active entry has no matching source document");
   });

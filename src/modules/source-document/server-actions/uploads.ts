@@ -7,15 +7,11 @@ import {
   type CreateSourceDocumentUploadPlanInput,
   type FinalizeSourceDocumentUploadInput,
 } from "../contract-schemas";
-import { withSourceDocumentLedgerAccess } from "./access";
+import { withLedgerAccess } from "@/modules/ledger/access";
 
-export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAccess(
-  async (
-    { ledgerId },
-    input: CreateSourceDocumentUploadPlanInput
-  ): Promise<DirectUploadPlanContract> =>
+export const createSourceDocumentUploadPlanAction = withLedgerAccess(
+  async (input: CreateSourceDocumentUploadPlanInput): Promise<DirectUploadPlanContract> =>
     planDirectUpload(
-      ledgerId,
       createSourceDocumentUploadPlanInputSchema.parse(input).map((file) => ({
         contentType: file.contentType,
         byteSize: file.byteSize,
@@ -25,10 +21,10 @@ export const createSourceDocumentUploadPlanAction = withSourceDocumentLedgerAcce
     )
 );
 
-export const finalizeSourceDocumentUploadAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, input: FinalizeSourceDocumentUploadInput): Promise<string[]> => {
+export const finalizeSourceDocumentUploadAction = withLedgerAccess(
+  async (input: FinalizeSourceDocumentUploadInput): Promise<string[]> => {
     const validated = finalizeSourceDocumentUploadInputSchema.parse(input);
-    const files = await finalizeDirectUpload({ ...validated, ledgerId });
+    const files = await finalizeDirectUpload(validated);
     return files.map((file) => file.id);
   }
 );

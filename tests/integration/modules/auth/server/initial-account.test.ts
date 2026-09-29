@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { books, entryCategories, ledgers, loginEmails, users } from "@/persistence";
+import { books, ledgers, loginEmails, users } from "@/persistence";
 import { findUserByEmail } from "@/modules/auth/server/users";
 import { createInitialAccount, hasAccount } from "@/modules/auth/server/initial-account";
 
@@ -28,15 +27,10 @@ describe("createInitialAccount", () => {
     const [address] = await db.select().from(loginEmails);
     expect(address).toMatchObject({ email: "owner@example.com", userId: result.userId });
     expect(address?.verifiedAt).toBeInstanceOf(Date);
-    expect(await db.select({ id: ledgers.id }).from(ledgers)).toEqual([{ id: result.ledgerId }]);
-    const ledgerBooks = await db.query.books.findMany({
-      where: eq(books.ledgerId, result.ledgerId),
-      orderBy: [books.sortOrder],
-    });
+    expect(await db.select({ id: ledgers.id }).from(ledgers)).toHaveLength(1);
+    const ledgerBooks = await db.query.books.findMany({ orderBy: [books.sortOrder] });
     expect(ledgerBooks.map((book) => book.name)).toEqual(["共同支出", "哞哞的"]);
-    const categories = await db.query.entryCategories.findMany({
-      where: eq(entryCategories.ledgerId, result.ledgerId),
-    });
+    const categories = await db.query.entryCategories.findMany();
     expect(categories.length).toBeGreaterThan(0);
   });
 

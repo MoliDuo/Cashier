@@ -3,7 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { BookUnavailableError, ConflictError, NotFoundError } from "@/lib/errors";
 import { logError } from "@/lib/error-handlers";
-import { books, ledgers, serviceCredentials } from "@/persistence";
+import { books, serviceCredentials } from "@/persistence";
 import { createToken, computeHash } from "@/lib/security/service-credential-token";
 import { lockLedgerForUpdate } from "@/lib/db/transaction-locks";
 import type {
@@ -28,7 +28,6 @@ function toServiceCredentialDto(row: typeof serviceCredentials.$inferSelect): Se
     bookId: row.bookId,
     tokenPrefix: row.tokenPrefix ?? "",
     tokenSuffix: row.tokenSuffix ?? "",
-    ledgerId: row.ledgerId,
     name: row.name,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
@@ -37,23 +36,19 @@ function toServiceCredentialDto(row: typeof serviceCredentials.$inferSelect): Se
 }
 
 /**
- * A key may only be bound to a live book of the same ledger. The failure is
+ * A key may only be bound to a live book. The failure is
  * `BookUnavailableError` rather than a plain conflict: the client has to tell a
  * bad or archived book apart from the active-credential cap, which is also a
  * conflict, or it reports the wrong reason.
  */
-async function assertBookInLedger(
-  executor: Pick<typeof db, "select">,
-  ledgerId: string,
-  bookId: string
-): Promise<void> {
+async function assertLiveBook(executor: Pick<typeof db, "select">, bookId: string): Promise<void> {
   const row = await executor
     .select({ id: books.id })
     .from(books)
-    .where(and(eq(books.id, bookId), eq(books.ledgerId, ledgerId), isNull(books.archivedAt)))
+    .where(and(eq(books.id, bookId), isNull(books.archivedAt)))
     .limit(1)
     .then((rows) => rows[0]);
-  if (row == null) throw new BookUnavailableError("Book does not belong to this ledger");
+  if (row == null) throw new BookUnavailableError("Book does not exist or is archived");
 }
 
 export async function authenticateServiceCredential(
@@ -64,12 +59,10 @@ export async function authenticateServiceCredential(
   const hashMatch = await db
     .select({
       id: serviceCredentials.id,
-      ledgerId: serviceCredentials.ledgerId,
       bookId: serviceCredentials.bookId,
       lastUsedAt: serviceCredentials.lastUsedAt,
     })
     .from(serviceCredentials)
-    .innerJoin(ledgers, eq(ledgers.id, serviceCredentials.ledgerId))
     // An archived book stops accepting uploads through its keys; the key
     // itself is untouched and starts working again if the book is restored.
     .innerJoin(books, and(eq(books.id, serviceCredentials.bookId), isNull(books.archivedAt)))
@@ -100,45 +93,43 @@ export async function authenticateServiceCredential(
       throw error;
     }
   }
-  // The authenticated contract is deliberately bounded to id, ledgerId and
-  // the key's book; lastUsedAt is read internally only to throttle the write.
+  // The authenticated contract is deliberately bounded to the key's id and
+  // book; lastUsedAt is read internally only to throttle the write.
   return {
     id: hashMatch.id,
-    ledgerId: hashMatch.ledgerId,
     bookId: hashMatch.bookId,
   };
 }
 
-export async function listServiceCredentials(ledgerId: string): Promise<ServiceCredentialDto[]> {
+export async function listServiceCredentials(): Promise<ServiceCredentialDto[]> {
   const rows = await db
     .select()
     .from(serviceCredentials)
-    .where(and(eq(serviceCredentials.ledgerId, ledgerId), isNull(serviceCredentials.revokedAt)))
+    .where(isNull(serviceCredentials.revokedAt))
     .orderBy(desc(serviceCredentials.createdAt))
     .limit(MAX_ACTIVE_CREDENTIALS);
   return rows.map(toServiceCredentialDto);
 }
 
-export async function createServiceCredential(
-  ledgerId: string,
-  input: { name: string; bookId: string }
-): Promise<CreatedServiceCredentialDto> {
+export async function createServiceCredential(input: {
+  name: string;
+  bookId: string;
+}): Promise<CreatedServiceCredentialDto> {
   const { name, bookId } = input;
   const { token, hash, prefix, suffix } = createToken();
   const row = await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
-    await assertBookInLedger(tx, ledgerId, bookId);
+    await lockLedgerForUpdate(tx);
+    await assertLiveBook(tx, bookId);
     const active = await tx
       .select({ id: serviceCredentials.id })
       .from(serviceCredentials)
-      .where(and(eq(serviceCredentials.ledgerId, ledgerId), isNull(serviceCredentials.revokedAt)));
+      .where(isNull(serviceCredentials.revokedAt));
     if (active.length >= MAX_ACTIVE_CREDENTIALS) {
       throw new ConflictError("A ledger can have at most 20 active service credentials.");
     }
     return tx
       .insert(serviceCredentials)
       .values({
-        ledgerId,
         name,
         bookId,
         tokenHash: hash,
@@ -156,27 +147,20 @@ export async function createServiceCredential(
 
 /**
  * Rebinds a live key to another book; uploads follow it immediately. Throws
- * `NotFoundError` for a missing key and `BookUnavailableError` for a book outside
- * the ledger.
+ * `NotFoundError` for a missing key and `BookUnavailableError` for a missing or
+ * archived book.
  */
 export async function setServiceCredentialBook(
-  ledgerId: string,
   credentialId: string,
   bookId: string
 ): Promise<ServiceCredentialDto> {
   const updated = await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
-    await assertBookInLedger(tx, ledgerId, bookId);
+    await lockLedgerForUpdate(tx);
+    await assertLiveBook(tx, bookId);
     return tx
       .update(serviceCredentials)
       .set({ bookId })
-      .where(
-        and(
-          eq(serviceCredentials.ledgerId, ledgerId),
-          eq(serviceCredentials.id, credentialId),
-          isNull(serviceCredentials.revokedAt)
-        )
-      )
+      .where(and(eq(serviceCredentials.id, credentialId), isNull(serviceCredentials.revokedAt)))
       .returning()
       .then((rows) => rows[0]);
   });
@@ -185,27 +169,18 @@ export async function setServiceCredentialBook(
 }
 
 /** Revoking an already revoked key is a no-op; an unknown key is `NotFoundError`. */
-export async function revokeServiceCredential(
-  ledgerId: string,
-  credentialId: string
-): Promise<void> {
+export async function revokeServiceCredential(credentialId: string): Promise<void> {
   const result = await db
     .update(serviceCredentials)
     .set({ revokedAt: new Date() })
-    .where(
-      and(
-        eq(serviceCredentials.ledgerId, ledgerId),
-        eq(serviceCredentials.id, credentialId),
-        isNull(serviceCredentials.revokedAt)
-      )
-    )
+    .where(and(eq(serviceCredentials.id, credentialId), isNull(serviceCredentials.revokedAt)))
     .returning({ id: serviceCredentials.id });
   if (result.length === 1) return;
 
   const existing = await db
     .select({ id: serviceCredentials.id })
     .from(serviceCredentials)
-    .where(and(eq(serviceCredentials.ledgerId, ledgerId), eq(serviceCredentials.id, credentialId)))
+    .where(eq(serviceCredentials.id, credentialId))
     .limit(1);
   if (existing.length === 0) throw new NotFoundError("Credential");
 }

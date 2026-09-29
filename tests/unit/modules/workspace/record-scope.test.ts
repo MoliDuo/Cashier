@@ -5,7 +5,6 @@ import type { BookDto } from "@/modules/ledger/contracts";
 const books: BookDto[] = [
   {
     id: "book-1",
-    ledgerId: "ledger-1",
     name: "共同支出",
     sortOrder: 1,
     archivedAt: null,

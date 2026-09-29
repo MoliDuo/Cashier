@@ -7,7 +7,7 @@ import { convertAmount } from "./exchange-rates";
 
 /** A conversion for the signed-in ledger; no stored rate for the day is a 409. */
 export const convertCurrency = withLedgerAccess(
-  async (_ledgerId: string, rawInput: unknown): Promise<ConvertCurrencyResult> => {
+  async (rawInput: unknown): Promise<ConvertCurrencyResult> => {
     const input = parseConvertCurrencyInput(rawInput);
     const converted = await convertAmount({
       amount: input.amount,

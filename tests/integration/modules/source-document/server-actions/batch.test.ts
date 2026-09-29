@@ -21,21 +21,19 @@ vi.mock("@/lib/ai/openai-client", () => ({
 const MISSING_ID = "00000000-0000-4000-8000-000000000001";
 
 describe("source document batch actions", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
     vi.mocked(getOpenAIClient).mockReturnValue(
       createOpenAIMock() as unknown as ReturnType<typeof getOpenAIClient>
     );
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
+    await createTestUserWithLedger(db);
   });
 
   it("deletes each document on its own and reports a missing one under a stable code", async () => {
     const db = getTestDb();
-    const kept = await createTestSourceDocument(db, ledgerId);
-    const deleted = await createTestSourceDocument(db, ledgerId);
+    const kept = await createTestSourceDocument(db);
+    const deleted = await createTestSourceDocument(db);
 
     const result = await batchDeleteSourceDocumentsAction([MISSING_ID, deleted]);
 
@@ -48,7 +46,7 @@ describe("source document batch actions", () => {
   });
 
   it("refuses an empty batch and runs a duplicated target once", async () => {
-    const document = await createTestSourceDocument(getTestDb(), ledgerId);
+    const document = await createTestSourceDocument(getTestDb());
 
     await expect(batchDeleteSourceDocumentsAction([])).rejects.toThrow(ValidationError);
     await expect(batchDeleteSourceDocumentsAction([document, document])).resolves.toEqual({
@@ -59,7 +57,7 @@ describe("source document batch actions", () => {
 
   it("keeps retrying later documents after one fails, inheriting each one's evidence", async () => {
     const db = getTestDb();
-    const document = await createTestSourceDocument(db, ledgerId, { text: "午餐 25元" });
+    const document = await createTestSourceDocument(db, { text: "午餐 25元" });
 
     const result = await batchRetrySourceDocumentsAction([MISSING_ID, document]);
 
@@ -92,9 +90,9 @@ describe("source document batch actions", () => {
       UnauthorizedError
     );
 
-    // A second ledger makes the single live one ambiguous: not found, never
-    // re-labelled as a sign-in problem.
-    await getTestDb().insert(ledgers).values({ id: crypto.randomUUID() });
+    // Without the ledger the action reports it as not found, never re-labelled
+    // as a sign-in problem.
+    await getTestDb().delete(ledgers);
     await expect(batchRetrySourceDocumentsAction([MISSING_ID])).rejects.toBeInstanceOf(
       NotFoundError
     );

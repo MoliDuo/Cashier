@@ -39,7 +39,6 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
   if (claim == null) return false;
   const lease = { attemptId: claim.job.attemptId, claimToken: claim.claimToken };
   const failure = {
-    ledgerId: claim.ledgerId,
     sourceDocumentId: claim.job.sourceDocumentId,
     attemptId: claim.job.attemptId,
     failureKind: "processing_error" as const,
@@ -67,7 +66,6 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
 
   try {
     await processAttempt({
-      ledgerId: claim.ledgerId,
       sourceDocumentId: claim.job.sourceDocumentId,
       attemptId: claim.job.attemptId,
       signal: held.signal,

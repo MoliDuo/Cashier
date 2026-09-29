@@ -12,14 +12,13 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
-async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entryDate?: string) {
+async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      ledgerId,
       documentDate: entryDate ?? null,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -31,27 +30,23 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
 }
 
 describe("batchDeleteLedgerEntriesAction", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = randomUUID();
     await db.insert(ledgers).values({
-      id: ledgerId,
+      id: randomUUID(),
       mainCurrency: "CNY",
     });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await ensureTestLedgerBooks(db);
   });
 
   it("deletes multiple entries from one document without creating an attempt", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     const entries = await db
       .insert(ledgerEntries)
       .values(
         [10, 20, 30].map((amount, index) => ({
           id: randomUUID(),
-          ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Item ${index}`,
           amount: String(amount),
@@ -96,9 +91,8 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .insert(sourceDocuments)
       .values({
         id: randomUUID(),
-        ledgerId,
         documentDate: null,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(doc).toBeDefined();
@@ -107,7 +101,6 @@ describe("batchDeleteLedgerEntriesAction", () => {
       .values(
         [10, 20].map((amount, index) => ({
           id: randomUUID(),
-          ledgerId,
           sourceDocumentId: doc!.id,
           itemName: `Typed ${index}`,
           amount: String(amount),
@@ -134,13 +127,12 @@ describe("batchDeleteLedgerEntriesAction", () => {
 
   it("commits one document's deletion independently of another document's failure in the same batch", async () => {
     const db = getTestDb();
-    const okDoc = await seedDoc(db, ledgerId);
-    const badDoc = await seedDoc(db, ledgerId);
+    const okDoc = await seedDoc(db);
+    const badDoc = await seedDoc(db);
     const [okEntry] = await db
       .insert(ledgerEntries)
       .values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: okDoc.id,
         itemName: "Keeper's sibling",
         amount: "10",
@@ -174,13 +166,12 @@ describe("batchDeleteLedgerEntriesAction", () => {
 
   it("fails every entry of a document's group together, without writes, while it is processing", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     const entries = await db
       .insert(ledgerEntries)
       .values(
         [10, 20].map((amount, index) => ({
           id: randomUUID(),
-          ledgerId,
           sourceDocumentId: doc.id,
           itemName: `Group item ${index}`,
           amount: String(amount),
@@ -193,7 +184,7 @@ describe("batchDeleteLedgerEntriesAction", () => {
     // so the group's transaction refuses the write as a whole.
     const [attempt] = await db
       .insert(extractionAttempts)
-      .values({ ledgerId, sourceDocumentId: doc.id, status: "processing" })
+      .values({ sourceDocumentId: doc.id, status: "processing" })
       .returning();
     await db
       .update(sourceDocuments)

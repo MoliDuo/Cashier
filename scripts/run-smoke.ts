@@ -91,7 +91,6 @@ async function main(): Promise<void> {
   const emailServer = createSmokeEmailServer();
   const emailEndpoint = `http://127.0.0.1:${await listenOnAnyPort(emailServer)}`;
   const userId = randomUUID();
-  const sharedLedgerId = randomUUID();
   const smokeEmail = "smoke@example.com";
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -166,11 +165,10 @@ async function main(): Promise<void> {
       // lands in whichever book the writer picked (or the first one, 共同支出).
       const db = drizzle(client, { schema });
       await seedUser(db, { id: userId, email: smokeEmail });
-      await seedLedger(db, { id: sharedLedgerId, mainCurrency: "CNY" });
-      await seedBooks(db, sharedLedgerId, ["共同支出", "旅行支出"]);
+      await seedLedger(db, { mainCurrency: "CNY" });
+      await seedBooks(db, ["共同支出", "旅行支出"]);
       await seedCategories(
         db,
-        sharedLedgerId,
         ["Food", "Shopping", "Travel"].map((name) => ({ name }))
       );
     } finally {

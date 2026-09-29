@@ -20,7 +20,6 @@ vi.mock("@/modules/ledger/queries", () => ({
 import { useLedgerPageEnvironment } from "@/modules/workspace/hooks/useLedgerPageEnvironment";
 
 const ledgerDto: LedgerDto = {
-  id: "ledger-1",
   settings: { ...getDefaultLedger().settings, mainCurrency: "USD" },
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",

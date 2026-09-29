@@ -1,12 +1,12 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { isValidDecimal } from "@/lib/money/decimal";
 import { entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 
-export function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
-  return and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
+export function activeDocumentWhere(sourceDocumentId: string) {
+  return eq(sourceDocuments.id, sourceDocumentId);
 }
 
 export function assertEntryValues(entries: readonly LedgerProjectionEntryContract[]): void {
@@ -26,7 +26,6 @@ export function requireCurrency(currency: string | null): string {
 
 export async function assertCategoryOwnership(
   tx: PostgresTransaction,
-  ledgerId: string,
   entries: readonly { categoryId?: string | null | undefined }[]
 ): Promise<void> {
   const categoryIds = [
@@ -36,7 +35,7 @@ export async function assertCategoryOwnership(
   const owned = await tx
     .select({ id: entryCategories.id })
     .from(entryCategories)
-    .where(and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, categoryIds)));
+    .where(inArray(entryCategories.id, categoryIds));
   if (owned.length !== categoryIds.length) {
     throw new NotFoundError("Entry category");
   }
@@ -45,7 +44,6 @@ export async function assertCategoryOwnership(
 export async function insertDocumentEntries(
   tx: PostgresTransaction,
   input: {
-    ledgerId: string;
     sourceDocumentId: string;
     entries: readonly LedgerProjectionEntryContract[];
   }
@@ -54,7 +52,6 @@ export async function insertDocumentEntries(
   await tx.insert(ledgerEntries).values(
     input.entries.map((entry, position) => ({
       id: entry.id ?? crypto.randomUUID(),
-      ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
       position,
       categoryId: entry.categoryId,
@@ -71,20 +68,12 @@ export async function insertDocumentEntries(
 export async function replaceProjection(
   tx: PostgresTransaction,
   input: {
-    ledgerId: string;
     sourceDocumentId: string;
     entries: readonly LedgerProjectionEntryContract[];
   }
 ): Promise<void> {
   assertEntryValues(input.entries);
-  await assertCategoryOwnership(tx, input.ledgerId, input.entries);
-  await tx
-    .delete(ledgerEntries)
-    .where(
-      and(
-        eq(ledgerEntries.ledgerId, input.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId)
-      )
-    );
+  await assertCategoryOwnership(tx, input.entries);
+  await tx.delete(ledgerEntries).where(eq(ledgerEntries.sourceDocumentId, input.sourceDocumentId));
   await insertDocumentEntries(tx, input);
 }

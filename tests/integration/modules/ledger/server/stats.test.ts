@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { sql } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { entryCategories, ledgerEntries, ledgers, loginEmails, users } from "@/persistence";
+import { entryCategories, ledgerEntries, ledgers } from "@/persistence";
 import { sourceDocuments } from "@/persistence/schema/source-document";
 import { randomUUID } from "node:crypto";
 import { getLedgerStatsAction } from "@/modules/ledger/server/stats";
@@ -11,11 +11,8 @@ import {
 } from "tests/helpers/schema-setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 
-const OTHER_USER_ID = "11111111-1111-1111-1111-111111111111";
-
 async function seedEntry(
   db: ReturnType<typeof getTestDb>,
-  ledgerId: string,
   opts: {
     amount: string;
     currency?: string;
@@ -27,9 +24,8 @@ async function seedEntry(
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      ledgerId,
       documentDate: opts.entryDate ?? null,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -39,7 +35,6 @@ async function seedEntry(
 
   await db.insert(ledgerEntries).values({
     id: randomUUID(),
-    ledgerId,
     sourceDocumentId: doc.id,
     itemName: "Test Item",
     amount: opts.amount,
@@ -52,16 +47,12 @@ async function seedEntry(
 }
 
 describe("getLedgerStatsAction", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = randomUUID();
     await db.insert(ledgers).values({
-      id: ledgerId,
       mainCurrency: "CNY",
     });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await ensureTestLedgerBooks(db);
   });
 
   it("returns zero values for empty ledger", async () => {
@@ -75,9 +66,9 @@ describe("getLedgerStatsAction", () => {
 
   it("groups totals by currency", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "100.00", currency: "CNY" });
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY" });
-    await seedEntry(db, ledgerId, { amount: "20.00", currency: "USD" });
+    await seedEntry(db, { amount: "100.00", currency: "CNY" });
+    await seedEntry(db, { amount: "50.00", currency: "CNY" });
+    await seedEntry(db, { amount: "20.00", currency: "USD" });
 
     const result = await getLedgerStatsAction({});
     const cny = result.totals.find((t) => t.currency === "CNY");
@@ -93,11 +84,8 @@ describe("getLedgerStatsAction", () => {
 
   it("uses the persisted main currency for entries", async () => {
     const db = getTestDb();
-    await db
-      .update(ledgers)
-      .set({ mainCurrency: "USD" })
-      .where(sql`${ledgers.id} = ${ledgerId}`);
-    await seedEntry(db, ledgerId, {
+    await db.update(ledgers).set({ mainCurrency: "USD" });
+    await seedEntry(db, {
       amount: "12.50",
       currency: "USD",
     });
@@ -113,17 +101,16 @@ describe("getLedgerStatsAction", () => {
     const categoryId = randomUUID();
     await db.insert(entryCategories).values({
       id: categoryId,
-      ledgerId,
       name: "Food",
       icon: "utensils",
       sortOrder: 1,
     });
-    await seedEntry(db, ledgerId, {
+    await seedEntry(db, {
       amount: "8.25",
       currency: "CNY",
       categoryId,
     });
-    await seedEntry(db, ledgerId, {
+    await seedEntry(db, {
       amount: "3.75",
       currency: "CNY",
       categoryId,
@@ -143,9 +130,9 @@ describe("getLedgerStatsAction", () => {
 
   it("returns trend sorted by date", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "30.00", currency: "CNY", entryDate: "2024-01-03" });
-    await seedEntry(db, ledgerId, { amount: "10.00", currency: "CNY", entryDate: "2024-01-01" });
-    await seedEntry(db, ledgerId, { amount: "20.00", currency: "CNY", entryDate: "2024-01-02" });
+    await seedEntry(db, { amount: "30.00", currency: "CNY", entryDate: "2024-01-03" });
+    await seedEntry(db, { amount: "10.00", currency: "CNY", entryDate: "2024-01-01" });
+    await seedEntry(db, { amount: "20.00", currency: "CNY", entryDate: "2024-01-02" });
 
     const result = await getLedgerStatsAction({});
     expect(result.trend).toHaveLength(3);
@@ -162,9 +149,9 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by startDate using the source document accounting date", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "100.00", currency: "CNY", entryDate: "2024-01-01" });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY", entryDate: "2024-02-01" });
-    await seedEntry(db, ledgerId, { amount: "300.00", currency: "CNY", entryDate: "2024-03-01" });
+    await seedEntry(db, { amount: "100.00", currency: "CNY", entryDate: "2024-01-01" });
+    await seedEntry(db, { amount: "200.00", currency: "CNY", entryDate: "2024-02-01" });
+    await seedEntry(db, { amount: "300.00", currency: "CNY", entryDate: "2024-03-01" });
 
     const result = await getLedgerStatsAction({ startDate: "2024-02-01" });
     const cny = result.totals.find((t) => t.currency === "CNY");
@@ -174,9 +161,9 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by endDate using the source document accounting date", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "100.00", currency: "CNY", entryDate: "2024-01-01" });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY", entryDate: "2024-02-01" });
-    await seedEntry(db, ledgerId, { amount: "300.00", currency: "CNY", entryDate: "2024-03-01" });
+    await seedEntry(db, { amount: "100.00", currency: "CNY", entryDate: "2024-01-01" });
+    await seedEntry(db, { amount: "200.00", currency: "CNY", entryDate: "2024-02-01" });
+    await seedEntry(db, { amount: "300.00", currency: "CNY", entryDate: "2024-03-01" });
 
     const result = await getLedgerStatsAction({ endDate: "2024-02-01" });
     const cny = result.totals.find((t) => t.currency === "CNY");
@@ -189,13 +176,12 @@ describe("getLedgerStatsAction", () => {
     const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
-      ledgerId,
       name: "餐饮",
       sortOrder: 1,
     });
 
-    await seedEntry(db, ledgerId, { amount: "100.00", currency: "CNY", categoryId: catId });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY" }); // no category
+    await seedEntry(db, { amount: "100.00", currency: "CNY", categoryId: catId });
+    await seedEntry(db, { amount: "200.00", currency: "CNY" }); // no category
 
     const result = await getLedgerStatsAction({
       categoryId: catId,
@@ -207,8 +193,8 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by currency", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "100.00", currency: "CNY" });
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "USD" });
+    await seedEntry(db, { amount: "100.00", currency: "CNY" });
+    await seedEntry(db, { amount: "50.00", currency: "USD" });
 
     const result = await getLedgerStatsAction({
       currency: "USD",
@@ -221,8 +207,8 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by minAmount using convertedAmount", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY" });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY" });
+    await seedEntry(db, { amount: "50.00", currency: "CNY" });
+    await seedEntry(db, { amount: "200.00", currency: "CNY" });
 
     const result = await getLedgerStatsAction({
       minAmount: "100",
@@ -234,8 +220,8 @@ describe("getLedgerStatsAction", () => {
 
   it("filters by maxAmount using convertedAmount", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY" });
-    await seedEntry(db, ledgerId, { amount: "200.00", currency: "CNY" });
+    await seedEntry(db, { amount: "50.00", currency: "CNY" });
+    await seedEntry(db, { amount: "200.00", currency: "CNY" });
 
     const result = await getLedgerStatsAction({
       maxAmount: "100",
@@ -249,7 +235,7 @@ describe("getLedgerStatsAction", () => {
     const db = getTestDb();
     await insertExchangeRates("2024-01-15", { USD: "1.1", CNY: "7.2" });
     // 110 USD at 7.2 / 1.1 CNY per USD is 720 CNY.
-    await seedEntry(db, ledgerId, {
+    await seedEntry(db, {
       amount: "110.00",
       currency: "USD",
       entryDate: "2024-01-15",
@@ -263,12 +249,12 @@ describe("getLedgerStatsAction", () => {
 
   it("excludes entries without a rate for their day from the main total but keeps original currency totals", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, {
+    await seedEntry(db, {
       amount: "100.00",
       currency: "USD",
       entryDate: "2024-01-15",
     });
-    await seedEntry(db, ledgerId, {
+    await seedEntry(db, {
       amount: "50.00",
       currency: "CNY",
       entryDate: "2024-01-15",
@@ -288,8 +274,8 @@ describe("getLedgerStatsAction", () => {
 
   it("single currency ledger: convertedTotal equals sum of amounts", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "100.00", currency: "CNY" });
-    await seedEntry(db, ledgerId, { amount: "50.00", currency: "CNY" });
+    await seedEntry(db, { amount: "100.00", currency: "CNY" });
+    await seedEntry(db, { amount: "50.00", currency: "CNY" });
 
     const result = await getLedgerStatsAction({});
     expect(result.convertedTotal).not.toBeNull();
@@ -299,12 +285,9 @@ describe("getLedgerStatsAction", () => {
 
   it("includes undated documents on their effective (UTC creation) date", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "75.00", currency: "CNY" });
+    await seedEntry(db, { amount: "75.00", currency: "CNY" });
     // Point the undated document at a fixed UTC creation date.
-    await db
-      .update(sourceDocuments)
-      .set({ createdAt: new Date("2024-04-08T20:00:00Z") })
-      .where(sql`${sourceDocuments.ledgerId} = ${ledgerId}`);
+    await db.update(sourceDocuments).set({ createdAt: new Date("2024-04-08T20:00:00Z") });
 
     const unfiltered = await getLedgerStatsAction({});
     expect(unfiltered.convertedTotal?.total).toBe("75");
@@ -324,8 +307,8 @@ describe("getLedgerStatsAction", () => {
 
   it("executes the summary as a single SQL statement", async () => {
     const db = getTestDb();
-    await seedEntry(db, ledgerId, { amount: "10.00", currency: "CNY", entryDate: "2024-01-01" });
-    await seedEntry(db, ledgerId, { amount: "20.00", currency: "USD", entryDate: "2024-01-02" });
+    await seedEntry(db, { amount: "10.00", currency: "CNY", entryDate: "2024-01-01" });
+    await seedEntry(db, { amount: "20.00", currency: "USD", entryDate: "2024-01-02" });
 
     const dbWithClient = getTestDb() as unknown as {
       $client?: {
@@ -355,33 +338,12 @@ describe("getLedgerStatsAction", () => {
     expect(summaryStatements).toHaveLength(1);
   });
 
-  it("fails closed once another account's live ledger makes the single ledger ambiguous", async () => {
-    const db = getTestDb();
-
-    await db.insert(users).values({
-      id: OTHER_USER_ID,
-    });
-
-    await db.insert(loginEmails).values({
-      userId: OTHER_USER_ID,
-      email: "other@example.com",
-      verifiedAt: new Date(),
-    });
-
-    const otherLedgerId = randomUUID();
-    await db.insert(ledgers).values({
-      id: otherLedgerId,
-    });
-
-    await expect(getLedgerStatsAction({})).rejects.toThrow("Ledger not found");
-  });
-
   it("totals only uncategorized entries for the uncategorized sentinel", async () => {
     const db = getTestDb();
     const catId = randomUUID();
-    await db.insert(entryCategories).values({ id: catId, ledgerId, name: "餐饮", sortOrder: 1 });
-    await seedEntry(db, ledgerId, { amount: "100.00", categoryId: catId });
-    await seedEntry(db, ledgerId, { amount: "30.00" });
+    await db.insert(entryCategories).values({ id: catId, name: "餐饮", sortOrder: 1 });
+    await seedEntry(db, { amount: "100.00", categoryId: catId });
+    await seedEntry(db, { amount: "30.00" });
 
     const result = await getLedgerStatsAction({ categoryId: "__uncategorized__" });
 
@@ -404,9 +366,8 @@ describe("getLedgerStatsAction", () => {
       const [sourceDoc] = await db
         .insert(sourceDocuments)
         .values({
-          ledgerId,
           documentDate: "2024-01-01",
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
       expect(sourceDoc).toBeDefined();
@@ -415,7 +376,6 @@ describe("getLedgerStatsAction", () => {
       }
 
       await db.insert(ledgerEntries).values({
-        ledgerId,
         sourceDocumentId: sourceDoc.id,
         amount: "100.00",
         currency: "MYR",
@@ -423,7 +383,6 @@ describe("getLedgerStatsAction", () => {
       });
 
       await db.insert(ledgerEntries).values({
-        ledgerId,
         sourceDocumentId: sourceDoc.id,
         amount: "50.00",
         currency: "USD",
@@ -431,7 +390,6 @@ describe("getLedgerStatsAction", () => {
       });
 
       await db.insert(ledgerEntries).values({
-        ledgerId,
         sourceDocumentId: sourceDoc.id,
         amount: "100.00",
         currency: "CNY",
@@ -452,14 +410,12 @@ describe("getLedgerStatsAction", () => {
       const [sourceDoc] = await db
         .insert(sourceDocuments)
         .values({
-          ledgerId,
           documentDate: null,
           createdAt: new Date("2024-02-10T23:30:00Z"),
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
       await db.insert(ledgerEntries).values({
-        ledgerId,
         sourceDocumentId: sourceDoc!.id,
         amount: "10.00",
         currency: "USD",

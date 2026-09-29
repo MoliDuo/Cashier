@@ -105,7 +105,6 @@ function entryNames(state: DehydratedState): string[] {
 }
 
 describe("ledger page bootstrap", () => {
-  let ledgerId = "";
   let bookId = "";
   let otherBookId = "";
 
@@ -120,7 +119,6 @@ describe("ledger page bootstrap", () => {
     const [document] = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         title: input.title,
         documentDate: input.date,
         bookId: input.book ?? bookId,
@@ -128,7 +126,6 @@ describe("ledger page bootstrap", () => {
       .returning({ id: sourceDocuments.id });
     await db.insert(ledgerEntries).values(
       input.amounts.map((amount, index) => ({
-        ledgerId,
         sourceDocumentId: document!.id,
         amount,
         currency: "CNY",
@@ -140,24 +137,23 @@ describe("ledger page bootstrap", () => {
   }
 
   async function setLedgerZone(timeZone: string) {
-    await getTestDb().update(ledgers).set({ timeZone }).where(eq(ledgers.id, ledgerId));
+    await getTestDb().update(ledgers).set({ timeZone });
   }
 
   beforeEach(async () => {
     request.cookies = {};
     request.failBooks = false;
     const db = getTestDb();
-    ({ ledgerId } = await createTestUserWithLedger(db));
+    await createTestUserWithLedger(db);
     [bookId] = await db
       .select({ id: books.id })
       .from(books)
-      .where(eq(books.ledgerId, ledgerId))
       .then((rows) => rows.map((row) => row.id));
     [{ id: otherBookId }] = (await db
       .insert(books)
-      .values({ ledgerId, name: "哞哞的", sortOrder: 2 })
+      .values({ name: "哞哞的", sortOrder: 2 })
       .returning({ id: books.id })) as [{ id: string }];
-    await db.insert(entryCategories).values({ ledgerId, name: "吃喝", sortOrder: 1 });
+    await db.insert(entryCategories).values({ name: "吃喝", sortOrder: 1 });
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-30T16:30:00Z"));
   });
@@ -173,7 +169,9 @@ describe("ledger page bootstrap", () => {
     expect(
       (query(books, "ledger", "books")?.state.data as Array<{ id: string }>).map((b) => b.id)
     ).toEqual([bookId, otherBookId]);
-    expect(query(shell, "ledger")?.state.data).toMatchObject({ id: ledgerId });
+    expect(query(shell, "ledger")?.state.data).toMatchObject({
+      settings: expect.objectContaining({ mainCurrency: "CNY" }),
+    });
     expect(query(shell, "ledger", "books")).toBeUndefined();
     expect(query(shell, "ledger", "categories")?.state.data).toEqual([
       expect.objectContaining({ name: "吃喝" }),
@@ -188,7 +186,7 @@ describe("ledger page bootstrap", () => {
   it("dehydrates the ledger's latest assignment run for the shell", async () => {
     const [job] = await getTestDb()
       .insert(categoryAssignmentJobs)
-      .values({ ledgerId, mode: "clear", status: "running" })
+      .values({ mode: "clear", status: "running" })
       .returning();
 
     const { shell } = await loadPage({ page: "records" });

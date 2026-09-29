@@ -16,7 +16,6 @@ vi.mock("@/modules/currency/ui/amount-text", () => ({
 const sourceDocument: SourceDocument = {
   id: "doc-1",
   version: 1,
-  ledgerId: "ledger-1",
   title: "Receipt",
   text: "Lunch",
   files: [],
@@ -36,7 +35,6 @@ const sourceDocument: SourceDocument = {
 
 const ledgerEntry: LedgerEntry = {
   id: "entry-1",
-  ledgerId: "ledger-1",
   categoryId: null,
   sourceDocumentId: "doc-1",
   amount: "12.00",

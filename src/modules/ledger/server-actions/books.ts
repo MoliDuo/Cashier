@@ -79,37 +79,37 @@ async function runBookMutation(
 }
 
 export const createBookAction = withLedgerAccess(
-  (ledgerId: string, data: CreateBookInput): Promise<BookMutationResult> =>
+  (data: CreateBookInput): Promise<BookMutationResult> =>
     runBookMutation(async () => {
       const validated = parseCreateBookInput(data);
-      const created = await createBook(ledgerId, { name: validated.name });
+      const created = await createBook({ name: validated.name });
       return {
         book: created,
-        books: await listBooksIncludingArchived(ledgerId),
+        books: await listBooksIncludingArchived(),
       };
     })
 );
 
 export const updateBookAction = withLedgerAccess(
-  (ledgerId: string, bookId: string, data: UpdateBookInput): Promise<BookMutationResult> =>
+  (bookId: string, data: UpdateBookInput): Promise<BookMutationResult> =>
     runBookMutation(async () => {
       const validatedId = parseBookId(bookId);
       const validated = parseUpdateBookInput(data);
-      const updated = await updateBook(ledgerId, validatedId, { name: validated.name });
+      const updated = await updateBook(validatedId, { name: validated.name });
       if (updated == null) throw new AppError("Book not found", "NOT_FOUND", 404);
       return {
         book: updated,
-        books: await listBooksIncludingArchived(ledgerId),
+        books: await listBooksIncludingArchived(),
       };
     })
 );
 
 export const reorderBooksAction = withLedgerAccess(
-  (ledgerId: string, bookIds: string[]): Promise<BookMutationResult> =>
+  (bookIds: string[]): Promise<BookMutationResult> =>
     runBookMutation(async () => {
       const validated = parseReorderBooksInput(bookIds);
-      await reorderBooks(ledgerId, validated);
-      return { books: await listBooksIncludingArchived(ledgerId) };
+      await reorderBooks(validated);
+      return { books: await listBooksIncludingArchived() };
     })
 );
 
@@ -119,12 +119,12 @@ export const reorderBooksAction = withLedgerAccess(
  * say which one it is.
  */
 export const archiveBookAction = withLedgerAccess(
-  async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
+  async (bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
-      const result = await archiveBook(ledgerId, validatedId);
+      const result = await archiveBook(validatedId);
       if (result.status !== "archived") return { ok: false, code: result.status };
-      return { ok: true, books: await listBooksIncludingArchived(ledgerId) };
+      return { ok: true, books: await listBooksIncludingArchived() };
     } catch (error) {
       const code = toBookMutationErrorCode(error);
       if (code === "unexpected") logError("books:archive", error);
@@ -134,14 +134,14 @@ export const archiveBookAction = withLedgerAccess(
 );
 
 export const restoreBookAction = withLedgerAccess(
-  async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
+  async (bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
-      const restored = await restoreBook(ledgerId, validatedId);
+      const restored = await restoreBook(validatedId);
       return {
         ok: true,
         book: restored,
-        books: await listBooksIncludingArchived(ledgerId),
+        books: await listBooksIncludingArchived(),
       };
     } catch (error) {
       const code = toBookMutationErrorCode(error);
@@ -152,12 +152,12 @@ export const restoreBookAction = withLedgerAccess(
 );
 
 export const deleteBookAction = withLedgerAccess(
-  async (ledgerId: string, bookId: string): Promise<BookMutationResult> => {
+  async (bookId: string): Promise<BookMutationResult> => {
     try {
       const validatedId = parseBookId(bookId);
-      const result = await deleteBook(ledgerId, validatedId);
+      const result = await deleteBook(validatedId);
       if (result.status !== "deleted") return { ok: false, code: result.status };
-      return { ok: true, books: await listBooksIncludingArchived(ledgerId) };
+      return { ok: true, books: await listBooksIncludingArchived() };
     } catch (error) {
       const code = toBookMutationErrorCode(error);
       if (code === "unexpected") logError("books:delete", error);

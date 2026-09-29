@@ -81,11 +81,8 @@ async function readStatementCounter(db: TestDatabase, name: string): Promise<num
 }
 
 describe("projection write shape", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
-    const { ledgerId: createdLedgerId } = await createTestUserWithLedger(getTestDb());
-    ledgerId = createdLedgerId;
+    await createTestUserWithLedger(getTestDb());
   });
 
   it("inserts 1, 50 and 500 projection entries with one statement each", async () => {
@@ -96,14 +93,12 @@ describe("projection write shape", () => {
 
     for (const count of [1, 50, 500]) {
       const pending = await createPendingAttempt({
-        ledgerId,
         input: { text: `Doc ${count}`, storedFileIds: [], documentDate: null },
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
       });
       const created = { sourceDocumentId: pending.attempt.sourceDocumentId };
       await activateAttempt({
         lease: await claimAttemptForTest(pending.attempt.id),
-        ledgerId,
         sourceDocumentId: pending.attempt.sourceDocumentId,
         attemptId: pending.attempt.id,
         entries: Array.from({ length: count }, (_, index) =>
@@ -115,12 +110,7 @@ describe("projection write shape", () => {
       const rows = await db
         .select({ id: ledgerEntries.id })
         .from(ledgerEntries)
-        .where(
-          and(
-            eq(ledgerEntries.ledgerId, ledgerId),
-            eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
-          )
-        );
+        .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId));
       expect(rows).toHaveLength(count);
       await db.execute(
         sql.raw(`UPDATE statement_counters SET value = 0 WHERE name = 'ledger_entries_insert'`)
@@ -131,16 +121,14 @@ describe("projection write shape", () => {
   it("edits a document's entries without duplicating its files or entries", async () => {
     const db = getTestDb();
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "With file",
       entries: [entry("A"), entry("B")],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const file = (
       await db
         .insert(storedFiles)
         .values({
-          ledgerId,
           storageKey: `tests/${created.sourceDocumentId}/0`,
           contentType: "image/jpeg",
           byteSize: 100,
@@ -150,7 +138,6 @@ describe("projection write shape", () => {
     )[0];
     if (file == null) throw new Error("Expected stored file insert to return a row");
     await db.insert(sourceDocumentFiles).values({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       storedFileId: file.id,
       position: 0,
@@ -164,7 +151,6 @@ describe("projection write shape", () => {
     ]);
 
     await addLedgerEntry({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       amount: "10",
       currency: "CNY",
@@ -201,12 +187,7 @@ describe("projection write shape", () => {
         itemName: ledgerEntries.itemName,
       })
       .from(ledgerEntries)
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
-        )
-      )
+      .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId))
       .orderBy(ledgerEntries.position);
     expect(liveEntries).toEqual([
       { position: 0, itemName: "A" },
@@ -219,7 +200,6 @@ describe("projection write shape", () => {
     const db = getTestDb();
     const pinnedCreatedAt = new Date("2026-01-02T03:04:05.000Z");
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Manual",
       entryDate: "2026-05-01",
       entries: [
@@ -230,23 +210,15 @@ describe("projection write shape", () => {
         }),
         entry("Three", { id: "33333333-3333-4333-8333-333333333333" }),
       ],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const originalRows = await db
       .select()
       .from(ledgerEntries)
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
-        )
-      );
+      .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId));
     const originalById = new Map(originalRows.map((row) => [row.id, row]));
     const versionAfterCreate = (
-      await db
-        .select({ version: ledgerSyncState.version })
-        .from(ledgerSyncState)
-        .where(eq(ledgerSyncState.ledgerId, ledgerId))
+      await db.select({ version: ledgerSyncState.version }).from(ledgerSyncState)
     )[0]?.version;
     await installStatementCounters(db, [
       { table: "ledger_entries", operation: "INSERT", name: "ledger_entries_insert" },
@@ -254,7 +226,6 @@ describe("projection write shape", () => {
     ]);
 
     await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [created.sourceDocumentId],
       ledgerEntryIds: originalRows.map((row) => row.id),
       description: "updated",
@@ -268,12 +239,7 @@ describe("projection write shape", () => {
     const activeRows = await db
       .select()
       .from(ledgerEntries)
-      .where(
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
-        )
-      )
+      .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId))
       .orderBy(ledgerEntries.position);
     expect(activeRows.map((row) => [row.itemName, row.description])).toEqual([
       ["One", "updated"],
@@ -289,10 +255,7 @@ describe("projection write shape", () => {
     // The change-log trigger aggregates by transaction: exactly one version
     // bump for the whole replace.
     const versionAfterReplace = (
-      await db
-        .select({ version: ledgerSyncState.version })
-        .from(ledgerSyncState)
-        .where(eq(ledgerSyncState.ledgerId, ledgerId))
+      await db.select({ version: ledgerSyncState.version }).from(ledgerSyncState)
     )[0]?.version;
     expect(Number(versionAfterReplace)).toBe(Number(versionAfterCreate) + 1);
   });
@@ -300,14 +263,13 @@ describe("projection write shape", () => {
   it("leaves entries an edit does not change as they were", async () => {
     const db = getTestDb();
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Manual",
       entryDate: "2026-05-01",
       entries: [
         entry("Kept", { id: "44444444-4444-4444-8444-444444444444" }),
         entry("Edited", { id: "55555555-5555-4555-8555-555555555555" }),
       ],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const staleUpdatedAt = new Date("2026-01-01T00:00:00.000Z");
     await db
@@ -316,7 +278,6 @@ describe("projection write shape", () => {
       .where(eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId));
 
     await batchUpdateLedgerEntries({
-      ledgerId,
       sourceDocumentIds: [created.sourceDocumentId],
       ledgerEntryIds: ["55555555-5555-4555-8555-555555555555"],
       itemName: "Edited again",
@@ -335,10 +296,9 @@ describe("projection write shape", () => {
   it("reuses positions across repeated removals and additions without creating attempts", async () => {
     const db = getTestDb();
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Repeated edits",
       entries: [entry("Keep"), entry("Replace")],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     for (let iteration = 0; iteration < 3; iteration++) {
       const rows = await db.query.ledgerEntries.findMany({
@@ -347,14 +307,12 @@ describe("projection write shape", () => {
       });
       expect(
         await deleteLedgerEntry({
-          ledgerId,
           sourceDocumentId: created.sourceDocumentId,
           ledgerEntryId: rows[1]!.id,
         })
       ).toEqual({ ledgerEntryId: rows[1]!.id, deleted: true });
       expect(
         await addLedgerEntry({
-          ledgerId,
           sourceDocumentId: created.sourceDocumentId,
           amount: "10",
           currency: "CNY",

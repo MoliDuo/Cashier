@@ -71,26 +71,18 @@ vi.mock("@/lib/storage/s3", () => ({
 // Mock Tasks
 
 describe("Service Credentials & Ledger Entry Ingestion", () => {
-  let testLedgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
 
     await db.delete(ledgers);
-    const { ledgerId } = await createTestUserWithLedger(
-      db,
-      undefined,
-      "API Test Ledger",
-      TEST_USER_ID
-    );
-    testLedgerId = ledgerId;
+    await createTestUserWithLedger(db, undefined, "API Test Ledger", TEST_USER_ID);
   });
 
   it("should create and list service credentials via Actions", async () => {
     // Create Credential - returns data with one-time token
     const createRes = await createServiceCredentialAction({
       name: "Test Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
+      bookId: await testBookId(getTestDb()),
     });
 
     expect(createRes).toBeDefined();
@@ -112,7 +104,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     expect(computeHash(createRes.token)).toBe(stored?.tokenHash);
 
     // List Credentials
-    const listRes = await listServiceCredentials(testLedgerId);
+    const listRes = await listServiceCredentials();
     const listedCredential = requireFirst(listRes, "service credential");
 
     expect(listRes).toHaveLength(1);
@@ -129,7 +121,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     await expect(
       createServiceCredentialAction({
         name: "",
-        bookId: await testBookId(getTestDb(), testLedgerId),
+        bookId: await testBookId(getTestDb()),
       } as never)
     ).rejects.toThrow(ValidationError);
   });
@@ -148,10 +140,9 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const createdCredentials = await db
       .insert(serviceCredentials)
       .values({
-        ledgerId: testLedgerId,
         name: "Ingest Credential",
         tokenHash: hash,
-        bookId: await testBookId(db, testLedgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -177,8 +168,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
       where: eq(sourceDocuments.id, data.sourceDocumentId),
     });
     expect(doc).toBeDefined();
-    expect(doc?.ledgerId).toBe(testLedgerId);
-    expect(doc?.bookId).toBe(await testBookId(db, testLedgerId));
+    expect(doc?.bookId).toBe(await testBookId(db));
     const attempt = await db.query.extractionAttempts.findFirst({
       where: eq(extractionAttempts.sourceDocumentId, data.sourceDocumentId),
     });
@@ -208,10 +198,9 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const createdCredentials = await db
       .insert(serviceCredentials)
       .values({
-        ledgerId: testLedgerId,
         name: "Broken Body Credential",
         tokenHash: hash,
-        bookId: await testBookId(db, testLedgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -243,10 +232,9 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const createdCredentials = await db
       .insert(serviceCredentials)
       .values({
-        ledgerId: testLedgerId,
         name: "Timezone Credential",
         tokenHash: hash,
-        bookId: await testBookId(db, testLedgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -287,14 +275,10 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     // The ledger keeps one zone for every book; UTC+14 is a day ahead of the
     // default zone for ten hours of each day, which is when this would catch a
     // regression back to a per-book or server zone.
-    await db
-      .update(ledgers)
-      .set({ timeZone: "Pacific/Kiritimati" })
-      .where(eq(ledgers.id, testLedgerId));
+    await db.update(ledgers).set({ timeZone: "Pacific/Kiritimati" });
     const zonedBookId = crypto.randomUUID();
     await db.insert(books).values({
       id: zonedBookId,
-      ledgerId: testLedgerId,
       name: "Zoned",
       sortOrder: 9,
     });
@@ -302,7 +286,6 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const createdCredentials = await db
       .insert(serviceCredentials)
       .values({
-        ledgerId: testLedgerId,
         name: "Zoned Credential",
         tokenHash: computeHash(knownToken),
         bookId: zonedBookId,
@@ -337,7 +320,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     // Create credential via action to get proper hash
     const createRes = await createServiceCredentialAction({
       name: "Delete Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
+      bookId: await testBookId(getTestDb()),
     });
 
     // deleteServiceCredentialAction returns void
@@ -354,7 +337,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const db = getTestDb();
     const credential = await createServiceCredentialAction({
       name: "Lifecycle Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
+      bookId: await testBookId(getTestDb()),
     });
     const image = await validJpegBase64();
     const firstResponse = await ledgerEntryPOST(
@@ -394,7 +377,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     const db = getTestDb();
     const credential = await createServiceCredentialAction({
       name: "Throttle Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
+      bookId: await testBookId(getTestDb()),
     });
     const image = await validJpegBase64();
     const post = () =>
@@ -441,7 +424,7 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
     // Create a credential via action to get proper hash-based credential
     const created = await createServiceCredentialAction({
       name: "New Credential",
-      bookId: await testBookId(getTestDb(), testLedgerId),
+      bookId: await testBookId(getTestDb()),
     });
 
     // Get settings via getLedgerSettingsAction

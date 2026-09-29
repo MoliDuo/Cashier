@@ -25,10 +25,9 @@ import {
 import { getCategoryAssignmentJob } from "@/server/category-assignment/jobs";
 
 async function validateMode(
-  ledgerId: string,
   mode: CategoryAssignmentMode
 ): Promise<CategoryAssignmentCandidateSnapshot[]> {
-  const categories = await listCategories(ledgerId);
+  const categories = await listCategories();
   const byId = new Map(categories.map((category) => [category.id, category]));
   const ids =
     mode.kind === "ai"
@@ -47,21 +46,19 @@ async function validateMode(
     : [];
 }
 
-async function loadJob(ledgerId: string, jobId: string): Promise<CategoryAssignmentJobDto> {
-  const job = await getCategoryAssignmentJob({ ledgerId, jobId });
+async function loadJob(jobId: string): Promise<CategoryAssignmentJobDto> {
+  const job = await getCategoryAssignmentJob({ jobId });
   if (job == null) throw new ValidationError("Category assignment job was not found");
   return toCategoryAssignmentJobDto(job);
 }
 
 async function start(
-  ledgerId: string,
   input: StartCategoryAssignmentInput,
   retryOfJobId?: string
 ): Promise<CategoryAssignmentJobDto> {
-  const candidates = await validateMode(ledgerId, input.mode);
-  const settings = await getLedgerSettings(ledgerId);
+  const candidates = await validateMode(input.mode);
+  const settings = await getLedgerSettings();
   const job = await startCategoryAssignment({
-    ledgerId,
     requestKey: input.requestKey,
     mode: input.mode,
     ledgerEntryIds: input.ledgerEntryIds,
@@ -70,8 +67,8 @@ async function start(
     ...(retryOfJobId == null ? {} : { retryOfJobId }),
   });
   // The reply describes the job as it was submitted; the run starts after it.
-  const submitted = await loadJob(ledgerId, job.id);
-  scheduleCategoryAssignmentAfter(job.id, ledgerId);
+  const submitted = await loadJob(job.id);
+  scheduleCategoryAssignmentAfter(job.id);
   return submitted;
 }
 
@@ -80,40 +77,34 @@ async function start(
  * request key returns the run it started.
  */
 export const startCategoryAssignmentAction = withLedgerAccess(
-  async (ledgerId: string, input: StartCategoryAssignmentInput) =>
-    start(ledgerId, parseStartCategoryAssignmentInput(input))
+  async (input: StartCategoryAssignmentInput) => start(parseStartCategoryAssignmentInput(input))
 );
 
-export const cancelCategoryAssignmentAction = withLedgerAccess(
-  async (ledgerId: string, input: { jobId: string }) => {
-    const validated = parseCancelCategoryAssignmentInput(input);
-    await cancelCategoryAssignment({ ledgerId, jobId: validated.jobId });
-    return loadJob(ledgerId, validated.jobId);
-  }
-);
+export const cancelCategoryAssignmentAction = withLedgerAccess(async (input: { jobId: string }) => {
+  const validated = parseCancelCategoryAssignmentInput(input);
+  await cancelCategoryAssignment({ jobId: validated.jobId });
+  return loadJob(validated.jobId);
+});
 
 export const retryCategoryAssignmentFailuresAction = withLedgerAccess(
-  async (ledgerId: string, input: { jobId: string; requestKey: string }) => {
+  async (input: { jobId: string; requestKey: string }) => {
     const validated = parseRetryCategoryAssignmentInput(input);
     const retry = await retryCategoryAssignmentFailures({
-      ledgerId,
       ...validated,
     });
-    const submitted = await loadJob(ledgerId, retry.id);
-    scheduleCategoryAssignmentAfter(retry.id, ledgerId);
+    const submitted = await loadJob(retry.id);
+    scheduleCategoryAssignmentAfter(retry.id);
     return submitted;
   }
 );
 
 export const retryCategoryAssignmentLatestAction = withLedgerAccess(
-  async (ledgerId: string, input: { jobId: string; requestKey: string }) => {
+  async (input: { jobId: string; requestKey: string }) => {
     const validated = parseRetryCategoryAssignmentInput(input);
     const latest = await resolveLatestConflictSelection({
-      ledgerId,
       jobId: validated.jobId,
     });
     return start(
-      ledgerId,
       {
         requestKey: validated.requestKey,
         mode: latest.mode,

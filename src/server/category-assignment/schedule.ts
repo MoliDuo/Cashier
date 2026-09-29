@@ -2,8 +2,7 @@ import { after } from "next/server";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import {
-  drainDueCategoryAssignments,
-  recoverLedgerCategoryAssignments,
+  recoverCategoryAssignments,
   runCategoryAssignmentJob,
 } from "@/server/category-assignment/run";
 
@@ -15,15 +14,11 @@ import {
  * This is server-only utility code rather than a "use server" action: it is
  * invoked from within other server contexts, not from the client.
  */
-export function scheduleCategoryAssignmentAfter(jobId: string, ledgerId: string): void {
+export function scheduleCategoryAssignmentAfter(jobId: string): void {
   after(() =>
     runCategoryAssignmentJob(jobId).catch((error: unknown) => {
       logger.error(
-        {
-          error,
-          jobSubject: logIdentifier("processing-job", jobId),
-          ledgerSubject: logIdentifier("ledger", ledgerId),
-        },
+        { error, jobSubject: logIdentifier("processing-job", jobId) },
         "after() category assignment failed"
       );
     })
@@ -31,29 +26,23 @@ export function scheduleCategoryAssignmentAfter(jobId: string, ledgerId: string)
 }
 
 /**
- * Schedules a recovery pass for one ledger. Called from the status query the
- * client is already polling, so a run whose `after()` callback died (a
- * restarted process, a closed tab) is picked up on the next poll; the daily
+ * Schedules a recovery pass over due category work. Called from the status
+ * query the client is already polling, so a run whose `after()` callback died
+ * (a restarted process, a closed tab) is picked up on the next poll; the daily
  * cron drains whatever no poll picked up.
  */
-export function scheduleCategoryAssignmentRecoveryAfter(
-  ledgerId: string,
-  requestId?: string
-): void {
+export function scheduleCategoryAssignmentRecoveryAfter(requestId?: string): void {
   after(() =>
-    recoverLedgerCategoryAssignments(ledgerId).catch((error: unknown) => {
-      logger.error(
-        { error, ledgerSubject: logIdentifier("ledger", ledgerId), requestId },
-        "after() category assignment recovery failed"
-      );
+    recoverCategoryAssignments().catch((error: unknown) => {
+      logger.error({ error, requestId }, "after() category assignment recovery failed");
     })
   );
 }
 
-/** Schedules a pass over every ledger's due category work; the daily cron's backstop. */
+/** Schedules a pass over all due category work; the daily cron's backstop. */
 export function scheduleCategoryAssignmentDrainAfter(): void {
   after(() =>
-    drainDueCategoryAssignments().catch((error: unknown) => {
+    recoverCategoryAssignments().catch((error: unknown) => {
       logger.error({ error }, "after() category assignment drain failed");
     })
   );

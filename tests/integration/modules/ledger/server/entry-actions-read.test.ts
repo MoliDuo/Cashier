@@ -15,14 +15,13 @@ import {
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
 
-async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entryDate?: string) {
+async function seedDoc(db: ReturnType<typeof getTestDb>, entryDate?: string) {
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
       id: randomUUID(),
-      ledgerId,
       documentDate: entryDate ?? null,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   expect(doc).toBeDefined();
@@ -33,13 +32,9 @@ async function seedDoc(db: ReturnType<typeof getTestDb>, ledgerId: string, entry
   return doc;
 }
 
-async function getTargetLedgerEntriesAction(
-  ledgerId: string,
-  input: Parameters<typeof getLedgerEntriesAction>[0]
-) {
+async function getTargetLedgerEntriesAction(input: Parameters<typeof getLedgerEntriesAction>[0]) {
   const db = getTestDb();
   const documents = await db.query.sourceDocuments.findMany({
-    where: (documents, { eq }) => eq(documents.ledgerId, ledgerId),
     columns: { id: true },
   });
   for (const document of documents) {
@@ -49,25 +44,19 @@ async function getTargetLedgerEntriesAction(
 }
 
 describe("getLedgerEntriesAction", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
     const db = getTestDb();
-    ledgerId = randomUUID();
-    await db.insert(ledgers).values({
-      id: ledgerId,
-    });
-    await ensureTestLedgerBooks(db, ledgerId);
+    await db.insert(ledgers).values({});
+    await ensureTestLedgerBooks(db);
   });
 
   it("returns paginated entries", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
 
     for (let i = 0; i < 5; i++) {
       await db.insert(ledgerEntries).values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: `Item ${i}`,
         amount: "10.00",
@@ -75,7 +64,7 @@ describe("getLedgerEntriesAction", () => {
       });
     }
 
-    const result = await getTargetLedgerEntriesAction(ledgerId, { limit: 3 });
+    const result = await getTargetLedgerEntriesAction({ limit: 3 });
     expect(result.items).toHaveLength(3);
     expect(result.nextCursor).toBeDefined();
   });
@@ -86,14 +75,13 @@ describe("getLedgerEntriesAction", () => {
     const entriesByDoc: Array<{ a: string; b: string }> = [];
 
     for (let i = 0; i < 3; i++) {
-      const doc = await seedDoc(db, ledgerId, "2026-05-15");
+      const doc = await seedDoc(db, "2026-05-15");
       await db.update(sourceDocuments).set({ createdAt }).where(eq(sourceDocuments.id, doc.id));
       const [a, b] = await db
         .insert(ledgerEntries)
         .values([
           {
             id: randomUUID(),
-            ledgerId,
             sourceDocumentId: doc.id,
             itemName: `A-${i}`,
             amount: "10.00",
@@ -101,7 +89,6 @@ describe("getLedgerEntriesAction", () => {
           },
           {
             id: randomUUID(),
-            ledgerId,
             sourceDocumentId: doc.id,
             itemName: `B-${i}`,
             amount: "20.00",
@@ -118,7 +105,7 @@ describe("getLedgerEntriesAction", () => {
     const collected: string[] = [];
     let cursor: string | null | undefined;
     for (let pageNum = 0; pageNum < 10; pageNum++) {
-      const result = await getTargetLedgerEntriesAction(ledgerId, {
+      const result = await getTargetLedgerEntriesAction({
         cursor: cursor ?? undefined,
         limit: 2,
       });
@@ -140,11 +127,10 @@ describe("getLedgerEntriesAction", () => {
 
   it("rejects a cursor whose fingerprint does not match the query", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     await db.insert(ledgerEntries).values([
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "First",
         amount: "10.00",
@@ -152,7 +138,6 @@ describe("getLedgerEntriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Second",
         amount: "20.00",
@@ -160,7 +145,6 @@ describe("getLedgerEntriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Third",
         amount: "30.00",
@@ -168,14 +152,14 @@ describe("getLedgerEntriesAction", () => {
       },
     ]);
 
-    const firstPage = await getTargetLedgerEntriesAction(ledgerId, { limit: 2 });
+    const firstPage = await getTargetLedgerEntriesAction({ limit: 2 });
     expect(firstPage.nextCursor).toBeDefined();
     if (firstPage.nextCursor == null) {
       throw new Error("Expected a next cursor on the first page");
     }
 
     await expect(
-      getTargetLedgerEntriesAction(ledgerId, {
+      getTargetLedgerEntriesAction({
         cursor: firstPage.nextCursor,
         categoryId: randomUUID(),
       })
@@ -184,27 +168,26 @@ describe("getLedgerEntriesAction", () => {
 
   it("includes undated documents on their effective (UTC creation) date", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     await db
       .update(sourceDocuments)
       .set({ createdAt: new Date("2026-06-12T18:00:00.000Z") })
       .where(eq(sourceDocuments.id, doc.id));
     await db.insert(ledgerEntries).values({
       id: randomUUID(),
-      ledgerId,
       sourceDocumentId: doc.id,
       itemName: "Undated",
       amount: "10.00",
       currency: "CNY",
     });
 
-    const inRange = await getTargetLedgerEntriesAction(ledgerId, {
+    const inRange = await getTargetLedgerEntriesAction({
       startDate: "2026-06-12",
       endDate: "2026-06-12",
     });
     expect(inRange.items.map((item) => item.itemName)).toEqual(["Undated"]);
 
-    const outside = await getTargetLedgerEntriesAction(ledgerId, {
+    const outside = await getTargetLedgerEntriesAction({
       startDate: "2026-06-13",
     });
     expect(outside.items).toHaveLength(0);
@@ -215,16 +198,14 @@ describe("getLedgerEntriesAction", () => {
     const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
-      ledgerId,
       name: "餐饮",
       sortOrder: 1,
     });
 
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     await db.insert(ledgerEntries).values([
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Categorized",
         amount: "10.00",
@@ -233,7 +214,6 @@ describe("getLedgerEntriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Uncategorized",
         amount: "20.00",
@@ -241,7 +221,7 @@ describe("getLedgerEntriesAction", () => {
       },
     ]);
 
-    const result = await getTargetLedgerEntriesAction(ledgerId, { categoryId: catId });
+    const result = await getTargetLedgerEntriesAction({ categoryId: catId });
     expect(result.items).toHaveLength(1);
     const categorizedEntry = result.items[0];
     expect(categorizedEntry).toBeDefined();
@@ -253,18 +233,16 @@ describe("getLedgerEntriesAction", () => {
     const catId = randomUUID();
     await db.insert(entryCategories).values({
       id: catId,
-      ledgerId,
       name: "餐饮",
       sortOrder: 1,
     });
 
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
 
     const [categorizedEntry] = await db
       .insert(ledgerEntries)
       .values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Categorized",
         amount: "10.00",
@@ -281,7 +259,6 @@ describe("getLedgerEntriesAction", () => {
       .insert(ledgerEntries)
       .values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Uncategorized",
         amount: "20.00",
@@ -293,7 +270,7 @@ describe("getLedgerEntriesAction", () => {
       throw new Error("Expected ledger entry insert to return a row");
     }
 
-    const result = await getTargetLedgerEntriesAction(ledgerId, {
+    const result = await getTargetLedgerEntriesAction({
       categoryId: UNCATEGORIZED_SENTINEL,
     });
 
@@ -303,11 +280,10 @@ describe("getLedgerEntriesAction", () => {
 
   it("filters by currency", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     await db.insert(ledgerEntries).values([
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "CNY item",
         amount: "10.00",
@@ -315,7 +291,6 @@ describe("getLedgerEntriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "USD item",
         amount: "20.00",
@@ -323,7 +298,7 @@ describe("getLedgerEntriesAction", () => {
       },
     ]);
 
-    const result = await getTargetLedgerEntriesAction(ledgerId, { currency: "USD" });
+    const result = await getTargetLedgerEntriesAction({ currency: "USD" });
     expect(result.items).toHaveLength(1);
     const usdEntry = result.items[0];
     expect(usdEntry).toBeDefined();
@@ -332,9 +307,9 @@ describe("getLedgerEntriesAction", () => {
 
   it("filters by date range via sourceDocument.entryDate", async () => {
     const db = getTestDb();
-    const doc1 = await seedDoc(db, ledgerId, "2024-01-01");
-    const doc2 = await seedDoc(db, ledgerId, "2024-06-01");
-    const doc3 = await seedDoc(db, ledgerId, "2024-12-01");
+    const doc1 = await seedDoc(db, "2024-01-01");
+    const doc2 = await seedDoc(db, "2024-06-01");
+    const doc3 = await seedDoc(db, "2024-12-01");
 
     for (const [doc, name] of [
       [doc1, "Jan"],
@@ -343,7 +318,6 @@ describe("getLedgerEntriesAction", () => {
     ] as const) {
       await db.insert(ledgerEntries).values({
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: name,
         amount: "10.00",
@@ -351,7 +325,7 @@ describe("getLedgerEntriesAction", () => {
       });
     }
 
-    const result = await getTargetLedgerEntriesAction(ledgerId, {
+    const result = await getTargetLedgerEntriesAction({
       startDate: "2024-02-01",
       endDate: "2024-11-01",
     });
@@ -369,10 +343,9 @@ describe("getLedgerEntriesAction", () => {
       .insert(sourceDocuments)
       .values({
         id: randomUUID(),
-        ledgerId,
         documentDate: "2024-01-15",
         createdAt: new Date("2024-03-01"),
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(docA).toBeDefined();
@@ -385,10 +358,9 @@ describe("getLedgerEntriesAction", () => {
       .insert(sourceDocuments)
       .values({
         id: randomUUID(),
-        ledgerId,
         documentDate: "2024-03-15",
         createdAt: new Date("2024-01-01"),
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     expect(docB).toBeDefined();
@@ -398,7 +370,6 @@ describe("getLedgerEntriesAction", () => {
 
     await db.insert(ledgerEntries).values({
       id: randomUUID(),
-      ledgerId,
       sourceDocumentId: docA.id,
       itemName: "Jan Item",
       amount: "10.00",
@@ -407,7 +378,6 @@ describe("getLedgerEntriesAction", () => {
 
     await db.insert(ledgerEntries).values({
       id: randomUUID(),
-      ledgerId,
       sourceDocumentId: docB.id,
       itemName: "Mar Item",
       amount: "10.00",
@@ -415,7 +385,7 @@ describe("getLedgerEntriesAction", () => {
     });
 
     // Filter for January 2024
-    const result = await getTargetLedgerEntriesAction(ledgerId, {
+    const result = await getTargetLedgerEntriesAction({
       startDate: "2024-01-01",
       endDate: "2024-01-31",
     });
@@ -429,11 +399,10 @@ describe("getLedgerEntriesAction", () => {
 
   it("filters by minAmount and maxAmount", async () => {
     const db = getTestDb();
-    const doc = await seedDoc(db, ledgerId);
+    const doc = await seedDoc(db);
     await db.insert(ledgerEntries).values([
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Cheap",
         amount: "10.00",
@@ -441,7 +410,6 @@ describe("getLedgerEntriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Mid",
         amount: "50.00",
@@ -449,7 +417,6 @@ describe("getLedgerEntriesAction", () => {
       },
       {
         id: randomUUID(),
-        ledgerId,
         sourceDocumentId: doc.id,
         itemName: "Expensive",
         amount: "200.00",
@@ -457,7 +424,7 @@ describe("getLedgerEntriesAction", () => {
       },
     ]);
 
-    const result = await getTargetLedgerEntriesAction(ledgerId, {
+    const result = await getTargetLedgerEntriesAction({
       minAmount: "20",
       maxAmount: "100",
     });
@@ -471,11 +438,10 @@ describe("getLedgerEntriesAction", () => {
     const db = getTestDb();
     // 1 USD is 7.2 / 1.1 = 6.545… CNY on this day; the earlier day has no rate.
     await insertExchangeRates("2024-01-15", { USD: "1.1", CNY: "7.2" });
-    const ratedDoc = await seedDoc(db, ledgerId, "2024-01-15");
-    const unratedDoc = await seedDoc(db, ledgerId, "2023-06-01");
+    const ratedDoc = await seedDoc(db, "2024-01-15");
+    const unratedDoc = await seedDoc(db, "2023-06-01");
     const entry = (sourceDocumentId: string, itemName: string, amount: string) => ({
       id: randomUUID(),
-      ledgerId,
       sourceDocumentId,
       itemName,
       amount,
@@ -490,7 +456,7 @@ describe("getLedgerEntriesAction", () => {
       ]);
     const bounds = { minAmount: "20", maxAmount: "100" };
 
-    const listed = await getTargetLedgerEntriesAction(ledgerId, bounds);
+    const listed = await getTargetLedgerEntriesAction(bounds);
     const totals = await getLedgerStatsAction(bounds);
 
     expect(listed.items.map((item) => item.itemName)).toEqual(["Within"]);
@@ -506,11 +472,10 @@ describe("getLedgerEntriesAction", () => {
   it("lists exactly the entries the totals count for the same filtered window", async () => {
     const db = getTestDb();
     const catId = randomUUID();
-    await db.insert(entryCategories).values({ id: catId, ledgerId, name: "餐饮", sortOrder: 1 });
-    const doc = await seedDoc(db, ledgerId, "2026-03-10");
+    await db.insert(entryCategories).values({ id: catId, name: "餐饮", sortOrder: 1 });
+    const doc = await seedDoc(db, "2026-03-10");
     const entry = (itemName: string, amount: string, currency = "CNY", categoryId?: string) => ({
       id: randomUUID(),
-      ledgerId,
       sourceDocumentId: doc.id,
       itemName,
       amount,
@@ -539,7 +504,7 @@ describe("getLedgerEntriesAction", () => {
       search: "  coffee  ",
     };
 
-    const listed = await getTargetLedgerEntriesAction(ledgerId, { ...window, limit: 20 });
+    const listed = await getTargetLedgerEntriesAction({ ...window, limit: 20 });
     const totals = await getLedgerStatsAction(window);
 
     expect(listed.items.map((item) => item.id)).toEqual([beans!.id]);

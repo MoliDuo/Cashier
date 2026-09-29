@@ -6,9 +6,8 @@ import { previewSourceDocumentDateImpact } from "@/modules/workspace/server/sour
 import { sourceDocumentIdsSchema } from "@/modules/source-document/contract-schemas";
 
 export const previewSourceDocumentDateImpactAction = withLedgerAccess(
-  async (ledgerId: string, input: { sourceDocumentIds: string[]; ledgerEntryIds: string[] }) =>
+  async (input: { sourceDocumentIds: string[]; ledgerEntryIds: string[] }) =>
     previewSourceDocumentDateImpact({
-      ledgerId,
       sourceDocumentIds: sourceDocumentIdsSchema.parse(input.sourceDocumentIds),
       // A selection of documents without entries has no entry ids, and still moves.
       ledgerEntryIds:

@@ -14,9 +14,8 @@ import {
 } from "tests/helpers/schema-setup";
 import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
 
-const findVisibleEntry = async (id: string, ledgerId: string) => {
+const findVisibleEntry = async (id: string) => {
   const page = await listLedgerEntryPage({
-    ledgerId,
     limit: 100,
     filters: {},
   });
@@ -29,33 +28,14 @@ describe("visible ledger entries", () => {
   });
 
   it("returns null when the entry does not exist", async () => {
-    await expect(findVisibleEntry(crypto.randomUUID(), crypto.randomUUID())).resolves.toBeNull();
-  });
-
-  it("returns null when entry exists but belongs to a different ledger", async () => {
-    const db = getTestDb();
-    const ledger = createLedgerData();
-    const sourceDocument = createSourceDocumentData(ledger.id);
-    const entry = createLedgerEntryData(ledger.id, { sourceDocumentId: sourceDocument.id });
-
-    await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
-    await db.insert(sourceDocuments).values({
-      ...sourceDocument,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${sourceDocument.ledgerId} ORDER BY sort_order LIMIT 1)`,
-    });
-    await db.insert(ledgerEntries).values(entry);
-    await activateTestSourceDocumentProjection(db, sourceDocument.id);
-
-    // pass a different ledgerId — should return null, not throw
-    await expect(findVisibleEntry(entry.id, crypto.randomUUID())).resolves.toBeNull();
+    await expect(findVisibleEntry(crypto.randomUUID())).resolves.toBeNull();
   });
 
   it("returns detail while stripping heavy source-document fields", async () => {
     const db = getTestDb();
     const ledger = createLedgerData();
-    const category = createCategoryData(ledger.id);
-    const sourceDocument = createSourceDocumentData(ledger.id, {
+    const category = createCategoryData();
+    const sourceDocument = createSourceDocumentData({
       imageUrls: ["https://example.com/a.png", "https://example.com/b.png"],
       metadata: {
         note: "keep-me",
@@ -63,24 +43,24 @@ describe("visible ledger entries", () => {
         originalImageUrls: ["https://example.com/original.png"],
       },
     });
-    const entry = createLedgerEntryData(ledger.id, {
+    const entry = createLedgerEntryData({
       categoryId: category.id,
       sourceDocumentId: sourceDocument.id,
     });
 
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values(category);
     await db.insert(sourceDocuments).values({
       ...sourceDocument,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${sourceDocument.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values(entry);
     await activateTestSourceDocumentProjection(db, sourceDocument.id, {
       imageUrls: ["https://example.com/a.png", "https://example.com/b.png"],
     });
 
-    const result = await findVisibleEntry(entry.id, ledger.id);
+    const result = await findVisibleEntry(entry.id);
 
     expect(result).not.toBeNull();
     expect(result?.id).toBe(entry.id);

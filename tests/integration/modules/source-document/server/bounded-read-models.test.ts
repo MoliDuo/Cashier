@@ -27,7 +27,6 @@ const SOURCE_LIST_KEYS = [
   "hasImages",
   "id",
   "ledgerEntries",
-  "ledgerId",
   "processingStatus",
   "supportedActions",
   "text",
@@ -108,18 +107,17 @@ const LEDGER_LIST_KEYS = [
   "exchangeRate",
   "id",
   "itemName",
-  "ledgerId",
   "sourceDocument",
   "sourceDocumentId",
   "updatedAt",
 ];
 
-async function collectSourceDocumentPages(ledgerId: string, limit: number) {
+async function collectSourceDocumentPages(limit: number) {
   const items = [];
   let cursor: string | null = null;
   const pageSizes: number[] = [];
   do {
-    const page = await listStreamPage(ledgerId, { limit, cursor });
+    const page = await listStreamPage({ limit, cursor });
     items.push(...page.items);
     pageSizes.push(page.items.length);
     cursor = page.nextCursor;
@@ -127,12 +125,12 @@ async function collectSourceDocumentPages(ledgerId: string, limit: number) {
   return { items, pageSizes };
 }
 
-async function collectLedgerEntryPages(ledgerId: string, limit: number) {
+async function collectLedgerEntryPages(limit: number) {
   const items = [];
   let cursor: string | null = null;
   const pageSizes: number[] = [];
   do {
-    const page = await listLedgerEntries(ledgerId, { limit, cursor: cursor ?? undefined });
+    const page = await listLedgerEntries({ limit, cursor: cursor ?? undefined });
     items.push(...page.items);
     pageSizes.push(page.items.length);
     cursor = page.nextCursor;
@@ -143,17 +141,15 @@ async function collectLedgerEntryPages(ledgerId: string, limit: number) {
 describe("bounded target read models", () => {
   it("keeps source-document list and detail reads within fixed query budgets", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const [document] = await db
       .insert(sourceDocuments)
       .values({
-        ledgerId,
         documentDate: "2026-09-03",
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       })
       .returning();
     await db.insert(ledgerEntries).values({
-      ledgerId,
       sourceDocumentId: document!.id,
       amount: "12.00",
       currency: "CNY",
@@ -170,15 +166,15 @@ describe("bounded target read models", () => {
         .filter((statement) => /^(select|with)\b/.test(statement))
         .filter((statement, index, normalized) => statement !== normalized[index - 1]);
     const capture = await captureSqlStatements(async (getStatements) => {
-      const list = await listTargetSourceDocuments({ ledgerId, limit: 20 });
+      const list = await listTargetSourceDocuments({ limit: 20 });
       const afterList = readStatements(getStatements()).length;
-      const detail = await getTargetSourceDocument(ledgerId, document!.id);
+      const detail = await getTargetSourceDocument(document!.id);
       const afterDetail = readStatements(getStatements()).length;
-      const evidence = await getSourceDocumentInput(ledgerId, document!.id);
+      const evidence = await getSourceDocumentInput(document!.id);
       const afterEvidence = readStatements(getStatements()).length;
-      await listStreamPage(ledgerId, { limit: 20 });
+      await listStreamPage({ limit: 20 });
       const afterStream = readStatements(getStatements()).length;
-      const ledgerPage = await listLedgerEntries(ledgerId, { limit: 20 });
+      const ledgerPage = await listLedgerEntries({ limit: 20 });
       const afterLedgerPage = readStatements(getStatements()).length;
       return {
         list,
@@ -210,12 +206,11 @@ describe("bounded target read models", () => {
 
   it.each([1, 3])("checks ownership for %i stored files with one select", async (fileCount) => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const files = await db
       .insert(storedFiles)
       .values(
         Array.from({ length: fileCount }, (_, index) => ({
-          ledgerId,
           storageKey: `bounded-ownership/${fileCount}/${index}`,
           contentType: "image/jpeg",
           byteSize: 1,
@@ -226,13 +221,12 @@ describe("bounded target read models", () => {
 
     const capture = await captureSqlStatements(async () =>
       createPendingAttempt({
-        ledgerId,
         input: {
           text: null,
           storedFileIds: files.map((file) => file.id),
           documentDate: null,
         },
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
       })
     );
     const ownershipSelects = capture.statements
@@ -245,7 +239,7 @@ describe("bounded target read models", () => {
 
   it("paginates a large source-document history with a bounded list DTO", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const historySize = 31;
     const sensitiveText = "full-source-text-that-must-not-enter-history";
     const sensitiveUrl = "/api/uploads/private/history-receipt.jpg";
@@ -256,14 +250,11 @@ describe("bounded target read models", () => {
       .insert(sourceDocuments)
       .values(
         Array.from({ length: historySize }, (_, index) => ({
-          ledgerId,
           title: `Receipt ${index}`,
           documentDate: "2026-07-15",
           createdAt,
           updatedAt: createdAt,
-        })).map((row) => ({
-          ...row,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${row.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         }))
       )
       .returning();
@@ -274,8 +265,8 @@ describe("bounded target read models", () => {
       });
     }
 
-    const firstPage = await listStreamPage(ledgerId, { limit: 7 });
-    const history = await collectSourceDocumentPages(ledgerId, 7);
+    const firstPage = await listStreamPage({ limit: 7 });
+    const history = await collectSourceDocumentPages(7);
     const serialized = JSON.stringify(firstPage);
 
     expect(history.items).toHaveLength(historySize);
@@ -295,7 +286,7 @@ describe("bounded target read models", () => {
       expect(serialized).not.toContain(forbidden);
     }
 
-    const detail = (await getSourceDocumentInput(ledgerId, documents[0]!.id))!;
+    const detail = (await getSourceDocumentInput(documents[0]!.id))!;
     expect(Object.keys(detail).sort()).toEqual(
       ["createdAt", "documentDate", "files", "id", "processingStatus", "text"].sort()
     );
@@ -315,7 +306,7 @@ describe("bounded target read models", () => {
 
   it("paginates a large ledger history without leaking source evidence or internal attempts", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const historySize = 31;
     const sensitiveText = "full-ledger-source-text-that-must-not-enter-list";
     const sensitiveUrl = "/api/uploads/private/ledger-receipt.jpg";
@@ -323,7 +314,6 @@ describe("bounded target read models", () => {
     const storageKey = "private/ledger-receipt.jpg";
     const createdAt = "2026-07-15T08:00:00.000Z";
     const created = await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Large receipt",
       inputText: sensitiveText,
       entryDate: "2026-07-15",
@@ -336,10 +326,10 @@ describe("bounded target read models", () => {
         description: null,
         createdAt,
       })),
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
-    const firstPage = await listLedgerEntries(ledgerId, { limit: 7 });
-    const history = await collectLedgerEntryPages(ledgerId, 7);
+    const firstPage = await listLedgerEntries({ limit: 7 });
+    const history = await collectLedgerEntryPages(7);
     const serialized = JSON.stringify(firstPage);
 
     expect(history.items).toHaveLength(historySize);

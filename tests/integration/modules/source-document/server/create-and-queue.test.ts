@@ -10,7 +10,6 @@ const objectStore = vi.hoisted(() => ({ current: undefined as MemoryObjectStore 
 vi.mock("@/lib/storage/s3", () => ({ getS3Storage: () => objectStore.current }));
 
 describe("createAndQueueSourceDocument", () => {
-  let ledgerId = "";
   let storage: MemoryObjectStore;
 
   async function inlineImage() {
@@ -27,15 +26,14 @@ describe("createAndQueueSourceDocument", () => {
     objectStore.current = storage;
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
+    await createTestUserWithLedger(db);
   });
 
   it("stores inline images once and files them with the new document", async () => {
     const db = getTestDb();
 
     const created = await createAndQueueSourceDocument({
-      ledgerId,
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
       timeZone: "Asia/Shanghai",
       input: { kind: "inline", images: [await inlineImage()] },
     });
@@ -53,7 +51,6 @@ describe("createAndQueueSourceDocument", () => {
     // images were already stored.
     await expect(
       createAndQueueSourceDocument({
-        ledgerId,
         bookId: crypto.randomUUID(),
         timeZone: "Asia/Shanghai",
         input: { kind: "inline", images: [await inlineImage()] },

@@ -11,7 +11,6 @@ import {
 } from "tests/helpers/schema-setup";
 
 describe("Batch Update Ledger Entries Action", () => {
-  let testLedgerId: string;
   let testEntryIds: string[];
   let testCategoryId: string;
   let testSourceDocId: string;
@@ -20,12 +19,11 @@ describe("Batch Update Ledger Entries Action", () => {
     const db = getTestDb();
 
     await db.delete(ledgers);
-    const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
-    testLedgerId = ledgerId;
+    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
 
     const [category] = await db
       .insert(entryCategories)
-      .values({ ledgerId: testLedgerId, name: "Dining", sortOrder: 1 })
+      .values({ name: "Dining", sortOrder: 1 })
       .returning();
     expect(category).toBeDefined();
     if (category == null) {
@@ -34,13 +32,12 @@ describe("Batch Update Ledger Entries Action", () => {
     testCategoryId = category.id;
 
     // Create a test source document for entries
-    testSourceDocId = await createTestSourceDocument(db, testLedgerId);
+    testSourceDocId = await createTestSourceDocument(db);
 
     const entries = await db
       .insert(ledgerEntries)
       .values([
         {
-          ledgerId: testLedgerId,
           sourceDocumentId: testSourceDocId,
           amount: "100",
           currency: "CNY",
@@ -48,7 +45,6 @@ describe("Batch Update Ledger Entries Action", () => {
           description: "Initial description 1",
         },
         {
-          ledgerId: testLedgerId,
           sourceDocumentId: testSourceDocId,
           amount: "200",
           currency: "CNY",

@@ -14,8 +14,8 @@ import {
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
-async function convertedAmountsById(ledgerId: string) {
-  const page = await listStreamPage(ledgerId, { limit: 20 });
+async function convertedAmountsById() {
+  const page = await listStreamPage({ limit: 20 });
   return new Map(
     page.items.flatMap((item) =>
       (item.ledgerEntries ?? []).map((entry) => [entry.id, entry.convertedAmount] as const)
@@ -42,23 +42,22 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledger = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
-      await ensureTestLedgerBooks(db, ledger.id);
+      await ensureTestLedgerBooks(db);
       await insertExchangeRates("2024-03-14", { USD: "1.15", MYR: "5" });
       await insertExchangeRates("2024-03-15", { USD: "1.2", MYR: "5" });
       const documents = ["2024-03-14", "2024-03-15"].map((documentDate) =>
-        createSourceDocumentData(ledger.id, { status: "completed", documentDate })
+        createSourceDocumentData({ status: "completed", documentDate })
       );
       await db.insert(sourceDocuments).values(
         documents.map((document) => ({
           ...document,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         }))
       );
       const ids = documents.map(() => crypto.randomUUID());
       for (const [index, document] of documents.entries()) {
         await db.insert(ledgerEntries).values({
           id: ids[index]!,
-          ledgerId: ledger.id,
           sourceDocumentId: document.id,
           amount: "100",
           currency: "MYR",
@@ -66,7 +65,7 @@ describe("Source Document Update Actions", () => {
         });
         await activateTestSourceDocumentProjection(db, document.id);
       }
-      expect(await convertedAmountsById(ledger.id)).toEqual(
+      expect(await convertedAmountsById()).toEqual(
         new Map([
           [ids[0]!, "23.00"],
           [ids[1]!, "24.00"],
@@ -78,7 +77,7 @@ describe("Source Document Update Actions", () => {
         data: { documentDate: "2024-03-15", title: "Updated title" },
       });
 
-      expect(await convertedAmountsById(ledger.id)).toEqual(
+      expect(await convertedAmountsById()).toEqual(
         new Map([
           [ids[0]!, "24.00"],
           [ids[1]!, "24.00"],
@@ -89,14 +88,14 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledger = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledger);
-      await ensureTestLedgerBooks(db, ledger.id);
-      const document = createSourceDocumentData(ledger.id, {
+      await ensureTestLedgerBooks(db);
+      const document = createSourceDocumentData({
         status: "completed",
         documentDate: "2024-03-14",
       });
       await db.insert(sourceDocuments).values({
         ...document,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       });
       await activateTestSourceDocumentProjection(db, document.id);
       const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -117,19 +116,19 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
-      await ensureTestLedgerBooks(db, ledgerData.id);
+      await ensureTestLedgerBooks(db);
 
       // Create multiple documents
-      const docData1 = createSourceDocumentData(ledgerData.id);
-      const docData2 = createSourceDocumentData(ledgerData.id);
+      const docData1 = createSourceDocumentData();
+      const docData2 = createSourceDocumentData();
       await db.insert(sourceDocuments).values([
         {
           ...docData1,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData1.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
           ...docData2,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData2.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
       ]);
       await activateTestSourceDocumentProjection(db, docData1.id);
@@ -157,19 +156,18 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData({ mainCurrency: "USD" });
       await db.insert(ledgers).values(ledgerData);
-      await ensureTestLedgerBooks(db, ledgerData.id);
-      const document = createSourceDocumentData(ledgerData.id, {
+      await ensureTestLedgerBooks(db);
+      const document = createSourceDocumentData({
         status: "completed",
         documentDate: "2024-03-14",
       });
       await db.insert(sourceDocuments).values({
         ...document,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       });
       const entryId = crypto.randomUUID();
       await db.insert(ledgerEntries).values({
         id: entryId,
-        ledgerId: ledgerData.id,
         sourceDocumentId: document.id,
         amount: "100",
         currency: "CNY",
@@ -187,14 +185,14 @@ describe("Source Document Update Actions", () => {
         where: eq(sourceDocuments.id, document.id),
       });
       expect(updatedDocument?.documentDate).toBe("2024-03-15");
-      expect((await convertedAmountsById(ledgerData.id)).get(entryId)).toBe("10.00");
+      expect((await convertedAmountsById()).get(entryId)).toBe("10.00");
     });
 
     it("rejects an empty batch", async () => {
       const db = getTestDb();
       const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
-      await ensureTestLedgerBooks(db, ledgerData.id);
+      await ensureTestLedgerBooks(db);
 
       await expect(
         batchUpdateSourceDocumentsAction({
@@ -208,11 +206,11 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
-      await ensureTestLedgerBooks(db, ledgerData.id);
-      const docData = createSourceDocumentData(ledgerData.id, { title: "Same title" });
+      await ensureTestLedgerBooks(db);
+      const docData = createSourceDocumentData({ title: "Same title" });
       await db.insert(sourceDocuments).values({
         ...docData,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${docData.ledgerId} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       });
       await activateTestSourceDocumentProjection(db, docData.id);
 
@@ -232,17 +230,17 @@ describe("Source Document Update Actions", () => {
       const db = getTestDb();
       const ledgerData = createLedgerData();
       await db.insert(ledgers).values(ledgerData);
-      await ensureTestLedgerBooks(db, ledgerData.id);
-      const okDoc = createSourceDocumentData(ledgerData.id, { title: "Original A" });
-      const deletedDoc = createSourceDocumentData(ledgerData.id, { title: "Original B" });
+      await ensureTestLedgerBooks(db);
+      const okDoc = createSourceDocumentData({ title: "Original A" });
+      const deletedDoc = createSourceDocumentData({ title: "Original B" });
       await db.insert(sourceDocuments).values([
         {
           ...okDoc,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${okDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
         {
           ...deletedDoc,
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${deletedDoc.ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         },
       ]);
       await activateTestSourceDocumentProjection(db, okDoc.id);

@@ -14,14 +14,6 @@ import {
 } from "@/lib/db/transaction-locks";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 
-function whereSourceDocumentNotDeleted(ledgerId: string) {
-  return eq(sourceDocuments.ledgerId, ledgerId);
-}
-
-function whereSourceDocumentNotDeletedId(ledgerId: string, sourceDocumentId: string) {
-  return and(whereSourceDocumentNotDeleted(ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
-}
-
 export type AssignBookResult = { ok: true } | { ok: false; reason: "book_unavailable" };
 
 /**
@@ -30,37 +22,30 @@ export type AssignBookResult = { ok: true } | { ok: false; reason: "book_unavail
  * version as it is.
  */
 export async function assignSourceDocumentBook(input: {
-  ledgerId: string;
   sourceDocumentId: string;
   bookId: string;
 }): Promise<AssignBookResult> {
   return db.transaction(async (tx) => {
     // The ledger row is locked first, like every other aggregate command, so a
     // concurrent book edit and a concurrent processing write cannot interleave.
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
+    await lockLedgerForUpdate(tx);
+    const document = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
     if (document.bookId === input.bookId) return { ok: true as const };
     // Checked inside the transaction, not by the caller: a book archived while
     // the form sat open must not silently receive the record, and only here is
-    // the row known to still be live. The composite key would accept an
+    // the row known to still be live. The foreign key would accept an
     // archived book, so the archived check cannot be left to the database.
     const target = await tx
       .select({ id: books.id })
       .from(books)
-      .where(
-        and(
-          eq(books.id, input.bookId),
-          eq(books.ledgerId, input.ledgerId),
-          isNull(books.archivedAt)
-        )
-      )
+      .where(and(eq(books.id, input.bookId), isNull(books.archivedAt)))
       .limit(1)
       .then((rows) => rows[0]);
     if (target == null) return { ok: false as const, reason: "book_unavailable" as const };
     const [updated] = await tx
       .update(sourceDocuments)
       .set({ bookId: input.bookId, updatedAt: new Date() })
-      .where(whereSourceDocumentNotDeletedId(input.ledgerId, input.sourceDocumentId))
+      .where(eq(sourceDocuments.id, input.sourceDocumentId))
       .returning({ id: sourceDocuments.id });
     if (updated == null) throw new ConflictError("Source document changed during book edit");
     return { ok: true as const };
@@ -68,7 +53,6 @@ export async function assignSourceDocumentBook(input: {
 }
 
 interface BatchUpdateSourceDocumentsInput {
-  ledgerId: string;
   sourceDocumentIds: string[];
   data: BatchUpdateSourceDocumentsPayload;
   ledgerEntryIds?: string[];
@@ -81,24 +65,16 @@ type QueryExecutor = Pick<typeof db, "select">;
  * they move to `entryDate`. Best effort: the edit commits either way.
  */
 async function ensureRatesForDateChange(
-  ledgerId: string,
   sourceDocumentIds: readonly string[],
   entryDate: string
 ): Promise<void> {
   const foreign = await db
     .select({ id: ledgerEntries.id })
     .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId)
-      )
-    )
-    .innerJoin(ledgers, eq(ledgers.id, ledgerEntries.ledgerId))
+    .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+    .crossJoin(ledgers)
     .where(
       and(
-        eq(ledgerEntries.ledgerId, ledgerId),
         inArray(ledgerEntries.sourceDocumentId, [...sourceDocumentIds]),
         sql`${ledgerEntries.currency} <> ${ledgers.mainCurrency}`
       )
@@ -108,7 +84,6 @@ async function ensureRatesForDateChange(
 }
 
 export async function updateSourceDocuments({
-  ledgerId,
   sourceDocumentIds: requestedIds,
   data,
   ledgerEntryIds: selectedLedgerEntryIds,
@@ -123,7 +98,7 @@ export async function updateSourceDocuments({
       documentDate: sourceDocuments.documentDate,
     })
     .from(sourceDocuments)
-    .where(and(eq(sourceDocuments.ledgerId, ledgerId), inArray(sourceDocuments.id, requestedIds)))
+    .where(inArray(sourceDocuments.id, requestedIds))
     .orderBy(asc(sourceDocuments.id));
   if (initialDocuments.length !== requestedIds.length) {
     throw new ConflictError("Source document is not editable");
@@ -137,15 +112,15 @@ export async function updateSourceDocuments({
   );
   const dateChange = data.documentDate !== undefined && changedDateIds.size > 0;
   if (dateChange) {
-    await ensureRatesForDateChange(ledgerId, [...changedDateIds], data.documentDate!);
+    await ensureRatesForDateChange([...changedDateIds], data.documentDate!);
   }
 
   const transactionResult = await db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
+    await lockLedgerForUpdate(tx);
 
     let documents: LockedSourceDocument[];
     try {
-      documents = await lockSourceDocumentsForUpdate(tx, ledgerId, requestedIds);
+      documents = await lockSourceDocumentsForUpdate(tx, requestedIds);
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw new ConflictError("Source documents changed before the batch edit");
@@ -158,14 +133,8 @@ export async function updateSourceDocuments({
       const selected = await tx
         .select({ id: ledgerEntries.id, sourceDocumentId: ledgerEntries.sourceDocumentId })
         .from(ledgerEntries)
-        .innerJoin(
-          sourceDocuments,
-          and(
-            eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            eq(sourceDocuments.ledgerId, ledgerId)
-          )
-        )
-        .where(and(eq(ledgerEntries.ledgerId, ledgerId), inArray(ledgerEntries.id, selectedIds)));
+        .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+        .where(inArray(ledgerEntries.id, selectedIds));
       const selectedDocumentIds = [
         ...new Set(
           selected.flatMap((entry) =>
@@ -183,19 +152,8 @@ export async function updateSourceDocuments({
       const affected = await tx
         .select({ id: ledgerEntries.id })
         .from(ledgerEntries)
-        .innerJoin(
-          sourceDocuments,
-          and(
-            eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-            eq(sourceDocuments.ledgerId, ledgerId)
-          )
-        )
-        .where(
-          and(
-            eq(ledgerEntries.ledgerId, ledgerId),
-            inArray(ledgerEntries.sourceDocumentId, requestedIds)
-          )
-        );
+        .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+        .where(inArray(ledgerEntries.sourceDocumentId, requestedIds));
       impact = {
         selectedEntryCount: selected.length,
         sourceDocumentCount: requestedIds.length,
@@ -219,7 +177,7 @@ export async function updateSourceDocuments({
         throw new ConflictError("Source documents changed before the batch edit");
       }
 
-      const projectionEntries = await loadProjectionEntriesForDocuments(tx, ledgerId, requestedIds);
+      const projectionEntries = await loadProjectionEntriesForDocuments(tx, requestedIds);
       // Every requested document must be in a valid state for the batch to
       // commit — but only documents whose title or date actually changes get
       // a new attempt; a document already at the target date/title is a
@@ -235,7 +193,6 @@ export async function updateSourceDocuments({
         await replaceDocumentEntriesInTransaction(tx, {
           document,
           previousEntries: entries,
-          ledgerId,
           sourceDocumentId: document.id,
           entryDate: data.documentDate!,
           ...(data.title === undefined ? {} : { title: data.title }),
@@ -267,12 +224,9 @@ export async function updateSourceDocuments({
           updatedAt: new Date(),
         })
         .where(
-          and(
-            whereSourceDocumentNotDeleted(ledgerId),
-            inArray(
-              sourceDocuments.id,
-              changedDocuments.map((document) => document.id)
-            )
+          inArray(
+            sourceDocuments.id,
+            changedDocuments.map((document) => document.id)
           )
         )
         .returning({ id: sourceDocuments.id });
@@ -291,7 +245,6 @@ export async function updateSourceDocuments({
 }
 
 export async function updateLedgerEntryDates(input: {
-  ledgerId: string;
   sourceDocumentIds: string[];
   ledgerEntryIds: string[];
   entryDate: string;
@@ -300,14 +253,8 @@ export async function updateLedgerEntryDates(input: {
   const selected = await db
     .select({ id: ledgerEntries.id, sourceDocumentId: ledgerEntries.sourceDocumentId })
     .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId)
-      )
-    )
-    .where(and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, selectedIds)));
+    .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+    .where(inArray(ledgerEntries.id, selectedIds));
   if (selected.length !== selectedIds.length) throw new NotFoundError("Selected ledger entry");
   const sourceDocumentIds = [
     ...new Set(
@@ -322,7 +269,6 @@ export async function updateLedgerEntryDates(input: {
     throw new NotFoundError("Source document target");
   }
   const result = await updateSourceDocuments({
-    ledgerId: input.ledgerId,
     sourceDocumentIds: input.sourceDocumentIds,
     ledgerEntryIds: selectedIds,
     data: { documentDate: input.entryDate },
@@ -333,24 +279,12 @@ export async function updateLedgerEntryDates(input: {
 
 function loadProjectionEntriesForDocuments(
   executor: QueryExecutor,
-  ledgerId: string,
   sourceDocumentIds: readonly string[]
 ) {
   return executor
     .select(getTableColumns(ledgerEntries))
     .from(ledgerEntries)
-    .innerJoin(
-      sourceDocuments,
-      and(
-        eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, ledgerId)
-      )
-    )
-    .where(
-      and(
-        eq(ledgerEntries.ledgerId, ledgerId),
-        inArray(ledgerEntries.sourceDocumentId, [...sourceDocumentIds])
-      )
-    )
+    .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
+    .where(inArray(ledgerEntries.sourceDocumentId, [...sourceDocumentIds]))
     .orderBy(ledgerEntries.sourceDocumentId, ledgerEntries.position, ledgerEntries.id);
 }

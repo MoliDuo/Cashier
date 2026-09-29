@@ -18,16 +18,9 @@ import {
 } from "@/lib/db/transaction-locks";
 import { assertCategoryOwnership } from "./projections/shared";
 
-async function listProjectionEntries(
-  tx: PostgresTransaction,
-  ledgerId: string,
-  sourceDocumentId: string
-) {
+async function listProjectionEntries(tx: PostgresTransaction, sourceDocumentId: string) {
   return tx.query.ledgerEntries.findMany({
-    where: and(
-      eq(ledgerEntries.ledgerId, ledgerId),
-      eq(ledgerEntries.sourceDocumentId, sourceDocumentId)
-    ),
+    where: eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
     orderBy: (entries, { asc }) => [asc(entries.position), asc(entries.id)],
   });
 }
@@ -70,7 +63,6 @@ function changed(
  * written. Best effort: the entry saves either way.
  */
 async function prepareCreate(input: {
-  ledgerId: string;
   sourceDocumentId: string;
   currency?: string;
 }): Promise<void> {
@@ -80,16 +72,8 @@ async function prepareCreate(input: {
       effectiveDate: sourceDocuments.effectiveDate,
     })
     .from(sourceDocuments)
-    .innerJoin(
-      ledgers,
-      and(eq(ledgers.id, sourceDocuments.ledgerId), eq(ledgers.id, input.ledgerId))
-    )
-    .where(
-      and(
-        eq(sourceDocuments.id, input.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId)
-      )
-    )
+    .crossJoin(ledgers)
+    .where(eq(sourceDocuments.id, input.sourceDocumentId))
     .then((rows) => rows[0]);
   if (context == null) throw new NotFoundError("Source document");
   if (input.currency != null && input.currency !== context.mainCurrency) {
@@ -102,7 +86,6 @@ async function prepareCreate(input: {
  * changes, caches the rates the entries are read at.
  */
 async function prepareBatchUpdate(input: {
-  ledgerId: string;
   sourceDocumentIds: string[];
   ledgerEntryIds: string[];
   amount?: string;
@@ -122,17 +105,11 @@ async function prepareBatchUpdate(input: {
       sourceDocuments,
       and(
         eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-        eq(sourceDocuments.ledgerId, input.ledgerId),
         inArray(sourceDocuments.id, input.sourceDocumentIds)
       )
     )
-    .innerJoin(
-      ledgers,
-      and(eq(ledgers.id, sourceDocuments.ledgerId), eq(ledgers.id, input.ledgerId))
-    )
-    .where(
-      and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, requestedIds))
-    );
+    .crossJoin(ledgers)
+    .where(inArray(ledgerEntries.id, requestedIds));
   if (rows.length !== requestedIds.length) {
     throw new NotFoundError("Active ledger entry projection");
   }
@@ -149,7 +126,6 @@ async function prepareBatchUpdate(input: {
 }
 
 export interface AddLedgerEntryInput {
-  ledgerId: string;
   sourceDocumentId: string;
   amount: string;
   currency?: string;
@@ -159,7 +135,6 @@ export interface AddLedgerEntryInput {
 }
 
 export interface BatchUpdateLedgerEntriesInput {
-  ledgerId: string;
   sourceDocumentIds: string[];
   ledgerEntryIds: string[];
   categoryId?: string | null;
@@ -173,21 +148,19 @@ export async function addLedgerEntry(
   input: AddLedgerEntryInput
 ): Promise<{ ledgerEntryId: string }> {
   await prepareCreate({
-    ledgerId: input.ledgerId,
     sourceDocumentId: input.sourceDocumentId,
     ...(input.currency === undefined ? {} : { currency: input.currency }),
   });
   return db.transaction(async (tx) => {
-    const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
-    const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
-    await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
-    const entries = await listProjectionEntries(tx, input.ledgerId, document.id);
+    const ledger = await lockLedgerForUpdate(tx);
+    const document = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
+    await assertCategoryOwnership(tx, [{ categoryId: input.categoryId }]);
+    const entries = await listProjectionEntries(tx, document.id);
     const ledgerEntryId = crypto.randomUUID();
     const effectiveCurrency = input.currency ?? ledger.mainCurrency;
     await replaceDocumentEntriesInTransaction(tx, {
       document,
       previousEntries: entries,
-      ledgerId: input.ledgerId,
       sourceDocumentId: document.id,
       entries: [
         ...entries.map(toProjectionEntry),
@@ -206,21 +179,19 @@ export async function addLedgerEntry(
 }
 
 export async function deleteLedgerEntry(input: {
-  ledgerId: string;
   sourceDocumentId: string;
   ledgerEntryId: string;
 }): Promise<{ ledgerEntryId: string; deleted: true }> {
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
-    const entries = await listProjectionEntries(tx, input.ledgerId, document.id);
+    await lockLedgerForUpdate(tx);
+    const document = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
+    const entries = await listProjectionEntries(tx, document.id);
     if (!entries.some((entry) => entry.id === input.ledgerEntryId)) {
       throw new NotFoundError("Active ledger entry projection");
     }
     await replaceDocumentEntriesInTransaction(tx, {
       document,
       previousEntries: entries,
-      ledgerId: input.ledgerId,
       sourceDocumentId: document.id,
       entries: entries.filter((entry) => entry.id !== input.ledgerEntryId).map(toProjectionEntry),
     });
@@ -233,32 +204,19 @@ export async function batchUpdateLedgerEntries(
 ): Promise<{ ledgerEntryIds: string[]; affectedCount: number }> {
   await prepareBatchUpdate(input);
   return db.transaction(async (tx) => {
-    const ledger = await lockLedgerForUpdate(tx, input.ledgerId);
-    const documents = await lockSourceDocumentsForUpdate(
-      tx,
-      input.ledgerId,
-      input.sourceDocumentIds
-    );
-    await assertCategoryOwnership(tx, input.ledgerId, [{ categoryId: input.categoryId }]);
+    const ledger = await lockLedgerForUpdate(tx);
+    const documents = await lockSourceDocumentsForUpdate(tx, input.sourceDocumentIds);
+    await assertCategoryOwnership(tx, [{ categoryId: input.categoryId }]);
     const requestedIds = [...new Set(input.ledgerEntryIds)].sort();
     const requested = new Set(requestedIds);
     const activeEntries = await tx
       .select(getTableColumns(ledgerEntries))
       .from(ledgerEntries)
-      .innerJoin(
-        sourceDocuments,
-        and(
-          eq(sourceDocuments.id, ledgerEntries.sourceDocumentId),
-          eq(sourceDocuments.ledgerId, input.ledgerId)
-        )
-      )
+      .innerJoin(sourceDocuments, eq(sourceDocuments.id, ledgerEntries.sourceDocumentId))
       .where(
-        and(
-          eq(ledgerEntries.ledgerId, input.ledgerId),
-          inArray(
-            ledgerEntries.sourceDocumentId,
-            documents.map((document) => document.id)
-          )
+        inArray(
+          ledgerEntries.sourceDocumentId,
+          documents.map((document) => document.id)
         )
       )
       .orderBy(ledgerEntries.sourceDocumentId, ledgerEntries.position, ledgerEntries.id);
@@ -319,7 +277,6 @@ export async function batchUpdateLedgerEntries(
       await replaceDocumentEntriesInTransaction(tx, {
         document,
         previousEntries: entries,
-        ledgerId: input.ledgerId,
         sourceDocumentId: document.id,
         entries: entries.map((entry) => nextById.get(entry.id) ?? toProjectionEntry(entry)),
       });
@@ -329,7 +286,6 @@ export async function batchUpdateLedgerEntries(
 }
 
 export async function batchDeleteLedgerEntries(input: {
-  ledgerId: string;
   sourceDocumentIds: string[];
   ledgerEntryIds: string[];
 }): Promise<PartialBatchCommandResult> {
@@ -341,9 +297,7 @@ export async function batchDeleteLedgerEntries(input: {
       sourceDocumentId: ledgerEntries.sourceDocumentId,
     })
     .from(ledgerEntries)
-    .where(
-      and(eq(ledgerEntries.ledgerId, input.ledgerId), inArray(ledgerEntries.id, requestedIds))
-    );
+    .where(inArray(ledgerEntries.id, requestedIds));
   const ownershipById = new Map(ownership.map((row) => [row.id, row] as const));
   const groups = new Map<string, string[]>();
   for (const id of requestedIds) {
@@ -366,9 +320,9 @@ export async function batchDeleteLedgerEntries(input: {
     }
     try {
       await db.transaction(async (tx) => {
-        await lockLedgerForUpdate(tx, input.ledgerId);
-        const document = await lockSourceDocumentForUpdate(tx, input.ledgerId, sourceDocumentId);
-        const entries = await listProjectionEntries(tx, input.ledgerId, sourceDocumentId);
+        await lockLedgerForUpdate(tx);
+        const document = await lockSourceDocumentForUpdate(tx, sourceDocumentId);
+        const entries = await listProjectionEntries(tx, sourceDocumentId);
         const selected = new Set(entryIds);
         if (entryIds.some((id) => !entries.some((entry) => entry.id === id))) {
           throw new NotFoundError("Active ledger entry projection");
@@ -376,7 +330,6 @@ export async function batchDeleteLedgerEntries(input: {
         await replaceDocumentEntriesInTransaction(tx, {
           document,
           previousEntries: entries,
-          ledgerId: input.ledgerId,
           sourceDocumentId,
           entries: entries.filter((entry) => !selected.has(entry.id)).map(toProjectionEntry),
         });

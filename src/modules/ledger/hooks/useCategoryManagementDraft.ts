@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { EntryCategory, SaveEntryCategoriesInput } from "@/modules/ledger/contracts";
 import { computeCategoryCollectionRevision } from "@/modules/ledger/category-collection-revision";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
-import { useLedgerId } from "./useLedgerId";
 import {
   categoryDraftsEqual,
   editDraftEqual,
@@ -76,11 +75,8 @@ export function useCategoryManagementDraft({
   onReloadCategories,
   isSaving,
 }: UseCategoryManagementDraftOptions) {
-  const ledgerId = useLedgerId();
-  const key = ledgerId == null ? null : draftKey(ledgerId, "categories", "ledger");
-  const [restored] = useState(() =>
-    key == null ? null : (readDraft(key, parseStoredCategoryDraft)?.data ?? null)
-  );
+  const key = draftKey("categories", "ledger");
+  const [restored] = useState(() => readDraft(key, parseStoredCategoryDraft)?.data ?? null);
   const [restoredFromDraft, setRestoredFromDraft] = useState(restored != null);
   const [managing, setManaging] = useState(restored != null);
   const [serverDraft, setServerDraft] = useState<CategoryDraft[]>(restored?.base ?? []);
@@ -110,7 +106,6 @@ export function useCategoryManagementDraft({
   const revisionConflict = managing && (saveConflict || (serverMoved && hasCategoryDraft));
 
   useEffect(() => {
-    if (key == null) return;
     if (dirty) writeDraft(key, { base: serverDraft, order: draftOrder });
     else clearDraft(key);
   }, [dirty, draftOrder, key, serverDraft]);

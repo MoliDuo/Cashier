@@ -5,7 +5,6 @@ interface SourceDocumentPageCursor {
 }
 
 export interface SourceDocumentStreamCursor {
-  ledgerId: string;
   generation: string;
   filterHash: string;
   page: SourceDocumentPageCursor;
@@ -46,21 +45,19 @@ export function decodeSourceDocumentStreamCursor(
   cursor: string | null | undefined
 ): SourceDocumentStreamCursor | null {
   if (cursor == null || cursor === "") return null;
-  const [version, ledgerId, generation, filterHash, ...pageParts] = cursor.split("|");
+  const [version, generation, filterHash, ...pageParts] = cursor.split("|");
   if (
-    version !== "v3" ||
-    !ledgerId ||
+    version !== "v4" ||
     !/^\d+$/.test(generation ?? "") ||
     !/^[a-f0-9]{16}$/.test(filterHash ?? "")
   ) {
     return null;
   }
   const page = decodeSourceDocumentPageCursor(pageParts.join("|"));
-  return page == null ? null : { ledgerId, generation: generation!, filterHash: filterHash!, page };
+  return page == null ? null : { generation: generation!, filterHash: filterHash!, page };
 }
 
 export function encodeSourceDocumentStreamCursor(
-  ledgerId: string,
   generation: string,
   filterHash: string,
   pageCursor: string | null
@@ -68,5 +65,5 @@ export function encodeSourceDocumentStreamCursor(
   if (pageCursor == null) return null;
   const page = decodeSourceDocumentPageCursor(pageCursor);
   if (page == null) return null;
-  return `v3|${ledgerId}|${generation}|${filterHash}|${encodeSourceDocumentPageCursor(page)}`;
+  return `v4|${generation}|${filterHash}|${encodeSourceDocumentPageCursor(page)}`;
 }

@@ -5,6 +5,6 @@ import { withLedgerAccess } from "../access";
 import { generateEntryCategoryMetadata } from "../server/category-metadata";
 
 export const generateEntryCategoryMetadataAction = withLedgerAccess(
-  async (ledgerId: string, inputCategoryId: string) =>
-    generateEntryCategoryMetadata({ ledgerId, categoryId: parseEntryCategoryId(inputCategoryId) })
+  async (inputCategoryId: string) =>
+    generateEntryCategoryMetadata({ categoryId: parseEntryCategoryId(inputCategoryId) })
 );

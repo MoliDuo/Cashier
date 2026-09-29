@@ -19,7 +19,7 @@ describe("S3StorageProvider", () => {
       Body: { transformToWebStream: () => body, transformToByteArray },
     });
 
-    await expect(provider(send).stream("ledger/stored/file")).resolves.toBe(body);
+    await expect(provider(send).stream("stored/file")).resolves.toBe(body);
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
     expect(transformToByteArray).not.toHaveBeenCalled();
   });
@@ -35,10 +35,10 @@ describe("S3StorageProvider", () => {
     const storage = provider(send);
 
     await expect(
-      storage.upload("ledger/stored/file", Buffer.from([1, 2, 3]), "image/png")
+      storage.upload("stored/file", Buffer.from([1, 2, 3]), "image/png")
     ).resolves.toBeUndefined();
-    await expect(storage.download("ledger/stored/file")).resolves.toEqual(Buffer.from([1, 2, 3]));
-    await expect(storage.delete("ledger/stored/file")).resolves.toMatchObject({ success: true });
+    await expect(storage.download("stored/file")).resolves.toEqual(Buffer.from([1, 2, 3]));
+    await expect(storage.delete("stored/file")).resolves.toMatchObject({ success: true });
 
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(PutObjectCommand);
     expect(send.mock.calls[1]?.[0]).toBeInstanceOf(GetObjectCommand);
@@ -51,12 +51,12 @@ describe("S3StorageProvider", () => {
       $metadata: { httpStatusCode: 404 },
     });
     await expect(
-      provider(vi.fn().mockRejectedValue(missing)).download("ledger/stored/file")
+      provider(vi.fn().mockRejectedValue(missing)).download("stored/file")
     ).rejects.toMatchObject({ code: "FILE_NOT_FOUND", statusCode: 404 });
 
     await expect(
       provider(vi.fn().mockRejectedValue(new Error("network"))).upload(
-        "ledger/stored/file",
+        "stored/file",
         Buffer.from("x"),
         "image/jpeg"
       )
@@ -81,7 +81,7 @@ describe("S3StorageProvider", () => {
     );
 
     await expect(
-      storage.presignUpload("temporary/ledger/session/target", "image/png", "a".repeat(64), 900)
+      storage.presignUpload("temporary/target", "image/png", "a".repeat(64), 900)
     ).resolves.toEqual({
       url: "https://signed.example/upload",
       requiredHeaders: {
@@ -89,7 +89,7 @@ describe("S3StorageProvider", () => {
         "x-amz-meta-sha256": "a".repeat(64),
       },
     });
-    await expect(storage.readObject("temporary/ledger/session/target")).resolves.toEqual({
+    await expect(storage.readObject("temporary/target")).resolves.toEqual({
       bytes: Buffer.from([1, 2, 3]),
       metadata: {
         byteSize: 3,

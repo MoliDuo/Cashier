@@ -34,7 +34,6 @@ describe("entry-builder", () => {
       ],
       categories: [{ id: "cat-1", name: "Food", description: null }],
       sourceDocumentId: "doc-1",
-      ledgerId: "ledger-1",
       fallbackDate: "2026-03-20",
     });
 
@@ -65,7 +64,6 @@ describe("entry-builder", () => {
         { id: "cat-1", name: "Transport", description: null },
       ],
       sourceDocumentId: "doc-1",
-      ledgerId: "ledger-1",
       fallbackDate: "2026-03-20",
     });
 
@@ -103,7 +101,6 @@ describe("entry-builder", () => {
         { id: "cat-1", name: "Transport", description: null },
       ],
       sourceDocumentId: "doc-1",
-      ledgerId: "ledger-1",
       fallbackDate: "2026-03-20",
     });
 

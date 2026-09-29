@@ -11,7 +11,6 @@ import { mapStoredFileDto } from "./mappers";
 
 /** Read only the document's current input required to seed an edit-and-retry draft. */
 export async function getSourceDocumentInput(
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<SourceDocumentInputDto | null> {
   return db.transaction(
@@ -28,14 +27,11 @@ export async function getSourceDocumentInput(
         .leftJoin(
           extractionAttempts,
           and(
-            eq(extractionAttempts.ledgerId, sourceDocuments.ledgerId),
             eq(extractionAttempts.sourceDocumentId, sourceDocuments.id),
             eq(extractionAttempts.id, sourceDocuments.latestAttemptId)
           )
         )
-        .where(
-          and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))
-        )
+        .where(eq(sourceDocuments.id, sourceDocumentId))
         .limit(1)
         .then((rows) => rows[0]);
       if (document == null) return null;
@@ -48,19 +44,8 @@ export async function getSourceDocumentInput(
           originalFilename: storedFiles.originalFilename,
         })
         .from(sourceDocumentFiles)
-        .innerJoin(
-          storedFiles,
-          and(
-            eq(storedFiles.ledgerId, sourceDocumentFiles.ledgerId),
-            eq(storedFiles.id, sourceDocumentFiles.storedFileId)
-          )
-        )
-        .where(
-          and(
-            eq(sourceDocumentFiles.ledgerId, ledgerId),
-            eq(sourceDocumentFiles.sourceDocumentId, sourceDocumentId)
-          )
-        )
+        .innerJoin(storedFiles, eq(storedFiles.id, sourceDocumentFiles.storedFileId))
+        .where(eq(sourceDocumentFiles.sourceDocumentId, sourceDocumentId))
         .orderBy(asc(sourceDocumentFiles.position));
 
       return {

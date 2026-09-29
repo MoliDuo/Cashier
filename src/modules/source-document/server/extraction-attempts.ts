@@ -22,7 +22,6 @@ import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { replaceDocumentInput } from "./document-input";
 
 export type CreatePendingAttemptInput = {
-  ledgerId: string;
   input: {
     text: string | null;
     storedFileIds: readonly string[];
@@ -32,10 +31,6 @@ export type CreatePendingAttemptInput = {
   /** Recorded on a new document so a repeated create request finds it. */
   idempotency?: { source: string; key: string; fingerprint: string | null };
 } & ({ sourceDocumentId: string; bookId?: string } | { sourceDocumentId?: never; bookId: string });
-
-function activeDocumentWhere(ledgerId: string, sourceDocumentId: string) {
-  return and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId))!;
-}
 
 function mapAttempt(row: typeof extractionAttempts.$inferSelect): SourceDocumentAttemptContract {
   return {
@@ -53,7 +48,6 @@ function mapDocument(
 ): SourceDocumentContract {
   return {
     id: row.id,
-    ledgerId: row.ledgerId,
     version: row.version,
     latestAttemptId: row.latestAttemptId,
     supportedActions: deriveSourceDocumentCapabilities({
@@ -67,18 +61,18 @@ function mapDocument(
  * Insert the source document a new submission starts, under the locks that
  * make the ledger and the target book's liveness final for this transaction.
  *
- * The checks the caller already ran happened outside any lock, so an archive or
- * a ledger delete can commit between them and the insert. Lock the ledger first
- * and then the book — the documented ledger → book order — so the insert either
- * sees both live or refuses with its own error.
+ * The checks the caller already ran happened outside any lock, so an archive
+ * can commit between them and the insert. Lock the ledger first and then the
+ * book — the documented ledger → book order — so the insert either sees the
+ * book live or refuses with its own error.
  */
 async function insertNewSourceDocument(
   tx: PostgresTransaction,
   input: CreatePendingAttemptInput,
   sourceDocumentId: string
 ): Promise<typeof sourceDocuments.$inferSelect> {
-  await lockLedgerForUpdate(tx, input.ledgerId);
-  await lockBookForShare(tx, input.ledgerId, input.bookId!);
+  await lockLedgerForUpdate(tx);
+  await lockBookForShare(tx, input.bookId!);
   // The record carries its day from the start, so one still processing, or
   // one whose processing failed, never falls back to its UTC creation day.
   const documentDate =
@@ -87,14 +81,12 @@ async function insertNewSourceDocument(
       await tx
         .select({ timeZone: ledgers.timeZone })
         .from(ledgers)
-        .where(eq(ledgers.id, input.ledgerId))
         .then((rows) => rows[0]!.timeZone)
     );
   const rows = await tx
     .insert(sourceDocuments)
     .values({
       id: sourceDocumentId,
-      ledgerId: input.ledgerId,
       bookId: input.bookId!,
       documentDate,
       idempotencySource: input.idempotency?.source ?? null,
@@ -109,18 +101,11 @@ export async function createProcessingAttemptInTransaction(
   tx: PostgresTransaction,
   input: CreatePendingAttemptInput
 ): Promise<{ document: SourceDocumentContract; attempt: SourceDocumentAttemptContract }> {
-  const ledger = await tx
-    .select({ id: ledgers.id })
-    .from(ledgers)
-    .where(eq(ledgers.id, input.ledgerId))
-    .then((rows) => rows[0]);
-  if (ledger == null) throw new NotFoundError("Ledger");
-
   const sourceDocumentId = input.sourceDocumentId ?? crypto.randomUUID();
   const existingDocument = await tx
     .select()
     .from(sourceDocuments)
-    .where(activeDocumentWhere(input.ledgerId, sourceDocumentId))
+    .where(eq(sourceDocuments.id, sourceDocumentId))
     .then((rows) => rows[0]);
 
   if (existingDocument == null && input.sourceDocumentId != null) {
@@ -134,7 +119,7 @@ export async function createProcessingAttemptInTransaction(
   const document =
     existingDocument == null
       ? await insertNewSourceDocument(tx, input, sourceDocumentId)
-      : await lockSourceDocumentForUpdate(tx, input.ledgerId, sourceDocumentId);
+      : await lockSourceDocumentForUpdate(tx, sourceDocumentId);
 
   if (document.latestAttemptId != null) {
     const currentPending = await tx
@@ -142,7 +127,6 @@ export async function createProcessingAttemptInTransaction(
       .from(extractionAttempts)
       .where(
         and(
-          eq(extractionAttempts.ledgerId, input.ledgerId),
           eq(extractionAttempts.id, document.latestAttemptId),
           eq(extractionAttempts.sourceDocumentId, sourceDocumentId)
         )
@@ -159,7 +143,6 @@ export async function createProcessingAttemptInTransaction(
   const attempt = await tx
     .insert(extractionAttempts)
     .values({
-      ledgerId: input.ledgerId,
       sourceDocumentId,
       requestedDate: input.input.documentDate ?? document.documentDate,
       referenceDate: input.input.dateReference ?? input.input.documentDate,
@@ -179,13 +162,7 @@ export async function createProcessingAttemptInTransaction(
       : await tx
           .select({ id: storedFiles.id, byteSize: storedFiles.byteSize })
           .from(storedFiles)
-          .where(
-            and(
-              eq(storedFiles.ledgerId, input.ledgerId),
-              inArray(storedFiles.id, fileIds),
-              isNotNull(storedFiles.finalizedAt)
-            )
-          );
+          .where(and(inArray(storedFiles.id, fileIds), isNotNull(storedFiles.finalizedAt)));
   if (foundStoredFiles.length !== fileIds.length) throw new NotFoundError("Stored file");
   const storedFileById = new Map(foundStoredFiles.map((file) => [file.id, file]));
   const storedFileRows = fileIds.map((id) => storedFileById.get(id)!);
@@ -211,7 +188,7 @@ export async function createProcessingAttemptInTransaction(
       latestAttemptId: attempt.id,
       updatedAt: new Date(),
     })
-    .where(activeDocumentWhere(input.ledgerId, sourceDocumentId))
+    .where(eq(sourceDocuments.id, sourceDocumentId))
     .returning()
     .then((rows) => rows[0]);
   if (updatedDocument == null)
@@ -219,7 +196,6 @@ export async function createProcessingAttemptInTransaction(
   // The submission's input becomes the document's, even while the entries of
   // an earlier parse stay until this attempt completes.
   await replaceDocumentInput(tx, {
-    ledgerId: input.ledgerId,
     sourceDocumentId,
     text: input.input.text,
     storedFileIds: fileIds,
@@ -228,7 +204,6 @@ export async function createProcessingAttemptInTransaction(
 }
 
 export interface RecordProcessingFailureInput {
-  ledgerId: string;
   sourceDocumentId: string;
   attemptId: string;
   failureKind: AttemptFailureKind;
@@ -250,10 +225,10 @@ export async function recordProcessingFailure(
   input: RecordProcessingFailureInput
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
+    await lockLedgerForUpdate(tx);
     let document;
     try {
-      document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
+      document = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
     } catch (error) {
       if (error instanceof NotFoundError) return false;
       throw error;
@@ -264,7 +239,6 @@ export async function recordProcessingFailure(
       .from(extractionAttempts)
       .where(
         and(
-          eq(extractionAttempts.ledgerId, input.ledgerId),
           eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId),
           eq(extractionAttempts.id, input.attemptId)
         )
@@ -284,7 +258,6 @@ export async function recordProcessingFailure(
       })
       .where(
         and(
-          eq(extractionAttempts.ledgerId, input.ledgerId),
           eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId),
           eq(extractionAttempts.id, input.attemptId),
           eq(extractionAttempts.status, "processing")
@@ -297,7 +270,7 @@ export async function recordProcessingFailure(
       .set({ updatedAt: new Date() })
       .where(
         and(
-          activeDocumentWhere(input.ledgerId, input.sourceDocumentId),
+          eq(sourceDocuments.id, input.sourceDocumentId),
           eq(sourceDocuments.latestAttemptId, input.attemptId)
         )
       );
@@ -307,7 +280,6 @@ export async function recordProcessingFailure(
 
 export interface SourceDocumentContract {
   id: string;
-  ledgerId: string;
   version: number;
   latestAttemptId: string | null;
   supportedActions: readonly SupportedSourceDocumentAction[];

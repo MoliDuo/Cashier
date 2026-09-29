@@ -6,7 +6,7 @@ import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { parseSourceDocumentTargetIds } from "@/modules/source-document/contract-schemas";
 import { retrySourceDocument } from "../server/retry";
-import { withSourceDocumentLedgerAccess } from "./access";
+import { withLedgerAccess } from "@/modules/ledger/access";
 
 function logBatchFailure(operation: "delete" | "retry", error: unknown, code: string): void {
   logger.error(
@@ -45,16 +45,16 @@ async function runBatch(
   return result;
 }
 
-export const batchDeleteSourceDocumentsAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, sourceDocumentIds: string[]): Promise<PartialBatchCommandResult> =>
+export const batchDeleteSourceDocumentsAction = withLedgerAccess(
+  async (sourceDocumentIds: string[]): Promise<PartialBatchCommandResult> =>
     runBatch("delete", parseSourceDocumentTargetIds(sourceDocumentIds), (sourceDocumentId) =>
-      deleteSourceDocumentAtomically({ ledgerId, sourceDocumentId })
+      deleteSourceDocumentAtomically({ sourceDocumentId })
     )
 );
 
-export const batchRetrySourceDocumentsAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, sourceDocumentIds: string[]): Promise<PartialBatchCommandResult> =>
+export const batchRetrySourceDocumentsAction = withLedgerAccess(
+  async (sourceDocumentIds: string[]): Promise<PartialBatchCommandResult> =>
     runBatch("retry", parseSourceDocumentTargetIds(sourceDocumentIds), (sourceDocumentId) =>
-      retrySourceDocument({ ledgerId, sourceDocumentId })
+      retrySourceDocument({ sourceDocumentId })
     )
 );

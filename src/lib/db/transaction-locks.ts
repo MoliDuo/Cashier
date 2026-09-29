@@ -16,19 +16,14 @@ export type PostgresTransaction = Parameters<Parameters<typeof db.transaction>[0
  */
 
 /**
- * Acquire a FOR UPDATE row lock on the target ledger row.
+ * Acquire a FOR UPDATE row lock on the ledger row.
  * Returns its main currency, the one setting a locked writer reads.
  * Throws {@link NotFoundError} when the ledger does not exist.
  */
 export async function lockLedgerForUpdate(
-  tx: PostgresTransaction,
-  ledgerId: string
+  tx: PostgresTransaction
 ): Promise<{ mainCurrency: string }> {
-  const rows = await tx
-    .select({ mainCurrency: ledgers.mainCurrency })
-    .from(ledgers)
-    .where(eq(ledgers.id, ledgerId))
-    .for("update");
+  const rows = await tx.select({ mainCurrency: ledgers.mainCurrency }).from(ledgers).for("update");
 
   if (rows.length === 0) {
     throw new NotFoundError("Ledger");
@@ -44,18 +39,14 @@ export async function lockLedgerForUpdate(
  * before it and sees a live book, or after it and refuses. A shared lock is
  * enough — the caller only needs the row not to change underneath, not to edit
  * it — and lets two records into the same book commit in parallel.
- * Throws {@link NotFoundError} when the book does not exist, belongs to another
- * ledger, or was archived before this transaction took the ledger lock.
+ * Throws {@link NotFoundError} when the book does not exist or was archived
+ * before this transaction took the ledger lock.
  */
-export async function lockBookForShare(
-  tx: PostgresTransaction,
-  ledgerId: string,
-  bookId: string
-): Promise<void> {
+export async function lockBookForShare(tx: PostgresTransaction, bookId: string): Promise<void> {
   const rows = await tx
     .select({ id: books.id })
     .from(books)
-    .where(and(eq(books.ledgerId, ledgerId), eq(books.id, bookId), isNull(books.archivedAt)))
+    .where(and(eq(books.id, bookId), isNull(books.archivedAt)))
     .for("share");
 
   if (rows.length === 0) {
@@ -67,7 +58,6 @@ export async function lockBookForShare(
 // suggestions stay unread.
 const lockedSourceDocumentColumns = {
   id: sourceDocuments.id,
-  ledgerId: sourceDocuments.ledgerId,
   bookId: sourceDocuments.bookId,
   version: sourceDocuments.version,
   title: sourceDocuments.title,
@@ -88,13 +78,12 @@ export type LockedSourceDocument = Pick<
  */
 export async function lockSourceDocumentForUpdate(
   tx: PostgresTransaction,
-  ledgerId: string,
   sourceDocumentId: string
 ): Promise<LockedSourceDocument> {
   const rows = await tx
     .select(lockedSourceDocumentColumns)
     .from(sourceDocuments)
-    .where(and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)))
+    .where(eq(sourceDocuments.id, sourceDocumentId))
     .for("update");
 
   if (rows.length === 0) {
@@ -110,12 +99,10 @@ export async function lockSourceDocumentForUpdate(
  * deadlocks when several transactions lock overlapping document sets.
  * Throws {@link ValidationError} for a duplicate ID (a programming error: no
  * caller ever legitimately targets the same document twice in one command)
- * and {@link NotFoundError} when any requested document does not exist or
- * does not belong to `ledgerId`.
+ * and {@link NotFoundError} when any requested document does not exist.
  */
 export async function lockSourceDocumentsForUpdate(
   tx: PostgresTransaction,
-  ledgerId: string,
   sourceDocumentIds: readonly string[]
 ): Promise<LockedSourceDocument[]> {
   const uniqueIds = new Set(sourceDocumentIds);
@@ -127,7 +114,7 @@ export async function lockSourceDocumentsForUpdate(
   const rows = await tx
     .select(lockedSourceDocumentColumns)
     .from(sourceDocuments)
-    .where(and(eq(sourceDocuments.ledgerId, ledgerId), inArray(sourceDocuments.id, orderedIds)))
+    .where(inArray(sourceDocuments.id, orderedIds))
     .orderBy(asc(sourceDocuments.id))
     .for("update");
 

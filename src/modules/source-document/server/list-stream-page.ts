@@ -21,11 +21,7 @@ const STREAM_PAGE_LIMIT = 20;
 // ---------------------------------------------------------------------------
 
 /**
- * Decode a versioned stream cursor into its components.
- * Expected format: v2|ledgerId|effectiveDate|createdAt|id
- */
-/**
- * Validate that a cursor is compatible with the current ledger and filter inputs.
+ * Validate that a cursor is compatible with the current generation and filter inputs.
  * Returns the decoded inner cursor string for a valid cursor, or null when no
  * cursor was provided (first-page fetch).
  * Throws ValidationError for malformed, incompatible, or stale cursors so the
@@ -33,7 +29,6 @@ const STREAM_PAGE_LIMIT = 20;
  */
 function validateCursor(
   cursor: string | null | undefined,
-  ledgerId: string,
   generation: string,
   filterHash: string
 ): string | null {
@@ -41,9 +36,6 @@ function validateCursor(
   const decoded = decodeSourceDocumentStreamCursor(cursor);
   if (decoded == null) {
     throw new ValidationError("Invalid cursor format, restart required");
-  }
-  if (decoded.ledgerId !== ledgerId) {
-    throw new ValidationError("Cross-ledger cursor, restart required");
   }
   if (decoded.generation !== generation || decoded.filterHash !== filterHash) {
     throw new ValidationError("Stale stream cursor, restart required");
@@ -70,26 +62,23 @@ function filterFingerprint(input: ListStreamPageInput, search: string | undefine
 // Page query
 // ---------------------------------------------------------------------------
 
-export async function listStreamPage(
-  ledgerId: string,
-  input: ListStreamPageInput
-): Promise<StreamPage> {
+export async function listStreamPage(input: ListStreamPageInput): Promise<StreamPage> {
   // Enforce page size cap (defense in depth beyond the action schema)
   const limit = Math.min(input.limit, STREAM_PAGE_LIMIT);
   const search = normalizeSearchTerm(input.search);
   const filterHash = filterFingerprint(input, search);
-  const beforeVersion = await getLedgerVersion(ledgerId);
+  const beforeVersion = await getLedgerVersion();
   const generation = beforeVersion.toString();
 
-  // Validate cursor against ledger identity and filter compatibility.
+  // Validate cursor against the ledger generation and filter compatibility.
   // Throws ValidationError for malformed/incompatible cursors so the client
   // can discard stale pages and restart from page one.
   let innerCursor: string | null;
   try {
-    innerCursor = validateCursor(input.cursor, ledgerId, generation, filterHash);
+    innerCursor = validateCursor(input.cursor, generation, filterHash);
   } catch (error) {
     if (error instanceof ValidationError) {
-      const baseline = await getLedgerRefreshBaseline(ledgerId);
+      const baseline = await getLedgerRefreshBaseline();
       return {
         items: [],
         nextCursor: null,
@@ -102,7 +91,6 @@ export async function listStreamPage(
   }
 
   const page = await listTargetSourceDocuments({
-    ledgerId,
     ...(input.bookId == null ? {} : { bookId: input.bookId }),
     ...(input.statuses != null && input.statuses.length > 0
       ? { statuses: input.statuses as unknown as SourceDocumentProcessingStatus[] }
@@ -120,7 +108,6 @@ export async function listStreamPage(
 
   // Batch-load ledger entries for items that need them (completed cards etc.)
   const entriesByDocId = await listLedgerEntryViewsBySourceDocumentIds({
-    ledgerId,
     sourceDocumentIds: page.items.map((item) => item.id),
   });
 
@@ -134,7 +121,7 @@ export async function listStreamPage(
       ...(input.currency != null ? { currency: input.currency } : {}),
     }),
   }));
-  const baseline = await getLedgerRefreshBaseline(ledgerId);
+  const baseline = await getLedgerRefreshBaseline();
   if (baseline.version !== beforeVersion) {
     return {
       items: [],
@@ -147,7 +134,7 @@ export async function listStreamPage(
 
   return {
     items: items as SourceDocumentListItemDto[],
-    nextCursor: encodeSourceDocumentStreamCursor(ledgerId, generation, filterHash, page.nextCursor),
+    nextCursor: encodeSourceDocumentStreamCursor(generation, filterHash, page.nextCursor),
     generation,
     hasTransitionalWork: baseline.hasTransitionalWork,
   };

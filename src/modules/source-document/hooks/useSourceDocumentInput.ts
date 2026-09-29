@@ -15,7 +15,6 @@ import {
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
 import { fireAndForget } from "@/lib/safe-async";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
-import { useLedgerId } from "@/modules/ledger/hooks/useLedgerId";
 import type { RetrySourceDocumentResponseDto } from "@/modules/source-document/contracts";
 import { createSourceDocumentAction } from "@/modules/source-document/server-actions/create";
 import { editRetrySourceDocumentAction } from "@/modules/source-document/server-actions/retry";
@@ -72,11 +71,10 @@ interface CreateSubmissionIdentity {
 }
 
 function restoreDraft(
-  key: string | null,
+  key: string,
   initialData: SourceDocumentInputInitialData | undefined,
   timeZone: string | undefined
 ): MemoryInputDraft | null {
-  if (key == null) return null;
   const initialDate = createDraftDateState(initialData, timeZone);
   const kept = takeDraftFromMemory<MemoryInputDraft>(key);
   // A default date kept overnight is yesterday by now; only a hand-picked one stays.
@@ -118,14 +116,11 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
       : { mode: "create" as const, sourceDocumentId: null }
   );
   const { mode, sourceDocumentId } = target;
-  const ledgerId = useLedgerId();
-  // Where this form's unsaved input is kept; null keeps it only while mounted.
+  // Where this form's unsaved input is kept.
   const storageKey =
-    ledgerId == null
-      ? null
-      : sourceDocumentId != null
-        ? draftKey(ledgerId, "retry", sourceDocumentId)
-        : draftKey(ledgerId, "new-record-ai", "new");
+    sourceDocumentId != null
+      ? draftKey("retry", sourceDocumentId)
+      : draftKey("new-record-ai", "new");
 
   // --- The draft ------------------------------------------------------------
 
@@ -163,7 +158,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     setInitialDraft({ text: "", images: [] });
     setSelectedImageIndex(null);
     setRestoredFromDraft(false);
-    if (storageKey != null) clearDraft(storageKey);
+    clearDraft(storageKey);
   };
 
   /** Drops the kept input and goes back to what the form opened with. */
@@ -173,7 +168,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     setDateState(createDraftDateState(initialData, timeZone));
     setSelectedImageIndex(null);
     setRestoredFromDraft(false);
-    if (storageKey != null) clearDraft(storageKey);
+    clearDraft(storageKey);
   };
 
   // The record's book can change while the dialog stays open, and its zone
@@ -208,7 +203,6 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   }, [dateState, storageKey, images, isDraftDirty, text]);
 
   useEffect(() => {
-    if (storageKey == null) return;
     if (!isDraftDirty) {
       clearDraft(storageKey);
       return;
@@ -225,7 +219,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   useEffect(
     () => () => {
       const latest = latestRef.current;
-      if (latest.storageKey != null && latest.isDraftDirty) {
+      if (latest.isDraftDirty) {
         const kept: MemoryInputDraft = {
           text: latest.text,
           images: latest.images,

@@ -16,7 +16,6 @@ import { rowMode } from "./assignments";
 /** A job with its progress, counted from its entry and document rows when read. */
 export interface CategoryAssignmentJobRecord {
   id: string;
-  ledgerId: string;
   status: CategoryAssignmentJobStatus;
   mode: CategoryAssignmentMode;
   candidateSnapshot: CategoryAssignmentCandidate[];
@@ -42,7 +41,6 @@ export interface CategoryAssignmentJobRecord {
 
 interface JobProgressRow extends Record<string, unknown> {
   id: string;
-  ledger_id: string;
   status: CategoryAssignmentJobStatus;
   mode: "ai" | "assign" | "clear";
   assign_category_id: string | null;
@@ -72,7 +70,6 @@ function toIso(value: Date | string): string {
 function mapJob(row: JobProgressRow): CategoryAssignmentJobRecord {
   return {
     id: row.id,
-    ledgerId: row.ledger_id,
     status: row.status,
     mode: rowMode({
       mode: row.mode,
@@ -99,9 +96,9 @@ function mapJob(row: JobProgressRow): CategoryAssignmentJobRecord {
   };
 }
 
-async function readJob(ledgerId: string, jobId: string | null) {
+async function readJob(jobId: string | null) {
   const result = await db.execute<JobProgressRow>(sql`
-    SELECT job.id, job.ledger_id, job.status, job.mode, job.assign_category_id,
+    SELECT job.id, job.status, job.mode, job.assign_category_id,
       job.candidate_snapshot,
       job.completed_at, job.created_at, job.updated_at,
       entries.*, documents.*,
@@ -121,7 +118,7 @@ async function readJob(ledgerId: string, jobId: string | null) {
         count(*) FILTER (WHERE outcome = 'skipped')::text AS skipped,
         count(*) FILTER (WHERE outcome = 'cancelled')::text AS cancelled
       FROM ${categoryAssignmentEntries} AS entry
-      WHERE entry.job_id = job.id AND entry.ledger_id = job.ledger_id
+      WHERE entry.job_id = job.id
     ) AS entries
     CROSS JOIN LATERAL (
       SELECT
@@ -140,10 +137,9 @@ async function readJob(ledgerId: string, jobId: string | null) {
         ) AS next_retry_at,
         coalesce(bool_or(evidence_incomplete), false) AS evidence_incomplete
       FROM ${categoryAssignmentDocuments} AS work
-      WHERE work.job_id = job.id AND work.ledger_id = job.ledger_id
+      WHERE work.job_id = job.id
     ) AS documents
-    WHERE job.ledger_id = ${ledgerId}
-      ${jobId == null ? sql`` : sql`AND job.id = ${jobId}`}
+    ${jobId == null ? sql`` : sql`WHERE job.id = ${jobId}`}
     ORDER BY job.created_at DESC, job.id DESC
     LIMIT 1
   `);
@@ -152,14 +148,11 @@ async function readJob(ledgerId: string, jobId: string | null) {
 }
 
 export async function getCategoryAssignmentJob(input: {
-  ledgerId: string;
   jobId: string;
 }): Promise<CategoryAssignmentJobRecord | null> {
-  return readJob(input.ledgerId, input.jobId);
+  return readJob(input.jobId);
 }
 
-export async function getLatestCategoryAssignmentJob(input: {
-  ledgerId: string;
-}): Promise<CategoryAssignmentJobRecord | null> {
-  return readJob(input.ledgerId, null);
+export async function getLatestCategoryAssignmentJob(): Promise<CategoryAssignmentJobRecord | null> {
+  return readJob(null);
 }

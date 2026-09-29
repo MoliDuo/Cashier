@@ -6,13 +6,11 @@ import { normalize as decimalNormalize } from "@/lib/money/decimal";
 import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
 import { convertedAmountSql } from "@/modules/currency/server/conversion-sql";
 
-// Amount filters and totals convert in the document's ledger currency on the
+// Amount filters and totals convert in the ledger's main currency on the
 // document's day; an entry without a rate matches no amount bound.
-const documentMainCurrency = sql`(SELECT document_ledger.main_currency FROM ledgers document_ledger
-  WHERE document_ledger.id = ${sourceDocuments.ledgerId})`;
+const documentMainCurrency = sql`(SELECT main_currency FROM ledgers)`;
 
 export interface TargetSourceDocumentFilterInput {
-  ledgerId: string;
   bookId?: string;
   statuses?: readonly SourceDocumentProcessingStatus[];
   startDate?: string | null;
@@ -50,14 +48,13 @@ export interface TargetSourceDocumentListInput extends TargetSourceDocumentFilte
 }
 
 export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unknown>[] {
-  const conditions: SQL<unknown>[] = [eq(sourceDocuments.ledgerId, input.ledgerId)];
+  const conditions: SQL<unknown>[] = [];
   if (input.bookId != null) conditions.push(eq(sourceDocuments.bookId, input.bookId));
   if (input.statuses != null && input.statuses.length > 0) {
     conditions.push(
       sql`EXISTS (
         SELECT 1 FROM ${extractionAttempts}
         WHERE ${extractionAttempts.id} = ${sourceDocuments.latestAttemptId}
-          AND ${extractionAttempts.ledgerId} = ${input.ledgerId}
           AND ${inArray(extractionAttempts.status, input.statuses)}
       )`
     );
@@ -80,8 +77,7 @@ export function baseConditions(input: TargetSourceDocumentFilterInput): SQL<unkn
     conditions.push(sql`EXISTS (
       SELECT 1
       FROM ledger_entries AS matched_entries
-      WHERE matched_entries.ledger_id = ${input.ledgerId}
-        AND matched_entries.source_document_id = ${sourceDocuments.id}
+      WHERE matched_entries.source_document_id = ${sourceDocuments.id}
         ${input.minAmount !== undefined ? sql`AND ${matchedConverted} >= ${input.minAmount}` : sql``}
         ${input.maxAmount !== undefined ? sql`AND ${matchedConverted} <= ${input.maxAmount}` : sql``}
         ${
@@ -147,11 +143,7 @@ export async function calculateCompletedSourceDocumentTotal(
     .from(sourceDocuments)
     .innerJoin(
       ledgerEntries,
-      and(
-        eq(ledgerEntries.ledgerId, sourceDocuments.ledgerId),
-        eq(ledgerEntries.sourceDocumentId, sourceDocuments.id),
-        ...matchedEntryConditions
-      )
+      and(eq(ledgerEntries.sourceDocumentId, sourceDocuments.id), ...matchedEntryConditions)
     )
     .where(and(...baseConditions(input)))
     .then((rows) => rows[0]);

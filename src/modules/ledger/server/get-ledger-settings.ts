@@ -3,10 +3,10 @@ import type { LedgerSettingsViewDto } from "@/modules/ledger/contracts";
 import { countUncategorizedEntries } from "./categories";
 import { listServiceCredentials } from "./service-credentials";
 
-export async function getLedgerSettingsView(ledgerId: string): Promise<LedgerSettingsViewDto> {
+export async function getLedgerSettingsView(): Promise<LedgerSettingsViewDto> {
   const [uncategorizedCount, credentials] = await Promise.all([
-    countUncategorizedEntries(ledgerId),
-    listServiceCredentials(ledgerId),
+    countUncategorizedEntries(),
+    listServiceCredentials(),
   ]);
   return { uncategorizedCount, credentials };
 }

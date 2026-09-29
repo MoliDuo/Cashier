@@ -16,14 +16,13 @@ function parseVersion(value: string): bigint | null {
 }
 
 export async function getStreamRefresh(
-  ledgerId: string,
   request: LedgerRefreshRequest
 ): Promise<LedgerRefreshResult> {
   const parsedVersion = parseVersion(request.afterVersion);
   const requestVersionIsInvalid =
     parsedVersion == null || parsedVersion < BigInt(0) || parsedVersion > MAX_BIGINT_VERSION;
   const afterVersion = requestVersionIsInvalid ? BigInt(0) : parsedVersion;
-  const summary = await summarizeLedgerChanges({ ledgerId, afterVersion });
+  const summary = await summarizeLedgerChanges({ afterVersion });
   const base = {
     version: summary.currentVersion.toString(),
     hasTransitionalWork: summary.hasTransitionalWork,

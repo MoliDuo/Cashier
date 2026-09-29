@@ -23,7 +23,6 @@ vi.mock("@/modules/currency/hooks/useAmountDisplay", () => ({
 
 const entry: LedgerEntry = {
   id: "entry-1",
-  ledgerId: "ledger-1",
   categoryId: null,
   sourceDocumentId: "doc-1",
   amount: "18.00",

@@ -34,15 +34,13 @@ export async function applyCategoryAssignments(
   input: ApplyCategoryAssignmentsInput
 ): Promise<ApplyCategoryAssignmentsResult> {
   const now = input.now ?? new Date();
-  const { ledgerId, jobId, claimToken } = input.lease;
+  const { jobId, claimToken } = input.lease;
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, ledgerId);
+    await lockLedgerForUpdate(tx);
     const document = await tx
       .select()
       .from(sourceDocuments)
-      .where(
-        and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, input.sourceDocumentId))
-      )
+      .where(eq(sourceDocuments.id, input.sourceDocumentId))
       .for("update")
       .then((rows) => rows[0]);
     const job = await tx
@@ -50,7 +48,6 @@ export async function applyCategoryAssignments(
       .from(categoryAssignmentJobs)
       .where(
         and(
-          eq(categoryAssignmentJobs.ledgerId, ledgerId),
           eq(categoryAssignmentJobs.id, jobId),
           leaseHeldBy(
             categoryAssignmentJobs.claimToken,
@@ -70,7 +67,6 @@ export async function applyCategoryAssignments(
       .from(categoryAssignmentDocuments)
       .where(
         and(
-          eq(categoryAssignmentDocuments.ledgerId, ledgerId),
           eq(categoryAssignmentDocuments.jobId, jobId),
           eq(categoryAssignmentDocuments.sourceDocumentId, input.sourceDocumentId)
         )
@@ -84,7 +80,6 @@ export async function applyCategoryAssignments(
         .set({ outcome: status, errorCode, updatedAt: now })
         .where(
           and(
-            eq(categoryAssignmentEntries.ledgerId, ledgerId),
             eq(categoryAssignmentEntries.jobId, jobId),
             eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId),
             isNull(categoryAssignmentEntries.outcome)
@@ -118,16 +113,9 @@ export async function applyCategoryAssignments(
         sourceDocumentId: ledgerEntries.sourceDocumentId,
       })
       .from(categoryAssignmentEntries)
-      .leftJoin(
-        ledgerEntries,
-        and(
-          eq(ledgerEntries.ledgerId, ledgerId),
-          eq(ledgerEntries.id, categoryAssignmentEntries.ledgerEntryId)
-        )
-      )
+      .leftJoin(ledgerEntries, eq(ledgerEntries.id, categoryAssignmentEntries.ledgerEntryId))
       .where(
         and(
-          eq(categoryAssignmentEntries.ledgerId, ledgerId),
           eq(categoryAssignmentEntries.jobId, jobId),
           eq(categoryAssignmentEntries.sourceDocumentId, input.sourceDocumentId)
         )
@@ -151,9 +139,7 @@ export async function applyCategoryAssignments(
       const available = await tx
         .select({ id: entryCategories.id })
         .from(entryCategories)
-        .where(
-          and(eq(entryCategories.ledgerId, ledgerId), inArray(entryCategories.id, categoryIds))
-        );
+        .where(inArray(entryCategories.id, categoryIds));
       if (available.length !== categoryIds.length) {
         return finishWithoutWrite("conflict", "category_changed");
       }
@@ -181,7 +167,6 @@ export async function applyCategoryAssignments(
               sql`, `
             )}) AS target(id, category_id, original_category_id)
             WHERE entry.id = target.id
-              AND entry.ledger_id = ${ledgerId}
               AND entry.source_document_id = ${input.sourceDocumentId}
               AND entry.category_id IS NOT DISTINCT FROM target.original_category_id
             RETURNING entry.id

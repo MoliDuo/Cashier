@@ -85,7 +85,7 @@ async function renderShellData(tree: unknown) {
 }
 
 const view = {
-  context: { ledgerId: "ledger-1", ledgerDto: { id: "ledger-1" } },
+  context: { ledgerDto: {} },
   books: [],
   categories: Promise.resolve([]),
   rememberedBookId: BOOK_B,
@@ -106,7 +106,7 @@ describe("ledger layout", () => {
   it("schedules recovery and starts the store on the book the request resolved", async () => {
     const tree = await LedgerLayout({ children: null });
 
-    expect(scheduleProcessingRecoveryAfterMock).toHaveBeenCalledWith("ledger-1");
+    expect(scheduleProcessingRecoveryAfterMock).toHaveBeenCalledWith();
     expect(find(tree, WorkspaceStoreProvider).props.initialBookId).toBe(BOOK_B);
   });
 

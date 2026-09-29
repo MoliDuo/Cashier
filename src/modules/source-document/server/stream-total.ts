@@ -4,10 +4,7 @@ import type { GetStreamTotalInput, StreamTotalDto } from "../contracts";
 import { normalizeSearchTerm } from "@/lib/search";
 import { streamCategoryFilter } from "../stream-filter-policy";
 
-export async function getStreamTotal(
-  ledgerId: string,
-  input: GetStreamTotalInput = {}
-): Promise<StreamTotalDto> {
+export async function getStreamTotal(input: GetStreamTotalInput = {}): Promise<StreamTotalDto> {
   if (
     input.statuses != null &&
     input.statuses.length > 0 &&
@@ -19,7 +16,6 @@ export async function getStreamTotal(
   const search = normalizeSearchTerm(input.search);
   const { search: _search, categoryId, ...filters } = input;
   return calculateCompletedSourceDocumentTotal({
-    ledgerId,
     ...filters,
     ...(search != null ? { search } : {}),
     ...streamCategoryFilter(categoryId),

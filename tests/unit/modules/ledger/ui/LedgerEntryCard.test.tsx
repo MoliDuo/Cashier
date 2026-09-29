@@ -9,7 +9,6 @@ vi.mock("@/modules/currency/ui/AmountDisplay", () => ({
 
 const ledgerEntry: LedgerEntry = {
   id: "entry-1",
-  ledgerId: "ledger-1",
   categoryId: null,
   sourceDocumentId: "document-1",
   amount: "12.00",
@@ -23,7 +22,6 @@ const ledgerEntry: LedgerEntry = {
   sourceDocument: {
     id: "document-1",
     version: 1,
-    ledgerId: "ledger-1",
     title: "Lunch",
     documentDate: "2026-09-11",
     effectiveDate: "2026-09-11",

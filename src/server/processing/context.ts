@@ -26,16 +26,9 @@ export async function loadAttemptProcessingContext(
         createdAt: sourceDocuments.createdAt,
       })
       .from(extractionAttempts)
-      .innerJoin(
-        sourceDocuments,
-        and(
-          eq(sourceDocuments.ledgerId, extractionAttempts.ledgerId),
-          eq(sourceDocuments.id, extractionAttempts.sourceDocumentId)
-        )
-      )
+      .innerJoin(sourceDocuments, eq(sourceDocuments.id, extractionAttempts.sourceDocumentId))
       .where(
         and(
-          eq(extractionAttempts.ledgerId, request.ledgerId),
           eq(extractionAttempts.sourceDocumentId, request.sourceDocumentId),
           eq(extractionAttempts.id, request.attemptId)
         )
@@ -46,12 +39,7 @@ export async function loadAttemptProcessingContext(
     db
       .select({ id: sourceDocumentFiles.storedFileId })
       .from(sourceDocumentFiles)
-      .where(
-        and(
-          eq(sourceDocumentFiles.ledgerId, request.ledgerId),
-          eq(sourceDocumentFiles.sourceDocumentId, request.sourceDocumentId)
-        )
-      )
+      .where(eq(sourceDocumentFiles.sourceDocumentId, request.sourceDocumentId))
       .orderBy(asc(sourceDocumentFiles.position)),
     db
       .select({
@@ -60,7 +48,6 @@ export async function loadAttemptProcessingContext(
         description: entryCategories.description,
       })
       .from(entryCategories)
-      .where(eq(entryCategories.ledgerId, request.ledgerId))
       .orderBy(
         asc(entryCategories.sortOrder),
         asc(entryCategories.createdAt),

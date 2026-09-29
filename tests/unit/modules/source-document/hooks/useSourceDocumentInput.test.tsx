@@ -5,6 +5,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sourceDocumentInputCopy } from "@/copy/source-document";
 import { formatDateTimeForApi, parseDateString } from "@/lib/date-utils";
+import { clearAllDrafts } from "@/lib/drafts";
 import type { SourceDocumentInputProps } from "@/modules/source-document/ui/source-document-input.types";
 
 const {
@@ -44,9 +45,6 @@ vi.mock(
     uploadSourceDocumentSubmissionImages: uploadSubmissionImagesMock,
   })
 );
-
-const ledger = vi.hoisted(() => ({ id: null as string | null }));
-vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => ledger.id }));
 
 vi.mock("@/modules/source-document/ui/SourceDocumentInputView", () => ({
   SourceDocumentInputView: ({
@@ -124,7 +122,8 @@ describe("useSourceDocumentInput", () => {
     loadFilesMock.mockReset();
     uploadSubmissionImagesMock.mockReset();
     uploadSubmissionImagesMock.mockImplementation(async (payload: unknown) => payload);
-    ledger.id = null;
+    // Drafts outlive a hook in the page's memory, so each test starts without one.
+    clearAllDrafts();
     window.localStorage.clear();
   });
 
@@ -191,7 +190,7 @@ describe("useSourceDocumentInput", () => {
       expect(result.current.images).toHaveLength(0);
     });
 
-    it("releases object URLs on removal, reset, replacement, and unmount", async () => {
+    it("releases object URLs on removal, reset, replacement, and discarding a kept draft", async () => {
       const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
       createSourceDocumentActionMock.mockResolvedValue({ sourceDocumentId: "source-1" });
       const { result, unmount } = renderInput();
@@ -214,16 +213,21 @@ describe("useSourceDocumentInput", () => {
       act(() => result.current.discardDraft());
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:replace");
 
-      await add("blob:unmount");
+      // Closing keeps an unsaved draft's images for the next opening; discarding
+      // it there lets them go.
+      await add("blob:kept");
       unmount();
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:unmount");
+      expect(revokeObjectURL).not.toHaveBeenCalledWith("blob:kept");
+      const reopened = renderInput();
+      expect(reopened.result.current.images).toHaveLength(1);
+      act(() => reopened.result.current.discardDraft());
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:kept");
       expect(revokeObjectURL).toHaveBeenCalledTimes(4);
     });
   });
 
   describe("draft", () => {
     it("keeps typed text and picked images across a close, and only the text across a reload", async () => {
-      ledger.id = "ledger-1";
       loadFilesMock.mockResolvedValue([
         { kind: "ready", image: { data: "data:image/png;base64,AQ==", mimeType: "image/png" } },
       ]);
@@ -241,7 +245,7 @@ describe("useSourceDocumentInput", () => {
 
       // A reload loses the page's memory; the stored text is still there.
       const drafts = await import("@/lib/drafts");
-      drafts.takeDraftFromMemory(drafts.draftKey("ledger-1", "new-record-ai", "new"));
+      drafts.takeDraftFromMemory(drafts.draftKey("new-record-ai", "new"));
       const reloaded = renderInput();
       expect(reloaded.result.current.text).toBe("午饭 35");
       expect(reloaded.result.current.images).toHaveLength(0);
@@ -283,7 +287,6 @@ describe("useSourceDocumentInput", () => {
     });
 
     it("gives a draft kept past midnight today's default, but keeps a hand-picked date", () => {
-      ledger.id = "ledger-1";
       vi.useFakeTimers({ toFake: ["Date"] });
       try {
         vi.setSystemTime(new Date("2026-07-27T15:00:00.000Z"));

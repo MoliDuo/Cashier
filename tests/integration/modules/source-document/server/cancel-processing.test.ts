@@ -10,19 +10,18 @@ import { processingJobs } from "tests/helpers/processing-jobs";
 describe("cancel source-document processing", () => {
   it("retains the latest submission input and fences out the running worker", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const submission = await submitSourceDocument({
-      ledgerId,
       input: { text: "Lunch 12 CNY", storedFileIds: [], documentDate: "2026-09-10" },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const processing = processingJobs();
     const claim = await processing.claim(submission.attempt.id);
     expect(claim).not.toBeNull();
 
-    await expect(cancelSourceDocumentProcessing(ledgerId, submission.document.id)).resolves.toEqual(
-      { processingStatus: "cancelled" }
-    );
+    await expect(cancelSourceDocumentProcessing(submission.document.id)).resolves.toEqual({
+      processingStatus: "cancelled",
+    });
 
     const [document, attempt] = await Promise.all([
       db.query.sourceDocuments.findFirst({
@@ -45,9 +44,8 @@ describe("cancel source-document processing", () => {
 
   it("keeps the previous entries when a retry is cancelled", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const active = await createTestRecord(getTestDb(), {
-      ledgerId,
       entries: [
         {
           categoryId: null,
@@ -57,17 +55,16 @@ describe("cancel source-document processing", () => {
           description: null,
         },
       ],
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const retry = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: active.sourceDocumentId,
       supersedeProcessing: true,
       input: { text: "Replacement", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
-    await cancelSourceDocumentProcessing(ledgerId, active.sourceDocumentId);
+    await cancelSourceDocumentProcessing(active.sourceDocumentId);
     const after = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, active.sourceDocumentId),
     });

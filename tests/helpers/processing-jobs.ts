@@ -16,7 +16,7 @@ export function processingJobs() {
     claim: (attemptId: string) => claimProcessingJob(attemptId),
     renew: (attemptId: string, claimToken: string) =>
       renewProcessingJobLease(attemptId, claimToken),
-    recoverBatch: (ledgerId: string, maxBatch: number) => recoverProcessingJobs(ledgerId, maxBatch),
+    recoverBatch: (maxBatch: number) => recoverProcessingJobs(maxBatch),
     /** Leases run on the database clock, so a test expires one by moving it into the past. */
     expireLease: (attemptId: string) =>
       getTestDb()

@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
 import { testSession } from "tests/helpers/session";
 import { saveEntryCategoriesAction } from "@/modules/ledger/server-actions/categories";
-import { saveEntryCategories } from "@/modules/ledger/server/categories";
 import {
   entryCategories,
   ledgerEntries,
@@ -38,22 +37,21 @@ describe("saveEntryCategoriesAction", () => {
     const keepId = crypto.randomUUID();
     const removeId = crypto.randomUUID();
     const newId = crypto.randomUUID();
-    const document = createSourceDocumentData(ledger.id);
+    const document = createSourceDocumentData();
     const entryId = crypto.randomUUID();
 
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values([
-      { id: keepId, ledgerId: ledger.id, name: "Keep", sortOrder: 0 },
-      { id: removeId, ledgerId: ledger.id, name: "Remove", sortOrder: 1 },
+      { id: keepId, name: "Keep", sortOrder: 0 },
+      { id: removeId, name: "Remove", sortOrder: 1 },
     ]);
     await db.insert(sourceDocuments).values({
       ...document,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await db.insert(ledgerEntries).values({
       id: entryId,
-      ledgerId: ledger.id,
       sourceDocumentId: document.id,
       itemName: "Categorized",
       amount: "10.00",
@@ -63,7 +61,6 @@ describe("saveEntryCategoriesAction", () => {
     // Multiple affected entries must still advance their aggregate only once.
     await db.insert(ledgerEntries).values({
       id: crypto.randomUUID(),
-      ledgerId: ledger.id,
       sourceDocumentId: document.id,
       itemName: "Second categorized item",
       amount: "5",
@@ -72,9 +69,7 @@ describe("saveEntryCategoriesAction", () => {
     });
     await activateTestSourceDocumentProjection(db, document.id);
     const expectedRevision = await computeCategoryCollectionRevision(
-      await db.query.entryCategories.findMany({
-        where: eq(entryCategories.ledgerId, ledger.id),
-      })
+      await db.query.entryCategories.findMany()
     );
 
     const saved = await saveEntryCategoriesAction({
@@ -129,17 +124,16 @@ describe("saveEntryCategoriesAction", () => {
     const db = getTestDb();
     const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     const categoryId = crypto.randomUUID();
-    await db.insert(entryCategories).values({ id: categoryId, ledgerId: ledger.id, name: "Busy" });
-    const documents = [createSourceDocumentData(ledger.id), createSourceDocumentData(ledger.id)];
+    await db.insert(entryCategories).values({ id: categoryId, name: "Busy" });
+    const documents = [createSourceDocumentData(), createSourceDocumentData()];
     for (const document of documents) {
       await db.insert(sourceDocuments).values({
         ...document,
-        bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledger.id} ORDER BY sort_order LIMIT 1)`,
+        bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
       });
       await db.insert(ledgerEntries).values({
-        ledgerId: ledger.id,
         sourceDocumentId: document.id,
         categoryId,
         itemName: "Affected",
@@ -151,7 +145,6 @@ describe("saveEntryCategoriesAction", () => {
         const [attempt] = await db
           .insert(extractionAttempts)
           .values({
-            ledgerId: ledger.id,
             sourceDocumentId: document.id,
             status: "processing",
           })
@@ -162,9 +155,7 @@ describe("saveEntryCategoriesAction", () => {
           .where(eq(sourceDocuments.id, document.id));
       }
     }
-    const categories = await db.query.entryCategories.findMany({
-      where: eq(entryCategories.ledgerId, ledger.id),
-    });
+    const categories = await db.query.entryCategories.findMany();
     await expect(
       saveEntryCategoriesAction({
         expectedRevision: await computeCategoryCollectionRevision(categories),
@@ -174,14 +165,10 @@ describe("saveEntryCategoriesAction", () => {
     expect(
       await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, categoryId) })
     ).toBeDefined();
-    const entries = await db.query.ledgerEntries.findMany({
-      where: eq(ledgerEntries.ledgerId, ledger.id),
-    });
+    const entries = await db.query.ledgerEntries.findMany();
     expect(entries).toHaveLength(2);
     expect(entries.every((entry) => entry.categoryId === categoryId)).toBe(true);
-    const unchanged = await db.query.sourceDocuments.findMany({
-      where: eq(sourceDocuments.ledgerId, ledger.id),
-    });
+    const unchanged = await db.query.sourceDocuments.findMany();
     expect(unchanged.every((document) => document.version === 1)).toBe(true);
   });
 
@@ -195,56 +182,23 @@ describe("saveEntryCategoriesAction", () => {
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("rejects categories belonging to another ledger without modifying either collection", async () => {
-    const db = getTestDb();
-    const ledger = createLedgerData();
-    // Two ledgers never coexist in the app, so this drives the server function,
-    // which still scopes every category it touches by the ledger it is given.
-    const other = createLedgerData();
-    await db.insert(ledgers).values([ledger, other]);
-    const ownId = crypto.randomUUID();
-    const foreignId = crypto.randomUUID();
-    await db.insert(entryCategories).values([
-      { id: ownId, ledgerId: ledger.id, name: "Own" },
-      { id: foreignId, ledgerId: other.id, name: "Foreign" },
-    ]);
-    const current = await db.query.entryCategories.findMany({
-      where: eq(entryCategories.ledgerId, ledger.id),
-    });
-    await expect(
-      saveEntryCategories(ledger.id, {
-        expectedRevision: await computeCategoryCollectionRevision(current),
-        categories: [{ id: foreignId, name: "Overwrite", description: null, icon: null }],
-      })
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(
-      await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, ownId) })
-    ).toMatchObject({ name: "Own" });
-    expect(
-      await db.query.entryCategories.findFirst({ where: eq(entryCategories.id, foreignId) })
-    ).toMatchObject({ name: "Foreign" });
-  });
-
   it("allows every category to be edited and deleted", async () => {
     const db = getTestDb();
     const ledger = createLedgerData();
     const editableId = crypto.randomUUID();
     const fixedId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values([
-      { id: editableId, ledgerId: ledger.id, name: "Editable", sortOrder: 0 },
+      { id: editableId, name: "Editable", sortOrder: 0 },
       {
         id: fixedId,
-        ledgerId: ledger.id,
         name: "Fixed",
         sortOrder: 1,
       },
     ]);
     const expectedRevision = await computeCategoryCollectionRevision(
-      await db.query.entryCategories.findMany({
-        where: eq(entryCategories.ledgerId, ledger.id),
-      })
+      await db.query.entryCategories.findMany()
     );
 
     await expect(
@@ -271,15 +225,15 @@ describe("saveEntryCategoriesAction", () => {
     const db = getTestDb();
     const ledger = createLedgerData();
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
-    await db.insert(entryCategories).values({ ledgerId: ledger.id, name: "Kept", sortOrder: 0 });
+    await ensureTestLedgerBooks(db);
+    await db.insert(entryCategories).values({ name: "Kept", sortOrder: 0 });
 
     await expect(
       saveEntryCategoriesAction({ expectedRevision: "invalid", categories: [] } as never)
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-    await expect(
-      db.query.entryCategories.findMany({ where: eq(entryCategories.ledgerId, ledger.id) })
-    ).resolves.toEqual([expect.objectContaining({ name: "Kept" })]);
+    await expect(db.query.entryCategories.findMany()).resolves.toEqual([
+      expect.objectContaining({ name: "Kept" }),
+    ]);
   });
 
   it("rejects a stale category collection revision without applying the draft", async () => {
@@ -287,17 +241,14 @@ describe("saveEntryCategoriesAction", () => {
     const ledger = createLedgerData();
     const categoryId = crypto.randomUUID();
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values({
       id: categoryId,
-      ledgerId: ledger.id,
       name: "Original",
       sortOrder: 0,
     });
     const expectedRevision = await computeCategoryCollectionRevision(
-      await db.query.entryCategories.findMany({
-        where: eq(entryCategories.ledgerId, ledger.id),
-      })
+      await db.query.entryCategories.findMany()
     );
     await db
       .update(entryCategories)
@@ -320,15 +271,14 @@ describe("saveEntryCategoriesAction", () => {
     const ledger = createLedgerData();
     const [aId, bId, goneId] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values([
-      { id: aId, ledgerId: ledger.id, name: "A", sortOrder: 0 },
-      { id: bId, ledgerId: ledger.id, name: "B", sortOrder: 1 },
-      { id: goneId, ledgerId: ledger.id, name: "Gone", sortOrder: 2 },
+      { id: aId, name: "A", sortOrder: 0 },
+      { id: bId, name: "B", sortOrder: 1 },
+      { id: goneId, name: "Gone", sortOrder: 2 },
     ]);
     const expectedRevision = await computeCategoryCollectionRevision(
       await db.query.entryCategories.findMany({
-        where: eq(entryCategories.ledgerId, ledger.id),
         orderBy: entryCategories.sortOrder,
       })
     );
@@ -343,7 +293,6 @@ describe("saveEntryCategoriesAction", () => {
     });
 
     const rows = await db.query.entryCategories.findMany({
-      where: eq(entryCategories.ledgerId, ledger.id),
       orderBy: entryCategories.sortOrder,
     });
     expect(
@@ -360,16 +309,14 @@ describe("saveEntryCategoriesAction", () => {
     const ledger = createLedgerData();
     const categories = Array.from({ length: 100 }, (_, index) => ({
       id: crypto.randomUUID(),
-      ledgerId: ledger.id,
       name: `Category ${index}`,
       sortOrder: index,
     }));
     await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await ensureTestLedgerBooks(db);
     await db.insert(entryCategories).values(categories);
     const expectedRevision = await computeCategoryCollectionRevision(
       await db.query.entryCategories.findMany({
-        where: eq(entryCategories.ledgerId, ledger.id),
         orderBy: entryCategories.sortOrder,
       })
     );

@@ -15,27 +15,23 @@ import {
 } from "../server/service-credentials";
 
 export const createServiceCredentialAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    data: CreateServiceCredentialInput
-  ): Promise<CreatedServiceCredentialDto> =>
-    createServiceCredential(ledgerId, parseCreateServiceCredentialInput(data))
+  async (data: CreateServiceCredentialInput): Promise<CreatedServiceCredentialDto> =>
+    createServiceCredential(parseCreateServiceCredentialInput(data))
 );
 
 /** Rebinds one key to another book; its store of uploads follows immediately. */
 export const updateServiceCredentialAction = withLedgerAccess(
   async (
-    ledgerId: string,
     credentialId: string,
     data: UpdateServiceCredentialInput
   ): Promise<ServiceCredentialDto> => {
     const validatedCredentialId = parseServiceCredentialId(credentialId);
     const validated = parseUpdateServiceCredentialInput(data);
-    return setServiceCredentialBook(ledgerId, validatedCredentialId, validated.bookId);
+    return setServiceCredentialBook(validatedCredentialId, validated.bookId);
   }
 );
 
 export const deleteServiceCredentialAction = withLedgerAccess(
-  async (ledgerId: string, credentialId: string): Promise<void> =>
-    revokeServiceCredential(ledgerId, parseServiceCredentialId(credentialId))
+  async (credentialId: string): Promise<void> =>
+    revokeServiceCredential(parseServiceCredentialId(credentialId))
 );

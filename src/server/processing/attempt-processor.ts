@@ -50,7 +50,6 @@ function failureLogContext(
   failureCode: InvalidDiagnostic
 ): Record<string, unknown> {
   return {
-    ledgerSubject: logIdentifier("ledger", request.ledgerId),
     sourceDocumentSubject: logIdentifier("source-document", request.sourceDocumentId),
     attemptSubject: logIdentifier("attempt", request.attemptId),
     failureCode,
@@ -74,7 +73,7 @@ export async function processAttempt(
   throwIfProcessingCancelled(signal);
   const [context, ledgerSettings] = await Promise.all([
     loadAttemptProcessingContext(request),
-    getLedgerSettings(request.ledgerId),
+    getLedgerSettings(),
   ]);
   const { attempt, document, storedFileIds, categories } = context;
   if (attempt == null || document == null) throw new NotFoundError("Pending attempt");
@@ -85,7 +84,7 @@ export async function processAttempt(
   }
   throwIfProcessingCancelled(signal);
 
-  const loadedEvidence = await loadStoredFilesForAI(request.ledgerId, storedFileIds);
+  const loadedEvidence = await loadStoredFilesForAI(storedFileIds);
   throwIfProcessingCancelled(signal);
   const failedEvidence = loadedEvidence.filter(isFailedLoadImageResult);
   if (failedEvidence.length > 0) {
@@ -171,7 +170,6 @@ export async function processAttempt(
     validEntries,
     categories,
     sourceDocumentId: request.sourceDocumentId,
-    ledgerId: request.ledgerId,
     fallbackDate,
   });
   const entryInputs = entries.map((entry) => ({

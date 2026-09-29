@@ -9,12 +9,8 @@ import { sourceDocuments } from "@/persistence";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 
 describe("source-document-queries", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
-    const db = getTestDb();
-    const setup = await createTestUserWithLedger(db);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(getTestDb());
   });
 
   it("walks all cursors from start to final null", async () => {
@@ -26,10 +22,9 @@ describe("source-document-queries", () => {
       const inserted = await db
         .insert(sourceDocuments)
         .values({
-          ledgerId,
           documentDate: `2026-03-${String(day).padStart(2, "0")}`,
           createdAt: new Date(`2026-03-${String(day).padStart(2, "0")}T12:00:00Z`),
-          bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+          bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
         })
         .returning();
       await activateTestSourceDocumentProjection(db, inserted[0]!.id);
@@ -40,7 +35,7 @@ describe("source-document-queries", () => {
     const seenInWalk = new Set<string>();
 
     for (let i = 0; i < 50; i++) {
-      const page = await listStreamPage(ledgerId, {
+      const page = await listStreamPage({
         cursor,
         limit: 7,
       });

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
@@ -10,17 +10,13 @@ import {
 } from "@/modules/source-document/server/date-organization";
 import { addLedgerEntry } from "@/modules/source-document/server/entry-commands";
 
-const listStreamPage = (ledgerId: string) => listStreamPageFor(ledgerId, { limit: 20 });
+const listStreamPage = () => listStreamPageFor({ limit: 20 });
 
 async function createFixture() {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(
-    db,
-    `date-organization-${crypto.randomUUID()}`
-  );
+  await createTestUserWithLedger(db, `date-organization-${crypto.randomUUID()}`);
   const created = await createTestRecord(getTestDb(), {
-    ledgerId,
-    bookId: await testBookId(db, ledgerId),
+    bookId: await testBookId(db),
     title: "Long screenshot",
     entryDate: "2026-09-10",
     inputText: "Long screenshot text",
@@ -35,10 +31,7 @@ async function createFixture() {
     })),
   });
   const entries = await db.query.ledgerEntries.findMany({
-    where: and(
-      eq(ledgerEntries.ledgerId, ledgerId),
-      eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId)
-    ),
+    where: eq(ledgerEntries.sourceDocumentId, created.sourceDocumentId),
     orderBy: (row, { asc }) => [asc(row.position)],
   });
   const suggestionId = crypto.randomUUID();
@@ -68,20 +61,17 @@ async function createFixture() {
       },
     })
     .where(eq(sourceDocuments.id, created.sourceDocumentId));
-  return { db, ledgerId, created, entries, suggestionId };
+  return { db, created, entries, suggestionId };
 }
 
-async function activeEntryNames(ledgerId: string, sourceDocumentId: string) {
+async function activeEntryNames(sourceDocumentId: string) {
   const db = getTestDb();
   const document = await db.query.sourceDocuments.findFirst({
-    where: and(eq(sourceDocuments.ledgerId, ledgerId), eq(sourceDocuments.id, sourceDocumentId)),
+    where: eq(sourceDocuments.id, sourceDocumentId),
   });
   if (document == null) throw new Error("Live document expected");
   const entries = await db.query.ledgerEntries.findMany({
-    where: and(
-      eq(ledgerEntries.ledgerId, ledgerId),
-      eq(ledgerEntries.sourceDocumentId, sourceDocumentId)
-    ),
+    where: eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
     orderBy: (row, { asc }) => [asc(row.position)],
   });
   return { document, names: entries.map((entry) => entry.itemName) };
@@ -91,7 +81,6 @@ describe("date organization", () => {
   it("keeps uncertain entries in the original bill and creates one bill per applied date", async () => {
     const fixture = await createFixture();
     const result = await applyDateOrganization({
-      ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       suggestionId: fixture.suggestionId,
       groups: [
@@ -104,11 +93,11 @@ describe("date organization", () => {
 
     expect(result.sourceDocument.version).toBe(2);
     expect(result.createdSourceDocumentIds).toHaveLength(2);
-    const original = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    const original = await activeEntryNames(fixture.created.sourceDocumentId);
     expect(original.document.documentDate).toBe("2026-09-10");
     expect(original.names).toEqual(["Today"]);
     const created = await Promise.all(
-      result.createdSourceDocumentIds.map((id) => activeEntryNames(fixture.ledgerId, id))
+      result.createdSourceDocumentIds.map((id) => activeEntryNames(id))
     );
     expect(created.map(({ document, names }) => [document.documentDate, names])).toEqual([
       ["2026-09-09", ["Yesterday"]],
@@ -120,7 +109,7 @@ describe("date organization", () => {
       "Long screenshot text",
     ]);
     expect(created.map(({ document }) => document.latestAttemptId)).toEqual([null, null]);
-    const stream = await listStreamPage(fixture.ledgerId);
+    const stream = await listStreamPage();
     const createdCards = result.createdSourceDocumentIds.map((id) =>
       stream.items.find((item) => item.id === id)
     );
@@ -133,7 +122,6 @@ describe("date organization", () => {
   it("keeps the original id for the newest date when every entry is organized", async () => {
     const fixture = await createFixture();
     const result = await applyDateOrganization({
-      ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       suggestionId: fixture.suggestionId,
       groups: [
@@ -149,10 +137,10 @@ describe("date organization", () => {
 
     expect(result.sourceDocument.version).toBe(2);
     expect(result.createdSourceDocumentIds).toHaveLength(1);
-    const original = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    const original = await activeEntryNames(fixture.created.sourceDocumentId);
     expect(original.document.documentDate).toBe("2026-09-09");
     expect(original.names).toEqual(["Today", "Yesterday"]);
-    const older = await activeEntryNames(fixture.ledgerId, result.createdSourceDocumentIds[0]!);
+    const older = await activeEntryNames(result.createdSourceDocumentIds[0]!);
     expect(older.document.documentDate).toBe("2026-09-08");
     expect(older.names).toEqual(["Earlier"]);
   });
@@ -160,14 +148,12 @@ describe("date organization", () => {
   it("applies after an entry was added to the bill and keeps it in the original", async () => {
     const fixture = await createFixture();
     await addLedgerEntry({
-      ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       amount: "4.00",
       itemName: "Added later",
     });
 
     const result = await applyDateOrganization({
-      ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       suggestionId: fixture.suggestionId,
       groups: [
@@ -177,9 +163,9 @@ describe("date organization", () => {
     });
 
     expect(result.sourceDocument.version).toBe(3);
-    const original = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    const original = await activeEntryNames(fixture.created.sourceDocumentId);
     expect(original.names).toEqual(["Today", "Earlier", "Added later"]);
-    const moved = await activeEntryNames(fixture.ledgerId, result.createdSourceDocumentIds[0]!);
+    const moved = await activeEntryNames(result.createdSourceDocumentIds[0]!);
     expect(moved.names).toEqual(["Yesterday"]);
   });
 
@@ -189,20 +175,18 @@ describe("date organization", () => {
 
     await expect(
       dismissDateOrganization({
-        ledgerId: fixture.ledgerId,
         sourceDocumentId: fixture.created.sourceDocumentId,
         suggestionId: staleSuggestionId,
       })
     ).resolves.toEqual({ dismissed: true });
-    const kept = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    const kept = await activeEntryNames(fixture.created.sourceDocumentId);
     expect(kept.document.dateOrganizationSuggestion?.id).toBe(fixture.suggestionId);
 
     await dismissDateOrganization({
-      ledgerId: fixture.ledgerId,
       sourceDocumentId: fixture.created.sourceDocumentId,
       suggestionId: fixture.suggestionId,
     });
-    const dismissed = await activeEntryNames(fixture.ledgerId, fixture.created.sourceDocumentId);
+    const dismissed = await activeEntryNames(fixture.created.sourceDocumentId);
     expect(dismissed.document.dateOrganizationSuggestion).toBeNull();
     expect(dismissed.document.version).toBe(1);
   });

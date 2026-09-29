@@ -6,13 +6,12 @@ import {
 
 describe("buildLedgerEntryCursorCondition", () => {
   it("rejects malformed cursors", () => {
-    expect(() => buildLedgerEntryCursorCondition("not-a-date|entry-1", "ledger-1", {})).toThrow(
+    expect(() => buildLedgerEntryCursorCondition("not-a-date|entry-1", {})).toThrow(
       "Invalid ledger entry cursor"
     );
   });
 
-  it("binds valid cursors to the ledger and query", () => {
-    const ledgerId = "11111111-1111-4111-8111-111111111111";
+  it("binds valid cursors to the query", () => {
     const cursor = encodeLedgerEntryCursor(
       {
         effectiveDate: "2026-03-01",
@@ -21,23 +20,17 @@ describe("buildLedgerEntryCursorCondition", () => {
         position: 0,
         entryId: "33333333-3333-4333-8333-333333333333",
       },
-      ledgerId,
       { currency: "USD" }
     );
 
-    expect(buildLedgerEntryCursorCondition(cursor, ledgerId, { currency: "USD" })).not.toBeNull();
-    expect(() =>
-      buildLedgerEntryCursorCondition(cursor, "44444444-4444-4444-8444-444444444444", {
-        currency: "USD",
-      })
-    ).toThrow("does not match");
-    expect(() => buildLedgerEntryCursorCondition(cursor, ledgerId, { currency: "EUR" })).toThrow(
+    expect(buildLedgerEntryCursorCondition(cursor, { currency: "USD" })).not.toBeNull();
+    expect(() => buildLedgerEntryCursorCondition(cursor, { currency: "EUR" })).toThrow(
       "does not match"
     );
   });
 
   it("rejects oversized cursors", () => {
-    expect(() => buildLedgerEntryCursorCondition("a".repeat(1025), "ledger-1", {})).toThrow(
+    expect(() => buildLedgerEntryCursorCondition("a".repeat(1025), {})).toThrow(
       "Invalid ledger entry cursor"
     );
   });

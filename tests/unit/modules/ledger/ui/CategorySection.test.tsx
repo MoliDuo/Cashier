@@ -8,7 +8,6 @@ import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import { CategorySection } from "@/modules/ledger/ui/CategorySection";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock("@/modules/ledger/hooks/useLedgerId", () => ({ useLedgerId: () => "ledger-1" }));
 vi.mock("@/modules/ledger/ui/category-assignment-context", () => ({
   useCategoryAssignment: () => ({
     job: null,
@@ -22,7 +21,6 @@ vi.mock("@/modules/ledger/ui/category-assignment-context", () => ({
 
 const category: EntryCategoryWithCount = {
   id: "category-1",
-  ledgerId: "ledger-1",
   name: "Meals",
   description: null,
   icon: null,

@@ -23,24 +23,21 @@ vi.mock("@/modules/source-document/server/reads/list", async (importOriginal) =>
 });
 
 describe("listStreamPage", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
     duringPageRead.write = null;
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
-    await createTestSourceDocument(db, ledgerId, { status: "completed" });
+    await createTestUserWithLedger(db);
+    await createTestSourceDocument(db, { status: "completed" });
   });
 
   it("asks the reader to restart when the ledger changes while the page is read", async () => {
-    const before = await listStreamPage(ledgerId, { limit: 20 });
+    const before = await listStreamPage({ limit: 20 });
     expect(before).toMatchObject({ items: [expect.anything()] });
     expect(before.restartRequired).toBeUndefined();
 
-    duringPageRead.write = () =>
-      createTestSourceDocument(getTestDb(), ledgerId, { status: "processing" });
-    const torn = await listStreamPage(ledgerId, { limit: 20 });
+    duringPageRead.write = () => createTestSourceDocument(getTestDb(), { status: "processing" });
+    const torn = await listStreamPage({ limit: 20 });
 
     expect(torn).toEqual({
       items: [],
@@ -53,14 +50,16 @@ describe("listStreamPage", () => {
   });
 
   it("refuses a cursor from an older generation of the ledger", async () => {
-    await createTestSourceDocument(getTestDb(), ledgerId, { status: "completed" });
-    const first = await listStreamPage(ledgerId, { limit: 1 });
+    await createTestSourceDocument(getTestDb(), { status: "completed" });
+    const first = await listStreamPage({ limit: 1 });
     expect(first.nextCursor).not.toBeNull();
 
-    await createTestSourceDocument(getTestDb(), ledgerId, { status: "completed" });
+    await createTestSourceDocument(getTestDb(), { status: "completed" });
 
-    await expect(
-      listStreamPage(ledgerId, { limit: 1, cursor: first.nextCursor })
-    ).resolves.toMatchObject({ items: [], nextCursor: null, restartRequired: true });
+    await expect(listStreamPage({ limit: 1, cursor: first.nextCursor })).resolves.toMatchObject({
+      items: [],
+      nextCursor: null,
+      restartRequired: true,
+    });
   });
 });

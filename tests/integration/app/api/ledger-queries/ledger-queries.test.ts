@@ -29,15 +29,14 @@ describe("session ledger query transport", () => {
     vi.mocked(getCurrentSession).mockResolvedValue(testSession(userId));
   });
 
-  it("returns private scoped detail and refuses a caller without the live ledger", async () => {
+  it("returns private scoped detail", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData();
-    await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
-    const document = createSourceDocumentData(ledger.id, { status: "completed" });
+    await db.insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(db);
+    const document = createSourceDocumentData({ status: "completed" });
     await db.insert(sourceDocuments).values({
       ...document,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, document.id);
 
@@ -51,9 +50,6 @@ describe("session ledger query transport", () => {
     const unknownDocument = await POST(request("detail", [crypto.randomUUID()]));
     expect(unknownDocument.status).toBe(200);
     expect(await unknownDocument.json()).toBeNull();
-
-    vi.mocked(getCurrentSession).mockResolvedValue(testSession(crypto.randomUUID()));
-    expect((await POST(request("detail", [document.id]))).status).toBe(404);
   });
 
   it("requires a session and validates query envelopes", async () => {
@@ -64,9 +60,8 @@ describe("session ledger query transport", () => {
   });
 
   it("validates each supported read without leaking internal error data", async () => {
-    const ledger = createLedgerData();
-    await getTestDb().insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(getTestDb(), ledger.id);
+    await getTestDb().insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(getTestDb());
     for (const query of [
       "detail",
       "stream",
@@ -95,14 +90,15 @@ describe("session ledger query transport", () => {
 
   it("serves the settings reads over the same scoped transport", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData();
-    await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
+    await db.insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(db);
 
     const ledgerRead = await POST(request("ledger", []));
     expect(ledgerRead.status).toBe(200);
     expect(ledgerRead.headers.get("cache-control")).toBe("private, no-store");
-    expect(await ledgerRead.json()).toMatchObject({ id: ledger.id });
+    expect(await ledgerRead.json()).toMatchObject({
+      settings: expect.objectContaining({ mainCurrency: "CNY" }),
+    });
 
     const categoriesRead = await POST(request("categories", []));
     expect(categoriesRead.status).toBe(200);
@@ -117,9 +113,8 @@ describe("session ledger query transport", () => {
 
   it("serves the books reads over the same scoped transport", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData();
-    await db.insert(ledgers).values(ledger);
-    const books = await ensureTestLedgerBooks(db, ledger.id, ["共同支出", "旧账"]);
+    await db.insert(ledgers).values(createLedgerData());
+    const books = await ensureTestLedgerBooks(db, ["共同支出", "旧账"]);
     const liveBookId = books.get("共同支出")!;
     const retiredBookId = books.get("旧账")!;
     await db.execute(sql`UPDATE books SET archived_at = now() WHERE id = ${retiredBookId}`);
@@ -145,18 +140,17 @@ describe("session ledger query transport", () => {
     expect((await POST(request("book", ["not-a-uuid"]))).status).toBe(400);
 
     // A read that takes no arguments refuses one.
-    expect((await POST(request("books", [ledger.id]))).status).toBe(400);
+    expect((await POST(request("books", [crypto.randomUUID()]))).status).toBe(400);
   });
 
   it("serves a document's input for a retry, and 404 for an unknown one", async () => {
     const db = getTestDb();
-    const ledger = createLedgerData();
-    await db.insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(db, ledger.id);
-    const document = createSourceDocumentData(ledger.id, { status: "completed" });
+    await db.insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(db);
+    const document = createSourceDocumentData({ status: "completed" });
     await db.insert(sourceDocuments).values({
       ...document,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${document.ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     });
     await activateTestSourceDocumentProjection(db, document.id);
 
@@ -168,9 +162,8 @@ describe("session ledger query transport", () => {
   });
 
   it("converts with the stored rate of the day, and is a 409 without one", async () => {
-    const ledger = createLedgerData();
-    await getTestDb().insert(ledgers).values(ledger);
-    await ensureTestLedgerBooks(getTestDb(), ledger.id);
+    await getTestDb().insert(ledgers).values(createLedgerData());
+    await ensureTestLedgerBooks(getTestDb());
     await insertExchangeRates("2026-02-04", { CNY: 7.5, USD: 1.1 });
 
     const converted = await POST(
@@ -215,9 +208,8 @@ describe("session ledger query transport", () => {
     /** A ledger in Shanghai with one record on each side of the month boundary. */
     async function seedAcrossMonths() {
       const db = getTestDb();
-      const ledger = createLedgerData({ timeZone: "Asia/Shanghai" });
-      await db.insert(ledgers).values(ledger);
-      await ensureTestLedgerBooks(db, ledger.id);
+      await db.insert(ledgers).values(createLedgerData({ timeZone: "Asia/Shanghai" }));
+      await ensureTestLedgerBooks(db);
       for (const [title, date] of [
         ["September", "2026-09-30"],
         ["October", "2026-10-01"],
@@ -225,14 +217,12 @@ describe("session ledger query transport", () => {
         const [document] = await db
           .insert(sourceDocuments)
           .values({
-            ledgerId: ledger.id,
             title,
             documentDate: date,
-            bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledger.id} ORDER BY sort_order LIMIT 1)`,
+            bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
           })
           .returning({ id: sourceDocuments.id });
         await db.insert(ledgerEntries).values({
-          ledgerId: ledger.id,
           sourceDocumentId: document!.id,
           amount: "10.00",
           currency: "CNY",
@@ -243,7 +233,6 @@ describe("session ledger query transport", () => {
       // 16:30 UTC on the 30th is already the 1st of October in Shanghai.
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-09-30T16:30:00Z"));
-      return ledger;
     }
 
     it("reads this month in the ledger's zone, not the server's", async () => {

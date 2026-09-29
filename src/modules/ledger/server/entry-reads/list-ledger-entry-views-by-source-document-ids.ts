@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { asc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ledgerEntries } from "@/persistence";
 import {
@@ -9,12 +9,10 @@ import { mapLedgerEntryEmbeddedViewDto } from "./mappers";
 import type { LedgerEntryEmbeddedViewDto } from "@/modules/ledger/contracts";
 
 interface ListLedgerEntryViewsBySourceDocumentIdsInput {
-  ledgerId: string;
   sourceDocumentIds: string[];
 }
 
 export async function listLedgerEntryViewsBySourceDocumentIds({
-  ledgerId,
   sourceDocumentIds,
 }: ListLedgerEntryViewsBySourceDocumentIdsInput): Promise<
   Map<string, LedgerEntryEmbeddedViewDto[]>
@@ -26,10 +24,7 @@ export async function listLedgerEntryViewsBySourceDocumentIds({
   }
 
   const entries = await db.query.ledgerEntries.findMany({
-    where: and(
-      eq(ledgerEntries.ledgerId, ledgerId),
-      inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds)
-    ),
+    where: inArray(ledgerEntries.sourceDocumentId, sourceDocumentIds),
     with: { category: true },
     extras: {
       convertedAmount: entryConvertedAmountSql().as("converted_amount"),

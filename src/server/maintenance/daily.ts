@@ -6,7 +6,6 @@ import {
   loginEmailChallenges,
   sessions,
   webauthnChallenges,
-  ledgers,
   sourceDocumentFiles,
   storedFiles,
 } from "@/persistence";
@@ -16,6 +15,7 @@ import { runWithConcurrency } from "@/lib/concurrency";
 import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
 import { scheduleCategoryAssignmentDrainAfter } from "@/server/category-assignment/schedule";
 import { scheduleProcessingRecovery } from "@/server/processing/recovery";
+import { temporaryKey } from "@/server/stored-files/shared";
 import { CRON_BUDGET_MS } from "@/config/tuning";
 
 const BATCH = 1000;
@@ -72,7 +72,7 @@ export async function runDailyMaintenance(
   };
 
   await step("expired_records", () => deleteExpiredRecords(now, deadlineAt));
-  await step("processing_recovery", scheduleDueProcessing);
+  await step("processing_recovery", scheduleProcessingRecovery);
   await step("category_recovery", async () => scheduleCategoryAssignmentDrainAfter());
   await step("exchange_rates", () => refreshExchangeRates(now));
   await step("pending_files", () => deleteStalePendingFiles(now, deadlineAt));
@@ -120,12 +120,6 @@ async function deleteExpiredRecords(now: Date, deadlineAt: number): Promise<void
   for (const statement of statements) await deleteInBatches(statement, deadlineAt);
 }
 
-/** Schedules every ledger's due processing attempts that no run holds. */
-async function scheduleDueProcessing(): Promise<void> {
-  const rows = await db.select({ id: ledgers.id }).from(ledgers);
-  for (const ledger of rows) await scheduleProcessingRecovery(ledger.id);
-}
-
 /**
  * Deletes files planned over a day ago and never finalized, rows first and
  * then their objects. A document never takes a pending file, so none is in
@@ -135,23 +129,20 @@ async function deleteStalePendingFiles(now: Date, deadlineAt: number): Promise<v
   const dayAgo = new Date(now.getTime() - DAY_MS);
   const storage = getS3Storage();
   while (Date.now() < deadlineAt) {
-    const deleted = await db.execute<{ id: string; ledgerId: string; storageKey: string }>(sql`
+    const deleted = await db.execute<{ id: string; storageKey: string }>(sql`
       DELETE FROM ${storedFiles} WHERE id IN (
         SELECT file.id FROM ${storedFiles} AS file
         WHERE file.finalized_at IS NULL
           AND file.created_at < ${dayAgo}
           AND NOT EXISTS (
             SELECT 1 FROM ${sourceDocumentFiles} AS link
-            WHERE link.ledger_id = file.ledger_id AND link.stored_file_id = file.id
+            WHERE link.stored_file_id = file.id
           )
         LIMIT ${BATCH}
       )
-      RETURNING id, ledger_id AS "ledgerId", storage_key AS "storageKey"
+      RETURNING id, storage_key AS "storageKey"
     `);
-    const keys = deleted.rows.flatMap((file) => [
-      file.storageKey,
-      `temporary/${file.ledgerId}/${file.id}`,
-    ]);
+    const keys = deleted.rows.flatMap((file) => [file.storageKey, temporaryKey(file.id)]);
     await runWithConcurrency(keys, 4, async (key) => {
       await storage.delete(key);
     });
@@ -175,7 +166,7 @@ async function deleteUnusedFiles(now: Date, deadlineAt: number): Promise<void> {
           AND file.created_at < ${weekAgo}
           AND NOT EXISTS (
             SELECT 1 FROM ${sourceDocumentFiles} AS link
-            WHERE link.ledger_id = file.ledger_id AND link.stored_file_id = file.id
+            WHERE link.stored_file_id = file.id
           )
         LIMIT ${BATCH}
       )
@@ -228,7 +219,7 @@ async function deleteOrphanObjects(now: Date, deadlineAt: number): Promise<void>
     const candidates = page.objects
       .filter(
         (object) =>
-          object.key.includes("/stored/") &&
+          (object.key.startsWith("stored/") || object.key.includes("/stored/")) &&
           !object.key.startsWith("temporary/") &&
           object.lastModified != null &&
           object.lastModified.getTime() < dayAgo

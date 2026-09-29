@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { sourceDocuments } from "@/persistence";
 import { NotFoundError } from "@/lib/errors";
 import { db } from "@/lib/db";
@@ -12,20 +12,14 @@ import { lockLedgerForUpdate, lockSourceDocumentForUpdate } from "@/lib/db/trans
  * lease it would finish under.
  */
 export async function deleteSourceDocumentAtomically(input: {
-  ledgerId: string;
   sourceDocumentId: string;
 }): Promise<DeleteSourceDocumentResultDto> {
   return db.transaction(async (tx) => {
-    await lockLedgerForUpdate(tx, input.ledgerId);
-    await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
+    await lockLedgerForUpdate(tx);
+    await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
     const deleted = await tx
       .delete(sourceDocuments)
-      .where(
-        and(
-          eq(sourceDocuments.ledgerId, input.ledgerId),
-          eq(sourceDocuments.id, input.sourceDocumentId)
-        )
-      )
+      .where(eq(sourceDocuments.id, input.sourceDocumentId))
       .returning({ id: sourceDocuments.id });
     if (deleted.length === 0) throw new NotFoundError("Source document");
     return { sourceDocumentId: input.sourceDocumentId, deleted: true };

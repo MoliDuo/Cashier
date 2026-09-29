@@ -1,14 +1,12 @@
 import "server-only";
 import { cache } from "react";
 import { getCurrentSession } from "@/modules/auth/server/current-session";
-import { getLiveLedger } from "@/modules/ledger/server/live-ledger";
-import { isValidUuid } from "@/lib/validation";
-import { NotFoundError, UnauthorizedError } from "@/lib/errors";
+import { getLedger } from "@/modules/ledger/server/live-ledger";
+import { UnauthorizedError } from "@/lib/errors";
 import type { LedgerDto } from "@/modules/ledger/contracts";
 
 export interface AuthenticatedHomeContext {
   userId: string;
-  ledgerId: string;
   ledgerDto: LedgerDto;
   session: {
     user?: {
@@ -21,9 +19,9 @@ export interface AuthenticatedHomeContext {
 }
 
 /**
- * Request-scoped cached helper that resolves the session, home ledger, and
+ * Request-scoped cached helper that resolves the session, the ledger, and
  * ledger access in a single pass. Returns the consolidated context
- * so callers never need to call getCurrentSession(), getLiveLedger(), or
+ * so callers never need to call getCurrentSession(), getLedger(), or
  * requireLedgerAccess() separately within the same render tree.
  */
 export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHomeContext> => {
@@ -31,16 +29,11 @@ export const resolveAuthenticatedHome = cache(async (): Promise<AuthenticatedHom
   if (session == null) throw new UnauthorizedError();
   const userId = session.userId;
 
-  const ledger = await getLiveLedger(userId);
+  const ledger = await getLedger();
   if (ledger == null) throw new UnauthorizedError("Shared ledger is unavailable");
-
-  if (!isValidUuid(ledger.id)) {
-    throw new NotFoundError("Ledger");
-  }
 
   return {
     userId,
-    ledgerId: ledger.id,
     ledgerDto: ledger,
     session: {
       user: {

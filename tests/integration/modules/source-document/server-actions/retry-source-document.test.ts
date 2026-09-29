@@ -26,8 +26,6 @@ vi.mock("@/lib/ai/openai-client", () => ({
 }));
 
 describe("source-document retry action", () => {
-  let ledgerId = "";
-
   const createDocument = (text: string) =>
     createSourceDocumentAction({ text }, crypto.randomUUID());
 
@@ -37,9 +35,8 @@ describe("source-document retry action", () => {
     );
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db, undefined, "Retry Ledger", TEST_USER_ID));
+    await createTestUserWithLedger(db, undefined, "Retry Ledger", TEST_USER_ID);
     await db.insert(entryCategories).values({
-      ledgerId,
       name: "餐饮",
       description: "餐饮服务",
       sortOrder: 1,

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { mapLedgerEntryDto } from "./mappers";
@@ -16,7 +16,6 @@ import {
 } from "@/modules/currency/server/conversion-sql";
 
 interface ListLedgerEntryPageInput {
-  ledgerId: string;
   limit?: number;
   cursor?: string | null;
   filters: LedgerEntryFilterParams;
@@ -32,15 +31,13 @@ interface VisibleEntryRow {
 }
 
 export async function listLedgerEntryPage({
-  ledgerId,
   limit = 20,
   cursor,
   filters,
 }: ListLedgerEntryPageInput) {
   return db.transaction(
     async (tx) => {
-      const tenantCondition = and(eq(ledgerEntries.ledgerId, ledgerId));
-      const cursorCondition = buildLedgerEntryCursorCondition(cursor, ledgerId, filters, {
+      const cursorCondition = buildLedgerEntryCursorCondition(cursor, filters, {
         effectiveDate: sql`documents.effective_date`,
         documentCreatedAt: sql`documents.created_at`,
         documentId: sql`documents.id`,
@@ -48,10 +45,9 @@ export async function listLedgerEntryPage({
         entryId: sql`ledger_entries.id`,
       });
       const whereConditions = [
-        tenantCondition,
         ...buildLedgerEntryEffectiveDateConditions(filters),
         ...buildLedgerEntryValueConditions(filters, {
-          mainCurrency: sql`(SELECT main_currency FROM ledgers WHERE id = ${ledgerId})`,
+          mainCurrency: sql`(SELECT main_currency FROM ledgers)`,
           date: sql`documents.effective_date`,
         }),
         cursorCondition,
@@ -72,10 +68,9 @@ export async function listLedgerEntryPage({
         documents.id AS document_id
       FROM ledger_entries
       INNER JOIN source_documents documents
-        ON documents.ledger_id = ledger_entries.ledger_id
-       AND documents.id = ledger_entries.source_document_id
+        ON documents.id = ledger_entries.source_document_id
        ${filters.bookId == null ? sql`` : sql`AND documents.book_id = ${filters.bookId}`}
-      WHERE ${sql.join(whereConditions, sql` AND `)}
+      ${whereConditions.length === 0 ? sql`` : sql`WHERE ${sql.join(whereConditions, sql` AND `)}`}
     )
     SELECT id, position, effective_date::text AS "effectiveDate",
       document_created_at AS "documentCreatedAt", document_id AS "documentId"
@@ -102,7 +97,6 @@ export async function listLedgerEntryPage({
             position: lastItem.position,
             entryId: lastItem.id,
           },
-          ledgerId,
           filters
         );
       }
@@ -115,12 +109,9 @@ export async function listLedgerEntryPage({
           ? []
           : await tx.query.ledgerEntries
               .findMany({
-                where: and(
-                  eq(ledgerEntries.ledgerId, ledgerId),
-                  inArray(
-                    ledgerEntries.id,
-                    pagedRows.map((row) => row.id)
-                  )
+                where: inArray(
+                  ledgerEntries.id,
+                  pagedRows.map((row) => row.id)
                 ),
                 with: {
                   category: true,
@@ -128,7 +119,6 @@ export async function listLedgerEntryPage({
                     columns: {
                       id: true,
                       version: true,
-                      ledgerId: true,
                       title: true,
                       documentDate: true,
                       effectiveDate: true,
@@ -143,8 +133,7 @@ export async function listLedgerEntryPage({
                   hasImages: sql<boolean>`EXISTS (
                     SELECT 1
                     FROM ${sourceDocumentFiles} page_document_file
-                    WHERE page_document_file.ledger_id = ${ledgerEntries.ledgerId}
-                      AND page_document_file.source_document_id = ${ledgerEntries.sourceDocumentId}
+                    WHERE page_document_file.source_document_id = ${ledgerEntries.sourceDocumentId}
                   )`.as("has_images"),
                 },
               })

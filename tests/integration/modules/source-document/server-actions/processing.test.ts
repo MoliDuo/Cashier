@@ -7,17 +7,15 @@ import { NotFoundError, ValidationError } from "@/lib/errors";
 import { cancelSourceDocumentProcessingAction } from "@/modules/source-document/server-actions/processing";
 
 describe("cancelSourceDocumentProcessingAction", () => {
-  let ledgerId = "";
-
   beforeEach(async () => {
     const db = getTestDb();
     await db.delete(ledgers);
-    ({ ledgerId } = await createTestUserWithLedger(db));
+    await createTestUserWithLedger(db);
   });
 
   it("cancels the running parse of the signed-in ledger's document", async () => {
     const db = getTestDb();
-    const documentId = await createTestSourceDocument(db, ledgerId, { status: "processing" });
+    const documentId = await createTestSourceDocument(db, { status: "processing" });
 
     await expect(cancelSourceDocumentProcessingAction(documentId)).resolves.toEqual({
       processingStatus: "cancelled",

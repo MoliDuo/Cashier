@@ -1,28 +1,19 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getStreamRefresh } from "@/modules/source-document/server/stream-refresh";
-import { ledgerSyncState, ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
+import { ledgers, extractionAttempts, sourceDocuments } from "@/persistence";
 import { createTestSourceDocument, createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 
 describe("ledger refresh", () => {
-  let ledgerId: string;
-
   beforeEach(async () => {
-    ({ ledgerId } = await createTestUserWithLedger(
-      getTestDb(),
-      undefined,
-      undefined,
-      crypto.randomUUID()
-    ));
+    await createTestUserWithLedger(getTestDb(), undefined, undefined, crypto.randomUUID());
   });
 
-  const refresh = (afterVersion: string) => getStreamRefresh(ledgerId, { afterVersion });
+  const refresh = (afterVersion: string) => getStreamRefresh({ afterVersion });
 
   async function version(): Promise<bigint> {
-    const state = await getTestDb().query.ledgerSyncState.findFirst({
-      where: eq(ledgerSyncState.ledgerId, ledgerId),
-    });
+    const state = await getTestDb().query.ledgerSyncState.findFirst();
     return state?.version ?? BigInt(0);
   }
 
@@ -37,9 +28,9 @@ describe("ledger refresh", () => {
   });
 
   it("summarizes continuous document and settings changes", async () => {
-    await createTestSourceDocument(getTestDb(), ledgerId, { title: "Refresh receipt" });
+    await createTestSourceDocument(getTestDb(), { title: "Refresh receipt" });
     const afterDocument = await version();
-    await getTestDb().update(ledgers).set({ aiLanguage: "en" }).where(eq(ledgers.id, ledgerId));
+    await getTestDb().update(ledgers).set({ aiLanguage: "en" });
 
     expect(await refresh(afterDocument.toString())).toEqual({
       version: (await version()).toString(),
@@ -50,8 +41,8 @@ describe("ledger refresh", () => {
   });
 
   it("uses resource watermarks even for a client that has never refreshed", async () => {
-    await createTestSourceDocument(getTestDb(), ledgerId);
-    await getTestDb().update(ledgers).set({ aiLanguage: "en" }).where(eq(ledgers.id, ledgerId));
+    await createTestSourceDocument(getTestDb());
+    await getTestDb().update(ledgers).set({ aiLanguage: "en" });
     expect(await refresh("0")).toMatchObject({
       changed: true,
       invalidations: { categories: false, settings: true, stats: true },
@@ -61,14 +52,14 @@ describe("ledger refresh", () => {
   it("coalesces a transaction and rolls back its resource watermarks", async () => {
     const before = await version();
     await getTestDb().transaction(async (tx) => {
-      await tx.update(ledgers).set({ aiLanguage: "en" }).where(eq(ledgers.id, ledgerId));
-      await tx.update(ledgers).set({ aiLanguage: "zh-CN" }).where(eq(ledgers.id, ledgerId));
+      await tx.update(ledgers).set({ aiLanguage: "en" });
+      await tx.update(ledgers).set({ aiLanguage: "zh-CN" });
     });
     expect(await version()).toBe(before + BigInt(1));
     const committed = await refresh(before.toString());
     await expect(
       getTestDb().transaction(async (tx) => {
-        await tx.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
+        await tx.update(ledgers).set({ mainCurrency: "USD" });
         throw new Error("rollback");
       })
     ).rejects.toThrow("rollback");
@@ -77,7 +68,7 @@ describe("ledger refresh", () => {
 
   it("invalidates everything after a main-currency reset", async () => {
     const before = await version();
-    await getTestDb().update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
+    await getTestDb().update(ledgers).set({ mainCurrency: "USD" });
 
     expect(await refresh(before.toString())).toMatchObject({
       changed: true,
@@ -105,7 +96,7 @@ describe("ledger refresh", () => {
   });
 
   it("reports processing work until the document reaches a terminal state", async () => {
-    const documentId = await createTestSourceDocument(getTestDb(), ledgerId, {
+    const documentId = await createTestSourceDocument(getTestDb(), {
       status: "processing",
     });
     const processing = await refresh("0");

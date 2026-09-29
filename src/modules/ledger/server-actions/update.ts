@@ -7,12 +7,12 @@ import { updateLedgerSettings } from "../server/settings";
 import { toUpdateLedgerActionErrorCode } from "./update-error";
 
 export const updateLedgerSettingsAction = withLedgerAccess(
-  async (ledgerId: string, data: UpdateLedgerInput): Promise<UpdateLedgerActionResult> => {
+  async (data: UpdateLedgerInput): Promise<UpdateLedgerActionResult> => {
     try {
       const validated = parseUpdateLedgerInput(data);
       return {
         ok: true,
-        ledger: await updateLedgerSettings(ledgerId, validated),
+        ledger: await updateLedgerSettings(validated),
       };
     } catch (error) {
       const code = toUpdateLedgerActionErrorCode(error);

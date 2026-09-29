@@ -55,7 +55,6 @@ const BOOK_ID = "10000000-0000-4000-8000-000000000002";
 const baseProps = {
   viewedBookId: null as string | null,
   savedBook: { id: BOOK_ID, name: "Travel" } as { id: string; name: string } | null,
-  ledgerId: "ledger-1",
   activeTab: "records" as const,
   committedView: { filters: {}, range: null },
   onSaved: vi.fn(),

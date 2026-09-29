@@ -68,7 +68,6 @@ function documentWithFiles(count: number): SourceDocument {
   return {
     id: "doc-1",
     version: 1,
-    ledgerId: "ledger-1",
     title: "Receipt",
     text: null,
     files: Array.from({ length: count }, (_, index) => ({
@@ -99,7 +98,6 @@ function renderWithQueryClient(element: ReactElement) {
 
 const entry = (id: string, itemName: string): LedgerEntry => ({
   id,
-  ledgerId: "ledger-1",
   categoryId: null,
   sourceDocumentId: "doc-1",
   amount: "12.00",

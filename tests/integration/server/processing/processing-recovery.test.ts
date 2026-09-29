@@ -19,22 +19,20 @@ import { executeProcessingJob } from "@/server/processing/execute-job";
 
 /**
  * Creates a processing attempt for a single source document.
- * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions.
+ * Each call uses a fresh user to avoid unique-constraint collisions.
  */
 async function pendingIntent(
   requestedAt = "2026-07-15T00:00:00.000Z",
   userId = crypto.randomUUID()
-): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
+): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
-  const bookId = await testBookId(db, ledgerId);
+  await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
-    ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
   });
   return {
-    ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,
@@ -59,14 +57,13 @@ function findAttempt(attemptId: string) {
   });
 }
 
-async function supersede(ledgerId: string, job: ProcessingJobContract) {
+async function supersede(job: ProcessingJobContract) {
   const db = getTestDb();
   // A retry cancels the attempt it replaces; one document processes one attempt at a time.
   await setAttempt(job.attemptId, { status: "cancelled", finishedAt: new Date() });
   const newAttempt = await db
     .insert(extractionAttempts)
     .values({
-      ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       status: "processing",
     })
@@ -83,10 +80,10 @@ describe("Processing Recovery", () => {
   const maxBatch = 3;
 
   it("recovers an attempt that was submitted but never claimed (missed after())", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
 
-    const recoverable = await adapter.recoverBatch(ledgerId, maxBatch);
+    const recoverable = await adapter.recoverBatch(maxBatch);
 
     expect(recoverable.map((candidate) => candidate.attemptId)).toEqual([job.attemptId]);
     // Recovery only reads; a run counts the attempt when it claims it.
@@ -96,35 +93,35 @@ describe("Processing Recovery", () => {
   });
 
   it("re-selects an attempt with an expired claim", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
     await setAttempt(job.attemptId, {
       claimToken: crypto.randomUUID(),
       claimExpiresAt: new Date("2020-01-01T00:00:00.000Z"),
     });
 
-    const recoverable = await adapter.recoverBatch(ledgerId, maxBatch);
+    const recoverable = await adapter.recoverBatch(maxBatch);
 
     expect(recoverable.map((candidate) => candidate.attemptId)).toEqual([job.attemptId]);
   });
 
   it("leaves an attempt alone while its claim is live", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
     await expect(adapter.claim(job.attemptId)).resolves.not.toBeNull();
 
-    await expect(adapter.recoverBatch(ledgerId, maxBatch)).resolves.toHaveLength(0);
+    await expect(adapter.recoverBatch(maxBatch)).resolves.toHaveLength(0);
     await expect(adapter.claim(job.attemptId)).resolves.toBeNull();
   });
 
   it("does not double-process under concurrent requests", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
 
     // Two requests may both schedule the attempt; only one run can claim it.
     const [first, second] = await Promise.all([
-      adapter.recoverBatch(ledgerId, maxBatch),
-      adapter.recoverBatch(ledgerId, maxBatch),
+      adapter.recoverBatch(maxBatch),
+      adapter.recoverBatch(maxBatch),
     ]);
     expect([...first, ...second].map((candidate) => candidate.attemptId)).toEqual([
       job.attemptId,
@@ -134,26 +131,26 @@ describe("Processing Recovery", () => {
 
     expect(claims.filter((claim) => claim != null)).toHaveLength(1);
     expect((await findAttempt(job.attemptId))!.attemptCount).toBe(1);
-    await expect(adapter.recoverBatch(ledgerId, maxBatch)).resolves.toHaveLength(0);
+    await expect(adapter.recoverBatch(maxBatch)).resolves.toHaveLength(0);
   });
 
   it("skips recovery when the source document has been deleted", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
 
     const db = getTestDb();
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, job.sourceDocumentId));
 
-    const recoverable = await adapter.recoverBatch(ledgerId, maxBatch);
+    const recoverable = await adapter.recoverBatch(maxBatch);
     expect(recoverable).toHaveLength(0);
   });
 
   it("recovers only the attempt that replaced an earlier one", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
-    const newAttempt = await supersede(ledgerId, job);
+    const newAttempt = await supersede(job);
 
-    const recoverable = await adapter.recoverBatch(ledgerId, maxBatch);
+    const recoverable = await adapter.recoverBatch(maxBatch);
     expect(recoverable.map((candidate) => candidate.attemptId)).toEqual([newAttempt.id]);
     await expect(adapter.claim(job.attemptId)).resolves.toBeNull();
     const oldAttempt = await findAttempt(job.attemptId);
@@ -162,48 +159,36 @@ describe("Processing Recovery", () => {
   });
 
   it("skips an attempt that already finished", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
     await setAttempt(job.attemptId, { status: "completed", finishedAt: new Date() });
 
-    await expect(adapter.recoverBatch(ledgerId, maxBatch)).resolves.toHaveLength(0);
+    await expect(adapter.recoverBatch(maxBatch)).resolves.toHaveLength(0);
     await expect(adapter.claim(job.attemptId)).resolves.toBeNull();
     expect((await findAttempt(job.attemptId))?.status).toBe("completed");
   });
 
-  it("does not recover intents from other ledgers", async () => {
-    await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
-    const { ledgerId: ledgerB, job: intentB } = await pendingIntent(
-      "2026-07-15T00:00:00.000Z",
-      crypto.randomUUID()
-    );
-
-    const adapter = processingJobs();
-    const recoverable = await adapter.recoverBatch(ledgerB, maxBatch);
-    expect(recoverable.map((candidate) => candidate.attemptId)).toEqual([intentB.attemptId]);
-  });
-
   it("counts an attempt each time a run claims the job, not when it is scheduled", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
 
-    await adapter.recoverBatch(ledgerId, maxBatch);
+    await adapter.recoverBatch(maxBatch);
     await expect(adapter.claim(job.attemptId)).resolves.toMatchObject({ runNumber: 1 });
     await adapter.expireLease(job.attemptId);
     await expect(adapter.claim(job.attemptId)).resolves.toMatchObject({ runNumber: 2 });
   });
 
   it("does not hand out an attempt before its retry is due", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
     await setAttempt(job.attemptId, { nextAttemptAt: new Date(Date.now() + 60_000) });
 
-    await expect(adapter.recoverBatch(ledgerId, maxBatch)).resolves.toHaveLength(0);
+    await expect(adapter.recoverBatch(maxBatch)).resolves.toHaveLength(0);
     await expect(adapter.claim(job.attemptId)).resolves.toBeNull();
   });
 
   it("fails an exhausted job under its lease when a run claims it", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const adapter = processingJobs();
     await setAttempt(job.attemptId, { attemptCount: BACKGROUND_MAX_ATTEMPTS });
     const db = getTestDb();
@@ -212,7 +197,7 @@ describe("Processing Recovery", () => {
     });
 
     // Recovery still schedules it; the claim is where exhaustion is decided.
-    await expect(adapter.recoverBatch(ledgerId, maxBatch)).resolves.toHaveLength(1);
+    await expect(adapter.recoverBatch(maxBatch)).resolves.toHaveLength(1);
     await expect(executeProcessingJob(job)).resolves.toBe(true);
 
     expect(createAIContext).not.toHaveBeenCalled();
@@ -229,7 +214,7 @@ describe("Processing Recovery", () => {
   });
 
   it("gives a transiently failed attempt back to the queue with a backoff", async () => {
-    const { ledgerId, job } = await pendingIntent();
+    const { job } = await pendingIntent();
     const rateLimited = new AppError("limited", "ai_rate_limited", 503, { retryAfterMs: 5_000 });
     vi.mocked(createAIContext).mockReturnValue({
       generate: vi.fn().mockRejectedValue(rateLimited),
@@ -246,7 +231,7 @@ describe("Processing Recovery", () => {
     });
     // The provider asked for 5s, longer than the first backoff of 2s.
     expect(row!.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() + 3_000);
-    await expect(processingJobs().recoverBatch(ledgerId, maxBatch)).resolves.toHaveLength(0);
+    await expect(processingJobs().recoverBatch(maxBatch)).resolves.toHaveLength(0);
   });
 
   it("fails a transient failure on its last attempt with the provider's code", async () => {
@@ -286,20 +271,18 @@ describe("Processing Recovery", () => {
   });
 
   it("returns at most maxBatch intents", async () => {
-    const { ledgerId } = await pendingIntent();
-    const bookId = await testBookId(getTestDb(), ledgerId);
+    await pendingIntent();
+    const bookId = await testBookId(getTestDb());
     await createPendingAttempt({
-      ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
       bookId,
     });
     await createPendingAttempt({
-      ledgerId,
       input: { text: "Coffee 5.00 CNY", storedFileIds: [], documentDate: null },
       bookId,
     });
 
-    const recoverable = await processingJobs().recoverBatch(ledgerId, 2);
+    const recoverable = await processingJobs().recoverBatch(2);
 
     // maxBatch=2 limits the result even though 3 intents are eligible
     expect(recoverable).toHaveLength(2);
@@ -309,22 +292,20 @@ describe("Processing Recovery", () => {
 describe("Processing retry supersession", () => {
   it("atomically cancels the old attempt and invalidates its active claim", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const first = await submitSourceDocument({
-      ledgerId,
       input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
     const processing = processingJobs();
     const oldClaim = await processing.claim(first.job.attemptId);
     expect(oldClaim).not.toBeNull();
 
     const second = await submitSourceDocument({
-      ledgerId,
       sourceDocumentId: first.document.id,
       inheritInput: true,
       supersedeProcessing: true,
-      bookId: await testBookId(db, ledgerId),
+      bookId: await testBookId(db),
     });
 
     const [document, oldAttempt] = await Promise.all([

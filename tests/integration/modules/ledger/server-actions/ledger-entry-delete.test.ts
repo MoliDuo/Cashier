@@ -11,7 +11,6 @@ import {
 } from "tests/helpers/schema-setup";
 
 describe("Ledger Entry Delete Action", () => {
-  let testLedgerId: string;
   let testEntryId: string;
   let testSourceDocId: string;
 
@@ -19,16 +18,14 @@ describe("Ledger Entry Delete Action", () => {
     const db = getTestDb();
     // Clean up existing ledger for TEST_USER_ID to avoid unique constraint
     await db.delete(ledgers);
-    const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
-    testLedgerId = ledgerId;
+    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
 
     // Create a test source document for entries
-    testSourceDocId = await createTestSourceDocument(db, testLedgerId);
+    testSourceDocId = await createTestSourceDocument(db);
 
     const [entry] = await db
       .insert(ledgerEntries)
       .values({
-        ledgerId: testLedgerId,
         sourceDocumentId: testSourceDocId,
         amount: "100",
         currency: "CNY",
@@ -51,29 +48,5 @@ describe("Ledger Entry Delete Action", () => {
       where: eq(ledgerEntries.id, testEntryId),
     });
     expect(deletedEntry).toBeUndefined();
-  });
-
-  it("refuses every ledger once a second live one exists, which is the deployment's rule", async () => {
-    const db = getTestDb();
-    // This deployment serves one live ledger: `getLiveLedger` returns null as
-    // soon as there are two, so the refusal below is the single-ledger rule
-    // firing, not per-record scoping. Scoping is held at the aggregate, in
-    // tests/integration/modules/source-document/server/cross-ledger-access.test.ts, where a
-    // second ledger does not disable the check being measured.
-    await createTestUserWithLedger(
-      db,
-      "other@example.com",
-      "Other Ledger",
-      "11111111-1111-1111-1111-111111111111"
-    );
-
-    await expect(deleteLedgerEntryAction(testSourceDocId, testEntryId)).rejects.toThrow(
-      "Ledger not found"
-    );
-
-    const survivor = await db.query.ledgerEntries.findFirst({
-      where: eq(ledgerEntries.id, testEntryId),
-    });
-    expect(survivor).toBeDefined();
   });
 });

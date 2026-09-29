@@ -7,7 +7,6 @@ import { getBatchEntryDateImpact } from "@/modules/ledger/server/entry-reads/get
  * every selected document — including one with no entries, which still moves.
  */
 export async function previewSourceDocumentDateImpact(input: {
-  ledgerId: string;
   sourceDocumentIds: readonly string[];
   ledgerEntryIds: readonly string[];
 }): Promise<BatchEntryDateImpact> {
@@ -22,7 +21,6 @@ export async function previewSourceDocumentDateImpact(input: {
   }
 
   const impact = await getBatchEntryDateImpact({
-    ledgerId: input.ledgerId,
     ledgerEntryIds: [...input.ledgerEntryIds],
   });
   return {

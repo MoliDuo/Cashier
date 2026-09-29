@@ -23,23 +23,21 @@ afterEach(() => {
 
 /**
  * Creates a pending attempt + job for a single source document.
- * Each call uses a fresh user+ledger pair to avoid unique-constraint collisions
+ * Each call uses a fresh user to avoid unique-constraint collisions
  * when called multiple times within one test.
  */
 async function pendingIntent(
   requestedAt = "2026-07-15T00:00:00.000Z",
   userId = crypto.randomUUID()
-): Promise<{ ledgerId: string; job: ProcessingJobContract }> {
+): Promise<{ job: ProcessingJobContract }> {
   const db = getTestDb();
-  const { ledgerId } = await createTestUserWithLedger(db, undefined, undefined, userId);
-  const bookId = await testBookId(db, ledgerId);
+  await createTestUserWithLedger(db, undefined, undefined, userId);
+  const bookId = await testBookId(db);
   const pending = await createPendingAttempt({
-    ledgerId,
     input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
     bookId: bookId,
   });
   return {
-    ledgerId,
     job: {
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,
@@ -51,7 +49,7 @@ async function pendingIntent(
 describe("processing attempt jobs", () => {
   it("processes parser, reconciliation, exchange-rate facts, and result writes by attempt identity", async () => {
     const db = getTestDb();
-    const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
     const generate = vi.fn(async () => ({
       content: JSON.stringify({
         outcome: "success",
@@ -78,7 +76,6 @@ describe("processing attempt jobs", () => {
 
     await expect(
       processor.process({
-        ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         attemptId: job.attemptId,
         lease,
@@ -87,7 +84,6 @@ describe("processing attempt jobs", () => {
     ).resolves.toEqual({ processingStatus: "completed" });
     await expect(
       processor.process({
-        ledgerId,
         sourceDocumentId: job.sourceDocumentId,
         attemptId: job.attemptId,
         lease,
@@ -104,18 +100,15 @@ describe("processing attempt jobs", () => {
 
   it("processes with custom ledger prompt in AI generation request", async () => {
     const db = getTestDb();
-    const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
     // Update typed ledger settings with a custom prompt.
     const customPrompt = "Please categorize expenses as food or transport";
-    await db
-      .update(ledgers)
-      .set({
-        aiCustomPrompt: customPrompt,
-        aiLanguage: "en",
-        preferredCurrencies: ["CNY", "USD"],
-      })
-      .where(eq(ledgers.id, ledgerId));
+    await db.update(ledgers).set({
+      aiCustomPrompt: customPrompt,
+      aiLanguage: "en",
+      preferredCurrencies: ["CNY", "USD"],
+    });
 
     const generate = vi.fn(async () => ({
       content: JSON.stringify({
@@ -143,7 +136,6 @@ describe("processing attempt jobs", () => {
     const lease = await claimAttemptForTest(job.attemptId);
 
     await processor.process({
-      ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       attemptId: job.attemptId,
       lease,
@@ -162,7 +154,7 @@ describe("processing attempt jobs", () => {
   it("retried attempt uses current ledger settings", async () => {
     const db = getTestDb();
     await insertExchangeRates(new Date().toISOString().slice(0, 10), { CNY: 8, USD: 1.2 });
-    const { ledgerId, job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
+    const { job } = await pendingIntent("2026-07-15T00:00:00.000Z", crypto.randomUUID());
 
     // Process once without custom prompt (successful first parse)
     const generate1 = vi.fn(async () => ({
@@ -190,7 +182,6 @@ describe("processing attempt jobs", () => {
     const processor1 = attemptProcessor(() => ({ generate: generate1 }));
 
     await processor1.process({
-      ledgerId,
       sourceDocumentId: job.sourceDocumentId,
       attemptId: job.attemptId,
       lease: await claimAttemptForTest(job.attemptId),
@@ -199,19 +190,15 @@ describe("processing attempt jobs", () => {
 
     // Update typed settings after the first parse.
     const customPrompt = "Please focus on categorizing dining expenses";
-    await db
-      .update(ledgers)
-      .set({
-        aiCustomPrompt: customPrompt,
-        aiLanguage: "en",
-        preferredCurrencies: ["CNY", "USD"],
-      })
-      .where(eq(ledgers.id, ledgerId));
+    await db.update(ledgers).set({
+      aiCustomPrompt: customPrompt,
+      aiLanguage: "en",
+      preferredCurrencies: ["CNY", "USD"],
+    });
 
     // Create a second attempt (retry) after the settings change
-    const bookId = await testBookId(db, ledgerId);
+    const bookId = await testBookId(db);
     const pending2 = await createPendingAttempt({
-      ledgerId,
       input: { text: "Dinner 25.00 USD", storedFileIds: [], documentDate: null },
       bookId,
     });
@@ -241,7 +228,6 @@ describe("processing attempt jobs", () => {
     const processor2 = attemptProcessor(() => ({ generate: generate2 }));
 
     await processor2.process({
-      ledgerId,
       sourceDocumentId: pending2.document.id,
       attemptId: pending2.attempt.id,
       lease: await claimAttemptForTest(pending2.attempt.id),
@@ -266,7 +252,7 @@ describe("processing attempt jobs", () => {
 
     const won = claims.filter((claim) => claim != null);
     expect(won).toHaveLength(1);
-    expect(won[0]?.ledgerId).toBeDefined();
+    expect(won[0]?.job.attemptId).toBe(job.attemptId);
     await expect(
       db.query.extractionAttempts.findFirst({
         where: eq(extractionAttempts.id, job.attemptId),

@@ -17,13 +17,13 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
   return db.transaction(async (tx) => {
     // The ledger lock keeps the categories the entries reference from being
     // deleted underneath the activation.
-    await lockLedgerForUpdate(tx, input.ledgerId);
+    await lockLedgerForUpdate(tx);
 
     // Also lock the source document row to serialise with a concurrent delete.
     // Lock order: ledger → source document (prevents deadlocks).
     let document: LockedSourceDocument;
     try {
-      document = await lockSourceDocumentForUpdate(tx, input.ledgerId, input.sourceDocumentId);
+      document = await lockSourceDocumentForUpdate(tx, input.sourceDocumentId);
     } catch (error) {
       if (error instanceof NotFoundError) return false;
       throw error;
@@ -34,7 +34,6 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
       .from(extractionAttempts)
       .where(
         and(
-          eq(extractionAttempts.ledgerId, input.ledgerId),
           eq(extractionAttempts.sourceDocumentId, input.sourceDocumentId),
           eq(extractionAttempts.id, input.attemptId)
         )
@@ -49,7 +48,6 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
     }
 
     await replaceProjection(tx, {
-      ledgerId: input.ledgerId,
       sourceDocumentId: input.sourceDocumentId,
       entries: input.entries,
     });
@@ -73,7 +71,7 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
         dateOrganizationSuggestion: input.dateOrganizationSuggestion ?? null,
         updatedAt: now,
       })
-      .where(activeDocumentWhere(input.ledgerId, input.sourceDocumentId));
+      .where(activeDocumentWhere(input.sourceDocumentId));
     return true;
   });
 }

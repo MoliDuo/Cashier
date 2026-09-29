@@ -11,16 +11,16 @@ import { getLatestCategoryAssignmentJob } from "@/server/category-assignment/job
  * than beside the start action.
  */
 export const getCategoryAssignmentJobAction = withLedgerAccess(
-  async (ledgerId: string): Promise<CategoryAssignmentJobDto | null> => {
-    const job = await getLatestCategoryAssignmentJob({ ledgerId });
+  async (): Promise<CategoryAssignmentJobDto | null> => {
+    const job = await getLatestCategoryAssignmentJob();
     return job == null ? null : toCategoryAssignmentJobDto(job);
   }
 );
 
 export const getCategoryAssignmentResultsAction = withLedgerAccess(
-  async (
-    ledgerId: string,
-    input: { jobId: string; cursor?: number; limit?: number }
-  ): Promise<CategoryAssignmentResultPageDto> =>
-    listCategoryAssignmentResults({ ledgerId, ...input })
+  async (input: {
+    jobId: string;
+    cursor?: number;
+    limit?: number;
+  }): Promise<CategoryAssignmentResultPageDto> => listCategoryAssignmentResults(input)
 );

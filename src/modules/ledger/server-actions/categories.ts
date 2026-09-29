@@ -8,9 +8,9 @@ import {
 import { saveEntryCategories } from "../server/categories";
 
 export const saveEntryCategoriesAction = withLedgerAccess(
-  async (ledgerId: string, input: SaveEntryCategoriesInput): Promise<EntryCategoryDto[]> => {
+  async (input: SaveEntryCategoriesInput): Promise<EntryCategoryDto[]> => {
     const validated = parseSaveEntryCategoriesInput(input);
-    return saveEntryCategories(ledgerId, {
+    return saveEntryCategories({
       expectedRevision: validated.expectedRevision,
       categories: validated.categories.map((category) => ({
         ...(category.id === undefined ? {} : { id: category.id }),

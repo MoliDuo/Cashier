@@ -68,8 +68,6 @@ vi.mock("@/lib/storage/s3", () => ({
 }));
 
 describe("API v1 source-documents route", () => {
-  let ledgerId: string;
-
   let credentialKey: string;
 
   beforeEach(async () => {
@@ -78,18 +76,16 @@ describe("API v1 source-documents route", () => {
     mockR2.setUploadError(null);
 
     await db.delete(ledgers);
-    const setup = await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
 
     credentialKey = `sk_route_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);
     await db
       .insert(serviceCredentials)
       .values({
-        ledgerId,
         name: "Route Credential",
         tokenHash: computeHash(credentialKey),
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -123,7 +119,7 @@ describe("API v1 source-documents route", () => {
     const created = await db.query.sourceDocuments.findFirst({
       where: eq(sourceDocuments.id, data.sourceDocumentId),
     });
-    expect(created?.ledgerId).toBe(ledgerId);
+    expect(created).toBeDefined();
   });
 
   it("dates a document from the server clock when the credential sends no date", async () => {
@@ -167,10 +163,7 @@ describe("API v1 source-documents route", () => {
     expect(secondBody).toEqual(firstBody);
 
     const db = getTestDb();
-    const documents = await db
-      .select({ id: sourceDocuments.id })
-      .from(sourceDocuments)
-      .where(eq(sourceDocuments.ledgerId, ledgerId));
+    const documents = await db.select({ id: sourceDocuments.id }).from(sourceDocuments);
     const attempts = await db
       .select({ id: extractionAttempts.id })
       .from(extractionAttempts)
@@ -232,10 +225,7 @@ describe("API v1 source-documents route", () => {
     expect(response.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
 
     const db = getTestDb();
-    const documents = await db
-      .select({ id: sourceDocuments.id })
-      .from(sourceDocuments)
-      .where(eq(sourceDocuments.ledgerId, ledgerId));
+    const documents = await db.select({ id: sourceDocuments.id }).from(sourceDocuments);
     expect(documents).toHaveLength(1);
   });
 

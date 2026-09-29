@@ -90,9 +90,9 @@ export function buildLedgerEntryEffectiveDateConditions(
   return conditions;
 }
 
-function queryFingerprint(ledgerId: string, filters: LedgerEntryFilterParams): string {
+function queryFingerprint(filters: LedgerEntryFilterParams): string {
   return createHash("sha256")
-    .update(`${ledgerId}\0${serializeLedgerQuery(filters)}`)
+    .update(serializeLedgerQuery(filters))
     .digest("base64url")
     .slice(0, 16);
 }
@@ -108,12 +108,11 @@ interface LedgerEntryCursor {
 
 export function encodeLedgerEntryCursor(
   value: Omit<LedgerEntryCursor, "fingerprint">,
-  ledgerId: string,
   filters: LedgerEntryFilterParams
 ): string {
-  return Buffer.from(
-    JSON.stringify({ ...value, fingerprint: queryFingerprint(ledgerId, filters) })
-  ).toString("base64url");
+  return Buffer.from(JSON.stringify({ ...value, fingerprint: queryFingerprint(filters) })).toString(
+    "base64url"
+  );
 }
 
 const ledgerEntryCursorSchema = z
@@ -148,7 +147,6 @@ const cursorColumns = (): LedgerEntryCursorColumns => ({
 
 export function buildLedgerEntryCursorCondition(
   cursor: string | null | undefined,
-  ledgerId: string,
   filters: LedgerEntryFilterParams,
   columns: LedgerEntryCursorColumns = cursorColumns()
 ): SQL<unknown> | null {
@@ -167,7 +165,7 @@ export function buildLedgerEntryCursorCondition(
   } catch {
     throw new ValidationError("Invalid ledger entry cursor");
   }
-  if (value.fingerprint !== queryFingerprint(ledgerId, filters)) {
+  if (value.fingerprint !== queryFingerprint(filters)) {
     throw new ValidationError("Ledger entry cursor does not match the query");
   }
 

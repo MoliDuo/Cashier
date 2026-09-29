@@ -8,9 +8,8 @@ import { getStreamTotal } from "@/modules/source-document/server/stream-total";
 
 describe("ledger search", () => {
   it("normalizes search and keeps Stream and Details contracts independent", async () => {
-    const { ledgerId } = await createTestUserWithLedger(getTestDb());
+    await createTestUserWithLedger(getTestDb());
     await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Coffee Receipt",
       entryDate: "2026-07-15",
       entries: [
@@ -22,10 +21,9 @@ describe("ledger search", () => {
           description: "Morning special",
         },
       ],
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
     });
     await createTestRecord(getTestDb(), {
-      ledgerId,
       title: "Literal % Store",
       entryDate: "2026-07-16",
       entries: [
@@ -37,32 +35,32 @@ describe("ledger search", () => {
           description: null,
         },
       ],
-      bookId: await testBookId(getTestDb(), ledgerId),
+      bookId: await testBookId(getTestDb()),
     });
 
-    const titleMatch = await listStreamPage(ledgerId, { search: "  coffee   receipt ", limit: 20 });
-    const entryMatch = await listStreamPage(ledgerId, { search: "MORNING", limit: 20 });
-    const literalMatch = await listStreamPage(ledgerId, { search: "_100%", limit: 20 });
+    const titleMatch = await listStreamPage({ search: "  coffee   receipt ", limit: 20 });
+    const entryMatch = await listStreamPage({ search: "MORNING", limit: 20 });
+    const literalMatch = await listStreamPage({ search: "_100%", limit: 20 });
     expect(titleMatch.items).toEqual([]);
     expect(entryMatch.items.map((item) => item.title)).toEqual(["Coffee Receipt"]);
     expect(literalMatch.items.map((item) => item.title)).toEqual(["Literal % Store"]);
 
-    const detailsByTitle = await listLedgerEntries(ledgerId, {
+    const detailsByTitle = await listLedgerEntries({
       search: "Coffee Receipt",
       limit: 20,
     });
-    const detailsByDescription = await listLedgerEntries(ledgerId, {
+    const detailsByDescription = await listLedgerEntries({
       search: "morning",
       limit: 20,
     });
     expect(detailsByTitle.items).toHaveLength(0);
     expect(detailsByDescription.items.map((item) => item.itemName)).toEqual(["Latte"]);
 
-    await expect(getStreamTotal(ledgerId, { search: "morning" })).resolves.toEqual({
+    await expect(getStreamTotal({ search: "morning" })).resolves.toEqual({
       total: "12.5",
       unconvertedCount: 0,
     });
-    const summary = await calculateLedgerStats(ledgerId, { search: "morning" });
+    const summary = await calculateLedgerStats({ search: "morning" });
     expect(summary.convertedTotal?.total).toBe("12.5");
   });
 });

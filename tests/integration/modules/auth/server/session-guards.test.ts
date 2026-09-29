@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
 import { withAuth, requireAuth, requireRecentAuth } from "@/modules/auth/server/session-guards";
 import { withLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
-import { ledgers } from "@/persistence";
-import { createTestUserWithLedger, ensureTestLedgerBooks } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger } from "tests/helpers/schema-setup";
 import { testSession } from "tests/helpers/session";
 
 vi.mock("@/modules/auth/server/current-session", () => ({ getCurrentSession: vi.fn() }));
@@ -48,36 +46,22 @@ describe("withLedgerAccess", () => {
     vi.clearAllMocks();
   });
 
-  it("passes through when the current user owns the ledger", async () => {
+  it("runs the action with its arguments once the ledger exists", async () => {
     const db = getTestDb();
-    const ledgerId = "00000000-0000-4000-8000-000000000111";
     mockSession.mockResolvedValue(testSession());
+    await createTestUserWithLedger(db);
 
-    await db.insert(ledgers).values({
-      id: ledgerId,
-    });
-    await ensureTestLedgerBooks(db, ledgerId);
+    const action = withLedgerAccess(async (value: string) => value);
 
-    const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
-
-    await expect(action()).resolves.toBe(ledgerId);
+    await expect(action("ok")).resolves.toBe("ok");
   });
 
-  it("resolves only when there is exactly one ledger", async () => {
-    const db = getTestDb();
+  it("refuses before the ledger exists", async () => {
     mockSession.mockResolvedValue(testSession());
-    const { ledgerId: liveLedgerId } = await createTestUserWithLedger(db);
-    // A second ledger row: the access check does not ask who owns it.
-    const otherLedgerId = "00000000-0000-4000-8000-000000000222";
-    await db.insert(ledgers).values({ id: otherLedgerId });
-    await ensureTestLedgerBooks(db, otherLedgerId);
-    const action = withLedgerAccess(async (authorizedLedgerId) => authorizedLedgerId);
 
-    // Two ledgers make resolution ambiguous, so neither resolves.
+    const action = withLedgerAccess(async () => "ok");
+
     await expect(action()).rejects.toThrow(NotFoundError);
-
-    await db.delete(ledgers).where(eq(ledgers.id, otherLedgerId));
-    await expect(action()).resolves.toBe(liveLedgerId);
   });
 });
 

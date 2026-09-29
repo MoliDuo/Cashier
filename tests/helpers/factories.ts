@@ -28,7 +28,6 @@ export function createLedgerData(
 }
 
 export function createCategoryData(
-  ledgerId: string,
   overrides: Partial<{
     id: string;
     name: string;
@@ -41,7 +40,6 @@ export function createCategoryData(
 ) {
   return {
     id: randomUUID(),
-    ledgerId,
     name: "餐饮",
     description: "外卖、堂食、食材采购",
     icon: "🍽️",
@@ -53,7 +51,6 @@ export function createCategoryData(
 }
 
 export function createLedgerEntryData(
-  ledgerId: string,
   overrides: Partial<{
     id: string;
     categoryId: string | null;
@@ -71,7 +68,6 @@ export function createLedgerEntryData(
 
   return {
     id: randomUUID(),
-    ledgerId,
     categoryId: null,
     sourceDocumentId,
     amount: "25.50",
@@ -85,7 +81,6 @@ export function createLedgerEntryData(
 }
 
 export function createSourceDocumentData(
-  ledgerId: string,
   overrides: Partial<{
     id: string;
     title: string | null;
@@ -108,7 +103,6 @@ export function createSourceDocumentData(
   } = overrides;
   return {
     id: randomUUID(),
-    ledgerId,
     title: null,
     documentDate: null,
     createdAt: now,

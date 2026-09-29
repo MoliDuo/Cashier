@@ -1,6 +1,6 @@
 "use server";
 
-import { withSourceDocumentLedgerAccess } from "./access";
+import { withLedgerAccess } from "@/modules/ledger/access";
 import { assignSourceDocumentBook } from "../server/updates";
 import { parseAssignSourceDocumentBookInput } from "@/modules/ledger/contract-schemas";
 import { ValidationError } from "@/lib/errors";
@@ -12,11 +12,10 @@ import { ValidationError } from "@/lib/errors";
  * not-found, and a book that was archived under the reader's cursor is a
  * validation failure of the choice they made.
  */
-export const assignSourceDocumentBookAction = withSourceDocumentLedgerAccess(
-  async ({ ledgerId }, input: unknown): Promise<{ bookId: string }> => {
+export const assignSourceDocumentBookAction = withLedgerAccess(
+  async (input: unknown): Promise<{ bookId: string }> => {
     const validated = parseAssignSourceDocumentBookInput(input);
     const result = await assignSourceDocumentBook({
-      ledgerId,
       sourceDocumentId: validated.sourceDocumentId,
       bookId: validated.bookId,
     });

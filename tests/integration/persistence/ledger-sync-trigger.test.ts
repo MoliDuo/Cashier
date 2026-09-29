@@ -12,10 +12,8 @@ import {
   serviceCredentials,
 } from "@/persistence";
 
-async function syncState(ledgerId: string) {
-  const state = await getTestDb().query.ledgerSyncState.findFirst({
-    where: eq(ledgerSyncState.ledgerId, ledgerId),
-  });
+async function syncState() {
+  const state = await getTestDb().query.ledgerSyncState.findFirst();
   if (state == null) throw new Error("Expected a sync row for the ledger");
   return {
     version: state.version,
@@ -28,14 +26,13 @@ async function syncState(ledgerId: string) {
 describe("record_ledger_change trigger", () => {
   it("advances the ledger version once per transaction, however many rows change", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const sourceDocumentId = await createTestSourceDocument(db, ledgerId);
-    const before = await syncState(ledgerId);
+    await createTestUserWithLedger(db);
+    const sourceDocumentId = await createTestSourceDocument(db);
+    const before = await syncState();
 
     await db.transaction(async (tx) => {
       await tx.insert(ledgerEntries).values(
         ["Coffee", "Bagel", "Juice"].map((itemName, position) => ({
-          ledgerId,
           sourceDocumentId,
           position,
           itemName,
@@ -46,10 +43,10 @@ describe("record_ledger_change trigger", () => {
       await tx
         .update(ledgerEntries)
         .set({ amount: "2.00" })
-        .where(eq(ledgerEntries.ledgerId, ledgerId));
+        .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId));
     });
 
-    const after = await syncState(ledgerId);
+    const after = await syncState();
     expect(after.version).toBe(before.version + BigInt(1));
     expect(after.stats).toBe(after.version);
     expect(after.categories).toBe(before.categories);
@@ -58,31 +55,31 @@ describe("record_ledger_change trigger", () => {
 
   it("moves each watermark only for the changes it covers", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const sourceDocumentId = await createTestSourceDocument(db, ledgerId, { status: "processing" });
+    await createTestUserWithLedger(db);
+    const sourceDocumentId = await createTestSourceDocument(db, { status: "processing" });
 
-    const initial = await syncState(ledgerId);
+    const initial = await syncState();
     await db
       .update(extractionAttempts)
       .set({ status: "cancelled" })
       .where(eq(extractionAttempts.sourceDocumentId, sourceDocumentId));
-    const afterAttempt = await syncState(ledgerId);
+    const afterAttempt = await syncState();
     expect(afterAttempt.version).toBe(initial.version + BigInt(1));
     expect(afterAttempt.stats).toBe(initial.stats);
 
-    await db.insert(entryCategories).values({ ledgerId, name: "Snacks" });
-    const afterCategory = await syncState(ledgerId);
+    await db.insert(entryCategories).values({ name: "Snacks" });
+    const afterCategory = await syncState();
     expect(afterCategory.categories).toBe(afterCategory.version);
     expect(afterCategory.stats).toBe(afterCategory.version);
     expect(afterCategory.settings).toBe(initial.settings);
 
-    await db.update(ledgers).set({ aiCustomPrompt: "Be brief" }).where(eq(ledgers.id, ledgerId));
-    const afterSetting = await syncState(ledgerId);
+    await db.update(ledgers).set({ aiCustomPrompt: "Be brief" });
+    const afterSetting = await syncState();
     expect(afterSetting.settings).toBe(afterSetting.version);
     expect(afterSetting.categories).toBe(afterCategory.categories);
 
-    await db.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
-    const afterCurrency = await syncState(ledgerId);
+    await db.update(ledgers).set({ mainCurrency: "USD" });
+    const afterCurrency = await syncState();
     expect(afterCurrency).toEqual({
       version: afterCurrency.version,
       categories: afterCurrency.version,
@@ -93,17 +90,16 @@ describe("record_ledger_change trigger", () => {
 
   it("moves the version for a book, an API key and the ledger's zone, not a key's use", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
+    await createTestUserWithLedger(db);
     const [book] = await db
       .insert(books)
-      .values({ ledgerId, name: "旅行", sortOrder: 9 })
+      .values({ name: "旅行", sortOrder: 9 })
       .returning({ id: books.id });
-    const afterBook = await syncState(ledgerId);
+    const afterBook = await syncState();
 
     const [credential] = await db
       .insert(serviceCredentials)
       .values({
-        ledgerId,
         bookId: book!.id,
         name: "Shortcut",
         tokenHash: "a".repeat(64),
@@ -111,32 +107,30 @@ describe("record_ledger_change trigger", () => {
         tokenSuffix: "wxyz",
       })
       .returning({ id: serviceCredentials.id });
-    const afterKey = await syncState(ledgerId);
+    const afterKey = await syncState();
     expect(afterKey.version).toBe(afterBook.version + BigInt(1));
 
     await db
       .update(serviceCredentials)
       .set({ lastUsedAt: new Date() })
       .where(eq(serviceCredentials.id, credential!.id));
-    expect((await syncState(ledgerId)).version).toBe(afterKey.version);
+    expect((await syncState()).version).toBe(afterKey.version);
 
-    await db.update(ledgers).set({ timeZone: "Europe/Paris" }).where(eq(ledgers.id, ledgerId));
-    const afterZone = await syncState(ledgerId);
+    await db.update(ledgers).set({ timeZone: "Europe/Paris" });
+    const afterZone = await syncState();
     expect(afterZone.version).toBe(afterKey.version + BigInt(1));
     expect(afterZone.stats).toBe(afterZone.version);
   });
 
   it("creates a ledger's sync row on its first change and lets the ledger go", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    await db.delete(ledgerSyncState).where(eq(ledgerSyncState.ledgerId, ledgerId));
+    await createTestUserWithLedger(db);
+    await db.delete(ledgerSyncState);
 
-    await createTestSourceDocument(db, ledgerId);
-    expect((await syncState(ledgerId)).version).toBeGreaterThan(BigInt(0));
+    await createTestSourceDocument(db);
+    expect((await syncState()).version).toBeGreaterThan(BigInt(0));
 
-    await expect(db.delete(ledgers).where(eq(ledgers.id, ledgerId))).resolves.toBeDefined();
-    await expect(
-      db.query.ledgerSyncState.findFirst({ where: eq(ledgerSyncState.ledgerId, ledgerId) })
-    ).resolves.toBeUndefined();
+    await expect(db.delete(ledgers)).resolves.toBeDefined();
+    await expect(db.query.ledgerSyncState.findFirst()).resolves.toBeUndefined();
   });
 });

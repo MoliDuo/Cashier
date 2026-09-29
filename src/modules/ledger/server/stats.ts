@@ -9,14 +9,11 @@ import { calculateLedgerEntryStats } from "./entry-reads/calculate-ledger-entry-
  * the transport above it, so the session route and the server-side prefetch
  * cannot disagree about what a query means.
  */
-export async function calculateLedgerStats(
-  ledgerId: string,
-  query: unknown
-): Promise<LedgerSummaryDto> {
+export async function calculateLedgerStats(query: unknown): Promise<LedgerSummaryDto> {
   const validated = parseLedgerStatsQuery(query);
-  return calculateLedgerEntryStats({ ledgerId, filters: toLedgerEntryFilters(validated) });
+  return calculateLedgerEntryStats({ filters: toLedgerEntryFilters(validated) });
 }
 
-export const getLedgerStatsAction = withLedgerAccess(
-  async (ledgerId: string, query: unknown = {}) => calculateLedgerStats(ledgerId, query)
+export const getLedgerStatsAction = withLedgerAccess(async (query: unknown = {}) =>
+  calculateLedgerStats(query)
 );

@@ -24,7 +24,6 @@ import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { processAllPendingTasks } from "tests/helpers/processing";
 
 describe("SourceDocument Actions", () => {
-  let testLedgerId: string;
   let testCategoryId: string;
 
   function firstItem<T>(items: T[], errorMessage: string): T {
@@ -48,8 +47,7 @@ describe("SourceDocument Actions", () => {
 
     // Clean up existing ledger for TEST_USER_ID and create new one
     await db.delete(ledgers);
-    const { ledgerId } = await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
-    testLedgerId = ledgerId;
+    await createTestUserWithLedger(db, undefined, "Test Ledger", TEST_USER_ID);
 
     const newCat = firstItem(
       await db
@@ -58,7 +56,6 @@ describe("SourceDocument Actions", () => {
           name: "餐饮",
           description: "外卖、堂食",
           sortOrder: 1,
-          ledgerId: testLedgerId,
         })
         .returning(),
       "Expected category to be created in setup"
@@ -70,7 +67,6 @@ describe("SourceDocument Actions", () => {
       name: "水果",
       description: "Fresh Fruit",
       sortOrder: 2,
-      ledgerId: testLedgerId,
     });
   });
 
@@ -261,13 +257,10 @@ describe("SourceDocument Actions", () => {
     it("files the record into the chosen book and dates it in the ledger's zone", async () => {
       const [book] = await getTestDb()
         .insert(books)
-        .values({ ledgerId: testLedgerId, name: "哞哞的", sortOrder: 2 })
+        .values({ name: "哞哞的", sortOrder: 2 })
         .returning({ id: books.id });
       const bookId = book!.id;
-      await getTestDb()
-        .update(ledgers)
-        .set({ timeZone: "Asia/Singapore" })
-        .where(eq(ledgers.id, testLedgerId));
+      await getTestDb().update(ledgers).set({ timeZone: "Asia/Singapore" });
 
       await expect(createdDate({ text: "Lunch 12", bookId })).resolves.toEqual({
         bookId,
@@ -276,11 +269,8 @@ describe("SourceDocument Actions", () => {
     });
 
     it("follows the ledger's zone when it changes", async () => {
-      const bookId = await testBookId(getTestDb(), testLedgerId);
-      await getTestDb()
-        .update(ledgers)
-        .set({ timeZone: "Europe/Paris" })
-        .where(eq(ledgers.id, testLedgerId));
+      const bookId = await testBookId(getTestDb());
+      await getTestDb().update(ledgers).set({ timeZone: "Europe/Paris" });
 
       await expect(createdDate({ text: "Lunch 12" })).resolves.toEqual({
         bookId,

@@ -76,8 +76,6 @@ vi.mock("@/lib/storage/s3", () => ({
 }));
 
 describe("API v1 source-documents route", () => {
-  let ledgerId: string;
-
   let credentialKey: string;
 
   beforeEach(async () => {
@@ -86,18 +84,16 @@ describe("API v1 source-documents route", () => {
     mockR2.setUploadError(null);
 
     await db.delete(ledgers);
-    const setup = await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
-    ledgerId = setup.ledgerId;
+    await createTestUserWithLedger(db, undefined, "Route Test Ledger", TEST_USER_ID);
 
     credentialKey = `sk_route_${crypto.randomUUID().replace(/-/g, "")}`;
     const { prefix, suffix } = prefixSuffix(credentialKey);
     await db
       .insert(serviceCredentials)
       .values({
-        ledgerId,
         name: "Route Credential",
         tokenHash: computeHash(credentialKey),
-        bookId: await testBookId(db, ledgerId),
+        bookId: await testBookId(db),
         tokenPrefix: prefix,
         tokenSuffix: suffix,
       })
@@ -146,7 +142,6 @@ describe("API v1 source-documents route", () => {
     await flushAfterCallbacks();
     const db = getTestDb();
     await db.insert(ledgerEntries).values({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       itemName: "Lunch",
       description: "Noodles",
@@ -278,10 +273,9 @@ describe("API v1 source-documents route", () => {
       })
     ).then((response) => response.json());
     const db = getTestDb();
-    await db.update(ledgers).set({ mainCurrency: "USD" }).where(eq(ledgers.id, ledgerId));
+    await db.update(ledgers).set({ mainCurrency: "USD" });
     await db.insert(ledgerEntries).values([
       {
-        ledgerId,
         sourceDocumentId: created.sourceDocumentId,
         itemName: "USD purchase",
         description: null,
@@ -290,7 +284,6 @@ describe("API v1 source-documents route", () => {
         position: 0,
       },
       {
-        ledgerId,
         sourceDocumentId: created.sourceDocumentId,
         itemName: "Local coffee",
         description: null,
@@ -351,7 +344,6 @@ describe("API v1 source-documents route", () => {
     // The provider does not publish BHD; drop whatever the request cached.
     await db.delete(exchangeRates);
     await db.insert(ledgerEntries).values({
-      ledgerId,
       sourceDocumentId: created.sourceDocumentId,
       itemName: "Dinar purchase",
       amount: "12.500",

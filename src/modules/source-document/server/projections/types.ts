@@ -13,7 +13,6 @@ export interface LedgerProjectionEntryContract {
 }
 
 export interface ActivateAttemptInput {
-  ledgerId: string;
   sourceDocumentId: string;
   attemptId: string;
   title?: string | null;

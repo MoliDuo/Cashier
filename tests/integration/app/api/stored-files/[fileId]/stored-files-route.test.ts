@@ -31,27 +31,24 @@ function request(): NextRequest {
   return new Request("http://localhost/api/stored-files/file") as NextRequest;
 }
 
-async function createLinkedStoredFile(ledgerId: string) {
+async function createLinkedStoredFile() {
   const db = getTestDb();
   const [document] = await db
     .insert(sourceDocuments)
     .values({
-      ledgerId,
-      bookId: sql`(SELECT id FROM books WHERE ledger_id = ${ledgerId} ORDER BY sort_order LIMIT 1)`,
+      bookId: sql`(SELECT id FROM books ORDER BY sort_order LIMIT 1)`,
     })
     .returning();
   const [file] = await db
     .insert(storedFiles)
     .values({
-      ledgerId,
-      storageKey: `${ledgerId}/private/file`,
+      storageKey: "stored/private-file",
       contentType: "image/png",
       byteSize: 5,
       finalizedAt: new Date(),
     })
     .returning();
   await db.insert(sourceDocumentFiles).values({
-    ledgerId,
     sourceDocumentId: document!.id,
     storedFileId: file!.id,
     position: 0,
@@ -68,8 +65,8 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("serves trusted bytes without exposing the R2 key", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { file } = await createLinkedStoredFile(ledgerId);
+    await createTestUserWithLedger(db);
+    const { file } = await createLinkedStoredFile();
     downloadMock.mockResolvedValue(Buffer.from("bytes"));
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
@@ -82,25 +79,10 @@ describe("GET /api/stored-files/[fileId]", () => {
     expect(body).not.toContain(file.storageKey);
   });
 
-  it("returns 404 for an unknown account without revealing file existence", async () => {
-    const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { file } = await createLinkedStoredFile(ledgerId);
-    // There is one account, so file reads are scoped by "does the account
-    // exist", not by which user created the record.
-    vi.mocked(getCurrentSession).mockResolvedValue(testSession(crypto.randomUUID()));
-
-    const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
-
-    expect(response.status).toBe(404);
-    expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(downloadMock).not.toHaveBeenCalled();
-  });
-
   it("serves a file from the live ledger to the live account", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { file } = await createLinkedStoredFile(ledgerId);
+    await createTestUserWithLedger(db);
+    const { file } = await createLinkedStoredFile();
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
 
@@ -110,8 +92,8 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("returns 404 after the owning source document is deleted", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { document, file } = await createLinkedStoredFile(ledgerId);
+    await createTestUserWithLedger(db);
+    const { document, file } = await createLinkedStoredFile();
     await db.delete(sourceDocuments).where(eq(sourceDocuments.id, document.id));
 
     const response = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });
@@ -122,8 +104,8 @@ describe("GET /api/stored-files/[fileId]", () => {
 
   it("maps missing S3 objects and S3 outages to controlled responses", async () => {
     const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db);
-    const { file } = await createLinkedStoredFile(ledgerId);
+    await createTestUserWithLedger(db);
+    const { file } = await createLinkedStoredFile();
 
     downloadMock.mockRejectedValueOnce(new AppError("missing", "FILE_NOT_FOUND", 404));
     const missing = await GET(request(), { params: Promise.resolve({ fileId: file.id }) });

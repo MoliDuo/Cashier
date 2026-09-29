@@ -1,7 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
-import { ledgerSyncState } from "@/persistence";
 
 interface ChangeSummaryRow extends Record<string, unknown> {
   currentVersion: string;
@@ -17,32 +16,30 @@ interface RefreshBaselineRow extends Record<string, unknown> {
 }
 
 /** The ledger's change watermark; 0 before its first change. */
-export async function getLedgerVersion(ledgerId: string): Promise<bigint> {
+export async function getLedgerVersion(): Promise<bigint> {
   const state = await db.query.ledgerSyncState.findFirst({
-    where: eq(ledgerSyncState.ledgerId, ledgerId),
     columns: { version: true },
   });
   return state?.version ?? BigInt(0);
 }
 
-export async function getLedgerRefreshBaseline(
-  ledgerId: string
-): Promise<{ version: bigint; hasTransitionalWork: boolean }> {
+export async function getLedgerRefreshBaseline(): Promise<{
+  version: bigint;
+  hasTransitionalWork: boolean;
+}> {
   const result = await db.execute<RefreshBaselineRow>(sql`
       SELECT
         COALESCE(
-          (SELECT version FROM ledger_sync_state WHERE ledger_id = ${ledgerId}),
+          (SELECT version FROM ledger_sync_state),
           0
         )::text AS version,
         EXISTS (
           SELECT 1
           FROM source_documents document
           JOIN extraction_attempts attempt
-            ON attempt.ledger_id = document.ledger_id
-           AND attempt.source_document_id = document.id
+            ON attempt.source_document_id = document.id
            AND attempt.id = document.latest_attempt_id
-          WHERE document.ledger_id = ${ledgerId}
-            AND attempt.status = 'processing'
+          WHERE attempt.status = 'processing'
         ) AS "hasTransitionalWork"
     `);
   const row = result.rows[0];
@@ -50,13 +47,7 @@ export async function getLedgerRefreshBaseline(
   return { version: BigInt(row.version), hasTransitionalWork: row.hasTransitionalWork };
 }
 
-export async function summarizeLedgerChanges({
-  ledgerId,
-  afterVersion,
-}: {
-  ledgerId: string;
-  afterVersion: bigint;
-}): Promise<{
+export async function summarizeLedgerChanges({ afterVersion }: { afterVersion: bigint }): Promise<{
   currentVersion: bigint;
   categoriesChanged: boolean;
   settingsChanged: boolean;
@@ -73,14 +64,12 @@ export async function summarizeLedgerChanges({
           SELECT 1
           FROM source_documents document
           JOIN extraction_attempts attempt
-            ON attempt.ledger_id = document.ledger_id
-           AND attempt.source_document_id = document.id
+            ON attempt.source_document_id = document.id
            AND attempt.id = document.latest_attempt_id
-          WHERE document.ledger_id = ${ledgerId}
-            AND attempt.status = 'processing'
+          WHERE attempt.status = 'processing'
         ) AS "hasTransitionalWork"
       FROM (SELECT 1) baseline
-      LEFT JOIN ledger_sync_state state ON state.ledger_id = ${ledgerId}
+      LEFT JOIN ledger_sync_state state ON true
     `);
   const row = result.rows[0];
   if (row == null) {
