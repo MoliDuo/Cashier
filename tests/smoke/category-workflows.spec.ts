@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openTab } from "./navigation";
+import { ledgerNavigation, openTab } from "./navigation";
 import { seedRecord } from "./seed-record";
 import { signIn } from "./sign-in";
 
@@ -46,6 +46,10 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   const status = page.locator("#category-assignment-status");
   await expect(status).toBeVisible();
 
+  // The list stays in selecting after an action; a phone's tab bar comes back
+  // once the reader leaves it.
+  await page.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(ledgerNavigation(page)).toBeVisible();
   await openTab(page, "设置");
   await expect(status).toBeVisible();
   await openTab(page, "明细");

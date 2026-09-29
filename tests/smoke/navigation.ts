@@ -27,6 +27,9 @@ export function ledgerNavigation(page: Page) {
 
 export async function openTab(page: Page, destination: Destination) {
   const tab = ledgerNavigation(page).getByRole("button", { name: destination, exact: true });
+  // The tabs stay disabled until the workspace has mounted, and a key pressed
+  // on a disabled button does nothing.
+  await expect(tab).toBeEnabled();
   if ((await tab.getAttribute("aria-current")) !== "page") await press(page, tab);
   await expect(page).toHaveURL(DESTINATION_URLS[destination]);
   await expect(tab).toHaveAttribute("aria-current", "page");
