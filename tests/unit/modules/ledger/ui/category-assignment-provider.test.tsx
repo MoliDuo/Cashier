@@ -72,14 +72,11 @@ const DONE_9_OF_10 = batchActionsCopy.aiCategoryDone({ applied: 9, confirmed: 1,
 
 /** Asks the page for a run, the way the batch toolbar does after a submit. */
 function SubmitProbe({ run }: { run: CategoryAssignmentJob }) {
-  const { registerSubmittedJob, job: current } = useCategoryAssignment();
+  const { registerSubmittedJob } = useCategoryAssignment();
   return (
-    <>
-      <span data-testid="job-status">{current?.status ?? "none"}</span>
-      <button type="button" onClick={() => registerSubmittedJob(run)}>
-        submit
-      </button>
-    </>
+    <button type="button" onClick={() => registerSubmittedJob(run)}>
+      submit
+    </button>
   );
 }
 
@@ -195,6 +192,25 @@ describe("CategoryAssignmentProvider", () => {
     rerender(<ValueProbe />);
 
     expect(seen.at(-1)).toBe(settled);
+  });
+
+  it("keeps its readers' value when a finished run loads after the page", async () => {
+    getJob.mockResolvedValue(succeededJob());
+    const seen: unknown[] = [];
+    function ValueProbe() {
+      seen.push(useCategoryAssignment());
+      return null;
+    }
+    const { queryClient, wrapper } = setup();
+    render(<ValueProbe />, { wrapper });
+    const first = seen[0];
+
+    await poll(queryClient);
+    // React Query tells its observers on a later tick.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+    expect(queryClient.getQueryData(["ledger", "category-assignment"])).not.toBeNull();
+    expect(seen.at(-1)).toBe(first);
   });
 
   it("refuses to be read outside the provider", () => {

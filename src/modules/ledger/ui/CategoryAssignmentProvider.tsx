@@ -20,14 +20,15 @@ export function CategoryAssignmentProvider({ children }: { children: ReactNode }
   // The band and the completion notice are the only readers of the details
   // messages, and only one of them may be waiting at a time.
   const hasSomethingToSay = assignment.isVisible || notices.length > 0;
-  // The workspace re-renders this on every change of its own; a new value each
-  // time would reach every reader below, and a page still streaming in from the
-  // server is thrown away and rendered again on the client when its context
-  // changes before it hydrates.
-  const { job, isActive, isReadError, refresh, dismiss, registerSubmittedJob } = assignment;
+  // The workspace re-renders this on every change of its own, and the run loads
+  // after the page arrives; a new value either time would reach every reader
+  // below, and a page still streaming in from the server is thrown away and
+  // rendered again on the client when its context changes before it hydrates.
+  // So the value holds only what the readers use.
+  const { isActive, registerSubmittedJob } = assignment;
   const value = useMemo(
-    () => ({ job, isActive, isReadError, refresh, dismiss, registerSubmittedJob }),
-    [job, isActive, isReadError, refresh, dismiss, registerSubmittedJob]
+    () => ({ isActive, registerSubmittedJob }),
+    [isActive, registerSubmittedJob]
   );
 
   return (

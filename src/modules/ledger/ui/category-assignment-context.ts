@@ -3,13 +3,16 @@
 import { createContext, useContext } from "react";
 import type { CategoryAssignmentJob } from "@/modules/ledger/contracts";
 
+/**
+ * What the page below reads of the ledger's assignment run: only whether one is
+ * moving, and how to adopt a run it started. The run itself, its read errors and
+ * the band's commands stay with the provider, so the run loading after the page
+ * arrives — a finished one, say — leaves this value as it was. A page still
+ * streaming in from the server is thrown away and rendered again on the client
+ * when a context above it changes before it hydrates.
+ */
 export interface CategoryAssignmentContextValue {
-  /** The ledger's most recent assignment run. */
-  job: CategoryAssignmentJob | null;
   isActive: boolean;
-  isReadError: boolean;
-  refresh: () => Promise<unknown>;
-  dismiss: () => void;
   registerSubmittedJob: (job: CategoryAssignmentJob) => void;
 }
 
