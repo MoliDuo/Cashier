@@ -1,4 +1,3 @@
-import os from "node:os";
 import path from "path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, defineProject } from "vitest/config";
@@ -77,6 +76,16 @@ const sharedProjectTestConfig = {
   // Database-backed workers create a schema and apply the full migration journal.
   hookTimeout: 60_000,
 };
+/**
+ * Projects in one `sequence.groupOrder` run side by side and must share a
+ * worker limit. The unit and integration projects share one, so the unit
+ * files fill the cores while the test PostgreSQL container starts and no
+ * project waits for another's slowest file.
+ */
+const parallelProjects = {
+  sequence: { groupOrder: 0 },
+  maxWorkers: "100%",
+};
 
 export default defineConfig({
   resolve: {
@@ -90,12 +99,11 @@ export default defineConfig({
         test: {
           ...sharedProjectTestConfig,
           name: "unit-node",
-          sequence: { groupOrder: 0 },
+          ...parallelProjects,
           include: ["tests/unit/**/*.test.ts"],
           exclude: [...defaultProjectExcludes, ...unitDomTypeScriptTests],
           environment: "node",
           setupFiles: ["./tests/setup.common.ts"],
-          maxWorkers: "100%",
           testTimeout: 10000,
         },
       }),
@@ -104,12 +112,11 @@ export default defineConfig({
         test: {
           ...sharedProjectTestConfig,
           name: "unit-dom",
-          sequence: { groupOrder: 1 },
+          ...parallelProjects,
           include: ["tests/unit/**/*.test.tsx", ...unitDomTypeScriptTests],
           exclude: defaultProjectExcludes,
           environment: "happy-dom",
           setupFiles: ["./tests/setup.dom.ts"],
-          maxWorkers: "100%",
           testTimeout: 10000,
         },
       }),
@@ -118,7 +125,7 @@ export default defineConfig({
         test: {
           ...sharedProjectTestConfig,
           name: "integration-node",
-          sequence: { groupOrder: 3 },
+          ...parallelProjects,
           include: ["tests/integration/**/*.test.ts", "tests/integration/**/*.test.tsx"],
           exclude: [
             ...defaultProjectExcludes,
@@ -128,9 +135,6 @@ export default defineConfig({
           globalSetup: ["./tests/setup.postgres-global.ts"],
           setupFiles: ["./tests/setup.ts"],
           pool: "forks",
-          // Each file copies the migrated template into a database of its own,
-          // so files no longer contend for migration locks.
-          maxWorkers: Math.max(2, Math.floor(os.availableParallelism() / 2)),
           testTimeout: 30000,
         },
       }),
@@ -139,7 +143,7 @@ export default defineConfig({
         test: {
           ...sharedProjectTestConfig,
           name: "integration-dom",
-          sequence: { groupOrder: 4 },
+          sequence: { groupOrder: 1 },
           include: [
             "tests/integration/modules/source-document/ui/source-document-dialog-flows.test.tsx",
           ],

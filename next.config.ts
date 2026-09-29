@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
   // Evidence button sits underneath it. Development warnings still reach the
   // terminal and the browser console.
   devIndicators: false,
+  // `npm run check` type-checks with `next typegen && tsc` before it builds,
+  // so its build skips Next's second, identical pass. Vercel never sets this.
+  ...(process.env.CASHIER_CHECK_BUILD === "1" ? { typescript: { ignoreBuildErrors: true } } : {}),
   experimental: {
     // The ledger's pages are dynamic but carry no data of their own on a
     // client move — React Query holds it — so a page just left is safe to show

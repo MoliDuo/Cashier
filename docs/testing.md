@@ -17,6 +17,12 @@
 | `npm run test:demo`        | 在 demo 工作区上跑 `@demo` 用例               | Docker、Chromium |
 | `npm run check`            | 提交前的完整门禁，包含 `test:coverage`        | Docker           |
 
+`npm run check` 分两个阶段（`scripts/run-check.ts`）：先并行跑 `format:check`、`check:architecture`、
+`check:dead-code`、`lint` 和 `tsc`（`next typegen && tsc --noEmit`），任何一项失败就停，不再进入测试；全部通过后并行跑
+`test:coverage` 和 `build:check`。门禁构建设置 `CASHIER_CHECK_BUILD=1`，跳过 Next 自带的第二遍类型检查，
+因为 `tsc` 已经带着生成的路由类型检查过；Vercel 的构建不设置它。每个脚本的输出在它结束时整段打印，最后一张耗时表
+指出慢在哪一步。ESLint 和 Prettier 的缓存放在 `node_modules/.cache/`。
+
 跑单个文件：`npx vitest run tests/unit/path/to/file.test.ts`。Playwright 首次使用前运行
 `npx playwright install chromium`。
 
@@ -61,8 +67,13 @@
 
 - 全局 setup 只迁移一次模板库 `test_<run-id>_template`，提供给各 worker。
 - 每个测试文件用 `CREATE DATABASE … TEMPLATE` 建一份自己的库 `test_<run-id>_p<pool>_w<worker>`，布局与生产一致
-  （表在 `public`，迁移记录在 `drizzle`），文件结束时删除。没有文件会重放迁移，所以集成测试的 worker 数
-  随机器扩展（CPU 核数的一半）。
+  （表在 `public`，迁移记录在 `drizzle`），文件结束时等它的连接关闭后删除。没有文件会重放迁移。
+- unit-node、unit-dom 和 integration-node 在同一个 `sequence.groupOrder` 里并行，共用一个 worker 上限（Vitest
+  要求同组一致），单元测试在容器启动时就开始跑；integration-dom 在它们之后单独跑。
+- 测试容器是一次性的：数据目录在 tmpfs 上，并关闭 `fsync`、`synchronous_commit` 和 `full_page_writes`。
+- 每个用例之前，setup 在 `session_replication_role = replica` 下逐表 `DELETE`，一次往返清空这份库里的所有表（包括
+  用例自己建的表），外键和变更日志触发器都不触发，效果等同 `TRUNCATE … CASCADE`，但不用重写表文件。无权设置这个
+  参数的角色（可能出现在 `TEST_DATABASE_URL` 下）改用 `TRUNCATE`。
 - 不同的运行从不共享数据库。无论正常结束、失败还是被中断，runner 只删除带自己运行前缀的库。
 - 同一文件内的测试串行执行，因为 setup 会在测试之间清空这份库。数据库测试里不要用 `test.concurrent` 或
   `describe.concurrent`，除非先做到用例级隔离。

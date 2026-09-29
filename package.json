@@ -17,12 +17,12 @@
     "demo:reset": "tsx --conditions=react-server scripts/run-demo.ts --reset",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint --max-warnings 0",
-    "tsc": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint/ --concurrency auto",
+    "tsc": "next typegen && tsc --noEmit",
     "check:architecture": "depcruise src --config .dependency-cruiser.cjs",
     "check:dead-code": "knip --include files,dependencies,unlisted,unresolved,exports,types",
     "check:static": "npm run format:check && npm run check:architecture && npm run check:dead-code && npm run lint && npm run tsc",
-    "check": "npm run check:static && npm run test:coverage && npm run build:check",
+    "check": "tsx scripts/run-check.ts",
     "build:check": "tsx scripts/run-check-build.ts && tsx scripts/check-protected-route-bundle.ts",
     "test:prepare": "tsx scripts/prepare-test-postgres.ts",
     "test:smoke": "tsx --conditions=react-server scripts/run-smoke.ts",
@@ -40,7 +40,7 @@
     "account:create": "tsx --conditions=react-server scripts/account.ts create",
     "account:enroll": "tsx --conditions=react-server scripts/account.ts enroll",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check --cache ."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",

@@ -9,7 +9,7 @@ export async function runCheckBuild({
   spawnProcess = spawn,
 }: { environment?: NodeJS.ProcessEnv; spawnProcess?: SpawnProcess } = {}): Promise<number> {
   const child = spawnProcess(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], {
-    env: createTestEnvironment(environment, { NODE_ENV: "production" }),
+    env: createTestEnvironment(environment, { NODE_ENV: "production", CASHIER_CHECK_BUILD: "1" }),
     stdio: "inherit",
   });
 

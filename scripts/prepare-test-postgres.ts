@@ -134,12 +134,18 @@ async function verifyExternalDatabase(pool: QueryPool): Promise<void> {
   }
 }
 
+// The container is thrown away after the run, so durability buys nothing: the
+// data lives in memory and no write waits on a disk flush.
+const THROWAWAY_SERVER_SETTINGS = ["fsync=off", "synchronous_commit=off", "full_page_writes=off"];
+
 async function defaultContainerFactory(options: ContainerOptions): Promise<StartedContainer> {
   const { PostgreSqlContainer } = await import("@testcontainers/postgresql");
   return new PostgreSqlContainer(options.image)
     .withDatabase(options.database)
     .withUsername(options.username)
     .withPassword(options.password)
+    .withTmpFs({ "/var/lib/postgresql": "rw" })
+    .withCommand(["postgres", ...THROWAWAY_SERVER_SETTINGS.flatMap((setting) => ["-c", setting])])
     .withStartupTimeout(options.startupTimeoutMs)
     .start();
 }
