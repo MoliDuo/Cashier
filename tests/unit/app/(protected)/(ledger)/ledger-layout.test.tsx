@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   loadLedgerViewMock,
+  getLedgerBooksBootstrapMock,
   getLedgerShellBootstrapMock,
   getLedgerRouteBootstrapMock,
   scheduleProcessingRecoveryAfterMock,
   requestHeaders,
 } = vi.hoisted(() => ({
   loadLedgerViewMock: vi.fn(),
+  getLedgerBooksBootstrapMock: vi.fn(),
   getLedgerShellBootstrapMock: vi.fn(),
   getLedgerRouteBootstrapMock: vi.fn(),
   scheduleProcessingRecoveryAfterMock: vi.fn(),
@@ -17,6 +19,7 @@ const {
 
 vi.mock("@/modules/workspace/server/ledger-page-bootstrap", () => ({
   loadLedgerView: loadLedgerViewMock,
+  getLedgerBooksBootstrap: getLedgerBooksBootstrapMock,
   getLedgerShellBootstrap: getLedgerShellBootstrapMock,
   getLedgerRouteBootstrap: getLedgerRouteBootstrapMock,
 }));
@@ -46,7 +49,9 @@ vi.mock("@/app/(protected)/(ledger)/_route-fallback", () => ({
   LedgerRouteFallback: () => null,
 }));
 
+import { HydrationBoundary } from "@tanstack/react-query";
 import LedgerLayout from "@/app/(protected)/(ledger)/layout";
+import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
 import { RoutePrefetch } from "@/app/(protected)/(ledger)/_route-prefetch";
 import { WorkspaceStoreProvider } from "@/modules/workspace/store";
 import { LedgerWorkspace } from "@/modules/workspace/ui/LedgerWorkspace";
@@ -88,10 +93,13 @@ const view = {
   ledgerToday: "2026-09-26",
 };
 
+const booksState = { queries: [{ queryKey: ["ledger", "books"] }], mutations: [] };
+
 describe("ledger layout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loadLedgerViewMock.mockResolvedValue(view);
+    getLedgerBooksBootstrapMock.mockReturnValue(booksState);
     getLedgerShellBootstrapMock.mockResolvedValue({ queries: [], mutations: [] });
   });
 
@@ -100,6 +108,17 @@ describe("ledger layout", () => {
 
     expect(scheduleProcessingRecoveryAfterMock).toHaveBeenCalledWith("ledger-1");
     expect(find(tree, WorkspaceStoreProvider).props.initialBookId).toBe(BOOK_B);
+  });
+
+  it("hydrates the books above the bars, whose book switcher reads them first", async () => {
+    const tree = await LedgerLayout({ children: null });
+
+    expect(getLedgerBooksBootstrapMock).toHaveBeenCalledWith(view.books);
+    const boundary = elements(tree).find(
+      (element) => element.type === HydrationBoundary && element.props.state === booksState
+    );
+    expect(boundary).toBeDefined();
+    expect(find(boundary!.props.children, LedgerShell)).toBeDefined();
   });
 
   it("hands the workspace today in the ledger's zone", async () => {

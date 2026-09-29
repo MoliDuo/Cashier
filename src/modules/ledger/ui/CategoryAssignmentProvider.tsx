@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   useCategoryAssignmentJob,
@@ -20,18 +20,18 @@ export function CategoryAssignmentProvider({ children }: { children: ReactNode }
   // The band and the completion notice are the only readers of the details
   // messages, and only one of them may be waiting at a time.
   const hasSomethingToSay = assignment.isVisible || notices.length > 0;
+  // The workspace re-renders this on every change of its own; a new value each
+  // time would reach every reader below, and a page still streaming in from the
+  // server is thrown away and rendered again on the client when its context
+  // changes before it hydrates.
+  const { job, isActive, isReadError, refresh, dismiss, registerSubmittedJob } = assignment;
+  const value = useMemo(
+    () => ({ job, isActive, isReadError, refresh, dismiss, registerSubmittedJob }),
+    [job, isActive, isReadError, refresh, dismiss, registerSubmittedJob]
+  );
 
   return (
-    <CategoryAssignmentContext.Provider
-      value={{
-        job: assignment.job,
-        isActive: assignment.isActive,
-        isReadError: assignment.isReadError,
-        refresh: assignment.refresh,
-        dismiss: assignment.dismiss,
-        registerSubmittedJob: assignment.registerSubmittedJob,
-      }}
-    >
+    <CategoryAssignmentContext.Provider value={value}>
       {hasSomethingToSay ? (
         <>
           {notices.map((notice) => (
