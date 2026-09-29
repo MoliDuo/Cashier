@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/transaction-locks";
 import type { PostgresTransaction } from "@/lib/db/transaction-locks";
 import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { replaceDocumentInput } from "./document-input";
 
 export type CreatePendingAttemptInput = {
@@ -78,12 +79,24 @@ async function insertNewSourceDocument(
 ): Promise<typeof sourceDocuments.$inferSelect> {
   await lockLedgerForUpdate(tx, input.ledgerId);
   await lockBookForShare(tx, input.ledgerId, input.bookId!);
+  // The record carries its day from the start, so one still processing, or
+  // one whose processing failed, never falls back to its UTC creation day.
+  const documentDate =
+    input.input.documentDate ??
+    ledgerToday(
+      await tx
+        .select({ timeZone: ledgers.timeZone })
+        .from(ledgers)
+        .where(eq(ledgers.id, input.ledgerId))
+        .then((rows) => rows[0]!.timeZone)
+    );
   const rows = await tx
     .insert(sourceDocuments)
     .values({
       id: sourceDocumentId,
       ledgerId: input.ledgerId,
       bookId: input.bookId!,
+      documentDate,
       idempotencySource: input.idempotency?.source ?? null,
       idempotencyKey: input.idempotency?.key ?? null,
       idempotencyFingerprint: input.idempotency?.fingerprint ?? null,

@@ -108,8 +108,10 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 语义约定：
 
-- **日期挂在票据上。** 一张票据一个日期（`document_date`，缺省时 `effective_date` 取创建日）。
-  每条写入路径都按账本时区写入日期，所以 `effective_date` 的 UTC 兜底只剩理论上的可能。
+- **日期挂在票据上。** 一张票据一个日期（`document_date`，缺省时 `effective_date` 取 UTC 创建日）。
+  每条写入路径都按账本时区写入日期，新票据在创建的事务里就写入提交请求的日期，不等提取成功，
+  所以处理中、失败或已取消的票据也按账本时区归日。迁移 0019 和 0022 回填了此前缺日期的行，
+  `effective_date` 的 UTC 兜底只剩理论上的可能。
 - **一个账本、一个时区。** "今天"、周期的起止、新记录的默认日期都按 `ledgers.time_zone` 计算，
   不看设备、不看分账，也不看服务端的 `TZ`。服务端用 `ledgerToday`（`src/modules/ledger/server/query-period.ts`）取今天。
 - **周期由服务端解析。** 浏览器只发语义周期 `{range, offset}` 或自定义的起止日，

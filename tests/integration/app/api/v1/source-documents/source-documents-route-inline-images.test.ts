@@ -222,8 +222,8 @@ describe("API v1 source-documents route", () => {
       const attempt = await getTestDb().query.extractionAttempts.findFirst({
         where: eq(extractionAttempts.id, document!.latestAttemptId!),
       });
-      expect(document?.documentDate).toBeNull();
       expect(attempt?.requestedDate).toBe("2026-07-27");
+      expect(document?.documentDate).toBe("2026-07-27");
     });
 
     it("reports an invalid entryDate separately from valid image data", async () => {

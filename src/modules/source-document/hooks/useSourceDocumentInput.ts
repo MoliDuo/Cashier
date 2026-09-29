@@ -77,11 +77,12 @@ function restoreDraft(
   timeZone: string | undefined
 ): MemoryInputDraft | null {
   if (key == null) return null;
+  const initialDate = createDraftDateState(initialData, timeZone);
   const kept = takeDraftFromMemory<MemoryInputDraft>(key);
-  if (kept != null) return kept;
+  // A default date kept overnight is yesterday by now; only a hand-picked one stays.
+  if (kept != null) return kept.dateState.touched ? kept : { ...kept, dateState: initialDate };
   const stored = readDraft(key, parseStoredInputDraft);
   if (stored == null) return null;
-  const initialDate = createDraftDateState(initialData, timeZone);
   return {
     text: stored.data.text,
     images: toEditableImages(initialData?.images),

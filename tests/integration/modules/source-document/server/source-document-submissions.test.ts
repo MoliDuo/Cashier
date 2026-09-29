@@ -706,3 +706,58 @@ describe("new-record submission against a concurrent archive or ledger delete", 
     expect(await queuedAttemptIds(db)).toEqual([created.submission.attempt.id]);
   });
 });
+
+describe("the day a new record is filed under", () => {
+  async function failProcessing(ledgerId: string, sourceDocumentId: string, attemptId: string) {
+    await recordProcessingFailure({
+      lease: await claimAttemptForTest(attemptId),
+      ledgerId,
+      sourceDocumentId,
+      attemptId,
+      failureKind: "invalid_input",
+      failureMessage: "unreadable",
+    });
+  }
+
+  async function filedDay(sourceDocumentId: string) {
+    const document = await getTestDb().query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, sourceDocumentId),
+    });
+    return document?.effectiveDate;
+  }
+
+  it("is the ledger's today while it processes and after its processing fails", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    await db.update(ledgers).set({ timeZone: "Asia/Shanghai" }).where(eq(ledgers.id, ledgerId));
+    // 07:00 in Shanghai is still the previous day in UTC.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-03-01T23:00:00.000Z") });
+    try {
+      const created = await submitSourceDocument({
+        ledgerId,
+        bookId: await testBookId(db, ledgerId),
+        input: { text: "Breakfast 12", storedFileIds: [], documentDate: null },
+      });
+
+      expect(await filedDay(created.document.id)).toBe("2026-03-02");
+      await failProcessing(ledgerId, created.document.id, created.attempt.id);
+      expect(await filedDay(created.document.id)).toBe("2026-03-02");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("is the day the submission asked for, even when processing fails", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    const created = await submitSourceDocument({
+      ledgerId,
+      bookId: await testBookId(db, ledgerId),
+      input: { text: "Breakfast 12", storedFileIds: [], documentDate: "2026-03-02" },
+    });
+
+    expect(await filedDay(created.document.id)).toBe("2026-03-02");
+    await failProcessing(ledgerId, created.document.id, created.attempt.id);
+    expect(await filedDay(created.document.id)).toBe("2026-03-02");
+  });
+});

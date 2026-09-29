@@ -273,9 +273,10 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
       where: eq(extractionAttempts.id, doc!.latestAttemptId!),
     });
 
-    expect(doc?.documentDate).toBeNull();
     // The fixture book has no zone of its own, so the server date decides.
     expect(attempt?.requestedDate).toBe(formatDateTimeForApi(new Date()));
+    // The record is dated from the start, not only once processing succeeds.
+    expect(doc?.documentDate).toBe(attempt?.requestedDate);
   });
 
   it("files an upload into its key's book, dated in the ledger's zone", async () => {

@@ -282,6 +282,31 @@ describe("useSourceDocumentInput", () => {
       expect(isDirty()).toBe(false);
     });
 
+    it("gives a draft kept past midnight today's default, but keeps a hand-picked date", () => {
+      ledger.id = "ledger-1";
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(new Date("2026-07-27T15:00:00.000Z"));
+        const evening = renderInput({ timeZone: "Asia/Shanghai" });
+        act(() => evening.result.current.setText("夜宵 20"));
+        expect(formatDateTimeForApi(evening.result.current.entryDate)).toBe("2026-07-27");
+        evening.unmount();
+
+        vi.setSystemTime(new Date("2026-07-27T23:30:00.000Z"));
+        const morning = renderInput({ timeZone: "Asia/Shanghai" });
+        expect(morning.result.current.text).toBe("夜宵 20");
+        expect(formatDateTimeForApi(morning.result.current.entryDate)).toBe("2026-07-28");
+        act(() => morning.result.current.setEntryDate(parseDateString("2026-07-20")));
+        morning.unmount();
+
+        const later = renderInput({ timeZone: "Asia/Shanghai" });
+        expect(formatDateTimeForApi(later.result.current.entryDate)).toBe("2026-07-20");
+        later.unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("does not reinitialize a mounted draft when a refreshed seed arrives", () => {
       const { result, rerender, isDirty } = renderInput({ initialData: { text: "Original" } });
       act(() => result.current.setText("Unsaved"));
