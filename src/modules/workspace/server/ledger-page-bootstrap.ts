@@ -124,15 +124,26 @@ export const loadLedgerView = cache(async (): Promise<LedgerView> => {
   };
 });
 
-/** The ledger, its books and its categories: what the layout's shell renders from. */
+/**
+ * The live books, for the top bar's book switcher. The bars render outside the
+ * layout's data Suspense and read the books first, so the books are hydrated
+ * above them: hydrated any later, they land on a query the switcher already
+ * started, which defers them to an effect, and the workspace's context changes
+ * under a page that may still be streaming in.
+ */
+export function getLedgerBooksBootstrap(books: readonly BookDto[] | null): DehydratedState {
+  const queryClient = new QueryClient();
+  if (books != null) queryClient.setQueryData(queryKeys.books(), books);
+  return dehydrate(queryClient);
+}
+
+/** The ledger and its categories: what the workspace inside the layout renders from. */
 export async function getLedgerShellBootstrap(input: {
   ledgerDto: LedgerDto;
-  books: readonly BookDto[] | null;
   categories: Promise<EntryCategoryWithCount[]>;
 }): Promise<DehydratedState> {
   const queryClient = new QueryClient();
   queryClient.setQueryData(queryKeys.ledger(), input.ledgerDto);
-  if (input.books != null) queryClient.setQueryData(queryKeys.books(), input.books);
   queryClient.setQueryData(queryKeys.entryCategories(), await input.categories);
   return dehydrate(queryClient);
 }

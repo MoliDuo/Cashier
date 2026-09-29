@@ -180,6 +180,23 @@ describe("CategoryAssignmentProvider", () => {
     );
   });
 
+  it("hands its readers the same value when it re-renders with nothing new", async () => {
+    const seen: unknown[] = [];
+    function ValueProbe() {
+      seen.push(useCategoryAssignment());
+      return null;
+    }
+    const { queryClient, wrapper } = setup();
+    const { rerender } = render(<ValueProbe />, { wrapper });
+    await poll(queryClient);
+    const settled = seen.at(-1);
+
+    // The workspace above re-renders it with new children on every change of its own.
+    rerender(<ValueProbe />);
+
+    expect(seen.at(-1)).toBe(settled);
+  });
+
   it("refuses to be read outside the provider", () => {
     function Outside() {
       useCategoryAssignment();

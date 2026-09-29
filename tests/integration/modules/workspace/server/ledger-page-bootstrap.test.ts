@@ -9,6 +9,7 @@ import {
 import { books, entryCategories, ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import {
   getLedgerRouteBootstrap,
+  getLedgerBooksBootstrap,
   getLedgerShellBootstrap,
   loadLedgerView,
 } from "@/modules/workspace/server/ledger-page-bootstrap";
@@ -62,7 +63,7 @@ async function loadPage(input: PageInput) {
   const view = await loadLedgerView();
   const { ledgerDto } = await resolveAuthenticatedHome();
   const [shell, route] = await Promise.all([
-    getLedgerShellBootstrap({ ledgerDto, books: view.books, categories: view.categories }),
+    getLedgerShellBootstrap({ ledgerDto, categories: view.categories }),
     getLedgerRouteBootstrap({
       page: input.page,
       ledgerDto,
@@ -71,7 +72,7 @@ async function loadPage(input: PageInput) {
       ...(input.advancedFilters === undefined ? {} : { advancedFilters: input.advancedFilters }),
     }),
   ]);
-  return { view, shell, route };
+  return { view, books: getLedgerBooksBootstrap(view.books), shell, route };
 }
 
 function query(state: DehydratedState, ...prefix: string[]) {
@@ -154,13 +155,15 @@ describe("ledger page bootstrap", () => {
     vi.useRealTimers();
   });
 
-  it("dehydrates the ledger, its live books and its categories for the shell", async () => {
-    const { shell, view } = await loadPage({ page: "records" });
+  it("dehydrates the live books for the bars, and the ledger and its categories for the shell", async () => {
+    const { books, shell, view } = await loadPage({ page: "records" });
 
-    expect(query(shell, "ledger")?.state.data).toMatchObject({ id: ledgerId });
+    expect(books.queries.map((candidate) => candidate.queryKey)).toEqual([["ledger", "books"]]);
     expect(
-      (query(shell, "ledger", "books")?.state.data as Array<{ id: string }>).map((b) => b.id)
+      (query(books, "ledger", "books")?.state.data as Array<{ id: string }>).map((b) => b.id)
     ).toEqual([bookId, otherBookId]);
+    expect(query(shell, "ledger")?.state.data).toMatchObject({ id: ledgerId });
+    expect(query(shell, "ledger", "books")).toBeUndefined();
     expect(query(shell, "ledger", "categories")?.state.data).toEqual([
       expect.objectContaining({ name: "吃喝" }),
     ]);
@@ -286,7 +289,7 @@ describe("ledger page bootstrap", () => {
   it("keeps the remembered book when the books fail", async () => {
     request.failBooks = true;
 
-    const { view, shell, route } = await loadPage({ page: "records", bookId: otherBookId });
+    const { view, books, shell, route } = await loadPage({ page: "records", bookId: otherBookId });
 
     // A list that failed is not evidence the book is gone; losing it would
     // quietly reset the reader to 总账.
@@ -295,7 +298,7 @@ describe("ledger page bootstrap", () => {
     expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
       bookId: otherBookId,
     });
-    expect(query(shell, "ledger", "books")).toBeUndefined();
+    expect(books.queries).toEqual([]);
     expect(query(shell, "ledger", "categories")).toBeDefined();
   });
 });

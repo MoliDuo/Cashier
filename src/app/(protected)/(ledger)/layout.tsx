@@ -3,6 +3,7 @@ import { HydrationBoundary, type DehydratedState } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import {
+  getLedgerBooksBootstrap,
   getLedgerShellBootstrap,
   loadLedgerView,
   type LedgerView,
@@ -28,11 +29,15 @@ export default async function LedgerLayout({ children }: { children: React.React
 
   return (
     <WorkspaceStoreProvider initialBookId={view.bookId}>
-      <LedgerShell>
-        <Suspense fallback={<LedgerRouteFallback />}>
-          <LedgerShellData view={view}>{children}</LedgerShellData>
-        </Suspense>
-      </LedgerShell>
+      {/* The top bar's book switcher reads the books before anything below it,
+          so they are in the cache before the bars render. */}
+      <HydrationBoundary state={getLedgerBooksBootstrap(view.books)}>
+        <LedgerShell>
+          <Suspense fallback={<LedgerRouteFallback />}>
+            <LedgerShellData view={view}>{children}</LedgerShellData>
+          </Suspense>
+        </LedgerShell>
+      </HydrationBoundary>
     </WorkspaceStoreProvider>
   );
 }
@@ -47,11 +52,7 @@ async function LedgerShellData({
   const { ledgerDto } = view.context;
   let state: DehydratedState | undefined;
   try {
-    state = await getLedgerShellBootstrap({
-      ledgerDto,
-      books: view.books,
-      categories: view.categories,
-    });
+    state = await getLedgerShellBootstrap({ ledgerDto, categories: view.categories });
   } catch (error) {
     logger.error(
       { error, ledgerSubject: logIdentifier("ledger", ledgerDto.id) },
