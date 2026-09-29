@@ -21,8 +21,8 @@ code is organized and tested.
   rewrites, and do not revert user changes in a dirty worktree.
 - Add focused regression coverage for behavior changes, placed as `docs/testing.md` describes. Run
   the narrowest relevant checks while working and `npm run check` before declaring completion.
-- Validate external input with Zod, authorize ledger access, scope tenant queries by `ledgerId`, and
-  never log tokens, raw personal data, provider credentials, or image contents.
+- Validate external input with Zod, require an authenticated session (or an API credential) for
+  ledger data, and never log tokens, raw personal data, provider credentials, or image contents.
 - Treat database, object-storage, generated-history, and backup cleanup as destructive. Review the
   target set before deleting it.
 - Never commit `.env`, provider credentials, real receipts, API keys, or raw personal data.

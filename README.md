@@ -21,7 +21,7 @@ Cashier 会从图片或文字中提取日期、商家、金额、币种、分类
 - 复核和编辑 AI 结果，处理识别失败的账单
 - 管理多币种消费，并按账本主币种查看汇总；用分账把账目分开看，总账看全部
 - 在账目里按账单或按明细回看、筛选，在统计图表里看支出的去向和走势
-- 创建账本级 API 密钥，供脚本、快捷指令和外部集成使用（见 [API v1](./docs/api.md)）
+- 创建绑定分账的 API 密钥，供脚本、快捷指令和外部集成使用（见 [API v1](./docs/api.md)）
 - 中文界面；AI 可以按设置用其他语言填写账单内容
 
 <picture>
@@ -163,7 +163,7 @@ npm run account:enroll -- --email you@example.com
 
 重试次数、超时、限流额度、图片质量、恢复批量这些数字不是环境变量，它们在 `src/config/tuning.ts` 里，
 改一个数字然后部署即可。图片上限为 16 MP 业务校验和 24 MP sharp 解码保护。批量分类一次最多提交 5,000 条
-明细，每个账本同时只跑一个任务，同一账单每次 AI 请求最多包含 50 条明细。
+明细，同时只跑一个任务，同一账单每次 AI 请求最多包含 50 条明细。
 
 ## 部署到 Vercel
 
@@ -192,7 +192,7 @@ npm run account:enroll -- --email you@example.com
   判断用 `VERCEL_GIT_COMMIT_REF`，并且**取不到分支名时照常构建**：写成"不是 main 就跳过"的话，变量读不到时
   连生产也会被跳过。那行 `echo` 把实际取值打进构建日志，方便排查。
 - **每日 cron**：每天 UTC 18:00（北京时间凌晨 2 点，ECB 已发布当天汇率）调用 `/api/cron/daily`，带
-  `Authorization: Bearer <CRON_SECRET>`。它清理过期记录，给所有账本的待处理任务补一次调度，刷新汇率，
+  `Authorization: Bearer <CRON_SECRET>`。它清理过期记录，给待处理任务补一次调度，刷新汇率，
   并清理对象存储。返回的 JSON 列出每一步是 `done`、`failed` 还是 `skipped`。手动触发：
 
   ```sh

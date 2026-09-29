@@ -36,7 +36,9 @@
 8. **部署遵守 expand/contract。** 迁移执行时，旧版本还在对外服务。删除一列要分三次发布：
    先停写，再停读，最后才删。Vercel 先构建再迁移，所有待执行的迁移在一个事务里完成，构建或迁移失败都不会动库。模型不再提到、库里还没删的名字登记在 `schema-contract.test.ts` 的
    `retiredNames` 里。
-9. **租户查询按 `ledger_id` 限定。** 即使只有一个账本也照做。
+9. **账本是数据库保证的单例。** `ledgers` 只有一行（`uq_ledgers_singleton`），其余表不按账本区分：
+   登录即授权，查询不带账本过滤，账本设置直接读这一行。残留的 `ledger_id` 列由数据库默认值填写，
+   应用不读写它们，迁移 0024 删除。
 
 ## 3. 分层与目录
 
@@ -131,7 +133,6 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ### 数据访问
 
-- 租户数据在 SQL 里按 `ledgerId` 限定。
 - 优先用集合式语句（`UPDATE FROM`、CTE、`unnest`），不逐行查询。
 - keyset 排序与游标字段保持一致，游标里带查询的指纹。
 - **票据写入只走登记过的 writer**（`src/modules/source-document/server/`），没有第二条写路径。
@@ -207,7 +208,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 ### 批量分类
 
 - 选择一次提交，最多 `CATEGORY_ASSIGNMENT_MAX_ENTRIES` 个条目；服务端在一个事务里登记 job、票据和条目。
-  一个账本最多一个活动 job，run 租用 job 行，所以每个账本一个 worker，账本之间不共享槽位。
+  同时最多一个活动 job，run 租用 job 行，所以只有一个 worker。
 - run 逐个处理到期票据，花完 `CATEGORY_RUN_BUDGET_MS` 就停下，把手上的票据交回且不计尝试。没有待处理票据时，
   在同一个事务里根据条目结果定下 job 状态。关页面不会取消已开始的 job；job 活动期间，进度轮询每隔几秒起一次
   新 run，每日 cron 收拾剩下的。
@@ -221,7 +222,8 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 ### 存储
 
 - 网页图片用短时签名 PUT URL 直传到私有 S3 兼容存储。规划阶段为每张图登记一行 pending 的 `stored_files`，
-  不设额度：只有两个人在用，没有确认的文件由每日 cron 清掉。签名 URL 指向 `temporary/{ledgerId}/{storedFileId}`。
+  不设额度：只有两个人在用，没有确认的文件由每日 cron 清掉。签名 URL 指向 `temporary/{storedFileId}`，持久 key 是 `stored/{storedFileId}`。
+  更早的文件在 `{旧账本 id}/stored/{storedFileId}` 下，按 `stored_files.storage_key` 读取，不受影响。
 - 15 分钟内的最终化会核对每个临时对象的 MIME、大小和 SHA-256，用 sharp 归一化（同时剥离 EXIF），写入持久
   key 并标记 ready；重复最终化原样返回。只有 ready 的文件能挂到提取尝试上。
 - API v1 的内联图片不经过 `temporary/`：服务端归一化后同样预留 pending 行，写入持久对象，再标记 ready。
@@ -235,7 +237,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 请求不再顺带触发维护。每一步在 cron 预算内独立运行：
 
 1. 过期记录（验证码、challenge、会话、限流桶）；
-2. 用 `after()` 调度每个账本到期的提取工作；
+2. 用 `after()` 调度到期的提取工作；
 3. 同样调度分类工作；
 4. 刷新汇率，补齐缺失的日期并替换临时值；
 5. 超过 1 天的 pending 文件；
@@ -313,7 +315,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ### 刷新
 
-- 每个账本有一个单调递增的 bigint 同步版本。触发器每个事务为每个账本分配一个版本，并原子地更新分类、设置、
+- 账本有一个单调递增的 bigint 同步版本。触发器每个事务分配一个版本，并原子地更新分类、设置、
   统计各自的水位线（`ledger_sync_state`）。刷新时比较水位线和观察者的版本，不需要变更历史。改主币种会推进全部水位线。
 - 刷新只有一个驱动：`useLedgerSync`（`src/modules/workspace/hooks/useLedgerSync.ts`），在 ledger layout 里挂一次，
   账本的每个路由都受它照看。它的 query key 是 `["ledger-sync"]`，不在 `["ledger"]` 前缀下，失效时不会刷新自己。
@@ -325,7 +327,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 ### 草稿与离开
 
 - 未保存的输入会被保留，而不是拦住用户。`src/lib/drafts.ts` 按记录把草稿存进 localStorage，key 为
-  `draft:<ledgerId>:<kind>:<id>`，只存可 JSON 化的字段，选中的图片只在页面生命周期内留在内存。
+  `draft:<kind>:<id>`，只存可 JSON 化的字段，选中的图片只在页面生命周期内留在内存。
 - 关闭表单、用浏览器历史离开，都不询问；下次打开时恢复草稿，并提示"有未保存的修改 · 放弃"。账单详情没有草稿：
   每个字段改完就写库。
 - 已有记录的草稿记着它基于的版本，记录被改过时，草稿按冲突拒绝。
@@ -446,10 +448,15 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   之后又把明细拆成独立的 `/entries` 路由，四个 tab 并列，设置回到 tab，手机多选改由顶栏和底部操作栏承担。
   部署之后的下一次发布完成收尾：迁移 0021 删掉 `books.time_zone`，创建账单的输入不再接受 `timezone`。
 
+- **之后：去掉 `ledger_id`。** 账本一直是单例（`getLiveLedger` 早就要求恰好一行），浏览器也从不传账本 id，
+  按账本限定的查询从未隔离过任何东西，却让每个函数、每条查询和每个测试都带着它。单例改由
+  `uq_ledgers_singleton` 保证，授权就是登录（或 API 凭证）。按 expand/contract 分三次发布：迁移 0023 让数据库
+  用 `current_ledger_id()` 默认值继续填这一列，应用不再读写它；0024 删列并把复合外键改成单列外键；
+  之后把旧前缀下的图片搬到 `stored/`。
+
 ### 不做
 
 - **条目自带日期。** 多日期输入不常见，为它改约 53 个文件不划算，拆分和日期整理保留。
-- **去掉 `ledger_id`。** 与租户隔离的要求冲突，改动面约 250 个文件，收益很低。
 - **CI 拦部署。** 推送到 `main` 后 Vercel 立刻构建、迁移并部署，与 CI 并行。继续靠提交前本地 `npm run check` 兜底。
 - **升级到 TypeScript 7。** 仓库脚本已不再调用 TS 编译器 API，但 typescript-eslint 和 dependency-cruiser
   还依赖它，要等两者支持。
