@@ -1,15 +1,17 @@
 "use client";
-import type { MouseEvent, ReactNode } from "react";
-import { ArrowLeft, ChevronDown, Plus, Settings, Wallet } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronDown, ListChecks, Plus, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import type { LedgerTab } from "@/lib/ledger-tabs";
 import { cn } from "@/lib/utils";
 import { AmountText } from "@/modules/currency/ui/amount-text";
+import { SelectAllToggle, selectionCountText } from "@/modules/ledger/ui/batch-action-toolbar";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import { BookSwitcher } from "./BookSwitcher";
 import { LIST_CONTROLS_ID } from "./ListControlsDrop";
 import { ledgerPageCopy } from "@/copy/app";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface LedgerTopBarProps {
   activeTab: LedgerTab;
@@ -18,18 +20,16 @@ interface LedgerTopBarProps {
   navigation: ReactNode;
   onOpenInput: () => void;
   onInputIntent: () => void;
-  settingsHref: string;
-  onOpenSettings: () => void;
-  /** Leaves 设置 for the tab it was opened from. */
-  onLeaveSettings: () => void;
 }
 
 /**
- * The ledger's top bar. On 账目 and 统计 it holds the book switcher and the
- * gear (and, from md up, the tabs and 记一笔; below md, the page's summary
- * between them — 账目's list or 统计's figures — which drops that page's
- * controls down); on 设置 it is a back arrow and the page's name, since the
- * book being viewed has no bearing there.
+ * The ledger's top bar. On a phone it is three parts: the list's select toggle
+ * on the left, the page's summary in the middle (账目's or 明细's list, or 统计's
+ * figures, which drops that page's period and filter down), and the book
+ * switcher on the right. While a list is being selected from, the middle is the
+ * count and the right is select-all; 设置 has only its name, since the book
+ * being viewed has no bearing there. From md up the bar holds the logo, the
+ * tabs, 记一笔 and the book switcher instead, and selecting stays in the page.
  */
 export function LedgerTopBar({
   activeTab,
@@ -37,55 +37,67 @@ export function LedgerTopBar({
   navigation,
   onOpenInput,
   onInputIntent,
-  settingsHref,
-  onOpenSettings,
-  onLeaveSettings,
 }: LedgerTopBarProps) {
   const inSettings = activeTab === "settings";
   const headerSummary = useWorkspaceStore((state) => state.headerSummary);
+  const headerSelection = useWorkspaceStore((state) => state.headerSelection);
   const listControlsOpen = useWorkspaceStore((state) => state.listControlsOpen);
   const setListControlsOpen = useWorkspaceStore((state) => state.setListControlsOpen);
-  const openSettings = (event: MouseEvent<HTMLAnchorElement>) => {
-    // A plain click moves within the app. A modified one opens the link as
-    // usual, and so does a click before the page is ready: a plain link still
-    // works then, where the in-app move would have to be dropped.
-    if (disabled || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    onOpenSettings();
-  };
+  const selecting = !inSettings && headerSelection?.active === true;
 
   return (
     <>
-      <div className="flex min-w-0 flex-1 items-center gap-1 md:flex-none md:gap-3">
-        {inSettings ? (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onLeaveSettings}
-              disabled={disabled}
-              aria-label={ledgerPageCopy.back}
-              title={ledgerPageCopy.back}
-            >
-              <ArrowLeft className="size-5" aria-hidden="true" />
-            </Button>
-            <h1 className={textRoleClassName("sectionTitle")}>{ledgerPageCopy.settings}</h1>
-          </>
-        ) : (
-          <>
-            <span className="hidden items-center gap-2 pl-1 font-semibold text-text md:inline-flex">
-              <Wallet className="size-5 text-primary" aria-hidden="true" />
-              Cashier
-            </span>
-            <BookSwitcher disabled={disabled} />
-          </>
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-1 md:flex-none md:gap-3",
+          selecting ? "flex-none" : "flex-1"
         )}
+      >
+        <span className="hidden items-center gap-2 pl-1 font-semibold text-text md:inline-flex">
+          <Wallet className="size-5 text-primary" aria-hidden="true" />
+          Cashier
+        </span>
+        {!inSettings && headerSelection != null ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground md:hidden"
+            onClick={headerSelection.onToggle}
+            disabled={disabled || headerSelection.disabled}
+            aria-label={selecting ? batchActionsCopy.cancelSelect : batchActionsCopy.select}
+            title={selecting ? batchActionsCopy.cancelSelect : batchActionsCopy.select}
+          >
+            {selecting ? (
+              <X className="size-5" aria-hidden="true" />
+            ) : (
+              <ListChecks className="size-5" aria-hidden="true" />
+            )}
+          </Button>
+        ) : null}
       </div>
-      {/* A phone's bar has no tabs, so the list's summary sits in the middle;
-          the two sides share the rest equally, which keeps it centred. The
-          list's period and filter controls fold into it. */}
-      {!inSettings && headerSummary != null ? (
+      {/* A phone's bar has no tabs, so the page's name or summary sits in the
+          middle; the two sides share the rest equally, which keeps it centred.
+          The list's period and filter controls fold into the summary. */}
+      {inSettings ? (
+        <h1 className={textRoleClassName("sectionTitle", "shrink-0 md:sr-only")}>
+          {ledgerPageCopy.settings}
+        </h1>
+      ) : selecting && headerSelection != null ? (
+        <p
+          aria-live="polite"
+          className={textRoleClassName(
+            "bodyStrong",
+            "min-w-0 flex-1 truncate text-center tabular-nums md:hidden"
+          )}
+        >
+          {selectionCountText({
+            selectedCount: headerSelection.selectedCount,
+            loadedCount: headerSelection.loadedCount,
+            hasMoreData: headerSelection.hasMore,
+          })}
+        </p>
+      ) : headerSummary != null ? (
         <button
           type="button"
           aria-expanded={listControlsOpen}
@@ -121,7 +133,12 @@ export function LedgerTopBar({
         </button>
       ) : null}
       <div className="hidden h-full flex-1 justify-center md:flex">{navigation}</div>
-      <div className="flex flex-1 items-center justify-end gap-1 md:flex-none md:gap-2">
+      <div
+        className={cn(
+          "flex min-w-0 items-center justify-end gap-1 md:flex-none md:gap-2",
+          selecting ? "flex-none" : "flex-1"
+        )}
+      >
         <Button
           type="button"
           size="sm"
@@ -135,16 +152,18 @@ export function LedgerTopBar({
           {ledgerPageCopy.newRecord}
         </Button>
         {inSettings ? null : (
-          <a
-            href={settingsHref}
-            onClick={openSettings}
-            aria-label={ledgerPageCopy.settings}
-            title={ledgerPageCopy.settings}
-            className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface2 hover:text-text"
-          >
-            <Settings className="size-5" aria-hidden="true" />
-          </a>
+          <div className={cn("flex min-w-0 justify-end", selecting && "max-md:hidden")}>
+            <BookSwitcher disabled={disabled} />
+          </div>
         )}
+        {selecting && headerSelection != null ? (
+          <SelectAllToggle
+            className="min-h-11 shrink-0 px-2 md:hidden"
+            checked={headerSelection.allSelected}
+            disabled={disabled || headerSelection.disabled}
+            onToggle={headerSelection.onToggleAll}
+          />
+        ) : null}
       </div>
     </>
   );

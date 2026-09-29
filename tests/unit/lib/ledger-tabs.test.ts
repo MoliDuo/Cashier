@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  LEDGER_ROUTES,
   isLedgerTab,
-  ledgerPageFor,
   ledgerTabFromPathname,
   ledgerTabHref,
-  readRecordsView,
 } from "@/lib/ledger-tabs";
 
 describe("ledger tabs helpers", () => {
+  it("lists the four tabs in navigation order", () => {
+    expect(LEDGER_ROUTES).toEqual(["records", "entries", "stats", "settings"]);
+  });
+
   it("reads the route from its pathname", () => {
     expect(ledgerTabFromPathname("/stats")).toBe("stats");
+    expect(ledgerTabFromPathname("/entries")).toBe("entries");
     expect(ledgerTabFromPathname("/records/")).toBe("records");
   });
 
@@ -19,21 +23,14 @@ describe("ledger tabs helpers", () => {
     expect(ledgerTabFromPathname(null)).toBe("records");
   });
 
-  it("reads 账目's view, by bill unless entries are asked for", () => {
-    expect(readRecordsView(new URLSearchParams(""))).toBe("documents");
-    expect(readRecordsView(new URLSearchParams("view=entries"))).toBe("entries");
-    expect(readRecordsView(new URLSearchParams("view=other"))).toBe("documents");
-    expect(ledgerPageFor("records", new URLSearchParams("view=entries"))).toBe("entries");
-    expect(ledgerPageFor("stats", new URLSearchParams("view=entries"))).toBe("stats");
-  });
-
   it("builds a route href with its query", () => {
     expect(ledgerTabHref("settings")).toBe("/settings");
-    expect(ledgerTabHref("records", "view=entries")).toBe("/records?view=entries");
+    expect(ledgerTabHref("entries", "search=tea")).toBe("/entries?search=tea");
   });
 
   it("validates ledger route values", () => {
     expect(isLedgerTab("settings")).toBe(true);
+    expect(isLedgerTab("entries")).toBe(true);
     expect(isLedgerTab("stream")).toBe(false);
     expect(isLedgerTab(null)).toBe(false);
   });

@@ -152,11 +152,10 @@ describe("RoutePrefetch", () => {
     expect(getLedgerRouteBootstrapMock).not.toHaveBeenCalled();
   });
 
-  it("prefetches a document request's view and filters for the viewed book", async () => {
+  it("prefetches a document request's route and filters for the viewed book", async () => {
     await RoutePrefetch({
-      tab: "records",
+      tab: "entries",
       searchParams: Promise.resolve({
-        view: "entries",
         period: "lastMonth",
         categoryId: "c1",
         search: "tea",

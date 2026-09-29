@@ -4,8 +4,8 @@ import { usePeriodFilter } from "../../hooks/usePeriodFilter";
 import { DetailsTab } from "../DetailsTab";
 import { useLedgerWorkspace } from "../ledger-workspace-context";
 
-/** 账目 by entry: the entries themselves, under the page's filters. */
-export function EntriesView() {
+/** 明细: the entries themselves, under the page's filters. */
+export function EntriesRoute() {
   const { ledger, categories, recordScope, timeZone, today } = useLedgerWorkspace();
   const pathname = usePathname();
   const searchParams = useSearchParams();

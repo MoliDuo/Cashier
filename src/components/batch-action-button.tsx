@@ -15,6 +15,11 @@ export interface BatchActionButtonProps extends Omit<ButtonProps, "children"> {
    * reads, so the short form has to be contained in it.
    */
   shortLabel?: string;
+  /**
+   * `stacked` is the phone's action bar: the icon over its label, filling an
+   * equal share of the bar, at least a finger tall. It takes the short label.
+   */
+  orientation?: "row" | "stacked";
   children: ReactNode;
 }
 
@@ -26,14 +31,40 @@ export function BatchActionButton({
   icon: Icon,
   loading = false,
   shortLabel,
+  orientation = "row",
   children,
   className,
   disabled,
+  variant,
   ...props
 }: BatchActionButtonProps) {
+  if (orientation === "stacked") {
+    return (
+      <Button
+        variant="ghost"
+        aria-busy={loading || undefined}
+        disabled={disabled || loading}
+        className={cn(
+          "h-auto min-h-11 min-w-0 flex-1 flex-col gap-0.5 rounded-none px-1 py-2 text-micro font-medium [&_svg]:size-5",
+          variant === "destructive" && "text-danger hover:text-danger",
+          className
+        )}
+        {...props}
+      >
+        {loading ? (
+          <Loader2 aria-hidden="true" className="animate-spin" />
+        ) : (
+          <Icon aria-hidden="true" />
+        )}
+        <span className="max-w-full truncate">{shortLabel ?? children}</span>
+      </Button>
+    );
+  }
+
   return (
     <Button
       size="sm"
+      {...(variant != null ? { variant } : {})}
       aria-busy={loading || undefined}
       disabled={disabled || loading}
       // A phone row has to fit four actions beside the back button at 360px;

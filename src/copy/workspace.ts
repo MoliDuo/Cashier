@@ -1,7 +1,5 @@
 export const detailsTabCopy = {
   loadMoreFailed: "加载更多失败，重试",
-  select: "选择",
-  cancelSelect: "取消",
   noMore: "没有更多了",
   batchUpdated: (v: { count: string | number }) => `已更新 ${v.count} 项明细`,
   batchDeleted: (v: { count: string | number }) => `已删除 ${v.count} 项明细`,
@@ -12,6 +10,9 @@ export const detailsTabCopy = {
 };
 
 export const batchActionsCopy = {
+  select: "选择",
+  cancelSelect: "取消",
+  actionsLabel: "批量操作",
   deselectAll: "取消全选",
   selectDay: (v: { date: string | number }) => `选中${v.date}的全部项目`,
   deselectDay: (v: { date: string | number }) => `取消选中${v.date}的全部项目`,
@@ -143,8 +144,6 @@ export const entryFilterPanelCopy = {
 };
 
 export const ledgerEntriesTabCopy = {
-  select: "选择",
-  cancelSelect: "取消",
   loadMoreFailed: "加载更多失败，重试",
   noMore: "没有更多了",
   deleteConfirmTitle: "确认删除",

@@ -1,11 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const location = vi.hoisted(() => ({ pathname: "/records", search: "" }));
+const location = vi.hoisted(() => ({ pathname: "/records" }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => location.pathname,
-  useSearchParams: () => new URLSearchParams(location.search),
 }));
 vi.mock("@/components/skeletons/TabSkeletons", () => ({
   EntriesTabSkeleton: () => <div data-testid="stream-skeleton" />,
@@ -18,13 +17,12 @@ import { LedgerRouteFallback } from "@/app/(protected)/(ledger)/_route-fallback"
 
 describe("LedgerRouteFallback", () => {
   it.each([
-    ["/records", "", "stream-skeleton"],
-    ["/records", "view=entries", "details-skeleton"],
-    ["/stats", "", "stats-skeleton"],
-    ["/settings", "", "settings-skeleton"],
-  ] as const)("renders the skeleton of %s?%s", (route, search, testId) => {
+    ["/records", "stream-skeleton"],
+    ["/entries", "details-skeleton"],
+    ["/stats", "stats-skeleton"],
+    ["/settings", "settings-skeleton"],
+  ] as const)("renders the skeleton of %s", (route, testId) => {
     location.pathname = route;
-    location.search = search;
     render(<LedgerRouteFallback />);
     expect(screen.getByTestId(testId)).toBeInTheDocument();
   });

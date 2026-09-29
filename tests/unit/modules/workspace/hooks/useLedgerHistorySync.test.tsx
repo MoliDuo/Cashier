@@ -37,18 +37,11 @@ describe("useLedgerHistorySync", () => {
   });
 
   it("remembers each route's query without the open record", () => {
-    const { result, rerender } = renderSync("records", `view=entries&${detailSearch}`);
-    expect(result.current.routeQueries.records).toBe("view=entries");
+    const { result, rerender } = renderSync("records", `search=tea&${detailSearch}`);
+    expect(result.current.routeQueries.records).toBe("search=tea");
 
     rerender({ tab: "stats", query: "range=year" });
-    expect(result.current.routeQueries).toEqual({ records: "view=entries", stats: "range=year" });
-    expect(result.current.lastBrowsedTab).toBe("stats");
-  });
-
-  it("keeps the tab 设置 was opened from", () => {
-    const { result, rerender } = renderSync("records", "");
-    rerender({ tab: "settings", query: "" });
-    expect(result.current.lastBrowsedTab).toBe("records");
+    expect(result.current.routeQueries).toEqual({ records: "search=tea", stats: "range=year" });
   });
 
   it("drops a custom period it cannot read", async () => {

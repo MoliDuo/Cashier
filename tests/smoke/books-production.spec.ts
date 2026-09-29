@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { currentBookOption, selectBook, selectBookByName } from "./book-switch";
 import { bookAction, bookMenu, bookRow } from "./book-rows";
-import { openTab } from "./navigation";
+import { ledgerNavigation, openTab } from "./navigation";
 import { seedRecord } from "./seed-record";
 import { signIn } from "./sign-in";
 
@@ -157,7 +157,7 @@ test("books production scopes the stream, the details and the stats to one book"
   await openTab(page, "设置");
   await addBook(page, bookA);
   await addBook(page, bookB);
-  await openTab(page, "流水");
+  await openTab(page, "账目");
 
   await recordInBook(page, { item: itemA, amount: "111.11", book: bookA });
   await recordInBook(page, { item: itemB, amount: "222.22", book: bookB });
@@ -219,7 +219,7 @@ test("books production moves a record from one book to another", async ({ page }
   await openTab(page, "设置");
   await addBook(page, bookA);
   await addBook(page, bookB);
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   await recordInBook(page, { item, amount: "333.33", book: bookA });
 
   await selectBookByName(page, bookA);
@@ -270,7 +270,7 @@ test("books production starts a record in the viewed book", async ({ page }, tes
   await openTab(page, "设置");
   await addBook(page, bookA);
   await addBook(page, bookB);
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   await selectBookByName(page, bookA);
 
   // Viewing a book, 记一笔 starts in that book.
@@ -399,12 +399,12 @@ test("books production falls back to 总账 when the viewed book is archived", a
   await login(page);
   await openTab(page, "设置");
   await addBook(page, bookName);
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   await selectBookByName(page, bookName);
 
   await openTab(page, "设置");
   await archiveBook(page, bookName);
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   // The dead scope is gone once the strip marks 总账 again.
   await expect(currentBookOption(page)).toHaveText("总账");
 
@@ -474,14 +474,10 @@ test("books production files an API upload into the book its key is bound to", a
     )
     .toBe("completed");
 
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   await selectBookByName(page, bookName);
-  // A neutral click away from the switcher; a phone folds the toolbar away, so
-  // it lands on the view already shown rather than on the toolbar.
-  await page
-    .getByRole("group", { name: "账目视图" })
-    .getByRole("button", { name: "按账单", exact: true })
-    .click();
+  // A neutral click away from the switcher, on the tab already shown.
+  await ledgerNavigation(page).getByRole("button", { name: "账目", exact: true }).click();
   await expect(
     page.getByTestId("source-document-card-root").filter({ hasText: "Demo Receipt" })
   ).toHaveCount(1);

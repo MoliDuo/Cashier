@@ -26,13 +26,10 @@ const nextConfig: NextConfig = {
     unoptimized: true, // Disable Next.js image optimization - images are pre-processed on upload
     remotePatterns,
   },
-  // 流水 and 明细 became the two views of 账目; old links and installed
-  // shortcuts land there with their query carried along.
+  // 流水 became 账目; old links and installed shortcuts land there with their
+  // query carried along.
   async redirects() {
-    return [
-      { source: "/stream", destination: "/records", permanent: false },
-      { source: "/details", destination: "/records?view=entries", permanent: false },
-    ];
+    return [{ source: "/stream", destination: "/records", permanent: false }];
   },
   async headers() {
     return [

@@ -23,7 +23,7 @@ export function StatsRoute() {
         { range: "custom", from: startDate, to: endDate },
         { categoryId }
       );
-      navigate("records", buildEntriesDrilldownSearchParams({ startDate, endDate, categoryId }));
+      navigate("entries", buildEntriesDrilldownSearchParams({ startDate, endDate, categoryId }));
     },
     [bookId, navigate, queryClient]
   );
@@ -39,7 +39,7 @@ export function StatsRoute() {
         { categoryId, currency }
       );
       navigate(
-        "records",
+        "entries",
         buildEntriesDrilldownSearchParams({ startDate: date, endDate: date, categoryId, currency })
       );
     },

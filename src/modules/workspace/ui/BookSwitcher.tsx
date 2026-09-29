@@ -59,7 +59,7 @@ export function BookSwitcher({ disabled = false }: BookSwitcherProps) {
           <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-52">
+      <DropdownMenuContent align="end" className="w-52">
         {options.map((option, index) => (
           <Fragment key={option.scope ?? "all"}>
             {index === 1 ? <DropdownMenuSeparator /> : null}

@@ -28,12 +28,9 @@ export const ledgerPageCopy = {
   settings: "设置",
   navigation: "账本导航",
   records: "账目",
-  recordsView: "账目视图",
-  byDocument: "按账单",
-  byEntry: "按明细",
+  entries: "明细",
   filtered: "已筛选",
   totalPending: "—",
   stats: "统计",
-  back: "返回",
   newRecord: "记一笔",
 };

@@ -5,6 +5,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -25,11 +27,9 @@ interface WorkspaceState {
   /** Each route's last query, so returning to a tab returns to its filters. */
   routeQueries: Partial<Record<LedgerTab, string>>;
   rememberRouteQuery: (tab: LedgerTab, query: string) => void;
-  /** The tab 设置 was opened from, which its back arrow returns to. */
-  lastBrowsedTab: BrowsedTab;
   /**
-   * The list on screen as a phone's top bar prints it between the book and the
-   * gear, or null when no list is being browsed. Taking it down also folds the
+   * The list on screen as a phone's top bar prints it in the middle, or null
+   * when no list is being browsed. Taking it down also folds the
    * list's controls back up.
    */
   headerSummary: HeaderSummary | null;
@@ -37,6 +37,28 @@ interface WorkspaceState {
   /** Whether a phone's list controls hang open under the top bar. */
   listControlsOpen: boolean;
   setListControlsOpen: (open: boolean) => void;
+  /**
+   * The list's selection as a phone's top bar shows it: a toggle on the left
+   * and, while selecting, the count and 全选. Null on routes with nothing to
+   * select.
+   */
+  headerSelection: HeaderSelection | null;
+  setHeaderSelection: (selection: HeaderSelection | null) => void;
+}
+
+export interface HeaderSelection {
+  /** Whether the list is being selected from. */
+  active: boolean;
+  disabled: boolean;
+  selectedCount: number;
+  loadedCount: number;
+  /** Whether more of the list is still to load, so the count reads "已加载". */
+  hasMore: boolean;
+  allSelected: boolean | "indeterminate";
+  /** Enters or leaves selecting. */
+  onToggle: () => void;
+  /** Selects everything loaded, or clears when it all is selected. */
+  onToggleAll: () => void;
 }
 
 export interface HeaderSummary {
@@ -53,7 +75,19 @@ function sameSummary(a: HeaderSummary | null, b: HeaderSummary | null): boolean 
   return a.total === b.total && a.period === b.period && a.filtered === b.filtered;
 }
 
-type BrowsedTab = Exclude<LedgerTab, "settings">;
+function sameSelection(a: HeaderSelection | null, b: HeaderSelection | null): boolean {
+  if (a == null || b == null) return a === b;
+  return (
+    a.active === b.active &&
+    a.disabled === b.disabled &&
+    a.selectedCount === b.selectedCount &&
+    a.loadedCount === b.loadedCount &&
+    a.hasMore === b.hasMore &&
+    a.allSelected === b.allSelected &&
+    a.onToggle === b.onToggle &&
+    a.onToggleAll === b.onToggleAll
+  );
+}
 
 type WorkspaceStore = StoreApi<WorkspaceState>;
 
@@ -65,13 +99,11 @@ function createWorkspaceStore(initialBookId: string | null): WorkspaceStore {
     setBookId: (bookId) => set((state) => (state.bookId === bookId ? state : { bookId })),
     routeQueries: {},
     rememberRouteQuery: (tab, query) =>
-      set((state) => {
-        const lastBrowsedTab = tab === "settings" ? state.lastBrowsedTab : tab;
-        return state.routeQueries[tab] === query && state.lastBrowsedTab === lastBrowsedTab
+      set((state) =>
+        state.routeQueries[tab] === query
           ? state
-          : { routeQueries: { ...state.routeQueries, [tab]: query }, lastBrowsedTab };
-      }),
-    lastBrowsedTab: "records",
+          : { routeQueries: { ...state.routeQueries, [tab]: query } }
+      ),
     headerSummary: null,
     setHeaderSummary: (headerSummary) =>
       set((state) => {
@@ -87,6 +119,11 @@ function createWorkspaceStore(initialBookId: string | null): WorkspaceStore {
         (listControlsOpen && state.headerSummary == null)
           ? state
           : { listControlsOpen }
+      ),
+    headerSelection: null,
+    setHeaderSelection: (headerSelection) =>
+      set((state) =>
+        sameSelection(state.headerSelection, headerSelection) ? state : { headerSelection }
       ),
   }));
 }
@@ -148,3 +185,45 @@ export function useHeaderSummary(summary: HeaderSummary | null): {
 }
 
 const noSubscription = () => () => {};
+
+/**
+ * Puts a list's selection in the top bar for as long as the list is on screen;
+ * takes it down when the list leaves. The two commands are read through a ref,
+ * so a page's inline closures do not churn the store. It is published in a
+ * layout effect so a phone's tab bar is already gone when the action bar
+ * appears, rather than showing under it for a frame.
+ */
+export function useHeaderSelection(
+  selection: Omit<HeaderSelection, "onToggle" | "onToggleAll"> & {
+    onToggle: () => void;
+    onToggleAll: () => void;
+  }
+): void {
+  const store = useContext(WorkspaceStoreContext);
+  const commands = useRef({ onToggle: selection.onToggle, onToggleAll: selection.onToggleAll });
+  const { onToggle, onToggleAll } = selection;
+  useLayoutEffect(() => {
+    commands.current = { onToggle, onToggleAll };
+  }, [onToggle, onToggleAll]);
+  const [stable] = useState(() => ({
+    onToggle: () => commands.current.onToggle(),
+    onToggleAll: () => commands.current.onToggleAll(),
+  }));
+  const { active, disabled, selectedCount, loadedCount, hasMore, allSelected } = selection;
+  useLayoutEffect(() => {
+    if (store == null) return;
+    store.getState().setHeaderSelection({
+      active,
+      disabled,
+      selectedCount,
+      loadedCount,
+      hasMore,
+      allSelected,
+      ...stable,
+    });
+  }, [store, stable, active, disabled, selectedCount, loadedCount, hasMore, allSelected]);
+  useLayoutEffect(() => {
+    if (store == null) return;
+    return () => store.getState().setHeaderSelection(null);
+  }, [store]);
+}

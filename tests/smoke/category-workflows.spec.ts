@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openTab, showListControls } from "./navigation";
+import { openTab } from "./navigation";
 import { seedRecord } from "./seed-record";
 import { signIn } from "./sign-in";
 
@@ -16,11 +16,10 @@ test("AI category assignment remains visible across tabs and fits narrow screens
   await seedRecord(page, { item, amount: "12.34" });
 
   await openTab(page, "明细");
-  await expect(page).toHaveURL(/\/records\?view=entries/);
-  // The bill view leaves the page when the entry view commits, not when the URL changes.
+  await expect(page).toHaveURL(/\/entries/);
+  // The bill list leaves the page when the entry list commits, not when the URL changes.
   await expect(page.getByText(item, { exact: true })).toHaveCount(1);
   await expect(page.getByText(item, { exact: true })).toBeVisible();
-  await showListControls(page);
   await page.getByRole("button", { name: "选择", exact: true }).click();
   await page.getByRole("checkbox", { name: `选择${item}`, exact: true }).click();
   await page.getByRole("button", { name: /^(设置分类|分类)$/ }).click();

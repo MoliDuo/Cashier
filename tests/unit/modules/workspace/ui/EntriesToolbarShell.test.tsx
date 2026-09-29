@@ -19,4 +19,9 @@ describe("EntriesToolbarShell", () => {
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("hides on a phone while selecting, when the top bar and action bar take over", () => {
+    render(<EntriesToolbarShell>{null}</EntriesToolbarShell>);
+    expect(screen.getByTestId("entries-toolbar")).toHaveClass("max-md:hidden");
+  });
 });

@@ -2,10 +2,13 @@
 import type { ReactNode } from "react";
 
 interface AppShellProps {
-  /** The bar along the top: the book switcher, the desktop tabs and the gear. */
+  /** The bar along the top: the desktop tabs, 记一笔 and the book switcher. */
   topBar: ReactNode;
-  /** The phone's bar along the bottom; wider screens keep everything on top. */
-  bottomBar: ReactNode;
+  /**
+   * The phone's bar along the bottom; wider screens keep everything on top.
+   * Null while the page has an action bar of its own there.
+   */
+  bottomBar: ReactNode | null;
   children: ReactNode;
 }
 
@@ -28,9 +31,11 @@ export function AppShell({ topBar, bottomBar, children }: AppShellProps) {
       >
         {children}
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-header h-[calc(4rem+env(safe-area-inset-bottom))] border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-        {bottomBar}
-      </div>
+      {bottomBar != null ? (
+        <div className="fixed inset-x-0 bottom-0 z-header h-[calc(4rem+env(safe-area-inset-bottom))] border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
+          {bottomBar}
+        </div>
+      ) : null}
     </div>
   );
 }

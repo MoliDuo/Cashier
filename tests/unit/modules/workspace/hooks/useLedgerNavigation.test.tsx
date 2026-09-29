@@ -46,17 +46,27 @@ describe("useLedgerNavigation", () => {
     pathname.current = "/stats";
     search.current = "range=year";
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.remember("records", "view=entries&offset=-1&categoryId=c1"));
+    act(() => result.current.remember("records", "offset=-1&categoryId=c1"));
 
     // The period is one for the whole ledger, so it comes from the route being
-    // left; the view and the filters are 账目's own.
-    expect(result.current.navigation.hrefFor("records")).toBe(
-      "/records?view=entries&categoryId=c1&range=year"
-    );
+    // left; the filters are 账目's own.
+    expect(result.current.navigation.hrefFor("records")).toBe("/records?categoryId=c1&range=year");
     act(() => result.current.navigation.navigate("records"));
-    expect(router.push).toHaveBeenCalledWith("/records?view=entries&categoryId=c1&range=year", {
+    expect(router.push).toHaveBeenCalledWith("/records?categoryId=c1&range=year", {
       scroll: false,
     });
+  });
+
+  it("carries the period between 账目, 明细 and 统计", () => {
+    pathname.current = "/records";
+    search.current = "range=year&offset=-1";
+    const { result } = renderHook(useHarness, { wrapper });
+    act(() => result.current.remember("entries", "categoryId=c1"));
+
+    expect(result.current.navigation.hrefFor("entries")).toBe(
+      "/entries?categoryId=c1&range=year&offset=-1"
+    );
+    expect(result.current.navigation.hrefFor("stats")).toBe("/stats?range=year&offset=-1");
   });
 
   it("does not carry a period to or from 设置", () => {

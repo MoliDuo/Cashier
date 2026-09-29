@@ -36,7 +36,7 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { omitUndefinedProperties } from "@/lib/validation";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
-import type { LedgerPage } from "@/lib/ledger-tabs";
+import type { LedgerTab } from "@/lib/ledger-tabs";
 import {
   buildDetailsQueryDescriptor,
   buildStatsQueryDescriptor,
@@ -138,7 +138,7 @@ export async function getLedgerShellBootstrap(input: {
 }
 
 export interface GetLedgerRouteBootstrapInput {
-  page: LedgerPage;
+  page: LedgerTab;
   ledgerDto: LedgerDto;
   scope: LedgerViewScope;
   period?: Period;
@@ -169,7 +169,7 @@ export async function getLedgerRouteBootstrap(
     return dehydrate(queryClient);
   }
 
-  if (input.page === "documents") {
+  if (input.page === "records") {
     const descriptor = buildStreamQueryDescriptor({
       ...(bookId == null ? {} : { bookId }),
       period,

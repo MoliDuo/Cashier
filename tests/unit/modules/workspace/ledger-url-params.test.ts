@@ -134,7 +134,7 @@ describe("ledger-url-params", () => {
         categoryId: "c1",
         currency: null,
       }).toString()
-    ).toBe("range=custom&from=2026-02-01&to=2026-02-28&view=entries&categoryId=c1");
+    ).toBe("range=custom&from=2026-02-01&to=2026-02-28&categoryId=c1");
   });
 
   describe("parseStatusesParam", () => {

@@ -1,4 +1,4 @@
-import { RECORDS_VIEW_PARAM, ledgerTabHref } from "@/lib/ledger-tabs";
+import { ledgerTabHref } from "@/lib/ledger-tabs";
 import { LEDGER_FILTER_KEYS } from "./ledger-url-params";
 
 const LEGACY_STATS_KEYS = {
@@ -14,7 +14,7 @@ type LegacyTab = (typeof LEGACY_TABS)[number];
 /**
  * Where a bookmark from the single-page ledger lands. That page named the tab
  * in `?tab=` and prefixed each tab's filters (`streamPeriod`, `detailsSearch`);
- * 流水 and 明细 are now the two views of 账目, with unprefixed names. Anything
+ * 流水 and 明细 are now the routes 账目 and 明细, with unprefixed names. Anything
  * the old page would not have read is dropped rather than carried along.
  */
 export function legacyLedgerHref(searchParams: Pick<URLSearchParams, "get">): string {
@@ -25,7 +25,6 @@ export function legacyLedgerHref(searchParams: Pick<URLSearchParams, "get">): st
   const params = new URLSearchParams();
 
   if (tab === "stream" || tab === "details") {
-    if (tab === "details") params.set(RECORDS_VIEW_PARAM, "entries");
     // The old period names are carried as they were; the route reads them.
     for (const key of [...LEDGER_FILTER_KEYS, "period", "startDate", "endDate"]) {
       const value = searchParams.get(`${tab}${key[0]!.toUpperCase()}${key.slice(1)}`);
@@ -43,6 +42,6 @@ export function legacyLedgerHref(searchParams: Pick<URLSearchParams, "get">): st
     params.set("detail", detailId);
   }
 
-  const route = tab === "stream" || tab === "details" ? "records" : tab;
+  const route = tab === "stream" ? "records" : tab === "details" ? "entries" : tab;
   return ledgerTabHref(route, params.toString());
 }

@@ -1,4 +1,3 @@
-import { RECORDS_VIEW_PARAM } from "@/lib/ledger-tabs";
 import type { SourceDocumentProcessingStatus } from "@/modules/source-document/types";
 import { DECIMAL_STRING_PATTERN, normalize as normalizeDecimal } from "@/lib/money/decimal";
 import { periodQuery } from "./period-url-params";
@@ -100,7 +99,6 @@ export function buildEntriesDrilldownSearchParams(input: {
   currency?: string | null;
 }): URLSearchParams {
   const params = periodQuery({ range: "custom", from: input.startDate, to: input.endDate });
-  params.set(RECORDS_VIEW_PARAM, "entries");
   if (input.categoryId != null && input.categoryId !== "") {
     params.set("categoryId", input.categoryId);
   }

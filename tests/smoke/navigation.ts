@@ -1,10 +1,14 @@
 import { expect, type Page } from "@playwright/test";
 
-/**
- * Where a spec goes. 流水 and 明细 are 账目 by bill and by entry; 设置 is the
- * top bar's gear, not a tab.
- */
-export type Destination = "流水" | "明细" | "统计" | "设置";
+/** Where a spec goes: the four tabs of the navigation bar. */
+export type Destination = "账目" | "明细" | "统计" | "设置";
+
+const DESTINATION_URLS: Record<Destination, RegExp> = {
+  账目: /\/records/,
+  明细: /\/entries/,
+  统计: /\/stats/,
+  设置: /\/settings/,
+};
 
 /**
  * Activates a control by keyboard. The demo runner serves `next dev`, whose
@@ -22,32 +26,16 @@ export function ledgerNavigation(page: Page) {
 }
 
 export async function openTab(page: Page, destination: Destination) {
-  if (destination === "设置") {
-    if (!/\/settings(\?|$)/.test(page.url())) {
-      await press(page, page.getByRole("link", { name: "设置", exact: true }));
-    }
-    await expect(page).toHaveURL(/\/settings/);
-    return;
-  }
-  const navigation = ledgerNavigation(page);
-  if (destination === "统计") {
-    await press(page, navigation.getByRole("button", { name: "统计", exact: true }));
-    await expect(page).toHaveURL(/\/stats/);
-    return;
-  }
-  const records = navigation.getByRole("button", { name: "账目", exact: true });
-  if ((await records.getAttribute("aria-current")) !== "page") await press(page, records);
-  await expect(page).toHaveURL(/\/records/);
-  const view = page
-    .getByRole("group", { name: "账目视图" })
-    .getByRole("button", { name: destination === "明细" ? "按明细" : "按账单", exact: true });
-  if ((await view.getAttribute("aria-pressed")) !== "true") await view.click();
-  await expect(view).toHaveAttribute("aria-pressed", "true");
+  const tab = ledgerNavigation(page).getByRole("button", { name: destination, exact: true });
+  if ((await tab.getAttribute("aria-current")) !== "page") await press(page, tab);
+  await expect(page).toHaveURL(DESTINATION_URLS[destination]);
+  await expect(tab).toHaveAttribute("aria-current", "page");
 }
 
 /**
- * A phone folds 账目's toolbar (选择, the period and 筛选) into the top bar's
- * summary; this drops it down there. Wider screens keep it on the page.
+ * A phone folds a list's toolbar (the period and 筛选) into the top bar's
+ * summary; this drops it down there. Wider screens keep it on the page. 选择 is
+ * not in it: a phone selects from the top bar itself.
  */
 export async function showListControls(page: Page) {
   if ((page.viewportSize()?.width ?? Infinity) >= 768) return;

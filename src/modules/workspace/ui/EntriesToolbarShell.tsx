@@ -36,6 +36,7 @@ export function EntriesToolbarShell({
       // right would leave the total 4px proud of them.
       className={cn(
         "relative mb-2 flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2 pr-3 sm:mb-4",
+        browsing == null && "max-md:hidden",
         className
       )}
     >

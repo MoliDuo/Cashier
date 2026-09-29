@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { showListControls } from "./navigation";
+import { ledgerNavigation, showListControls } from "./navigation";
 import { seedRecord } from "./seed-record";
 import { signIn } from "./sign-in";
 
@@ -21,7 +21,6 @@ test("selection, instant edits and one-tap split navigation", async ({
   const total = card.getByText(/12\.34/).first();
   const chevronBefore = await card.getByRole("button", { name: "折叠", exact: true }).boundingBox();
   const totalBefore = await total.boundingBox();
-  await showListControls(page);
   await activate(page.getByRole("button", { name: "选择", exact: true }));
   const surface = page.locator('[data-selection-mode="true"]').filter({ has: card });
   const expand = surface.getByRole("button", { name: "折叠", exact: true });
@@ -39,8 +38,18 @@ test("selection, instant edits and one-tap split navigation", async ({
   await activate(surface.getByRole("checkbox"));
   await activate(expand);
   await expect(surface.getByRole("checkbox")).toBeChecked();
+  if (isMobile) {
+    // A phone selects from its top bar and acts from a bar where the tabs were.
+    const dock = page.getByRole("toolbar", { name: "批量操作" });
+    await expect(dock).toBeVisible();
+    await expect(ledgerNavigation(page)).toBeHidden();
+    await expect(page.getByText(/^已选 1 \/ /)).toBeVisible();
+    const remove = await dock.getByRole("button", { name: "删除", exact: true }).boundingBox();
+    expect(remove!.height + 0.001).toBeGreaterThanOrEqual(44);
+  }
   await page.screenshot({ path: testInfo.outputPath("stream-selection.png"), fullPage: true });
   await activate(page.getByRole("button", { name: "取消", exact: true }));
+  if (isMobile) await expect(ledgerNavigation(page)).toBeVisible();
   await card.getByRole("button", { name, exact: true }).click();
   dialog = page.getByRole("dialog");
   // The header holds the title and the close button, so the title has to stop

@@ -9,7 +9,7 @@ import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigati
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import { openNewRecord } from "@/lib/navigation/ledger-new-record-navigation";
-import { LEDGER_ROUTES, readRecordsView, type LedgerTab } from "@/lib/ledger-tabs";
+import { LEDGER_ROUTES, type LedgerTab } from "@/lib/ledger-tabs";
 import { readLedgerFilterParams } from "@/modules/workspace/ledger-url-params";
 import { readPeriodParams } from "@/modules/workspace/period-url-params";
 import {
@@ -26,7 +26,8 @@ import {
 export function LedgerShell({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const ready = useWorkspaceStore((state) => state.ready);
-  const lastBrowsedTab = useWorkspaceStore((state) => state.lastBrowsedTab);
+  // While a phone selects, its action bar takes the tab bar's place.
+  const selecting = useWorkspaceStore((state) => state.headerSelection?.active === true);
   // The viewed book changes on the client with no server render behind it, so
   // the hover prefetch reads it live from the store.
   const bookId = useWorkspaceStore((state) => state.bookId) ?? undefined;
@@ -56,7 +57,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
       const href = hrefFor(tab);
       prefetch(href);
       const query = new URLSearchParams(href.split("?")[1] ?? "");
-      if (tab === "records" && readRecordsView(query) === "entries") {
+      if (tab === "entries") {
         void prefetchDetailsTabQuery(
           queryClient,
           bookId,
@@ -89,21 +90,20 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
           }
           onOpenInput={openInput}
           onInputIntent={preloadNewRecordModules}
-          settingsHref={hrefFor("settings")}
-          onOpenSettings={() => changeTab("settings")}
-          onLeaveSettings={() => changeTab(lastBrowsedTab)}
         />
       }
       bottomBar={
-        <TabNavigation
-          variant="bottom"
-          disabled={!ready}
-          activeTab={activeTab}
-          onTabChange={changeTab}
-          onOpenInput={openInput}
-          onInputIntent={preloadNewRecordModules}
-          onTabIntent={preloadTab}
-        />
+        selecting ? null : (
+          <TabNavigation
+            variant="bottom"
+            disabled={!ready}
+            activeTab={activeTab}
+            onTabChange={changeTab}
+            onOpenInput={openInput}
+            onInputIntent={preloadNewRecordModules}
+            onTabIntent={preloadTab}
+          />
+        )
       }
     >
       {children}

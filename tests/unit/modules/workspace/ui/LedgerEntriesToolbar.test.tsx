@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Period } from "@/modules/ledger/domain/period";
 import type { BatchEntryDateImpact } from "@/modules/ledger/contracts";
 import { LedgerEntriesToolbar } from "@/modules/workspace/ui/LedgerEntriesToolbar";
@@ -146,5 +146,52 @@ describe("LedgerEntriesToolbar", () => {
     await waitFor(() =>
       expect(onUpdateDates).toHaveBeenCalledWith(expect.any(String), ["document-1"])
     );
+  });
+
+  describe("on a phone", () => {
+    const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+
+    beforeEach(() => {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: vi.fn((query: string) => ({
+          matches: true,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      });
+    });
+
+    afterEach(() => {
+      if (originalMatchMedia != null) {
+        Object.defineProperty(window, "matchMedia", originalMatchMedia);
+      } else {
+        Reflect.deleteProperty(window, "matchMedia");
+      }
+    });
+
+    it("moves the actions to the action bar and leaves the count to the top bar", () => {
+      render(
+        <LedgerEntriesToolbar
+          {...defaultProps}
+          isSelectionMode={true}
+          selectedCount={3}
+          onUpdateDates={vi.fn()}
+          onRetry={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      );
+
+      expect(screen.getByRole("toolbar", { name: "批量操作" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "全选" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/已选/)).not.toBeInTheDocument();
+    });
+
+    it("keeps the select toggle out of the drop-down", () => {
+      render(<LedgerEntriesToolbar {...defaultProps} />);
+
+      expect(screen.getByRole("button", { name: "选择" })).toHaveClass("max-md:hidden");
+    });
   });
 });

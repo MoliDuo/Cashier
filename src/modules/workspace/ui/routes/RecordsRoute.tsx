@@ -1,42 +1,31 @@
 "use client";
 import { usePathname, useSearchParams } from "next/navigation";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { RECORDS_VIEW_PARAM, readRecordsView, type RecordsView } from "@/lib/ledger-tabs";
-import { pushLedgerUrl } from "../../ledger-url-navigation";
-import { DocumentsView } from "./DocumentsView";
-import { EntriesView } from "./EntriesView";
-import { ledgerPageCopy } from "@/copy/app";
+import { usePeriodFilter } from "../../hooks/usePeriodFilter";
+import { LedgerEntriesTab } from "../LedgerEntriesTab";
+import { useLedgerWorkspace } from "../ledger-workspace-context";
 
-/**
- * 账目: the ledger's records, by bill or by entry. The two views share the
- * period and the filters in the URL, so switching keeps what is being looked at.
- */
+/** 账目: every bill, newest first, under the page's filters. */
 export function RecordsRoute() {
+  const { ledger, categories, recordScope, timeZone, today } = useLedgerWorkspace();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const view = readRecordsView(searchParams);
-
-  const changeView = (next: RecordsView) => {
-    if (next === view) return;
-    const params = new URLSearchParams(searchParams.toString());
-    if (next === "documents") params.delete(RECORDS_VIEW_PARAM);
-    else params.set(RECORDS_VIEW_PARAM, next);
-    pushLedgerUrl(pathname, params, "filter");
-  };
+  const { period, filterParams, handleFiltersChange, handlePeriodChange } = usePeriodFilter({
+    pathname,
+    searchParams,
+  });
 
   return (
-    <>
-      <SegmentedControl
-        className="mb-3"
-        label={ledgerPageCopy.recordsView}
-        value={view}
-        onChange={changeView}
-        options={[
-          { value: "documents", label: ledgerPageCopy.byDocument },
-          { value: "entries", label: ledgerPageCopy.byEntry },
-        ]}
-      />
-      {view === "entries" ? <EntriesView /> : <DocumentsView />}
-    </>
+    <LedgerEntriesTab
+      bookId={recordScope ?? undefined}
+      ledger={ledger}
+      categories={categories}
+      period={period}
+      today={today}
+      onPeriodChange={handlePeriodChange}
+      onFiltersChange={handleFiltersChange}
+      advancedFilters={filterParams}
+      collapseEntriesDefault={ledger.settings.collapseEntriesDefault}
+      timeZone={timeZone}
+    />
   );
 }

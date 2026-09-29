@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ListChecks } from "lucide-react";
+import { useIsPhoneLayout } from "@/hooks/use-is-phone-layout";
 import { textRoleClassName } from "@/components/typography";
 import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
 import type { EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -22,6 +23,7 @@ import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/EmptyState";
 import { useDetailsTab } from "../hooks/useDetailsTab";
+import { useHeaderSelection } from "../store";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 import { EntriesToolbarShell } from "./EntriesToolbarShell";
 import { LedgerQueryErrorBanner } from "./LedgerQueryErrorBanner";
@@ -29,7 +31,7 @@ import { PeriodBar } from "./PeriodBar";
 import { formatPeriodLabel } from "../period-label";
 import { IncompleteConversionNotice } from "@/components/IncompleteConversionNotice";
 import { commonCopy } from "@/copy/common";
-import { detailsTabCopy, entryFilterPanelCopy } from "@/copy/workspace";
+import { batchActionsCopy, detailsTabCopy, entryFilterPanelCopy } from "@/copy/workspace";
 
 interface DetailsTabProps {
   /** The book the list is narrowed to; undefined means 总账. */
@@ -65,10 +67,58 @@ export function DetailsTab({
     timeZone,
   });
   const { entries, monthStats } = tab;
+  const phone = useIsPhoneLayout();
+  const selectedCount = tab.selectedIds.length;
+  useHeaderSelection({
+    active: tab.isSelectionMode,
+    disabled: tab.isPending,
+    selectedCount,
+    loadedCount: entries.length,
+    hasMore: tab.hasNextPage || entries.length > tab.selectableCount,
+    allSelected: tab.isAllSelected ? true : selectedCount > 0 ? "indeterminate" : false,
+    onToggle: tab.toggleSelectionMode,
+    onToggleAll: () => {
+      if (tab.isPending) return;
+      if (tab.isAllSelected) tab.clearSelection();
+      else tab.selectAll();
+    },
+  });
 
   if (tab.queryStatus === "error" && !tab.queryHasData) {
     return <LedgerQueryErrorBanner empty onRetry={tab.retry} />;
   }
+  const batchToolbar = tab.isSelectionMode ? (
+    <LedgerEntriesBatchActionToolbar
+      layout={phone ? "dock" : "band"}
+      selectedCount={tab.selectedIds.length}
+      loadedCount={entries.length}
+      isAllSelected={tab.isAllSelected}
+      hasMoreData={tab.hasNextPage || entries.length > tab.selectableCount}
+      onSelectAll={() => !tab.isPending && tab.selectAll()}
+      onClearSelection={() => !tab.isPending && tab.clearSelection()}
+      categories={categories}
+      preferredCurrencies={ledger?.settings.currencies ?? []}
+      onChangeCategory={async (categoryId) => {
+        await tab.update.mutateAsync({ categoryId });
+      }}
+      onChangeCurrency={async (currency) => {
+        await tab.update.mutateAsync({ currency });
+      }}
+      onChangeDate={tab.openDateDialog}
+      onDelete={() => tab.setDeleteDialogOpen(true)}
+      isDeleting={tab.remove.isPending}
+      categoryDialogOpen={tab.categoryDialogOpen}
+      onCategoryDialogOpenChange={tab.setCategoryDialogOpen}
+      pickedCategoryIds={tab.pickedCategoryIds}
+      clearCategoryPicked={tab.clearCategoryPicked}
+      onToggleCategoryPick={tab.toggleCategoryPick}
+      onConfirmCategory={tab.confirmCategory}
+      isConfirmingCategory={tab.isConfirmingCategory}
+      isAssigningCategories={false}
+      isProcessing={tab.isPending}
+    />
+  ) : null;
+
   return (
     <>
       {tab.queryStatus === "error" && <LedgerQueryErrorBanner empty={false} onRetry={tab.retry} />}
@@ -95,46 +145,16 @@ export function DetailsTab({
                   }) > 0,
               }
         }
-        batchActions={
-          tab.isSelectionMode ? (
-            <LedgerEntriesBatchActionToolbar
-              selectedCount={tab.selectedIds.length}
-              loadedCount={entries.length}
-              isAllSelected={tab.isAllSelected}
-              hasMoreData={tab.hasNextPage || entries.length > tab.selectableCount}
-              onSelectAll={() => !tab.isPending && tab.selectAll()}
-              onClearSelection={() => !tab.isPending && tab.clearSelection()}
-              categories={categories}
-              preferredCurrencies={ledger?.settings.currencies ?? []}
-              onChangeCategory={async (categoryId) => {
-                await tab.update.mutateAsync({ categoryId });
-              }}
-              onChangeCurrency={async (currency) => {
-                await tab.update.mutateAsync({ currency });
-              }}
-              onChangeDate={tab.openDateDialog}
-              onDelete={() => tab.setDeleteDialogOpen(true)}
-              isDeleting={tab.remove.isPending}
-              categoryDialogOpen={tab.categoryDialogOpen}
-              onCategoryDialogOpenChange={tab.setCategoryDialogOpen}
-              pickedCategoryIds={tab.pickedCategoryIds}
-              clearCategoryPicked={tab.clearCategoryPicked}
-              onToggleCategoryPick={tab.toggleCategoryPick}
-              onConfirmCategory={tab.confirmCategory}
-              isConfirmingCategory={tab.isConfirmingCategory}
-              isAssigningCategories={false}
-              isProcessing={tab.isPending}
-            />
-          ) : undefined
-        }
       >
         <Button
           variant="ghost"
           size="icon"
           onClick={tab.toggleSelectionMode}
           disabled={tab.isPending}
-          className={cn("shrink-0 self-start", TOOLBAR_ICON_BUTTON_CLASS)}
-          aria-label={tab.isSelectionMode ? detailsTabCopy.cancelSelect : detailsTabCopy.select}
+          // A phone selects from its top bar; the drop-down keeps only the
+          // period and the filter.
+          className={cn("shrink-0 self-start max-md:hidden", TOOLBAR_ICON_BUTTON_CLASS)}
+          aria-label={tab.isSelectionMode ? batchActionsCopy.cancelSelect : batchActionsCopy.select}
         >
           {tab.isSelectionMode ? (
             <ArrowLeft className="h-4 w-4" />
@@ -142,6 +162,9 @@ export function DetailsTab({
             <ListChecks className="h-4 w-4" />
           )}
         </Button>
+        {phone ? null : batchToolbar != null ? (
+          <div className="min-w-0 flex-1">{batchToolbar}</div>
+        ) : null}
         {!tab.isSelectionMode ? (
           <>
             <PeriodBar
@@ -163,6 +186,7 @@ export function DetailsTab({
           </>
         ) : null}
       </EntriesToolbarShell>
+      {phone ? batchToolbar : null}
       {monthStats.unconvertedCount > 0 ? <IncompleteConversionNotice className="mb-2" /> : null}
       <div className="space-y-4">
         <div className="space-y-4">

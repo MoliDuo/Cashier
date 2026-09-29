@@ -55,7 +55,7 @@ test("settings save as they change, with nothing to confirm on the way out", asy
   await prompt.fill(next);
   await page.getByRole("switch", { name: "默认折叠账单", exact: true }).focus();
   await expect(page.getByText("设置更新成功").first()).toBeVisible();
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
   await page.reload();

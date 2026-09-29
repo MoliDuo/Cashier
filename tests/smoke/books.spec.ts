@@ -260,7 +260,7 @@ test("@demo archiving the book being viewed falls back to the ledger total", asy
   await expect(bookRow(page, bookName)).toBeVisible();
 
   // Narrow the records view to that book.
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   await selectBookByName(page, bookName);
   await expect(currentBookOption(page)).toHaveText(bookName);
 
@@ -270,7 +270,7 @@ test("@demo archiving the book being viewed falls back to the ledger total", asy
   await openTab(page, "设置");
   await archiveBook(page, bookName);
   await expect(page.getByRole("heading", { name: "已归档的分账", exact: true })).toBeVisible();
-  await openTab(page, "流水");
+  await openTab(page, "账目");
   // The dead scope is gone once the strip marks 总账 again.
   await expect(currentBookOption(page)).toHaveText("总账");
 

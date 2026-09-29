@@ -5,6 +5,7 @@ import type { EntryCategory } from "@/modules/ledger/contracts";
 import { BatchCategoryDialog } from "./BatchCategoryDialog";
 import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
 import { BatchSetCategoryDialog } from "./BatchSetCategoryDialog";
+import { textRoleClassName } from "@/components/typography";
 import { LedgerEntriesActions } from "./LedgerEntriesActions";
 import { SelectionBar } from "./SelectionBar";
 import { batchActionsCopy } from "@/copy/workspace";
@@ -45,6 +46,12 @@ export interface LedgerEntriesBatchActionToolbarProps {
   onToggleCategoryPick?: (categoryId: string | null, picked: boolean) => void;
   isConfirmingCategory?: boolean;
   isProcessing?: boolean;
+  /**
+   * `band` is the selection bar and its actions inside the surface's toolbar.
+   * `dock` is a phone's action bar, fixed along the bottom where the tab bar
+   * was; the count and select-all are in the top bar then.
+   */
+  layout?: "band" | "dock";
   className?: string;
 }
 
@@ -93,6 +100,7 @@ export function LedgerEntriesBatchActionToolbar({
   onToggleCategoryPick,
   isConfirmingCategory = false,
   isProcessing: externallyProcessing = false,
+  layout = "band",
   className,
 }: LedgerEntriesBatchActionToolbarProps) {
   const [internalChangingCategory, setInternalChangingCategory] = useState(false);
@@ -176,50 +184,79 @@ export function LedgerEntriesBatchActionToolbar({
     [isChangingCurrencyProp, onChangeCurrency]
   );
 
+  const limitNote =
+    selectedCount > 100 && limitedActions.length > 0
+      ? batchActionsCopy.batchLimit({ actions: limitedActions.join("、") })
+      : null;
+  const actions = (orientation: "row" | "stacked") => (
+    <LedgerEntriesActions
+      orientation={orientation}
+      disabled={actionsDisabled}
+      nonCategoryDisabled={selectedCount > 100}
+      isChangingCategory={isChangingCategory}
+      isChangingCurrency={isChangingCurrency}
+      isRetrying={isRetrying}
+      isDeleting={isDeleting}
+      isAssigningCategories={isAssigningCategories}
+      {...(onChangeCategory != null
+        ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
+        : {})}
+      {...(onChangeCurrency != null ? { onOpenCurrency: () => setCurrencyDialogOpen(true) } : {})}
+      {...(onChangeDate != null ? { onChangeDate } : {})}
+      {...(onRetry != null ? { onRetry } : {})}
+      {...(onSplit != null ? { onSplit } : {})}
+      {...(onDelete != null ? { onDelete } : {})}
+    />
+  );
+
   return (
     <>
-      <SelectionBar
-        selectedCount={selectedCount}
-        loadedCount={loadedCount}
-        isAllSelected={isAllSelected}
-        hasMoreData={hasMoreData}
-        disabled={isProcessing}
-        onSelectAll={onSelectAll}
-        onClearSelection={onClearSelection}
-        {...(className != null ? { className } : {})}
-        note={
-          selectedCount > 100 && limitedActions.length > 0 ? (
-            <p>
-              {batchActionsCopy.batchLimit({ actions: limitedActions.join("、") })}
-              {onChangeCategory != null ? batchActionsCopy.categoryBatchUnlimited : null}
-            </p>
-          ) : null
-        }
-      >
-        {hasActions ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
-            <LedgerEntriesActions
-              disabled={actionsDisabled}
-              nonCategoryDisabled={selectedCount > 100}
-              isChangingCategory={isChangingCategory}
-              isChangingCurrency={isChangingCurrency}
-              isRetrying={isRetrying}
-              isDeleting={isDeleting}
-              isAssigningCategories={isAssigningCategories}
-              {...(onChangeCategory != null
-                ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
-                : {})}
-              {...(onChangeCurrency != null
-                ? { onOpenCurrency: () => setCurrencyDialogOpen(true) }
-                : {})}
-              {...(onChangeDate != null ? { onChangeDate } : {})}
-              {...(onRetry != null ? { onRetry } : {})}
-              {...(onSplit != null ? { onSplit } : {})}
-              {...(onDelete != null ? { onDelete } : {})}
-            />
+      {layout === "dock" ? (
+        hasActions ? (
+          <div
+            role="toolbar"
+            aria-label={batchActionsCopy.actionsLabel}
+            className="fixed inset-x-0 bottom-0 z-header border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+          >
+            {limitNote != null ? (
+              <p
+                className={textRoleClassName(
+                  "micro",
+                  "px-3 pt-1.5 text-center text-muted-foreground"
+                )}
+              >
+                {limitNote}
+              </p>
+            ) : null}
+            <div className="flex h-16 items-stretch">{actions("stacked")}</div>
           </div>
-        ) : null}
-      </SelectionBar>
+        ) : null
+      ) : (
+        <SelectionBar
+          selectedCount={selectedCount}
+          loadedCount={loadedCount}
+          isAllSelected={isAllSelected}
+          hasMoreData={hasMoreData}
+          disabled={isProcessing}
+          onSelectAll={onSelectAll}
+          onClearSelection={onClearSelection}
+          {...(className != null ? { className } : {})}
+          note={
+            limitNote != null ? (
+              <p>
+                {limitNote}
+                {onChangeCategory != null ? batchActionsCopy.categoryBatchUnlimited : null}
+              </p>
+            ) : null
+          }
+        >
+          {hasActions ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
+              {actions("row")}
+            </div>
+          ) : null}
+        </SelectionBar>
+      )}
 
       {onChangeCategory != null && confirmsCategory ? (
         <BatchSetCategoryDialog

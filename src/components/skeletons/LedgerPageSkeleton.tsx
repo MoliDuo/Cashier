@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { LedgerPage } from "@/lib/ledger-tabs";
+import type { LedgerTab } from "@/lib/ledger-tabs";
 import {
   DetailsTabSkeleton,
   EntriesTabSkeleton,
@@ -11,9 +11,9 @@ import {
  * Skeleton component for the main ledger page
  * Shows immediately while server-side data is loading
  */
-export function LedgerPageSkeleton({ page = "documents" }: { page?: LedgerPage }) {
-  const contentByPage: Record<LedgerPage, ReactNode> = {
-    documents: <EntriesTabSkeleton />,
+export function LedgerPageSkeleton({ page = "records" }: { page?: LedgerTab }) {
+  const contentByPage: Record<LedgerTab, ReactNode> = {
+    records: <EntriesTabSkeleton />,
     entries: <DetailsTabSkeleton />,
     stats: <StatsTabSkeleton />,
     settings: <SettingsTabSkeleton />,

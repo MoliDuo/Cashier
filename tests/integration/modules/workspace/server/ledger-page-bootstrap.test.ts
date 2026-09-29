@@ -14,7 +14,7 @@ import {
 } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { buildStatsQueryDescriptor } from "@/modules/workspace/ledger-tab-query-descriptors";
 import { resolveAuthenticatedHome } from "@/modules/workspace/server/resolve-authenticated-home";
-import type { LedgerPage } from "@/lib/ledger-tabs";
+import type { LedgerTab } from "@/lib/ledger-tabs";
 import type { Period } from "@/modules/ledger/domain/period";
 import type { LedgerAdvancedFilters } from "@/modules/ledger/ledger-query";
 
@@ -46,7 +46,7 @@ vi.mock("@/modules/ledger/server/books", async (importOriginal) => {
 });
 
 interface PageInput {
-  page: LedgerPage;
+  page: LedgerTab;
   period?: Period;
   advancedFilters?: LedgerAdvancedFilters;
   /** The book the scope cookie names. */
@@ -155,7 +155,7 @@ describe("ledger page bootstrap", () => {
   });
 
   it("dehydrates the ledger, its live books and its categories for the shell", async () => {
-    const { shell, view } = await loadPage({ page: "documents" });
+    const { shell, view } = await loadPage({ page: "records" });
 
     expect(query(shell, "ledger")?.state.data).toMatchObject({ id: ledgerId });
     expect(
@@ -173,7 +173,7 @@ describe("ledger page bootstrap", () => {
 
     // 16:30 UTC on the 30th is already October in Shanghai, the ledger's zone,
     // where the deployment's UTC would still say September.
-    const { view, route } = await loadPage({ page: "documents" });
+    const { view, route } = await loadPage({ page: "records" });
 
     expect(view.ledgerToday).toBe("2026-10-01");
     expect(query(route, "ledger", "source-documents", "stream")?.queryKey[3]).toMatchObject({
@@ -201,7 +201,7 @@ describe("ledger page bootstrap", () => {
       book: otherBookId,
     });
 
-    const { view, route } = await loadPage({ page: "documents", bookId: otherBookId });
+    const { view, route } = await loadPage({ page: "records", bookId: otherBookId });
 
     // London is still in September, so this month is September for every book.
     expect(view.bookId).toBe(otherBookId);
@@ -216,7 +216,7 @@ describe("ledger page bootstrap", () => {
     await seedDocument({ title: "tea", date: "2026-09-12", amounts: ["60.00"] });
 
     const { route } = await loadPage({
-      page: "documents",
+      page: "records",
       advancedFilters: {
         minAmount: "20",
         maxAmount: "100",
@@ -286,7 +286,7 @@ describe("ledger page bootstrap", () => {
   it("keeps the remembered book when the books fail", async () => {
     request.failBooks = true;
 
-    const { view, shell, route } = await loadPage({ page: "documents", bookId: otherBookId });
+    const { view, shell, route } = await loadPage({ page: "records", bookId: otherBookId });
 
     // A list that failed is not evidence the book is gone; losing it would
     // quietly reset the reader to 总账.

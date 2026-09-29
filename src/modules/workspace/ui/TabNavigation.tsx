@@ -1,12 +1,10 @@
 "use client";
-import { BarChart3, Plus, ReceiptText } from "lucide-react";
+import { BarChart3, ListOrdered, Plus, ReceiptText, Settings } from "lucide-react";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
-import { NAVIGATION_TABS, type LedgerTab } from "@/lib/ledger-tabs";
+import { LEDGER_ROUTES, type LedgerTab } from "@/lib/ledger-tabs";
 import { ledgerPageCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
-
-type NavigationTab = (typeof NAVIGATION_TABS)[number];
 
 interface TabNavigationProps {
   /** The bar along the bottom of a phone, or the tabs inside the desktop top bar. */
@@ -14,24 +12,28 @@ interface TabNavigationProps {
   disabled?: boolean;
   activeTab: LedgerTab;
   onTabChange: (tab: LedgerTab) => void;
-  /** Opens 记一笔; the bottom bar carries it between the two tabs. */
+  /** Opens 记一笔; the bottom bar carries it between the tabs. */
   onOpenInput?: () => void;
   onInputIntent?: () => void;
   /** Called when an inactive destination receives pointer or keyboard focus. */
   onTabIntent?: (tab: LedgerTab) => void;
 }
 
-const TAB_ICONS: Record<NavigationTab, typeof ReceiptText> = {
+const TAB_ICONS: Record<LedgerTab, typeof ReceiptText> = {
   records: ReceiptText,
+  entries: ListOrdered,
   stats: BarChart3,
+  settings: Settings,
 };
 
-const TAB_LABELS: Record<NavigationTab, string> = {
+const TAB_LABELS: Record<LedgerTab, string> = {
   records: ledgerPageCopy.records,
+  entries: ledgerPageCopy.entries,
   stats: ledgerPageCopy.stats,
+  settings: ledgerPageCopy.settings,
 };
 
-/** 账目 and 统计. 设置 is not a tab; the top bar's gear opens it. */
+/** 账目, 明细, 统计 and 设置; a phone's bar carries 记一笔 between the first two and the rest. */
 export function TabNavigation({
   variant,
   disabled = false,
@@ -41,7 +43,7 @@ export function TabNavigation({
   onInputIntent,
   onTabIntent,
 }: TabNavigationProps) {
-  const tab = (value: NavigationTab) => (
+  const tab = (value: LedgerTab) => (
     <NavButton
       key={value}
       variant={variant}
@@ -57,7 +59,7 @@ export function TabNavigation({
   if (variant === "top") {
     return (
       <nav aria-label={ledgerPageCopy.navigation} className="flex h-full items-stretch gap-1">
-        {NAVIGATION_TABS.map(tab)}
+        {LEDGER_ROUTES.map(tab)}
       </nav>
     );
   }
@@ -65,9 +67,10 @@ export function TabNavigation({
   return (
     <nav
       aria-label={ledgerPageCopy.navigation}
-      className="grid h-full w-full grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] items-stretch"
+      className="grid h-full w-full grid-cols-[repeat(2,minmax(0,1fr))_4.5rem_repeat(2,minmax(0,1fr))] items-stretch"
     >
       {tab("records")}
+      {tab("entries")}
       <button
         type="button"
         disabled={disabled}
@@ -81,6 +84,7 @@ export function TabNavigation({
         <Plus className="size-5" aria-hidden="true" />
       </button>
       {tab("stats")}
+      {tab("settings")}
     </nav>
   );
 }

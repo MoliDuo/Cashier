@@ -58,7 +58,11 @@ import { LedgerShell } from "@/app/(protected)/(ledger)/_shell";
 import { EntriesToolbarShell } from "@/modules/workspace/ui/EntriesToolbarShell";
 import { ledgerPageCopy } from "@/copy/app";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { WorkspaceStoreProvider, useWorkspaceStore } from "@/modules/workspace/store";
+import {
+  WorkspaceStoreProvider,
+  useHeaderSelection,
+  useWorkspaceStore,
+} from "@/modules/workspace/store";
 
 const BOOK_ID = "10000000-0000-4000-8000-000000000001";
 
@@ -108,8 +112,8 @@ function renderShell(
   );
 }
 
-/** A tab on the phone's bottom bar; the desktop top bar carries the same two. */
-function destination(tab: Exclude<LedgerTab, "settings">) {
+/** A tab on the phone's bottom bar; the desktop top bar carries the same four. */
+function destination(tab: LedgerTab) {
   return within(screen.getByTestId("bottom-bar")).getByRole("button", {
     name: ledgerPageCopy[tab],
   });
@@ -125,6 +129,31 @@ function BrowsedList({ filtered = false, selecting = false }) {
       {null}
     </EntriesToolbarShell>
   );
+}
+
+/** A list that can be selected from, as 账目 and 明细 publish themselves. */
+function SelectableList({
+  active,
+  onToggle = () => {},
+  onToggleAll = () => {},
+}: {
+  active: boolean;
+  onToggle?: () => void;
+  onToggleAll?: () => void;
+}) {
+  const setReady = useWorkspaceStore((state) => state.setReady);
+  useEffect(() => setReady(true), [setReady]);
+  useHeaderSelection({
+    active,
+    disabled: false,
+    selectedCount: 2,
+    loadedCount: 5,
+    hasMore: false,
+    allSelected: "indeterminate",
+    onToggle,
+    onToggleAll,
+  });
+  return null;
 }
 
 describe("LedgerShell", () => {
@@ -181,33 +210,33 @@ describe("LedgerShell", () => {
     expect(prefetchStatsTabQueryMock.mock.calls.at(-1)?.[1]).toBeUndefined();
   });
 
-  it("opens 设置 from the gear, not from a tab", async () => {
+  it("opens 明细 and 设置 like any other tab", async () => {
     const user = userEvent.setup();
     renderShell();
-    const gear = within(screen.getByTestId("top-bar")).getByRole("link", { name: "设置" });
-    await waitFor(() => expect(destination("stats")).toBeEnabled());
+    await waitFor(() => expect(destination("entries")).toBeEnabled());
 
-    await user.click(gear);
+    await user.click(destination("entries"));
+    expect(navigateMock).toHaveBeenLastCalledWith("entries");
 
-    expect(navigateMock).toHaveBeenCalledWith("settings");
+    await user.click(destination("settings"));
+    expect(navigateMock).toHaveBeenLastCalledWith("settings");
   });
 
-  it("goes back from 设置 to the tab it was opened from", async () => {
-    const user = userEvent.setup();
+  it("has no gear and no back arrow in the top bar", () => {
     activeTabState.current = "settings";
     renderShell();
-    const back = within(screen.getByTestId("top-bar")).getByRole("button", { name: "返回" });
-    await waitFor(() => expect(back).toBeEnabled());
+    const topBar = within(screen.getByTestId("top-bar"));
 
-    await user.click(back);
-
-    expect(navigateMock).toHaveBeenCalledWith("records");
+    expect(topBar.queryByRole("link", { name: "设置" })).not.toBeInTheDocument();
+    expect(topBar.queryByRole("button", { name: "返回" })).not.toBeInTheDocument();
+    expect(topBar.getByRole("heading", { name: "设置" })).toBeInTheDocument();
   });
 
   it("warms every other route once the ledger is up", async () => {
     renderShell();
 
     await waitFor(() => expect(routerPrefetchMock).toHaveBeenCalledWith("/stats"));
+    expect(routerPrefetchMock).toHaveBeenCalledWith("/entries");
     expect(routerPrefetchMock).toHaveBeenCalledWith("/settings");
     expect(routerPrefetchMock).not.toHaveBeenCalledWith("/records");
   });
@@ -285,5 +314,58 @@ describe("LedgerShell", () => {
     );
 
     expect(within(screen.getByTestId("top-bar")).queryByText("¥10,800.33")).not.toBeInTheDocument();
+  });
+
+  it("turns a phone's bars over to selecting while a list is selected from", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    const onToggleAll = vi.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const renderWith = (active: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>
+            <SelectableList active={active} onToggle={onToggle} onToggleAll={onToggleAll} />
+          </LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(renderWith(false));
+    const topBar = within(screen.getByTestId("top-bar"));
+    const bottomBar = screen.getByTestId("bottom-bar");
+
+    // Browsing: the select toggle is on the left and the tabs are on the bottom.
+    expect(topBar.getByRole("button", { name: "选择" })).toBeInTheDocument();
+    expect(topBar.queryByText(/已选/)).not.toBeInTheDocument();
+    expect(within(bottomBar).getByRole("button", { name: "账目" })).toBeInTheDocument();
+
+    rerender(renderWith(true));
+    expect(topBar.getByText("已选 2 / 5")).toBeInTheDocument();
+    expect(within(bottomBar).queryByRole("button")).not.toBeInTheDocument();
+
+    await user.click(topBar.getByRole("checkbox", { name: "全选" }));
+    expect(onToggleAll).toHaveBeenCalledOnce();
+
+    await user.click(topBar.getByRole("button", { name: "取消" }));
+    expect(onToggle).toHaveBeenCalledOnce();
+
+    rerender(renderWith(false));
+    expect(within(bottomBar).getByRole("button", { name: "账目" })).toBeInTheDocument();
+  });
+
+  it("offers no select toggle on 统计 or 设置", () => {
+    activeTabState.current = "stats";
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceStoreProvider initialBookId={null}>
+          <LedgerShell>{null}</LedgerShell>
+        </WorkspaceStoreProvider>
+      </QueryClientProvider>
+    );
+
+    expect(
+      within(screen.getByTestId("top-bar")).queryByRole("button", { name: "选择" })
+    ).not.toBeInTheDocument();
   });
 });

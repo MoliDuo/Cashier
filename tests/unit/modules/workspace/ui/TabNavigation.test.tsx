@@ -17,7 +17,7 @@ describe("TabNavigation", () => {
     for (const button of screen.getAllByRole("button")) expect(button).toBeDisabled();
   });
 
-  it("puts 记一笔 between 账目 and 统计 on the bottom bar", async () => {
+  it("puts 记一笔 between the first two tabs and the last two on the bottom bar", async () => {
     const user = userEvent.setup();
     const onTabChange = vi.fn();
     const onOpenInput = vi.fn();
@@ -34,10 +34,11 @@ describe("TabNavigation", () => {
     expect(screen.getByRole("button", { name: "账目" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
       "账目",
+      "明细",
       "",
       "统计",
+      "设置",
     ]);
-    expect(screen.queryByRole("button", { name: "设置" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "统计" }));
     expect(onTabChange).toHaveBeenCalledWith("stats");
@@ -46,22 +47,23 @@ describe("TabNavigation", () => {
     expect(onOpenInput).toHaveBeenCalledOnce();
   });
 
-  it("offers only the two tabs in the top bar", () => {
+  it("offers the four tabs in the top bar", () => {
     render(<TabNavigation variant="top" activeTab="stats" onTabChange={vi.fn()} />);
 
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
       "账目",
+      "明细",
       "统计",
+      "设置",
     ]);
     expect(screen.getByRole("button", { name: "统计" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("marks neither tab on 设置", () => {
+  it("marks 设置 like any other tab when it is the page", () => {
     render(<TabNavigation variant="top" activeTab="settings" onTabChange={vi.fn()} />);
 
-    for (const button of screen.getAllByRole("button")) {
-      expect(button).not.toHaveAttribute("aria-current");
-    }
+    expect(screen.getByRole("button", { name: "设置" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "账目" })).not.toHaveAttribute("aria-current");
   });
 
   it("reports a tap on the active destination too; the shell decides it goes nowhere", async () => {

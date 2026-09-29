@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, ListChecks } from "lucide-react";
+import { useIsPhoneLayout } from "@/hooks/use-is-phone-layout";
+import { useHeaderSelection } from "../store";
 import { Button } from "@/components/ui/button";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { EntryFilterPanel, type EntryFilters } from "@/modules/ledger/ui/EntryFilterPanel";
@@ -21,7 +23,7 @@ import { useBatchDatePreview } from "../hooks/useBatchDatePreview";
 import type { BatchEntryDateImpact, EntryCategory } from "@/modules/ledger/contracts";
 import { DISPLAY_LOCALE } from "@/lib/constants";
 import { commonCopy } from "@/copy/common";
-import { batchActionsCopy, ledgerEntriesTabCopy } from "@/copy/workspace";
+import { batchActionsCopy } from "@/copy/workspace";
 
 interface LedgerEntriesToolbarProps {
   isSelectionMode: boolean;
@@ -102,6 +104,18 @@ export function LedgerEntriesToolbar({
       : onPreviewDateImpact([...selectedSourceDocumentIds], [...selectedEntryIds])
   );
 
+  const phone = useIsPhoneLayout();
+  useHeaderSelection({
+    active: isSelectionMode,
+    disabled: isProcessing,
+    selectedCount,
+    loadedCount,
+    hasMore: hasMoreData,
+    allSelected: isAllSelected ? true : selectedCount > 0 ? "indeterminate" : false,
+    onToggle: onToggleSelectionMode,
+    onToggleAll: () => (isAllSelected ? onClearSelection() : onSelectAll()),
+  });
+
   const handleOpenDateDialog = () => {
     setDateDialogOpen(true);
     if (onPreviewDateImpact != null) datePreview.start();
@@ -118,109 +132,115 @@ export function LedgerEntriesToolbar({
     handleDateDialogOpenChange(false);
   };
 
+  const batchToolbar = isSelectionMode ? (
+    <LedgerEntriesBatchActionToolbar
+      layout={phone ? "dock" : "band"}
+      className="min-w-0 flex-1"
+      selectedCount={selectedCount}
+      loadedCount={loadedCount}
+      isAllSelected={isAllSelected}
+      hasMoreData={hasMoreData}
+      onSelectAll={onSelectAll}
+      onClearSelection={onClearSelection}
+      {...(onUpdateDates != null ? { onChangeDate: handleOpenDateDialog } : {})}
+      {...(onRetry != null ? { onRetry: () => void onRetry(), isRetrying } : {})}
+      {...(onDelete != null ? { onDelete: () => setDeleteConfirmOpen(true), isDeleting } : {})}
+      isProcessing={isProcessing}
+    />
+  ) : null;
+
   return (
-    <EntriesToolbarShell
-      totalLabel={
-        !isSelectionMode && filteredTotal !== undefined
-          ? formatCurrencyAmount(filteredTotal, mainCurrency, locale)
-          : undefined
-      }
-      browsing={
-        isSelectionMode
-          ? undefined
-          : {
-              period: formatPeriodLabel(period, today),
-              filtered:
-                countActiveEntryFilters(filters, {
-                  showCategory: true,
-                  showCurrency: true,
-                  showStatus: true,
-                }) > 0,
-            }
-      }
-    >
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onToggleSelectionMode}
-        disabled={isProcessing}
-        className={cn("shrink-0 self-start", TOOLBAR_ICON_BUTTON_CLASS)}
-        aria-label={
-          isSelectionMode ? ledgerEntriesTabCopy.cancelSelect : ledgerEntriesTabCopy.select
+    <>
+      <EntriesToolbarShell
+        totalLabel={
+          !isSelectionMode && filteredTotal !== undefined
+            ? formatCurrencyAmount(filteredTotal, mainCurrency, locale)
+            : undefined
         }
-        title={isSelectionMode ? ledgerEntriesTabCopy.cancelSelect : ledgerEntriesTabCopy.select}
+        browsing={
+          isSelectionMode
+            ? undefined
+            : {
+                period: formatPeriodLabel(period, today),
+                filtered:
+                  countActiveEntryFilters(filters, {
+                    showCategory: true,
+                    showCurrency: true,
+                    showStatus: true,
+                  }) > 0,
+              }
+        }
       >
-        {isSelectionMode ? (
-          <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-        ) : (
-          <ListChecks aria-hidden="true" className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleSelectionMode}
+          disabled={isProcessing}
+          // A phone selects from its top bar; the drop-down keeps only the
+          // period and the filter.
+          className={cn("shrink-0 self-start max-md:hidden", TOOLBAR_ICON_BUTTON_CLASS)}
+          aria-label={isSelectionMode ? batchActionsCopy.cancelSelect : batchActionsCopy.select}
+          title={isSelectionMode ? batchActionsCopy.cancelSelect : batchActionsCopy.select}
+        >
+          {isSelectionMode ? (
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+          ) : (
+            <ListChecks aria-hidden="true" className="h-4 w-4" />
+          )}
+        </Button>
+
+        {phone ? null : batchToolbar}
+
+        {!isSelectionMode && (
+          <>
+            <PeriodBar
+              // On a phone the period takes the row and truncates, so 筛选 stays beside
+              // it instead of wrapping under a long week or range label.
+              className="min-w-0 flex-1 sm:flex-none"
+              period={period}
+              today={today}
+              onChange={onPeriodChange}
+              {...(timeZone != null ? { timeZone } : {})}
+            />
+            <EntryFilterPanel
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              categories={categories}
+              preferredCurrencies={preferredCurrencies}
+              className="w-auto"
+            />
+          </>
         )}
-      </Button>
-
-      {isSelectionMode && (
-        <LedgerEntriesBatchActionToolbar
-          className="min-w-0 flex-1"
-          selectedCount={selectedCount}
-          loadedCount={loadedCount}
-          isAllSelected={isAllSelected}
-          hasMoreData={hasMoreData}
-          onSelectAll={onSelectAll}
-          onClearSelection={onClearSelection}
-          {...(onUpdateDates != null ? { onChangeDate: handleOpenDateDialog } : {})}
-          {...(onRetry != null ? { onRetry: () => void onRetry(), isRetrying } : {})}
-          {...(onDelete != null ? { onDelete: () => setDeleteConfirmOpen(true), isDeleting } : {})}
-          isProcessing={isProcessing}
+        <BatchDateDialog
+          open={dateDialogOpen}
+          onOpenChange={handleDateDialogOpenChange}
+          value={selectedDate}
+          onChange={setSelectedDate}
+          impact={datePreview.impact == null ? null : batchDateImpactSummary(datePreview.impact)}
+          isPreviewing={datePreview.isPreviewing || isUpdatingDates}
+          previewFailed={datePreview.failed}
+          onRetryPreview={datePreview.start}
+          {...(isAllSelected && hasMoreData ? { scopeNote: batchActionsCopy.loadedScope } : {})}
+          isConfirming={isUpdatingDates}
+          onConfirm={() => void handleConfirmDate()}
+          {...(timeZone != null ? { timeZone } : {})}
         />
-      )}
-
-      {!isSelectionMode && (
-        <>
-          <PeriodBar
-            // On a phone the period takes the row and truncates, so 筛选 stays beside
-            // it instead of wrapping under a long week or range label.
-            className="min-w-0 flex-1 sm:flex-none"
-            period={period}
-            today={today}
-            onChange={onPeriodChange}
-            {...(timeZone != null ? { timeZone } : {})}
+        {onDelete != null && (
+          <ConfirmDialog
+            open={deleteConfirmOpen}
+            onOpenChange={setDeleteConfirmOpen}
+            title={batchActionsCopy.deleteTitleDocuments}
+            description={batchActionsCopy.deleteDescriptionDocuments({
+              count: selectedCount,
+              scope: isAllSelected && hasMoreData ? batchActionsCopy.loadedScope : "",
+            })}
+            variant="destructive"
+            confirmLabel={commonCopy.delete}
+            onConfirm={onDelete}
           />
-          <EntryFilterPanel
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            categories={categories}
-            preferredCurrencies={preferredCurrencies}
-            className="w-auto"
-          />
-        </>
-      )}
-      <BatchDateDialog
-        open={dateDialogOpen}
-        onOpenChange={handleDateDialogOpenChange}
-        value={selectedDate}
-        onChange={setSelectedDate}
-        impact={datePreview.impact == null ? null : batchDateImpactSummary(datePreview.impact)}
-        isPreviewing={datePreview.isPreviewing || isUpdatingDates}
-        previewFailed={datePreview.failed}
-        onRetryPreview={datePreview.start}
-        {...(isAllSelected && hasMoreData ? { scopeNote: batchActionsCopy.loadedScope } : {})}
-        isConfirming={isUpdatingDates}
-        onConfirm={() => void handleConfirmDate()}
-        {...(timeZone != null ? { timeZone } : {})}
-      />
-      {onDelete != null && (
-        <ConfirmDialog
-          open={deleteConfirmOpen}
-          onOpenChange={setDeleteConfirmOpen}
-          title={batchActionsCopy.deleteTitleDocuments}
-          description={batchActionsCopy.deleteDescriptionDocuments({
-            count: selectedCount,
-            scope: isAllSelected && hasMoreData ? batchActionsCopy.loadedScope : "",
-          })}
-          variant="destructive"
-          confirmLabel={commonCopy.delete}
-          onConfirm={onDelete}
-        />
-      )}
-    </EntriesToolbarShell>
+        )}
+      </EntriesToolbarShell>
+      {phone ? batchToolbar : null}
+    </>
   );
 }

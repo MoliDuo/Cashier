@@ -12,14 +12,12 @@ describe("legacyLedgerHref", () => {
     expect(href("tab=nope")).toBe("/records");
   });
 
-  it("lands 明细 on 账目's entries view with its own filters, dropping the other tab's", () => {
+  it("lands 明细 on its own route with its own filters, dropping the other tab's", () => {
     expect(
       href(
         "tab=details&detailsPeriod=custom&detailsStartDate=2026-01-01&detailsEndDate=2026-01-31&detailsCategoryId=c1&streamSearch=coffee"
       )
-    ).toBe(
-      "/records?view=entries&categoryId=c1&period=custom&startDate=2026-01-01&endDate=2026-01-31"
-    );
+    ).toBe("/entries?categoryId=c1&period=custom&startDate=2026-01-01&endDate=2026-01-31");
     expect(href("tab=stream&streamSearch=coffee&streamStatuses=failed")).toBe(
       "/records?statuses=failed&search=coffee"
     );

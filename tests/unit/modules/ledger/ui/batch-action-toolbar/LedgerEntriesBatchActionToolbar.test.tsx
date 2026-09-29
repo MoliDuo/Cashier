@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { EntryCategory } from "@/modules/ledger/contracts";
@@ -257,5 +257,69 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     fireEvent.click(screen.getByRole("button", { name: "设为「餐饮」" }));
 
     expect(onConfirmCategory).toHaveBeenCalledOnce();
+  });
+
+  describe("dock layout", () => {
+    it("drops the selection bar and offers the actions as a labelled toolbar", () => {
+      renderToolbar({
+        layout: "dock",
+        selectedCount: 2,
+        onChangeDate: vi.fn(),
+        onRetry: vi.fn(),
+        onDelete: vi.fn(),
+      });
+
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(screen.queryByText(/已选/)).not.toBeInTheDocument();
+      const dock = screen.getByRole("toolbar", { name: "批量操作" });
+      expect(
+        within(dock)
+          .getAllByRole("button")
+          .map((button) => button.textContent)
+      ).toEqual(["日期", "重试", "删除"]);
+    });
+
+    it("keeps every action a finger tall and marks delete as dangerous", () => {
+      renderToolbar({ layout: "dock", selectedCount: 1, onChangeDate: vi.fn(), onDelete: vi.fn() });
+
+      for (const button of within(screen.getByRole("toolbar")).getAllByRole("button")) {
+        expect(button).toHaveClass("min-h-11");
+      }
+      expect(screen.getByRole("button", { name: "删除" })).toHaveClass("text-danger");
+    });
+
+    it("runs an action and disables all of them while nothing is selected", () => {
+      const onDelete = vi.fn();
+      const { rerender, props } = renderToolbar({ layout: "dock", selectedCount: 0, onDelete });
+      expect(screen.getByRole("button", { name: "删除" })).toBeDisabled();
+
+      rerender(
+        <LedgerEntriesBatchActionToolbar
+          {...props}
+          selectedCount={1}
+          onDelete={onDelete}
+          layout="dock"
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: "删除" }));
+      expect(onDelete).toHaveBeenCalledOnce();
+    });
+
+    it("says the 100-row limit in one line above the actions", () => {
+      renderToolbar({
+        layout: "dock",
+        selectedCount: 101,
+        onChangeDate: vi.fn(),
+        onDelete: vi.fn(),
+      });
+
+      expect(screen.getByText("日期、删除每次最多处理 100 条。")).toBeInTheDocument();
+    });
+
+    it("renders nothing for a surface with no actions", () => {
+      renderToolbar({ layout: "dock", selectedCount: 1 });
+
+      expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+    });
   });
 });

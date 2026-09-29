@@ -21,6 +21,8 @@ interface LedgerEntriesActionsProps {
   onRetry?: () => void;
   onSplit?: () => void;
   onDelete?: () => void;
+  /** `stacked` is the phone's action bar. */
+  orientation?: "row" | "stacked";
 }
 
 /**
@@ -50,11 +52,13 @@ export function LedgerEntriesActions({
   onRetry,
   onSplit,
   onDelete,
+  orientation = "row",
 }: LedgerEntriesActionsProps) {
   return (
     <>
       {onOpenCategory != null && (
         <BatchActionButton
+          orientation={orientation}
           variant="outline"
           icon={Tag}
           disabled={disabled}
@@ -68,6 +72,7 @@ export function LedgerEntriesActions({
 
       {onChangeDate != null && (
         <BatchActionButton
+          orientation={orientation}
           variant="outline"
           icon={Calendar}
           disabled={disabled || nonCategoryDisabled}
@@ -78,12 +83,19 @@ export function LedgerEntriesActions({
         </BatchActionButton>
       )}
       {onSplit != null && (
-        <BatchActionButton variant="outline" icon={Scissors} disabled={disabled} onClick={onSplit}>
+        <BatchActionButton
+          orientation={orientation}
+          variant="outline"
+          icon={Scissors}
+          disabled={disabled}
+          onClick={onSplit}
+        >
           {batchActionsCopy.split}
         </BatchActionButton>
       )}
       {onRetry != null && (
         <BatchActionButton
+          orientation={orientation}
           variant="outline"
           icon={RefreshCw}
           disabled={disabled}
@@ -96,6 +108,7 @@ export function LedgerEntriesActions({
 
       {onOpenCurrency != null && (
         <BatchActionButton
+          orientation={orientation}
           variant="outline"
           icon={DollarSign}
           disabled={disabled || nonCategoryDisabled}
@@ -109,6 +122,7 @@ export function LedgerEntriesActions({
 
       {onDelete != null && (
         <BatchActionButton
+          orientation={orientation}
           variant="destructive"
           icon={Trash2}
           disabled={disabled || nonCategoryDisabled}

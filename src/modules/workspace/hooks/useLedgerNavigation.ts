@@ -9,7 +9,7 @@ import { useWorkspaceStore } from "../store";
 import { readPeriodParams, writePeriodParams } from "../period-url-params";
 
 /** The routes that read a period; moving between them carries it along. */
-const PERIOD_TABS: ReadonlySet<LedgerTab> = new Set(["records", "stats"]);
+const PERIOD_TABS: ReadonlySet<LedgerTab> = new Set(["records", "entries", "stats"]);
 
 /**
  * Moves between the ledger's routes. A tab opens on the query it was last left
