@@ -19,16 +19,12 @@ import { generateOTP, getResendCooldown } from "@/modules/auth/domain/otp";
 import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
 import { signInCodeEmailCopy } from "@/copy/email";
 
-function otpEmailCopy(host: string, expiresInMinutes: number) {
+function otpEmailCopy(otp: string, host: string, minutes: number) {
   const copy = signInCodeEmailCopy;
   return {
-    preview: copy.preview,
+    preview: copy.preview({ code: otp, minutes }),
     heading: copy.heading({ host }),
-    intro: copy.intro,
-    codeLabel: copy.codeLabel,
-    expiry: copy.expiry({ minutes: expiresInMinutes }),
-    warning: copy.warning,
-    footer: copy.footer,
+    note: copy.note({ minutes }),
   };
 }
 
@@ -90,13 +86,8 @@ export async function sendOTP(params: { email: SendOTPEmail; ip: string; host: s
     const delivery = await sendEmail({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: normalizedEmail,
-      subject: signInCodeEmailCopy.subject,
-      content: OTPEmail({
-        otp,
-        host: params.host,
-        expiresInMinutes,
-        copy: otpEmailCopy(params.host, expiresInMinutes),
-      }),
+      subject: signInCodeEmailCopy.subject({ code: otp }),
+      content: OTPEmail({ otp, copy: otpEmailCopy(otp, params.host, expiresInMinutes) }),
     });
     if (delivery === "not_configured") {
       throw new AppError("Email login is not configured", "EMAIL_NOT_CONFIGURED", 503);

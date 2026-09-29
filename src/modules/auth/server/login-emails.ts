@@ -11,6 +11,7 @@ import { runtimeEnv } from "@/lib/env/runtime";
 import { DEFAULT_AUTH_EMAIL_FROM } from "@/lib/utils/email";
 import { sendEmail } from "@/lib/email-delivery";
 import { generateOTP, getOTPExpiration, hashOTP, isValidOTPFormat } from "../domain/otp";
+import { OTP_EXPIRES_SECONDS } from "@/config/tuning";
 import {
   createLoginEmailChallenge,
   discardLoginEmailChallenge,
@@ -20,16 +21,14 @@ import { logger } from "@/lib/logger";
 import { logIdentifier } from "@/lib/security/log-identifier";
 import { addLoginEmailCopy } from "@/copy/email";
 
+const OTP_EXPIRES_MINUTES = Math.ceil(OTP_EXPIRES_SECONDS / 60);
+
 /**
  * Adding a login address. This is the old "change email" flow with the new
  * meaning: nothing is replaced, the account just gains another address that can
  * sign in, and the OTP is what proves the address is reachable.
  */
-export async function sendLoginEmailCode(input: {
-  userId: string;
-  newEmail: string;
-  host: string;
-}) {
+export async function sendLoginEmailCode(input: { userId: string; newEmail: string }) {
   const { userId, newEmail } = input;
   if (runtimeEnv.authResendKey == null)
     throw new ValidationError("Email delivery is not configured");
@@ -59,12 +58,14 @@ export async function sendLoginEmailCode(input: {
     const delivery = await sendEmail({
       from: runtimeEnv.authEmailFrom ?? DEFAULT_AUTH_EMAIL_FROM,
       to: newEmail,
-      subject: addLoginEmailCopy.subject,
+      subject: addLoginEmailCopy.subject({ code: otp }),
       content: OTPEmail({
         otp,
-        host: input.host,
-        expiresInMinutes: 5,
-        copy: addLoginEmailCopy,
+        copy: {
+          preview: addLoginEmailCopy.preview({ code: otp, minutes: OTP_EXPIRES_MINUTES }),
+          heading: addLoginEmailCopy.heading,
+          note: addLoginEmailCopy.note({ minutes: OTP_EXPIRES_MINUTES }),
+        },
       }),
     });
     if (delivery !== "sent") throw new Error("Email provider did not accept the message");

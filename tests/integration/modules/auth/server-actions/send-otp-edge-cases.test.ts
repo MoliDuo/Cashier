@@ -137,19 +137,20 @@ describe("sendOTPAction edge cases", () => {
     expect(resendSendMock).toHaveBeenCalledTimes(2);
   });
 
-  it("sends the Chinese email from the configured sender with the expiry in minutes", async () => {
+  it("puts the code in the subject and preview, from the configured sender", async () => {
     process.env.AUTH_RESEND_KEY = "test-resend-key";
     process.env.AUTH_EMAIL_FROM = "Cashier <login@cashier.example>";
 
     await sendOTPAction(testEmail);
 
     const message = resendSendMock.mock.calls[0]?.[0];
-    expect(message).toMatchObject({
-      from: "Cashier <login@cashier.example>",
-      to: testEmail,
-      subject: "Cashier 验证码",
-    });
-    expect(await render(message?.react)).toContain("5 分钟");
+    const code = /(\d{6}) 是你的 Cashier 登录验证码/.exec(String(message?.subject))?.[1];
+    expect(code).toBeDefined();
+    expect(message).toMatchObject({ from: "Cashier <login@cashier.example>", to: testEmail });
+    const html = await render(message?.react);
+    // The preview is what a phone's notification shows under the subject.
+    expect(html).toContain(`验证码 ${code}，5 分钟内有效`);
+    expect(html).toContain("5 分钟内有效。如非本人操作，请忽略此邮件。");
   });
 
   it("limits sends per client address across different emails", async () => {

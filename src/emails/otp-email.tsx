@@ -13,20 +13,16 @@ import * as React from "react";
 interface OTPEmailCopy {
   preview: string;
   heading: string;
-  intro: string;
-  codeLabel: string;
-  expiry: string;
-  warning: string;
-  footer: string;
+  /** How long the code lasts and what to do with an email you did not ask for. */
+  note: string;
 }
 
 interface OTPEmailProps {
   otp: string;
-  host: string;
-  expiresInMinutes: number;
   copy: OTPEmailCopy;
 }
 
+/** A heading, the code, and one line; the subject and preview already carry the code. */
 export default function OTPEmail({ otp, copy }: OTPEmailProps) {
   return (
     <Html lang="zh">
@@ -35,16 +31,10 @@ export default function OTPEmail({ otp, copy }: OTPEmailProps) {
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>{copy.heading}</Heading>
-          <Section style={section}>
-            <Text style={text}>{copy.intro}</Text>
-            <Section style={codeSection}>
-              <Text style={codeLabel}>{copy.codeLabel}</Text>
-              <Text style={codeText}>{otp}</Text>
-            </Section>
-            <Text style={expiryText}>{copy.expiry}</Text>
+          <Section style={codeSection}>
+            <Text style={codeText}>{otp}</Text>
           </Section>
-          <Text style={warningText}>{copy.warning}</Text>
-          <Text style={footer}>{copy.footer}</Text>
+          <Text style={noteText}>{copy.note}</Text>
         </Container>
       </Body>
     </Html>
@@ -71,32 +61,11 @@ const h1 = {
   marginBottom: "24px",
 };
 
-const section = {
-  padding: "24px",
-  border: "1px solid #e5e7eb",
-  borderRadius: "12px",
-  textAlign: "center" as const,
-};
-
-const text = {
-  fontSize: "16px",
-  lineHeight: "1.5",
-  color: "#374151",
-  marginBottom: "24px",
-};
-
 const codeSection = {
-  margin: "24px 0",
+  margin: "0",
   padding: "16px",
   backgroundColor: "#f9fafb",
   borderRadius: "8px",
-};
-
-const codeLabel = {
-  fontSize: "14px",
-  color: "#6b7280",
-  marginBottom: "8px",
-  textAlign: "center" as const,
 };
 
 const codeText = {
@@ -110,27 +79,9 @@ const codeText = {
   userSelect: "all" as const,
 };
 
-const expiryText = {
+const noteText = {
   fontSize: "14px",
   color: "#6b7280",
   marginTop: "16px",
-  marginBottom: "0",
-  textAlign: "center" as const,
-};
-
-const warningText = {
-  fontSize: "14px",
-  color: "#dc2626",
-  marginTop: "24px",
-  padding: "12px",
-  backgroundColor: "#fef2f2",
-  borderRadius: "6px",
-  textAlign: "center" as const,
-};
-
-const footer = {
-  fontSize: "14px",
-  color: "#6b7280",
-  marginTop: "24px",
   textAlign: "center" as const,
 };

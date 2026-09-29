@@ -1,7 +1,6 @@
 "use server";
 
 import crypto from "node:crypto";
-import { headers } from "next/headers";
 import { requireAuth, requireRecentAuth } from "@/modules/auth/server/session-guards";
 import { ConflictError, RateLimitError, ValidationError } from "@/lib/errors";
 import { AppError } from "@/lib/errors";
@@ -64,12 +63,7 @@ export async function sendLoginEmailCodeAction(
   try {
     const userId = await requireRecentAuth();
     const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
-    const requestHeaders = await headers();
-    const result = await sendLoginEmailCode({
-      userId,
-      newEmail,
-      host: requestHeaders.get("host") ?? "Cashier",
-    });
+    const result = await sendLoginEmailCode({ userId, newEmail });
     return { ok: true, expiresAt: result.expiresAt };
   } catch (error) {
     const code = mapError(error);

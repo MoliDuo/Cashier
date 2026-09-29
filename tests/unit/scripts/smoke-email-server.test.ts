@@ -3,18 +3,12 @@ import { Resend } from "resend";
 import OTPEmail from "@/emails/otp-email";
 import { acceptEmail, codeFromHtml, createSmokeOutbox } from "../../../scripts/smoke-email-server";
 
-const copy = {
-  preview: "preview",
-  heading: "heading",
-  intro: "intro",
-  codeLabel: "code",
-  expiry: "5 minutes",
-  warning: "warning",
-  footer: "footer",
-};
-
 function otpEmail(otp: string) {
-  return OTPEmail({ otp, host: "127.0.0.1", expiresInMinutes: 5, copy });
+  // The preview leads with the code too, so the outbox must still find the code's own line.
+  return OTPEmail({
+    otp,
+    copy: { preview: `验证码 ${otp}，5 分钟内有效`, heading: "heading", note: "5 minutes" },
+  });
 }
 
 /**
