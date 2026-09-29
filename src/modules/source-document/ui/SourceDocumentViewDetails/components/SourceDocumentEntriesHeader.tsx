@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { ArrowLeft, ListChecks } from "lucide-react";
+import { ArrowLeft, SquareCheckBig } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import { sourceDocumentDetailCopy } from "@/copy/source-document";
@@ -46,7 +46,7 @@ export function SourceDocumentEntriesHeader({
           {isSelectionMode ? (
             <ArrowLeft aria-hidden="true" className="size-4" />
           ) : (
-            <ListChecks aria-hidden="true" className="size-4" />
+            <SquareCheckBig aria-hidden="true" className="size-4" />
           )}
         </Button>
       ) : null}

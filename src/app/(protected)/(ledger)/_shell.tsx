@@ -7,6 +7,7 @@ import { TabNavigation } from "@/modules/workspace/ui/TabNavigation";
 import { preloadNewRecordModules } from "@/modules/workspace/ui/NewRecordForms";
 import { useLedgerNavigation } from "@/modules/workspace/hooks/useLedgerNavigation";
 import { useTabScrollRestoration } from "@/modules/workspace/hooks/useTabScrollRestoration";
+import { useTabRefresh } from "@/modules/workspace/hooks/useTabRefresh";
 import { useWorkspaceStore } from "@/modules/workspace/store";
 import { openNewRecord } from "@/lib/navigation/ledger-new-record-navigation";
 import { LEDGER_ROUTES, type LedgerTab } from "@/lib/ledger-tabs";
@@ -44,12 +45,15 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
     for (const tab of LEDGER_ROUTES) if (tab !== activeTab) prefetch(hrefFor(tab));
   }, [activeTab, hrefFor, prefetch, ready]);
 
+  // Tapping the tab already open refreshes it.
+  const { refreshing, refresh } = useTabRefresh();
   const changeTab = useCallback(
     (tab: LedgerTab) => {
-      if (!ready || tab === activeTab) return;
-      navigate(tab);
+      if (!ready) return;
+      if (tab === activeTab) refresh();
+      else navigate(tab);
     },
-    [activeTab, navigate, ready]
+    [activeTab, navigate, ready, refresh]
   );
 
   const preloadTab = useCallback(
@@ -84,6 +88,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
               variant="top"
               disabled={!ready}
               activeTab={activeTab}
+              refreshing={refreshing}
               onTabChange={changeTab}
               onTabIntent={preloadTab}
             />
@@ -98,6 +103,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
             variant="bottom"
             disabled={!ready}
             activeTab={activeTab}
+            refreshing={refreshing}
             onTabChange={changeTab}
             onOpenInput={openInput}
             onInputIntent={preloadNewRecordModules}

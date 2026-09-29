@@ -162,16 +162,20 @@ describe("LedgerShell", () => {
     activeTabState.current = "records";
   });
 
-  it("does nothing when the destination is the tab the reader is on", async () => {
+  it("refreshes the tab the reader is on instead of navigating to it", async () => {
     const user = userEvent.setup();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     const stream = vi.fn().mockResolvedValue("stream");
     renderShell(["ledger", "source-documents", "stream"], stream);
     await waitFor(() => expect(destination("records")).toBeEnabled());
+    await waitFor(() => expect(stream).toHaveBeenCalledTimes(1));
 
     await user.click(destination("records"));
 
     expect(navigateMock).not.toHaveBeenCalled();
-    expect(stream).toHaveBeenCalledTimes(1);
+    expect(window.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+    await waitFor(() => expect(stream).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(destination("records")).not.toHaveAttribute("aria-busy"));
   });
 
   it("navigates when the destination is another tab", async () => {

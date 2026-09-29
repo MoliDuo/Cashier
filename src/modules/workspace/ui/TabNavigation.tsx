@@ -1,5 +1,5 @@
 "use client";
-import { BarChart3, ListOrdered, Plus, ReceiptText, Settings } from "lucide-react";
+import { BarChart3, ClipboardList, Plus, ReceiptText, RefreshCw, Settings } from "lucide-react";
 import { textRoleClassName } from "@/components/typography";
 import { cn } from "@/lib/utils";
 import { LEDGER_ROUTES, type LedgerTab } from "@/lib/ledger-tabs";
@@ -11,6 +11,9 @@ interface TabNavigationProps {
   variant: "bottom" | "top";
   disabled?: boolean;
   activeTab: LedgerTab;
+  /** The open tab is reading again after a tap on it. */
+  refreshing?: boolean;
+  /** Called with the open tab too: a tap on it refreshes it. */
   onTabChange: (tab: LedgerTab) => void;
   /** Opens 记一笔; the bottom bar carries it between the tabs. */
   onOpenInput?: () => void;
@@ -21,7 +24,7 @@ interface TabNavigationProps {
 
 const TAB_ICONS: Record<LedgerTab, typeof ReceiptText> = {
   records: ReceiptText,
-  entries: ListOrdered,
+  entries: ClipboardList,
   stats: BarChart3,
   settings: Settings,
 };
@@ -33,11 +36,15 @@ const TAB_LABELS: Record<LedgerTab, string> = {
   settings: ledgerPageCopy.settings,
 };
 
-/** 账目, 明细, 统计 and 设置; a phone's bar carries 记一笔 between the first two and the rest. */
+/**
+ * 账目, 明细, 统计 and 设置; a phone's bar carries 记一笔 between the first two and
+ * the rest. Tapping the open tab refreshes it, and its icon turns while it does.
+ */
 export function TabNavigation({
   variant,
   disabled = false,
   activeTab,
+  refreshing = false,
   onTabChange,
   onOpenInput,
   onInputIntent,
@@ -49,6 +56,7 @@ export function TabNavigation({
       variant={variant}
       disabled={disabled}
       active={activeTab === value}
+      refreshing={refreshing && activeTab === value}
       icon={TAB_ICONS[value]}
       label={TAB_LABELS[value]}
       onClick={() => onTabChange(value)}
@@ -92,6 +100,7 @@ export function TabNavigation({
 interface NavButtonProps {
   variant: "bottom" | "top";
   active: boolean;
+  refreshing: boolean;
   icon: typeof ReceiptText;
   label: string;
   onClick: () => void;
@@ -102,6 +111,7 @@ interface NavButtonProps {
 function NavButton({
   variant,
   active,
+  refreshing,
   icon: Icon,
   label,
   onClick,
@@ -118,6 +128,7 @@ function NavButton({
       onPointerDown={onIntent}
       onFocus={onIntent}
       aria-current={active ? "page" : undefined}
+      aria-busy={refreshing || undefined}
       className={cn(
         "relative inline-flex min-w-0 items-center justify-center font-medium transition-colors",
         variant === "bottom"
@@ -133,7 +144,14 @@ function NavButton({
             : "text-muted-foreground hover:text-text"
       )}
     >
-      <Icon className="size-5 shrink-0 md:size-4" aria-hidden="true" />
+      {refreshing ? (
+        <RefreshCw
+          className="size-5 shrink-0 motion-safe:animate-spin md:size-4"
+          aria-hidden="true"
+        />
+      ) : (
+        <Icon className="size-5 shrink-0 md:size-4" aria-hidden="true" />
+      )}
       <span className="truncate">{label}</span>
     </button>
   );

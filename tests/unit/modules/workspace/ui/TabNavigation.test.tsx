@@ -94,4 +94,21 @@ describe("TabNavigation", () => {
     await user.hover(screen.getByRole("button", { name: "账目" }));
     expect(onTabIntent).not.toHaveBeenCalledWith("records");
   });
+
+  it("hands a tap on the open tab back, and marks it busy while it refreshes", async () => {
+    const user = userEvent.setup();
+    const onTabChange = vi.fn();
+    const { rerender } = render(
+      <TabNavigation variant="bottom" activeTab="entries" onTabChange={onTabChange} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "明细" }));
+    expect(onTabChange).toHaveBeenCalledWith("entries");
+
+    rerender(
+      <TabNavigation variant="bottom" activeTab="entries" refreshing onTabChange={onTabChange} />
+    );
+    expect(screen.getByRole("button", { name: "明细" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "账目" })).not.toHaveAttribute("aria-busy");
+  });
 });

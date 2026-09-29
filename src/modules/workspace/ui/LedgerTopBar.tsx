@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { ChevronDown, ListChecks, Plus, Wallet, X } from "lucide-react";
+import { ChevronDown, SquareCheckBig, Plus, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { textRoleClassName } from "@/components/typography";
 import type { LedgerTab } from "@/lib/ledger-tabs";
@@ -71,7 +71,7 @@ export function LedgerTopBar({
             {selecting ? (
               <X className="size-5" aria-hidden="true" />
             ) : (
-              <ListChecks className="size-5" aria-hidden="true" />
+              <SquareCheckBig className="size-5" aria-hidden="true" />
             )}
           </Button>
         ) : null}

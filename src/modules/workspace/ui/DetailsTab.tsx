@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ListChecks } from "lucide-react";
+import { ArrowLeft, SquareCheckBig } from "lucide-react";
 import { useIsPhoneLayout } from "@/hooks/use-is-phone-layout";
 import { textRoleClassName } from "@/components/typography";
 import type { EntryCategory, Ledger } from "@/modules/ledger/contracts";
@@ -159,7 +159,7 @@ export function DetailsTab({
           {tab.isSelectionMode ? (
             <ArrowLeft className="h-4 w-4" />
           ) : (
-            <ListChecks className="h-4 w-4" />
+            <SquareCheckBig className="h-4 w-4" />
           )}
         </Button>
         {phone ? null : batchToolbar != null ? (
