@@ -26,7 +26,10 @@ interface SourceDocumentCameraPanelProps {
 }
 
 /**
- * The in-form viewfinder: a full-width live box, then one row of controls.
+ * The in-form viewfinder: a full-width live box, a row of secondary controls, then the full-width shutter.
+ *
+ * The shutter gets its own row: sharing one wrapping row let a larger system font or
+ * display zoom push it onto a line of its own while a smaller phone still fit all three.
  *
  * A browser that cannot open the camera says so in one line rather than
  * disappearing: a phone that expected a viewfinder and finds nothing has no way
@@ -105,7 +108,7 @@ export function SourceDocumentCameraPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <Button
           type="button"
           variant="ghost"
@@ -129,23 +132,24 @@ export function SourceDocumentCameraPanel({
             {sourceDocumentInputCopy.switchCamera}
           </Button>
         ) : null}
-        <span
-          {...(isFull
-            ? { title: sourceDocumentInputCopy.tooManyImages({ count: MAX_FILES }) }
-            : {})}
-        >
-          <Button
-            type="button"
-            size="sm"
-            onClick={onCapture}
-            disabled={!isReady || isFull || isBusy}
-            aria-label={sourceDocumentInputCopy.capturePhoto}
-          >
-            <Camera className="h-4 w-4" />
-            {sourceDocumentInputCopy.capturePhoto}
-          </Button>
-        </span>
       </div>
+
+      <span
+        className="block"
+        {...(isFull ? { title: sourceDocumentInputCopy.tooManyImages({ count: MAX_FILES }) } : {})}
+      >
+        <Button
+          type="button"
+          size="sm"
+          className="w-full"
+          onClick={onCapture}
+          disabled={!isReady || isFull || isBusy}
+          aria-label={sourceDocumentInputCopy.capturePhoto}
+        >
+          <Camera className="h-4 w-4" />
+          {sourceDocumentInputCopy.capturePhoto}
+        </Button>
+      </span>
     </div>
   );
 }
