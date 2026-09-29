@@ -158,6 +158,50 @@ export async function createTestSourceDocument(
 }
 
 /**
+ * A record with entries and no parse attempt, the shape a split or a date
+ * organization leaves: it has no submission, so its status is idle.
+ */
+export async function createTestRecord(
+  db: TestDatabase,
+  input: {
+    ledgerId: string;
+    bookId: string;
+    title?: string | null;
+    entryDate?: string | null;
+    inputText?: string | null;
+    entries: readonly {
+      id?: string;
+      categoryId: string | null;
+      amount: string;
+      currency: string | null;
+      itemName: string;
+      description: string | null;
+      createdAt?: string;
+    }[];
+  }
+): Promise<{ sourceDocumentId: string }> {
+  const sourceDocumentId = await db.transaction((tx) =>
+    seedSourceDocument(tx, {
+      ledgerId: input.ledgerId,
+      bookId: input.bookId,
+      title: input.title ?? null,
+      documentDate: input.entryDate ?? null,
+      inputText: input.inputText ?? null,
+      entries: input.entries.map((entry) => ({
+        ...(entry.id === undefined ? {} : { id: entry.id }),
+        categoryId: entry.categoryId,
+        itemName: entry.itemName,
+        amount: entry.amount,
+        currency: entry.currency ?? "CNY",
+        description: entry.description,
+        ...(entry.createdAt === undefined ? {} : { createdAt: new Date(entry.createdAt) }),
+      })),
+    })
+  );
+  return { sourceDocumentId };
+}
+
+/**
  * Settles fixture ledger entries inserted straight into a document: gives its
  * live entries contiguous positions, in the order they were written, and
  * records the given text and files as the document's input when it has none.

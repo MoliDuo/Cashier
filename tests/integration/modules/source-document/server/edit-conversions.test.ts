@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import * as exchangeRates from "@/modules/currency/server/exchange-rates";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
 import { batchUpdateLedgerEntries } from "@/modules/source-document/server/entry-commands";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { updateSourceDocuments } from "@/modules/source-document/server/updates";
 
 afterEach(() => vi.restoreAllMocks());
@@ -14,7 +13,7 @@ async function fixture() {
   const db = getTestDb();
   const { ledgerId } = await createTestUserWithLedger(db);
   const bookId = await testBookId(db, ledgerId);
-  const created = await createManualDocument({
+  const created = await createTestRecord(getTestDb(), {
     ledgerId,
     bookId: bookId,
     title: "Original",

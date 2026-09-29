@@ -12,10 +12,9 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
 import { runDailyMaintenance } from "@/server/maintenance/daily";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
@@ -121,7 +120,7 @@ describe("source document input", () => {
 
   it("gives a record typed in by hand and the bill split from it the same input", async () => {
     const ledgerId = await newLedger();
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       bookId: await testBookId(getTestDb(), ledgerId),
       inputText: "Typed by hand",
@@ -152,7 +151,7 @@ describe("source document input", () => {
     const ledgerId = await newLedger();
     // The second file is on no document, so the sweep takes it.
     const [listed] = await Promise.all([storeFile(ledgerId), storeFile(ledgerId)]);
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       bookId: await testBookId(getTestDb(), ledgerId),
       entries: [entry],

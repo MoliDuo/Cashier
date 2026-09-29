@@ -2,9 +2,8 @@ import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { describe, expect, it } from "vitest";
 import { createProcessingAttemptInTransaction } from "@/modules/source-document/server/extraction-attempts";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
@@ -30,7 +29,7 @@ async function setupDocumentWithFailedRetry(
 ) {
   // Step 1: Create a document with entries
   const bookId = await testBookId(db, ledgerId);
-  const created = await createManualDocument({
+  const created = await createTestRecord(getTestDb(), {
     ledgerId,
     title: "Original",
     entryDate: "2026-07-15",
@@ -167,7 +166,7 @@ describe("retry active result summary", () => {
   it("keeps the previous entries when an edit-retry fails while showing its input and failure", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Original",
       entryDate: "2026-07-15",
@@ -229,7 +228,7 @@ describe("retry active result summary", () => {
     const { ledgerId } = await createTestUserWithLedger(db, "retry-multi-entry");
 
     // Create a manual document with multiple entries
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Multi-entry",
       entryDate: "2026-07-15",

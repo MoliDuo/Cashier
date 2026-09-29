@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { currentBookOption, selectBook, selectBookByName } from "./book-switch";
 import { bookAction, bookMenu, bookRow } from "./book-rows";
 import { openTab } from "./navigation";
+import { seedRecord } from "./seed-record";
 
 /** Archives through the confirmation, which is the only path that may retire a book. */
 async function archiveBook(page: Page, name: string) {
@@ -28,7 +29,7 @@ test("there is no web setup, and an enrollment link nobody issued is refused", a
  * These run against the demo workspace, which is the only environment with
  * more than one book.
  */
-test("@demo files a record into a book and moves it to another", async ({ page }, testInfo) => {
+test("@demo shows a record in its own book and moves it to another", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const item = `Booked in 梁梁 ${testInfo.project.name}`;
@@ -46,19 +47,11 @@ test("@demo files a record into a book and moves it to another", async ({ page }
   // 共同支出, unless it is changed for that one record.
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   const create = page.getByRole("dialog");
-  await create.getByRole("button", { name: "快速记账", exact: true }).click();
-  const bookPicker = create.getByLabel("分账", { exact: true });
-  await expect(bookPicker).toHaveText(/共同支出/);
-  // Radix sets `pointer-events: none` on the trigger while its listbox is open
-  // and portals the listbox to the body, so it is opened with the keyboard and
-  // the option is read from the page rather than from inside the dialog.
-  await bookPicker.press("ArrowDown");
-  await page.getByRole("option", { name: "梁梁" }).click();
-  await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
-  await create.getByRole("textbox", { name: "金额", exact: true }).fill("33.00");
-  await create.getByRole("button", { name: "记一笔", exact: true }).click();
+  await expect(create.getByLabel("分账", { exact: true })).toHaveText(/共同支出/);
+  await page.keyboard.press("Escape");
   await expect(create).toHaveCount(0);
+
+  await seedRecord(page, { item, amount: "33.00", book: "梁梁" });
   await expect(page.getByText(item, { exact: true }).first()).toBeVisible();
 
   // It is in 梁梁 and not in 哞哞: the books are separate views of 总账. The
@@ -161,7 +154,7 @@ test("@demo the view remembers the device's last choice", async ({ page, context
 test("@demo the record picker remembers the book a record was saved into", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const item = `Picker memory ${Date.now()}`;
+  const text = `Picker memory ${Date.now()}`;
 
   await page.goto("/");
   await page.getByRole("button", { name: "以开发身份进入", exact: true }).click();
@@ -174,17 +167,14 @@ test("@demo the record picker remembers the book a record was saved into", async
 
   // A first open selects the first book in 设置 order, 共同支出.
   let create = await openDialog();
-  await create.getByRole("button", { name: "快速记账", exact: true }).click();
   let bookPicker = create.getByLabel("分账", { exact: true });
   await expect(bookPicker).toHaveText(/共同支出/);
 
   // Save one record into 哞哞.
   await bookPicker.press("ArrowDown");
   await page.getByRole("option", { name: "哞哞" }).click();
-  await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
-  await create.getByRole("textbox", { name: "金额", exact: true }).fill("12.00");
-  await create.getByRole("button", { name: "记一笔", exact: true }).click();
+  await create.getByRole("textbox", { name: /输入消费记录/ }).fill(text);
+  await create.getByRole("button", { name: "发送", exact: true }).click();
   await expect(create).toHaveCount(0);
 
   // The next open starts from that save.

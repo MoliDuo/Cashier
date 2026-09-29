@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { books, entryCategories, ledgerEntries, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { claimAttemptForTest } from "tests/helpers/processing-attempt";
 import { getTestDb } from "tests/setup";
 import {
@@ -26,7 +26,6 @@ import {
   updateSourceDocuments,
 } from "@/modules/source-document/server/updates";
 import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { splitSourceDocumentAtomically } from "@/modules/source-document/server/split";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
@@ -81,7 +80,7 @@ async function readEntry(ledgerEntryId: string) {
 
 /** An active, completed document with `count` entries — version 1. */
 async function createActiveDocument(ledgerId: string, count = 1) {
-  const created = await createManualDocument({
+  const created = await createTestRecord(getTestDb(), {
     ledgerId,
     bookId: await testBookId(getTestDb(), ledgerId),
     title: "Original",

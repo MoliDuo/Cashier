@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { quickEntryFormCopy, sourceDocumentInputCopy } from "@/copy/source-document";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 
 const toastSuccessMock = vi.hoisted(() => vi.fn());
 
@@ -24,7 +24,6 @@ describe("new record success feedback", () => {
 
   it("shows a single action toast and preserves filters when opening the record", () => {
     showNewRecordSuccessFeedback({
-      mode: "ai",
       result: { sourceDocumentId: "source-1", documentDate: "2026-07-17" },
       activeTab: "stats",
       committedView: { filters: {}, range: null },
@@ -55,9 +54,8 @@ describe("new record success feedback", () => {
     });
   });
 
-  it("uses the mode-specific generic toast for an unfiltered in-range Stream record", () => {
+  it("uses the generic toast for an unfiltered in-range Stream record", () => {
     showNewRecordSuccessFeedback({
-      mode: "quick",
       result: { sourceDocumentId: "source-2", documentDate: "2026-07-17" },
       activeTab: "records",
       committedView: { filters: {}, range: { from: "2026-07-01", to: "2026-07-31" } },
@@ -66,12 +64,11 @@ describe("new record success feedback", () => {
     });
 
     expect(toastSuccessMock).toHaveBeenCalledOnce();
-    expect(toastSuccessMock).toHaveBeenCalledWith(quickEntryFormCopy.quickEntrySuccess);
+    expect(toastSuccessMock).toHaveBeenCalledWith(sourceDocumentInputCopy.uploadSuccess);
   });
 
   it("names the book and warns that it is out of view when saved elsewhere", () => {
     showNewRecordSuccessFeedback({
-      mode: "quick",
       result: { sourceDocumentId: "source-3", documentDate: "2026-07-17" },
       activeTab: "records",
       committedView: { filters: {}, range: { from: "2026-07-01", to: "2026-07-31" } },
@@ -96,7 +93,6 @@ describe("new record success feedback", () => {
     ).toBe(true);
 
     showNewRecordSuccessFeedback({
-      mode: "ai",
       result: { sourceDocumentId: "source-4", documentDate: "2026-07-17" },
       activeTab: "records",
       committedView: { filters: {}, range: null },

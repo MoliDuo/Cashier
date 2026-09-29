@@ -1,14 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { ledgerEntries, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listStreamPage as listStreamPageFor } from "@/modules/source-document/server/list-stream-page";
 import {
   applyDateOrganization,
   dismissDateOrganization,
 } from "@/modules/source-document/server/date-organization";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { addLedgerEntry } from "@/modules/source-document/server/entry-commands";
 
 const listStreamPage = (ledgerId: string) => listStreamPageFor(ledgerId, { limit: 20 });
@@ -19,7 +18,7 @@ async function createFixture() {
     db,
     `date-organization-${crypto.randomUUID()}`
   );
-  const created = await createManualDocument({
+  const created = await createTestRecord(getTestDb(), {
     ledgerId,
     bookId: await testBookId(db, ledgerId),
     title: "Long screenshot",

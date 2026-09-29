@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/server/stream-total";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 
 describe("ledger search", () => {
   it("normalizes search and keeps Stream and Details contracts independent", async () => {
     const { ledgerId } = await createTestUserWithLedger(getTestDb());
-    await createManualDocument({
+    await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Coffee Receipt",
       entryDate: "2026-07-15",
@@ -25,7 +24,7 @@ describe("ledger search", () => {
       ],
       bookId: await testBookId(getTestDb(), ledgerId),
     });
-    await createManualDocument({
+    await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Literal % Store",
       entryDate: "2026-07-16",

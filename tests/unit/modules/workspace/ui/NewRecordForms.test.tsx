@@ -30,26 +30,22 @@ vi.mock("@/modules/workspace/ui/new-record-success-feedback", () => ({
   showNewRecordSuccessFeedback: showSuccessMock,
 }));
 
-type QuickEntryProps = {
+type SourceDocumentInputProps = {
   bookId: string;
   onSuccess?: (result: { sourceDocumentId: string; documentDate: string }) => void;
 };
 
-vi.mock("@/modules/source-document/ui/QuickEntryForm", () => ({
-  QuickEntryForm: (props: QuickEntryProps) => (
+vi.mock("@/modules/source-document/ui/SourceDocumentInput", () => ({
+  SourceDocumentInput: (props: SourceDocumentInputProps) => (
     <button
       type="button"
-      data-testid="quick-save"
+      data-testid="record-save"
       data-book-id={props.bookId}
       onClick={() => props.onSuccess?.({ sourceDocumentId: "doc-1", documentDate: "2026-09-19" })}
     >
       save
     </button>
   ),
-}));
-
-vi.mock("@/modules/source-document/ui/SourceDocumentInput", () => ({
-  SourceDocumentInput: () => null,
 }));
 
 import { NewRecordForms } from "@/modules/workspace/ui/NewRecordForms";
@@ -62,13 +58,8 @@ const baseProps = {
   ledgerId: "ledger-1",
   activeTab: "records" as const,
   committedView: { filters: {}, range: null },
-  inputMode: "quick" as const,
-  categories: [],
-  mainCurrency: "CNY",
-  preferredCurrencies: [],
   onSaved: vi.fn(),
-  setAiPending: vi.fn(),
-  setQuickPending: vi.fn(),
+  onPendingChange: vi.fn(),
   bookPicker: null,
 };
 
@@ -80,21 +71,21 @@ describe("NewRecordForms picker memory", () => {
 
   it("remembers the saved book after a successful save", async () => {
     render(<NewRecordForms {...baseProps} bookId={BOOK_ID} />);
-    fireEvent.click(await screen.findByTestId("quick-save"));
+    fireEvent.click(await screen.findByTestId("record-save"));
 
     expect(window.localStorage.getItem("cashier:new-record-book")).toBe(BOOK_ID);
   });
 
-  it("closes the dialog after any save, whatever the other mode still holds", async () => {
+  it("closes the dialog after a save", async () => {
     render(<NewRecordForms {...baseProps} bookId={BOOK_ID} />);
-    fireEvent.click(await screen.findByTestId("quick-save"));
+    fireEvent.click(await screen.findByTestId("record-save"));
 
     expect(baseProps.onSaved).toHaveBeenCalledOnce();
   });
 
   it("does not touch the memory when the save never succeeds", async () => {
     render(<NewRecordForms {...baseProps} bookId={BOOK_ID} />);
-    await screen.findByTestId("quick-save");
+    await screen.findByTestId("record-save");
 
     // No save: rendering and unmounting the form is not a choice.
     expect(window.localStorage.getItem("cashier:new-record-book")).toBeNull();

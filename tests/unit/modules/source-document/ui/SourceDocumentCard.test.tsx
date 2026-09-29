@@ -60,7 +60,6 @@ describe("SourceDocumentCard interactions", () => {
     );
 
     expect(screen.getByText(/12\.00/)).toBeInTheDocument();
-    expect(screen.queryByText(/快速记账|Quick Entry/i)).not.toBeInTheDocument();
   });
 
   it("labels an unparsable document without echoing its AI reason in the badge", () => {

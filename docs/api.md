@@ -91,7 +91,7 @@ Authorization: Bearer <token>
 
 处理中响应会返回 `Retry-After: 5`。客户端应等待后再轮询，不要持续快速请求。完成状态
 包含票据当前的账目结果；异常或失败状态包含经过清理的错误信息，不会暴露内部堆栈。`status`
-反映最近一次解析；在应用内手动录入或拆分出来的票据没有解析记录，此时 `status` 为
+反映最近一次解析；在应用内拆分或整理日期后产生的票据没有解析记录，此时 `status` 为
 `"completed"`，`revisionId` 为 `null`。
 
 完成状态中的 `result.total` 使用账本主币种汇总，`result.totalCurrency` 是三位 ISO

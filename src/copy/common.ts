@@ -1,6 +1,6 @@
 /**
  * 术语表 — every screen names the same things the same way:
- * - 账单: one record (a receipt, a message, a quick entry); the code calls it a
+ * - 账单: one record (a receipt, a message); the code calls it a
  *   source document. Not 票据, 单据 or 记录.
  * - 明细: one line of a bill; the code calls it a ledger entry. Not 条目 or 分录.
  * - 原始凭证: the images and text a bill was made from.

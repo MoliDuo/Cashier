@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
+import { claimAttemptForTest, createPendingAttempt } from "tests/helpers/processing-attempt";
 import type { LedgerProjectionEntryContract } from "@/modules/source-document/server/projections/types";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import {
   ledgerEntries,
   ledgerSyncState,
@@ -11,12 +12,12 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
+import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import {
   addLedgerEntry,
   batchUpdateLedgerEntries,
   deleteLedgerEntry,
 } from "@/modules/source-document/server/entry-commands";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 
 type TestDatabase = ReturnType<typeof getTestDb>;
 
@@ -94,13 +95,20 @@ describe("projection write shape", () => {
     ]);
 
     for (const count of [1, 50, 500]) {
-      const created = await createManualDocument({
+      const pending = await createPendingAttempt({
         ledgerId,
-        title: `Doc ${count}`,
+        input: { text: `Doc ${count}`, storedFileIds: [], documentDate: null },
+        bookId: await testBookId(db, ledgerId),
+      });
+      const created = { sourceDocumentId: pending.attempt.sourceDocumentId };
+      await activateAttempt({
+        lease: await claimAttemptForTest(pending.attempt.id),
+        ledgerId,
+        sourceDocumentId: pending.attempt.sourceDocumentId,
+        attemptId: pending.attempt.id,
         entries: Array.from({ length: count }, (_, index) =>
           entry(`Item ${index}`, { amount: String(index + 1) })
         ),
-        bookId: await testBookId(db, ledgerId),
       });
 
       expect(await readStatementCounter(db, "ledger_entries_insert")).toBe(1);
@@ -122,7 +130,7 @@ describe("projection write shape", () => {
 
   it("edits a document's entries without duplicating its files or entries", async () => {
     const db = getTestDb();
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "With file",
       entries: [entry("A"), entry("B")],
@@ -210,7 +218,7 @@ describe("projection write shape", () => {
   it("preserves entry identity and order without history copies, and increments change-log version", async () => {
     const db = getTestDb();
     const pinnedCreatedAt = new Date("2026-01-02T03:04:05.000Z");
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Manual",
       entryDate: "2026-05-01",
@@ -291,7 +299,7 @@ describe("projection write shape", () => {
 
   it("leaves entries an edit does not change as they were", async () => {
     const db = getTestDb();
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Manual",
       entryDate: "2026-05-01",
@@ -326,7 +334,7 @@ describe("projection write shape", () => {
 
   it("reuses positions across repeated removals and additions without creating attempts", async () => {
     const db = getTestDb();
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Repeated edits",
       entries: [entry("Keep"), entry("Replace")],

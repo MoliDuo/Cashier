@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { openTab } from "./navigation";
+import { seedRecord } from "./seed-record";
 import { signIn } from "./sign-in";
 
 test("unsaved input is kept as a draft and leaving never asks", async ({ page }, testInfo) => {
@@ -26,14 +27,7 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
   // A record's fields are written as they change, so Back out of its sheet
   // closes it without a prompt and the change is already on the list.
   const name = `Draft record ${testInfo.project.name} ${Date.now()}`;
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "快速记账", exact: true }).click();
-  await dialog.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(name);
-  await dialog.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
-  await dialog.getByRole("textbox", { name: "金额", exact: true }).fill("5.00");
-  await dialog.getByRole("button", { name: "记一笔", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await seedRecord(page, { item: name, amount: "5.00" });
   const card = page.getByTestId("source-document-card-root").filter({ hasText: name });
   await card.getByRole("button", { name, exact: true }).click();
   dialog = page.getByRole("dialog");

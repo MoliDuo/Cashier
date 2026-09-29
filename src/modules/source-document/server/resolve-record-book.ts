@@ -3,11 +3,11 @@ import { getBook, listBooks } from "@/modules/ledger/server/books";
 import { ValidationError } from "@/lib/errors";
 
 /**
- * Which book a manually entered record lands in. The web forms always send the
- * book the picker showed; without one (an older client, or an API call that
- * leaves it out) the first live book in switcher order is used. A ledger with
- * no live book cannot accept a manual record, so that is a validation failure
- * rather than a silent default.
+ * Which book a new record lands in. The web form always sends the book the
+ * picker showed; without one (an older client, or an API call that leaves it
+ * out) the first live book in switcher order is used. A ledger with no live
+ * book cannot accept a record, so that is a validation failure rather than a
+ * silent default.
  */
 export async function resolveRecordBook(
   ledgerId: string,

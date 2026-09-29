@@ -30,15 +30,6 @@ import {
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
 
 const uuidSchema = z.string().regex(UUID_REGEX, "Invalid UUID");
-const databaseDecimalSchema = z
-  .string()
-  .regex(/^-?(?:0|[1-9]\d{0,17})(?:\.\d{1,3})?$/, "Amount exceeds numeric(21,3)")
-  .transform(normalize);
-const positiveDecimalSchema = z
-  .string()
-  .regex(DECIMAL_STRING_PATTERN, "Amount must be a plain decimal string")
-  .pipe(databaseDecimalSchema)
-  .refine((value) => compare(value, "0") > 0, "Amount must be positive");
 const strictObjectSchema = <TShape extends z.ZodRawShape>(shape: TShape) =>
   z.preprocess(omitUndefinedObjectFields, z.object(shape).strict());
 const optionalQueryDecimalSchema = z.preprocess(
@@ -350,16 +341,6 @@ export const batchUpdateSourceDocumentsInputSchema = strictObjectSchema({
   data: updateSourceDocumentInputSchema,
 });
 
-export const createQuickEntryInputSchema = strictObjectSchema({
-  bookId: uuidSchema.optional(),
-  categoryId: uuidSchema,
-  amount: positiveDecimalSchema,
-  currency: z.string().length(3).optional(),
-  itemName: z.string().trim().min(1).max(200).optional(),
-  description: z.string().max(500).nullable().optional(),
-  entryDate: optionalDateStringSchema,
-});
-
 function parseSourceDocumentContract<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (!result.success) {
@@ -386,4 +367,3 @@ export type FinalizeSourceDocumentUploadInput = z.infer<
   typeof finalizeSourceDocumentUploadInputSchema
 >;
 export type BatchUpdateSourceDocumentsInput = z.infer<typeof updateSourceDocumentInputSchema>;
-export type CreateQuickEntryInput = z.infer<typeof createQuickEntryInputSchema>;

@@ -11,7 +11,6 @@ import {
   activeDocumentWhere,
   assertCategoryOwnership,
   assertEntryValues,
-  replaceProjection,
   requireCurrency,
 } from "./shared";
 
@@ -205,40 +204,4 @@ export async function replaceDocumentEntriesInTransaction(
     .returning({ id: sourceDocuments.id })
     .then((rows) => rows[0]);
   if (updated == null) throw new ConflictError("Source document changed during the edit");
-}
-
-/** Creates a record typed in by hand, with its input text and entries. */
-export async function createCompletedProjectionInTransaction(
-  tx: PostgresTransaction,
-  input: {
-    ledgerId: string;
-    sourceDocumentId: string;
-    bookId: string;
-    title?: string | null;
-    entryDate?: string | null;
-    inputText?: string | null;
-    entries: readonly LedgerProjectionEntryContract[];
-  }
-): Promise<void> {
-  const existing = await tx
-    .select({ id: sourceDocuments.id })
-    .from(sourceDocuments)
-    .where(eq(sourceDocuments.id, input.sourceDocumentId))
-    .then((rows) => rows[0]);
-  if (existing != null) throw new ConflictError("Source document already exists");
-  if (input.bookId == null) throw new ValidationError("A book is required for a new record");
-
-  await tx.insert(sourceDocuments).values({
-    id: input.sourceDocumentId,
-    ledgerId: input.ledgerId,
-    bookId: input.bookId,
-    title: input.title ?? null,
-    inputText: input.inputText ?? null,
-    documentDate: input.entryDate ?? null,
-  });
-  await replaceProjection(tx, {
-    ledgerId: input.ledgerId,
-    sourceDocumentId: input.sourceDocumentId,
-    entries: input.entries,
-  });
 }

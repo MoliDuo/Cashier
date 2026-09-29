@@ -2,9 +2,8 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { cancelSourceDocumentProcessing } from "@/modules/source-document/server/cancel-processing";
 import { ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 import { submitSourceDocument } from "@/modules/source-document/server/submissions";
 import { processingJobs } from "tests/helpers/processing-jobs";
 
@@ -47,7 +46,7 @@ describe("cancel source-document processing", () => {
   it("keeps the previous entries when a retry is cancelled", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const active = await createManualDocument({
+    const active = await createTestRecord(getTestDb(), {
       ledgerId,
       entries: [
         {

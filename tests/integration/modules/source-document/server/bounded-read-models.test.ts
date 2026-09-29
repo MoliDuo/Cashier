@@ -6,6 +6,7 @@ import {
   activateTestSourceDocumentProjection,
   createTestUserWithLedger,
   testBookId,
+  createTestRecord,
 } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
@@ -13,7 +14,6 @@ import { listStreamPage } from "@/modules/source-document/server/list-stream-pag
 import { listTargetSourceDocuments } from "@/modules/source-document/server/reads/list";
 import { getTargetSourceDocument } from "@/modules/source-document/server/reads/list";
 import { getSourceDocumentInput } from "@/modules/source-document/server/reads/input";
-import { createManualDocument } from "@/modules/source-document/server/projections/writes";
 
 const SOURCE_LIST_KEYS = [
   "bookId",
@@ -322,7 +322,7 @@ describe("bounded target read models", () => {
     const localPath = "/var/lib/cashier/uploads/private/ledger-receipt.jpg";
     const storageKey = "private/ledger-receipt.jpg";
     const createdAt = "2026-07-15T08:00:00.000Z";
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Large receipt",
       inputText: sensitiveText,

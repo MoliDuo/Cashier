@@ -81,15 +81,6 @@ export async function getCategory(
   return row == null ? null : mapCategory(row);
 }
 
-/** The category's name for a record title, or empty when it has none or is gone. */
-export async function getCategoryName(
-  ledgerId: string,
-  categoryId: string | null
-): Promise<string> {
-  if (categoryId == null || categoryId === "") return "";
-  return (await getCategory(ledgerId, categoryId))?.name ?? "";
-}
-
 export async function listCategoriesWithCount(
   ledgerId: string
 ): Promise<EntryCategoryWithCountDto[]> {

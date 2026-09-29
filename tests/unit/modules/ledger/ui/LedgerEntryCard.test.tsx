@@ -33,10 +33,9 @@ const ledgerEntry: LedgerEntry = {
 };
 
 describe("LedgerEntryCard", () => {
-  it("renders an entry without exposing its creation source", () => {
+  it("renders an entry", () => {
     render(<LedgerEntryCard ledgerEntry={ledgerEntry} />);
 
     expect(screen.getByText("Lunch")).toBeInTheDocument();
-    expect(screen.queryByText(/快速记账|Quick Entry/i)).not.toBeInTheDocument();
   });
 });

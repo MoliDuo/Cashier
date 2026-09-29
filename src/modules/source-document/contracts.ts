@@ -38,12 +38,6 @@ export interface RetrySourceDocumentResponseDto {
   status: "processing";
 }
 
-export interface QuickEntryResponseDto {
-  sourceDocumentId: string;
-  ledgerEntryId: string;
-  status: "completed";
-}
-
 export interface CreatedRecordResult {
   sourceDocumentId: string;
   documentDate: string;

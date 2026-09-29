@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { openTab } from "./navigation";
 import { signIn } from "./sign-in";
 
-test("protected redirect, default ledger, manual entry, edit, delete and sign out", async ({
+test("protected redirect, default ledger, create, edit, delete and sign out", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -30,23 +30,21 @@ test("protected redirect, default ledger, manual entry, edit, delete and sign ou
   await signIn(page);
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   const create = page.getByRole("dialog");
-  await create.getByRole("button", { name: "快速记账", exact: true }).click();
-  await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
-  await create.getByRole("textbox", { name: "金额", exact: true }).fill("12.34");
-  await create.getByRole("button", { name: "记一笔", exact: true }).click();
+  await create.getByRole("textbox", { name: /输入消费记录/ }).fill(`${item} 12.34`);
+  await create.getByRole("button", { name: "发送", exact: true }).click();
   await expect(create).toHaveCount(0);
+  // The AI stub answers every submission with the same bill, so the bill is
+  // found by the title it gives and renamed to this run's own below.
+  const parsed = "Demo Receipt";
+  const card = page.getByTestId("source-document-card-root").filter({ hasText: parsed }).first();
+  await expect(card).toBeVisible({ timeout: 30_000 });
   await page.reload();
   await expect(readySignal).toBeEnabled();
-  await page
-    .getByTestId("source-document-card-root")
-    .filter({ hasText: item })
-    .getByRole("button", { name: item, exact: true })
-    .click();
+  await card.getByRole("button", { name: parsed, exact: true }).click();
   const detail = page.getByRole("dialog").first();
   // The title swaps from its display button to an input when it is clicked,
   // and Enter writes it; there is no edit mode and nothing else to save.
-  await detail.getByRole("button", { name: item, exact: true }).first().click();
+  await detail.getByRole("button", { name: parsed, exact: true }).first().click();
   const title = detail.getByRole("textbox", { name: "账单标题", exact: true });
   await title.fill(`${item} edited`);
   await title.press("Enter");

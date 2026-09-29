@@ -160,20 +160,3 @@ export const diagnosticCodeCopy = {
   processingTimeout: "处理超时",
   processingTimeoutDesc: "处理时间过长，任务已停止。请重试。",
 };
-
-export const quickEntryFormCopy = {
-  selectCategory: "选择分类",
-  selectDate: "选择日期",
-  currency: "货币",
-  selectCurrency: "选择货币",
-  amount: "金额",
-  itemName: "名称（可选）",
-  itemNamePlaceholder: "默认使用分类名称：",
-  record: "记一笔",
-  quickEntrySuccess: "已记一笔",
-  quickEntryError: "记账失败",
-  amountRequired: "请输入金额",
-  categoryRequired: "请选择分类",
-  noCategories: "请先创建分类，再添加快速记录。",
-  goToSettings: "前往设置",
-};

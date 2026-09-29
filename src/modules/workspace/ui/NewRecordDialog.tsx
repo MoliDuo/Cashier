@@ -1,13 +1,12 @@
 "use client";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import type { BookDto, EntryCategoryWithCount } from "@/modules/ledger/contracts";
+import type { BookDto } from "@/modules/ledger/contracts";
 import type { RecordScope } from "@/modules/ledger/filters";
 import { readLastNewRecordBookId } from "../new-record-book-memory";
 import { NewRecordForms } from "./NewRecordForms";
-import type { CommittedView, NewRecordInputMode } from "./new-record-success-feedback";
+import type { CommittedView } from "./new-record-success-feedback";
 import {
   Select,
   SelectContent,
@@ -29,18 +28,14 @@ interface NewRecordDialogProps {
   books: readonly BookDto[];
   activeTab: LedgerTab;
   committedView: CommittedView;
-  categories: EntryCategoryWithCount[];
-  mainCurrency: string;
-  preferredCurrencies: string[];
   /** The ledger's zone, which dates a new record by default. */
   timeZone: string;
 }
 
 /**
- * The "new record" dialog: the AI-parse / quick-entry toggle on top, the active
- * form below, and a footer pinned to the bottom with the book on the left and
- * the submit on the right. Closing it never asks: each form keeps its unsaved
- * input as a draft and restores it on the next opening.
+ * The "new record" dialog: the form, and a footer pinned to the bottom with the
+ * book on the left and the submit on the right. Closing it never asks: the form
+ * keeps its unsaved input as a draft and restores it on the next opening.
  */
 export function NewRecordDialog({
   open: isOpen,
@@ -49,19 +44,13 @@ export function NewRecordDialog({
   books,
   activeTab,
   committedView,
-  categories,
-  mainCurrency,
-  preferredCurrencies,
   timeZone,
 }: NewRecordDialogProps) {
   // The dialog opens from every tab, so the picker labels live in the shell
   // bundle instead of the 设置 one.
   // The shell's + button opens it from outside the page, so whether it is open
   // lives in the URL, where the system back gesture can close it.
-  const [inputMode, setInputMode] = useState<NewRecordInputMode>("ai");
-  const [aiPending, setAiPending] = useState(false);
-  const [quickPending, setQuickPending] = useState(false);
-  const isSubmitting = aiPending || quickPending;
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const handleOpenChange = (open: boolean) => {
     if (!open && !isSubmitting) onClose();
   };
@@ -107,30 +96,14 @@ export function NewRecordDialog({
           <DialogTitle>{ledgerPageCopy.newRecord}</DialogTitle>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 sm:flex-none sm:px-6 sm:pt-6">
-          <SegmentedControl
-            className="mb-4 shrink-0"
-            label={ledgerPageCopy.newRecordMode}
-            value={inputMode}
-            onChange={setInputMode}
-            disabled={isSubmitting}
-            options={[
-              { value: "ai", label: ledgerPageCopy.aiParse },
-              { value: "quick", label: ledgerPageCopy.quickEntry },
-            ]}
-          />
           <NewRecordForms
             bookId={selectedBookId}
             viewedBookId={scope}
             savedBook={selectedBook}
             activeTab={activeTab}
             committedView={committedView}
-            inputMode={inputMode}
-            categories={categories}
-            mainCurrency={mainCurrency}
-            preferredCurrencies={preferredCurrencies}
             onSaved={onClose}
-            setAiPending={setAiPending}
-            setQuickPending={setQuickPending}
+            onPendingChange={setIsSubmitting}
             timeZone={timeZone}
             bookPicker={
               <Select value={selectedBookId} onValueChange={setBookId} disabled={isSubmitting}>

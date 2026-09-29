@@ -1,14 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import "server-only";
-import type {
-  ActivateAttemptInput,
-  CreateManualDocumentInput,
-} from "@/modules/source-document/server/projections/types";
+import type { ActivateAttemptInput } from "@/modules/source-document/server/projections/types";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { extractionAttempts, sourceDocuments } from "@/persistence";
 import {
-  lockBookForShare,
   lockLedgerForUpdate,
   lockSourceDocumentForUpdate,
   type LockedSourceDocument,
@@ -16,7 +12,6 @@ import {
 import { closeProcessingLeaseInTransaction } from "@/server/processing/terminal";
 
 import { activeDocumentWhere, replaceProjection } from "./shared";
-import { createCompletedProjectionInTransaction } from "./manual-entries";
 
 export async function activateAttempt(input: ActivateAttemptInput): Promise<boolean> {
   return db.transaction(async (tx) => {
@@ -80,32 +75,5 @@ export async function activateAttempt(input: ActivateAttemptInput): Promise<bool
       })
       .where(activeDocumentWhere(input.ledgerId, input.sourceDocumentId));
     return true;
-  });
-}
-
-export async function createManualDocument(
-  input: CreateManualDocumentInput
-): Promise<{ sourceDocumentId: string }> {
-  return db.transaction(async (tx) => {
-    // The ledger lock keeps the categories the entries reference from being
-    // deleted underneath the new record.
-    await lockLedgerForUpdate(tx, input.ledgerId);
-
-    // The book was resolved outside this transaction; the ledger lock makes
-    // the re-read authoritative, so a book archived while the form was open
-    // refuses here instead of gaining a record after retirement.
-    await lockBookForShare(tx, input.ledgerId, input.bookId);
-
-    const sourceDocumentId = input.sourceDocumentId ?? crypto.randomUUID();
-    await createCompletedProjectionInTransaction(tx, {
-      ledgerId: input.ledgerId,
-      bookId: input.bookId,
-      sourceDocumentId,
-      ...(input.title !== undefined ? { title: input.title } : {}),
-      ...(input.entryDate !== undefined ? { entryDate: input.entryDate } : {}),
-      ...(input.inputText !== undefined ? { inputText: input.inputText } : {}),
-      entries: input.entries,
-    });
-    return { sourceDocumentId };
   });
 }

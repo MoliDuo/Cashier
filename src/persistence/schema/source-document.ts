@@ -34,7 +34,7 @@ export const sourceDocuments = pgTable(
     effectiveDate: date("effective_date", { mode: "string" })
       .notNull()
       .generatedAlwaysAs(sql`COALESCE("document_date", ("created_at" AT TIME ZONE 'UTC')::date)`),
-    /** The newest extraction attempt; null for a record entered or split off by hand. */
+    /** The newest extraction attempt; null for a record split off or reorganized from another. */
     latestAttemptId: uuid("latest_attempt_id"),
     version: integer("version").notNull().default(1),
     /** Who sent the create request that made the document: `user:<id>` or `credential:<id>`. */

@@ -114,9 +114,6 @@ export function LedgerWorkspace({ ledgerToday, children }: LedgerWorkspaceProps)
             books={value.books}
             activeTab={activeTab}
             committedView={committedView}
-            categories={categories}
-            mainCurrency={mainCurrency}
-            preferredCurrencies={preferredCurrencies}
             timeZone={timeZone}
           />
 

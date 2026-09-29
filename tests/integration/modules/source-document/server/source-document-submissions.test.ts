@@ -18,12 +18,14 @@ import {
 } from "@/persistence";
 import { ConflictError, ValidationError } from "@/lib/errors";
 import { MAX_FILES } from "@/lib/storage/upload-policy";
-import { createTestBooks, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { getTestDb } from "tests/setup";
 import {
-  activateAttempt,
-  createManualDocument,
-} from "@/modules/source-document/server/projections/writes";
+  createTestBooks,
+  createTestUserWithLedger,
+  testBookId,
+  createTestRecord,
+} from "tests/helpers/schema-setup";
+import { getTestDb } from "tests/setup";
+import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import {
   submitSourceDocument,
   submitSourceDocumentIdempotently,
@@ -245,7 +247,7 @@ describe("target source-document submissions", () => {
   it("preserves active results across failed/anomalous retries and rejects stale activation", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const active = await createManualDocument({
+    const active = await createTestRecord(getTestDb(), {
       ledgerId,
       entries: [entry],
       bookId: await testBookId(db, ledgerId),

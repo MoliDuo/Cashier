@@ -7,7 +7,7 @@ import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import {
   entryCategories,
   ledgerEntries,
@@ -16,10 +16,7 @@ import {
   sourceDocuments,
   storedFiles,
 } from "@/persistence";
-import {
-  activateAttempt,
-  createManualDocument,
-} from "@/modules/source-document/server/projections/writes";
+import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import { deleteSourceDocumentAtomically } from "@/modules/source-document/server/delete";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
 
@@ -207,7 +204,7 @@ describe("current-runtime target adapters", () => {
   it("deletes a document with everything it owns but its stored files, and refuses late completion", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const active = await createManualDocument({
+    const active = await createTestRecord(getTestDb(), {
       ledgerId,
       entries: [projectionEntry],
       bookId: await testBookId(db, ledgerId),

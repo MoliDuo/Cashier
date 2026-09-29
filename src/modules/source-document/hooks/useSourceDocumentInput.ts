@@ -524,12 +524,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const isTouchInput = useIsTouchInput();
   const camera = useCameraCapture({
-    enabled:
-      isTouchInput &&
-      mode === "create" &&
-      props.isActive !== false &&
-      isCameraOpen &&
-      !isSubmitting,
+    enabled: isTouchInput && mode === "create" && isCameraOpen && !isSubmitting,
     onCapture: (file) => addImageFiles([file]),
   });
 

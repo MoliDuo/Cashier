@@ -6,9 +6,7 @@ import type { CivilRange } from "@/modules/ledger/domain/period";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import { openLedgerDetail } from "@/lib/navigation/ledger-detail-navigation";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import { quickEntryFormCopy, sourceDocumentInputCopy } from "@/copy/source-document";
-
-export type NewRecordInputMode = "ai" | "quick";
+import { sourceDocumentInputCopy } from "@/copy/source-document";
 
 /** What 流水 is showing: its filters, and the days its period covers (null for all). */
 export interface CommittedView {
@@ -22,7 +20,6 @@ interface SavedBook {
 }
 
 interface ShowNewRecordSuccessFeedbackOptions {
-  mode: NewRecordInputMode;
   result: CreatedRecordResult;
   activeTab: LedgerTab;
   committedView: CommittedView;
@@ -72,7 +69,6 @@ export function shouldWarnNewRecordMayBeHidden(
 }
 
 export function showNewRecordSuccessFeedback({
-  mode,
   result,
   activeTab,
   committedView,
@@ -99,7 +95,5 @@ export function showNewRecordSuccessFeedback({
     return;
   }
 
-  toast.success(
-    mode === "ai" ? sourceDocumentInputCopy.uploadSuccess : quickEntryFormCopy.quickEntrySuccess
-  );
+  toast.success(sourceDocumentInputCopy.uploadSuccess);
 }

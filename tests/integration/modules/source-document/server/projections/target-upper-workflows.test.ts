@@ -4,17 +4,14 @@ import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { queryEnhancedStats } from "@/modules/stats/server/enhanced-stats-query";
 import { entryCategories, ledgerEntries, extractionAttempts, sourceDocuments } from "@/persistence";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { getTestDb } from "tests/setup";
 import { listLedgerEntries } from "@/modules/ledger/server/list-entries";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
 import { listLedgerEntryPage } from "@/modules/ledger/server/entry-reads/list-ledger-entry-page";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
-import {
-  activateAttempt,
-  createManualDocument,
-} from "@/modules/source-document/server/projections/writes";
+import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 import {
   batchUpdateLedgerEntries,
   deleteLedgerEntry,
@@ -52,7 +49,7 @@ describe("target upper workflows", () => {
   it("uses persisted list state and paginates without skips", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const completed = await createManualDocument({
+    const completed = await createTestRecord(getTestDb(), {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],
@@ -104,7 +101,7 @@ describe("target upper workflows", () => {
       .insert(entryCategories)
       .values({ ledgerId, name: "Food" })
       .returning();
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [{ ...entry, categoryId: category!.id }],
@@ -180,7 +177,7 @@ describe("target upper workflows", () => {
     await insertExchangeRates("2026-07-14", { USD: 1, CNY: 8 });
     const transactionAt = "2026-07-14T12:30:00.000Z";
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const;
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       title: "Receipt with adjustments",
       entryDate: "2026-07-14",
@@ -274,7 +271,7 @@ describe("target upper workflows", () => {
     expect(new Set(targetLinks.map((link) => link.id))).toEqual(new Set(ids));
   });
 
-  it("prevents cross-workspace reads and rolls back invalid manual replacement", async () => {
+  it("prevents cross-workspace reads and rolls back a batch update to a foreign category", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
     const { ledgerId: otherLedgerId } = await createTestUserWithLedger(
@@ -287,18 +284,7 @@ describe("target upper workflows", () => {
       .insert(entryCategories)
       .values({ ledgerId: otherLedgerId, name: "Other" })
       .returning();
-    await expect(
-      createManualDocument({
-        ledgerId,
-        entries: [{ ...entry, categoryId: otherCategory!.id }],
-        bookId: await testBookId(db, ledgerId),
-      })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(await db.select().from(sourceDocuments)).toHaveLength(0);
-    expect(await db.select().from(extractionAttempts)).toHaveLength(0);
-    expect(await db.select().from(ledgerEntries)).toHaveLength(0);
-
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       entries: [entry],
       bookId: await testBookId(db, ledgerId),
@@ -335,7 +321,7 @@ describe("target upper workflows", () => {
   it("edits a manual entry in place while keeping its id and creating no attempt", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);
-    const created = await createManualDocument({
+    const created = await createTestRecord(getTestDb(), {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [entry],

@@ -21,13 +21,3 @@ export interface ActivateAttemptInput {
   dateOrganizationSuggestion?: DateOrganizationSuggestion | null;
   lease: ProcessingLeaseContract;
 }
-
-export interface CreateManualDocumentInput {
-  ledgerId: string;
-  bookId: string;
-  sourceDocumentId?: string;
-  inputText?: string | null;
-  title?: string | null;
-  entryDate?: string | null;
-  entries: readonly LedgerProjectionEntryContract[];
-}

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { openTab, showListControls } from "./navigation";
+import { seedRecord } from "./seed-record";
 import { signIn } from "./sign-in";
 
 test("AI category assignment remains visible across tabs and fits narrow screens", async ({
@@ -12,13 +13,7 @@ test("AI category assignment remains visible across tabs and fits narrow screens
 
   await signIn(page);
 
-  await page.getByRole("button", { name: "记一笔", exact: true }).click();
-  const create = page.getByRole("dialog");
-  await create.getByRole("button", { name: "快速记账", exact: true }).click();
-  await create.getByRole("textbox", { name: "名称（可选）", exact: true }).fill(item);
-  await create.getByRole("group", { name: "选择分类" }).getByRole("button").first().click();
-  await create.getByRole("textbox", { name: "金额", exact: true }).fill("12.34");
-  await create.getByRole("button", { name: "记一笔", exact: true }).click();
+  await seedRecord(page, { item, amount: "12.34" });
 
   await openTab(page, "明细");
   await expect(page).toHaveURL(/\/records\?view=entries/);

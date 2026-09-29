@@ -4,14 +4,9 @@ import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { safePrefetch } from "@/lib/safe-prefetch";
 import type { LedgerTab } from "@/lib/ledger-tabs";
-import type { EntryCategoryWithCount } from "@/modules/ledger/contracts";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";
 import { writeLastNewRecordBookId } from "../new-record-book-memory";
-import {
-  showNewRecordSuccessFeedback,
-  type CommittedView,
-  type NewRecordInputMode,
-} from "./new-record-success-feedback";
+import { showNewRecordSuccessFeedback, type CommittedView } from "./new-record-success-feedback";
 
 const SourceDocumentInput = dynamic(
   () =>
@@ -20,22 +15,10 @@ const SourceDocumentInput = dynamic(
     })),
   { ssr: false, loading: () => <InputFormLoadingFallback /> }
 );
-const QuickEntryForm = dynamic(
-  () =>
-    import("@/modules/source-document/ui/QuickEntryForm").then((m) => ({
-      default: m.QuickEntryForm,
-    })),
-  { ssr: false, loading: () => <InputFormLoadingFallback /> }
-);
-
 export function preloadNewRecordModules() {
   safePrefetch(
     import("@/modules/source-document/ui/SourceDocumentInput"),
     "PREFETCH_SOURCE_DOCUMENT_INPUT_FAILED"
-  );
-  safePrefetch(
-    import("@/modules/source-document/ui/QuickEntryForm"),
-    "PREFETCH_QUICK_ENTRY_FAILED"
   );
 }
 
@@ -63,16 +46,11 @@ interface NewRecordFormsProps {
   savedBook: { id: string; name: string } | null;
   activeTab: LedgerTab;
   committedView: CommittedView;
-  inputMode: NewRecordInputMode;
-  categories: EntryCategoryWithCount[];
-  mainCurrency: string;
-  preferredCurrencies: string[];
   timeZone?: string;
   /** Closes the dialog once a record is saved. */
   onSaved: () => void;
-  setAiPending: (pending: boolean) => void;
-  setQuickPending: (pending: boolean) => void;
-  /** The record's book picker, shown in each form's footer. */
+  onPendingChange: (pending: boolean) => void;
+  /** The record's book picker, shown in the form's footer. */
   bookPicker: ReactNode;
 }
 
@@ -82,24 +60,18 @@ export function NewRecordForms({
   savedBook,
   activeTab,
   committedView,
-  inputMode,
-  categories,
-  mainCurrency,
-  preferredCurrencies,
   timeZone,
   onSaved,
-  setAiPending,
-  setQuickPending,
+  onPendingChange,
   bookPicker,
 }: NewRecordFormsProps) {
   const handleSuccess = useCallback(
-    (mode: NewRecordInputMode, result: CreatedRecordResult) => {
+    (result: CreatedRecordResult) => {
       // Only a saved record counts as the picker's "last choice": a pick that
       // was changed and then cancelled must not become the next default.
       if (savedBook != null) writeLastNewRecordBookId(savedBook.id);
 
       showNewRecordSuccessFeedback({
-        mode,
         result,
         activeTab,
         committedView,
@@ -107,46 +79,21 @@ export function NewRecordForms({
         savedBook,
       });
 
-      // A saved record closes the dialog. Whatever was typed into the other
-      // mode stays in that mode's draft for the next opening.
+      // A saved record closes the dialog.
       onSaved();
     },
     [activeTab, committedView, onSaved, savedBook, viewedBookId]
   );
 
   return (
-    <>
-      <div
-        className={inputMode === "ai" ? "flex flex-1 flex-col" : "hidden"}
-        aria-hidden={inputMode !== "ai"}
-      >
-        <SourceDocumentInput
-          bookId={bookId}
-
-          isActive={inputMode === "ai"}
-          // One picker at a time: the hidden form must not carry a second copy.
-          footerStart={inputMode === "ai" ? bookPicker : undefined}
-          onPendingChange={setAiPending}
-          {...(timeZone != null ? { timeZone } : {})}
-          onSuccess={(result) => handleSuccess("ai", result)}
-        />
-      </div>
-      <div
-        className={inputMode === "quick" ? "flex flex-1 flex-col" : "hidden"}
-        aria-hidden={inputMode !== "quick"}
-      >
-        <QuickEntryForm
-          bookId={bookId}
-
-          categories={categories}
-          mainCurrency={mainCurrency}
-          preferredCurrencies={preferredCurrencies}
-          onPendingChange={setQuickPending}
-          footerStart={inputMode === "quick" ? bookPicker : undefined}
-          {...(timeZone != null ? { timeZone } : {})}
-          onSuccess={(result) => handleSuccess("quick", result)}
-        />
-      </div>
-    </>
+    <div className="flex flex-1 flex-col">
+      <SourceDocumentInput
+        bookId={bookId}
+        footerStart={bookPicker}
+        onPendingChange={onPendingChange}
+        {...(timeZone != null ? { timeZone } : {})}
+        onSuccess={handleSuccess}
+      />
+    </div>
   );
 }

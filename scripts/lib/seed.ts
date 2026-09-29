@@ -242,6 +242,8 @@ export interface SeedEntry {
   amount: string;
   currency: string;
   description?: string | null;
+  /** Defaults to the document's time. */
+  createdAt?: Date;
 }
 
 export interface SeedSourceDocument {
@@ -324,7 +326,7 @@ export async function seedSourceDocument(
         currency: entry.currency,
         itemName: entry.itemName,
         description: entry.description ?? null,
-        createdAt: at,
+        createdAt: entry.createdAt ?? at,
         updatedAt: at,
       }))
     );

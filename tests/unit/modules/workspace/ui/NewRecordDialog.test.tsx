@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ledgerPageCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
 import type { BookDto } from "@/modules/ledger/contracts";
 import { writeLastNewRecordBookId } from "@/modules/workspace/new-record-book-memory";
@@ -13,9 +12,7 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
     viewedBookId: string | null;
     savedBook: { id: string; name: string } | null;
     timeZone?: string;
-    inputMode: string;
-    setInputMode: (mode: "ai" | "quick") => void;
-    setAiPending: (pending: boolean) => void;
+    onPendingChange: (pending: boolean) => void;
     onSaved: () => void;
     bookPicker: ReactNode;
   }) => (
@@ -27,13 +24,12 @@ vi.mock("@/modules/workspace/ui/NewRecordForms", () => ({
         props.savedBook == null ? "" : `${props.savedBook.id}:${props.savedBook.name}`
       }
       data-time-zone={props.timeZone ?? ""}
-      data-input-mode={props.inputMode}
     >
       {props.bookPicker}
-      <button type="button" onClick={() => props.setAiPending(true)}>
+      <button type="button" onClick={() => props.onPendingChange(true)}>
         start submit
       </button>
-      <button type="button" onClick={() => props.setAiPending(false)}>
+      <button type="button" onClick={() => props.onPendingChange(false)}>
         settle submit
       </button>
       <button type="button" onClick={() => props.onSaved()}>
@@ -135,9 +131,6 @@ function renderDialog(overrides: Partial<DialogProps> = {}) {
     books: defaultBooks,
     activeTab: "records",
     committedView: { filters: {}, range: null },
-    categories: [],
-    mainCurrency: "CNY",
-    preferredCurrencies: [],
     timeZone: "Europe/Berlin",
     ...overrides,
   };
@@ -251,17 +244,7 @@ describe("NewRecordDialog state", () => {
     window.localStorage.clear();
   });
 
-  it("opens on AI parsing and switches to quick entry", () => {
-    const { open } = renderDialog();
-    open();
-    expect(screen.getByTestId("record-forms")).toHaveAttribute("data-input-mode", "ai");
-
-    fireEvent.click(screen.getByRole("button", { name: ledgerPageCopy.quickEntry }));
-
-    expect(screen.getByTestId("record-forms")).toHaveAttribute("data-input-mode", "quick");
-  });
-
-  it("cannot be closed or switched while a form is submitting", () => {
+  it("cannot be closed while the form is submitting", () => {
     const { open } = renderDialog();
     open();
     expect(screen.getByRole("button", { name: commonCopy.close })).toBeInTheDocument();
@@ -269,7 +252,6 @@ describe("NewRecordDialog state", () => {
     fireEvent.click(screen.getByRole("button", { name: "start submit" }));
 
     expect(screen.queryByRole("button", { name: commonCopy.close })).toBeNull();
-    expect(screen.getByRole("button", { name: ledgerPageCopy.quickEntry })).toBeDisabled();
     act(() => {
       fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     });
@@ -281,7 +263,7 @@ describe("NewRecordDialog state", () => {
     expect(screen.queryByTestId("record-forms")).toBeNull();
   });
 
-  it("closes when a form saves", () => {
+  it("closes when the form saves", () => {
     const { open } = renderDialog();
     open();
 

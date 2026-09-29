@@ -5,21 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { updateLedgerSettings } from "@/modules/ledger/server/settings";
 import { ledgerEntries, ledgers, sourceDocuments } from "@/persistence";
 import { exchangeRates } from "@/persistence/schema/currency";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
+import { createTestUserWithLedger, testBookId, createTestRecord } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { calculateLedgerStats } from "@/modules/ledger/server/stats";
-import {
-  activateAttempt,
-  createManualDocument,
-} from "@/modules/source-document/server/projections/writes";
+import { activateAttempt } from "@/modules/source-document/server/projections/writes";
 
 describe("target Settings currency workflow", () => {
   let ledgerId = "";
   let sourceDocumentId: string;
 
   async function createEntry() {
-    const result = await createManualDocument({
+    const result = await createTestRecord(getTestDb(), {
       ledgerId,
       entryDate: "2026-07-15",
       entries: [
@@ -204,86 +201,6 @@ describe("target Settings currency workflow", () => {
 });
 
 describe("settings concurrency invariants", () => {
-  it("concurrent main-currency change and first createManual are serialised by the ledger lock", async () => {
-    const db = getTestDb();
-    const { ledgerId } = await createTestUserWithLedger(db, "settings-race-create-manual");
-    // Resolved up front: awaiting it inside the array below would leave the
-    // settings update running with no handler attached until it returned.
-    const bookId = await testBookId(db, ledgerId);
-
-    for (let i = 0; i < 5; i++) {
-      // Run main-currency change and first entry creation concurrently on a fresh ledger.
-      const results = await Promise.allSettled([
-        updateLedgerSettings(ledgerId, { settings: { mainCurrency: "USD" } }),
-        createManualDocument({
-          ledgerId,
-          entryDate: "2026-07-15",
-          entries: [
-            {
-              categoryId: null,
-              amount: "80.00",
-              currency: "CNY",
-              itemName: "Race entry",
-              description: null,
-            },
-          ],
-          bookId,
-        }),
-      ]);
-
-      // The lock serialises operations: either settings changes first (then entries are
-      // created with the new currency) or entries are created first (then settings throws).
-      // Neither deadlock should occur.
-      const ledger = await db.query.ledgers.findFirst({
-        where: eq(ledgers.id, ledgerId),
-      });
-      const activeEntries = await db.query.ledgerEntries.findMany({
-        where: eq(ledgerEntries.ledgerId, ledgerId),
-      });
-
-      // Invariant: if entries were created, settings either succeeded before entry creation
-      // or threw because entries already existed. The ledger lock ensures no interleaving.
-      // In either case, the ledger row is intact and readable.
-      expect(ledger).not.toBeNull();
-
-      // Verify main-currency/entry consistency invariant.
-      const [settingsResult, createResult] = results;
-      const mainCurrency = ledger?.mainCurrency;
-
-      if (createResult.status === "fulfilled") {
-        // Entries were created — either settings ran first (changed currency) and entries
-        // followed, or entries ran first and settings was rejected.
-        if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
-          // Settings succeeded: must have run before entries, so mainCurrency is "USD"
-          expect(mainCurrency).toBe("USD");
-          // Entries use the currency they were created with (CNY), which may differ from
-          // the new main currency — this is an expected edge-case when settings changes
-          // before the first entry is created.
-          expect(activeEntries.length).toBeGreaterThan(0);
-          expect(activeEntries.every((e) => e.currency === "CNY")).toBe(true);
-        } else {
-          // Settings was rejected: entries existed first, so mainCurrency stays at its default.
-          expect(mainCurrency).toBe("CNY");
-          expect(activeEntries.length).toBeGreaterThan(0);
-        }
-      } else if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
-        // Only settings succeeded, no entries created — mainCurrency is "USD".
-        expect(mainCurrency).toBe("USD");
-        expect(activeEntries).toHaveLength(0);
-      }
-
-      // Clean up for next iteration
-      if (createResult.status === "fulfilled") {
-        // Deleting the documents takes their entries with them.
-        await db.delete(sourceDocuments).where(eq(sourceDocuments.ledgerId, ledgerId));
-      }
-      // Reset main currency if it was changed
-      if (settingsResult.status === "fulfilled" && settingsResult.value != null) {
-        await db.update(ledgers).set({ mainCurrency: "CNY" }).where(eq(ledgers.id, ledgerId));
-      }
-    }
-  });
-
   it("concurrent main-currency change and first activateAttempt are serialised by the ledger lock", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db, "settings-race-activate-attempt");
