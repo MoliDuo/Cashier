@@ -17,7 +17,7 @@ import {
 } from "@/modules/ledger/server-actions/credentials";
 import { listServiceCredentials } from "@/modules/ledger/server/service-credentials";
 import { getLedgerSettingsAction } from "@/modules/ledger/server/get-ledger-settings";
-import { formatDateTimeForApi, getDateInTimezone } from "@/lib/date-utils";
+import { getDateInTimezone } from "@/lib/date-utils";
 import { ValidationError } from "@/lib/errors";
 import { computeHash } from "@/lib/security/service-credential-token";
 import sharp from "sharp";
@@ -273,8 +273,9 @@ describe("Service Credentials & Ledger Entry Ingestion", () => {
       where: eq(extractionAttempts.id, doc!.latestAttemptId!),
     });
 
-    // The fixture book has no zone of its own, so the server date decides.
-    expect(attempt?.requestedDate).toBe(formatDateTimeForApi(new Date()));
+    // Without a day of its own, the upload is dated today in the ledger's zone.
+    const [ledger] = await db.select({ timeZone: ledgers.timeZone }).from(ledgers);
+    expect(attempt?.requestedDate).toBe(getDateInTimezone(ledger!.timeZone));
     // The record is dated from the start, not only once processing succeeds.
     expect(doc?.documentDate).toBe(attempt?.requestedDate);
   });

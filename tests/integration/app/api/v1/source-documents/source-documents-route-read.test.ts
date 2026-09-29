@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { POST } from "@/app/api/v1/source-documents/route";
@@ -265,7 +266,9 @@ describe("API v1 source-documents route", () => {
   });
 
   it("totals converted amounts in the ledger main currency instead of raw amounts", async () => {
-    await insertExchangeRates(new Date().toISOString().slice(0, 10), { USD: 1, CNY: 5 });
+    // The record is dated today in the ledger's zone, which is not always UTC's day.
+    const [ledger] = await getTestDb().select({ timeZone: ledgers.timeZone }).from(ledgers);
+    await insertExchangeRates(ledgerToday(ledger!.timeZone), { USD: 1, CNY: 5 });
     const image = await validJpegBase64();
     const created = await POST(
       new NextRequest("http://localhost/api/v1/source-documents", {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { POST } from "@/app/api/v1/source-documents/route";
@@ -137,15 +138,14 @@ describe("API v1 source-documents route", () => {
     expect(response.status).toBe(201);
     const data = await response.json();
 
-    // An API key belongs to a person but is not that person's device, and
-    // neither member's own zone applies: the record is dated by the server.
-    const created = await getTestDb().query.extractionAttempts.findFirst({
+    // An API key belongs to a person but is not that person's device: the
+    // record is dated today in the ledger's zone.
+    const db = getTestDb();
+    const created = await db.query.extractionAttempts.findFirst({
       where: eq(extractionAttempts.id, data.revisionId),
     });
-    const serverToday = new Intl.DateTimeFormat("sv-SE", {
-      ...(process.env.TZ ? { timeZone: process.env.TZ } : {}),
-    }).format(new Date());
-    expect(created?.requestedDate).toBe(serverToday);
+    const [ledger] = await db.select({ timeZone: ledgers.timeZone }).from(ledgers);
+    expect(created?.requestedDate).toBe(ledgerToday(ledger!.timeZone));
   });
 
   it("creates one document, attempt, and processing job for concurrent idempotent requests", async () => {
