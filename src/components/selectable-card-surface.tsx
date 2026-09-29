@@ -16,6 +16,15 @@ export interface SelectableCardSurfaceProps {
    */
   radiusClassName?: string;
   /**
+   * Where the selected outline is drawn. A whole card draws it "inside", over its
+   * own border: the ledger list lets the browser skip painting off-screen groups
+   * (`content-visibility`), which clips everything outside a group's box, so an
+   * outline drawn outside a card that sits flush with its group loses its outer
+   * half. A full-bleed row inside a shared card has nothing of its own to draw
+   * over, so it outlines "outside", along the card's edge.
+   */
+  outline?: "inside" | "outside";
+  /**
    * When set, an expand/collapse control is rendered above the selection
    * overlay while in selection mode so cards with an expandable body keep
    * their chevron interactive during batch selection. `positionClassName`
@@ -41,6 +50,7 @@ export const SelectableCardSurface = memo(function SelectableCardSurface({
   selectionLabel,
   onToggleSelection,
   radiusClassName = "rounded-[var(--radius-xl)]",
+  outline = "inside",
   expandable,
   children,
 }: SelectableCardSurfaceProps) {
@@ -54,7 +64,7 @@ export const SelectableCardSurface = memo(function SelectableCardSurface({
         "relative [--selectable-card-header-height:56px]",
         radiusClassName,
         selectionMode && "isolate",
-        selectionMode && selected && "ring-1 ring-primary",
+        selectionMode && selected && outline === "outside" && "ring-1 ring-primary",
         selectionMode && disabled && "opacity-60"
       )}
       data-selection-mode={selectionMode ? "true" : "false"}
@@ -75,6 +85,7 @@ export const SelectableCardSurface = memo(function SelectableCardSurface({
           onClick={onToggleSelection}
           className={cn(
             "absolute inset-0 cursor-pointer touch-manipulation text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed",
+            selected && outline === "inside" && "ring-2 ring-inset ring-primary",
             radiusClassName
           )}
         />

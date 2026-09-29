@@ -116,6 +116,28 @@ describe("SelectableCardSurface", () => {
     );
   });
 
+  it("draws a selected card's outline inside its own box so a clipped group cannot cut it", () => {
+    // Regression: the ledger list clips each group to its box, so an outline
+    // drawn outside a card flush with the group lost its outer half.
+    const { container } = render(
+      <SelectableCardSurface
+        selectionMode
+        selected
+        selectionLabel="Select lunch"
+        onToggleSelection={vi.fn()}
+      >
+        <div>Lunch</div>
+      </SelectableCardSurface>
+    );
+
+    expect(container.querySelector('[data-selected="true"]')).not.toHaveClass("ring-1");
+    expect(screen.getByRole("checkbox", { name: "Select lunch" })).toHaveClass(
+      "ring-2",
+      "ring-inset",
+      "ring-primary"
+    );
+  });
+
   it("disables an unselected card when the selection limit is reached", async () => {
     const user = userEvent.setup();
     const onToggleSelection = vi.fn();

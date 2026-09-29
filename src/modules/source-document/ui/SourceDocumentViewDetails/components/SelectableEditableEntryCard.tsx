@@ -60,6 +60,7 @@ export const SelectableEditableEntryCard = memo(function SelectableEditableEntry
       selected={selected}
       selectionLabel={selectionLabel}
       onToggleSelection={() => onSelectEntry(entry.id, !selected)}
+      outline="outside"
       radiusClassName={isLast ? LAST_ROW_RADIUS : "rounded-none"}
     >
       <Card
