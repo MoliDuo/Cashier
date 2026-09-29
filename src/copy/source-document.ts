@@ -11,7 +11,8 @@ export const sourceDocumentCardCopy = {
 };
 
 export const sourceDocumentInputCopy = {
-  placeholder: "输入消费记录，例如：午饭 35 元… (支持粘贴图片)",
+  inputLabel: "收支内容",
+  placeholder: "请输入收支内容，例如：午餐 35 元。支持粘贴或添加图片。",
   image: "图片",
   send: "发送",
   uploadSuccess: "提交成功",

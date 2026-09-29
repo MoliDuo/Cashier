@@ -10,18 +10,18 @@ test("unsaved input is kept as a draft and leaving never asks", async ({ page },
   // A typed record survives closing the dialog and a reload.
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   let dialog = page.getByRole("dialog");
-  const input = dialog.getByRole("textbox", { name: /输入消费记录/ });
+  const input = dialog.getByRole("textbox", { name: /收支内容/ });
   await input.fill(text);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.reload();
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("textbox", { name: /输入消费记录/ })).toHaveValue(text);
+  await expect(dialog.getByRole("textbox", { name: /收支内容/ })).toHaveValue(text);
   const notice = dialog.getByRole("status").filter({ hasText: "有未保存的修改" }).first();
   await expect(notice).toBeVisible();
   await notice.getByRole("button", { name: "放弃", exact: true }).click();
-  await expect(dialog.getByRole("textbox", { name: /输入消费记录/ })).toHaveValue("");
+  await expect(dialog.getByRole("textbox", { name: /收支内容/ })).toHaveValue("");
   await page.keyboard.press("Escape");
 
   // A record's fields are written as they change, so Back out of its sheet

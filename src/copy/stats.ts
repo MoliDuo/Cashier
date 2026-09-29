@@ -69,7 +69,6 @@ export const statsTabCopy = {
   rankingMore: (v: { amount: string | number }) => `较上期 ↑${v.amount}`,
   rankingLess: (v: { amount: string | number }) => `较上期 ↓${v.amount}`,
   largestEntries: "最大几笔",
-  largestEntryOriginal: (v: { amount: string | number }) => `原币 ${v.amount}`,
   showAllCategories: (v: { count: string | number }) => `显示全部（${v.count}）`,
   showFewerCategories: "收起",
   noShare: "无占比",

@@ -280,7 +280,7 @@ test("books production starts a record in the viewed book", async ({ page }, tes
 
   await dialog.getByLabel("分账", { exact: true }).press("ArrowDown");
   await page.getByRole("option", { name: bookB, exact: true }).click();
-  await dialog.getByRole("textbox", { name: /输入消费记录/ }).fill(text);
+  await dialog.getByRole("textbox", { name: /收支内容/ }).fill(text);
   await dialog.getByRole("button", { name: "发送", exact: true }).click();
   await expect(
     page.getByText(`已保存到「${bookB}」，当前视图不会显示这张账单。`, { exact: true })

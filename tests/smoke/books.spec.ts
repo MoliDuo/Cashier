@@ -173,7 +173,7 @@ test("@demo the record picker remembers the book a record was saved into", async
   // Save one record into 哞哞.
   await bookPicker.press("ArrowDown");
   await page.getByRole("option", { name: "哞哞" }).click();
-  await create.getByRole("textbox", { name: /输入消费记录/ }).fill(text);
+  await create.getByRole("textbox", { name: /收支内容/ }).fill(text);
   await create.getByRole("button", { name: "发送", exact: true }).click();
   await expect(create).toHaveCount(0);
 

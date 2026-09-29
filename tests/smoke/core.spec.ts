@@ -30,7 +30,7 @@ test("protected redirect, default ledger, create, edit, delete and sign out", as
   await signIn(page);
   await page.getByRole("button", { name: "记一笔", exact: true }).click();
   const create = page.getByRole("dialog");
-  await create.getByRole("textbox", { name: /输入消费记录/ }).fill(`${item} 12.34`);
+  await create.getByRole("textbox", { name: /收支内容/ }).fill(`${item} 12.34`);
   await create.getByRole("button", { name: "发送", exact: true }).click();
   await expect(create).toHaveCount(0);
   // The AI stub answers every submission with the same bill, so the bill is

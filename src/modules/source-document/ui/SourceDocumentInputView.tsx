@@ -197,7 +197,7 @@ export function SourceDocumentInputView({
         onChange={(event) => onTextChange(event.target.value)}
         onPaste={onTextareaPaste}
         placeholder={sourceDocumentInputCopy.placeholder}
-        aria-label={sourceDocumentInputCopy.placeholder}
+        aria-label={sourceDocumentInputCopy.inputLabel}
         className="resize-none"
         rows={5}
         autoFocus={!showsViewfinder}

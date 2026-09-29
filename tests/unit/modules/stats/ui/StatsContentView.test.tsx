@@ -124,7 +124,8 @@ describe("StatsContentView", () => {
 
     const row = screen.getByRole("button", { name: /Deposit/ });
     expect(row).toHaveAccessibleName(/¥3,000\.00/);
-    expect(within(row).getByText(/原币/)).toBeVisible();
+    expect(within(row).getByText(/1,800\.00/)).toBeVisible();
+    expect(within(row).queryByText(/原币/)).toBeNull();
     fireEvent.click(row);
     expect(openLedgerEntrySourceDocumentMock).toHaveBeenCalledWith(
       expect.objectContaining({ sourceDocumentId: "d1" })

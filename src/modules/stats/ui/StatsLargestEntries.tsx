@@ -34,13 +34,7 @@ export function StatsLargestEntries({ entries, currencySymbol, onOpen }: StatsLa
           const original =
             entry.originalCurrency === currencySymbol
               ? null
-              : statsTabCopy.largestEntryOriginal({
-                  amount: formatCurrencyAmount(
-                    entry.originalAmount,
-                    entry.originalCurrency,
-                    locale
-                  ),
-                });
+              : formatCurrencyAmount(entry.originalAmount, entry.originalCurrency, locale);
           const category = entry.categoryName ?? statsTabCopy.uncategorized;
           return (
             <li key={entry.id}>
