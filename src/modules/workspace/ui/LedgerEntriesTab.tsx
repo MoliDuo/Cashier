@@ -57,6 +57,10 @@ export function LedgerEntriesTab({
         onToggleSelectionMode={selection.handleToggleSelectionMode}
         onSelectAll={selection.handleSelectAll}
         onClearSelection={selection.handleClearSelection}
+        selectAbnormal={{
+          count: selection.abnormalCount,
+          onSelect: selection.handleSelectAbnormal,
+        }}
         onUpdateDates={selection.handleUpdateDates}
         onPreviewDateImpact={selection.handlePreviewDateImpact}
         isUpdatingDates={selection.isUpdatingDates}

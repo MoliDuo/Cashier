@@ -48,8 +48,14 @@ import { previewSourceDocumentDateImpactAction } from "@/modules/workspace/serve
 import { commonCopy } from "@/copy/common";
 import { sourceDocumentActionCopy } from "@/copy/source-document";
 import { batchActionsCopy } from "@/copy/workspace";
+import type { SourceDocumentProcessingStatus } from "@/lib/source-document-values";
 
 type StreamPage = Awaited<ReturnType<typeof fetchStreamPage>>;
+
+const ABNORMAL_STATUSES: ReadonlySet<SourceDocumentProcessingStatus | null> = new Set([
+  "failed",
+  "cancelled",
+]);
 
 interface StreamRecoveryVariables {
   sourceDocumentId: string;
@@ -202,6 +208,17 @@ export function useLedgerEntriesTab({
 
   const allSourceDocumentIds = useMemo(
     () => streamGroups.flatMap((g) => g.items.map((i) => i.sourceDocument.id)),
+    [streamGroups]
+  );
+  // Loaded records whose processing failed or was cancelled: the ones a batch
+  // retry or delete is usually meant for.
+  const abnormalSourceDocumentIds = useMemo(
+    () =>
+      streamGroups.flatMap((g) =>
+        g.items
+          .filter((i) => ABNORMAL_STATUSES.has(i.sourceDocument.processingStatus))
+          .map((i) => i.sourceDocument.id)
+      ),
     [streamGroups]
   );
   const queryFingerprint = useMemo(
@@ -459,6 +476,10 @@ export function useLedgerEntriesTab({
       handleSetGroupSelection,
       handleSelectAll: () => {
         if (!isBatchPending) selectAll();
+      },
+      abnormalCount: abnormalSourceDocumentIds.length,
+      handleSelectAbnormal: () => {
+        if (!isBatchPending) retainSelection(abnormalSourceDocumentIds);
       },
       handleClearSelection: () => {
         if (!isBatchPending) clearSelection();

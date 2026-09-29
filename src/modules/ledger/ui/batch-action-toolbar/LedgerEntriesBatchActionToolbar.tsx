@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { CircleAlert } from "lucide-react";
+import { BatchActionButton } from "@/components/batch-action-button";
 import type { EntryCategory } from "@/modules/ledger/contracts";
 import { BatchCategoryDialog } from "./BatchCategoryDialog";
 import { BatchCurrencyDialog } from "./BatchCurrencyDialog";
@@ -17,6 +19,11 @@ export interface LedgerEntriesBatchActionToolbarProps {
   hasMoreData?: boolean;
   onSelectAll: () => void;
   onClearSelection: () => void;
+  /**
+   * Selects exactly the loaded rows whose processing failed or was cancelled,
+   * so retry or delete can take them all at once. Only 账目 offers it.
+   */
+  selectAbnormal?: { count: number; onSelect: () => void };
   categories?: EntryCategory[];
   preferredCurrencies?: string[];
   isChangingCategory?: boolean;
@@ -79,6 +86,7 @@ export function LedgerEntriesBatchActionToolbar({
   hasMoreData = false,
   onSelectAll,
   onClearSelection,
+  selectAbnormal,
   categories = [],
   preferredCurrencies = [],
   isChangingCategory: isChangingCategoryProp,
@@ -132,6 +140,7 @@ export function LedgerEntriesBatchActionToolbar({
   // A surface that supports none of the batch writes still gets the way to
   // select all, but no empty row of buttons.
   const hasActions =
+    selectAbnormal != null ||
     onChangeCategory != null ||
     onChangeCurrency != null ||
     onChangeDate != null ||
@@ -189,24 +198,40 @@ export function LedgerEntriesBatchActionToolbar({
       ? batchActionsCopy.batchLimit({ actions: limitedActions.join("、") })
       : null;
   const actions = (orientation: "row" | "stacked") => (
-    <LedgerEntriesActions
-      orientation={orientation}
-      disabled={actionsDisabled}
-      nonCategoryDisabled={selectedCount > 100}
-      isChangingCategory={isChangingCategory}
-      isChangingCurrency={isChangingCurrency}
-      isRetrying={isRetrying}
-      isDeleting={isDeleting}
-      isAssigningCategories={isAssigningCategories}
-      {...(onChangeCategory != null
-        ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
-        : {})}
-      {...(onChangeCurrency != null ? { onOpenCurrency: () => setCurrencyDialogOpen(true) } : {})}
-      {...(onChangeDate != null ? { onChangeDate } : {})}
-      {...(onRetry != null ? { onRetry } : {})}
-      {...(onSplit != null ? { onSplit } : {})}
-      {...(onDelete != null ? { onDelete } : {})}
-    />
+    <>
+      {selectAbnormal != null ? (
+        <BatchActionButton
+          orientation={orientation}
+          variant="outline"
+          icon={CircleAlert}
+          // Picking the rows is not an action on the selection, so it stays
+          // available with nothing selected.
+          disabled={isProcessing || selectAbnormal.count === 0}
+          shortLabel={batchActionsCopy.selectAbnormalShort}
+          onClick={selectAbnormal.onSelect}
+        >
+          {batchActionsCopy.selectAbnormal({ count: selectAbnormal.count })}
+        </BatchActionButton>
+      ) : null}
+      <LedgerEntriesActions
+        orientation={orientation}
+        disabled={actionsDisabled}
+        nonCategoryDisabled={selectedCount > 100}
+        isChangingCategory={isChangingCategory}
+        isChangingCurrency={isChangingCurrency}
+        isRetrying={isRetrying}
+        isDeleting={isDeleting}
+        isAssigningCategories={isAssigningCategories}
+        {...(onChangeCategory != null
+          ? { onOpenCategory: () => handleCategoryDialogOpenChange(true) }
+          : {})}
+        {...(onChangeCurrency != null ? { onOpenCurrency: () => setCurrencyDialogOpen(true) } : {})}
+        {...(onChangeDate != null ? { onChangeDate } : {})}
+        {...(onRetry != null ? { onRetry } : {})}
+        {...(onSplit != null ? { onSplit } : {})}
+        {...(onDelete != null ? { onDelete } : {})}
+      />
+    </>
   );
 
   return (

@@ -61,6 +61,8 @@ export const batchActionsCopy = {
   deleteDescriptionDocuments: (v: { count: string | number; scope: string | number }) =>
     `将删除 ${v.count} 张账单及其明细，无法撤销。${v.scope}`,
   selectAll: "全选",
+  selectAbnormal: (v: { count: string | number }) => `选中异常（${v.count}）`,
+  selectAbnormalShort: "选中异常",
   selectedOfTotal: (v: { selected: string | number; total: string | number }) =>
     `已选 ${v.selected} / ${v.total}`,
   selectedOfLoaded: (v: { selected: string | number; loaded: string | number }) =>

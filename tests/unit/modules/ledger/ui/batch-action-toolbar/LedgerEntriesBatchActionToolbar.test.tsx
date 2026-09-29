@@ -40,6 +40,21 @@ describe("LedgerEntriesBatchActionToolbar", () => {
     expect(props.onSelectAll).toHaveBeenCalledOnce();
   });
 
+  it("selects the abnormal records with nothing selected yet, and only when there are some", () => {
+    const onSelect = vi.fn();
+    const { rerender, props } = renderToolbar({ selectAbnormal: { count: 2, onSelect } });
+
+    const button = screen.getByRole("button", { name: /选中异常（2）/ });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(onSelect).toHaveBeenCalledOnce();
+
+    rerender(
+      <LedgerEntriesBatchActionToolbar {...props} selectAbnormal={{ count: 0, onSelect }} />
+    );
+    expect(screen.getByRole("button", { name: /选中异常（0）/ })).toBeDisabled();
+  });
+
   it("names what the control does and counts beside it", () => {
     renderToolbar({ selectedCount: 2, loadedCount: 5 });
 

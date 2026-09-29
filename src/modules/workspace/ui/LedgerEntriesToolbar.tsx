@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ListChecks } from "lucide-react";
+import { ArrowLeft, SquareCheckBig } from "lucide-react";
 import { useIsPhoneLayout } from "@/hooks/use-is-phone-layout";
 import { useHeaderSelection } from "../store";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ interface LedgerEntriesToolbarProps {
   selectedEntryIds?: string[];
   onToggleSelectionMode: () => void;
   onSelectAll: () => void;
+  /** Selects the loaded records whose processing failed or was cancelled. */
+  selectAbnormal?: { count: number; onSelect: () => void };
   onClearSelection: () => void;
   onUpdateDates?: (date: string, sourceDocumentIds: string[]) => Promise<void> | void;
   onPreviewDateImpact?: (
@@ -71,6 +73,7 @@ export function LedgerEntriesToolbar({
   selectedEntryIds = [],
   onToggleSelectionMode,
   onSelectAll,
+  selectAbnormal,
   onClearSelection,
   onUpdateDates,
   onPreviewDateImpact,
@@ -142,6 +145,7 @@ export function LedgerEntriesToolbar({
       hasMoreData={hasMoreData}
       onSelectAll={onSelectAll}
       onClearSelection={onClearSelection}
+      {...(selectAbnormal != null ? { selectAbnormal } : {})}
       {...(onUpdateDates != null ? { onChangeDate: handleOpenDateDialog } : {})}
       {...(onRetry != null ? { onRetry: () => void onRetry(), isRetrying } : {})}
       {...(onDelete != null ? { onDelete: () => setDeleteConfirmOpen(true), isDeleting } : {})}
@@ -185,7 +189,7 @@ export function LedgerEntriesToolbar({
           {isSelectionMode ? (
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
           ) : (
-            <ListChecks aria-hidden="true" className="h-4 w-4" />
+            <SquareCheckBig aria-hidden="true" className="h-4 w-4" />
           )}
         </Button>
 

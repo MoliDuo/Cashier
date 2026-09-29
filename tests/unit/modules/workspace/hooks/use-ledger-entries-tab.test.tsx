@@ -390,6 +390,26 @@ describe("useLedgerEntriesTab selection and batch commands", () => {
     unmount();
   });
 
+  it("selects exactly the loaded records whose processing failed or was cancelled", async () => {
+    mocks.fetchStreamPage.mockResolvedValue({
+      items: [
+        makeItem("doc-1", { processingStatus: "completed" }),
+        makeItem("doc-2", { processingStatus: "failed" }),
+        makeItem("doc-3", { processingStatus: "processing" }),
+        makeItem("doc-4", { processingStatus: "cancelled" }),
+        makeItem("doc-5", { processingStatus: null }),
+      ],
+      nextCursor: null,
+      generation: "1",
+    });
+    const { result } = renderTab();
+
+    await selectDocuments(result, ["doc-1"]);
+    expect(result.current.selection.abnormalCount).toBe(2);
+    act(() => result.current.selection.handleSelectAbnormal());
+    expect([...result.current.selection.selectedIds].sort()).toEqual(["doc-2", "doc-4"]);
+  });
+
   it("does not clear selection or show success when a batch date update fails", async () => {
     mocks.batchUpdate.mockRejectedValueOnce(new Error("not found"));
     const { result } = renderTab();
