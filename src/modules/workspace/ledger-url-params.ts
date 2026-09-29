@@ -72,16 +72,6 @@ export interface LedgerFilterParams {
 type SearchParamsLike = Pick<URLSearchParams, "get" | "toString">;
 type SearchParamsStringLike = Pick<URLSearchParams, "toString">;
 
-/** Every query key 流水 and 明细 read their filters from; the period has its own. */
-export const LEDGER_FILTER_KEYS = [
-  "categoryId",
-  "currency",
-  "minAmount",
-  "maxAmount",
-  "statuses",
-  "search",
-] as const;
-
 export interface LedgerUrlUpdate {
   categoryId?: string | null;
   currency?: string | null;

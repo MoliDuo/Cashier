@@ -46,7 +46,7 @@ describe("useLedgerHistorySync", () => {
 
   it("drops a custom period it cannot read", async () => {
     const replace = vi.spyOn(window.history, "replaceState");
-    renderSync("records", "period=custom&startDate=2026-02-01&categoryId=c1");
+    renderSync("records", "range=custom&from=2026-02-01&categoryId=c1");
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith(expect.anything(), "", "/records?categoryId=c1")
     );

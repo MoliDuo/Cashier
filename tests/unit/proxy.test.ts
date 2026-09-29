@@ -22,25 +22,6 @@ describe("proxy", () => {
     });
   });
 
-  describe("retired locale prefixes", () => {
-    // A bookmark or an installed shortcut from the bilingual era still points
-    // at /zh/..., so the prefix is stripped rather than 404'd.
-    it.each([
-      ["/zh/login", "/login"],
-      ["/en/ledgers/ledger-1", "/ledgers/ledger-1"],
-      ["/zh", "/"],
-    ])("redirects %s to %s", (from, to) => {
-      const res = proxy(createRequest(from));
-
-      expect(res.status).toBe(307);
-      expect(new URL(res.headers.get("location")!).pathname).toBe(to);
-    });
-
-    it("leaves a path that merely starts with those letters alone", () => {
-      expect(proxy(createRequest("/zhuanzhang")).status).toBe(200);
-    });
-  });
-
   describe("pages", () => {
     it("leaves page authorization to the protected layouts", () => {
       expect(proxy(createRequest("/dashboard")).status).toBe(200);

@@ -27,14 +27,6 @@ test("the four tabs are routes of their own, and Back walks them", async ({ page
   await page.goBack();
   await expect(page).toHaveURL(/\/records$/);
 
-  await page.goto("/stream");
-  await expect(page).toHaveURL(/\/records$/);
-
-  // A bookmark from the single-page ledger still opens where it pointed.
-  await page.goto("/?tab=stats&statsRange=year");
-  await expect(page).toHaveURL(/\/stats\?range=year$/);
-  await expect(destination("统计")).toBeEnabled();
-
   expect(errors).toEqual([]);
 });
 

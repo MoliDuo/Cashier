@@ -175,7 +175,7 @@ describe("RoutePrefetch", () => {
     await RoutePrefetch({
       tab: "entries",
       searchParams: Promise.resolve({
-        period: "lastMonth",
+        offset: "-1",
         categoryId: "c1",
         search: "tea",
       }),

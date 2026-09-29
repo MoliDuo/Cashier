@@ -24,10 +24,4 @@ describe("stats-url-params", () => {
     ).toBe("");
     expect(normalizeStatsSearchParams(new URLSearchParams("range=year&offset=-1"))).toBeNull();
   });
-
-  it("reads 统计's old links through the shared period", () => {
-    expect(normalizeStatsSearchParams(new URLSearchParams("period=lastMonth"))?.toString()).toBe(
-      "offset=-1"
-    );
-  });
 });

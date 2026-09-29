@@ -1,4 +1,4 @@
-import { DEFAULT_PERIOD, parsePeriod, type Period } from "@/modules/ledger/domain/period";
+import { parsePeriod, type Period } from "@/modules/ledger/domain/period";
 
 /**
  * The period every ledger route carries in its URL, under the same four names:
@@ -7,36 +7,9 @@ import { DEFAULT_PERIOD, parsePeriod, type Period } from "@/modules/ledger/domai
  */
 export const PERIOD_URL_KEYS = ["range", "offset", "from", "to"] as const;
 
-/** The names older links used: 流水 and 明细's presets and 统计's own. */
-const LEGACY_PERIOD_KEYS = ["period", "startDate", "endDate"] as const;
-
 type SearchParamsLike = Pick<URLSearchParams, "get">;
 
-function legacyPeriod(params: SearchParamsLike): Period | null {
-  const period = params.get("period");
-  if (period == null) return null;
-  switch (period) {
-    case "all":
-      return { range: "all" };
-    case "lastMonth":
-      return { range: "month", offset: -1 };
-    case "custom":
-      return parsePeriod({
-        range: "custom",
-        from: params.get("startDate"),
-        to: params.get("endDate"),
-      });
-    default:
-      // thisMonth, and the rolling windows the panel stopped offering.
-      return DEFAULT_PERIOD;
-  }
-}
-
 export function readPeriodParams(params: SearchParamsLike): Period {
-  if (params.get("range") == null) {
-    const legacy = legacyPeriod(params);
-    if (legacy != null) return legacy;
-  }
   return parsePeriod({
     range: params.get("range"),
     offset: params.get("offset"),
@@ -51,7 +24,7 @@ export function writePeriodParams(
   period: Period
 ): URLSearchParams {
   const params = new URLSearchParams(current.toString());
-  for (const key of [...PERIOD_URL_KEYS, ...LEGACY_PERIOD_KEYS]) params.delete(key);
+  for (const key of PERIOD_URL_KEYS) params.delete(key);
   if (period.range === "all") params.set("range", "all");
   else if (period.range === "custom") {
     params.set("range", "custom");
