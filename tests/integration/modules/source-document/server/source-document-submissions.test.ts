@@ -747,6 +747,34 @@ describe("the day a new record is filed under", () => {
     }
   });
 
+  it("stays the ledger's today after its processing succeeds", async () => {
+    const db = getTestDb();
+    const { ledgerId } = await createTestUserWithLedger(db);
+    await db.update(ledgers).set({ timeZone: "Asia/Shanghai" }).where(eq(ledgers.id, ledgerId));
+    // 07:00 in Shanghai is still the previous day in UTC.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-03-01T23:00:00.000Z") });
+    try {
+      const created = await submitSourceDocument({
+        ledgerId,
+        bookId: await testBookId(db, ledgerId),
+        input: { text: "Breakfast 12", storedFileIds: [], documentDate: null },
+      });
+
+      expect(
+        await activateAttempt({
+          lease: await claimAttemptForTest(created.attempt.id),
+          ledgerId,
+          sourceDocumentId: created.document.id,
+          attemptId: created.attempt.id,
+          entries: [entry],
+        })
+      ).toBe(true);
+      expect(await filedDay(created.document.id)).toBe("2026-03-02");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("is the day the submission asked for, even when processing fails", async () => {
     const db = getTestDb();
     const { ledgerId } = await createTestUserWithLedger(db);

@@ -153,12 +153,15 @@ export async function createProcessingAttemptInTransaction(
     }
   }
 
+  // A submission without a date asks for the record's own day: a new record's
+  // day in the ledger's zone, or the day an existing one already carries.
+  // Success writes this back, so it must never be null for a dated record.
   const attempt = await tx
     .insert(extractionAttempts)
     .values({
       ledgerId: input.ledgerId,
       sourceDocumentId,
-      requestedDate: input.input.documentDate,
+      requestedDate: input.input.documentDate ?? document.documentDate,
       referenceDate: input.input.dateReference ?? input.input.documentDate,
       status: "processing",
     })

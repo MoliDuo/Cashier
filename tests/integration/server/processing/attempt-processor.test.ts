@@ -150,15 +150,20 @@ describe("processAttempt", () => {
     expect(ensureRates).toHaveBeenCalledWith(["2026-09-01"]);
   });
 
-  it("asks for the creation day's rates when the document carries no date", async () => {
-    await process(
+  it("asks for the record's own day's rates when the submission carries no date", async () => {
+    const { attempt } = await process(
       modelReply({
         outcome: "success",
         entries: [{ item_name: "Croissant", amount: "10", currency: "EUR" }],
       }),
       null
     );
+    const document = await getTestDb().query.sourceDocuments.findFirst({
+      where: eq(sourceDocuments.id, attempt!.sourceDocumentId),
+    });
 
-    expect(ensureRates).toHaveBeenCalledWith(["2026-08-30"]);
+    expect(document?.documentDate).not.toBeNull();
+    expect(attempt?.requestedDate).toBe(document?.documentDate);
+    expect(ensureRates).toHaveBeenCalledWith([document?.documentDate]);
   });
 });
