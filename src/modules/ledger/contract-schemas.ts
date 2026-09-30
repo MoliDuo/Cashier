@@ -11,6 +11,11 @@ import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
 import { isValidTimeZone } from "@/lib/date-utils";
 import { MAX_SEARCH_LENGTH, normalizeSearchTerm } from "@/lib/search";
 import { compare, DECIMAL_STRING_PATTERN, normalize } from "@/lib/money/decimal";
+import {
+  CALENDAR_RANGES,
+  MAX_PERIOD_OFFSET,
+  MIN_PERIOD_OFFSET,
+} from "@/modules/ledger/domain/period";
 
 const uuidSchema = z.string().regex(UUID_REGEX, "Invalid UUID");
 const strictObjectSchema = <TShape extends z.ZodRawShape>(shape: TShape) =>
@@ -62,8 +67,14 @@ export const timeZoneSchema = z
 /** A period as the browser sends it; the server reads it in the ledger's zone. */
 export const periodInputSchema = z.discriminatedUnion("range", [
   z
-    .object({ range: z.enum(["week", "month", "year"]), offset: z.number().int().min(-521).max(0) })
-    .strict(),
+    .object({ range: z.enum(CALENDAR_RANGES), offset: z.number().int() })
+    .strict()
+    .refine(
+      (value) =>
+        value.offset >= MIN_PERIOD_OFFSET[value.range] &&
+        value.offset <= MAX_PERIOD_OFFSET[value.range],
+      { message: "Period out of reach", path: ["offset"] }
+    ),
   z.object({ range: z.literal("all") }).strict(),
   z
     .object({ range: z.literal("custom"), from: dateStringSchema, to: dateStringSchema })

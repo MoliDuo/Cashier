@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calendarRangeOf,
+  canStepPeriod,
   monthPeriod,
   parsePeriod,
   periodKey,
@@ -47,10 +48,27 @@ describe("calendar periods", () => {
     ).toEqual({ from: "2026-09-01", to: "2026-09-10" });
   });
 
-  it("steps only calendar periods, never past the current one", () => {
-    expect(stepPeriod({ range: "month", offset: 0 }, 1)).toEqual({ range: "month", offset: 0 });
+  it("steps only calendar periods, up to a year ahead", () => {
+    expect(stepPeriod({ range: "month", offset: 0 }, 1)).toEqual({ range: "month", offset: 1 });
+    expect(stepPeriod({ range: "month", offset: 12 }, 1)).toEqual({ range: "month", offset: 12 });
+    expect(stepPeriod({ range: "week", offset: 52 }, 1)).toEqual({ range: "week", offset: 52 });
+    expect(stepPeriod({ range: "year", offset: 1 }, 1)).toEqual({ range: "year", offset: 1 });
     expect(stepPeriod({ range: "month", offset: 0 }, -1)).toEqual({ range: "month", offset: -1 });
     expect(stepPeriod({ range: "all" }, -1)).toEqual({ range: "all" });
+  });
+
+  it("says whether a step would move the period", () => {
+    expect(canStepPeriod({ range: "month", offset: 0 }, 1)).toBe(true);
+    expect(canStepPeriod({ range: "month", offset: 12 }, 1)).toBe(false);
+    expect(canStepPeriod({ range: "month", offset: -119 }, -1)).toBe(false);
+    expect(canStepPeriod({ range: "all" }, 1)).toBe(false);
+  });
+
+  it("resolves a month ahead to its whole days", () => {
+    expect(resolvePeriod({ range: "month", offset: 1 }, "2026-09-30")).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-31",
+    });
   });
 
   it("names a month or year by its offset from today, within the reach of a step", () => {
@@ -58,10 +76,13 @@ describe("calendar periods", () => {
     expect(monthPeriod("2026-09-29", 2025, 12)).toEqual({ range: "month", offset: -9 });
     expect(monthPeriod("2026-09-29", 2016, 10)).toEqual({ range: "month", offset: -119 });
     expect(monthPeriod("2026-09-29", 2016, 9)).toBeNull();
-    expect(monthPeriod("2026-09-29", 2026, 10)).toBeNull();
+    expect(monthPeriod("2026-09-29", 2026, 10)).toEqual({ range: "month", offset: 1 });
+    expect(monthPeriod("2026-09-29", 2027, 9)).toEqual({ range: "month", offset: 12 });
+    expect(monthPeriod("2026-09-29", 2027, 10)).toBeNull();
     expect(yearPeriod("2026-09-29", 2017)).toEqual({ range: "year", offset: -9 });
     expect(yearPeriod("2026-09-29", 2016)).toBeNull();
-    expect(yearPeriod("2026-09-29", 2027)).toBeNull();
+    expect(yearPeriod("2026-09-29", 2027)).toEqual({ range: "year", offset: 1 });
+    expect(yearPeriod("2026-09-29", 2028)).toBeNull();
   });
 });
 
@@ -129,7 +150,7 @@ describe("parsePeriod", () => {
   it("defaults to this month and rejects what it cannot read", () => {
     expect(parsePeriod({})).toEqual({ range: "month", offset: 0 });
     expect(parsePeriod({ range: "fortnight" })).toEqual({ range: "month", offset: 0 });
-    expect(parsePeriod({ range: "month", offset: "2" })).toEqual({ range: "month", offset: 0 });
+    expect(parsePeriod({ range: "month", offset: "1.5" })).toEqual({ range: "month", offset: 0 });
     expect(parsePeriod({ range: "custom", from: "2026-09-10", to: "2026-09-01" })).toEqual({
       range: "month",
       offset: 0,
@@ -140,8 +161,10 @@ describe("parsePeriod", () => {
     });
   });
 
-  it("clamps an offset to ten years back", () => {
+  it("clamps an offset to ten years back and a year ahead", () => {
     expect(parsePeriod({ range: "year", offset: "-40" })).toEqual({ range: "year", offset: -9 });
+    expect(parsePeriod({ range: "month", offset: "2" })).toEqual({ range: "month", offset: 2 });
+    expect(parsePeriod({ range: "month", offset: "40" })).toEqual({ range: "month", offset: 12 });
   });
 
   it("keys equal periods equally", () => {

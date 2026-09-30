@@ -17,8 +17,8 @@ describe("PeriodPicker", () => {
       "aria-pressed",
       "true"
     );
-    // A month still to come has nothing to read.
-    expect(screen.getByRole("button", { name: "2026年10月" })).toBeDisabled();
+    // A month ahead holds the bills dated ahead.
+    expect(screen.getByRole("button", { name: "2026年10月" })).toBeEnabled();
 
     await userEvent.click(screen.getByRole("button", { name: "上一年" }));
     await userEvent.click(screen.getByRole("button", { name: "2025年12月" }));
@@ -30,8 +30,15 @@ describe("PeriodPicker", () => {
       <PeriodPicker period={{ range: "month", offset: 0 }} today={TODAY} onChange={vi.fn()} />
     );
 
-    expect(screen.getByRole("button", { name: "下一年" })).toBeDisabled();
+    const forward = screen.getByRole("button", { name: "下一年" });
+    await userEvent.click(forward);
+    expect(screen.getByText("2027年")).toBeInTheDocument();
+    expect(forward).toBeDisabled();
+    expect(screen.getByRole("button", { name: "2027年9月" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "2027年10月" })).toBeDisabled();
+
     const back = screen.getByRole("button", { name: "上一年" });
+    await userEvent.click(back);
     for (let step = 0; step < 10; step += 1) await userEvent.click(back);
     expect(screen.getByText("2016年")).toBeInTheDocument();
     expect(back).toBeDisabled();
@@ -53,6 +60,8 @@ describe("PeriodPicker", () => {
     await userEvent.click(screen.getByRole("button", { name: "年" }));
     expect(screen.getByRole("button", { name: "2017年" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "2016年" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2027年" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "2028年" })).not.toBeInTheDocument();
   });
 
   it("applies 全部 at once, and two named days from their own apply", async () => {

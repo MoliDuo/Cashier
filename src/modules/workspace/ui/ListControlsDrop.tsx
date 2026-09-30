@@ -1,6 +1,6 @@
 import { useEffect, type ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-import { MIN_PERIOD_OFFSET, stepPeriod, type Period } from "@/modules/ledger/domain/period";
+import { canStepPeriod, stepPeriod, type Period } from "@/modules/ledger/domain/period";
 import { useHeaderSummary, type HeaderSummary } from "@/modules/workspace/store";
 import { PeriodPicker } from "./PeriodPicker";
 
@@ -41,7 +41,7 @@ export function ListControlsDrop({
   const steps =
     period.range === "all" || period.range === "custom"
       ? null
-      : { back: period.offset > MIN_PERIOD_OFFSET[period.range], forward: period.offset < 0 };
+      : { back: canStepPeriod(period, -1), forward: canStepPeriod(period, 1) };
   const { open, close } = useHeaderSummary(
     summary == null
       ? null

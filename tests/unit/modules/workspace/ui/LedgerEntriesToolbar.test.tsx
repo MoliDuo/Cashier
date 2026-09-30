@@ -33,13 +33,25 @@ describe("LedgerEntriesToolbar", () => {
     expect(screen.getByText("¥123.45")).toBeInTheDocument();
   });
 
-  it("steps to the previous month and cannot step past this one", () => {
+  it("steps to either side of this month, up to a year ahead", () => {
     const onPeriodChange = vi.fn();
-    render(<LedgerEntriesToolbar {...defaultProps} onPeriodChange={onPeriodChange} />);
+    const { rerender } = render(
+      <LedgerEntriesToolbar {...defaultProps} onPeriodChange={onPeriodChange} />
+    );
 
-    expect(screen.getByRole("button", { name: "下一期" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "上一期" }));
     expect(onPeriodChange).toHaveBeenCalledWith({ range: "month", offset: -1 });
+    fireEvent.click(screen.getByRole("button", { name: "下一期" }));
+    expect(onPeriodChange).toHaveBeenCalledWith({ range: "month", offset: 1 });
+
+    rerender(
+      <LedgerEntriesToolbar
+        {...defaultProps}
+        period={{ range: "month", offset: 12 }}
+        onPeriodChange={onPeriodChange}
+      />
+    );
+    expect(screen.getByRole("button", { name: "下一期" })).toBeDisabled();
   });
 
   it("prints both days of a named range", () => {

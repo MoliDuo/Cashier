@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TOOLBAR_ICON_BUTTON_CLASS } from "@/components/toolbar-control";
 import { cn } from "@/lib/utils";
-import { stepPeriod, type Period } from "@/modules/ledger/domain/period";
+import { canStepPeriod, stepPeriod, type Period } from "@/modules/ledger/domain/period";
 import { formatPeriodLabel } from "../period-label";
 import { PeriodPicker } from "./PeriodPicker";
 import { periodBarCopy } from "@/copy/controls";
@@ -37,7 +37,7 @@ export function PeriodBar({
 }: PeriodBarProps) {
   const [open, setOpen] = useState(false);
   const steps = period.range !== "all" && period.range !== "custom";
-  const canGoNext = steps && period.offset < 0;
+  const canGoNext = canStepPeriod(period, 1);
   const label = formatPeriodLabel(period, today);
 
   return (

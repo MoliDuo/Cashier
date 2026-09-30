@@ -206,13 +206,14 @@ describe("session ledger query transport", () => {
     });
 
     /** A ledger in Shanghai with one record on each side of the month boundary. */
-    async function seedAcrossMonths() {
+    async function seedAcrossMonths(ahead: ReadonlyArray<readonly [string, string]> = []) {
       const db = getTestDb();
       await db.insert(ledgers).values(createLedgerData({ timeZone: "Asia/Shanghai" }));
       await ensureTestLedgerBooks(db);
       for (const [title, date] of [
         ["September", "2026-09-30"],
         ["October", "2026-10-01"],
+        ...ahead,
       ] as const) {
         const [document] = await db
           .insert(sourceDocuments)
@@ -265,10 +266,24 @@ describe("session ledger query transport", () => {
       expect(all.summary.total).toBe("20");
     });
 
+    it("reads a month ahead for bills dated ahead, and leaves 全部 at today", async () => {
+      await seedAcrossMonths([["November", "2026-11-15"]]);
+
+      const next = await (
+        await POST(request("stream", [{ period: { range: "month", offset: 1 } }]))
+      ).json();
+      expect(next.items.map((item: { title: string }) => item.title)).toEqual(["November"]);
+
+      const all = await (await POST(request("stats", [{ period: { range: "all" } }]))).json();
+      expect(all.range.to).toBe("2026-10-01");
+      expect(all.summary.total).toBe("20");
+    });
+
     it("refuses a period it cannot read", async () => {
       await seedAcrossMonths();
       for (const period of [
-        { range: "month", offset: 1 },
+        { range: "month", offset: 13 },
+        { range: "month", offset: -120 },
         { range: "custom", from: "2026-09-10", to: "2026-09-01" },
         { range: "decade" },
       ]) {

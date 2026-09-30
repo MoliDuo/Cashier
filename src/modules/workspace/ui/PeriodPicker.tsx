@@ -8,6 +8,8 @@ import { formatDateTimeForApi } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import {
   CALENDAR_RANGES,
+  MAX_PERIOD_OFFSET,
+  MIN_PERIOD_OFFSET,
   monthPeriod,
   periodKey,
   resolvePeriod,
@@ -22,8 +24,11 @@ const RANGE_CHOICES: readonly PeriodRange[] = [...CALENDAR_RANGES, "all", "custo
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 /** The weeks listed by name; the arrows beside the period reach further back. */
 const LISTED_WEEKS = 6;
-/** The years a year period reaches, `MIN_PERIOD_OFFSET.year` back to this one. */
-const LISTED_YEARS = 10;
+/** The years a year period reaches, as offsets from this one. */
+const LISTED_YEAR_OFFSETS = Array.from(
+  { length: MAX_PERIOD_OFFSET.year - MIN_PERIOD_OFFSET.year + 1 },
+  (_, index) => MIN_PERIOD_OFFSET.year + index
+);
 
 interface PeriodPickerProps {
   period: Period;
@@ -129,7 +134,7 @@ export function PeriodPicker({ period, today, onChange, timeZone, className }: P
               type="button"
               variant="ghost"
               size="icon"
-              disabled={shownYear >= thisYear}
+              disabled={monthPeriod(today, shownYear + 1, 1) == null}
               onClick={() => setShownYear((year) => year + 1)}
               aria-label={periodBarCopy.nextYear}
               title={periodBarCopy.nextYear}
@@ -149,8 +154,8 @@ export function PeriodPicker({ period, today, onChange, timeZone, className }: P
         </div>
       ) : view === "year" ? (
         <div className="grid grid-cols-5 gap-1">
-          {Array.from({ length: LISTED_YEARS }, (_, index) => {
-            const year = thisYear - LISTED_YEARS + 1 + index;
+          {LISTED_YEAR_OFFSETS.map((offset) => {
+            const year = thisYear + offset;
             return cell(yearPeriod(today, year), periodBarCopy.yearName({ year }));
           })}
         </div>

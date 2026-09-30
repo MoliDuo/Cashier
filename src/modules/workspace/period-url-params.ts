@@ -2,8 +2,8 @@ import { parsePeriod, type Period } from "@/modules/ledger/domain/period";
 
 /**
  * The period every ledger route carries in its URL, under the same four names:
- * `range` (week, month, year, all or custom; month is omitted), `offset` (zero
- * or negative; zero is omitted), and `from` / `to` for a custom range.
+ * `range` (week, month, year, all or custom; month is omitted), `offset` (steps
+ * from the current period; zero is omitted), and `from` / `to` for a custom range.
  */
 export const PERIOD_URL_KEYS = ["range", "offset", "from", "to"] as const;
 

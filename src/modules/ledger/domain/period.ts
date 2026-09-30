@@ -1,6 +1,6 @@
 /**
  * The one period model every ledger view reads by: a calendar week, month or
- * year counted back from the current one, everything, or two named days.
+ * year counted from the current one, everything, or two named days.
  *
  * It is plain civil-date arithmetic on "YYYY-MM-DD" strings, done in UTC so no
  * runtime zone can shift a day. "Today" is always passed in — the server takes
@@ -35,6 +35,13 @@ export const MIN_PERIOD_OFFSET: Readonly<Record<CalendarRange, number>> = {
   week: -521,
   month: -119,
   year: -9,
+};
+
+/** How far ahead a calendar period can be stepped, for bills dated ahead: a year. */
+export const MAX_PERIOD_OFFSET: Readonly<Record<CalendarRange, number>> = {
+  week: 52,
+  month: 12,
+  year: 1,
 };
 
 /** The longest span one read may cover. */
@@ -113,20 +120,29 @@ export function resolvePeriod(period: Period, today: string): CivilRange | null 
   }
 }
 
+function clampOffset(range: CalendarRange, offset: number): number {
+  return Math.min(MAX_PERIOD_OFFSET[range], Math.max(MIN_PERIOD_OFFSET[range], offset));
+}
+
 /** A period one step earlier or later; only calendar periods can step. */
 export function stepPeriod(period: Period, step: number): Period {
   if (period.range === "all" || period.range === "custom") return period;
-  const offset = Math.min(0, Math.max(MIN_PERIOD_OFFSET[period.range], period.offset + step));
-  return { range: period.range, offset };
+  return { range: period.range, offset: clampOffset(period.range, period.offset + step) };
+}
+
+/** Whether `stepPeriod` would move the period, so a control can say it cannot. */
+export function canStepPeriod(period: Period, step: number): boolean {
+  if (period.range === "all" || period.range === "custom") return false;
+  return clampOffset(period.range, period.offset + step) !== period.offset;
 }
 
 function calendarOffset(range: CalendarRange, offset: number): Period | null {
-  return offset > 0 || offset < MIN_PERIOD_OFFSET[range] ? null : { range, offset };
+  return clampOffset(range, offset) === offset ? { range, offset } : null;
 }
 
 /**
- * The month period for `month` (1–12) of `year`, or null when it is after the
- * current month or further back than a period steps.
+ * The month period for `month` (1–12) of `year`, or null when it is further
+ * ahead or further back than a period steps.
  */
 export function monthPeriod(today: string, year: number, month: number): Period | null {
   const now = toUtc(today);
@@ -238,9 +254,10 @@ export function parsePeriod(fields: {
   if (!(CALENDAR_RANGES as readonly string[]).includes(range)) return DEFAULT_PERIOD;
   const calendar = range as CalendarRange;
   const offset = Number(fields.offset ?? 0);
-  return Number.isInteger(offset) && offset <= 0
-    ? { range: calendar, offset: Math.max(MIN_PERIOD_OFFSET[calendar], offset) }
-    : { range: calendar, offset: 0 };
+  return {
+    range: calendar,
+    offset: Number.isInteger(offset) ? clampOffset(calendar, offset) : 0,
+  };
 }
 
 /** A stable string for a period, for query keys and comparisons. */

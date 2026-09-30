@@ -347,8 +347,10 @@ describe("LedgerShell", () => {
       [{ range: "month", offset: 0 }],
     ]);
 
-    // The current period is as far forward as a period goes.
+    // A year ahead is as far forward as a period goes.
     rerender(renderWith({ range: "month", offset: 0 }));
+    expect(topBar.getByRole("button", { name: "下一期" })).toBeEnabled();
+    rerender(renderWith({ range: "month", offset: 12 }));
     expect(topBar.getByRole("button", { name: "下一期" })).toBeDisabled();
     expect(topBar.getByRole("button", { name: "上一期" })).toBeEnabled();
 

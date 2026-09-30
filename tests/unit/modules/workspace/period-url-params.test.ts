@@ -16,6 +16,7 @@ describe("period-url-params", () => {
     for (const period of [
       { range: "week", offset: -2 },
       { range: "year", offset: -1 },
+      { range: "month", offset: 3 },
       { range: "all" },
       { range: "custom", from: "2026-09-01", to: "2026-09-10" },
     ] as const) {
