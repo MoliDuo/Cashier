@@ -221,7 +221,6 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 - 网页图片用短时签名 PUT URL 直传到私有 S3 兼容存储。规划阶段为每张图登记一行 pending 的 `stored_files`，
   不设额度：只有两个人在用，没有确认的文件由每日 cron 清掉。签名 URL 指向 `temporary/{storedFileId}`，持久 key 是 `stored/{storedFileId}`。
-  更早的文件在 `{旧账本 id}/stored/{storedFileId}` 下，按 `stored_files.storage_key` 读取，不受影响。
 - 15 分钟内的最终化会核对每个临时对象的 MIME、大小和 SHA-256，用 sharp 归一化（同时剥离 EXIF），写入持久
   key 并标记 ready；重复最终化原样返回。只有 ready 的文件能挂到提取尝试上。
 - API v1 的内联图片不经过 `temporary/`：服务端归一化后同样预留 pending 行，写入持久对象，再标记 ready。
@@ -241,7 +240,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 5. 超过 1 天的 pending 文件；
 6. 7 天没有被任何票据使用的 ready 文件（先删行，再删对象）；
 7. `temporary/` 下超过 1 天的对象；
-8. 超过 1 天、没有任何行指向的孤儿对象。
+8. `stored/` 下超过 1 天、没有任何行指向的孤儿对象。
 
 ## 7. 前端
 
@@ -454,8 +453,8 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   `ledger_sync_state` 改为单行；之后把旧前缀下的图片搬到 `stored/`。
   顺带让 `document_date` 必填：此前缺日期时由生成列 `effective_date` 退回 UTC 创建日，迁移 0019、0022、
   0023 三次回填后这条兜底已无行可用，0024 设为 NOT NULL，读取全部改读 `document_date`，
-  迁移 0025 删掉 `effective_date`。旧前缀下的图片由 `npm run storage:relocate` 搬到 `stored/<id>`
-  （默认只列出，`--apply` 才搬），线上搬完后孤儿扫描收窄到 `stored/`。
+  迁移 0025 删掉 `effective_date`。旧前缀下的 1321 张图片用一次性脚本搬到了 `stored/<id>`，
+  孤儿扫描随后只看 `stored/`。
 
 ### 不做
 

@@ -236,20 +236,19 @@ npm run check
 它依次检查格式、架构（dependency-cruiser）与死代码（knip）、lint、类型，跑带覆盖率的全部测试，
 再用隔离的占位配置做一次生产构建并检查受保护路由的包体积。集成测试需要 Docker。
 
-| 命令                       | 用途                                                         |
-| -------------------------- | ------------------------------------------------------------ |
-| `npm run dev`              | 启动开发服务器                                               |
-| `npm run dev:demo`         | 启动独立的 demo 工作区                                       |
-| `npm run docker:local`     | 启动本地 PostgreSQL 和 MinIO                                 |
-| `npm run docker:down`      | 停止本地基础服务，保留具名卷                                 |
-| `npm run db:migrate`       | 对当前 `DATABASE_URL` 应用迁移                               |
-| `npm run account:create`   | 创建唯一的账号、账本、分账和默认分类                         |
-| `npm run account:enroll`   | 打印添加通行密钥的一次性链接（可找回）                       |
-| `npm run storage:relocate` | 把旧前缀下的图片搬到 `stored/`（默认只列出，`--apply` 才搬） |
-| `npm test`                 | 单元测试                                                     |
-| `npm run test:all`         | 单元测试和集成测试                                           |
-| `npm run test:smoke`       | Playwright 浏览器 smoke 测试                                 |
-| `npm run check`            | 提交前的完整门禁                                             |
+| 命令                     | 用途                                   |
+| ------------------------ | -------------------------------------- |
+| `npm run dev`            | 启动开发服务器                         |
+| `npm run dev:demo`       | 启动独立的 demo 工作区                 |
+| `npm run docker:local`   | 启动本地 PostgreSQL 和 MinIO           |
+| `npm run docker:down`    | 停止本地基础服务，保留具名卷           |
+| `npm run db:migrate`     | 对当前 `DATABASE_URL` 应用迁移         |
+| `npm run account:create` | 创建唯一的账号、账本、分账和默认分类   |
+| `npm run account:enroll` | 打印添加通行密钥的一次性链接（可找回） |
+| `npm test`               | 单元测试                               |
+| `npm run test:all`       | 单元测试和集成测试                     |
+| `npm run test:smoke`     | Playwright 浏览器 smoke 测试           |
+| `npm run check`          | 提交前的完整门禁                       |
 
 ## License
 

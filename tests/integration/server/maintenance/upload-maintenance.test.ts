@@ -19,8 +19,8 @@ async function seed() {
   const storage = new MemoryObjectStore();
   objectStore.current = storage;
   const now = Date.now();
-  // Files stored before the ledger id was retired sit under `<ledger id>/stored/`.
-  const legacyPrefix = crypto.randomUUID();
+  // An object outside `stored/` and `temporary/` is never the sweep's to delete.
+  const foreignPrefix = crypto.randomUUID();
   const file = (name: string, createdAt: number, finalized: boolean) => ({
     id: crypto.randomUUID(),
     storageKey: `stored/${name}`,
@@ -34,12 +34,7 @@ async function seed() {
   const oldReady = file("old-ready", now - 3 * DAY_MS, true);
   const unused = file("unused", now - 7 * DAY_MS - 60_000, true);
   const used = file("used", now - 30 * DAY_MS, true);
-  // Older rows carry keys of other shapes; the row, not the shape, keeps the object.
-  const legacy = {
-    ...file("legacy", now - 3 * DAY_MS, true),
-    storageKey: `${legacyPrefix}/stored/a/b.jpg`,
-  };
-  const rows = [stalePending, freshPending, oldReady, unused, used, legacy];
+  const rows = [stalePending, freshPending, oldReady, unused, used];
   await db.insert(storedFiles).values(rows);
   const objectAt = async (key: string, modifiedAt: number) => {
     await storage.upload(key, Buffer.from(key));
@@ -51,29 +46,27 @@ async function seed() {
     input: { text: null, storedFileIds: [used.id], documentDate: null },
   });
   await objectAt("stored/orphan", now - DAY_MS - 60_000);
-  await objectAt(`${legacyPrefix}/stored/orphan`, now - DAY_MS - 60_000);
+  await objectAt(`${foreignPrefix}/stored/orphan`, now - DAY_MS - 60_000);
   await objectAt("stored/young-orphan", now - DAY_MS + 60_000);
-  await objectAt(`${legacyPrefix}/stored/young-orphan`, now - DAY_MS + 60_000);
   await objectAt(`temporary/${stalePending.id}`, now - DAY_MS - 60_000);
   await objectAt("temporary/abandoned", now - DAY_MS - 60_000);
   await objectAt("temporary/session/target", now - 2 * DAY_MS);
   await objectAt("temporary/in-flight", now - DAY_MS + 60_000);
   return {
     db,
-    legacyPrefix,
+    foreignPrefix,
     storage,
     objectAt,
     stalePending,
     freshPending,
     oldReady,
     used,
-    legacy,
   };
 }
 
 describe("daily upload maintenance", () => {
   it("deletes stale pending files, unused files, and old objects nothing names", async () => {
-    const { db, legacyPrefix, storage, freshPending, oldReady, used, legacy } = await seed();
+    const { db, foreignPrefix, storage, freshPending, oldReady, used } = await seed();
 
     await expect(runDailyMaintenance()).resolves.toMatchObject({
       pending_files: "done",
@@ -82,7 +75,7 @@ describe("daily upload maintenance", () => {
       orphan_objects: "done",
     });
 
-    const kept = [freshPending, oldReady, used, legacy];
+    const kept = [freshPending, oldReady, used];
     expect((await db.select().from(storedFiles)).map((row) => row.id).sort()).toEqual(
       kept.map((row) => row.id).sort()
     );
@@ -90,14 +83,14 @@ describe("daily upload maintenance", () => {
       [
         ...kept.map((row) => row.storageKey),
         "stored/young-orphan",
-        `${legacyPrefix}/stored/young-orphan`,
+        `${foreignPrefix}/stored/orphan`,
         "temporary/in-flight",
       ].sort()
     );
   });
 
-  it("sweeps orphans under both key layouts and leaves temporary objects alone", async () => {
-    const { db, legacyPrefix, storage, objectAt, stalePending } = await seed();
+  it("sweeps orphans under stored/ alone and leaves temporary objects to their own sweep", async () => {
+    const { db, foreignPrefix, storage, objectAt, stalePending } = await seed();
     const stale = Date.now() - 2 * DAY_MS;
     await objectAt(`temporary/${crypto.randomUUID()}/stored/upload`, stale);
     const temporaryBefore = [...storage.files.keys()].filter(
@@ -117,14 +110,13 @@ describe("daily upload maintenance", () => {
 
     const keys = [...storage.files.keys()];
     expect(keys).not.toContain("stored/orphan");
-    expect(keys).not.toContain(`${legacyPrefix}/stored/orphan`);
     expect(keys).toEqual(
-      expect.arrayContaining(["stored/young-orphan", `${legacyPrefix}/stored/young-orphan`])
+      expect.arrayContaining(["stored/young-orphan", `${foreignPrefix}/stored/orphan`])
     );
     expect(keys.filter((key) => key.startsWith("temporary/")).sort()).toEqual(
       temporaryBefore.sort()
     );
-    expect(await db.select().from(storedFiles)).toHaveLength(4);
+    expect(await db.select().from(storedFiles)).toHaveLength(3);
   });
 
   it("starts no cleanup once the deadline has passed", async () => {
@@ -138,7 +130,7 @@ describe("daily upload maintenance", () => {
       orphan_objects: "skipped",
     });
 
-    expect(await db.select().from(storedFiles)).toHaveLength(6);
+    expect(await db.select().from(storedFiles)).toHaveLength(5);
     expect([...storage.files.keys()].sort()).toEqual(objectsBefore);
   });
 });

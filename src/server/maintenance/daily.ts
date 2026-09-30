@@ -219,8 +219,7 @@ async function deleteOrphanObjects(now: Date, deadlineAt: number): Promise<void>
     const candidates = page.objects
       .filter(
         (object) =>
-          (object.key.startsWith("stored/") || object.key.includes("/stored/")) &&
-          !object.key.startsWith("temporary/") &&
+          object.key.startsWith("stored/") &&
           object.lastModified != null &&
           object.lastModified.getTime() < dayAgo
       )

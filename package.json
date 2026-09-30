@@ -39,7 +39,6 @@
     "db:studio": "drizzle-kit studio",
     "account:create": "tsx --conditions=react-server scripts/account.ts create",
     "account:enroll": "tsx --conditions=react-server scripts/account.ts enroll",
-    "storage:relocate": "tsx --conditions=react-server scripts/relocate-stored-files.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check --cache ."
   },

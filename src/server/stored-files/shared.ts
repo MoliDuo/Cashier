@@ -55,11 +55,7 @@ export function temporaryKey(storedFileId: string): string {
   return `temporary/${storedFileId}`;
 }
 
-/**
- * Where a ready file's bytes live. Files stored before the ledger id was
- * retired sit under `<ledger id>/stored/`; every read goes through the row's
- * `storage_key`, so both layouts resolve.
- */
+/** Where a ready file's bytes live. */
 export function durableKey(storedFileId: string): string {
   return `stored/${storedFileId}`;
 }
