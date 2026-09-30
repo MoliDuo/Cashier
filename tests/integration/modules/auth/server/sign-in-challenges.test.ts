@@ -98,7 +98,7 @@ describe("OTP Repository", () => {
       const tokens = await db.select().from(signInChallenges);
       const token = requireDefined(tokens[0], "Expected stored OTP token");
       expect(token.codeHash).not.toBe(otp);
-      // Verify the stored hash can be verified with the OTP (supports both new and legacy formats)
+      // The stored hash still verifies against the code it was made from.
       expect(verifyOTP(otp, token.codeHash)).toBe(true);
     });
   });

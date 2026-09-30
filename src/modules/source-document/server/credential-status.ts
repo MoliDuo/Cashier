@@ -90,9 +90,8 @@ export async function getCredentialSourceDocumentStatus(
       })),
     };
   }
-  // An unparsable document reports the stable VALIDATION_FAILED code — this
-  // replaces the four legacy invalid codes — plus the natural-language reason
-  // the ledger owner reads, which may be absent.
+  // An unparsable document reports the stable VALIDATION_FAILED code plus the
+  // natural-language reason the ledger owner reads, which may be absent.
   const error =
     status === "failed"
       ? { code: toStableFailureCode(attempt?.failureCode ?? null) }
