@@ -1,6 +1,6 @@
 {
-  "id": "985d582d-6684-4324-8e32-e6c9f79b5547",
-  "prevId": "2ad34401-af4f-4733-8eec-a1f4a978dafc",
+  "id": "dab2810c-c5d2-4dcd-a172-b816744cdce2",
+  "prevId": "985d582d-6684-4324-8e32-e6c9f79b5547",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1356,16 +1356,6 @@
           "type": "date",
           "primaryKey": false,
           "notNull": true
-        },
-        "effective_date": {
-          "name": "effective_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true,
-          "generated": {
-            "as": "COALESCE(\"document_date\", (\"created_at\" AT TIME ZONE 'UTC')::date)",
-            "type": "stored"
-          }
         },
         "latest_attempt_id": {
           "name": "latest_attempt_id",

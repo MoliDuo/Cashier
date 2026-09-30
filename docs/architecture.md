@@ -454,7 +454,8 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   `ledger_sync_state` 改为单行；之后把旧前缀下的图片搬到 `stored/`。
   顺带让 `document_date` 必填：此前缺日期时由生成列 `effective_date` 退回 UTC 创建日，迁移 0019、0022、
   0023 三次回填后这条兜底已无行可用，0024 设为 NOT NULL，读取全部改读 `document_date`，
-  `effective_date` 留到下一次发布删除。
+  迁移 0025 删掉 `effective_date`。旧前缀下的图片由 `npm run storage:relocate` 搬到 `stored/<id>`
+  （默认只列出，`--apply` 才搬），线上搬完后孤儿扫描收窄到 `stored/`。
 
 ### 不做
 

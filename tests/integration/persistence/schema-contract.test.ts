@@ -310,6 +310,10 @@ describe("PostgreSQL schema contract", () => {
       },
       { table: "source_documents", column: "document_date", nullable: "NO", type: "date" },
     ]);
+    const documentColumns = (await fetchColumns("source_documents")).map(
+      (column) => column.columnName
+    );
+    expect(documentColumns).not.toContain("effective_date");
   });
 
   it("keeps no passwords, auth versions or setup state", async () => {

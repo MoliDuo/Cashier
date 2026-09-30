@@ -176,6 +176,13 @@
       "when": 1790701107367,
       "tag": "0024_drop_ledger_id",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790733805825,
+      "tag": "0025_drop_effective_date",
+      "breakpoints": true
     }
   ]
 }
