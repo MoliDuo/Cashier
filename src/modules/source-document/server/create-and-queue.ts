@@ -26,6 +26,8 @@ export interface CreateAndQueueSourceDocumentInput {
   idempotency?: SourceDocumentIdempotencyInput;
   /** Correlates the processing `after()` with the request that queued it. */
   requestId?: string;
+  /** The browser's id for this submit, carried to the processing telemetry event. */
+  correlationId?: string;
 }
 
 function resolveDocumentDate(documentDate: string | undefined, timeZone: string): string {
@@ -83,7 +85,12 @@ export async function createAndQueueSourceDocument(
       }
       pending = result.submission;
     }
-    scheduleProcessingAfter(pending.job, input.requestId);
+    scheduleProcessingAfter(
+      input.correlationId == null
+        ? pending.job
+        : { ...pending.job, correlationId: input.correlationId },
+      input.requestId
+    );
     return {
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,

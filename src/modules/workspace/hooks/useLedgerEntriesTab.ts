@@ -15,7 +15,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { useSelection } from "@/hooks/use-selection";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
@@ -277,6 +277,7 @@ export function useLedgerEntriesTab({
     BatchUpdateSourceDocumentsResultDto,
     { ids: string[]; entryDate: string }
   >({
+    name: "list.batch_update_dates",
     waitFor: false,
     mutationFn: ({ ids, entryDate }) =>
       batchUpdateSourceDocumentsAction({
@@ -294,6 +295,7 @@ export function useLedgerEntriesTab({
     PartialBatchCommandResult,
     { ids: string[]; onCommitted: () => void }
   >({
+    name: "list.batch_delete",
     waitFor: false,
     mutationFn: ({ ids }) => batchDeleteSourceDocumentsAction(ids),
     onSuccess: (result, { onCommitted }) => {
@@ -304,6 +306,7 @@ export function useLedgerEntriesTab({
   });
 
   const batchRetry = useLedgerMutation<PartialBatchCommandResult, string[]>({
+    name: "list.batch_retry",
     waitFor: false,
     mutationFn: (ids) => batchRetrySourceDocumentsAction(ids),
     onSuccess: (result) =>
@@ -335,11 +338,13 @@ export function useLedgerEntriesTab({
   const [cancellingIds, setCancellingIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const retryMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
+    name: "list.retry",
     mutationFn: ({ sourceDocumentId }) => retrySourceDocumentAction(sourceDocumentId),
     successMessage: sourceDocumentActionCopy.retrySuccess,
     errorMessage: sourceDocumentActionCopy.retryError,
   });
   const cancelMutation = useLedgerMutation<unknown, StreamRecoveryVariables>({
+    name: "list.cancel_processing",
     mutationFn: ({ sourceDocumentId }) => cancelSourceDocumentProcessingAction(sourceDocumentId),
     successMessage: sourceDocumentActionCopy.cancelSuccess,
     errorMessage: sourceDocumentActionCopy.cancelError,
@@ -408,6 +413,7 @@ export function useLedgerEntriesTab({
   );
 
   const deleteSourceDocument = useLedgerMutation<void, string>({
+    name: "list.delete_record",
     waitFor: false,
     mutationFn: async (id) => {
       await deleteSourceDocumentAction(id);

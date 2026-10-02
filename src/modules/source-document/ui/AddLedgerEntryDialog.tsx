@@ -83,7 +83,11 @@ export function AddLedgerEntryDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}>
+    <Dialog
+      name="entry.add"
+      open={open}
+      onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}
+    >
       <DialogContent
         variant="modal"
         className="sm:max-w-md"

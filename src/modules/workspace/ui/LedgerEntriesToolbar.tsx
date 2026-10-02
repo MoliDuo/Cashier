@@ -233,6 +233,7 @@ export function LedgerEntriesToolbar({
         />
         {onDelete != null && (
           <ConfirmDialog
+            name="list.batch_delete_confirm"
             open={deleteConfirmOpen}
             onOpenChange={setDeleteConfirmOpen}
             title={batchActionsCopy.deleteTitleDocuments}

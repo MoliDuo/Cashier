@@ -8,7 +8,16 @@ if (demoProject != null && !/^[a-z][a-z0-9-]{0,40}$/.test(demoProject)) {
 // Build remotePatterns from environment
 const remotePatterns: Array<{ protocol: "https" | "http"; hostname: string }> = [];
 
+// Telemetry reaches the browser through this build-time flag, so dev and test builds without
+// INSIGHT_URL and INSIGHT_KEY never start the SDK. Only presence is inlined, never the values.
+const insightEnabled =
+  (process.env.INSIGHT_URL ?? "").trim() !== "" && (process.env.INSIGHT_KEY ?? "").trim() !== "";
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_INSIGHT_ENABLED: insightEnabled ? "true" : "false",
+    NEXT_PUBLIC_GIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
+  },
   ...(demoProject == null ? {} : { distDir: `.next-${demoProject}` }),
   // instrumentation.ts is enabled by default in Next.js 16+
   // The dev tools badge is fixed to a viewport corner, where it covers the

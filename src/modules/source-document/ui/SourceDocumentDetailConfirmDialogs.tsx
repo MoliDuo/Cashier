@@ -32,6 +32,7 @@ export function SourceDocumentDetailConfirmDialogs({
   return (
     <>
       <ConfirmDialog
+        name="detail.batch_delete_confirm"
         open={showBatchDeleteConfirm}
         onOpenChange={setShowBatchDeleteConfirm}
         title={sourceDocumentDetailCopy.batchDeleteTitle}
@@ -42,6 +43,7 @@ export function SourceDocumentDetailConfirmDialogs({
       />
 
       <ConfirmDialog
+        name="detail.delete_entry_confirm"
         open={pendingDeleteEntryId != null}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPendingDeleteEntryId(null);
@@ -57,6 +59,7 @@ export function SourceDocumentDetailConfirmDialogs({
       />
 
       <ConfirmDialog
+        name="detail.delete_record_confirm"
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title={sourceDocumentDetailCopy.deleteDocument}

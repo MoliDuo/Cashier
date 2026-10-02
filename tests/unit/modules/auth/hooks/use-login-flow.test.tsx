@@ -11,6 +11,7 @@ const {
   pushMock,
   refreshMock,
   searchParams,
+  trackMock,
 } = vi.hoisted(() => ({
   sendOTPActionMock: vi.fn(),
   otpSignInMock: vi.fn(),
@@ -21,7 +22,10 @@ const {
   pushMock: vi.fn(),
   refreshMock: vi.fn(),
   searchParams: { value: "" },
+  trackMock: vi.fn(),
 }));
+
+vi.mock("@/lib/telemetry/client", () => ({ track: trackMock }));
 
 vi.mock("@/modules/auth/server-actions/sign-in", () => ({
   signInWithOtpAction: otpSignInMock,
@@ -296,5 +300,100 @@ describe("useLoginFlow passkey sign-in", () => {
 
     expect(result.current.error).toBe(authCopy.rateLimitedDesc);
     expect(startAuthenticationMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("useLoginFlow telemetry", () => {
+  const options = { challenge: "c", rpId: "localhost" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams.value = "";
+  });
+
+  const events = (name: string) =>
+    trackMock.mock.calls.filter(([event]) => event === name).map(([, props]) => props);
+
+  it("records a requested code and a refused one, without the email address", async () => {
+    sendOTPActionMock.mockResolvedValueOnce({
+      ok: true,
+      expiresIn: 300,
+      expiresAt: 1_800_000_000,
+      canResendAt: 1_799_999_760,
+    });
+    const { result } = renderHook(() => useLoginFlow());
+    await act(() => result.current.handleSendOTP(createEmailSubmitEvent("private@example.com")));
+
+    sendOTPActionMock.mockResolvedValueOnce({ ok: false, code: "rate_limited" });
+    await act(() => result.current.handleResendOTP());
+
+    expect(events("signin.code")).toEqual([
+      { resend: false, ok: true },
+      { resend: true, ok: false, errorKind: "rate_limited" },
+    ]);
+    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("private@example.com");
+  });
+
+  it("records a code sign-in by outcome, never the code", async () => {
+    sendOTPActionMock.mockResolvedValue({
+      ok: true,
+      expiresIn: 300,
+      expiresAt: 1_800_000_000,
+      canResendAt: 1_799_999_760,
+    });
+    const { result } = renderHook(() => useLoginFlow());
+    await act(() => result.current.handleSendOTP(createEmailSubmitEvent("user@example.com")));
+    act(() => result.current.setOtp("123456"));
+
+    otpSignInMock.mockResolvedValueOnce({ ok: false, code: "otp_invalid" });
+    await act(() => result.current.handleVerifyOTP());
+    otpSignInMock.mockResolvedValueOnce({ ok: true });
+    await act(() => result.current.handleVerifyOTP());
+
+    expect(events("signin.attempt")).toEqual([
+      { method: "otp", ok: false, errorKind: "otp_invalid" },
+      { method: "otp", ok: true },
+    ]);
+    expect(JSON.stringify(trackMock.mock.calls)).not.toContain("123456");
+  });
+
+  it("records passkey outcomes: success, an unknown passkey, a failed ceremony, but not a dismissal", async () => {
+    startPasskeyMock.mockResolvedValue({ ok: true, challengeId: "id", options });
+    // A finished sign-in leaves the hook loading, so each attempt gets a fresh one.
+    const attempt = async () => {
+      const { result } = renderHook(() => useLoginFlow());
+      await act(() => result.current.handlePasskeyLogin());
+    };
+
+    startAuthenticationMock.mockResolvedValueOnce({ id: "cred" });
+    finishPasskeyMock.mockResolvedValueOnce({ ok: true });
+    await attempt();
+
+    startAuthenticationMock.mockResolvedValueOnce({ id: "cred" });
+    finishPasskeyMock.mockResolvedValueOnce({ ok: false, code: "invalid_credentials" });
+    await attempt();
+
+    startAuthenticationMock.mockRejectedValueOnce(new Error("hardware fault"));
+    await attempt();
+
+    startAuthenticationMock.mockRejectedValueOnce(
+      Object.assign(new Error("cancelled"), { name: "NotAllowedError" })
+    );
+    await attempt();
+
+    expect(events("signin.attempt")).toEqual([
+      { method: "passkey", ok: true },
+      { method: "passkey", ok: false, errorKind: "invalid_credentials" },
+      { method: "passkey", ok: false, errorKind: "ceremony_failed" },
+    ]);
+  });
+
+  it("records the development sign-in", async () => {
+    devSignInMock.mockResolvedValue({ ok: true });
+    const { result } = renderHook(() => useLoginFlow({ isDevAuthAvailable: true }));
+
+    await act(() => result.current.handleDevSignIn());
+
+    expect(events("signin.attempt")).toEqual([{ method: "dev", ok: true }]);
   });
 });

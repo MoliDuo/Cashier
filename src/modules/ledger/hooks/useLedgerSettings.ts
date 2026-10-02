@@ -2,10 +2,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useSmartPolling } from "@/hooks/use-smart-polling";
 import { LEDGER } from "@/lib/constants";
 import { useLedgerMutation } from "@/lib/mutations/use-ledger-mutation";
+import { track } from "@/lib/telemetry/client";
 import { queryKeys } from "@/lib/query-keys";
 import { omitUndefinedProperties } from "@/lib/validation";
 import type { UpdateLedgerInput } from "@/modules/ledger/contract-schemas";
@@ -106,6 +107,7 @@ export function useLedgerSettings({
     }
   };
   const updateLedgerMutation = useLedgerMutation<Ledger, UpdateLedgerData>({
+    name: "settings.update",
     mutationFn: async (data) => {
       const result = await updateLedgerSettingsAction({
         settings: omitUndefinedProperties(data),
@@ -115,7 +117,12 @@ export function useLedgerSettings({
     },
     successMessage: settingsCopy.updateSuccess,
     errorMessage: null,
-    onSuccess: (savedLedger) => {
+    onSuccess: (savedLedger, data) => {
+      track("settings.change", {
+        area: "ledger",
+        action: "save",
+        fields: Object.keys(omitUndefinedProperties(data)),
+      });
       queryClient.setQueryData(queryKeys.ledger(), savedLedger);
     },
     onError: (error) => toast.error(error.message || settingsCopy.updateFailed),
@@ -145,6 +152,7 @@ export function useLedgerSettings({
     Awaited<ReturnType<typeof generateEntryCategoryMetadataAction>>,
     { categoryId: string; requestId: number }
   >({
+    name: "category.generate_metadata",
     mutationFn: ({ categoryId }) => generateEntryCategoryMetadataAction(categoryId),
     // Restart the category list's polling until every category has its metadata.
     onSuccess: () => setMetadataPollingSession((session) => session + 1),
@@ -175,10 +183,12 @@ export function useLedgerSettings({
   );
 
   const saveCategories = useLedgerMutation<EntryCategory[], SaveEntryCategoriesInput>({
+    name: "category.save",
     mutationFn: (input) => saveEntryCategoriesAction(input),
     successMessage: settingsCopy.categoriesSaved,
     errorMessage: settingsCopy.saveCategoriesFailed,
     onSuccess: (saved, input) => {
+      track("settings.change", { area: "categories", action: "save" });
       queryClient.setQueryData(queryKeys.entryCategories(), saved);
       for (const category of input.categories) {
         if (category.clientId != null) requestCategoryMetadata(category.clientId);
@@ -190,9 +200,11 @@ export function useLedgerSettings({
     CreatedServiceCredential,
     { name: string; bookId: string }
   >({
+    name: "credential.create",
     mutationFn: (input) => createServiceCredentialAction(input),
     successMessage: settingsCopy.credentialCreated,
     errorMessage: null,
+    onSuccess: () => track("settings.change", { area: "credential", action: "create" }),
     onError: (error) => {
       const code = (error as Error & { code?: unknown }).code;
       // Two different conflicts reach here: the 20-key cap and a book that is
@@ -205,15 +217,19 @@ export function useLedgerSettings({
   });
 
   const setCredentialBook = useLedgerMutation<ServiceCredential, { id: string; bookId: string }>({
+    name: "credential.set_book",
     mutationFn: (input) => updateServiceCredentialAction(input.id, { bookId: input.bookId }),
     successMessage: settingsCopy.credentialBookChanged,
     errorMessage: settingsCopy.credentialBookChangeFailed,
+    onSuccess: () => track("settings.change", { area: "credential", action: "update" }),
   });
 
   const deleteCredential = useLedgerMutation<void, string>({
+    name: "credential.delete",
     mutationFn: (id) => deleteServiceCredentialAction(id),
     successMessage: settingsCopy.credentialDeleted,
     errorMessage: settingsCopy.deleteFailed,
+    onSuccess: () => track("settings.change", { area: "credential", action: "delete" }),
   });
 
   return {
