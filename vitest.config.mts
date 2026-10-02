@@ -54,6 +54,7 @@ const unitDomTypeScriptTests = [
   "tests/unit/lib/navigation/ledger-detail-navigation.test.ts",
   "tests/unit/lib/navigation/ledger-new-record-navigation.test.ts",
   "tests/unit/lib/sign-out-cleanup.test.ts",
+  "tests/unit/lib/telemetry/client.test.ts",
   "tests/unit/lib/store/modal-stack.test.ts",
   "tests/unit/lib/utils.test.ts",
   "tests/unit/modules/currency/hooks/useConvertedAmount.test.ts",

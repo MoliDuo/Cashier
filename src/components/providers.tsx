@@ -2,6 +2,7 @@
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { TelemetryVitals } from "@/components/providers/telemetry-vitals";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QUERY } from "@/lib/constants";
 
@@ -40,6 +41,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         {children}
+        <TelemetryVitals />
         <Toaster position="top-center" richColors closeButton />
       </ThemeProvider>
     </QueryClientProvider>
