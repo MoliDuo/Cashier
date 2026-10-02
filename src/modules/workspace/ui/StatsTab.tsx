@@ -20,6 +20,8 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { PeriodBar } from "./PeriodBar";
 import { ListControlsDrop } from "./ListControlsDrop";
 import { formatPeriodLabel } from "../period-label";
+import { trackPeriodSwitch } from "../telemetry";
+import { track } from "@/lib/telemetry/client";
 import { statsTabCopy } from "@/copy/stats";
 
 const STATS_QUERY_DEBOUNCE_MS = 250;
@@ -71,11 +73,17 @@ export function StatsTab({
   const period = useMemo(() => readPeriodParams(searchParams), [searchParams]);
   const chartView = readStatsView(searchParams);
   const setPeriod = useCallback(
-    (next: Period) => pushLedgerUrl(pathname, writePeriodParams(searchParams, next), "stats"),
+    (next: Period) => {
+      trackPeriodSwitch("stats", next);
+      pushLedgerUrl(pathname, writePeriodParams(searchParams, next), "stats");
+    },
     [pathname, searchParams]
   );
   const setChartView = useCallback(
-    (view: StatsView) => pushLedgerUrl(pathname, writeStatsView(searchParams, view), "stats"),
+    (view: StatsView) => {
+      track("stats.view", { view });
+      pushLedgerUrl(pathname, writeStatsView(searchParams, view), "stats");
+    },
     [pathname, searchParams]
   );
 
@@ -173,8 +181,22 @@ export function StatsTab({
         chartView={chartView}
         onChartViewChange={setChartView}
         fallbackCurrency={ledger?.settings.mainCurrency ?? "CNY"}
-        {...(onCategoryDrilldown !== undefined ? { onCategoryDrilldown } : {})}
-        {...(onDateDrilldown !== undefined ? { onDateDrilldown } : {})}
+        {...(onCategoryDrilldown !== undefined
+          ? {
+              onCategoryDrilldown: (...args: Parameters<typeof onCategoryDrilldown>) => {
+                track("stats.drilldown", { kind: "category" });
+                onCategoryDrilldown(...args);
+              },
+            }
+          : {})}
+        {...(onDateDrilldown !== undefined
+          ? {
+              onDateDrilldown: (date: string) => {
+                track("stats.drilldown", { kind: "date" });
+                onDateDrilldown(date);
+              },
+            }
+          : {})}
       />
     </div>
   );

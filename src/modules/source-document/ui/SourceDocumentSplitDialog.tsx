@@ -49,7 +49,11 @@ export function SourceDocumentSplitDialog({
   const totalSelected = selectedCount ?? selectedEntries.length;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}>
+    <Dialog
+      name="record.split"
+      open={open}
+      onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}
+    >
       <DialogContent
         variant="modal"
         className="sm:max-w-md"

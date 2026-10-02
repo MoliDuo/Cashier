@@ -246,6 +246,7 @@ export function DetailsTab({
         </div>
 
         <ConfirmDialog
+          name="entries.delete_confirm"
           open={tab.deleteDialogOpen}
           onOpenChange={tab.setDeleteDialogOpen}
           title={detailsTabCopy.deleteSelectedTitle}

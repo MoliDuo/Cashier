@@ -49,6 +49,7 @@ export function PeriodBar({
           size="icon-sm"
           className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
           disabled={disabled}
+          data-track="period.prev"
           onClick={() => onChange(stepPeriod(period, -1))}
           aria-label={periodBarCopy.previous}
           title={periodBarCopy.previous}
@@ -60,6 +61,7 @@ export function PeriodBar({
         type="button"
         variant="ghost"
         disabled={disabled}
+        data-track="period.open"
         onClick={() => setOpen(true)}
         className="h-8 min-w-0 gap-1 px-2 tabular-nums"
         aria-label={`${periodBarCopy.label}：${label}`}
@@ -75,6 +77,7 @@ export function PeriodBar({
           size="icon-sm"
           className={cn("shrink-0", TOOLBAR_ICON_BUTTON_CLASS)}
           disabled={disabled || !canGoNext}
+          data-track="period.next"
           onClick={() => onChange(stepPeriod(period, 1))}
           aria-label={periodBarCopy.next}
           title={periodBarCopy.next}
@@ -112,7 +115,7 @@ function PeriodDialog({
   onChange: (period: Period) => void;
 }) {
   return (
-    <Dialog open onOpenChange={onOpenChange}>
+    <Dialog name="period.picker" open onOpenChange={onOpenChange}>
       <DialogContent variant="modal" className="sm:max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{periodBarCopy.choose}</DialogTitle>

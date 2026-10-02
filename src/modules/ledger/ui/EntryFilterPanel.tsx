@@ -61,6 +61,7 @@ export function EntryFilterPanel({
         "shrink-0",
         activeFilterCount > 0 && "border-primary/50 text-primary"
       )}
+      data-track="list.filter_open"
       onClick={() => handleOpenChange(true)}
       aria-label={
         activeFilterCount > 0
@@ -103,7 +104,7 @@ export function EntryFilterPanel({
           {entryFilterPanelCopy.clearFilters}
         </Button>
       ) : null}
-      <Dialog open={open} onOpenChange={handleOpenChange}>
+      <Dialog name="filter.panel" open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           variant="modal"
           // The header and the footer are fixed rows; the sections between them

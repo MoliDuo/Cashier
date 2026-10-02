@@ -76,6 +76,7 @@ export function LedgerTopBar({
             variant="ghost"
             size="icon"
             className="text-muted-foreground md:hidden"
+            data-track="topbar.select_toggle"
             onClick={headerSelection.onToggle}
             disabled={disabled || headerSelection.disabled}
             aria-label={selecting ? batchActionsCopy.cancelSelect : batchActionsCopy.select}
@@ -119,6 +120,7 @@ export function LedgerTopBar({
               size="icon"
               className={STEP_BUTTON_CLASS}
               disabled={disabled || !headerSummary.steps.back}
+              data-track="topbar.period_prev"
               onClick={() => headerSummary.onStep(-1)}
               aria-label={periodBarCopy.previous}
               title={periodBarCopy.previous}
@@ -166,6 +168,7 @@ export function LedgerTopBar({
               size="icon"
               className={STEP_BUTTON_CLASS}
               disabled={disabled || !headerSummary.steps.forward}
+              data-track="topbar.period_next"
               onClick={() => headerSummary.onStep(1)}
               aria-label={periodBarCopy.next}
               title={periodBarCopy.next}
@@ -186,6 +189,7 @@ export function LedgerTopBar({
           type="button"
           size="sm"
           className="hidden gap-1.5 md:inline-flex"
+          data-track="topbar.new_record"
           onClick={onOpenInput}
           onPointerEnter={onInputIntent}
           onFocus={onInputIntent}

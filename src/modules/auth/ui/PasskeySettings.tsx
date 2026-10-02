@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
 import { textRoleClassName } from "@/components/typography";

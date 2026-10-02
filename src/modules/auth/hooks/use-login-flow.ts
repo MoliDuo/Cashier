@@ -15,6 +15,7 @@ import {
   type SignInActionResult,
 } from "@/modules/auth/server-actions/sign-in";
 import { authCopy } from "@/copy/auth";
+import { track } from "@/lib/telemetry/client";
 
 type LoginStep = "email" | "otp";
 
@@ -99,7 +100,12 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     setOtpExpired(false);
   };
 
-  const finishSignIn = (result: SignInActionResult) => {
+  const finishSignIn = (result: SignInActionResult, method: "otp" | "passkey" | "dev") => {
+    track("signin.attempt", {
+      method,
+      ok: result.ok,
+      ...(result.ok ? {} : { errorKind: result.code }),
+    });
     if (result.ok) {
       router.push(callbackUrl);
       router.refresh();
@@ -120,6 +126,11 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     setError(null);
     try {
       const result = await sendOTPAction(submittedEmail);
+      track("signin.code", {
+        resend: false,
+        ok: result.ok,
+        ...(result.ok ? {} : { errorKind: result.code }),
+      });
       if (!result.ok) {
         setError(getSendOTPErrorMessage(result, "sendCodeFailed"));
         return;
@@ -146,7 +157,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await signInWithOtpAction(email, otp));
+      finishSignIn(await signInWithOtpAction(email, otp), "otp");
     } catch {
       setError(authCopy.unexpectedError);
       setIsLoading(false);
@@ -159,6 +170,11 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     setResendPending(true);
     try {
       const result = await sendOTPAction(email);
+      track("signin.code", {
+        resend: true,
+        ok: result.ok,
+        ...(result.ok ? {} : { errorKind: result.code }),
+      });
       if (!result.ok) {
         setError(getSendOTPErrorMessage(result, "resendFailed"));
         return;
@@ -189,14 +205,17 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     try {
       const start = await startPasskeySignInAction();
       if (!start.ok) {
-        finishSignIn(start);
+        finishSignIn(start, "passkey");
         return;
       }
       let response;
       try {
         response = await startAuthentication({ optionsJSON: start.options });
       } catch (error) {
-        if (!isCancelledCeremony(error)) setError(authCopy.passkeyFailed);
+        if (!isCancelledCeremony(error)) {
+          track("signin.attempt", { method: "passkey", ok: false, errorKind: "ceremony_failed" });
+          setError(authCopy.passkeyFailed);
+        }
         setIsLoading(false);
         return;
       }
@@ -204,11 +223,12 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
       // An unknown passkey and a bad signature both come back as invalid
       // credentials, which for a passkey is not about any email address.
       if (!result.ok && result.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS) {
+        track("signin.attempt", { method: "passkey", ok: false, errorKind: result.code });
         setError(authCopy.passkeyFailed);
         setIsLoading(false);
         return;
       }
-      finishSignIn(result);
+      finishSignIn(result, "passkey");
     } catch {
       setError(authCopy.unexpectedError);
       setIsLoading(false);
@@ -220,7 +240,7 @@ export function useLoginFlow({ isDevAuthAvailable = false }: LoginFlowOptions = 
     setIsLoading(true);
     setError(null);
     try {
-      finishSignIn(await devSignInAction());
+      finishSignIn(await devSignInAction(), "dev");
     } catch {
       setError(authCopy.devSignInFailed);
       setIsLoading(false);

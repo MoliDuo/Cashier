@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { EntryFilters } from "@/modules/ledger/filters";
 import type { CivilRange } from "@/modules/ledger/domain/period";
 import type { CreatedRecordResult } from "@/modules/source-document/contracts";

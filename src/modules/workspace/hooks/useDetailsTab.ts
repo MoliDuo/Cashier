@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CATEGORY_ASSIGNMENT_MAX_ENTRIES } from "@/config/tuning";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { useSelection } from "@/hooks/use-selection";
@@ -202,6 +202,7 @@ export function useDetailsTab({
     { ledgerEntryIds: string[]; affectedCount: number },
     { categoryId?: string | null; currency?: string | null }
   >({
+    name: "entries.batch_update",
     waitFor: false,
     mutationFn: (data) =>
       batchUpdateLedgerEntriesAction(sourceDocumentIdsFor(selectedIds), selectedIds, data),
@@ -217,6 +218,7 @@ export function useDetailsTab({
     Awaited<ReturnType<typeof batchDeleteLedgerEntriesAction>>,
     void
   >({
+    name: "entries.batch_delete",
     waitFor: false,
     mutationFn: () =>
       batchDeleteLedgerEntriesAction(sourceDocumentIdsFor(selectedIds), selectedIds),
@@ -264,6 +266,7 @@ export function useDetailsTab({
   const isPreviewingDate = datePreview.isPreviewing;
 
   const updateDates = useLedgerMutation<{ impact: BatchDateImpact }, void>({
+    name: "entries.batch_update_dates",
     waitFor: false,
     mutationFn: () =>
       batchUpdateLedgerEntryDatesAction(
@@ -319,6 +322,7 @@ export function useDetailsTab({
     CategoryAssignmentJob,
     { requestKey: string; mode: CategoryAssignmentMode; ledgerEntryIds: string[] }
   >({
+    name: "entries.ai_categorize",
     waitFor: false,
     mutationFn: (input) => startCategoryAssignmentAction(input),
     errorMessage: batchActionsCopy.aiCategoryFailed,
