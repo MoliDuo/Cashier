@@ -149,6 +149,35 @@ npm run account:enroll -- --email you@example.com
 `.env.local.example` 里的内部密钥是公开的固定开发值，只用于 loopback 环境复制后立即启动，
 不能用于可被外部访问的部署。
 
+### 使用统计（可选）
+
+Cashier 可以把用量和错误事件发给自建的 MoliInsight 平台。两个变量都不设置时，埋点完全关闭，应用照常运行。
+
+| 变量          | 必需 | 默认值 | 说明                                                                         |
+| ------------- | ---- | ------ | ---------------------------------------------------------------------------- |
+| `INSIGHT_URL` | 否   | 无     | MoliInsight 平台的地址。                                                     |
+| `INSIGHT_KEY` | 否   | 无     | 平台的 ingest 密钥。只在服务端使用，浏览器通过同源的 `/api/telemetry` 中继。 |
+
+两个都设置才会启用。浏览器端是否启用在构建时决定，所以在 Vercel 上修改它们之后要重新部署。
+事件只含类型、代码、个数和时长，不含金额、备注、商户名、账本名或图片内容；登录之前事件留在浏览器本地队列里，
+登录后才会发出。事件名和属性见 `src/lib/telemetry/events.ts`，架构说明见 `docs/architecture.md` 的"遥测"一节。
+
+**上传事件目录。** `telemetry-catalog.json` 描述所有事件、指标和漏斗，平台的看板和 MCP 用它显示说明。
+每次改动埋点后上传一次：
+
+```sh
+moli-insight catalog telemetry-catalog.json
+# 或者用 ingest 密钥直接 PUT
+curl -X PUT -H "Authorization: Bearer $INSIGHT_KEY" -H "Content-Type: application/json" \
+  --data @telemetry-catalog.json "$INSIGHT_URL/v1/catalog"
+```
+
+上传前可以先离线校验：`moli-insight catalog --dry-run telemetry-catalog.json`。
+
+**SDK 包是临时随仓库提供的。** `@moli-insight/web` 和 `@moli-insight/node` 目前以 `file:` 依赖指向
+`vendor/moli-insight/` 里的 tarball。等这两个包发布后，把 `package.json` 里的依赖改成发布的版本号，
+更新锁文件并删除 `vendor/moli-insight/`（同时去掉 `.prettierignore` 里的 `vendor/`）。
+
 ### 可信入口、日志与端口
 
 | 变量            | 默认值 | 说明                                                                                                                |
@@ -179,6 +208,7 @@ npm run account:enroll -- --email you@example.com
 - `AUTH_SECRET`：安全随机值，在重启、预览实例和多次构建之间保持一致。更换它会让所有会话、未用的验证码和
   API key 失效。
 - `CRON_SECRET`：至少 32 个字符，例如 `openssl rand -hex 32`。
+- `INSIGHT_URL`、`INSIGHT_KEY`（可选）：同时设置才启用使用统计，见“使用统计”一节。设置后需要重新部署。
 
 然后按"连接真实服务"一节，在能连到生产数据库的机器上用相同的 `DATABASE_URL`、`AUTH_SECRET`、`APP_URL`
 运行 `account:create` 和 `account:enroll`。
