@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "events": [
+    {
+      "name": "record.open",
+      "description": "The record form opened. restored is true when it came back with a kept draft.",
+      "props": {
+        "mode": {
+          "type": "string",
+          "description": "Which form: a new record, or an edit-and-retry of an existing one.",
+          "enum": ["create", "retry"]
+        },
+        "restored": {
+          "type": "boolean",
+          "description": "The form opened with a kept draft."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "record.input",
+      "description": "The first time text, an image or the date is touched in a form.",
+      "props": {
+        "mode": {
+          "type": "string",
+          "description": "Which form: a new record, or an edit-and-retry of an existing one.",
+          "enum": ["create", "retry"]
+        },
+        "kind": {
+          "type": "string",
+          "description": "What was touched.",
+          "enum": ["text", "image", "date"]
+        },
+        "count": {
+          "type": "number",
+          "description": "Images added, for kind image."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "record.submit",
+      "description": "Submit pressed in the record form. correlationId is the same id the server sends on processing.finished.",
+      "props": {
+        "mode": {
+          "type": "string",
+          "description": "Which form: a new record, or an edit-and-retry of an existing one.",
+          "enum": ["create", "retry"]
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Random id of this submission; no user content."
+        },
+        "imageCount": {
+          "type": "number",
+          "description": "Images attached."
+        },
+        "chars": {
+          "type": "number",
+          "description": "Length of the text, in characters; never the text.",
+          "unit": "chars"
+        },
+        "dateEdited": {
+          "type": "boolean",
+          "description": "The date was changed by hand."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "record.result",
+      "description": "A submit settled: the record was accepted (ok) or refused before processing.",
+      "props": {
+        "mode": {
+          "type": "string",
+          "description": "Which form: a new record, or an edit-and-retry of an existing one.",
+          "enum": ["create", "retry"]
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Matches record.submit."
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "The record was accepted."
+        },
+        "ms": {
+          "type": "number",
+          "description": "Time from submit to the answer.",
+          "unit": "ms"
+        },
+        "errorKind": {
+          "type": "string",
+          "description": "Error code or message key when ok is false."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "record.abandon",
+      "description": "The record form closed without a successful submit.",
+      "props": {
+        "mode": {
+          "type": "string",
+          "description": "Which form: a new record, or an edit-and-retry of an existing one.",
+          "enum": ["create", "retry"]
+        },
+        "hadInput": {
+          "type": "boolean",
+          "description": "Something had been typed or attached."
+        },
+        "submitting": {
+          "type": "boolean",
+          "description": "A submit was still in flight."
+        },
+        "imageCount": {
+          "type": "number",
+          "description": "Images attached."
+        },
+        "chars": {
+          "type": "number",
+          "description": "Length of the text; never the text.",
+          "unit": "chars"
+        },
+        "openMs": {
+          "type": "number",
+          "description": "How long the form was open.",
+          "unit": "ms"
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "record.draft",
+      "description": "A kept draft was restored or thrown away.",
+      "props": {
+        "mode": {
+          "type": "string",
+          "description": "Which form: a new record, or an edit-and-retry of an existing one.",
+          "enum": ["create", "retry"]
+        },
+        "action": {
+          "type": "string",
+          "description": "What happened to the draft.",
+          "enum": ["restore", "discard"]
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "detail.edit",
+      "description": "A field of a record or one of its entries was written (a correction of what the AI read).",
+      "props": {
+        "target": {
+          "type": "string",
+          "description": "Record or entry.",
+          "enum": ["document", "entry"]
+        },
+        "fields": {
+          "type": "array",
+          "description": "Column names written; never values."
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "The write succeeded."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "period.switch",
+      "description": "The period changed from the bar, its picker or the statistics page.",
+      "props": {
+        "tab": {
+          "type": "string",
+          "description": "Where it changed.",
+          "enum": ["entries", "stats"]
+        },
+        "range": {
+          "type": "string",
+          "description": "Range kind.",
+          "enum": ["week", "month", "year", "all", "custom"]
+        },
+        "offset": {
+          "type": "number",
+          "description": "Periods back from now, for calendar ranges."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "filter.apply",
+      "description": "The filter dialog applied filters.",
+      "props": {
+        "fields": {
+          "type": "array",
+          "description": "Names of the filters set; never their values."
+        },
+        "count": {
+          "type": "number",
+          "description": "How many filters are set."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "stats.view",
+      "description": "The statistics chart view changed.",
+      "props": {
+        "view": {
+          "type": "string",
+          "description": "View code."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "stats.drilldown",
+      "description": "A statistics bar or slice was opened as a list.",
+      "props": {
+        "kind": {
+          "type": "string",
+          "description": "What was opened.",
+          "enum": ["category", "date"]
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "settings.change",
+      "description": "A setting was saved.",
+      "props": {
+        "area": {
+          "type": "string",
+          "description": "Which settings.",
+          "enum": ["ledger", "categories", "credential"]
+        },
+        "action": {
+          "type": "string",
+          "description": "What was done.",
+          "enum": ["save", "create", "update", "delete"]
+        },
+        "fields": {
+          "type": "array",
+          "description": "Setting keys saved; never values."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "signin.code",
+      "description": "A one-time sign-in code was requested.",
+      "props": {
+        "resend": {
+          "type": "boolean",
+          "description": "It was a resend."
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "The code was sent."
+        },
+        "errorKind": {
+          "type": "string",
+          "description": "Error code when ok is false."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "signin.attempt",
+      "description": "A sign-in attempt finished.",
+      "props": {
+        "method": {
+          "type": "string",
+          "description": "How the user signed in.",
+          "enum": ["otp", "passkey", "dev"]
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "Signed in."
+        },
+        "errorKind": {
+          "type": "string",
+          "description": "Error code when ok is false."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "processing.finished",
+      "description": "Server side: a processing attempt reached its end. Sent with the correlation id of the submitting record.submit; an attempt resumed by recovery has none.",
+      "props": {
+        "outcome": {
+          "type": "string",
+          "description": "How it ended.",
+          "enum": ["completed", "failed", "cancelled"]
+        },
+        "ms": {
+          "type": "number",
+          "description": "From the submission being queued to this outcome.",
+          "unit": "ms"
+        },
+        "runs": {
+          "type": "number",
+          "description": "Runs this attempt was given."
+        },
+        "errorKind": {
+          "type": "string",
+          "description": "Failure code when outcome is failed."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "$error",
+      "description": "The app's error boundary caught an error.",
+      "props": {
+        "kind": {
+          "type": "string",
+          "description": "Always boundary.",
+          "enum": ["boundary"]
+        },
+        "source": {
+          "type": "string",
+          "description": "Which boundary."
+        },
+        "name": {
+          "type": "string",
+          "description": "Error class name."
+        },
+        "digest": {
+          "type": "string",
+          "description": "Next.js error digest."
+        }
+      },
+      "tier": "product"
+    },
+    {
+      "name": "$toast",
+      "description": "A toast was shown. Only the level: the text may name a file or book.",
+      "props": {
+        "level": {
+          "type": "string",
+          "description": "Toast level.",
+          "enum": ["success", "error", "warning"]
+        }
+      },
+      "tier": "product"
+    }
+  ],
+  "metrics": [
+    {
+      "name": "record_abandon_rate",
+      "description": "Share of opened record forms closed without a successful submit.",
+      "kind": "ratio",
+      "numerator": {
+        "event": "record.abandon"
+      },
+      "denominator": {
+        "event": "record.open"
+      },
+      "groupBy": ["mode"],
+      "goodDirection": "down"
+    },
+    {
+      "name": "record_submit_failure_rate",
+      "description": "Share of submits the server refused before processing.",
+      "kind": "ratio",
+      "numerator": {
+        "event": "record.result",
+        "where": [
+          {
+            "prop": "ok",
+            "op": "eq",
+            "value": false
+          }
+        ]
+      },
+      "denominator": {
+        "event": "record.result"
+      },
+      "groupBy": ["mode"],
+      "goodDirection": "down"
+    },
+    {
+      "name": "ai_failure_rate",
+      "description": "Share of finished processing attempts that failed.",
+      "kind": "ratio",
+      "numerator": {
+        "event": "processing.finished",
+        "where": [
+          {
+            "prop": "outcome",
+            "op": "eq",
+            "value": "failed"
+          }
+        ]
+      },
+      "denominator": {
+        "event": "processing.finished"
+      },
+      "groupBy": ["errorKind"],
+      "goodDirection": "down"
+    },
+    {
+      "name": "ai_correction_rate",
+      "description": "Entry corrections per completed AI reading: how often users have to fix what the AI read.",
+      "kind": "ratio",
+      "numerator": {
+        "event": "detail.edit",
+        "where": [
+          {
+            "prop": "target",
+            "op": "eq",
+            "value": "entry"
+          },
+          {
+            "prop": "ok",
+            "op": "eq",
+            "value": true
+          }
+        ]
+      },
+      "denominator": {
+        "event": "processing.finished",
+        "where": [
+          {
+            "prop": "outcome",
+            "op": "eq",
+            "value": "completed"
+          }
+        ]
+      },
+      "goodDirection": "down"
+    },
+    {
+      "name": "signin_failure_rate",
+      "description": "Share of sign-in attempts that failed.",
+      "kind": "ratio",
+      "numerator": {
+        "event": "signin.attempt",
+        "where": [
+          {
+            "prop": "ok",
+            "op": "eq",
+            "value": false
+          }
+        ]
+      },
+      "denominator": {
+        "event": "signin.attempt"
+      },
+      "groupBy": ["method"],
+      "goodDirection": "down"
+    }
+  ],
+  "funnels": [
+    {
+      "name": "record_flow",
+      "description": "Open the record form, press submit, have the record accepted.",
+      "steps": [
+        {
+          "event": "record.open"
+        },
+        {
+          "event": "record.submit"
+        },
+        {
+          "event": "record.result",
+          "where": [
+            {
+              "prop": "ok",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "windowMs": 1800000,
+      "by": "session"
+    }
+  ]
+}
