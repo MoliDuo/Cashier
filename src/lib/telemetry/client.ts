@@ -29,7 +29,13 @@ export const TELEMETRY_ENDPOINT = "/api/telemetry";
 let started = false;
 let lastScreen: string | null = null;
 
-/** Starts the SDK once, with the router's `$screen` events left to `trackScreenTransition`. */
+/**
+ * Starts the SDK once. Its automatic capture is off except `$visibility`, which
+ * feeds usage time: `$tap`, `$rage_tap` and `$dead_tap` name the clicked element
+ * by its `aria-label`, which here can be a book or category name, and `$error`
+ * carries a message that can quote user input. `$screen` is left to
+ * `trackScreenTransition`, and errors to the boundary in `app/error.tsx`.
+ */
 export function startTelemetry(): void {
   if (started || !isTelemetryEnabled() || typeof window === "undefined") return;
   started = true;
@@ -37,7 +43,7 @@ export function startTelemetry(): void {
     init({
       endpoint: TELEMETRY_ENDPOINT,
       release: process.env.NEXT_PUBLIC_GIT_SHA ?? "dev",
-      autoCapture: { screens: false },
+      autoCapture: { taps: false, rage: false, dead: false, errors: false, screens: false },
     });
     lastScreen = window.location.pathname;
     trackScreen(lastScreen, "app");

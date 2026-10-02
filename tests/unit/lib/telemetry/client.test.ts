@@ -52,7 +52,9 @@ describe("telemetry client", () => {
       expect(sdk.init).toHaveBeenCalledWith({
         endpoint: "/api/telemetry",
         release: "abc1234",
-        autoCapture: { screens: false },
+        // Only `$visibility` stays automatic: taps name elements by aria-label (book and
+        // category names) and window errors carry message text.
+        autoCapture: { taps: false, rage: false, dead: false, errors: false, screens: false },
       });
       // The first screen, by path only.
       expect(sdk.trackScreen).toHaveBeenCalledWith("/entries", "app");

@@ -432,7 +432,9 @@ Cashier 把用量和错误事件发给自建的 MoliInsight 平台，用来看�
   事件的触发点留在各模块里：`src/modules/workspace/telemetry.ts` 放期间和筛选的辅助函数。
 - **启动。** 浏览器端在 `src/instrumentation-client.ts` 里初始化，并在 `onRouterTransitionStart` 里上报
   `$screen`（只含路径，SDK 自带的屏幕采集已关闭，避免重复）。Web Vitals 由 `components/providers/telemetry-vitals.tsx`
-  经 `useReportWebVitals` 上报。服务端用 `INSIGHT_URL` 和 `INSIGHT_KEY` 创建一个缓存的 Node SDK 实例。
+  经 `useReportWebVitals` 上报。服务端用 `INSIGHT_URL` 和 `INSIGHT_KEY` 创建一个缓存的 Node SDK 实例，事件的 `release`
+  与浏览器端相同（`NEXT_PUBLIC_GIT_SHA`，没有提交号时为 `dev`）。只设置了两个变量中的一个时，应用照常运行，
+  但启动时 `instrumentation.ts` 会记一条警告。
 - **开关。** 两个变量都设置了才启用。`next.config.ts` 在构建时只把"是否设置"内联为
   `NEXT_PUBLIC_INSIGHT_ENABLED`，值本身不进浏览器；所以改变这两个变量之后需要重新构建部署，浏览器端才会跟着变。
   测试环境把它们置空，单元测试不会发出任何网络请求。
@@ -447,7 +449,9 @@ Cashier 把用量和错误事件发给自建的 MoliInsight 平台，用来看�
 - **共用入口。** 大多数事件不需要在功能代码里手写：`useLedgerMutation` 要求必填的 `name`，并把每次写入记为
   `$op`；`postLedgerQuery` 把读取记为 `$op`（`query.<name>`）；`Dialog` 可选的 `name` 记 `$dialog` 的打开和
   关闭方式；`@/lib/toast` 包装 sonner 并记 `$toast`（只记级别）；`src/app/error.tsx` 记 `$error`。
-  关键控件用 `data-track="area.control"` 让 SDK 自动记点击。
+  SDK 自带的自动采集只保留 `$visibility`（用量时长）；`$tap`、`$rage_tap`、`$dead_tap` 用 `aria-label` 命名被点的元素，
+  而这里的 label 可能是账本名或分类名，`$error` 的自动采集带 message，可能引用用户输入，所以这几项都关闭
+  （见 `startTelemetry`）。错误由 `error.tsx` 只报类型和 digest；因此 `data-track` 目前不会产生事件。
 - **隐私。** 属性只放类型、代码、个数和时长。不放金额、备注、商户名、账本名、搜索文本、其他用户输入、令牌或图片内容。
   例如 `record.submit` 只带文本长度和图片张数，`detail.edit` 和 `filter.apply` 只带字段名。
   新增事件时要同步更新 `events.ts` 和仓库根目录的 `telemetry-catalog.json`，

@@ -46,6 +46,8 @@ describe("telemetry server", () => {
     expect((init.headers as Record<string, string>).authorization).toBe("Bearer mi_test_key");
     const body = JSON.parse(init.body as string);
     expect(body.context.platform).toBe("server");
+    // Tagged like the browser's events, even where the build has no commit SHA.
+    expect(body.context.release).toBe(process.env.NEXT_PUBLIC_GIT_SHA ?? "dev");
     expect(body.events).toHaveLength(1);
     expect(body.events[0]).toMatchObject({
       name: "processing.finished",

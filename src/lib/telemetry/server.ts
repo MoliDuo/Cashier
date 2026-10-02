@@ -21,6 +21,8 @@ export function getInsight(): Insight {
   const insight = createInsight({
     ...(url == null ? {} : { url }),
     ...(key == null ? {} : { key }),
+    // The same value the browser tags its events with (see next.config.ts).
+    release: process.env.NEXT_PUBLIC_GIT_SHA ?? "dev",
     onError: ({ status }) => {
       logger.warn({ status: status ?? null }, "Telemetry delivery failed");
     },

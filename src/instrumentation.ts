@@ -12,6 +12,11 @@ export async function register() {
   try {
     const startupEnv = validateStartupEnv();
 
+    // A half-set pair turns telemetry off without a word, so say so once at boot.
+    if ((startupEnv.INSIGHT_URL == null) !== (startupEnv.INSIGHT_KEY == null)) {
+      logger.warn("Telemetry is off: INSIGHT_URL and INSIGHT_KEY must be set together");
+    }
+
     logger.info(
       {
         nodeEnv: process.env.NODE_ENV ?? "not set",

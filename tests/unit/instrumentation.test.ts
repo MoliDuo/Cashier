@@ -7,7 +7,7 @@ const logger = {
   debug: vi.fn(),
 };
 
-const validateStartupEnv = vi.fn(() => ({
+const validateStartupEnv = vi.fn((): Record<string, string | undefined> => ({
   DATABASE_URL: "file:./data/sqlite.db",
   S3_BUCKET: "cashier-images",
 }));
@@ -34,6 +34,27 @@ describe("instrumentation.register", () => {
     expect(validateStartupEnv).toHaveBeenCalledTimes(1);
     // Accounts come from `account:create`; boot prints no codes or links.
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns once when only one of INSIGHT_URL and INSIGHT_KEY is set", async () => {
+    const { register } = await import("@/instrumentation");
+    const base = { DATABASE_URL: "x", S3_BUCKET: "b" };
+
+    validateStartupEnv.mockReturnValueOnce({ ...base, INSIGHT_URL: "https://insight.example" });
+    await register();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+
+    validateStartupEnv.mockReturnValueOnce({ ...base, INSIGHT_KEY: "mi_key" });
+    await register();
+    expect(logger.warn).toHaveBeenCalledTimes(2);
+
+    validateStartupEnv.mockReturnValueOnce({
+      ...base,
+      INSIGHT_URL: "https://insight.example",
+      INSIGHT_KEY: "mi_key",
+    });
+    await register();
+    expect(logger.warn).toHaveBeenCalledTimes(2);
   });
 
   it("rethrows startup env validation failures", async () => {
