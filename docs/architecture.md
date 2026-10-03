@@ -52,7 +52,7 @@ src/app/                  路由与 API handler：认证、校验、调用、映
   api/ledger-queries      浏览器读取的唯一入口（类型化查询注册表）
   api/v1                  外部 API（快捷指令）
   api/stored-files        带授权的图片上传（POST）和文件读取（GET）
-  api/health              容器健康检查
+  healthz                 容器健康检查，返回 {ok, version}（version 是构建的提交哈希）
   login、api/auth         登录说明页，以及 OIDC 登录与回调
 src/modules/<m>/          auth、currency、ledger、source-document、stats、workspace
   server-actions/         Zod 校验 + withLedgerAccess，然后直接调用 server/ 的函数；只用于命令
@@ -149,22 +149,23 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 - **身份来自外部的 OIDC 提供方**（Authelia 或任何标准提供方）。应用不保存密码、passkey 或验证码，
   只配置三个值：`OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`。回调地址固定为
-  `${APP_URL}/api/auth/callback`，应用不信任请求里的 Host 来构造它。
+  `${APP_URL}/auth/callback`，应用不信任请求里的 Host 来构造它。
 - **登录流程**（`src/modules/auth/server/oidc.ts`，授权码加 PKCE）：
   - 受保护页面没有会话时跳 `/login`。`/login` 在没有 `error`、`notice` 参数时直接服务端重定向到
     `/api/auth/login`，所以提供方已登录时，用户不用点任何东西。
   - `/api/auth/login` 生成 state、nonce 和 PKCE verifier，放进短期 cookie `cashier_oidc`（httpOnly、
-    SameSite=Lax、路径 `/api/auth`、10 分钟；内容带 HMAC 签名，不落库），再跳到提供方。`callbackUrl`
+    SameSite=Lax、路径 `/auth/callback`、10 分钟；内容带 HMAC 签名，不落库），再跳到提供方。`callbackUrl`
     只接受同站相对路径。
-  - `/api/auth/callback` 校验 state、PKCE、nonce 和 ID token 签名，邮箱取自 ID token，ID token 没有时取
-    userinfo（核对 `sub` 一致）；`email_verified` 明确为 false 时拒绝。state cookie 每次回调都清掉，
+  - `/auth/callback` 校验 state、PKCE、nonce 和 ID token 的签名（只接受 RS256）、issuer、audience、
+    有效期和签发时间（`iat` 与现在相差不超过 5 分钟）；邮箱必须在 ID token 里（提供方的声明策略负责补全），
+    不用 userinfo 代替；`email_verified` 明确为 false 时拒绝。请求的 scope 是 `openid profile email groups`。state cookie 每次回调都清掉，
     所以一次授权只能用一次。
 - **谁能用由 `login_emails` 决定。** 回调拿到的邮箱按 `lower()` 匹配 `login_emails`：匹配才创建会话；
   不匹配就不创建，回到 `/login?error=not_bound`。账号仍是单个共享账号，`login_emails` 是可以登录它的邮箱
   白名单，要求与提供方那边的用户邮箱一一对应。设置页直接增删邮箱，不再发验证码——能进设置页的人已经通过了
   提供方；至少保留一个邮箱，删除邮箱会结束该账号的全部会话。
-- **会话。** 自建 `sessions` 表，cookie `cashier_session` 里是 32 字节随机令牌（httpOnly、Secure、
-  SameSite=Lax），库里存它的 HMAC。14 天滑动过期，`last_seen_at` 超过 1 天才续期。用 `getCurrentSession`
+- **会话。** 自建 `sessions` 表，cookie `__Host-cashier_session` 里是 32 字节随机令牌（httpOnly、始终 Secure、
+  SameSite=Lax、Path=/），库里存它的 HMAC。14 天滑动过期，`last_seen_at` 超过 1 天才续期。用 `getCurrentSession`
   读取，用 `requireAuth` 或 `withAuth`（`src/modules/auth/server/session-guards.ts`）把关，吊销就是删除行。
   一次查询带出用户和登录邮箱。proxy 只检查 cookie 是否存在，`/api/auth/` 是公开路径。
 - **退出。** 只清应用自己的会话，不退出提供方，也不调用提供方的登出端点。退出后落在
