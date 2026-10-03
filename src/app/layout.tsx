@@ -3,13 +3,14 @@ import type { Metadata, Viewport } from "next";
 import { textRoleClassName } from "@/components/typography";
 import { metadataCopy } from "@/copy/app";
 import { commonCopy } from "@/copy/common";
+import { THEME_COLOR } from "@/lib/theme-colors";
 
 export const metadata: Metadata = {
   title: metadataCopy.title,
   description: metadataCopy.description,
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: ["/favicon.ico", "/icon.png"],
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, "/favicon.ico", "/icon.png"],
     apple: "/apple-icon.png",
   },
   appleWebApp: {
@@ -21,8 +22,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#101112" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
   ],
   width: "device-width",
   initialScale: 1,
@@ -37,7 +38,7 @@ export default function RootLayout({
   // route changes land where they intend to instead of animating there.
   return (
     <html lang="zh" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body className="antialiased" style={{ backgroundColor: "var(--bg)" }}>
+      <body data-app="cashier" className="antialiased" style={{ backgroundColor: "var(--bg)" }}>
         <a
           href="#main-content"
           className={textRoleClassName(

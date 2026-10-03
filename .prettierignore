@@ -9,3 +9,7 @@ pnpm-lock.yaml
 yarn.lock
 src/persistence/postgres-migrations/meta/*_snapshot.json
 .zcode/
+
+# Copied from MoliSpec design/dist; not edited by hand (standard 011, 11.2.3)
+src/app/moli-tokens.css
+src/app/moli-tailwind.css

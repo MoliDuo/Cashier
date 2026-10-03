@@ -1,0 +1,25 @@
+/* 由 design/tokens/build.mjs 生成。用法：在应用的入口 css 里
+   @import "tailwindcss";
+   @import "./tokens.css";
+   @import "./tailwind.css";
+   然后 <body data-app="todo"> 即可使用 bg-bg、text-muted、bg-accent 等。 */
+@theme inline {
+  --color-bg: var(--moli-bg);
+  --color-surface: var(--moli-surface);
+  --color-surface-2: var(--moli-surface2);
+  --color-border: var(--moli-border);
+  --color-text: var(--moli-text);
+  --color-muted: var(--moli-muted);
+  --color-accent: var(--moli-accent);
+  --color-accent-fg: var(--moli-accent-fg);
+  --color-danger: var(--moli-danger);
+  --color-warning: var(--moli-warning);
+  --color-success: var(--moli-success);
+  --color-info: var(--moli-info);
+  --radius-sm: var(--moli-radius-sm);
+  --radius-md: var(--moli-radius-md);
+  --radius-lg: var(--moli-radius-lg);
+  --radius-xl: var(--moli-radius-xl);
+  --font-sans: var(--moli-font-sans);
+  --font-mono: var(--moli-font-mono);
+}

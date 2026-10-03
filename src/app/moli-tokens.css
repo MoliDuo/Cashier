@@ -1,0 +1,342 @@
+/* 由 design/tokens/build.mjs 生成，不要手改。来源：tokens.json、apps.json。风格 A1「石墨」 */
+
+:root {
+  --moli-bg: #fafafa;
+  --moli-surface: #ffffff;
+  --moli-surface2: #f4f4f5;
+  --moli-border: #e4e4e7;
+  --moli-text: #18181b;
+  --moli-muted: #696972;
+  --moli-danger: #d73337;
+  --moli-warning: #da950b;
+  --moli-success: #009957;
+  --moli-info: #1a89c5;
+  --moli-radius-sm: 4px;
+  --moli-radius-md: 8px;
+  --moli-radius-lg: 12px;
+  --moli-radius-xl: 16px;
+  --moli-radius-full: 9999px;
+  --moli-space-1: 4px;
+  --moli-space-2: 8px;
+  --moli-space-3: 12px;
+  --moli-space-4: 16px;
+  --moli-space-5: 20px;
+  --moli-space-6: 24px;
+  --moli-space-8: 32px;
+  --moli-space-10: 40px;
+  --moli-space-12: 48px;
+  --moli-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --moli-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --moli-text-xs: 12px;
+  --moli-text-xs-line: 16px;
+  --moli-text-sm: 13px;
+  --moli-text-sm-line: 20px;
+  --moli-text-base: 14px;
+  --moli-text-base-line: 22px;
+  --moli-text-lg: 16px;
+  --moli-text-lg-line: 24px;
+  --moli-text-xl: 20px;
+  --moli-text-xl-line: 28px;
+  --moli-text-2xl: 24px;
+  --moli-text-2xl-line: 32px;
+  --moli-text-3xl: 30px;
+  --moli-text-3xl-line: 38px;
+  --moli-accent: #3f3f46;
+  --moli-accent-fg: #ffffff;
+  color-scheme: light dark;
+}
+[data-app="cashier"] {
+  --moli-accent: #007f38;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="diary"] {
+  --moli-accent: #4461be;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="home"] {
+  --moli-accent: #ad3a52;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="sub"] {
+  --moli-accent: #007973;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="insight"] {
+  --moli-accent: #7750b1;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="see"] {
+  --moli-accent: #00729b;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="whisper"] {
+  --moli-accent: #9e3f84;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="switch"] {
+  --moli-accent: #826400;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="todo"] {
+  --moli-accent: #a34e00;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="warden"] {
+  --moli-accent: #3f3f46;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="sync"] {
+  --moli-accent: #607200;
+  --moli-accent-fg: #ffffff;
+}
+[data-app="demo"] {
+  --moli-accent: #3f3f46;
+  --moli-accent-fg: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --moli-bg: #0a0a0a;
+  --moli-surface: #141414;
+  --moli-surface2: #1c1c1e;
+  --moli-border: #27272a;
+  --moli-text: #fafafa;
+  --moli-muted: #a1a1aa;
+  --moli-danger: #fa6863;
+  --moli-warning: #edb345;
+  --moli-success: #4bc680;
+  --moli-info: #55aee8;
+  --moli-accent: #d4d4d8;
+  --moli-accent-fg: #0a0a0a;
+  color-scheme: dark;
+}
+:root[data-theme="dark"] [data-app="cashier"] {
+  --moli-accent: #37bb62;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="diary"] {
+  --moli-accent: #7598ff;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="home"] {
+  --moli-accent: #f46a82;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="sub"] {
+  --moli-accent: #00b6ac;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="insight"] {
+  --moli-accent: #b082f7;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="see"] {
+  --moli-accent: #00ace7;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="whisper"] {
+  --moli-accent: #e16fbf;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="switch"] {
+  --moli-accent: #c39800;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="todo"] {
+  --moli-accent: #ee7a1f;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="warden"] {
+  --moli-accent: #d4d4d8;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="sync"] {
+  --moli-accent: #92ac00;
+  --moli-accent-fg: #0a0a0a;
+}
+:root[data-theme="dark"] [data-app="demo"] {
+  --moli-accent: #d4d4d8;
+  --moli-accent-fg: #0a0a0a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --moli-bg: #0a0a0a;
+    --moli-surface: #141414;
+    --moli-surface2: #1c1c1e;
+    --moli-border: #27272a;
+    --moli-text: #fafafa;
+    --moli-muted: #a1a1aa;
+    --moli-danger: #fa6863;
+    --moli-warning: #edb345;
+    --moli-success: #4bc680;
+    --moli-info: #55aee8;
+    --moli-accent: #d4d4d8;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="cashier"] {
+    --moli-accent: #37bb62;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="diary"] {
+    --moli-accent: #7598ff;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="home"] {
+    --moli-accent: #f46a82;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="sub"] {
+    --moli-accent: #00b6ac;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="insight"] {
+    --moli-accent: #b082f7;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="see"] {
+    --moli-accent: #00ace7;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="whisper"] {
+    --moli-accent: #e16fbf;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="switch"] {
+    --moli-accent: #c39800;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="todo"] {
+    --moli-accent: #ee7a1f;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="warden"] {
+    --moli-accent: #d4d4d8;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="sync"] {
+    --moli-accent: #92ac00;
+    --moli-accent-fg: #0a0a0a;
+  }
+  :root:not([data-theme="light"]) [data-app="demo"] {
+    --moli-accent: #d4d4d8;
+    --moli-accent-fg: #0a0a0a;
+  }
+}
+
+@supports (color: oklch(0 0 0)) {
+  :root {
+    --moli-danger: oklch(0.58 0.2 25);
+    --moli-warning: oklch(0.72 0.15 75);
+    --moli-success: oklch(0.6 0.15 155);
+    --moli-info: oklch(0.6 0.13 240);
+  }
+  [data-app="cashier"] {
+    --moli-accent: oklch(0.52 0.15 150);
+}
+  [data-app="diary"] {
+    --moli-accent: oklch(0.52 0.15 268);
+}
+  [data-app="home"] {
+    --moli-accent: oklch(0.52 0.15 12);
+}
+  [data-app="sub"] {
+    --moli-accent: oklch(0.52 0.15 188);
+}
+  [data-app="insight"] {
+    --moli-accent: oklch(0.52 0.15 300);
+}
+  [data-app="see"] {
+    --moli-accent: oklch(0.52 0.15 232);
+}
+  [data-app="whisper"] {
+    --moli-accent: oklch(0.52 0.15 340);
+}
+  [data-app="switch"] {
+    --moli-accent: oklch(0.52 0.15 88);
+}
+  [data-app="todo"] {
+    --moli-accent: oklch(0.52 0.15 52);
+}
+  [data-app="sync"] {
+    --moli-accent: oklch(0.52 0.15 120);
+}
+  :root[data-theme="dark"] {
+    --moli-danger: oklch(0.7 0.18 25);
+    --moli-warning: oklch(0.8 0.14 80);
+    --moli-success: oklch(0.74 0.15 155);
+    --moli-info: oklch(0.72 0.12 240);
+  }
+  :root[data-theme="dark"] [data-app="cashier"] {
+    --moli-accent: oklch(0.7 0.17 150);
+}
+  :root[data-theme="dark"] [data-app="diary"] {
+    --moli-accent: oklch(0.7 0.17 268);
+}
+  :root[data-theme="dark"] [data-app="home"] {
+    --moli-accent: oklch(0.7 0.17 12);
+}
+  :root[data-theme="dark"] [data-app="sub"] {
+    --moli-accent: oklch(0.7 0.17 188);
+}
+  :root[data-theme="dark"] [data-app="insight"] {
+    --moli-accent: oklch(0.7 0.17 300);
+}
+  :root[data-theme="dark"] [data-app="see"] {
+    --moli-accent: oklch(0.7 0.17 232);
+}
+  :root[data-theme="dark"] [data-app="whisper"] {
+    --moli-accent: oklch(0.7 0.17 340);
+}
+  :root[data-theme="dark"] [data-app="switch"] {
+    --moli-accent: oklch(0.7 0.17 88);
+}
+  :root[data-theme="dark"] [data-app="todo"] {
+    --moli-accent: oklch(0.7 0.17 52);
+}
+  :root[data-theme="dark"] [data-app="sync"] {
+    --moli-accent: oklch(0.7 0.17 120);
+}
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --moli-danger: oklch(0.7 0.18 25);
+      --moli-warning: oklch(0.8 0.14 80);
+      --moli-success: oklch(0.74 0.15 155);
+      --moli-info: oklch(0.72 0.12 240);
+    }
+    :root:not([data-theme="light"]) [data-app="cashier"] {
+      --moli-accent: oklch(0.7 0.17 150);
+}
+    :root:not([data-theme="light"]) [data-app="diary"] {
+      --moli-accent: oklch(0.7 0.17 268);
+}
+    :root:not([data-theme="light"]) [data-app="home"] {
+      --moli-accent: oklch(0.7 0.17 12);
+}
+    :root:not([data-theme="light"]) [data-app="sub"] {
+      --moli-accent: oklch(0.7 0.17 188);
+}
+    :root:not([data-theme="light"]) [data-app="insight"] {
+      --moli-accent: oklch(0.7 0.17 300);
+}
+    :root:not([data-theme="light"]) [data-app="see"] {
+      --moli-accent: oklch(0.7 0.17 232);
+}
+    :root:not([data-theme="light"]) [data-app="whisper"] {
+      --moli-accent: oklch(0.7 0.17 340);
+}
+    :root:not([data-theme="light"]) [data-app="switch"] {
+      --moli-accent: oklch(0.7 0.17 88);
+}
+    :root:not([data-theme="light"]) [data-app="todo"] {
+      --moli-accent: oklch(0.7 0.17 52);
+}
+    :root:not([data-theme="light"]) [data-app="sync"] {
+      --moli-accent: oklch(0.7 0.17 120);
+}
+  }
+}
+
+body { background: var(--moli-bg); color: var(--moli-text); font: var(--moli-text-base)/var(--moli-text-base-line) var(--moli-font-sans); }
+.moli-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--moli-space-2); height: 36px; padding: 0 var(--moli-space-4); border: 1px solid var(--moli-border); border-radius: var(--moli-radius-md); background: var(--moli-surface); color: var(--moli-text); font: 500 var(--moli-text-base) var(--moli-font-sans); cursor: pointer; }
+.moli-btn--primary { background: var(--moli-accent); border-color: transparent; color: var(--moli-accent-fg); }
+.moli-card { background: var(--moli-surface); border: 1px solid var(--moli-border); border-radius: var(--moli-radius-lg); padding: var(--moli-space-4); }
