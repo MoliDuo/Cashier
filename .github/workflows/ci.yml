@@ -15,9 +15,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Work reaches main by a direct push, and the deploy follows a green ci, so this is the gate that
-  # matters. `npm run check` ends in a production build, which is what a bad dependency bump breaks.
+  # A commit the merge queue landed on main is the very commit the queue already tested (same SHA),
+  # so the push run skips the checks instead of repeating them. Direct pushes run everything.
+  verified:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      skip: ${{ steps.queue.outputs.skip }}
+    steps:
+      - id: queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          skip=false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=merge_group&status=success&per_page=1" --jq .total_count)
+            if [ "$n" -gt 0 ]; then skip=true; fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
+  # The deploy follows a green ci on main, so this is the gate that matters. `npm run check` ends in a production build, which is what a bad dependency bump breaks.
   check:
+    needs: verified
+    if: needs.verified.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -32,6 +54,8 @@ jobs:
         run: npm run check
 
   gitleaks:
+    needs: verified
+    if: needs.verified.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -46,6 +70,8 @@ jobs:
   # The image is what actually runs: build it as the deploy does, start it with its database and
   # object store, and check that /healthz answers with the commit it was built from.
   build:
+    needs: verified
+    if: needs.verified.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -81,6 +107,8 @@ jobs:
 
   # A real browser against a real build is the slowest thing here.
   integration:
+    needs: verified
+    if: needs.verified.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -106,9 +134,15 @@ jobs:
 
   ci-gate:
     if: always()
-    needs: [check, gitleaks, build, integration]
+    needs: [verified, check, gitleaks, build, integration]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - run: |
-          [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false" ]
+          results="${{ join(needs.*.result, ' ') }}"
+          if [ "${{ needs.verified.outputs.skip }}" = "true" ]; then
+            echo "Already tested by the merge queue at this commit."
+            [ "${{ needs.verified.result }}" = "success" ]
+          else
+            case " $results " in *" failure "*|*" cancelled "*|*" skipped "*) exit 1 ;; esac
+          fi
