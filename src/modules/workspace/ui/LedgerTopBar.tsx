@@ -68,7 +68,7 @@ export function LedgerTopBar({
       >
         <span className="hidden items-center gap-2 pl-1 font-semibold text-text md:inline-flex">
           <Wallet className="size-5 text-primary" aria-hidden="true" />
-          Cashier
+          Moli Cashier
         </span>
         {!inSettings && headerSelection != null ? (
           <Button

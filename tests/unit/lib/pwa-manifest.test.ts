@@ -10,8 +10,8 @@ const expectedIcons = [
 describe("buildPwaManifest", () => {
   it("describes the installed app", () => {
     expect(buildPwaManifest()).toEqual({
-      name: "Cashier - AI 记账助手",
-      short_name: "Cashier",
+      name: "Moli Cashier - AI 记账助手",
+      short_name: "Moli Cashier",
       description: "AI 驱动的智能记账工具",
       start_url: "/records",
       display: "standalone",

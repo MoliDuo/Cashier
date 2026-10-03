@@ -1,6 +1,43 @@
-# Agent Guidelines
+# AGENTS.md
 
-Cashier is built for the two people who use it. [README.md](./README.md) covers setup,
+<!-- prettier-ignore-start -->
+<!-- moli-rules:start -->
+## Moli rules (copied verbatim from MoliSpec; do not edit)
+
+These rules apply to every Moli repository. The full standards live in the private repo `MoliDuo/MoliSpec` (`standards/`).
+
+**Naming**
+- Product name `MoliFoo` (repo, package, file and identifier names, no spaces). User-facing name is `Moli Foo` (one space): window titles, app name, UI text, README title, Release titles.
+
+**Deploy and CI**
+- Deploy only after CI passes. Pushing to `main` deploys to production (server apps), so run the check entry (`npm run check` or the stack's equivalent) locally before pushing, and watch CI after.
+- Keep the CI names fixed: workflows `ci` / `deploy` / `release`; jobs `check`, `gitleaks`, `build`, `integration`, `ci-gate`.
+- Never delete or skip tests, or loosen lint rules, to make a check pass.
+
+**Git**
+- Conventional Commits (`feat(scope): subject`). Small changes may be pushed straight to `main`. Use a branch and PR for large changes, database migrations, auth or permission code, and deploy, CI or Dockerfile changes.
+- Never force-push `main`. Roll back with `git revert`.
+
+**Secrets and private information**
+- Never commit secrets, `.env` files, keys, or internal information (server addresses, hostnames, Tailscale addresses, personal emails). Use obviously fake values in tests and examples (`test-token`, `example.com`, `192.0.2.1`).
+- Never print secret values in logs, chat, or commits. Never store secrets in the OS keychain. Runtime secrets live in the server `.env` (mode 600); build and release secrets live in GitHub organization secrets.
+- Do not copy a shared (organization-level) secret into repository-level secrets unless the administrator has said so.
+
+**Login, data, config**
+- Sign-in is Authelia only. Do not build your own accounts, passwords or registration pages.
+- Database and settings schemas only add; never delete or rename an existing field in one step. Migrations must keep the previous app version working.
+- Clients are offline-first and the server is authoritative. Settings are read in the order defined in the config standard; do not invent a second source.
+- Server apps expose `GET /healthz` returning `{"ok": true, "version": "<commit sha>"}`, run as non-root, take config from environment variables, and publish no host ports.
+
+**Working with the user**
+- Do only what was asked. Do not publish, delete, or change shared settings (GitHub org, server, DNS) without being asked.
+- Reply to the user in Chinese, briefly.
+<!-- moli-rules:end -->
+<!-- prettier-ignore-end -->
+
+## About this project
+
+Moli Cashier is built for the two people who use it. [README.md](./README.md) covers setup,
 configuration, deployment, and the command list; the documents below are the authority for how the
 code is organized and tested.
 
@@ -29,7 +66,7 @@ code is organized and tested.
 
 ## Repository gate
 
-`npm run check` must pass before a commit lands. It runs formatting (Prettier), the architecture
+`npm run check` must pass before you push. It runs formatting (Prettier), the architecture
 check (dependency-cruiser), dead-code detection (knip), ESLint with zero warnings, `tsc`, the full
 test suite with the coverage thresholds in `vitest.config.mts`, and a production build against
 isolated placeholders with the protected-route bundle budget. The static checks run side by side and
@@ -37,21 +74,21 @@ stop the gate on the first failure; the tests and the build then run side by sid
 lists each step's time. Integration tests need a running Docker daemon. Run `npm run test:smoke` as
 well when a change touches sign-in, routing, or the flows the smoke specs cover.
 
-Deployment is manual: `docker compose up -d --build` on the host builds the image and recreates the
-app container, whose entrypoint migrates the database and then starts the server. CI never deploys,
-so the local gate is the gate.
+Deployment is automatic: a push to `main` runs the `ci` workflow, and when `ci-gate` passes the
+`deploy` workflow builds `moli-cashier:<commit sha>` and ships it to the server (see
+[docs/deploy.md](./docs/deploy.md)). So the local gate is not the only gate, but it must still pass
+before you push, and you watch CI after.
 
 ## Migrations
 
 - Generate with drizzle-kit, then keep the migration as hand-written SQL; keep only the latest
   snapshot and format the journal with Prettier.
-- Migrations are stop-the-world: the old container is stopped before the new one runs `npm run db:migrate`
-  in its entrypoint, so no previous release serves against the new schema and a column can be dropped or
-  renamed in the same release that stops using it. Names the model no longer mentions but the database
-  still has go in `retiredNames` in the schema contract test, which is only needed when a cleanup is
-  split across releases.
+- Migrations only add. The deploy keeps the previous release able to run against the new schema, so a
+  column or table that the code stops using is dropped by a migration in the _next_ release, never in the
+  same one, and nothing is renamed in one step. Names the model no longer mentions but the database
+  still has go in `retiredNames` in the schema contract test.
 - Every pending migration runs in one transaction under an advisory lock, so a failed migration leaves
-  the database untouched and the container does not start. Back up before upgrading.
+  the database untouched. The deploy takes a `pg_dump` first (`deploy/pre-deploy.sh`).
 - Name constraints and indexes `uq_<table>_…`, `idx_<table>_…`, `fk_<table>_<target>` and
   `ck_<table>_…`; primary keys stay `<table>_pkey`. The schema contract test enforces it.
 

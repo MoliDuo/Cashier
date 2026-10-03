@@ -43,3 +43,9 @@ next-env.d.ts
 .formless/
 .worktrees/
 .zcode/
+
+# secrets and keys
+.dev.vars
+*.key
+*.p12
+*.keystore

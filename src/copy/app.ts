@@ -1,5 +1,5 @@
 export const metadataCopy = {
-  title: "Cashier - AI 记账助手",
+  title: "Moli Cashier - AI 记账助手",
   description: "AI 驱动的智能记账工具",
 };
 

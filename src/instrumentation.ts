@@ -6,7 +6,7 @@ export async function register() {
     return;
   }
 
-  logger.info("Starting Cashier service...");
+  logger.info("Starting Moli Cashier service...");
 
   // Log critical configuration status for diagnostics (safe, no secrets exposed)
   try {

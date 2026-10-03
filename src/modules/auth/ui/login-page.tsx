@@ -50,7 +50,7 @@ export function AuthLoginPage({
             className="mx-auto mb-4 rounded-lg border border-border"
           />
           <h1 className={textRoleClassName("pageTitle")}>
-            <span translate="no">Cashier</span>
+            <span translate="no">Moli Cashier</span>
           </h1>
           <p className={textRoleClassName("bodyMuted", "mt-2")}>{authCopy.productTagline}</p>
         </div>
