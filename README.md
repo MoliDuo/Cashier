@@ -53,7 +53,7 @@ npm run dev:demo
 ```
 
 打开终端打印的本地地址，选择 `Continue as dev`。启动信息里列出了预置的示例 API 密钥，每个都标注了
-它写入的分账。`docker-compose.demo.yml` 启动专用的 `cashier-demo` PostgreSQL 和 MinIO，迁移
+它写入的分账。`docker-compose.demo.yml` 启动专用的 `cashier-demo` PostgreSQL 和对象存储，迁移
 `cashier_demo` 数据库，并写入虚构的票据和历史；AI 和邮件由本地假服务代替。每次启动都会先打印重建目标，
 再把工作区恢复成初始数据，上一次的修改不会保留。
 
@@ -62,7 +62,7 @@ npm run demo:reset            # 只预览目标
 npm run demo:reset -- --apply # 重建 dev@cashier.local 的专用数据
 ```
 
-默认端口为应用 `3000`、PostgreSQL `55433`、MinIO `59000`，可用 `CASHIER_DEMO_APP_PORT`、
+默认端口为应用 `3000`、PostgreSQL `55433`、对象存储 `59000`，可用 `CASHIER_DEMO_APP_PORT`、
 `CASHIER_DEMO_POSTGRES_PORT`、`CASHIER_DEMO_S3_PORT` 覆盖。
 
 ### 连接真实服务
@@ -74,7 +74,7 @@ npm ci
 cp .env.local.example .env
 ```
 
-编辑 `.env`，填入 AI 密钥（`OPENAI_API_KEY`）。然后启动 PostgreSQL、MinIO 和应用：
+编辑 `.env`，填入 AI 密钥（`OPENAI_API_KEY`）。然后启动 PostgreSQL、对象存储和应用：
 
 ```bash
 npm run docker:local
@@ -129,14 +129,14 @@ npm run account:enroll -- --email you@example.com
 
 ### S3 兼容对象存储
 
-| 变量                   | 必需 | 默认值  | 说明                                                   |
-| ---------------------- | ---- | ------- | ------------------------------------------------------ |
-| `S3_ENDPOINT`          | 是   | 无      | 服务端访问的 S3 兼容端点。浏览器从不直接访问对象存储。 |
-| `S3_REGION`            | 否   | `auto`  | MinIO 用任意值即可；其他服务按供应商配置。             |
-| `S3_BUCKET`            | 是   | 无      | 已经存在的私有存储桶名称。                             |
-| `S3_ACCESS_KEY_ID`     | 是   | 无      | S3 访问密钥 ID。                                       |
-| `S3_SECRET_ACCESS_KEY` | 是   | 无      | S3 访问密钥。                                          |
-| `S3_FORCE_PATH_STYLE`  | 否   | `false` | MinIO 等服务通常需要设为 `true`。                      |
+| 变量                   | 必需 | 默认值  | 说明                                                                              |
+| ---------------------- | ---- | ------- | --------------------------------------------------------------------------------- |
+| `S3_ENDPOINT`          | 是   | 无      | 服务端访问的 S3 兼容端点。浏览器从不直接访问对象存储。                            |
+| `S3_REGION`            | 否   | `auto`  | 自建网关须与它的 `VGW_REGION` 一致（compose 里是 `auto`）；其他服务按供应商配置。 |
+| `S3_BUCKET`            | 是   | 无      | 已经存在的私有存储桶名称。                                                        |
+| `S3_ACCESS_KEY_ID`     | 是   | 无      | S3 访问密钥 ID。                                                                  |
+| `S3_SECRET_ACCESS_KEY` | 是   | 无      | S3 访问密钥。                                                                     |
+| `S3_FORCE_PATH_STYLE`  | 否   | `false` | Versity、MinIO 等自建服务通常需要设为 `true`。                                    |
 
 ### 认证与内部密钥
 
@@ -156,7 +156,7 @@ npm run account:enroll -- --email you@example.com
 | --------------- | ------ | ------------------------------------------------------------------------------------------ |
 | `TRUSTED_PROXY` | 无     | 可选值仅为 `proxy`。设置后读取由你的反向代理覆盖的单值 `X-Real-IP`，应用端口不能直接暴露。 |
 | `LOG_LEVEL`     | `info` | 应用日志级别。                                                                             |
-| `S3_PORT`       | `9000` | 本地开发用的 MinIO 暴露的端口（Docker 部署里 MinIO 不暴露端口）。                          |
+| `S3_PORT`       | `9000` | 本地开发用的对象存储暴露的端口（Docker 部署里不暴露端口）。                                |
 
 未配置可信入口，或 `X-Real-IP` 为空、多值、非法时，地址会归入固定的哈希 `unknown` 桶，登录限流仍然生效。客户端地址只用于登录限流，API v1 和登录后的操作不限流。
 
@@ -258,7 +258,7 @@ compose 会先停掉旧的应用容器，再创建新的；新容器的入口先
 以及非敏感配置的记录。恢复时使用彼此对应的数据库和对象存储快照，只恢复一项会留下缺图片的记录或没人引用的对象。
 
 `docker compose down` 只停止并移除容器，数据目录保持不动；删除数据目录会永久删除数据库和图片。
-本地开发用的 `docker-compose.local.yml` 有两个具名卷：`cashier_postgres` 和 `cashier_minio`，
+本地开发用的 `docker-compose.local.yml` 有两个具名卷：`cashier_postgres` 和 `cashier_s3`，
 `npm run docker:down` 同样保留它们，加 `-v` 会永久删除。
 
 ## 开发
@@ -280,7 +280,7 @@ npm run check
 | ------------------------ | -------------------------------------- |
 | `npm run dev`            | 启动开发服务器                         |
 | `npm run dev:demo`       | 启动独立的 demo 工作区                 |
-| `npm run docker:local`   | 启动本地 PostgreSQL 和 MinIO           |
+| `npm run docker:local`   | 启动本地 PostgreSQL 和对象存储         |
 | `npm run docker:down`    | 停止本地基础服务，保留具名卷           |
 | `npm run db:migrate`     | 对当前 `DATABASE_URL` 应用迁移         |
 | `npm run account:create` | 创建唯一的账号、账本、分账和默认分类   |

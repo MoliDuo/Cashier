@@ -306,7 +306,7 @@ describe("demo reset preview", () => {
     expect(statements()).toContain("BEGIN READ ONLY");
     expect(statements()).toContain("COMMIT");
     expect(statements().filter((sql) => WRITES.test(sql))).toEqual([]);
-    // Neither MinIO nor its bucket bootstrap is involved: no object can be
+    // Neither the object store nor its bucket bootstrap is involved: no object can be
     // created or deleted by a preview.
     expect(previewState.storageClients).toBe(0);
     expect(previewState.s3Sends).toBe(0);

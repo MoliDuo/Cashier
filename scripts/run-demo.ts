@@ -79,12 +79,12 @@ async function run(command: string, args: string[], environment: NodeJS.ProcessE
 
 /** Returns the standalone Compose invocation used by the demo stack. */
 export function createDemoComposeArgs(environment: Environment = process.env): string[] {
-  return [...composeProjectArgs(environment), "up", "-d", "postgres", "minio", "storage-bootstrap"];
+  return [...composeProjectArgs(environment), "up", "-d", "postgres", "s3", "storage-bootstrap"];
 }
 
 /**
  * The services a preview needs, which is only the database it reads: bringing up
- * MinIO and its bucket bootstrap would create the very objects a preview promises
+ * the object store and its bucket bootstrap would create the very objects a preview promises
  * not to touch.
  *
  * Returns the database-only Compose invocation the preview uses.

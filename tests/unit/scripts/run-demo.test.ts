@@ -28,7 +28,7 @@ describe("demo runtime environment", () => {
       "up",
       "-d",
       "postgres",
-      "minio",
+      "s3",
       "storage-bootstrap",
     ]);
   });
@@ -164,7 +164,7 @@ describe("demo command sequencing", () => {
     const sequence = flat(calls);
     expect(sequence).not.toContain("reset-schema");
     expect(sequence).not.toContain("migrate-database");
-    expect(sequence).not.toContain("minio");
+    expect(sequence).not.toContain("s3");
     expect(sequence).not.toContain("storage-bootstrap");
     expect(sequence).not.toContain("next");
   });
@@ -190,7 +190,7 @@ describe("demo command sequencing", () => {
         "up",
         "-d",
         "postgres",
-        "minio",
+        "s3",
         "storage-bootstrap",
       ],
       [process.execPath, ...TSX, "scripts/demo-data.ts", "reset-schema"],
