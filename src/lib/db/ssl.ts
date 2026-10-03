@@ -7,9 +7,17 @@ export function resolvePostgresSsl(connectionString: string, nodeEnv: string | u
   const sslMode = url.searchParams.get("sslmode")?.toLowerCase();
   const isLocal = LOCAL_DATABASE_HOSTS.has(url.hostname);
 
-  if (nodeEnv === "production" && !isLocal && sslMode !== "require" && sslMode !== "verify-full") {
+  // `disable` is an explicit choice, for a database on a private network (the compose file's
+  // `postgres` host); only a URL that says nothing about TLS is refused.
+  if (
+    nodeEnv === "production" &&
+    !isLocal &&
+    sslMode !== "require" &&
+    sslMode !== "verify-full" &&
+    sslMode !== "disable"
+  ) {
     throw new Error(
-      "Production DATABASE_URL for a non-local PostgreSQL host requires sslmode=require or sslmode=verify-full"
+      "Production DATABASE_URL for a non-local PostgreSQL host requires an explicit sslmode: require, verify-full or disable"
     );
   }
 

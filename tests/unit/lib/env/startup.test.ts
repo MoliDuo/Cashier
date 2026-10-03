@@ -67,7 +67,7 @@ describe("validateStartupEnv", () => {
     const result = validateStartupEnv({ ...baseEnv, NODE_ENV: "production" });
 
     expect(result.AI_MODEL).toBe("gpt-4o");
-    expect(result.DATABASE_POOL_MAX).toBe(5);
+    expect(result.DATABASE_POOL_MAX).toBe(10);
   });
 
   it("accepts an absent or platform-managed trusted proxy", () => {

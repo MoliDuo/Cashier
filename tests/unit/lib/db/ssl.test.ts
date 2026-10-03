@@ -14,13 +14,19 @@ describe("resolvePostgresSsl", () => {
     );
   });
 
-  it("rejects insecure non-local production URLs", () => {
+  it("accepts an explicit sslmode=disable for a non-local production host", () => {
+    expect(resolvePostgresSsl("postgresql://postgres/cashier?sslmode=disable", "production")).toBe(
+      false
+    );
+  });
+
+  it("rejects non-local production URLs that do not choose a TLS mode", () => {
     expect(() => resolvePostgresSsl("postgresql://db.example/cashier", "production")).toThrow(
-      "requires sslmode=require or sslmode=verify-full"
+      "requires an explicit sslmode"
     );
     expect(() =>
       resolvePostgresSsl("postgresql://db.example/cashier?sslmode=prefer", "production")
-    ).toThrow("requires sslmode=require or sslmode=verify-full");
+    ).toThrow("requires an explicit sslmode");
   });
 
   it("allows local and non-production URLs without forcing TLS", () => {

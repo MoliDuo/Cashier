@@ -1,5 +1,4 @@
 import "server-only";
-import { attachDatabasePool } from "@vercel/functions/db-connections";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@/persistence";
@@ -19,9 +18,6 @@ function createPool(): Pool {
     idleTimeoutMillis: 30_000,
     statement_timeout: 30_000,
   });
-  // On Vercel, keeps a suspending function alive until its idle connections
-  // close, so none is left open on the database; elsewhere it does nothing.
-  attachDatabasePool(created);
   return created;
 }
 
@@ -30,6 +26,9 @@ const pool = globalForDb.pool ?? createPool();
 globalForDb.pool = pool;
 
 export const db = drizzle(pool, { schema });
+
+/** The pool itself, for the few callers that need a dedicated session (advisory locks). */
+export const databasePool: Pool = pool;
 
 /** Ends the pool, so a command-line script can exit once its work is done. */
 export async function closeDatabase(): Promise<void> {
