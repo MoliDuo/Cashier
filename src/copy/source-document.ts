@@ -21,7 +21,6 @@ export const sourceDocumentInputCopy = {
   entryDate: "日期（可选）",
   preparing: "正在准备图片",
   uploading: "正在上传图片",
-  finalizing: "正在确认上传",
   submitting: "正在创建账单，此阶段无法取消",
   cancelling: "正在取消上传…",
   imageTooLarge: (v: { fileName: string | number }) =>

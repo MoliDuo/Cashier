@@ -10,16 +10,19 @@
 /** Maximum number of inline images per API v1 request. */
 export const API_V1_MAX_IMAGES = 3;
 
-/** Maximum decoded bytes for a single inline image. */
-export const API_V1_MAX_DECODED_IMAGE_BYTES = 3 * 1024 * 1024; // 3 MiB
+/** Maximum decoded bytes for a single inline image: a phone photo straight from the camera. */
+export const API_V1_MAX_DECODED_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MiB
 
-/** Maximum total decoded bytes across all images in one API v1 request. */
-export const API_V1_MAX_DECODED_BATCH_BYTES = 3 * 1024 * 1024; // 3 MiB
+/**
+ * Maximum total decoded bytes across all images in one API v1 request. What is stored is the
+ * normalized form, which a submission still limits to 3 MiB in total.
+ */
+export const API_V1_MAX_DECODED_BATCH_BYTES = 24 * 1024 * 1024; // 24 MiB
 
 /**
  * Maximum raw JSON request body size.
  *
- * 3 MiB of decoded data needs exactly 4 MiB of base64 characters; the 64 KiB
+ * 24 MiB of decoded data needs exactly 32 MiB of base64 characters; the 64 KiB
  * allowance covers the three possible data: URL prefixes, the MIME strings,
  * and the JSON structure around the images, so any payload that passes the
  * decoded-size checks can never be rejected on the wire.

@@ -10,12 +10,7 @@ import {
 } from "@/lib/validation";
 import { MAX_BATCH_SIZE } from "@/lib/batch-ids";
 import { MAX_SEARCH_LENGTH, normalizeSearchTerm } from "@/lib/search";
-import {
-  MAX_FILES,
-  MAX_ORIGINAL_BYTES_PER_FILE,
-  MAX_TEXT_CHARACTERS,
-  SUPPORTED_MIME_TYPES,
-} from "@/lib/storage/upload-policy";
+import { MAX_FILES, MAX_TEXT_CHARACTERS, SUPPORTED_MIME_TYPES } from "@/lib/storage/upload-policy";
 import {
   API_V1_MAX_DECODED_BATCH_BYTES,
   API_V1_MAX_DECODED_IMAGE_BYTES,
@@ -174,7 +169,10 @@ const imagesSchemaV1 = z
     // for elements that actually reached the transform.
     const total = images.reduce((sum, image) => sum + (image.bytes?.length ?? 0), 0);
     if (total > API_V1_MAX_DECODED_BATCH_BYTES) {
-      ctx.addIssue({ code: "custom", message: "Decoded image batch exceeds 3 MiB" });
+      ctx.addIssue({
+        code: "custom",
+        message: `Decoded image batch exceeds ${API_V1_MAX_DECODED_BATCH_BYTES / 1024 / 1024} MiB`,
+      });
     }
   });
 
@@ -193,26 +191,6 @@ export const retrySourceDocumentInputSchema = strictObjectSchema({
   if ((value.text == null || value.text === "") && value.storedFileIds.length === 0) {
     ctx.addIssue({ code: "custom", message: "Content (text or images) is required" });
   }
-});
-
-export const createSourceDocumentUploadPlanInputSchema = z
-  .array(
-    strictObjectSchema({
-      contentType: z.string().regex(IMAGE_MIME_REGEX, "Invalid image type"),
-      byteSize: z.number().int().positive().max(MAX_ORIGINAL_BYTES_PER_FILE),
-      originalFilename: z.string().max(255).nullable(),
-      checksum: z
-        .string()
-        .regex(/^[a-f\d]{64}$/i)
-        .nullable()
-        .optional(),
-    })
-  )
-  .min(1)
-  .max(MAX_FILES);
-
-export const finalizeSourceDocumentUploadInputSchema = strictObjectSchema({
-  storedFileIds: z.array(uuidSchema).min(1).max(MAX_FILES),
 });
 
 const validateFilterRange = (
@@ -360,10 +338,4 @@ export function parseSourceDocumentTargetIds(input: unknown): string[] {
 
 export type CreateSourceDocumentInputContract = z.infer<typeof createSourceDocumentInputSchema>;
 export type RetrySourceDocumentInputContract = z.infer<typeof retrySourceDocumentInputSchema>;
-export type CreateSourceDocumentUploadPlanInput = z.infer<
-  typeof createSourceDocumentUploadPlanInputSchema
->;
-export type FinalizeSourceDocumentUploadInput = z.infer<
-  typeof finalizeSourceDocumentUploadInputSchema
->;
 export type BatchUpdateSourceDocumentsInput = z.infer<typeof updateSourceDocumentInputSchema>;

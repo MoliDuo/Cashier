@@ -1,15 +1,7 @@
 "use client";
 
 import { compressImage } from "@/lib/image-utils";
-import {
-  MAX_FILES,
-  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
-  MAX_ORIGINAL_BYTES_PER_FILE,
-} from "@/lib/storage/upload-policy";
-import {
-  createSourceDocumentUploadPlanAction,
-  finalizeSourceDocumentUploadAction,
-} from "@/modules/source-document/server-actions/uploads";
+import { MAX_FILES, MAX_ORIGINAL_BYTES_PER_FILE } from "@/lib/storage/upload-policy";
 
 export interface SourceDocumentUploadImage {
   file: File;
@@ -24,14 +16,7 @@ export interface SourceDocumentSubmitPayload {
 }
 
 export interface SourceDocumentSubmissionProgress {
-  phase:
-    | "preparing"
-    | "planning"
-    | "uploading"
-    | "finalizing"
-    | "submitting"
-    | "cancelling"
-    | "complete";
+  phase: "preparing" | "uploading" | "submitting" | "cancelling" | "complete";
   percent: number;
   loadedBytes?: number;
   totalBytes?: number;
@@ -39,7 +24,7 @@ export interface SourceDocumentSubmissionProgress {
   fileCount?: number;
 }
 
-export type SourceDocumentSubmissionUploadStage = "prepare" | "plan" | "upload" | "finalize";
+export type SourceDocumentSubmissionUploadStage = "prepare" | "upload";
 
 export class SourceDocumentSubmissionUploadError extends Error {
   constructor(
@@ -54,13 +39,19 @@ export class SourceDocumentSubmissionUploadError extends Error {
 
 interface InlinePreparationDependencies {
   compress?: typeof compressImage;
-  createPlan?: typeof createSourceDocumentUploadPlanAction;
-  finalize?: typeof finalizeSourceDocumentUploadAction;
-  put?: typeof fetch;
+  post?: typeof fetch;
   signal?: AbortSignal;
 }
 
-const QUALITY_STEPS = [0.78, 0.68, 0.58, 0.48, 0.38] as const;
+/**
+ * A photo above this size is shrunk in the browser first, to save the upload; the server normalizes
+ * every image again, so this is only about bytes on the wire.
+ */
+const COMPRESS_ABOVE_BYTES = 2 * 1024 * 1024;
+const COMPRESS_DIMENSION = 2048;
+const COMPRESS_QUALITY = 0.85;
+const UPLOAD_CONCURRENCY = 2;
+const UPLOAD_ATTEMPTS = 3;
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted === true) {
@@ -74,11 +65,9 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function filesFitUploadLimits(files: readonly File[]): boolean {
-  return (
-    files.every((file) => file.size <= MAX_ORIGINAL_BYTES_PER_FILE) &&
-    files.reduce((total, file) => total + file.size, 0) <= MAX_NORMALIZED_BYTES_PER_ATTEMPT
-  );
+/** Rejections that retrying cannot fix: the server understood the request and refused it. */
+function isFinalRefusal(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
 function submissionBase(payload: SourceDocumentSubmitPayload): SourceDocumentSubmitPayload {
@@ -89,15 +78,67 @@ function submissionBase(payload: SourceDocumentSubmitPayload): SourceDocumentSub
   };
 }
 
-async function sha256(file: File, signal?: AbortSignal): Promise<string> {
-  throwIfAborted(signal);
-  const buffer = await file.arrayBuffer();
-  throwIfAborted(signal);
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  throwIfAborted(signal);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+async function prepareFile(file: File, deps: InlinePreparationDependencies): Promise<File> {
+  throwIfAborted(deps.signal);
+  if (file.size <= COMPRESS_ABOVE_BYTES) return file;
+  try {
+    const compressed = await (deps.compress ?? compressImage)(
+      file,
+      COMPRESS_DIMENSION,
+      COMPRESS_DIMENSION,
+      COMPRESS_QUALITY,
+      deps.signal
+    );
+    throwIfAborted(deps.signal);
+    return compressed.file.size < file.size ? compressed.file : file;
+  } catch (error) {
+    if (deps.signal?.aborted === true || isAbortError(error)) {
+      throwIfAborted(deps.signal);
+      throw error;
+    }
+    // The original is still uploadable when it fits the server's limit.
+    if (file.size <= MAX_ORIGINAL_BYTES_PER_FILE) return file;
+    throw new SourceDocumentSubmissionUploadError("Failed to compress source image", "prepare", {
+      cause: error,
+    });
+  }
 }
 
+async function uploadFile(file: File, deps: InlinePreparationDependencies): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < UPLOAD_ATTEMPTS; attempt += 1) {
+    throwIfAborted(deps.signal);
+    try {
+      const response = await (deps.post ?? fetch)("/api/stored-files", {
+        method: "POST",
+        headers: { "Content-Type": file.type, "X-Filename": encodeURIComponent(file.name) },
+        body: file,
+        ...(deps.signal === undefined ? {} : { signal: deps.signal }),
+      });
+      if (response.ok) {
+        const stored = (await response.json()) as { id?: unknown };
+        if (typeof stored.id !== "string") throw new Error("Upload response had no file id");
+        return stored.id;
+      }
+      lastError = new Error(`Upload failed with ${response.status}`);
+      if (isFinalRefusal(response.status)) break;
+    } catch (error) {
+      if (deps.signal?.aborted === true || isAbortError(error)) {
+        throwIfAborted(deps.signal);
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+  throwIfAborted(deps.signal);
+  throw lastError ?? new Error("Upload failed");
+}
+
+/**
+ * Sends a submission's images to the server one request each and returns the payload naming the
+ * stored files. Nothing is kept on the server that a document does not take: files that end up
+ * unused are swept after a week.
+ */
 export async function uploadSourceDocumentSubmissionImages(
   payload: SourceDocumentSubmitPayload,
   dependencies: InlinePreparationDependencies = {},
@@ -111,46 +152,8 @@ export async function uploadSourceDocumentSubmissionImages(
   }
 
   onProgress?.({ phase: "preparing", percent: 0, fileCount: images.length });
-  const originals = images.map((image) => image.file);
-  const compress = dependencies.compress ?? compressImage;
-
-  let files: File[] | null = filesFitUploadLimits(originals) ? originals : null;
-  if (files == null) {
-    for (let qualityIndex = 0; qualityIndex < QUALITY_STEPS.length; qualityIndex += 1) {
-      throwIfAborted(dependencies.signal);
-      const quality = QUALITY_STEPS[qualityIndex]!;
-      let compressed;
-      try {
-        compressed = await Promise.all(
-          originals.map((file) => compress(file, 1080, 1080, quality, dependencies.signal))
-        );
-      } catch (error) {
-        if (dependencies.signal?.aborted === true || isAbortError(error)) {
-          throwIfAborted(dependencies.signal);
-          throw error;
-        }
-        throw new SourceDocumentSubmissionUploadError(
-          "Failed to compress source image",
-          "prepare",
-          {
-            cause: error,
-          }
-        );
-      }
-      throwIfAborted(dependencies.signal);
-      const candidates = compressed.map((image) => image.file);
-      onProgress?.({
-        phase: "preparing",
-        percent: Math.min(80, 15 + qualityIndex * 15),
-        fileCount: candidates.length,
-      });
-      if (filesFitUploadLimits(candidates)) {
-        files = candidates;
-        break;
-      }
-    }
-  }
-  if (files == null) {
+  const files = await Promise.all(images.map((image) => prepareFile(image.file, dependencies)));
+  if (files.some((file) => file.size > MAX_ORIGINAL_BYTES_PER_FILE)) {
     throw new SourceDocumentSubmissionUploadError(
       "Images cannot be compressed within the upload size limit",
       "prepare"
@@ -159,53 +162,26 @@ export async function uploadSourceDocumentSubmissionImages(
 
   try {
     throwIfAborted(dependencies.signal);
-    onProgress?.({ phase: "planning", percent: 55, fileCount: files.length });
-    const checksums = await Promise.all(files.map((file) => sha256(file, dependencies.signal)));
-    throwIfAborted(dependencies.signal);
-    const plan = await (dependencies.createPlan ?? createSourceDocumentUploadPlanAction)(
-      files.map((file, index) => ({
-        contentType: file.type,
-        byteSize: file.size,
-        originalFilename: file.name,
-        checksum: checksums[index]!,
-      }))
-    );
-    throwIfAborted(dependencies.signal);
-    let loadedBytes = 0;
     const totalBytes = files.reduce((total, file) => total + file.size, 0);
+    const storedFileIds: string[] = new Array<string>(files.length);
+    let loadedBytes = 0;
     let nextIndex = 0;
-    const uploadWorker = async () => {
-      while (nextIndex < plan.targets.length) {
+    onProgress?.({
+      phase: "uploading",
+      percent: 20,
+      loadedBytes,
+      totalBytes,
+      fileCount: files.length,
+    });
+    const worker = async () => {
+      while (nextIndex < files.length) {
         const index = nextIndex++;
-        const target = plan.targets[index]!;
         const file = files[index]!;
-        let response: Response | null = null;
-        let lastError: unknown;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          throwIfAborted(dependencies.signal);
-          try {
-            response = await (dependencies.put ?? fetch)(target.url, {
-              method: "PUT",
-              headers: target.requiredHeaders,
-              body: file,
-              ...(dependencies.signal === undefined ? {} : { signal: dependencies.signal }),
-            });
-            if (response.ok) break;
-            lastError = new Error(`Direct upload failed with ${response.status}`);
-          } catch (error) {
-            if (dependencies.signal?.aborted === true || isAbortError(error)) {
-              throwIfAborted(dependencies.signal);
-              throw error;
-            }
-            lastError = error;
-          }
-        }
-        throwIfAborted(dependencies.signal);
-        if (response?.ok !== true) throw lastError ?? new Error("Direct upload failed");
+        storedFileIds[index] = await uploadFile(file, dependencies);
         loadedBytes += file.size;
         onProgress?.({
           phase: "uploading",
-          percent: 55 + Math.round((loadedBytes / totalBytes) * 30),
+          percent: 20 + Math.round((loadedBytes / totalBytes) * 75),
           loadedBytes,
           totalBytes,
           fileIndex: index,
@@ -213,16 +189,9 @@ export async function uploadSourceDocumentSubmissionImages(
         });
       }
     };
-    await Promise.all(Array.from({ length: Math.min(3, files.length) }, uploadWorker));
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, worker));
     throwIfAborted(dependencies.signal);
-    onProgress?.({ phase: "finalizing", percent: 88, fileCount: files.length });
-    const storedFileIds = await (dependencies.finalize ?? finalizeSourceDocumentUploadAction)({
-      storedFileIds: plan.targets.map((target) => target.id),
-    });
-    return {
-      ...base,
-      storedFileIds: [...(base.storedFileIds ?? []), ...storedFileIds],
-    };
+    return { ...base, storedFileIds: [...base.storedFileIds, ...storedFileIds] };
   } catch (error) {
     if (dependencies.signal?.aborted === true || isAbortError(error)) {
       throwIfAborted(dependencies.signal);

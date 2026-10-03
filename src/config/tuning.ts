@@ -46,6 +46,8 @@ export const AI_CATEGORY_REQUEST_TIMEOUT_MS = 60_000;
 /** The most entries one category assignment can be started over. */
 export const CATEGORY_ASSIGNMENT_MAX_ENTRIES = 5000;
 
+/** How many images are decoded at once; a large photo takes a few hundred megabytes to decode. */
+export const IMAGE_PROCESSING_CONCURRENCY = 2;
 /** JPEG quality for a normalised receipt photo. */
 export const MAX_IMAGE_QUALITY = 85;
 

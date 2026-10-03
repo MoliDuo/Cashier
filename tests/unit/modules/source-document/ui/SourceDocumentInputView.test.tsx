@@ -92,7 +92,7 @@ describe("SourceDocumentInputView upload cancellation", () => {
         fileInputRef={createRef<HTMLInputElement>()}
         isPending
         isSubmitting={false}
-        progress={{ phase: "finalizing", percent: 88 }}
+        progress={{ phase: "submitting", percent: 100 }}
         canSubmit
         canCancelUpload={false}
         onEntryDateChange={vi.fn()}
@@ -110,7 +110,7 @@ describe("SourceDocumentInputView upload cancellation", () => {
     );
 
     expect(screen.queryByRole("button", { name: sourceDocumentInputCopy.cancelUpload })).toBeNull();
-    expect(screen.getByText(sourceDocumentInputCopy.finalizing)).toBeTruthy();
+    expect(screen.getByText(sourceDocumentInputCopy.submitting)).toBeTruthy();
   });
 
   it("announces the cancelling phase without exposing another cancel action", () => {

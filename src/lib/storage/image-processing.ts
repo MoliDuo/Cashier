@@ -16,7 +16,7 @@ import {
   validateImageProcessing,
   sanitizeMimeType,
 } from "@/lib/storage/upload-policy";
-import { MAX_IMAGE_QUALITY } from "@/config/tuning";
+import { IMAGE_PROCESSING_CONCURRENCY, MAX_IMAGE_QUALITY } from "@/config/tuning";
 
 /**
  * Image processing options
@@ -60,10 +60,34 @@ const MAX_OUTPUT_SIZE = MAX_NORMALIZED_BYTES_PER_FILE;
 const MAX_RETRIES = 3;
 
 /**
- * Limit input pixels for Sharp. Uses the environment value which defaults
- * to 25 MP (higher than the policy 16 MP to allow a controlled error path).
+ * Limit input pixels for Sharp: a margin over the policy limit, so an image
+ * just over it is refused by the policy check with its own message rather
+ * than by Sharp.
  */
 const MAX_INPUT_PIXELS = MAX_MEGAPIXELS_PER_FILE * 1_000_000 * 1.5;
+
+let activeProcessing = 0;
+const waitingForProcessing: Array<() => void> = [];
+
+/**
+ * Decoding a large photo takes a few hundred megabytes, so only a couple of
+ * images are decoded at once, whichever request they came from.
+ */
+async function withProcessingSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (activeProcessing < IMAGE_PROCESSING_CONCURRENCY) {
+    activeProcessing += 1;
+  } else {
+    // The slot is handed over without being released, so the count stays put.
+    await new Promise<void>((resolve) => waitingForProcessing.push(resolve));
+  }
+  try {
+    return await work();
+  } finally {
+    const next = waitingForProcessing.shift();
+    if (next == null) activeProcessing -= 1;
+    else next();
+  }
+}
 
 /**
  * Process and compress an image buffer
@@ -74,11 +98,19 @@ const MAX_INPUT_PIXELS = MAX_MEGAPIXELS_PER_FILE * 1_000_000 * 1.5;
  * @returns Processed buffer and trusted output MIME type
  * @throws {Error} If the image cannot be decoded or violates policy limits
  */
-export async function processImage(
+export function processImage(
   buffer: Buffer,
   mimeType: string,
-  options: ImageProcessingOptions = {},
-  retryCount: number = 0
+  options: ImageProcessingOptions = {}
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  return withProcessingSlot(() => processImageAttempt(buffer, mimeType, options, 0));
+}
+
+async function processImageAttempt(
+  buffer: Buffer,
+  mimeType: string,
+  options: ImageProcessingOptions,
+  retryCount: number
 ): Promise<{ buffer: Buffer; mimeType: string }> {
   const opts = { ...DEFAULT_IMAGE_OPTIONS, ...options };
 
@@ -218,7 +250,7 @@ export async function processImage(
         "Processed image exceeds max size, retrying with lower quality"
       );
       // Attempt another pass with lower quality
-      return processImage(
+      return processImageAttempt(
         buffer,
         mimeType,
         {

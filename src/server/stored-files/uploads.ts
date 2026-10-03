@@ -1,47 +1,63 @@
 import "server-only";
 import crypto from "node:crypto";
-import { and, eq, inArray, isNull, notExists } from "drizzle-orm";
-import type {
-  DirectUploadPlanContract,
-  StoredFileContract,
-  UploadFileRequestContract,
-} from "./types";
+import { and, eq, inArray, notExists } from "drizzle-orm";
+import type { StoredFileContract } from "./types";
 import { db } from "@/lib/db";
 import { getS3Storage } from "@/lib/storage/s3";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
+import { AppError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { processImage } from "@/lib/storage/image-processing";
 import {
-  DIRECT_UPLOAD_FINALIZE_BUFFER_MS,
   MAX_FILES,
   MAX_NORMALIZED_BYTES_PER_ATTEMPT,
   MAX_ORIGINAL_BYTES_PER_FILE,
-  UPLOAD_PLAN_EXPIRY_MS,
+  SUPPORTED_MIME_SET,
 } from "@/lib/storage/upload-policy";
 import { sourceDocumentFiles, storedFiles } from "@/persistence";
-import { checksum, durableKey, mapStoredFile, temporaryKey, validateRequests } from "./shared";
+import { checksum, durableKey, mapStoredFile, temporaryKey } from "./shared";
 
-interface PendingFile {
+interface NewFile {
   id: string;
   contentType: string;
   byteSize: number;
   originalFilename: string | null;
-  checksum: string | null;
+  checksum: string;
+  bytes: Buffer;
 }
 
-/** Records files as pending; finalization or the daily sweep settles them. */
-async function reservePendingFiles(files: readonly PendingFile[], now: Date): Promise<void> {
-  await db.insert(storedFiles).values(
-    files.map((file) => ({
-      id: file.id,
-      storageKey: durableKey(file.id),
-      contentType: file.contentType,
-      byteSize: file.byteSize,
-      originalFilename: file.originalFilename,
-      checksum: file.checksum,
-      createdAt: now,
-    }))
-  );
+/**
+ * Records the files, then writes their objects. The row comes first so that an object never exists
+ * without one a sweep can find; a failure after it removes the rows again. Files are recorded as
+ * ready, since their bytes are already normalized.
+ */
+async function storeFiles(files: readonly NewFile[]): Promise<(typeof storedFiles.$inferSelect)[]> {
+  const now = new Date();
+  const rows = await db
+    .insert(storedFiles)
+    .values(
+      files.map((file) => ({
+        id: file.id,
+        storageKey: durableKey(file.id),
+        contentType: file.contentType,
+        byteSize: file.byteSize,
+        originalFilename: file.originalFilename,
+        checksum: file.checksum,
+        createdAt: now,
+        finalizedAt: now,
+      }))
+    )
+    .returning();
+  const ids = files.map((file) => file.id);
+  try {
+    const storage = getS3Storage();
+    await Promise.all(
+      files.map((file) => storage.upload(durableKey(file.id), file.bytes, file.contentType))
+    );
+  } catch (error) {
+    await discardUnusedFiles(ids);
+    throw error;
+  }
+  return rows;
 }
 
 /**
@@ -79,160 +95,58 @@ export async function discardUnusedFiles(storedFileIds: readonly string[]): Prom
 }
 
 /**
- * Plans a browser upload: one pending file per request, each with a presigned
- * URL for its temporary object. The declared size, type and checksum are held
- * on the pending row until finalization checks the bytes against them.
+ * Normalizes one uploaded image and stores it as a ready file. The declared type only has to be a
+ * supported one: Sharp decides what the bytes are, and the stored file carries what Sharp wrote.
+ * The attempt's total is checked again when a document takes the files.
  */
-export async function planDirectUpload(
-  files: readonly UploadFileRequestContract[]
-): Promise<DirectUploadPlanContract> {
-  validateRequests(files);
-  if (files.some((file) => file.checksum == null || !/^[a-f\d]{64}$/.test(file.checksum))) {
-    throw new ValidationError("Direct uploads require a lowercase SHA-256 checksum");
+export async function storeUploadedImage(input: {
+  bytes: Buffer;
+  contentType: string;
+  originalFilename: string | null;
+}): Promise<StoredFileContract> {
+  if (!SUPPORTED_MIME_SET.has(input.contentType)) {
+    throw new ValidationError("Unsupported upload content type");
   }
-  if (files.reduce((total, file) => total + file.byteSize, 0) > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
-    throw new ValidationError("Direct upload batch exceeds the configured total byte limit");
+  if (input.bytes.length === 0 || input.bytes.length > MAX_ORIGINAL_BYTES_PER_FILE) {
+    throw new ValidationError("Upload file size exceeds the configured limit");
   }
-
-  const now = new Date();
-  const pending = files.map((file) => ({
+  if ((input.originalFilename?.length ?? 0) > 255) {
+    throw new ValidationError("Upload filename is too long");
+  }
+  const processed = await processImage(input.bytes, input.contentType).catch((error: unknown) => {
+    // Bytes Sharp cannot read are the uploader's mistake, not a fault here.
+    throw error instanceof AppError
+      ? error
+      : new ValidationError("The file is not a readable image");
+  });
+  if (processed.buffer.length > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
+    throw new ValidationError(
+      `Stored image is ${processed.buffer.length} bytes, over the attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
+    );
+  }
+  const file: NewFile = {
     id: crypto.randomUUID(),
-    contentType: file.contentType,
-    byteSize: file.byteSize,
-    originalFilename: file.originalFilename,
-    checksum: file.checksum!,
-  }));
-  await reservePendingFiles(pending, now);
-  try {
-    const targets = await Promise.all(
-      pending.map(async (file) => ({
-        id: file.id,
-        ...(await getS3Storage().presignUpload(
-          temporaryKey(file.id),
-          file.contentType,
-          file.checksum,
-          Math.floor((UPLOAD_PLAN_EXPIRY_MS - DIRECT_UPLOAD_FINALIZE_BUFFER_MS) / 1000)
-        )),
-      }))
-    );
-    return {
-      expiresAt: new Date(now.getTime() + UPLOAD_PLAN_EXPIRY_MS).toISOString(),
-      targets,
-      maxFiles: MAX_FILES,
-      maxBytesPerFile: MAX_ORIGINAL_BYTES_PER_FILE,
-    };
-  } catch (error) {
-    await discardUnusedFiles(pending.map((file) => file.id));
-    throw error;
-  }
-}
-
-/**
- * Inspects, normalizes and stores the objects a browser uploaded, then marks
- * their files ready. Finalizing files that are already ready returns them
- * unchanged, so a retried request is harmless.
- */
-export async function finalizeDirectUpload(input: {
-  storedFileIds: readonly string[];
-}): Promise<readonly StoredFileContract[]> {
-  const { storedFileIds } = input;
-  if (storedFileIds.length === 0 || new Set(storedFileIds).size !== storedFileIds.length) {
-    throw new ValidationError("Finalization requires unique stored files");
-  }
-  const rows = await db
-    .select()
-    .from(storedFiles)
-    .where(inArray(storedFiles.id, [...storedFileIds]));
-  if (rows.length !== storedFileIds.length) throw new NotFoundError("Stored file");
-  const now = new Date();
-  const pending = rows.filter((row) => row.finalizedAt == null);
-  if (pending.some((row) => row.createdAt.getTime() + UPLOAD_PLAN_EXPIRY_MS <= now.getTime())) {
-    throw new ConflictError("Upload plan has expired");
-  }
-
-  if (pending.length > 0) {
-    const storage = getS3Storage();
-    let normalized: { bytes: Buffer; contentType: string; checksum: string }[];
-    try {
-      const uploaded = await Promise.all(
-        pending.map(async (row) => {
-          const { metadata, bytes } = await storage.readObject(temporaryKey(row.id));
-          if (
-            metadata.byteSize !== row.byteSize ||
-            bytes.length !== row.byteSize ||
-            metadata.contentType !== row.contentType ||
-            checksum(bytes) !== row.checksum
-          ) {
-            throw new ConflictError("Uploaded object does not match the upload plan");
-          }
-          return bytes;
-        })
-      );
-      normalized = await Promise.all(
-        uploaded.map(async (bytes, position) => {
-          const processed = await processImage(bytes, pending[position]!.contentType);
-          return {
-            bytes: processed.buffer,
-            contentType: processed.mimeType,
-            checksum: checksum(processed.buffer),
-          };
-        })
-      );
-    } catch (error) {
-      // Bytes that break the plan never become usable; bytes still on their
-      // way leave the files pending for another try.
-      if (error instanceof ConflictError) {
-        await discardUnusedFiles(pending.map((row) => row.id));
-      }
-      throw error;
-    }
-    const readyBytes = rows
-      .filter((row) => row.finalizedAt != null)
-      .reduce((sum, row) => sum + row.byteSize, 0);
-    const totalBytes = normalized.reduce((sum, file) => sum + file.bytes.length, readyBytes);
-    if (totalBytes > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
-      throw new ValidationError(
-        `Total stored bytes ${totalBytes} exceeds attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
-      );
-    }
-
-    await Promise.all(
-      pending.map(async (row, position) => {
-        const file = normalized[position]!;
-        await storage.upload(row.storageKey, file.bytes, file.contentType);
-        // A concurrent finalization of the same file wrote the same bytes, so
-        // whichever update lands first is the one that counts.
-        await db
-          .update(storedFiles)
-          .set({
-            contentType: file.contentType,
-            byteSize: file.bytes.length,
-            checksum: file.checksum,
-            finalizedAt: now,
-          })
-          .where(and(eq(storedFiles.id, row.id), isNull(storedFiles.finalizedAt)));
-      })
-    );
-    await Promise.all(pending.map((row) => storage.delete(temporaryKey(row.id))));
-  }
-
-  const ready = await db
-    .select()
-    .from(storedFiles)
-    .where(inArray(storedFiles.id, [...storedFileIds]));
-  const byId = new Map(ready.map((row) => [row.id, row]));
-  return storedFileIds.map((id) => mapStoredFile(byId.get(id)!));
+    contentType: processed.mimeType,
+    byteSize: processed.buffer.length,
+    originalFilename: input.originalFilename,
+    checksum: checksum(processed.buffer),
+    bytes: processed.buffer,
+  };
+  const [row] = await storeFiles([file]);
+  return mapStoredFile(row!);
 }
 
 /**
  * Stores images the server already holds and normalized, such as an API
- * request's inline images: pending rows first, for the quota, then the
- * objects, then the rows are marked ready. Returns ids in input order.
+ * request's inline images. Returns ids in input order.
  */
 export async function storeProcessedImages(
   images: readonly { bytes: Buffer; contentType: string }[]
 ): Promise<string[]> {
-  const files = images.map((image) => ({
+  if (images.length === 0 || images.length > MAX_FILES) {
+    throw new ValidationError(`Uploads require 1-${MAX_FILES} files`);
+  }
+  const files: NewFile[] = images.map((image) => ({
     id: crypto.randomUUID(),
     contentType: image.contentType,
     byteSize: image.bytes.length,
@@ -240,27 +154,12 @@ export async function storeProcessedImages(
     checksum: checksum(image.bytes),
     bytes: image.bytes,
   }));
-  validateRequests(files);
   const totalBytes = files.reduce((sum, file) => sum + file.byteSize, 0);
   if (totalBytes > MAX_NORMALIZED_BYTES_PER_ATTEMPT) {
     throw new ValidationError(
       `Total stored bytes ${totalBytes} exceeds attempt limit of ${MAX_NORMALIZED_BYTES_PER_ATTEMPT}`
     );
   }
-  await reservePendingFiles(files, new Date());
-  const ids = files.map((file) => file.id);
-  try {
-    const storage = getS3Storage();
-    await Promise.all(
-      files.map((file) => storage.upload(durableKey(file.id), file.bytes, file.contentType))
-    );
-    await db
-      .update(storedFiles)
-      .set({ finalizedAt: new Date() })
-      .where(and(inArray(storedFiles.id, ids), isNull(storedFiles.finalizedAt)));
-  } catch (error) {
-    await discardUnusedFiles(ids);
-    throw error;
-  }
-  return ids;
+  await storeFiles(files);
+  return files.map((file) => file.id);
 }

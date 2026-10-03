@@ -1,3 +1,7 @@
+import {
+  API_V1_MAX_DECODED_BATCH_BYTES,
+  API_V1_MAX_DECODED_IMAGE_BYTES,
+} from "@/modules/source-document/api-v1-policy";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { ledgerToday } from "@/modules/ledger/server/query-period";
@@ -203,14 +207,17 @@ describe("API v1 source-documents route", () => {
     expect(missing.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it("accepts a legal 3 MiB decoded image through the request-body boundary", async () => {
+  it("accepts the largest legal decoded image through the request-body boundary", async () => {
     const small = await sharp({
       create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } },
     })
       .jpeg()
       .toBuffer();
-    const padded = Buffer.concat([small, Buffer.alloc(3 * 1024 * 1024 - small.length)]);
-    expect(padded.length).toBe(3 * 1024 * 1024);
+    const padded = Buffer.concat([
+      small,
+      Buffer.alloc(API_V1_MAX_DECODED_IMAGE_BYTES - small.length),
+    ]);
+    expect(padded.length).toBe(API_V1_MAX_DECODED_IMAGE_BYTES);
 
     const request = new NextRequest("http://localhost/api/v1/source-documents", {
       method: "POST",
@@ -229,8 +236,8 @@ describe("API v1 source-documents route", () => {
     expect(documents).toHaveLength(1);
   });
 
-  it("rejects a decoded batch above 3 MiB with 400", async () => {
-    const half = Buffer.alloc((3 * 1024 * 1024) / 2 + 1).toString("base64");
+  it("rejects a decoded batch above 24 MiB with 400", async () => {
+    const half = Buffer.alloc(API_V1_MAX_DECODED_BATCH_BYTES / 2 + 1).toString("base64");
     const request = new NextRequest("http://localhost/api/v1/source-documents", {
       method: "POST",
       headers: { Authorization: `Bearer ${credentialKey}` },
@@ -247,7 +254,7 @@ describe("API v1 source-documents route", () => {
     const body = await response.json();
     expect(body.error.details.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ message: "Decoded image batch exceeds 3 MiB" }),
+        expect.objectContaining({ message: "Decoded image batch exceeds 24 MiB" }),
       ])
     );
   });

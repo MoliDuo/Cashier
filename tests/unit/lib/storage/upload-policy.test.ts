@@ -60,7 +60,7 @@ describe("validateImageProcessing", () => {
   });
 
   it("rejects oversized dimensions and unsupported formats", () => {
-    expect(() => validateImageProcessing({ width: 5000, height: 4000, format: "jpeg" })).toThrow(
+    expect(() => validateImageProcessing({ width: 8000, height: 7000, format: "jpeg" })).toThrow(
       "exceed maximum"
     );
     expect(() => validateImageProcessing({ width: 100, height: 100, format: "tiff" })).toThrow(

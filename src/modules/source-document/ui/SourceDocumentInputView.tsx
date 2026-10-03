@@ -279,15 +279,13 @@ function SubmissionProgress({
   const percent = progress.percent;
   const isIndeterminate = progress.phase === "submitting";
   const phaseLabel =
-    progress.phase === "preparing" || progress.phase === "planning"
+    progress.phase === "preparing"
       ? sourceDocumentInputCopy.preparing
       : progress.phase === "uploading"
         ? sourceDocumentInputCopy.uploading
-        : progress.phase === "finalizing"
-          ? sourceDocumentInputCopy.finalizing
-          : progress.phase === "cancelling"
-            ? sourceDocumentInputCopy.cancelling
-            : sourceDocumentInputCopy.submitting;
+        : progress.phase === "cancelling"
+          ? sourceDocumentInputCopy.cancelling
+          : sourceDocumentInputCopy.submitting;
 
   return (
     <div className="space-y-2" role="status" aria-live="polite">

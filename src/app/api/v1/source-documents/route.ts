@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createSourceDocumentFromCredentialRequest } from "@/modules/source-document/server/create-from-credential-request";
-import { AppError, ValidationError } from "@/lib/errors";
+import { ValidationError } from "@/lib/errors";
+import { readBoundedBody, RequestBodyTooLargeError } from "@/lib/http/bounded-body";
 import { ApiV1HandlerFailure, handleApiV1Route } from "@/server/api-v1/request-pipeline";
 import { toApiV1SourceDocumentCreateResponse } from "@/app/api/v1/_shared/compatibility";
 import {
@@ -9,52 +10,16 @@ import {
 } from "@/modules/source-document/contract-schemas";
 import { API_V1_MAX_REQUEST_BYTES } from "@/modules/source-document/api-v1-policy";
 
-/**
- * Request-body bound violation. Carries the number of bytes actually consumed
- * from the stream so failure metrics can report how far the request got
- * before rejection.
- */
-class RequestBodyTooLargeError extends AppError {
-  readonly bytesRead: number;
-
-  constructor(bytesRead: number) {
-    super("Request body exceeds the maximum allowed size", "PAYLOAD_TOO_LARGE", 413);
-    this.bytesRead = bytesRead;
-  }
-}
-
 async function readBoundedJson(request: NextRequest): Promise<{ data: unknown; bytes: number }> {
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > API_V1_MAX_REQUEST_BYTES) {
-    throw new RequestBodyTooLargeError(0);
-  }
-  if (request.body == null) throw new ValidationError("Invalid JSON body");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    if (bytes > API_V1_MAX_REQUEST_BYTES) {
-      await reader.cancel();
-      throw new RequestBodyTooLargeError(bytes);
-    }
-    chunks.push(value);
-  }
-  const merged = new Uint8Array(bytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+  const body = await readBoundedBody(request, API_V1_MAX_REQUEST_BYTES);
+  if (body == null) throw new ValidationError("Invalid JSON body");
   let data: unknown;
   try {
-    data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(merged)) as unknown;
+    data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body.bytes)) as unknown;
   } catch {
     throw new ValidationError("Invalid JSON body");
   }
-  return { data, bytes };
+  return { data, bytes: body.length };
 }
 
 export async function POST(request: NextRequest) {

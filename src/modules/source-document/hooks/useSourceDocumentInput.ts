@@ -262,10 +262,7 @@ export function useSourceDocumentInput(props: SourceDocumentInputProps) {
     setProgress(null);
   };
 
-  const canCancelUpload =
-    progress?.phase === "preparing" ||
-    progress?.phase === "planning" ||
-    progress?.phase === "uploading";
+  const canCancelUpload = progress?.phase === "preparing" || progress?.phase === "uploading";
 
   const cancelUpload = () => {
     if (!canCancelUpload) return;

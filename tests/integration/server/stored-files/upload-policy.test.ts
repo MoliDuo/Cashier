@@ -2,29 +2,20 @@ import type { ObjectStore } from "@/lib/storage";
 /**
  * Upload Policy Integration Tests
  *
- * Covers boundary enforcement across the full upload -> finalize -> attempt-attach
+ * Covers boundary enforcement across the full upload -> attempt-attach
  * pipeline, using the real Postgres adapters with an in-memory R2 store.
  * Every test verifies that policy violations terminate before durable state
  * is created and that internal keys are never leaked.
  */
 
-import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
-import {
-  finalizeDirectUpload,
-  planDirectUpload,
-  storeProcessedImages,
-} from "@/server/stored-files/uploads";
-import { DirectMemoryObjectStore, MemoryObjectStore } from "tests/helpers/memory-object-store";
+import { storeProcessedImages, storeUploadedImage } from "@/server/stored-files/uploads";
+import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { createProcessingAttemptInTransaction } from "@/modules/source-document/server/extraction-attempts";
-import { ConflictError, ValidationError } from "@/lib/errors";
-import {
-  MAX_NORMALIZED_BYTES_PER_ATTEMPT,
-  MAX_ORIGINAL_BYTES_PER_FILE,
-  MAX_FILES,
-} from "@/lib/storage/upload-policy";
+import { ValidationError } from "@/lib/errors";
+import { MAX_NORMALIZED_BYTES_PER_ATTEMPT, MAX_FILES } from "@/lib/storage/upload-policy";
 import { extractionAttempts, storedFiles } from "@/persistence";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import { getTestDb } from "tests/setup";
@@ -38,117 +29,7 @@ async function finalizedFile(body: Buffer): Promise<{ id: string }> {
   return { id: id! };
 }
 
-function sha256(bytes: Buffer): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
 describe("upload policy integration", () => {
-  describe("invalid uploads produce no source document", () => {
-    it("rejects upload plan with unsupported MIME type before any durable state", async () => {
-      await createTestUserWithLedger(getTestDb());
-      objectStore.current = new MemoryObjectStore();
-
-      await expect(
-        planDirectUpload([
-          {
-            contentType: "image/bmp",
-            byteSize: 1024,
-            originalFilename: null,
-            checksum: "a".repeat(64),
-          },
-        ])
-      ).rejects.toThrow(ValidationError);
-
-      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
-    });
-
-    it("rejects upload plan with oversized file before any durable state", async () => {
-      await createTestUserWithLedger(getTestDb());
-      objectStore.current = new MemoryObjectStore();
-
-      await expect(
-        planDirectUpload([
-          {
-            contentType: "image/jpeg",
-            byteSize: MAX_ORIGINAL_BYTES_PER_FILE + 1,
-            originalFilename: null,
-            checksum: "a".repeat(64),
-          },
-        ])
-      ).rejects.toThrow(ValidationError);
-
-      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
-    });
-
-    it("rejects upload plan with too many files before any durable state", async () => {
-      await createTestUserWithLedger(getTestDb());
-      objectStore.current = new MemoryObjectStore();
-      const files = Array.from({ length: MAX_FILES + 1 }, () => ({
-        contentType: "image/jpeg" as const,
-        byteSize: 1024,
-        originalFilename: null as string | null,
-        checksum: "a".repeat(64),
-      }));
-
-      await expect(planDirectUpload(files)).rejects.toThrow(ValidationError);
-
-      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
-    });
-  });
-
-  describe("checksum mismatch at finalization", () => {
-    it("rejects uploaded bytes that do not match the planned checksum", async () => {
-      await createTestUserWithLedger(getTestDb());
-      const storage = new DirectMemoryObjectStore();
-      objectStore.current = storage;
-
-      const body = Buffer.from("receipt-image-data");
-      // Plan a checksum that does NOT match the bytes the browser sends.
-      const wrongChecksum = "a".repeat(64);
-      const plan = await planDirectUpload([
-        {
-          contentType: "image/jpeg",
-          byteSize: body.length,
-          originalFilename: null,
-          checksum: wrongChecksum,
-        },
-      ]);
-      const id = plan.targets[0]!.id;
-      storage.put(`temporary/${id}`, body, "image/jpeg", wrongChecksum);
-
-      await expect(finalizeDirectUpload({ storedFileIds: [id] })).rejects.toThrow(ConflictError);
-
-      // The planned file is discarded rather than left usable.
-      expect(await getTestDb().select().from(storedFiles)).toHaveLength(0);
-    });
-
-    it("accepts uploaded bytes when the checksum matches", async () => {
-      await createTestUserWithLedger(getTestDb());
-      const storage = new DirectMemoryObjectStore();
-      objectStore.current = storage;
-
-      const body = await sharp({
-        create: { width: 1, height: 1, channels: 3, background: "white" },
-      })
-        .jpeg()
-        .toBuffer();
-      const plan = await planDirectUpload([
-        {
-          contentType: "image/jpeg",
-          byteSize: body.length,
-          originalFilename: null,
-          checksum: sha256(body),
-        },
-      ]);
-      const id = plan.targets[0]!.id;
-      storage.put(`temporary/${id}`, body, "image/jpeg", sha256(body));
-
-      await expect(finalizeDirectUpload({ storedFileIds: [id] })).resolves.toEqual([
-        expect.objectContaining({ id }),
-      ]);
-    });
-  });
-
   describe("aggregate byte overflow at attempt attachment", () => {
     it("rejects attempt attachment when total bytes exceed MAX_NORMALIZED_BYTES_PER_ATTEMPT", async () => {
       const db = getTestDb();
@@ -157,13 +38,11 @@ describe("upload policy integration", () => {
       objectStore.current = new MemoryObjectStore();
 
       // Create enough finalized stored files to overflow the attempt aggregate limit.
-      // Each file must be below MAX_ORIGINAL_BYTES_PER_FILE (4 MB), but their sum
-      // must exceed MAX_NORMALIZED_BYTES_PER_ATTEMPT (20 MB).
-      const fileSize = Math.floor(MAX_ORIGINAL_BYTES_PER_FILE * 0.9); // ~3.6 MB per file
-      const fileCount = Math.ceil(MAX_NORMALIZED_BYTES_PER_ATTEMPT / fileSize) + 1; // enough to exceed
+      // Each file fits the attempt limit on its own, but their sum does not.
+      const fileSize = Math.floor(MAX_NORMALIZED_BYTES_PER_ATTEMPT * 0.6);
+      const fileCount = 2;
       const totalBytes = fileSize * fileCount;
       expect(totalBytes).toBeGreaterThan(MAX_NORMALIZED_BYTES_PER_ATTEMPT);
-      expect(fileSize).toBeLessThanOrEqual(MAX_ORIGINAL_BYTES_PER_FILE);
 
       const files = await Promise.all(
         Array.from({ length: fileCount }, () => finalizedFile(Buffer.alloc(fileSize, 0xff)))
@@ -297,26 +176,18 @@ describe("upload policy integration", () => {
       await createTestUserWithLedger(db);
       objectStore.current = new MemoryObjectStore();
 
-      const storage = new DirectMemoryObjectStore();
+      const storage = new MemoryObjectStore();
       objectStore.current = storage;
       const body = await sharp({
         create: { width: 1, height: 1, channels: 3, background: "white" },
       })
         .jpeg()
         .toBuffer();
-      const plan = await planDirectUpload([
-        {
-          contentType: "image/jpeg",
-          byteSize: body.length,
-          originalFilename: null,
-          checksum: sha256(body),
-        },
-      ]);
-      storage.put(`temporary/${plan.targets[0]!.id}`, body, "image/jpeg", sha256(body));
-      const [file] = await finalizeDirectUpload({
-        storedFileIds: [plan.targets[0]!.id],
+      const file = await storeUploadedImage({
+        bytes: body,
+        contentType: "image/jpeg",
+        originalFilename: null,
       });
-      if (file == null) throw new Error("Expected a finalized file");
 
       // The StoredFileContract returned by the adapter should not contain storageKey
       expect(file).not.toHaveProperty("storageKey");

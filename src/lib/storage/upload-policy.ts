@@ -4,16 +4,16 @@ import { ValidationError } from "@/lib/errors";
  * Shared Web Upload Policy
  *
  * Central, provider-neutral policy constants and validators for Web source-document
- * uploads. Every upload layer — client preflight, server validation, Sharp processing,
- * and stored-file finalization — applies the same rules from this module.
+ * uploads. Every upload layer — client preflight, server validation, and Sharp
+ * processing — applies the same rules from this module.
  *
  * These defaults apply to the Web submission flow only. The API v1 flow
  * has its own separate limits and is not covered by this module.
  *
  * KNOWN GAP (escalation condition — not fixed in Task 6):
- * The Web submission path (createSourceDocumentAction) accepts pre-finalized
+ * The Web submission path (createSourceDocumentAction) accepts already-stored
  * storedFileIds without re-validating them against the current upload policy.
- * A stored file that passed policy checks at finalization time could later
+ * A stored file that passed policy checks when it was uploaded could later
  * exceed policy limits if the policy is tightened. Closing this gap requires
  * a policy version stamp on stored files or a re-validation step at attempt
  * creation time. See Issue 2 in the Task 6 review.
@@ -27,7 +27,7 @@ import { ValidationError } from "@/lib/errors";
 export const MAX_FILES = 4;
 
 /** Maximum original (raw uploaded) bytes per individual file. */
-export const MAX_ORIGINAL_BYTES_PER_FILE = 3 * 1024 * 1024; // 3 MB
+export const MAX_ORIGINAL_BYTES_PER_FILE = 20 * 1024 * 1024; // 20 MiB
 
 /** Maximum normalized (post-processing) bytes per individual file. */
 export const MAX_NORMALIZED_BYTES_PER_FILE = 4 * 1024 * 1024; // 4 MB
@@ -36,14 +36,10 @@ export const MAX_NORMALIZED_BYTES_PER_FILE = 4 * 1024 * 1024; // 4 MB
 export const MAX_NORMALIZED_BYTES_PER_ATTEMPT = 3 * 1024 * 1024; // 3 MB
 
 /** Maximum megapixels per image file (width * height / 1_000_000). */
-export const MAX_MEGAPIXELS_PER_FILE = 16;
+export const MAX_MEGAPIXELS_PER_FILE = 48;
 
 /** Maximum characters in a text-only source-document submission. */
 export const MAX_TEXT_CHARACTERS = 20000;
-
-/** How long a planned upload may wait for finalization. */
-export const UPLOAD_PLAN_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
-export const DIRECT_UPLOAD_FINALIZE_BUFFER_MS = 2 * 60 * 1000; // 2 minutes
 
 /**
  * Explicitly supported MIME types for Web uploads.
@@ -110,9 +106,9 @@ export function validateImageProcessing(metadata: {
 
 /**
  * Validate total normalized bytes against the per-attempt aggregate limit.
- * Called during finalization and attempt processing.
+ * Called during attempt processing.
  *
- * @param aggregateNormalizedBytes - Sum of all previously finalized normalized bytes
+ * @param aggregateNormalizedBytes - Sum of all previously stored normalized bytes
  *                                   across all files in the attempt.
  * @param newFileBytes - Normalized size of the file being added.
  */
