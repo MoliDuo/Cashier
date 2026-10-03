@@ -3,7 +3,6 @@ import { z } from "zod";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { omitUndefinedProperties } from "@/lib/validation";
 import { requireLedgerAccess } from "@/modules/ledger/access";
-import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { getSourceDocumentDetailAction } from "@/modules/source-document/server/get-document-detail";
 import { listStreamPage } from "@/modules/source-document/server/list-stream-page";
 import { getStreamTotal } from "@/modules/source-document/server/stream-total";
@@ -28,7 +27,6 @@ import {
   getCategoryAssignmentResultsAction,
   getCategoryAssignmentJobAction,
 } from "@/modules/ledger/server/get-category-assignment-job";
-import { scheduleCategoryAssignmentRecoveryAfter } from "@/server/category-assignment/schedule";
 import {
   findEarliestDocumentDate,
   queryEnhancedStats,
@@ -107,7 +105,6 @@ export async function POST(request: Request) {
           ...omitUndefinedProperties(parsed),
           limit: parsed.limit,
         });
-        scheduleProcessingRecoveryAfter();
         break;
       }
       case "total": {
@@ -122,7 +119,6 @@ export async function POST(request: Request) {
         const parsed = z.object({ afterVersion: z.string().regex(/^\d+$/) }).parse(input);
         await requireLedgerAccess();
         result = await getStreamRefresh(parsed);
-        scheduleProcessingRecoveryAfter();
         break;
       }
       case "source-document-input": {
@@ -131,7 +127,6 @@ export async function POST(request: Request) {
         const document = await getSourceDocumentInput(id);
         if (document == null) throw new NotFoundError("Source document");
         result = document;
-        scheduleProcessingRecoveryAfter();
         break;
       }
       case "convert-currency":
@@ -186,9 +181,6 @@ export async function POST(request: Request) {
       case "category-assignment": {
         noArgumentsSchema.parse(payload.args);
         result = await getCategoryAssignmentJobAction();
-        // This poll is the recovery trigger: there is no cron, so a run
-        // whose after() callback died is restarted on the next poll.
-        scheduleCategoryAssignmentRecoveryAfter();
         break;
       }
       case "category-assignment-results":

@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import * as schema from "@/persistence";
 import { databaseUrlFor, runDatabaseName } from "../scripts/prepare-test-postgres";
 import { seedUser } from "../scripts/lib/seed";
-import { flushAfterCallbacks } from "./setup.common";
+import "./setup.common";
 
 const postgresContext = inject("cashierPostgres");
 // VITEST_POOL_ID identifies a reusable worker slot; VITEST_WORKER_ID identifies the
@@ -146,17 +146,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await flushAfterCallbacks();
   await testDatabase?.pool.end();
   testDatabase = undefined;
   await dropFileDatabase();
 });
 
 beforeEach(async () => {
-  // Drain request-bound `after()` work from the previous test before emptying
-  // the tables, otherwise maintenance/processing transactions can deadlock
-  // against the per-test cleanup.
-  await flushAfterCallbacks();
   const database = testDatabase;
   if (database == null) throw new Error("Test PostgreSQL database is not initialized");
 

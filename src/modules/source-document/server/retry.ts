@@ -1,5 +1,5 @@
 import "server-only";
-import { scheduleProcessingAfter } from "@/server/processing/schedule";
+import { requestBackgroundWork } from "@/server/background/wake";
 import type { RetrySourceDocumentResponseDto } from "@/modules/source-document/contracts";
 import { submitSourceDocument } from "./submissions";
 
@@ -18,12 +18,12 @@ export async function retrySourceDocument({
   sourceDocumentId,
   input,
 }: RetrySourceDocumentInput): Promise<RetrySourceDocumentResponseDto> {
-  const pending = await submitSourceDocument({
+  await submitSourceDocument({
     sourceDocumentId,
     inheritInput: input == null,
     supersedeProcessing: true,
     ...(input == null ? {} : { input }),
   });
-  scheduleProcessingAfter(pending.job);
+  requestBackgroundWork();
   return { status: "processing" };
 }

@@ -10,7 +10,12 @@ import {
   ProcessingFailure,
 } from "@/modules/source-document/domain/parse/contracts";
 import { recordProcessingFailure } from "@/modules/source-document/server/extraction-attempts";
-import { claimProcessingJob, renewProcessingJobLease, rescheduleProcessingJob } from "./jobs";
+import {
+  claimProcessingJob,
+  releaseProcessingJob,
+  renewProcessingJobLease,
+  rescheduleProcessingJob,
+} from "./jobs";
 import { processAttempt } from "./attempt-processor";
 import { BACKGROUND_MAX_ATTEMPTS } from "@/config/tuning";
 
@@ -29,12 +34,20 @@ function toFailureCode(error: unknown): ProcessingFailureCode {
   }
 }
 
+export interface ExecuteProcessingJobOptions {
+  /** Aborts when the process is shutting down; the attempt is then handed back uncounted. */
+  shutdown?: AbortSignal;
+}
+
 /**
  * Claims one processing attempt, keeps its lease alive while it is parsed, and
  * records the outcome. A transient failure gives the attempt back to the queue
  * until it runs out of attempts. Returns false when another execution holds it.
  */
-export async function executeProcessingJob(job: ProcessingJobContract): Promise<boolean> {
+export async function executeProcessingJob(
+  job: ProcessingJobContract,
+  options: ExecuteProcessingJobOptions = {}
+): Promise<boolean> {
   const claim = await claimProcessingJob(job.attemptId);
   if (claim == null) return false;
   const lease = { attemptId: claim.job.attemptId, claimToken: claim.claimToken };
@@ -64,14 +77,23 @@ export async function executeProcessingJob(job: ProcessingJobContract): Promise<
     }
   );
 
+  const signal =
+    options.shutdown == null ? held.signal : AbortSignal.any([held.signal, options.shutdown]);
+
   try {
     await processAttempt({
       sourceDocumentId: claim.job.sourceDocumentId,
       attemptId: claim.job.attemptId,
-      signal: held.signal,
+      signal,
       lease,
     });
   } catch (error) {
+    if (options.shutdown?.aborted === true && !held.signal.aborted) {
+      // The release is fenced on the lease and on the attempt still processing, so an attempt that
+      // was cancelled or finished in the meantime is left alone.
+      await releaseProcessingJob(lease);
+      return true;
+    }
     if (error instanceof ProcessingCancelledError || held.signal.aborted) return true;
     const classified = classifyFailure(error);
     if (classified.kind === "transient" && claim.runNumber < BACKGROUND_MAX_ATTEMPTS) {

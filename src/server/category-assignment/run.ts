@@ -5,7 +5,7 @@ import { classifyFailure, retryDelayMs } from "@/lib/background/retry";
 import { holdLease } from "@/lib/db/lease";
 import { applyCategoryAssignments } from "@/modules/source-document/server/category-assignments";
 import { isSuccessfulLoadImageResult, loadStoredFilesForAI } from "@/server/processing/evidence";
-import { BACKGROUND_MAX_ATTEMPTS, CATEGORY_RUN_BUDGET_MS } from "@/config/tuning";
+import { BACKGROUND_MAX_ATTEMPTS } from "@/config/tuning";
 import type {
   CategoryAssignmentDocumentWork,
   ClaimedCategoryAssignmentJob,
@@ -39,17 +39,31 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+interface RunSignals {
+  /** Aborts when the lease is lost or the process is shutting down. */
+  signal: AbortSignal;
+  /** Aborts when the process is shutting down. */
+  shutdown: AbortSignal;
+  /** Aborts when the lease is lost or cannot be renewed. */
+  lease: AbortSignal;
+}
+
+/** The run is stopping because the process is, not because the lease was lost. */
+function stoppedByShutdown({ shutdown, lease }: RunSignals): boolean {
+  return shutdown.aborted && !lease.aborted;
+}
+
 /**
  * Asks the model about one document's entries, a request block at a time, then
  * writes the decisions. Returns false when the run has to stop: its lease is
- * gone or its budget ended between blocks.
+ * gone or the process is shutting down.
  */
 async function processDocument(
   job: ClaimedCategoryAssignmentJob,
   document: CategoryAssignmentDocumentWork,
-  signal: AbortSignal,
-  deadlineAt: number
+  signals: RunSignals
 ): Promise<boolean> {
+  const { signal } = signals;
   const { sourceDocumentId } = document;
   const startedAt = Date.now();
   const subject = {
@@ -89,9 +103,10 @@ async function processDocument(
           chunkIndex * REQUEST_CHUNK_SIZE < group.subjects.length;
           chunkIndex += 1
         ) {
-          if (signal.aborted) return false;
-          if (Date.now() >= deadlineAt) {
-            await yieldCategoryAssignmentDocument(job, sourceDocumentId);
+          if (signal.aborted) {
+            if (stoppedByShutdown(signals)) {
+              await yieldCategoryAssignmentDocument(job, sourceDocumentId);
+            }
             return false;
           }
           const chunk = {
@@ -144,8 +159,12 @@ async function processDocument(
     );
     return result.status !== "claim_lost";
   } catch (error) {
-    // A lost lease aborts the request; there is nothing left to record.
-    if (signal.aborted) return false;
+    if (signal.aborted) {
+      // A lost lease aborts the request and there is nothing left to record; a shutdown hands the
+      // document back uncounted, keeping the blocks already done.
+      if (stoppedByShutdown(signals)) await yieldCategoryAssignmentDocument(job, sourceDocumentId);
+      return false;
+    }
     const failure = classifyFailure(error);
     const errorCode = failure.code ?? "ai_provider_unavailable";
     const retrying = failure.kind === "transient" && document.runNumber < BACKGROUND_MAX_ATTEMPTS;
@@ -169,12 +188,10 @@ async function processDocument(
 }
 
 /**
- * Works through a claimed job's documents one at a time until none is left,
- * the budget is spent, or the lease is lost. A document waiting out a retry
- * that comes due within the budget is waited for; one due later is left to the
- * next run, which the status poll starts.
+ * Works through a claimed job's documents one at a time until none is left, the lease is lost or the
+ * process is shutting down. A document waiting out a retry is waited for.
  */
-async function runJob(job: ClaimedCategoryAssignmentJob, deadlineAt: number): Promise<void> {
+async function runJob(job: ClaimedCategoryAssignmentJob, shutdown: AbortSignal): Promise<void> {
   const lease = holdLease(
     () => renewCategoryAssignmentLease(job),
     (reason, error) =>
@@ -183,17 +200,21 @@ async function runJob(job: ClaimedCategoryAssignmentJob, deadlineAt: number): Pr
         "Category assignment lease lost"
       )
   );
+  const signals: RunSignals = {
+    signal: AbortSignal.any([lease.signal, shutdown]),
+    shutdown,
+    lease: lease.signal,
+  };
   try {
-    while (!lease.signal.aborted && Date.now() < deadlineAt) {
+    while (!signals.signal.aborted) {
       const next = await nextCategoryAssignmentDocument(job);
       if (next.kind === "lost") return;
       if (next.kind === "done") break;
       if (next.kind === "wait") {
-        if (Date.now() + next.delayMs >= deadlineAt) break;
-        await sleep(next.delayMs, lease.signal);
+        await sleep(next.delayMs, signals.signal);
         continue;
       }
-      if (!(await processDocument(job, next.document, lease.signal, deadlineAt))) break;
+      if (!(await processDocument(job, next.document, signals))) break;
     }
   } finally {
     lease.stop();
@@ -201,22 +222,16 @@ async function runJob(job: ClaimedCategoryAssignmentJob, deadlineAt: number): Pr
   await releaseCategoryAssignmentJob(job);
 }
 
-async function runClaimed(scope: { jobId?: string }): Promise<boolean> {
-  const deadlineAt = Date.now() + CATEGORY_RUN_BUDGET_MS;
-  let ran = false;
-  while (Date.now() < deadlineAt) {
-    const job = await claimCategoryAssignmentJob(scope);
-    if (job == null) return ran;
-    ran = true;
-    await runJob(job, deadlineAt);
-  }
-  return ran;
-}
-
-export async function runCategoryAssignmentJob(jobId: string): Promise<boolean> {
-  return runClaimed({ jobId });
-}
-
-export async function recoverCategoryAssignments(): Promise<void> {
-  await runClaimed({});
+/**
+ * Claims the next category job that has work due and runs it to completion. False when there was
+ * none. A process that is shutting down hands the job back, and the next one resumes it.
+ */
+export async function runNextCategoryAssignmentJob(
+  shutdown: AbortSignal,
+  scope: { jobId?: string } = {}
+): Promise<boolean> {
+  const job = await claimCategoryAssignmentJob(scope);
+  if (job == null) return false;
+  await runJob(job, shutdown);
+  return true;
 }

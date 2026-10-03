@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   queue: [] as Next[],
   claims: 0,
   lease: new AbortController(),
+  shutdown: new AbortController(),
 }));
 
 function subjects(count: number) {
@@ -90,7 +91,6 @@ const adapters = vi.hoisted(() => ({
 
 vi.mock("@/config/tuning", () => ({
   BACKGROUND_MAX_ATTEMPTS: 3,
-  CATEGORY_RUN_BUDGET_MS: 50_000,
 }));
 vi.mock("@/lib/db/lease", () => ({
   holdLease: () => ({ signal: state.lease.signal, stop: () => undefined }),
@@ -125,7 +125,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 vi.mock("@/lib/security/log-identifier", () => ({ logIdentifier: () => "hashed" }));
 
-import { runCategoryAssignmentJob } from "@/server/category-assignment/run";
+import { runNextCategoryAssignmentJob } from "@/server/category-assignment/run";
 
 function document(
   index: number,
@@ -144,7 +144,7 @@ function document(
 }
 
 async function run() {
-  const running = runCategoryAssignmentJob("job-1");
+  const running = runNextCategoryAssignmentJob(state.shutdown.signal);
   await vi.runAllTimersAsync();
   return running;
 }
@@ -157,6 +157,7 @@ describe("category assignment run", () => {
     state.queue = [];
     state.claims = 0;
     state.lease = new AbortController();
+    state.shutdown = new AbortController();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -178,14 +179,13 @@ describe("category assignment run", () => {
     expect(adapters.next).not.toHaveBeenCalled();
   });
 
-  it("stops starting documents once the run budget is spent", async () => {
+  it("runs a long job to completion rather than stopping on a time budget", async () => {
     state.queue = [document(1), document(2), document(3), document(4)];
     const startedAt = Date.now();
 
     await run();
-    // Requests start at 0s, 20s and 40s; at 60s the 50-second budget is spent.
-    expect(adapters.decide).toHaveBeenCalledTimes(3);
-    expect(Date.now() - startedAt).toBe(60_000);
+    expect(adapters.decide).toHaveBeenCalledTimes(4);
+    expect(Date.now() - startedAt).toBe(80_000);
     expect(adapters.release).toHaveBeenCalledTimes(1);
   });
 
@@ -212,8 +212,8 @@ describe("category assignment run", () => {
     expect(adapters.apply).toHaveBeenCalledTimes(1);
   });
 
-  it("hands a document back when the budget ends between its request blocks", async () => {
-    state.queue = [document(1)];
+  it("hands a document back when shutdown arrives between its request blocks", async () => {
+    state.queue = [document(1), document(2)];
     adapters.loadDocumentGroups.mockResolvedValueOnce([
       {
         sourceDocumentId: "document-1",
@@ -221,18 +221,44 @@ describe("category assignment run", () => {
         documentDate: "2026-09-10",
         inputText: null,
         storedFileIds: [],
-        subjects: subjects(200),
+        subjects: subjects(120),
       },
     ]);
+    adapters.decide.mockImplementationOnce(async (input) => {
+      state.shutdown.abort();
+      return {
+        decisions: input.group.subjects.map((subject) => ({
+          ledgerEntryId: subject.ledgerEntryId,
+          categoryId: "category-1",
+        })),
+        confirmedCount: 0,
+      };
+    });
 
     await run();
-    expect(adapters.decide).toHaveBeenCalledTimes(3);
+    expect(adapters.decide).toHaveBeenCalledTimes(1);
     expect(adapters.yieldDocument).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: "job-1" }),
       "document-1"
     );
     expect(adapters.apply).not.toHaveBeenCalled();
     expect(adapters.fail).not.toHaveBeenCalled();
+    expect(adapters.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands a document back uncounted when shutdown aborts its request", async () => {
+    state.queue = [document(1), document(2)];
+    adapters.decide.mockImplementationOnce(async () => {
+      state.shutdown.abort();
+      throw new Error("aborted");
+    });
+
+    await run();
+    expect(adapters.yieldDocument).toHaveBeenCalledTimes(1);
+    expect(adapters.fail).not.toHaveBeenCalled();
+    expect(adapters.reschedule).not.toHaveBeenCalled();
+    expect(adapters.decide).toHaveBeenCalledTimes(1);
+    expect(adapters.release).toHaveBeenCalledTimes(1);
   });
 
   it("puts a document back to wait out a transient failure", async () => {
@@ -295,7 +321,7 @@ describe("category assignment run", () => {
     expect(adapters.decide).toHaveBeenCalledTimes(1);
   });
 
-  it("waits for a retry that comes due within the budget", async () => {
+  it("waits for a retry to come due", async () => {
     state.queue = [{ kind: "wait", delayMs: 8_000 }, document(1)];
     const startedAt = Date.now();
 
@@ -304,10 +330,14 @@ describe("category assignment run", () => {
     expect(Date.now() - startedAt).toBe(28_000);
   });
 
-  it("leaves a retry due after the budget to the next run", async () => {
-    state.queue = [{ kind: "wait", delayMs: 60_000 }];
+  it("stops waiting for a retry when shutdown arrives", async () => {
+    state.queue = [{ kind: "wait", delayMs: 60_000 }, document(1)];
 
-    await run();
+    const running = runNextCategoryAssignmentJob(state.shutdown.signal);
+    await vi.advanceTimersByTimeAsync(1_000);
+    state.shutdown.abort();
+    await running;
+
     expect(adapters.decide).not.toHaveBeenCalled();
     expect(adapters.release).toHaveBeenCalledTimes(1);
   });

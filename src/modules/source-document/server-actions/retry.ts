@@ -9,7 +9,6 @@ import {
 import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { withSourceDocumentLedgerAccess } from "./access";
 import { withLedgerAccess } from "@/modules/ledger/access";
-import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 
 /**
  * Direct Retry: retry an existing source document with immutable evidence.
@@ -25,9 +24,6 @@ export const retrySourceDocumentAction = withLedgerAccess(
     const result = await retrySourceDocument({
       sourceDocumentId: parseSourceDocumentId(sourceDocumentId),
     });
-
-    // Also recover any missed processing intents
-    scheduleProcessingRecoveryAfter();
 
     return result;
   }
@@ -61,9 +57,6 @@ export const editRetrySourceDocumentAction = withSourceDocumentLedgerAccess(
       sourceDocumentId: validatedSourceDocumentId,
       input: validatedInput,
     });
-
-    // Also recover any missed processing intents
-    scheduleProcessingRecoveryAfter();
 
     return result;
   }

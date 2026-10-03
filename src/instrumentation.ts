@@ -24,4 +24,10 @@ export async function register() {
     logger.error({ error }, "Failed during startup initialization");
     throw error;
   }
+
+  // Tests drive the worker themselves; a second one claiming their rows would race them.
+  if (process.env.NODE_ENV !== "test") {
+    const { startBackgroundRuntime } = await import("@/server/background/runtime");
+    startBackgroundRuntime();
+  }
 }

@@ -79,7 +79,7 @@ async function supersede(job: ProcessingJobContract) {
 describe("Processing Recovery", () => {
   const maxBatch = 3;
 
-  it("recovers an attempt that was submitted but never claimed (missed after())", async () => {
+  it("recovers an attempt that was submitted but never claimed (the wake was missed)", async () => {
     const { job } = await pendingIntent();
     const adapter = processingJobs();
 
@@ -114,11 +114,11 @@ describe("Processing Recovery", () => {
     await expect(adapter.claim(job.attemptId)).resolves.toBeNull();
   });
 
-  it("does not double-process under concurrent requests", async () => {
+  it("does not double-process under concurrent workers", async () => {
     const { job } = await pendingIntent();
     const adapter = processingJobs();
 
-    // Two requests may both schedule the attempt; only one run can claim it.
+    // Two workers may both see the attempt; only one run can claim it.
     const [first, second] = await Promise.all([
       adapter.recoverBatch(maxBatch),
       adapter.recoverBatch(maxBatch),

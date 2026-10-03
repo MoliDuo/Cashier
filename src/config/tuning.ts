@@ -33,6 +33,8 @@ export const LEASE_HEARTBEAT_MS = FUNCTION_BUDGET_MS / 8;
 export const LEASE_DURATION_MS = 4 * LEASE_HEARTBEAT_MS;
 /** How long the daily cron keeps starting new maintenance work. */
 export const CRON_BUDGET_MS = FUNCTION_BUDGET_MS - OUTCOME_RESERVE_MS;
+/** How often the background worker looks for due work when nothing wakes it. */
+export const BACKGROUND_POLL_INTERVAL_MS = 5_000;
 /** Runs one piece of background work gets, the first one included, before it is failed. */
 export const BACKGROUND_MAX_ATTEMPTS = 3;
 
@@ -91,5 +93,5 @@ export const SIGN_IN_RATE_LIMITS = {
 /** How long a signed-in session survives without being renewed. */
 export const SESSION_MAX_AGE_DAYS = 14;
 
-/** Picking up source documents whose processing died mid-flight. */
-export const PROCESSING_RECOVERY_MAX_BATCH = 5;
+/** How many due extraction attempts the worker looks at per pass. */
+export const PROCESSING_BATCH_SIZE = 5;

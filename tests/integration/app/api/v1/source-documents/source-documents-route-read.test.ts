@@ -6,7 +6,7 @@ import sharp from "sharp";
 import { POST } from "@/app/api/v1/source-documents/route";
 import { GET } from "@/app/api/v1/source-documents/[sourceDocumentId]/route";
 import { getTestDb } from "tests/setup";
-import { flushAfterCallbacks } from "tests/setup.common";
+import { drainBackground } from "tests/helpers/background";
 import { insertExchangeRates } from "tests/helpers/exchange-rates";
 import { TEST_USER_ID, createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
 import {
@@ -139,7 +139,7 @@ describe("API v1 source-documents route", () => {
     ).then((response) => response.json());
     // Let the parse the POST scheduled finish before rewriting its rows by hand;
     // otherwise both sides take ledger row locks and can deadlock.
-    await flushAfterCallbacks();
+    await drainBackground();
     const db = getTestDb();
     await db.insert(ledgerEntries).values({
       sourceDocumentId: created.sourceDocumentId,
@@ -339,7 +339,7 @@ describe("API v1 source-documents route", () => {
         body: JSON.stringify({ images: [{ data: image, mimeType: "image/jpeg" }] }),
       })
     ).then((response) => response.json());
-    await flushAfterCallbacks();
+    await drainBackground();
     const db = getTestDb();
     // The provider does not publish BHD; drop whatever the request cached.
     await db.delete(exchangeRates);

@@ -65,8 +65,9 @@ export async function claimProcessingJob(
 
 /**
  * The processing attempts that are due but that no run holds: their
- * `after()` was lost, their function was killed, or their retry came due.
- * Nothing is written; a duplicate schedule just finds the attempt claimed.
+ * they were just submitted, their run was released or died with its lease, or
+ * their retry came due. Nothing is written; a second worker just finds the
+ * attempt claimed.
  */
 export async function recoverProcessingJobs(
   maxBatch: number
@@ -130,6 +131,24 @@ export async function rescheduleProcessingJob(
     UPDATE extraction_attempts attempt
     SET claim_token = NULL, claim_expires_at = NULL,
         next_attempt_at = ${databaseClockPlus(delayMs)}
+    WHERE attempt.id = ${lease.attemptId}
+      AND ${leaseHeldBy(claimToken, claimExpiresAt, lease.claimToken)}
+      AND attempt.status = 'processing'
+    RETURNING attempt.id
+  `);
+  return released.rows.length === 1;
+}
+
+/**
+ * Hands a held attempt back when the process is shutting down. The run is not counted: stopping on
+ * request is not a failed attempt, and the attempt stays due, so the next process claims it at once
+ * instead of waiting out the lease. False when the lease was already lost.
+ */
+export async function releaseProcessingJob(lease: ProcessingLeaseContract): Promise<boolean> {
+  const released = await db.execute(sql`
+    UPDATE extraction_attempts attempt
+    SET claim_token = NULL, claim_expires_at = NULL,
+        attempt_count = greatest(attempt.attempt_count - 1, 0)
     WHERE attempt.id = ${lease.attemptId}
       AND ${leaseHeldBy(claimToken, claimExpiresAt, lease.claimToken)}
       AND attempt.status = 'processing'

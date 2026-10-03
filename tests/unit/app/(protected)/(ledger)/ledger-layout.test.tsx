@@ -6,14 +6,12 @@ const {
   getLedgerBooksBootstrapMock,
   getLedgerShellBootstrapMock,
   getLedgerRouteBootstrapMock,
-  scheduleProcessingRecoveryAfterMock,
   requestHeaders,
 } = vi.hoisted(() => ({
   loadLedgerViewMock: vi.fn(),
   getLedgerBooksBootstrapMock: vi.fn(),
   getLedgerShellBootstrapMock: vi.fn(),
   getLedgerRouteBootstrapMock: vi.fn(),
-  scheduleProcessingRecoveryAfterMock: vi.fn(),
   requestHeaders: { current: new Headers() },
 }));
 
@@ -22,9 +20,6 @@ vi.mock("@/modules/workspace/server/ledger-page-bootstrap", () => ({
   getLedgerBooksBootstrap: getLedgerBooksBootstrapMock,
   getLedgerShellBootstrap: getLedgerShellBootstrapMock,
   getLedgerRouteBootstrap: getLedgerRouteBootstrapMock,
-}));
-vi.mock("@/server/processing/recovery", () => ({
-  scheduleProcessingRecoveryAfter: scheduleProcessingRecoveryAfterMock,
 }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
@@ -103,10 +98,9 @@ describe("ledger layout", () => {
     getLedgerShellBootstrapMock.mockResolvedValue({ queries: [], mutations: [] });
   });
 
-  it("schedules recovery and starts the store on the book the request resolved", async () => {
+  it("starts the store on the book the request resolved", async () => {
     const tree = await LedgerLayout({ children: null });
 
-    expect(scheduleProcessingRecoveryAfterMock).toHaveBeenCalledWith();
     expect(find(tree, WorkspaceStoreProvider).props.initialBookId).toBe(BOOK_B);
   });
 

@@ -2,9 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { sql } from "drizzle-orm";
 import { getTestDb } from "tests/setup";
-import { flushAfterCallbacks } from "tests/setup.common";
-import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { createPendingAttempt } from "tests/helpers/processing-attempt";
 import { MemoryObjectStore } from "tests/helpers/memory-object-store";
 import { GET } from "@/app/api/cron/daily/route";
 
@@ -52,8 +49,6 @@ describe("GET /api/cron/daily", () => {
     await expect(response.json()).resolves.toEqual({
       steps: {
         expired_records: "done",
-        processing_recovery: "done",
-        category_recovery: "done",
         exchange_rates: "done",
         pending_files: "done",
         unused_files: "done",
@@ -65,24 +60,5 @@ describe("GET /api/cron/daily", () => {
       sql`SELECT 1 FROM rate_limit_buckets WHERE bucket_key = 'stale-bucket'`
     );
     expect(stale.rows).toHaveLength(0);
-  });
-
-  it("schedules processing attempts whose run was lost", async () => {
-    vi.stubEnv("CRON_SECRET", SECRET);
-    const db = getTestDb();
-    await createTestUserWithLedger(db);
-    const pending = await createPendingAttempt({
-      input: { text: "Lunch 12.50 CNY", storedFileIds: [], documentDate: null },
-      bookId: await testBookId(db),
-    });
-
-    await GET(cronRequest(`Bearer ${SECRET}`));
-    await flushAfterCallbacks(10_000);
-
-    // The scheduled run claimed the attempt; the test provider then fails it.
-    const claimed = await db.execute<{ attempt_count: number }>(sql`
-      SELECT attempt_count FROM extraction_attempts WHERE id = ${pending.attempt.id}
-    `);
-    expect(Number(claimed.rows[0]!.attempt_count)).toBeGreaterThanOrEqual(1);
   });
 });

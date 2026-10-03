@@ -13,8 +13,6 @@ import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { refreshExchangeRates } from "@/modules/currency/server/exchange-rates";
-import { scheduleCategoryAssignmentDrainAfter } from "@/server/category-assignment/schedule";
-import { scheduleProcessingRecovery } from "@/server/processing/recovery";
 import { temporaryKey } from "@/server/stored-files/shared";
 import { CRON_BUDGET_MS } from "@/config/tuning";
 
@@ -25,8 +23,6 @@ const UNUSED_FILE_GRACE_DAYS = 7;
 
 export type DailyStep =
   | "expired_records"
-  | "processing_recovery"
-  | "category_recovery"
   | "exchange_rates"
   | "pending_files"
   | "unused_files"
@@ -44,9 +40,9 @@ export interface DailyMaintenanceOptions {
 /**
  * The daily sweep behind `/api/cron/daily`. Each step is independent: one
  * that fails is logged and the rest still run, and steps that would start
- * after the deadline are skipped for the next day. Work that needs a model
- * call is only scheduled here, with `after()`, so it gets the function's
- * remaining time rather than the sweep's.
+ * after the deadline are skipped for the next day. Extraction and category
+ * work is not part of the sweep: the background worker picks it up as it
+ * comes due.
  */
 export async function runDailyMaintenance(
   options: DailyMaintenanceOptions = {}
@@ -72,8 +68,6 @@ export async function runDailyMaintenance(
   };
 
   await step("expired_records", () => deleteExpiredRecords(now, deadlineAt));
-  await step("processing_recovery", scheduleProcessingRecovery);
-  await step("category_recovery", async () => scheduleCategoryAssignmentDrainAfter());
   await step("exchange_rates", () => refreshExchangeRates(now));
   await step("pending_files", () => deleteStalePendingFiles(now, deadlineAt));
   await step("unused_files", () => deleteUnusedFiles(now, deadlineAt));

@@ -20,20 +20,34 @@ vi.mock("@/lib/env/startup", () => ({
   validateStartupEnv,
 }));
 
+const startBackgroundRuntime = vi.fn();
+vi.mock("@/server/background/runtime", () => ({ startBackgroundRuntime }));
+
 describe("instrumentation.register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_RUNTIME = "nodejs";
   });
 
-  it("validates startup env without installing process-global orchestration", async () => {
+  it("does not start the background worker under test", async () => {
     const { register } = await import("@/instrumentation");
 
     await register();
 
     expect(validateStartupEnv).toHaveBeenCalledTimes(1);
+    expect(startBackgroundRuntime).not.toHaveBeenCalled();
     // Accounts come from `account:create`; boot prints no codes or links.
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("starts the background worker outside of tests", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { register } = await import("@/instrumentation");
+
+    await register();
+
+    expect(startBackgroundRuntime).toHaveBeenCalledTimes(1);
+    vi.unstubAllEnvs();
   });
 
   it("rethrows startup env validation failures", async () => {
@@ -45,5 +59,6 @@ describe("instrumentation.register", () => {
 
     await expect(register()).rejects.toThrow("invalid env");
     expect(logger.error).toHaveBeenCalled();
+    expect(startBackgroundRuntime).not.toHaveBeenCalled();
   });
 });

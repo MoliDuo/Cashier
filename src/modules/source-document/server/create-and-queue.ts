@@ -3,7 +3,7 @@ import { ValidationError } from "@/lib/errors";
 import { ledgerToday } from "@/modules/ledger/server/query-period";
 import { validateAggregateFileCount } from "@/lib/storage/upload-policy";
 import { discardUnusedFiles } from "@/server/stored-files/uploads";
-import { scheduleProcessingAfter } from "@/server/processing/schedule";
+import { requestBackgroundWork } from "@/server/background/wake";
 import {
   findIdempotentSubmission,
   submitSourceDocument,
@@ -24,7 +24,7 @@ export interface CreateAndQueueSourceDocumentInput {
   /** The ledger's zone, which names the day a record without one gets. */
   timeZone: string;
   idempotency?: SourceDocumentIdempotencyInput;
-  /** Correlates the processing `after()` with the request that queued it. */
+  /** Correlates the processing run with the request that queued it. */
   requestId?: string;
 }
 
@@ -83,7 +83,7 @@ export async function createAndQueueSourceDocument(
       }
       pending = result.submission;
     }
-    scheduleProcessingAfter(pending.job, input.requestId);
+    requestBackgroundWork();
     return {
       sourceDocumentId: pending.document.id,
       attemptId: pending.attempt.id,

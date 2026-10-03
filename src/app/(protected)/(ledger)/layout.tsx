@@ -9,7 +9,6 @@ import {
 } from "@/modules/workspace/server/ledger-page-bootstrap";
 import { WorkspaceStoreProvider } from "@/modules/workspace/store";
 import { LedgerWorkspace } from "@/modules/workspace/ui/LedgerWorkspace";
-import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { LedgerRouteFallback } from "./_route-fallback";
 import { LedgerShell } from "./_shell";
 import { orSignIn } from "./_sign-in";
@@ -21,10 +20,6 @@ import { orSignIn } from "./_sign-in";
  */
 export default async function LedgerLayout({ children }: { children: React.ReactNode }) {
   const view = await orSignIn(loadLedgerView());
-  // Authenticated request boundary for processing recovery: the reads stay
-  // side-effect free, but every document load still gets a recovery pass
-  // after the response finishes.
-  scheduleProcessingRecoveryAfter();
 
   return (
     <WorkspaceStoreProvider initialBookId={view.bookId}>

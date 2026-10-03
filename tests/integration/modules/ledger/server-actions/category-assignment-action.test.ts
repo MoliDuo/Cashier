@@ -16,7 +16,7 @@ import {
   activateTestSourceDocumentProjection,
   ensureTestLedgerBooks,
 } from "tests/helpers/schema-setup";
-import { flushAfterCallbacks } from "tests/setup.common";
+import { drainBackground } from "tests/helpers/background";
 
 const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
 
@@ -106,7 +106,7 @@ describe("submitSelection", () => {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
-    await flushAfterCallbacks();
+    await drainBackground();
 
     expect(job).toMatchObject({ total: 2, appliedCount: 0 });
     const stored = await getCategoryAssignmentJobAction();
@@ -144,7 +144,7 @@ describe("submitSelection", () => {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
-    await flushAfterCallbacks(15_000);
+    await drainBackground();
 
     await expect(getCategoryAssignmentJobAction()).resolves.toMatchObject({
       status: "failed",
@@ -170,7 +170,7 @@ describe("submitSelection", () => {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
-    await flushAfterCallbacks();
+    await drainBackground();
 
     await expect(getCategoryAssignmentJobAction()).resolves.toMatchObject({
       status: "succeeded",
@@ -243,7 +243,7 @@ describe("submitSelection", () => {
       ledgerEntryIds: entryIds,
       candidateCategoryIds: [food.id, home.id],
     });
-    await flushAfterCallbacks(15_000);
+    await drainBackground();
 
     await expect(getCategoryAssignmentJobAction()).resolves.toMatchObject({
       status: "failed",
@@ -258,7 +258,7 @@ describe("submitSelection", () => {
       categoryId: null,
       count: 1,
     });
-    // after() runs the job straight away here, so the model call is held open
+    // the worker runs the job straight away here, so the model call is held open
     // to keep the first run active until the second request arrives.
     const held = Promise.withResolvers<never>();
     held.promise.catch(() => {});

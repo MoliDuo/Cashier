@@ -5,7 +5,6 @@ import { getLedgerSettings } from "@/modules/ledger/server/settings";
 import { NotFoundError } from "@/lib/errors";
 import type { SourceDocumentSubmissionContract } from "@/modules/source-document/server/submissions";
 import type { PreparedApiV1SourceDocumentInput } from "@/modules/source-document/api-v1-policy";
-import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { createAndQueueSourceDocument } from "./create-and-queue";
 
 function contentFingerprint(payload: PreparedApiV1SourceDocumentInput): string {
@@ -30,8 +29,8 @@ function contentFingerprint(payload: PreparedApiV1SourceDocumentInput): string {
 /**
  * Server-only entry point for POST /api/v1/source-documents.
  *
- * A plain module function (not a "use server" action) that owns the
- * request-bound `after()` callbacks for credential ingestion.
+ * A plain module function (not a "use server" action) for credential
+ * ingestion.
  */
 export async function createSourceDocumentFromCredentialRequest(input: {
   credential: AuthenticatedServiceCredential;
@@ -61,10 +60,6 @@ export async function createSourceDocumentFromCredentialRequest(input: {
         }),
     ...(input.requestId == null ? {} : { requestId: input.requestId }),
   });
-
-  // Also recover older pending intents. The claim CAS makes
-  // duplicate scheduling harmless.
-  scheduleProcessingRecoveryAfter(input.requestId);
 
   return result;
 }

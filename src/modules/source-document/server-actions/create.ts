@@ -9,7 +9,6 @@ import { omitUndefinedProperties } from "@/lib/validation";
 import { createAndQueueSourceDocument } from "../server/create-and-queue";
 import { resolveRecordBook } from "../server/resolve-record-book";
 import { withSourceDocumentLedgerAccess } from "./access";
-import { scheduleProcessingRecoveryAfter } from "@/server/processing/recovery";
 import { sourceDocumentFingerprint } from "@/modules/source-document/source-document-fingerprint";
 
 /**
@@ -43,9 +42,6 @@ export const createSourceDocumentAction = withSourceDocumentLedgerAccess(
         contentFingerprint: sourceDocumentFingerprint(payload),
       },
     });
-
-    // Also recover any missed processing intents
-    scheduleProcessingRecoveryAfter();
 
     return { sourceDocumentId: result.sourceDocumentId, version: 1, status: "processing" };
   }

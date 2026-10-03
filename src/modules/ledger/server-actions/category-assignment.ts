@@ -1,6 +1,6 @@
 "use server";
 import { ValidationError } from "@/lib/errors";
-import { scheduleCategoryAssignmentAfter } from "@/server/category-assignment/schedule";
+import { requestBackgroundWork } from "@/server/background/wake";
 import type {
   CategoryAssignmentCandidateSnapshot,
   CategoryAssignmentMode,
@@ -66,9 +66,9 @@ async function start(
     customPrompt: settings?.aiCustomPrompt || null,
     ...(retryOfJobId == null ? {} : { retryOfJobId }),
   });
-  // The reply describes the job as it was submitted; the run starts after it.
+  // The reply describes the job as it was submitted; the worker starts it after.
   const submitted = await loadJob(job.id);
-  scheduleCategoryAssignmentAfter(job.id);
+  requestBackgroundWork();
   return submitted;
 }
 
@@ -93,7 +93,7 @@ export const retryCategoryAssignmentFailuresAction = withLedgerAccess(
       ...validated,
     });
     const submitted = await loadJob(retry.id);
-    scheduleCategoryAssignmentAfter(retry.id);
+    requestBackgroundWork();
     return submitted;
   }
 );
