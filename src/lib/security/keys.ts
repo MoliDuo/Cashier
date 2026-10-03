@@ -6,8 +6,7 @@ import { runtimeEnv } from "@/lib/env/runtime";
  * `AUTH_SECRET`, one key per purpose, so a digest made for one use can never
  * be replayed as another's and there is only one secret to provision.
  */
-export type KeyPurpose =
-  "session" | "otp" | "rate-limit" | "log-identifier" | "credential" | "enrollment";
+export type KeyPurpose = "session" | "log-identifier" | "credential" | "oidc-flow";
 
 const derived = new Map<string, Buffer>();
 

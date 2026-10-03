@@ -17,10 +17,6 @@ const { queryState, refetchQueries, BOOKS } = vi.hoisted(() => ({
   ],
 }));
 
-vi.mock("@/modules/auth/server-actions/sign-in", () => ({
-  signOutAction: vi.fn(),
-}));
-
 const { forgetLedgerDataOnThisDevice } = vi.hoisted(() => ({
   forgetLedgerDataOnThisDevice: vi.fn(),
 }));
@@ -143,17 +139,19 @@ describe("SettingsTab account authentication controls", () => {
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent)
     ).toEqual(["主题", "默认折叠账单"]);
-    // One 账户 card: how this person signs in, and signing out at its end.
+    // One 账户 card: the addresses that sign in, and signing out at its end.
     expect(
       within(screen.getByRole("heading", { level: 2, name: "账户" }).closest("section")!)
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent)
-    ).toEqual(["登录邮箱", "通行密钥", "在这台设备上退出"]);
+    ).toEqual(["登录邮箱", "在这台设备上退出"]);
   });
 
   it("clears this device's drafts and remembered book when the reader signs out", async () => {
     const assign = vi.fn();
     vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });
+    const logout = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", logout);
     const ledger: Ledger = {
       settings: { ...getDefaultLedger().settings },
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -172,8 +170,10 @@ describe("SettingsTab account authentication controls", () => {
     const confirm = await screen.findByRole("dialog");
     fireEvent.click(within(confirm).getByRole("button", { name: /退出登录/ }));
 
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("/login"));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/login?notice=signed_out"));
+    expect(logout).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
     expect(forgetLedgerDataOnThisDevice).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
   });
 
   it("keeps loaded settings visible when a query fails and exposes a local retry", () => {

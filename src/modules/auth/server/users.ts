@@ -14,7 +14,6 @@ export interface UserAccount {
 
 export interface LoginEmail {
   email: string;
-  emailVerifiedAt: string | null;
 }
 
 /**
@@ -62,12 +61,9 @@ export async function findUserById(id: string): Promise<UserAccount | null> {
 /** The account's login addresses, oldest first. */
 export async function listLoginEmails(userId: string): Promise<LoginEmail[]> {
   const rows = await db
-    .select({ email: loginEmails.email, verifiedAt: loginEmails.verifiedAt })
+    .select({ email: loginEmails.email })
     .from(loginEmails)
     .where(eq(loginEmails.userId, userId))
     .orderBy(asc(loginEmails.createdAt), asc(loginEmails.id));
-  return rows.map((row) => ({
-    email: row.email,
-    emailVerifiedAt: row.verifiedAt?.toISOString() ?? null,
-  }));
+  return rows;
 }

@@ -1,14 +1,12 @@
 "use client";
 import { textRoleClassName } from "@/components/typography";
 import type { EntryCategoryWithCount, Ledger } from "@/modules/ledger/contracts";
-import { usePathname } from "next/navigation";
-import { useSearchParams } from "next/navigation";
 import { BookkeepingSettings } from "./settings/BookkeepingSettings";
 import { AccountSettings } from "./settings/AccountSettings";
 import { BookSettings } from "./settings/BookSettings";
 import { useBooks } from "@/modules/ledger/hooks/useBooks";
 import { useLedgerSettings } from "@/modules/ledger/hooks/useLedgerSettings";
-import { signOutAction } from "@/modules/auth/server-actions/sign-in";
+import { leavePastOverlays } from "@/lib/navigation/overlay-history";
 import { forgetLedgerDataOnThisDevice } from "@/lib/sign-out-cleanup";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
@@ -32,8 +30,6 @@ export function SettingsTab({
   initialBooks,
   userEmail,
 }: SettingsTabProps) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const {
     ledger: settingsLedger,
@@ -61,26 +57,22 @@ export function SettingsTab({
 
   const signOutTo = async (callbackUrl: string) => {
     try {
-      await signOutAction();
+      await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       // A full page load, not a client-side push: the old session's cached
-      // ledger data must not survive into the login page.
-      window.location.assign(callbackUrl);
+      // ledger data must not survive into the login page. The confirmation
+      // dialog's history entry goes first: popping it after the load has begun
+      // would cancel the load and leave the reader on this page.
+      const load = () => window.location.assign(callbackUrl);
+      if (!leavePastOverlays(0, load)) load();
     }
   };
 
   const handleSignOut = async () => {
     // Only a sign-out the reader chose clears the device. A session that ended
-    // for them (re-authentication, credentials changed) keeps the drafts for
-    // when they are back.
+    // for them (a login email was removed) keeps the drafts for when they are back.
     forgetLedgerDataOnThisDevice();
-    await signOutTo("/login");
-  };
-
-  const handleRequireReauthentication = async () => {
-    const query = searchParams.toString();
-    const currentPath = query === "" ? pathname : `${pathname}?${query}`;
-    await signOutTo(`/login?notice=reauth_required&callbackUrl=${encodeURIComponent(currentPath)}`);
+    await signOutTo("/login?notice=signed_out");
   };
 
   const handleAllSessionsEnded = async () => {
@@ -142,7 +134,6 @@ export function SettingsTab({
         onDeleteCredential={(id) => deleteCredential.mutateAsync(id)}
         onCredentialDialogClose={createCredential.reset}
         onSignOut={handleSignOut}
-        onRequireReauthentication={handleRequireReauthentication}
         onAllSessionsEnded={handleAllSessionsEnded}
       />
     </div>

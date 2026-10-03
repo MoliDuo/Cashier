@@ -1,33 +1,42 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { KeyRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { useLoginFlow } from "../hooks/use-login-flow";
-import { EmailStep } from "./email-step";
-import { OtpStep } from "./otp-step";
-import { useSearchParams } from "next/navigation";
 import { textRoleClassName } from "@/components/typography";
-import { authCopy } from "@/copy/auth";
+import { authCopy, type LoginMessageKey } from "@/copy/auth";
+import { devSignInAction } from "../server-actions/sign-in";
 
 export function AuthLoginPage({
-  emailAuthEnabled = false,
+  messageKey = null,
+  callbackUrl = "/",
   devAuthAvailable = false,
   accountMissing = false,
 }: {
-  emailAuthEnabled?: boolean;
+  messageKey?: LoginMessageKey | null;
+  callbackUrl?: string;
   devAuthAvailable?: boolean;
   accountMissing?: boolean;
 }) {
-  const searchParams = useSearchParams();
-  const flow = useLoginFlow({ isDevAuthAvailable: devAuthAvailable });
-  const notice = searchParams.get("notice");
-  const noticeMessage =
-    notice === "reauth_required"
-      ? authCopy.reauthRequiredNotice
-      : notice === "credentials_changed"
-        ? authCopy.credentialsChangedNotice
-        : null;
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
+  const message = messageKey == null ? null : authCopy.messages[messageKey];
+
+  const handleDevSignIn = async () => {
+    setIsLoading(true);
+    setDevError(null);
+    try {
+      const result = await devSignInAction();
+      if (!result.ok) throw new Error("dev sign-in refused");
+      router.push(callbackUrl);
+      router.refresh();
+    } catch {
+      setDevError(authCopy.devSignInFailed);
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8">
@@ -52,109 +61,43 @@ export function AuthLoginPage({
               <p className={textRoleClassName("bodyStrong")}>{authCopy.noAccountTitle}</p>
               <p className={textRoleClassName("bodyMuted", "mt-1")}>{authCopy.noAccountDesc}</p>
               <pre className={textRoleClassName("meta", "mt-2 overflow-x-auto text-text")}>
-                <code translate="no">
-                  {"npm run account:create -- --email you@example.com\n"}
-                  {"npm run account:enroll -- --email you@example.com"}
-                </code>
+                <code translate="no">npm run account:create -- --email you@example.com</code>
               </pre>
             </div>
           ) : null}
-          {noticeMessage != null ? (
-            <p
-              role="status"
-              className={textRoleClassName("body", "mb-5 rounded-md bg-surface2 p-3")}
+          {message != null ? (
+            <div
+              role={message.tone === "error" ? "alert" : "status"}
+              className={textRoleClassName(
+                "body",
+                message.tone === "error"
+                  ? "mb-5 rounded-md bg-destructive/10 p-3 text-destructive"
+                  : "mb-5 rounded-md bg-surface2 p-3"
+              )}
             >
-              {noticeMessage}
-            </p>
-          ) : null}
-          {flow.passkeySupported ? (
-            <div className="mb-5">
-              <Button
-                type="button"
-                className="min-h-11 w-full"
-                disabled={flow.isLoading || flow.resendPending}
-                onClick={() => void flow.handlePasskeyLogin()}
-              >
-                <KeyRound aria-hidden="true" className="size-4" />
-                {authCopy.passkeySignIn}
-              </Button>
-              {emailAuthEnabled ? (
-                <div className="mt-5 flex items-center gap-3" aria-hidden="true">
-                  <span className="h-px flex-1 bg-border" />
-                  <span className={textRoleClassName("meta")}>{authCopy.orDivider}</span>
-                  <span className="h-px flex-1 bg-border" />
-                </div>
-              ) : null}
+              <p className={textRoleClassName("bodyStrong")}>{message.title}</p>
+              <p className="mt-1">{message.desc}</p>
             </div>
           ) : null}
-          {emailAuthEnabled ? (
-            <>
-              <div className="mb-5">
-                <h2 className={textRoleClassName("sectionTitle")}>
-                  {flow.step === "email" ? authCopy.emailLoginTitle : authCopy.verifyCode}
-                </h2>
-                <p className={textRoleClassName("bodyMuted", "mt-1")}>
-                  {flow.step === "email"
-                    ? authCopy.emailLoginDesc
-                    : authCopy.verifyCodeDesc({ email: flow.email })}
-                </p>
-              </div>
-              {flow.step === "email" ? (
-                <EmailStep
-                  callbackUrl={flow.callbackUrl}
-                  email={flow.email}
-                  isLoading={flow.isLoading}
-                  error={flow.error}
-                  onEmailChange={flow.setEmail}
-                  onSubmit={flow.handleSendOTP}
-                  secondary={flow.passkeySupported}
-                />
-              ) : (
-                <OtpStep
-                  otp={flow.otp}
-                  isLoading={flow.isLoading}
-                  error={flow.error}
-                  expiresAt={flow.expiresAt}
-                  canResendAt={flow.canResendAt}
-                  resendPending={flow.resendPending}
-                  otpExpired={flow.otpExpired}
-                  onOtpChange={flow.setOtp}
-                  onVerify={flow.handleVerifyOTP}
-                  onResend={flow.handleResendOTP}
-                  onChangeEmail={flow.handleChangeEmail}
-                  onExpired={flow.handleOTPExpired}
-                />
-              )}
-            </>
-          ) : (
-            <>
-              {/* With passkeys available there is nothing missing to report. */}
-              {flow.passkeySupported ? null : (
-                <p className={textRoleClassName("bodyMuted")}>{authCopy.emailAuthNotConfigured}</p>
-              )}
-              {flow.error != null ? (
-                <p
-                  role="alert"
-                  className={textRoleClassName(
-                    "body",
-                    "mt-4 rounded-md bg-destructive/10 p-3 text-destructive"
-                  )}
-                >
-                  {flow.error}
-                </p>
-              ) : null}
-            </>
+          {accountMissing ? null : (
+            // A plain link: the route answers with a redirect to another origin, which a
+            // client-side navigation or prefetch must not try to follow.
+            <Button asChild className="min-h-11 w-full">
+              <a href={`/api/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
+                {message == null ? authCopy.signIn : authCopy.signInAgain}
+              </a>
+            </Button>
           )}
         </div>
 
-        {flow.isDevAuthAvailable ? (
+        {devAuthAvailable ? (
           <div className="mt-4 rounded-md border border-dashed border-border bg-surface2/60 p-3 text-center">
             <p className={textRoleClassName("meta")}>{authCopy.devSignInDesc}</p>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => flow.handleDevSignIn()}
-                disabled={flow.isLoading}
+                onClick={() => void handleDevSignIn()}
+                disabled={isLoading}
                 className={textRoleClassName(
                   "bodyStrong",
                   "inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-3 transition-colors hover:bg-surface2 disabled:opacity-50"
@@ -163,6 +106,11 @@ export function AuthLoginPage({
                 {authCopy.devSignIn}
               </button>
             </div>
+            {devError != null ? (
+              <p role="alert" className={textRoleClassName("meta", "mt-2 text-destructive")}>
+                {devError}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

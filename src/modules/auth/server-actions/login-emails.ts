@@ -1,128 +1,61 @@
 "use server";
 
 import crypto from "node:crypto";
-import { requireAuth, requireRecentAuth } from "@/modules/auth/server/session-guards";
-import { ConflictError, RateLimitError, ValidationError } from "@/lib/errors";
-import { AppError } from "@/lib/errors";
-import { normalizeEmail } from "@/lib/utils/email";
+import { requireAuth } from "@/modules/auth/server/session-guards";
+import { ConflictError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { parseSendOTPEmail } from "@/modules/auth/contract-schemas";
-import { sendLoginEmailCode, verifyLoginEmailCode } from "@/modules/auth/server/login-emails";
-import { removeLoginEmail } from "@/modules/auth/server/account-security";
+import { parseLoginEmail } from "@/modules/auth/contract-schemas";
+import { addLoginEmail, removeLoginEmail } from "@/modules/auth/server/login-emails";
 import { listLoginEmails } from "@/modules/auth/server/users";
-import { AUTH_ERROR_CODES } from "@/modules/auth/errors";
 
-export type LoginEmailErrorCode =
-  | "invalid_email"
-  | "reauth_required"
-  | "invalid_code"
-  | "expired_code"
-  | "email_in_use"
-  | "rate_limited"
-  | "locked"
-  | "last_email"
-  | "unknown";
-
-export type SendLoginEmailCodeActionResult =
-  { ok: true; expiresAt: number } | { ok: false; code: LoginEmailErrorCode };
+export type LoginEmailErrorCode = "invalid_email" | "email_in_use" | "last_email" | "unknown";
 
 export type LoginEmailsActionResult =
-  { ok: true; emails: string[]; verified: boolean } | { ok: false; code: LoginEmailErrorCode };
-
-export type RemoveLoginEmailActionResult =
   { ok: true; emails: string[] } | { ok: false; code: LoginEmailErrorCode };
 
 function mapError(error: unknown): LoginEmailErrorCode {
-  if (error instanceof AppError && error.code === AUTH_ERROR_CODES.REAUTHENTICATION_REQUIRED) {
-    return "reauth_required";
-  }
   if (error instanceof ConflictError) return "email_in_use";
   if (error instanceof ValidationError && Array.isArray(error.details?.issues)) {
     return "invalid_email";
   }
-  if (error instanceof RateLimitError) return "rate_limited";
-  if (error instanceof AppError) {
-    switch (error.code) {
-      case "LOGIN_EMAIL_LOCKED":
-        return "locked";
-      case "LOGIN_EMAIL_EXPIRED_CODE":
-        return "expired_code";
-      case "LOGIN_EMAIL_INVALID_CODE":
-        return "invalid_code";
-      case "LOGIN_EMAIL_LAST":
-        return "last_email";
-    }
-  }
   return "unknown";
 }
 
-/** Sends an OTP to an address that is not yet a login address. */
-export async function sendLoginEmailCodeAction(
-  inputEmail: string
-): Promise<SendLoginEmailCodeActionResult> {
-  try {
-    const userId = await requireRecentAuth();
-    const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
-    const result = await sendLoginEmailCode({ userId, newEmail });
-    return { ok: true, expiresAt: result.expiresAt };
-  } catch (error) {
-    const code = mapError(error);
-    if (code === "unknown") {
-      logger.error(
-        { correlationId: crypto.randomUUID(), errorCode: "LOGIN_EMAIL_SEND_FAILED" },
-        "Login email code request failed"
-      );
-    }
-    return { ok: false, code };
+function failed(error: unknown, errorCode: string, message: string): LoginEmailsActionResult {
+  const code = mapError(error);
+  if (code === "unknown") {
+    logger.error({ correlationId: crypto.randomUUID(), errorCode }, message);
   }
+  return { ok: false, code };
 }
 
-/** Confirms the code and adds the address to the account. */
-export async function verifyLoginEmailCodeAction(
-  inputEmail: string,
-  otp: string
-): Promise<LoginEmailsActionResult> {
+async function emailsOf(userId: string): Promise<string[]> {
+  return (await listLoginEmails(userId)).map((row) => row.email);
+}
+
+/** Lets the person the identity provider knows by this address sign in. */
+export async function addLoginEmailAction(inputEmail: string): Promise<LoginEmailsActionResult> {
   try {
     const userId = await requireAuth();
-    const newEmail = normalizeEmail(parseSendOTPEmail(inputEmail));
-    await verifyLoginEmailCode(userId, newEmail, otp);
-    const emails = (await listLoginEmails(userId)).map((row) => row.email);
-    return { ok: true, emails, verified: true };
+    await addLoginEmail({ userId, email: parseLoginEmail(inputEmail) });
+    return { ok: true, emails: await emailsOf(userId) };
   } catch (error) {
-    const code = mapError(error);
-    if (code === "unknown") {
-      logger.error(
-        { correlationId: crypto.randomUUID(), errorCode: "LOGIN_EMAIL_VERIFY_FAILED" },
-        "Login email verification failed"
-      );
-    }
-    return { ok: false, code };
+    return failed(error, "LOGIN_EMAIL_ADD_FAILED", "Adding a login email failed");
   }
 }
 
-export async function removeLoginEmailAction(
-  inputEmail: string
-): Promise<RemoveLoginEmailActionResult> {
+export async function removeLoginEmailAction(inputEmail: string): Promise<LoginEmailsActionResult> {
   try {
-    const userId = await requireRecentAuth();
-    const email = normalizeEmail(parseSendOTPEmail(inputEmail));
+    const userId = await requireAuth();
     const result = await removeLoginEmail({
       userId,
-      email,
+      email: parseLoginEmail(inputEmail),
       now: new Date(),
     });
     if (result === "last_email") return { ok: false, code: "last_email" };
     if (result === "not_found") return { ok: false, code: "unknown" };
-    const emails = (await listLoginEmails(userId)).map((row) => row.email);
-    return { ok: true, emails };
+    return { ok: true, emails: await emailsOf(userId) };
   } catch (error) {
-    const code = mapError(error);
-    if (code === "unknown") {
-      logger.error(
-        { correlationId: crypto.randomUUID(), errorCode: "LOGIN_EMAIL_REMOVE_FAILED" },
-        "Login email removal failed"
-      );
-    }
-    return { ok: false, code };
+    return failed(error, "LOGIN_EMAIL_REMOVE_FAILED", "Login email removal failed");
   }
 }

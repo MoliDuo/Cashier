@@ -59,6 +59,9 @@ const server = setupServer(
     return HttpResponse.json({ base: "EUR", start_date: start, end_date: end, rates: days });
   })
 );
+/** For a test that talks to a provider it started itself on this machine. */
+export const testNetwork = server;
+
 const unexpectedRequests: Error[] = [];
 
 export function createUnexpectedHttpError(request: Pick<Request, "method" | "url">): Error {

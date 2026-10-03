@@ -79,7 +79,6 @@ describe("session ledger query transport", () => {
       "source-document-input",
       "convert-currency",
       "login-emails",
-      "passkeys",
     ]) {
       const response = await POST(request(query, [{ unexpected: true }]));
       expect(response.status).toBe(400);
@@ -179,7 +178,7 @@ describe("session ledger query transport", () => {
     expect(missing.status).toBe(409);
   });
 
-  it("serves the account's login emails and passkeys to its own session", async () => {
+  it("serves the account's login emails to its own session", async () => {
     const { userId: ownerId } = await createTestUserWithLedger(
       getTestDb(),
       "owner@example.com",
@@ -191,13 +190,9 @@ describe("session ledger query transport", () => {
     const emails = await POST(request("login-emails", []));
     expect(emails.status).toBe(200);
     expect(await emails.json()).toEqual(["owner@example.com"]);
-    const passkeys = await POST(request("passkeys", []));
-    expect(passkeys.status).toBe(200);
-    expect(await passkeys.json()).toEqual([]);
 
     vi.mocked(getCurrentSession).mockResolvedValue(null);
     expect((await POST(request("login-emails", []))).status).toBe(401);
-    expect((await POST(request("passkeys", []))).status).toBe(401);
   });
 
   describe("periods", () => {

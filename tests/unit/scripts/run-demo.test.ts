@@ -75,6 +75,20 @@ describe("demo runtime environment", () => {
     });
   });
 
+  it("points the identity provider at a closed loopback port, whatever the shell has", () => {
+    const result = createDemoEnvironment({
+      NODE_ENV: "development",
+      OIDC_ISSUER_URL: "https://auth.example.com",
+      OIDC_CLIENT_SECRET: "real-secret",
+    });
+
+    expect(result).toMatchObject({
+      OIDC_ISSUER_URL: "http://127.0.0.1:1",
+      OIDC_CLIENT_ID: "cashier-demo",
+    });
+    expect(result.OIDC_CLIENT_SECRET).not.toBe("real-secret");
+  });
+
   it("uses explicit valid ports consistently", () => {
     const result = createDemoEnvironment({
       NODE_ENV: "development",

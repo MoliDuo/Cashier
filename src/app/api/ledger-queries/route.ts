@@ -35,7 +35,6 @@ import { getSourceDocumentInput } from "@/modules/source-document/server/reads/i
 import { convertCurrency } from "@/modules/currency/server/convert-currency";
 import { requireAuth } from "@/modules/auth/server/session-guards";
 import { listLoginEmails } from "@/modules/auth/server/users";
-import { listPasskeys } from "@/modules/auth/server/passkeys";
 import { parseEnhancedStatsInput } from "@/modules/stats/contract-schemas";
 
 const requestSchema = z
@@ -59,7 +58,6 @@ const requestSchema = z
       "source-document-input",
       "convert-currency",
       "login-emails",
-      "passkeys",
     ]),
     args: z.array(z.unknown()).max(1),
   })
@@ -125,17 +123,13 @@ export async function POST(request: Request) {
       case "convert-currency":
         result = await convertCurrency(input);
         break;
-      // The account's sign-in methods belong to the person, not the ledger.
+      // Who may sign in belongs to the account, not the ledger.
       case "login-emails": {
         noArgumentsSchema.parse(payload.args);
         const userId = await requireAuth();
         result = (await listLoginEmails(userId)).map((row) => row.email);
         break;
       }
-      case "passkeys":
-        noArgumentsSchema.parse(payload.args);
-        result = await listPasskeys(await requireAuth());
-        break;
       case "entries": {
         const { ledger } = await requireLedgerAccess();
         result = await listLedgerEntries(withResolvedPeriod(input, ledger.settings.timeZone));

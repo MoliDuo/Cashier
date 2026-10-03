@@ -11,7 +11,7 @@ import { createDemoAiServer } from "./demo-ai-server";
 import { seedBooks, seedCategories, seedLedger, seedUser } from "./lib/seed";
 import { tsxArgs } from "./lib/tsx";
 import { prepareTestPostgres } from "./prepare-test-postgres";
-import { createSmokeEmailServer } from "./smoke-email-server";
+import { createSmokeOidcServer } from "./smoke-oidc-server";
 import { createSmokeObjectStorage } from "./smoke-object-storage";
 
 // Next.js needs its port before it starts, because APP_URL carries
@@ -86,10 +86,11 @@ async function main(): Promise<void> {
   // in-memory S3 endpoint instead of a bucket: the image still travels through
   // the real client, and nothing leaves this machine or outlives the run.
   const storageEndpoint = `http://127.0.0.1:${storagePort}`;
-  // Sign-in codes go through the real Resend client too, to an in-memory outbox
-  // the OTP spec reads them back from.
-  const emailServer = createSmokeEmailServer();
-  const emailEndpoint = `http://127.0.0.1:${await listenOnAnyPort(emailServer)}`;
+  // Sign-in goes through the real OIDC client too, to a provider on loopback
+  // that signs in whoever a spec tells it to.
+  const oidcClient = { clientId: "cashier-smoke", clientSecret: randomUUID() };
+  const oidcServer = createSmokeOidcServer(oidcClient).server;
+  const oidcEndpoint = `http://127.0.0.1:${await listenOnAnyPort(oidcServer)}`;
   const userId = randomUUID();
   const smokeEmail = "smoke@example.com";
   const env: NodeJS.ProcessEnv = {
@@ -98,9 +99,9 @@ async function main(): Promise<void> {
     DATABASE_URL: databaseUrl.toString(),
     APP_URL: baseURL,
     AUTH_SECRET: randomUUID(),
-    AUTH_RESEND_KEY: "re_smoke_unused",
-    RESEND_BASE_URL: emailEndpoint,
-    AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
+    OIDC_ISSUER_URL: oidcEndpoint,
+    OIDC_CLIENT_ID: oidcClient.clientId,
+    OIDC_CLIENT_SECRET: oidcClient.clientSecret,
     OPENAI_API_KEY: "smoke-unused",
     OPENAI_BASE_URL: `http://127.0.0.1:${aiPort}/v1`,
     S3_ENDPOINT: storageEndpoint,
@@ -112,11 +113,10 @@ async function main(): Promise<void> {
     // off in this server whatever this says; the specs sign in through
     // tests/smoke/sign-in.ts instead.
     DEV_AUTH_BYPASS: "false",
-    TRUSTED_PROXY: "",
     TZ: "UTC",
     SMOKE_BASE_URL: baseURL,
     SMOKE_EMAIL: smokeEmail,
-    SMOKE_EMAIL_OUTBOX_URL: emailEndpoint,
+    SMOKE_OIDC_URL: oidcEndpoint,
   };
   let activeChild: ChildProcess | undefined;
   let server: ChildProcess | undefined;
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
     await stop(server);
     await closeServer(aiServer);
     await closeServer(storageServer);
-    await closeServer(emailServer);
+    await closeServer(oidcServer);
     if (created && /^smoke_[a-f0-9]{32}$/.test(databaseName)) {
       const target = await admin.query("SELECT datname FROM pg_database WHERE datname = $1", [
         databaseName,

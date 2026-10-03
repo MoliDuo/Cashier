@@ -28,7 +28,7 @@ function timestamp(at: Date | undefined): Date {
   return at ?? new Date();
 }
 
-/** An account and its one verified login address. Returns the user id. */
+/** An account and its one login address. Returns the user id. */
 export async function seedUser(
   db: SeedDatabase,
   input: { id?: string; email: string; at?: Date }
@@ -38,7 +38,7 @@ export async function seedUser(
   await db.insert(schema.users).values({ id, createdAt: at, updatedAt: at }).onConflictDoNothing();
   await db
     .insert(schema.loginEmails)
-    .values({ userId: id, email: input.email, verifiedAt: at, createdAt: at, updatedAt: at });
+    .values({ userId: id, email: input.email, createdAt: at, updatedAt: at });
   return id;
 }
 

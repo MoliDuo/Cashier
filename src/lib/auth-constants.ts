@@ -1,1 +1,0 @@
-export const RECENT_AUTH_MAX_AGE_SECONDS = 600;

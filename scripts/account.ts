@@ -2,11 +2,12 @@
  * Local account commands, run on a machine that can reach the database:
  *
  *   npm run account:create -- --email you@example.com [--book 共同支出 --book …]
- *   npm run account:enroll -- --email you@example.com
+ *   npm run account:add-email -- --email you@example.com
  *
- * `create` makes the one account with its ledger, books and categories.
- * `enroll` prints a one-time link that adds a passkey to it; it is also the
- * way back in when every passkey is lost and the email cannot receive codes.
+ * `create` makes the one account with its ledger, books and categories. The
+ * email is the one the identity provider knows the person by.
+ * `add-email` binds one more address to it; it is the way back in when the
+ * provider's address for a person changed and nobody can reach the settings page.
  */
 import { parseArgs } from "node:util";
 import { z } from "zod";
@@ -35,15 +36,13 @@ const argsSchema = z.discriminatedUnion("command", [
         .default(DEFAULT_BOOK_NAMES),
     })
     .strict(),
-  z.object({ command: z.literal("enroll"), email: emailSchema }).strict(),
+  z.object({ command: z.literal("add-email"), email: emailSchema }).strict(),
 ]);
 
 const envSchema = z.object({
   DATABASE_URL: z
     .string({ error: "is required" })
     .regex(/^postgres(ql)?:\/\//, "must be a PostgreSQL connection URL"),
-  AUTH_SECRET: z.string({ error: "is required" }).trim().min(1, "is required"),
-  APP_URL: z.url({ error: "must be the URL the app is served from" }),
 });
 
 function parseCommand(argv: string[]) {
@@ -61,7 +60,7 @@ function parseCommand(argv: string[]) {
     const issues = parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
     throw new Error(
       `${issues.join("; ")}\nusage: account.ts create --email <address> [--book <name>]…` +
-        `\n       account.ts enroll --email <address>`
+        `\n       account.ts add-email --email <address>`
     );
   }
   return parsed.data;
@@ -85,22 +84,14 @@ async function main() {
       await createInitialAccount({ email: command.email, bookNames: command.books });
       console.log(
         "Created the account, its ledger, books and categories.\n" +
-          "Add its first passkey: npm run account:enroll -- --email <the same address>"
+          "It signs in through the identity provider as that email."
       );
       return;
     }
 
-    const { issueEnrollmentToken, ENROLLMENT_TTL_MS } =
-      await import("@/modules/auth/server/enrollment");
-    const issued = await issueEnrollmentToken(command.email);
-    if (issued == null) throw new Error("no account signs in with that email");
-    const link = new URL("/enroll", env.data.APP_URL);
-    link.searchParams.set("token", issued.token);
-    console.log(
-      `Open this link within ${ENROLLMENT_TTL_MS / 60_000} minutes to add a passkey. ` +
-        "It works once, and replaces any link issued before.\n" +
-        link.toString()
-    );
+    const { addLoginEmailToTheAccount } = await import("@/modules/auth/server/login-emails");
+    await addLoginEmailToTheAccount(command.email);
+    console.log("That email can now sign in.");
   } finally {
     await closeDatabase();
   }

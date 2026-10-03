@@ -26,7 +26,6 @@ describe("createInitialAccount", () => {
     expect(await findUserByEmail("owner@example.com")).toMatchObject({ id: result.userId });
     const [address] = await db.select().from(loginEmails);
     expect(address).toMatchObject({ email: "owner@example.com", userId: result.userId });
-    expect(address?.verifiedAt).toBeInstanceOf(Date);
     expect(await db.select({ id: ledgers.id }).from(ledgers)).toHaveLength(1);
     const ledgerBooks = await db.query.books.findMany({ orderBy: [books.sortOrder] });
     expect(ledgerBooks.map((book) => book.name)).toEqual(["共同支出", "哞哞的"]);

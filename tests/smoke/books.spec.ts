@@ -10,15 +10,10 @@ async function archiveBook(page: Page, name: string) {
   await page.getByRole("dialog").getByRole("button", { name: "归档", exact: true }).click();
 }
 
-test("there is no web setup, and an enrollment link nobody issued is refused", async ({ page }) => {
-  // Accounts come from `account:create`; enrollment itself is covered by
-  // tests/integration/modules/auth/server/enrollment.test.ts.
+test("there is no web setup", async ({ page }) => {
+  // Accounts come from `account:create`.
   const response = await page.goto("/setup");
   expect(response?.status()).toBe(404);
-
-  await page.goto(`/enroll?token=${"A".repeat(43)}`);
-  await expect(page.getByRole("heading", { name: "链接不可用" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "创建通行密钥" })).toHaveCount(0);
 });
 
 /**

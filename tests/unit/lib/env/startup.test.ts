@@ -7,6 +7,9 @@ const baseEnv = {
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
   APP_URL: "http://localhost:3000",
+  OIDC_ISSUER_URL: "http://localhost:9091",
+  OIDC_CLIENT_ID: "cashier",
+  OIDC_CLIENT_SECRET: "client-secret",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "cashier-images",
   S3_ACCESS_KEY_ID: "test-access-key",
@@ -70,30 +73,6 @@ describe("validateStartupEnv", () => {
     expect(result.DATABASE_POOL_MAX).toBe(10);
   });
 
-  it("accepts an absent or proxy-managed trusted proxy", () => {
-    expect(
-      validateStartupEnv({
-        ...baseEnv,
-        NODE_ENV: "production",
-      }).TRUSTED_PROXY
-    ).toBeUndefined();
-
-    expect(
-      validateStartupEnv({
-        ...baseEnv,
-        NODE_ENV: "production",
-        TRUSTED_PROXY: "proxy",
-      }).TRUSTED_PROXY
-    ).toBe("proxy");
-
-    expect(() =>
-      validateStartupEnv({
-        ...baseEnv,
-        TRUSTED_PROXY: "true",
-      })
-    ).toThrow(/TRUSTED_PROXY/);
-  });
-
   it("only permits DEV_AUTH_BYPASS in tests or loopback development", () => {
     expect(validateStartupEnv({ ...baseEnv, DEV_AUTH_BYPASS: "true" }).DEV_AUTH_BYPASS).toBe(
       "true"
@@ -132,22 +111,13 @@ describe("validateStartupEnv", () => {
     ).toThrow(/DEV_AUTH_BYPASS/);
   });
 
-  it("accepts AUTH_EMAIL_FROM in named mailbox format", () => {
-    const result = validateStartupEnv({
-      ...baseEnv,
-      AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
-    });
-
-    expect(result.AUTH_EMAIL_FROM).toBe("Cashier <noreply@example.com>");
-  });
-
-  it("rejects invalid AUTH_EMAIL_FROM", () => {
-    expect(() =>
-      validateStartupEnv({
-        ...baseEnv,
-        AUTH_EMAIL_FROM: "not-an-email",
-      })
-    ).toThrow(/AUTH_EMAIL_FROM/);
+  it("requires the OIDC provider settings, with an issuer that is a URL", () => {
+    for (const name of ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"]) {
+      expect(() => validateStartupEnv({ ...baseEnv, [name]: "" })).toThrow(new RegExp(name));
+    }
+    expect(() => validateStartupEnv({ ...baseEnv, OIDC_ISSUER_URL: "not-a-url" })).toThrow(
+      /OIDC_ISSUER_URL/
+    );
   });
 
   it("requires AUTH_SECRET", () => {
@@ -163,7 +133,6 @@ describe("validateStartupEnv", () => {
     expect(Object.keys(ENV_DEFAULTS).sort()).toEqual([
       "AI_MODEL",
       "APP_URL",
-      "AUTH_EMAIL_FROM",
       "DATABASE_POOL_MAX",
       "DEV_AUTH_BYPASS",
       "LOG_LEVEL",

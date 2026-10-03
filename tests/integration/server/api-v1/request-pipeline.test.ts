@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { getTestDb } from "tests/setup";
 import { createTestUserWithLedger, testBookId } from "tests/helpers/schema-setup";
-import { ledgers, rateLimitBuckets, serviceCredentials } from "@/persistence";
+import { ledgers, serviceCredentials } from "@/persistence";
 import { computeHash, prefixSuffix } from "@/lib/security/service-credential-token";
 import { handleApiV1Route } from "@/server/api-v1/request-pipeline";
 
@@ -74,6 +74,5 @@ describe("handleApiV1Route", () => {
       expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(response.headers.get("X-RateLimit-Limit")).toBeNull();
     }
-    await expect(getTestDb().select().from(rateLimitBuckets)).resolves.toEqual([]);
   });
 });

@@ -293,8 +293,7 @@ describe("PostgreSQL schema contract", () => {
           ('ledger_entries', 'source_document_id'),
           ('extraction_attempts', 'requested_date'),
           ('extraction_attempts', 'claim_token'),
-          ('source_documents', 'document_date'),
-          ('login_emails', 'verified_at')
+          ('source_documents', 'document_date')
         )
       ORDER BY table_name, column_name
     `);
@@ -302,12 +301,6 @@ describe("PostgreSQL schema contract", () => {
       { table: "extraction_attempts", column: "claim_token", nullable: "YES", type: "uuid" },
       { table: "extraction_attempts", column: "requested_date", nullable: "YES", type: "date" },
       { table: "ledger_entries", column: "source_document_id", nullable: "NO", type: "uuid" },
-      {
-        table: "login_emails",
-        column: "verified_at",
-        nullable: "NO",
-        type: "timestamp with time zone",
-      },
       { table: "source_documents", column: "document_date", nullable: "NO", type: "date" },
     ]);
     const documentColumns = (await fetchColumns("source_documents")).map(

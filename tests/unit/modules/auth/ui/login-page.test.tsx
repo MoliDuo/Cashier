@@ -1,169 +1,85 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const searchState = vi.hoisted(() => ({ query: "" }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+const devSignIn = vi.hoisted(() => vi.fn());
 
-const mockUseLoginFlow = vi.hoisted(() =>
-  vi.fn((options?: { isDevAuthAvailable?: boolean }) => ({
-    passkeySupported: false,
-    handlePasskeyLogin: vi.fn(),
-    callbackUrl: "/",
-    step: "email" as "email" | "otp",
-    email: "",
-    otp: "",
-    isLoading: false,
-    error: null as string | null,
-    expiresAt: null,
-    canResendAt: null,
-    resendPending: false,
-    otpExpired: false,
-    isDevAuthAvailable: options?.isDevAuthAvailable ?? false,
-    setEmail: vi.fn(),
-    setOtp: vi.fn(),
-    handleSendOTP: vi.fn(),
-    handleVerifyOTP: vi.fn(),
-    handleResendOTP: vi.fn(),
-    handleChangeEmail: vi.fn(),
-    handleOTPExpired: vi.fn(),
-    handleDevSignIn: vi.fn(),
-  }))
-);
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("@/modules/auth/server-actions/sign-in", () => ({ devSignInAction: devSignIn }));
 
-type Flow = ReturnType<typeof mockUseLoginFlow>;
-
-const flowWith = (overrides: Partial<Flow>) => ({ ...mockUseLoginFlow(), ...overrides });
-
-vi.mock("@/modules/auth/hooks/use-login-flow", () => ({
-  useLoginFlow: mockUseLoginFlow,
-}));
-
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(searchState.query),
-}));
+import { AuthLoginPage } from "@/modules/auth/ui/login-page";
 
 describe("AuthLoginPage", () => {
-  it("asks for an email address to send a code to, with no password field", async () => {
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage emailAuthEnabled />);
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    expect(screen.getByLabelText("邮箱")).toBeInTheDocument();
+  it("presents Cashier as a quiet app entry with one way in, a link to the provider sign-in", () => {
+    render(<AuthLoginPage callbackUrl="/settings" />);
+
+    expect(document.querySelector('img[src*="icon.png"]')).toHaveAttribute("alt", "");
+    expect(screen.getByRole("heading", { name: "Cashier" })).toBeInTheDocument();
+    expect(screen.getByText("一个安静的个人账本")).toBeInTheDocument();
+    // A plain link, so the browser follows the redirect to the provider itself.
+    expect(screen.getByRole("link", { name: "登录" })).toHaveAttribute(
+      "href",
+      "/api/auth/login?callbackUrl=%2Fsettings"
+    );
+    expect(screen.queryByLabelText("邮箱")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
-    expect(screen.getByText("邮箱登录")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "发送验证码" })).toBeEnabled();
   });
 
-  it("moves on to the code once one was sent", async () => {
-    mockUseLoginFlow.mockReturnValueOnce(flowWith({ step: "otp", email: "a@example.com" }));
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage emailAuthEnabled />);
+  it.each([
+    ["signed_out", "status", "已退出登录"],
+    ["credentials_changed", "status", "登录邮箱已变更"],
+    ["not_bound", "alert", "这个账号还没有绑定"],
+    ["denied", "alert", "登录已取消"],
+    ["failed", "alert", "登录没有完成"],
+  ] as const)("explains %s and offers to sign in again", (messageKey, role, title) => {
+    render(<AuthLoginPage messageKey={messageKey} />);
 
-    expect(screen.getByText("验证验证码")).toBeInTheDocument();
-    expect(screen.getByText("输入发送至 a@example.com 的 6 位验证码")).toBeInTheDocument();
-    expect(screen.queryByLabelText("邮箱")).not.toBeInTheDocument();
+    expect(screen.getByRole(role)).toHaveTextContent(title);
+    expect(screen.getByRole("link", { name: "重新登录" })).toBeInTheDocument();
   });
 
-  it("says email sign-in is unavailable instead of offering a form that cannot send", async () => {
-    mockUseLoginFlow.mockReturnValueOnce(flowWith({ error: "发生意外错误" }));
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+  it("tells an instance with no account which command creates one, and offers no sign-in yet", () => {
+    const { unmount } = render(<AuthLoginPage accountMissing />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("还没有账户");
+    expect(screen.getByText(/npm run account:create -- --email/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "登录" })).not.toBeInTheDocument();
+    unmount();
+
     render(<AuthLoginPage />);
-
-    expect(screen.getByText("邮箱登录未配置，请联系管理员")).toBeInTheDocument();
-    expect(screen.queryByLabelText("邮箱")).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("发生意外错误");
+    expect(screen.queryByText("还没有账户")).not.toBeInTheDocument();
   });
 
-  it("puts passkey sign-in first, above the email code, where the browser supports it", async () => {
-    const handlePasskeyLogin = vi.fn();
-    mockUseLoginFlow.mockReturnValueOnce(flowWith({ passkeySupported: true, handlePasskeyLogin }));
-
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage emailAuthEnabled />);
-
-    const passkey = screen.getByRole("button", { name: "使用通行密钥登录" });
-    const send = screen.getByRole("button", { name: "发送验证码" });
-    expect(passkey.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("或")).toBeInTheDocument();
-    fireEvent.click(passkey);
-    expect(handlePasskeyLogin).toHaveBeenCalledOnce();
-  });
-
-  it("drops the divider when a passkey is the only way in", async () => {
-    mockUseLoginFlow.mockReturnValueOnce(flowWith({ passkeySupported: true }));
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage />);
-
-    expect(screen.getByRole("button", { name: "使用通行密钥登录" })).toBeInTheDocument();
-    expect(screen.queryByText("或")).not.toBeInTheDocument();
-    // A working passkey means nothing is missing, so nothing is reported.
-    expect(screen.queryByText("邮箱登录未配置，请联系管理员")).not.toBeInTheDocument();
-  });
-
-  it("keeps the email code secondary to a passkey", async () => {
-    mockUseLoginFlow.mockReturnValueOnce(flowWith({ passkeySupported: true }));
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage emailAuthEnabled />);
-
-    expect(screen.getByLabelText("邮箱")).not.toHaveFocus();
-    expect(screen.getByRole("button", { name: "发送验证码" })).not.toHaveClass("bg-primary");
-  });
-
-  it("hides passkey sign-in where the browser has no WebAuthn", async () => {
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage emailAuthEnabled />);
-
-    expect(screen.queryByRole("button", { name: "使用通行密钥登录" })).not.toBeInTheDocument();
-  });
-
-  it("offers exactly one development entry, and only when enabled", async () => {
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
+  it("offers exactly one development entry, and only when enabled", () => {
     const { unmount } = render(<AuthLoginPage />);
     expect(screen.queryByRole("button", { name: /身份进入/ })).not.toBeInTheDocument();
     unmount();
 
-    const handleDevSignIn = vi.fn();
-    mockUseLoginFlow.mockReturnValueOnce(flowWith({ isDevAuthAvailable: true, handleDevSignIn }));
+    render(<AuthLoginPage devAuthAvailable />);
+    expect(screen.getAllByRole("button", { name: /身份进入/ })).toHaveLength(1);
+  });
+
+  it("enters as the dev account and goes where the visitor was headed", async () => {
+    devSignIn.mockResolvedValue({ ok: true });
+    render(<AuthLoginPage devAuthAvailable callbackUrl="/stats" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /身份进入/ }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/stats"));
+    expect(router.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("says so when the dev sign-in is refused", async () => {
+    devSignIn.mockResolvedValue({ ok: false });
     render(<AuthLoginPage devAuthAvailable />);
 
-    const entries = screen.getAllByRole("button", { name: /身份进入/ });
-    expect(entries).toHaveLength(1);
-    fireEvent.click(entries[0]!);
-    expect(handleDevSignIn).toHaveBeenCalledWith();
-    expect(mockUseLoginFlow).toHaveBeenLastCalledWith({ isDevAuthAvailable: true });
-  });
+    fireEvent.click(screen.getByRole("button", { name: /身份进入/ }));
 
-  it("presents Cashier as a quiet app entry instead of a marketing page", async () => {
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage />);
-
-    const logo = document.querySelector('img[src*="icon.png"]');
-    expect(logo).toHaveAttribute("alt", "");
-    expect(screen.getByRole("heading", { name: "Cashier" })).toBeInTheDocument();
-    expect(screen.getByText("一个安静的个人账本")).toBeInTheDocument();
-  });
-
-  it("tells an instance with no account which commands create one", async () => {
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    const { unmount } = render(<AuthLoginPage emailAuthEnabled accountMissing />);
-
-    expect(screen.getByRole("status")).toHaveTextContent("还没有账户");
-    expect(screen.getByText(/npm run account:create -- --email/)).toHaveTextContent(
-      /npm run account:enroll -- --email/
-    );
-    unmount();
-
-    render(<AuthLoginPage emailAuthEnabled />);
-    expect(screen.queryByText("还没有账户")).not.toBeInTheDocument();
-  });
-
-  it.each([
-    ["reauth_required", "请重新登录以继续此操作。"],
-    ["credentials_changed", "登录凭据已更新，请重新登录。"],
-  ])("renders the %s login notice as status", async (notice, message) => {
-    searchState.query = `notice=${notice}&callbackUrl=%2Fsettings`;
-    const { AuthLoginPage } = await import("@/modules/auth/ui/login-page");
-    render(<AuthLoginPage />);
-
-    expect(screen.getByRole("status")).toHaveTextContent(message);
-    searchState.query = "";
+    expect(await screen.findByRole("alert")).toHaveTextContent("开发会话启动失败");
+    expect(router.push).not.toHaveBeenCalled();
   });
 });

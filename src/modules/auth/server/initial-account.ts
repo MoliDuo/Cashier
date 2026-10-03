@@ -23,10 +23,9 @@ export async function hasAccount(): Promise<boolean> {
 }
 
 /**
- * Creates the one account from the command line: the user, its verified login
- * address, the ledger, the books and the default categories, in a single
- * transaction. The account has no credential yet; `account:enroll` issues the
- * link that adds its first passkey.
+ * Creates the one account from the command line: the user, its login address,
+ * the ledger, the books and the default categories, in a single transaction.
+ * The address must be the one the identity provider knows the person by.
  */
 export async function createInitialAccount(
   input: InitialAccountInput
@@ -37,7 +36,6 @@ export async function createInitialAccount(
     throw new ValidationError("Book names must be unique");
   }
   const email = input.email.trim().toLowerCase();
-  const now = new Date();
 
   return db.transaction(async (tx) => {
     // Two concurrent runs would otherwise both see an empty database.
@@ -55,7 +53,7 @@ export async function createInitialAccount(
     const [user] = await tx.insert(users).values({}).returning();
     if (user == null) throw new AppError("Failed to create the account", "ACCOUNT_FAILED", 500);
 
-    await tx.insert(loginEmails).values({ userId: user.id, email, verifiedAt: now });
+    await tx.insert(loginEmails).values({ userId: user.id, email });
 
     // The books and categories take the ledger from the row inserted here.
     const [ledger] = await tx

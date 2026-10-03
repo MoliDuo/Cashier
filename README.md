@@ -45,7 +45,7 @@ Cashier 会从图片或文字中提取日期、商家、金额、币种、分类
 
 ### Demo 工作区
 
-最快的试用方式，不碰你的任何东西：不需要远程数据库、对象存储、邮件、AI 密钥，也不读项目的 `.env`。
+最快的试用方式，不碰你的任何东西：不需要远程数据库、对象存储、认证服务、AI 密钥，也不读项目的 `.env`。
 
 ```bash
 npm ci
@@ -54,7 +54,7 @@ npm run dev:demo
 
 打开终端打印的本地地址，选择 `Continue as dev`。启动信息里列出了预置的示例 API 密钥，每个都标注了
 它写入的分账。`docker-compose.demo.yml` 启动专用的 `cashier-demo` PostgreSQL 和对象存储，迁移
-`cashier_demo` 数据库，并写入虚构的票据和历史；AI 和邮件由本地假服务代替。每次启动都会先打印重建目标，
+`cashier_demo` 数据库，并写入虚构的票据和历史；AI 由本地假服务代替，登录用 dev 旁路。每次启动都会先打印重建目标，
 再把工作区恢复成初始数据，上一次的修改不会保留。
 
 ```bash
@@ -86,18 +86,18 @@ npm run dev
 
 ```bash
 npm run account:create -- --email you@example.com
-npm run account:enroll -- --email you@example.com
+npm run account:add-email -- --email other@example.com
 ```
 
-- `account:create` 在一个事务里创建账号、已验证的登录邮箱、账本、分账（默认 `共同支出`，可用 `--book`
+- `account:create` 在一个事务里创建账号、登录邮箱、账本、分账（默认 `共同支出`，可用 `--book`
   多次指定）和默认分类；已有账号或邮箱已被使用时拒绝执行。
-- `account:enroll` 只在终端打印 `APP_URL/enroll?token=…`。链接 30 分钟内有效、只能用一次，重新运行会作废
-  之前的链接；库里只存令牌的 HMAC。在浏览器打开它创建通行密钥（passkey），随即登录。
+- `account:add-email` 给唯一的账号再绑定一个登录邮箱。平时在设置页的"登录邮箱"里增删即可；只有在认证服务里
+  改了邮箱、导致没有人能登录时，才需要用这个命令兜底。
 
-账号没有密码。通行密钥是主要登录方式，邮件验证码（需要 `AUTH_RESEND_KEY`）是备用方式。通行密钥全部丢失、
-邮箱也收不到验证码时，再运行一次 `account:enroll` 即可找回。
+账号没有密码，登录完全交给认证服务（见下面的"登录（OIDC）"）。本地开发可以设置 `DEV_AUTH_BYPASS=true`，
+在登录页直接以开发身份进入。
 
-两个命令读取 `DATABASE_URL`、`AUTH_SECRET` 和 `APP_URL`（环境变量，或项目根目录的 `.env.local` / `.env`）。
+两个命令读取 `DATABASE_URL`（环境变量，或项目根目录的 `.env.local` / `.env`）。
 
 不要提交 `.env`、服务商凭证、真实票据、API 密钥或原始个人数据。
 
@@ -140,29 +140,27 @@ npm run account:enroll -- --email you@example.com
 
 ### 认证与内部密钥
 
-| 变量              | 必需   | 默认值                          | 说明                                                             |
-| ----------------- | ------ | ------------------------------- | ---------------------------------------------------------------- |
-| `AUTH_SECRET`     | 运行时 | 本地模板提供                    | 唯一的内部密钥，会话、验证码、限流、API key 的密钥都由它派生。   |
-| `AUTH_RESEND_KEY` | 否     | 无                              | 配置后启用 Resend 邮箱验证码登录和添加登录邮箱。                 |
-| `AUTH_EMAIL_FROM` | 否     | `Cashier <noreply@example.com>` | 邮箱验证码的发件人。                                             |
-| `DEV_AUTH_BYPASS` | 否     | `false`                         | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。 |
+| 变量                 | 必需   | 默认值       | 说明                                                                     |
+| -------------------- | ------ | ------------ | ------------------------------------------------------------------------ |
+| `AUTH_SECRET`        | 运行时 | 本地模板提供 | 唯一的内部密钥，会话、登录过程的签名、API key 的密钥都由它派生。         |
+| `OIDC_ISSUER_URL`    | 是     | 无           | OIDC 提供方的 issuer 地址。必须是 https；只有 loopback 地址可以用 http。 |
+| `OIDC_CLIENT_ID`     | 是     | 无           | 在提供方里为 Cashier 注册的 client id。                                  |
+| `OIDC_CLIENT_SECRET` | 是     | 无           | 对应的 client secret，用 `client_secret_basic` 发送。                    |
+| `DEV_AUTH_BYPASS`    | 否     | `false`      | 仅测试环境，或 `APP_URL` 指向 loopback 的 development 环境可用。         |
 
 `.env.local.example` 里的内部密钥是公开的固定开发值，只用于 loopback 环境复制后立即启动，
 不能用于可被外部访问的部署。
 
-### 可信入口、日志与端口
+### 日志与端口
 
-| 变量            | 默认值 | 说明                                                                                       |
-| --------------- | ------ | ------------------------------------------------------------------------------------------ |
-| `TRUSTED_PROXY` | 无     | 可选值仅为 `proxy`。设置后读取由你的反向代理覆盖的单值 `X-Real-IP`，应用端口不能直接暴露。 |
-| `LOG_LEVEL`     | `info` | 应用日志级别。                                                                             |
-| `S3_PORT`       | `9000` | 本地开发用的对象存储暴露的端口（Docker 部署里不暴露端口）。                                |
-
-未配置可信入口，或 `X-Real-IP` 为空、多值、非法时，地址会归入固定的哈希 `unknown` 桶，登录限流仍然生效。客户端地址只用于登录限流，API v1 和登录后的操作不限流。
+| 变量        | 默认值 | 说明                                                        |
+| ----------- | ------ | ----------------------------------------------------------- |
+| `LOG_LEVEL` | `info` | 应用日志级别。                                              |
+| `S3_PORT`   | `9000` | 本地开发用的对象存储暴露的端口（Docker 部署里不暴露端口）。 |
 
 ### 调参常量
 
-重试次数、超时、限流额度、图片质量这些数字不是环境变量，它们在 `src/config/tuning.ts` 里，
+重试次数、超时、图片质量这些数字不是环境变量，它们在 `src/config/tuning.ts` 里，
 改一个数字然后重新部署即可。上传的单张原图最多 20 MiB、约 48 MP；一次提交归一化后的总量限制在 3 MiB（它约束
 发给 AI 的载荷）。批量分类一次最多提交 5,000 条明细，同时只跑一个任务，同一账单每次 AI 请求最多包含 50 条明细。
 
@@ -180,10 +178,12 @@ cp .env.example .env
 编辑 `.env`，至少填写：
 
 - `CASHIER_HOST`：对外域名，例如 `cashier.example.com`。`APP_URL` 必须是 `https://<CASHIER_HOST>`，
-  passkey 的 RP 和注册链接都由它决定；以后改域名会让已有的 passkey 失效。
+  OIDC 的回调地址 `<APP_URL>/api/auth/callback` 由它决定；以后改域名要同步改认证服务里登记的回调地址。
 - `POSTGRES_PASSWORD`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`：随机值，例如 `openssl rand -hex 24`。
 - `OPENAI_API_KEY`（以及按需的 `OPENAI_BASE_URL`、`AI_MODEL`）。
-- `AUTH_SECRET`：安全随机值，在重启和升级之间保持一致。更换它会让所有会话、未用的验证码和 API key 失效。
+- `OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`：在认证服务里为 Cashier 注册 client 后得到，
+  配置见下面的"登录（OIDC）"。
+- `AUTH_SECRET`：安全随机值，在重启和升级之间保持一致。更换它会让所有会话和 API key 失效。
 - `CASHIER_DATA_DIR`：数据库和对象存储的宿主机目录，默认 `./data`。
 
 ### 启动
@@ -203,20 +203,55 @@ Postgres 和对象存储只在 compose 的内部网络里，不占用宿主机�
 
 ```bash
 docker compose exec app npm run account:create -- --email you@example.com
-docker compose exec app npm run account:enroll -- --email you@example.com
 ```
+
+### 登录（OIDC）
+
+Cashier 通过 OIDC 授权码流程（带 PKCE）登录，认证服务可以是 Authelia 或任何标准的 OIDC 提供方。
+认证服务里用户的邮箱与 Cashier 的"登录邮箱"一一对应：提供方返回的邮箱没有绑定在 Cashier 里，就不能使用。
+没有本地会话时，Cashier 直接跳到认证服务；认证服务里已经登录时，用户只会看到一次很快的跳转。
+退出登录只清除 Cashier 自己的会话，不会退出认证服务，并停在不自动跳转的登录页。
+
+以 Authelia 为例，在它的配置里登记 Cashier（`client_secret` 用 Authelia 的哈希格式，`OIDC_CLIENT_SECRET` 填明文）：
+
+```yaml
+identity_providers:
+  oidc:
+    clients:
+      - client_id: cashier
+        client_name: Cashier
+        client_secret: "$pbkdf2-sha512$…"
+        public: false
+        authorization_policy: two_factor
+        consent_mode: implicit
+        redirect_uris:
+          - https://cashier.example.com/api/auth/callback
+        scopes: [openid, email, profile]
+        require_pkce: true
+        pkce_challenge_method: S256
+        token_endpoint_auth_method: client_secret_basic
+```
+
+`OIDC_ISSUER_URL` 是 Authelia 的公开地址（例如 `https://auth.example.com`）。邮箱取自 ID token 的 `email`，
+没有时再向 userinfo 端点读取；提供方标明 `email_verified` 为 false 的邮箱会被拒绝。
+
+**从旧的通行密钥 / 邮件验证码登录升级前**，先确认 Cashier 设置页里的登录邮箱与认证服务里的用户邮箱一致，
+否则升级后没有人能登录。万一已经锁在外面，在服务器上补一个邮箱：
+
+```bash
+docker compose exec app npm run account:add-email -- --email you@example.com
+```
+
+升级会删除通行密钥、验证码和限流相关的表，迁移前请先备份。
 
 ### 反向代理
 
-passkey 和手机相机都要求 HTTPS，所以应用前面必须有终止 TLS 的反向代理。`compose.yaml` 里带有 Traefik 的 labels，
+手机相机和 OIDC 回调都要求 HTTPS，所以应用前面必须有终止 TLS 的反向代理。`compose.yaml` 里带有 Traefik 的 labels，
 并让应用加入外部网络 `server-internal-net`（Traefik 所在的网络）；用别的反向代理时，删掉这些 labels 和那个网络，
 自己转发到应用的 3000 端口。无论用哪种代理，都要满足：
 
 - 保留原始的 `Host`（和 `X-Forwarded-Host`），并设置 `X-Forwarded-Proto: https`。否则登录和所有 server action
   会因为来源检查失败，会话 cookie 也会丢掉 `Secure`。
-- 用连接的真实客户端地址**覆盖**请求里的 `X-Real-IP`，并设置 `TRUSTED_PROXY=proxy`。不设置的话，所有请求的
-  客户端 IP 都记为 `unknown`，按 IP 的登录限流会变成所有人共用一个桶，陌生人的请求也会把你挡在登录页外；
-  设置了但代理没有覆盖这个头，别人就能伪造来源地址绕过限流。
 - 读超时至少几分钟：上传和 AI 请求都可能持续几十秒。
 - 请求体上限不小于 32 MiB（API v1 的请求体上限）。
 
@@ -276,19 +311,19 @@ npm run check
 它依次检查格式、架构（dependency-cruiser）与死代码（knip）、lint、类型，跑带覆盖率的全部测试，
 再用隔离的占位配置做一次生产构建并检查受保护路由的包体积。集成测试需要 Docker。
 
-| 命令                     | 用途                                   |
-| ------------------------ | -------------------------------------- |
-| `npm run dev`            | 启动开发服务器                         |
-| `npm run dev:demo`       | 启动独立的 demo 工作区                 |
-| `npm run docker:local`   | 启动本地 PostgreSQL 和对象存储         |
-| `npm run docker:down`    | 停止本地基础服务，保留具名卷           |
-| `npm run db:migrate`     | 对当前 `DATABASE_URL` 应用迁移         |
-| `npm run account:create` | 创建唯一的账号、账本、分账和默认分类   |
-| `npm run account:enroll` | 打印添加通行密钥的一次性链接（可找回） |
-| `npm test`               | 单元测试                               |
-| `npm run test:all`       | 单元测试和集成测试                     |
-| `npm run test:smoke`     | Playwright 浏览器 smoke 测试           |
-| `npm run check`          | 提交前的完整门禁                       |
+| 命令                        | 用途                                 |
+| --------------------------- | ------------------------------------ |
+| `npm run dev`               | 启动开发服务器                       |
+| `npm run dev:demo`          | 启动独立的 demo 工作区               |
+| `npm run docker:local`      | 启动本地 PostgreSQL 和对象存储       |
+| `npm run docker:down`       | 停止本地基础服务，保留具名卷         |
+| `npm run db:migrate`        | 对当前 `DATABASE_URL` 应用迁移       |
+| `npm run account:create`    | 创建唯一的账号、账本、分账和默认分类 |
+| `npm run account:add-email` | 给唯一的账号再绑定一个登录邮箱       |
+| `npm test`                  | 单元测试                             |
+| `npm run test:all`          | 单元测试和集成测试                   |
+| `npm run test:smoke`        | Playwright 浏览器 smoke 测试         |
+| `npm run check`             | 提交前的完整门禁                     |
 
 ## License
 

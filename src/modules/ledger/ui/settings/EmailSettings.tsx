@@ -21,9 +21,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { LEDGER } from "@/lib/constants";
 import { fetchLoginEmails } from "@/modules/auth/queries";
 import {
+  addLoginEmailAction,
   removeLoginEmailAction,
-  sendLoginEmailCodeAction,
-  verifyLoginEmailCodeAction,
 } from "@/modules/auth/server-actions/login-emails";
 import type { LoginEmailErrorCode } from "@/modules/auth/server-actions/login-emails";
 import { SettingsField } from "@/components/SettingsField";
@@ -33,24 +32,19 @@ import { settingsEmailsCopy } from "@/copy/settings";
 interface EmailSettingsProps {
   /** The address this session signed in with, painted until the full list arrives. */
   userEmail?: string;
-  onRequireReauthentication?: () => void | Promise<void>;
   /** Removing an address ends every session, so this browser has to sign in again. */
   onAllSessionsEnded?: () => void | Promise<void>;
 }
 
 /**
- * 登录邮箱: every address here signs in with a code sent to it. An address is
- * added by verifying an OTP sent to it, and the account keeps at least one, so a
- * removal can be refused with a reason rather than a crash.
+ * 登录邮箱: the addresses allowed to sign in. Whoever the identity provider
+ * knows by one of them gets in, so adding one needs no code. The account keeps
+ * at least one, so a removal can be refused with a reason rather than a crash.
  *
  * It is the field 账户 is about, so it keeps a field heading inside that card:
- * 通行密钥 and API 密钥 stand alone as cards because each saves on its own.
+ * API 密钥 stands alone as a card because it saves on its own.
  */
-export function EmailSettings({
-  userEmail,
-  onRequireReauthentication,
-  onAllSessionsEnded,
-}: EmailSettingsProps) {
+export function EmailSettings({ userEmail, onAllSessionsEnded }: EmailSettingsProps) {
   const queryClient = useQueryClient();
   const key = queryKeys.loginEmails();
   const { data } = useQuery({
@@ -64,8 +58,6 @@ export function EmailSettings({
   const emails = data ?? (userEmail == null || userEmail === "" ? [] : [userEmail]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
@@ -74,18 +66,8 @@ export function EmailSettings({
     switch (code) {
       case "invalid_email":
         return settingsEmailsCopy.invalidEmail;
-      case "invalid_code":
-        return settingsEmailsCopy.invalidCode;
-      case "expired_code":
-        return settingsEmailsCopy.expiredCode;
       case "email_in_use":
         return settingsEmailsCopy.emailInUse;
-      case "rate_limited":
-        return settingsEmailsCopy.rateLimited;
-      case "locked":
-        return settingsEmailsCopy.locked;
-      case "reauth_required":
-        return settingsEmailsCopy.reauthRequired;
       case "last_email":
         return settingsEmailsCopy.lastEmail;
       default:
@@ -95,48 +77,15 @@ export function EmailSettings({
 
   const reset = () => {
     setEmail("");
-    setCode("");
-    setSent(false);
     setError(null);
   };
 
-  const requestCode = async () => {
+  const add = async () => {
     setPending(true);
     setError(null);
     try {
-      const result = await sendLoginEmailCodeAction(email);
+      const result = await addLoginEmailAction(email);
       if (!result.ok) {
-        if (result.code === "reauth_required") {
-          await onRequireReauthentication?.();
-          return;
-        }
-        const text = message(result.code);
-        setError(text);
-        toast.error(text);
-        return;
-      }
-      setSent(true);
-      setCode("");
-      toast.success(settingsEmailsCopy.codeSent);
-    } catch {
-      const text = message("unknown");
-      setError(text);
-      toast.error(text);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const verify = async () => {
-    setPending(true);
-    setError(null);
-    try {
-      const result = await verifyLoginEmailCodeAction(email, code);
-      if (!result.ok) {
-        if (result.code === "reauth_required") {
-          await onRequireReauthentication?.();
-          return;
-        }
         const text = message(result.code);
         setError(text);
         toast.error(text);
@@ -210,30 +159,10 @@ export function EmailSettings({
                 disabled={pending}
                 onChange={(event) => {
                   setEmail(event.target.value);
-                  setSent(false);
-                  setCode("");
                   setError(null);
                 }}
               />
             </div>
-            {sent ? (
-              <div className="grid gap-2">
-                <Label htmlFor="login-email-code">{settingsEmailsCopy.verificationCode}</Label>
-                <Input
-                  id="login-email-code"
-                  name="verificationCode"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  spellCheck={false}
-                  value={code}
-                  disabled={pending}
-                  onChange={(event) => {
-                    setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-                    setError(null);
-                  }}
-                />
-              </div>
-            ) : null}
             {error != null ? (
               <p role="alert" className={textRoleClassName("body", "text-destructive")}>
                 {error}
@@ -244,12 +173,9 @@ export function EmailSettings({
             <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={pending}>
               {commonCopy.cancel}
             </Button>
-            <Button
-              disabled={pending || email.trim() === "" || (sent && code.length !== 6)}
-              onClick={() => void (sent ? verify() : requestCode())}
-            >
+            <Button disabled={pending || email.trim() === ""} onClick={() => void add()}>
               {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-              {sent ? settingsEmailsCopy.verify : settingsEmailsCopy.sendCode}
+              {settingsEmailsCopy.addConfirm}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -266,10 +192,6 @@ export function EmailSettings({
           if (removeTarget == null) return false;
           const result = await removeLoginEmailAction(removeTarget);
           if (!result.ok) {
-            if (result.code === "reauth_required") {
-              await onRequireReauthentication?.();
-              return false;
-            }
             toast.error(message(result.code));
             return false;
           }

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
-import { isValidAuthEmailFrom } from "@/lib/utils/email";
 export const ENV_DEFAULTS = {
   OPENAI_BASE_URL: "https://api.openai.com/v1",
   APP_URL: "http://localhost:3000",
@@ -8,7 +7,6 @@ export const ENV_DEFAULTS = {
   AI_MODEL: "gpt-4o",
   S3_REGION: "auto",
   S3_FORCE_PATH_STYLE: "false",
-  AUTH_EMAIL_FROM: "Cashier <noreply@example.com>",
   LOG_LEVEL: "info",
   DEV_AUTH_BYPASS: "false",
   DATABASE_POOL_MAX: "10",
@@ -60,25 +58,18 @@ const startupEnvFields = {
   OPENAI_BASE_URL: urlWithDefault("OPENAI_BASE_URL"),
   AUTH_SECRET: requiredString("AUTH_SECRET"),
   APP_URL: urlWithDefault("APP_URL"),
-  AUTH_RESEND_KEY: z.preprocess(blankToUndefined, z.string().trim().optional()),
-  AUTH_EMAIL_FROM: z.preprocess(
+  OIDC_ISSUER_URL: z.preprocess(
     blankToUndefined,
-    z
-      .string()
-      .trim()
-      .refine(
-        isValidAuthEmailFrom,
-        "AUTH_EMAIL_FROM must be a valid email address or Display Name <email> mailbox"
-      )
-      .default(getDefaultString("AUTH_EMAIL_FROM"))
+    z.url({ error: "OIDC_ISSUER_URL must be a valid URL" })
   ),
+  OIDC_CLIENT_ID: requiredString("OIDC_CLIENT_ID"),
+  OIDC_CLIENT_SECRET: requiredString("OIDC_CLIENT_SECRET"),
   S3_ENDPOINT: z.preprocess(blankToUndefined, z.url({ error: "S3_ENDPOINT must be a valid URL" })),
   S3_REGION: stringWithDefault("S3_REGION"),
   S3_BUCKET: requiredString("S3_BUCKET"),
   S3_ACCESS_KEY_ID: requiredString("S3_ACCESS_KEY_ID"),
   S3_SECRET_ACCESS_KEY: requiredString("S3_SECRET_ACCESS_KEY"),
   S3_FORCE_PATH_STYLE: booleanStringWithDefault("S3_FORCE_PATH_STYLE"),
-  TRUSTED_PROXY: z.preprocess(blankToUndefined, z.literal("proxy").optional()),
   TZ: stringWithDefault("TZ"),
   AI_MODEL: stringWithDefault("AI_MODEL"),
   LOG_LEVEL: stringWithDefault("LOG_LEVEL"),

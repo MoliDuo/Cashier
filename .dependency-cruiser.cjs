@@ -18,9 +18,9 @@ const moduleServer = moduleAt("src/modules/[^/]+/server");
 const moduleUi = moduleAt("src/modules/[^/]+/(?:ui|hooks)");
 const moduleServerActions = moduleAt("src/modules/[^/]+/server-actions");
 const app = moduleAt("src/app");
-const providerSdks = packages("pg|openai|resend|drizzle-orm|@aws-sdk/[^/]+");
+const providerSdks = packages("pg|openai|drizzle-orm|@aws-sdk/[^/]+");
 const frameworks = packages("next|next-auth|@auth/[^/]+|server-only");
-const aiAndMailSdks = packages("ai|openai|resend|@(?:ai-sdk|aws-sdk|google|anthropic-ai)/[^/]+");
+const aiSdks = packages("ai|openai|@(?:ai-sdk|aws-sdk|google|anthropic-ai)/[^/]+");
 const dataAccess = [libDb, persistence, ...providerSdks];
 const actionsFile = "actions(?:\\.[^/.]+|/index\\.[^/.]+)$";
 const actionsBarrel = `(?:^|/)${actionsFile}`;
@@ -112,7 +112,7 @@ module.exports = {
         "Server actions and API routes call server functions, not the database or providers.",
       severity: "error",
       from: { path: ["^src/modules/[^/]+/server-actions/", "^src/app/api/"] },
-      to: onto([...dataAccess, s3, openaiClient, ...aiAndMailSdks]),
+      to: onto([...dataAccess, s3, openaiClient, ...aiSdks]),
     },
     {
       name: "providers-not-module-ui",

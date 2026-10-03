@@ -55,7 +55,7 @@ describe("seed", () => {
       .select()
       .from(schema.loginEmails)
       .where(eq(schema.loginEmails.userId, userId));
-    expect(email).toMatchObject({ email: "seed@example.com", verifiedAt: at });
+    expect(email).toMatchObject({ email: "seed@example.com" });
     const [ledger] = await db.select().from(schema.ledgers);
     expect(ledger).toMatchObject({ mainCurrency: "USD", aiLanguage: "zh-CN" });
     expect(

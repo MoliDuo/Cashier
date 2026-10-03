@@ -1,14 +1,7 @@
 import "server-only";
 import { inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import {
-  categoryAssignmentJobs,
-  loginEmailChallenges,
-  sessions,
-  webauthnChallenges,
-  sourceDocumentFiles,
-  storedFiles,
-} from "@/persistence";
+import { categoryAssignmentJobs, sessions, sourceDocumentFiles, storedFiles } from "@/persistence";
 import { getS3Storage } from "@/lib/storage/s3";
 import { logger } from "@/lib/logger";
 import { runWithConcurrency } from "@/lib/concurrency";
@@ -66,23 +59,10 @@ async function deleteInBatches(statement: SQL): Promise<void> {
 }
 
 async function deleteExpiredRecords(now: Date): Promise<void> {
-  const twoDaysAgo = new Date(now.getTime() - 2 * DAY_MS);
   const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS);
   const statements = [
-    sql`DELETE FROM rate_limit_buckets WHERE bucket_key IN (
-      SELECT bucket_key FROM rate_limit_buckets WHERE window_start < ${twoDaysAgo} LIMIT ${BATCH}
-    )`,
-    sql`DELETE FROM sign_in_challenges WHERE id IN (
-      SELECT id FROM sign_in_challenges WHERE expires_at < ${now} LIMIT ${BATCH}
-    )`,
-    sql`DELETE FROM ${webauthnChallenges} WHERE id IN (
-      SELECT id FROM ${webauthnChallenges} WHERE expires_at < ${now} LIMIT ${BATCH}
-    )`,
     sql`DELETE FROM ${sessions} WHERE id IN (
       SELECT id FROM ${sessions} WHERE expires_at < ${now} LIMIT ${BATCH}
-    )`,
-    sql`DELETE FROM ${loginEmailChallenges} WHERE id IN (
-      SELECT id FROM ${loginEmailChallenges} WHERE expires_at < ${now} LIMIT ${BATCH}
     )`,
     // Result work rows cascade with the parent after the seven-day viewing window.
     sql`DELETE FROM ${categoryAssignmentJobs} WHERE id IN (

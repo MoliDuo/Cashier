@@ -269,12 +269,6 @@ export const categoryAssignmentEntries = pgTable(
   ]
 );
 
-export const rateLimitBuckets = pgTable("rate_limit_buckets", {
-  bucketKey: text("bucket_key").primaryKey(),
-  count: integer("count").notNull().default(0),
-  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
-});
-
 /** The ledger's one row of change watermarks, kept by the change-log triggers. */
 export const ledgerSyncState = pgTable(
   "ledger_sync_state",

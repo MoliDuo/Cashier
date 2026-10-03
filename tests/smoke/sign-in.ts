@@ -24,10 +24,10 @@ function sessionTokenHash(token: string): string {
  * Signs the smoke account in by opening a session for it directly.
  *
  * A production build compiles `NODE_ENV` in as "production", so the dev
- * sign-in is off here however the server is started, and passkeys and email
- * codes are what the account has. The runner owns the database and
- * AUTH_SECRET, so it writes the session row a real sign-in would and hands the
- * browser the cookie; the email-code spec is what drives the sign-in screen.
+ * sign-in is off here however the server is started. The runner owns the
+ * database and AUTH_SECRET, so it writes the session row a real sign-in would
+ * and hands the browser the cookie; the OIDC spec is what drives the sign-in
+ * through the provider.
  */
 export async function signIn(page: Page): Promise<void> {
   const token = randomBytes(32).toString("base64url");

@@ -7,15 +7,15 @@ export interface RuntimeEnv {
   readonly openaiApiKey: string;
   readonly openaiBaseUrl: string;
   readonly hasOpenaiBaseUrl: boolean;
-  readonly authResendKey: string | undefined;
-  readonly authEmailFrom: string;
+  readonly oidcIssuerUrl: string;
+  readonly oidcClientId: string;
+  readonly oidcClientSecret: string;
   readonly s3Endpoint: string;
   readonly s3Region: string;
   readonly s3Bucket: string;
   readonly s3AccessKeyId: string;
   readonly s3SecretAccessKey: string;
   readonly s3ForcePathStyle: boolean;
-  readonly trustedProxy: string | undefined;
   readonly aiModel: string;
   readonly databasePoolMax: number;
 }
@@ -45,11 +45,14 @@ export const runtimeEnv: RuntimeEnv = {
   get hasOpenaiBaseUrl() {
     return hasExplicitValue("OPENAI_BASE_URL");
   },
-  get authResendKey() {
-    return getStartupEnvValue("AUTH_RESEND_KEY");
+  get oidcIssuerUrl() {
+    return getStartupEnvValue("OIDC_ISSUER_URL");
   },
-  get authEmailFrom() {
-    return getStartupEnvValue("AUTH_EMAIL_FROM");
+  get oidcClientId() {
+    return getStartupEnvValue("OIDC_CLIENT_ID");
+  },
+  get oidcClientSecret() {
+    return getStartupEnvValue("OIDC_CLIENT_SECRET");
   },
   get s3Endpoint() {
     return getStartupEnvValue("S3_ENDPOINT");
@@ -68,9 +71,6 @@ export const runtimeEnv: RuntimeEnv = {
   },
   get s3ForcePathStyle() {
     return getStartupEnvValue("S3_FORCE_PATH_STYLE") === "true";
-  },
-  get trustedProxy() {
-    return getStartupEnvValue("TRUSTED_PROXY");
   },
   get aiModel() {
     return getStartupEnvValue("AI_MODEL");

@@ -54,24 +54,6 @@ export const MAX_IMAGE_QUALITY = 85;
 /** How long the client treats a fetched source document as fresh. */
 export const SOURCE_DOC_STALE_TIME_MS = 120_000;
 
-/** One-time codes: lifetime, and what happens when they are guessed at. */
-export const OTP_EXPIRES_SECONDS = 300;
-export const OTP_MAX_ATTEMPTS = 5;
-export const OTP_LOCKOUT_MINUTES = 15;
-export const OTP_RESEND_COOLDOWN_SECONDS = 60;
-
-/**
- * Rate limits on the requests made before signing in, per client IP. Nothing
- * a signed-in session does is limited. The resend cooldown above caps codes
- * sent to one address.
- */
-export const SIGN_IN_RATE_LIMITS = {
-  otpSendPerIp: { max: 10, windowSeconds: 60 * 60 },
-  otpVerifyPerIp: { max: 5, windowSeconds: 60 },
-  passkeyStartPerIp: { max: 30, windowSeconds: 15 * 60 },
-  enrollStartPerIp: { max: 30, windowSeconds: 15 * 60 },
-} as const;
-
 /** How long a signed-in session survives without being renewed. */
 export const SESSION_MAX_AGE_DAYS = 14;
 

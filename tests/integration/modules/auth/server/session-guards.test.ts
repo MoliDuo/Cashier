@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { withAuth, requireAuth, requireRecentAuth } from "@/modules/auth/server/session-guards";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withAuth, requireAuth } from "@/modules/auth/server/session-guards";
 import { withLedgerAccess } from "@/modules/ledger/access";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import { getTestDb } from "tests/setup";
@@ -76,40 +76,5 @@ describe("requireAuth", () => {
     mockSession.mockResolvedValue(null);
 
     await expect(requireAuth()).rejects.toThrow(UnauthorizedError);
-  });
-});
-
-describe("requireRecentAuth", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-23T12:00:00.000Z"));
-  });
-
-  afterEach(() => vi.useRealTimers());
-
-  it("allows authentication within the ten-minute window", async () => {
-    mockSession.mockResolvedValue(
-      testSession("user-recent", { authenticatedAt: new Date("2026-08-23T11:50:00.000Z") })
-    );
-
-    await expect(requireRecentAuth()).resolves.toBe("user-recent");
-  });
-
-  it("requires reauthentication after the ten-minute window", async () => {
-    mockSession.mockResolvedValue(
-      testSession("user-stale", { authenticatedAt: new Date("2026-08-23T11:49:59.999Z") })
-    );
-
-    await expect(requireRecentAuth()).rejects.toMatchObject({
-      code: "REAUTHENTICATION_REQUIRED",
-    });
-  });
-
-  it("requires reauthentication without a session", async () => {
-    mockSession.mockResolvedValue(null);
-
-    await expect(requireRecentAuth()).rejects.toMatchObject({
-      code: "REAUTHENTICATION_REQUIRED",
-    });
   });
 });

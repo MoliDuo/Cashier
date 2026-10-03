@@ -17,8 +17,10 @@ describe("proxy", () => {
       }
     });
 
-    it("no longer has an /api/auth exemption", () => {
-      expect(proxy(createRequest("/api/auth/session")).status).toBe(401);
+    it("lets the sign-in routes through without a session, since that is how one starts", () => {
+      for (const path of ["/api/auth/login", "/api/auth/callback"]) {
+        expect(proxy(createRequest(path)).status).toBe(200);
+      }
     });
   });
 

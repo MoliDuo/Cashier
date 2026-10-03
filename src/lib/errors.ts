@@ -61,27 +61,3 @@ export class BookUnavailableError extends AppError {
     super(message, "BOOK_UNAVAILABLE", 409);
   }
 }
-
-/**
- * Rate limit error (429)
- */
-export class RateLimitError extends AppError {
-  retryAfter?: number;
-
-  constructor(message: string = "Too many requests", retryAfter?: number) {
-    super(message, "RATE_LIMIT", 429);
-    if (retryAfter !== undefined) {
-      this.retryAfter = retryAfter;
-    }
-  }
-}
-
-/**
- * The rate-limit backend is unavailable. Authentication and verification
- * callers should fail closed instead of treating this as an empty bucket.
- */
-export class RateLimitUnavailableError extends AppError {
-  constructor(message: string = "Authentication rate limiting is temporarily unavailable") {
-    super(message, "AUTH_RATE_LIMIT_UNAVAILABLE", 503);
-  }
-}

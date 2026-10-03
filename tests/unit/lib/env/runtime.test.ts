@@ -8,6 +8,9 @@ const baseEnv = {
   OPENAI_API_KEY: "sk-test",
   AUTH_SECRET: "auth-secret",
   APP_URL: "http://localhost:3000",
+  OIDC_ISSUER_URL: "http://localhost:9091",
+  OIDC_CLIENT_ID: "cashier",
+  OIDC_CLIENT_SECRET: "client-secret",
   S3_ENDPOINT: "http://localhost:9000",
   S3_BUCKET: "cashier-images",
   S3_ACCESS_KEY_ID: "test-access-key",
@@ -37,11 +40,11 @@ describe("runtimeEnv", () => {
       ...originalEnv,
       ...baseEnv,
       AI_MODEL: "custom-model",
-      AUTH_EMAIL_FROM: "Cashier <security@example.com>",
       LOG_LEVEL: "warn",
       TZ: "UTC",
-      TRUSTED_PROXY: "proxy",
-      AUTH_RESEND_KEY: "re_test",
+      OIDC_ISSUER_URL: "https://auth.example.com",
+      OIDC_CLIENT_ID: "cashier",
+      OIDC_CLIENT_SECRET: "client-secret",
       OPENAI_BASE_URL: "https://openai-proxy.example/v1",
     };
 
@@ -51,13 +54,13 @@ describe("runtimeEnv", () => {
     expect(runtimeEnv.openaiApiKey).toBe("sk-test");
     expect(runtimeEnv.openaiBaseUrl).toBe("https://openai-proxy.example/v1");
     expect(runtimeEnv.hasOpenaiBaseUrl).toBe(true);
-    expect(runtimeEnv.authResendKey).toBe("re_test");
-    expect(runtimeEnv.authEmailFrom).toBe("Cashier <security@example.com>");
+    expect(runtimeEnv.oidcIssuerUrl).toBe("https://auth.example.com");
+    expect(runtimeEnv.oidcClientId).toBe("cashier");
+    expect(runtimeEnv.oidcClientSecret).toBe("client-secret");
     expect(runtimeEnv.s3Endpoint).toBe("http://localhost:9000");
     expect(runtimeEnv.s3Bucket).toBe("cashier-images");
     expect(runtimeEnv.s3AccessKeyId).toBe("test-access-key");
     expect(runtimeEnv.s3SecretAccessKey).toBe("test-secret-key");
-    expect(runtimeEnv.trustedProxy).toBe("proxy");
     expect(runtimeEnv.aiModel).toBe("custom-model");
   });
 

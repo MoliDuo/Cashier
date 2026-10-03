@@ -6,7 +6,6 @@ import type {
   ServiceCredential,
 } from "@/modules/ledger/contracts";
 import { EmailSettings } from "./EmailSettings";
-import { PasskeySettings } from "@/modules/auth/ui/PasskeySettings";
 import { ServiceCredentialSection } from "../ServiceCredentialSection";
 import { SettingsField } from "@/components/SettingsField";
 import { SettingsSection } from "@/components/SettingsSection";
@@ -29,7 +28,6 @@ interface AccountSettingsProps {
   onDeleteCredential: (id: string) => Promise<void>;
   onCredentialDialogClose: () => void;
   onSignOut: () => void | Promise<void>;
-  onRequireReauthentication: () => void | Promise<void>;
   /** Removing a login email ends every session, so each one signs in again. */
   onAllSessionsEnded: () => void | Promise<void>;
 }
@@ -44,7 +42,6 @@ export function AccountSettings({
   onDeleteCredential,
   onCredentialDialogClose,
   onSignOut,
-  onRequireReauthentication,
   onAllSessionsEnded,
 }: AccountSettingsProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -62,17 +59,14 @@ export function AccountSettings({
         onDeleteCredential={onDeleteCredential}
         onCredentialDialogClose={onCredentialDialogClose}
       />
-      {/* 账户 is how this person signs in — the emails, then the passkeys — and
-          signing out closes it and the page. */}
+      {/* 账户 is who may sign in — the emails — and signing out closes it and the page. */}
       <SettingsSection title={settingsCopy.account}>
         <EmailSettings
           {...(userEmail !== undefined ? { userEmail } : {})}
-          onRequireReauthentication={onRequireReauthentication}
           onAllSessionsEnded={onAllSessionsEnded}
         />
-        <PasskeySettings onRequireReauthentication={onRequireReauthentication} />
-        {/* The button sits on the heading row at every width, like 添加邮箱 and
-            添加通行密钥, instead of dropping under its own label on a phone. */}
+        {/* The button sits on the heading row at every width, like 添加邮箱,
+            instead of dropping under its own label on a phone. */}
         <SettingsField
           title={settingsCopy.signOutHere}
           stacked

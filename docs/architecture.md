@@ -169,7 +169,13 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
   一次查询带出用户和登录邮箱。proxy 只检查 cookie 是否存在，`/api/auth/` 是公开路径。
 - **退出。** 只清应用自己的会话，不退出提供方，也不调用提供方的登出端点。退出后落在
   `/login?notice=signed_out`，这个页面不自动跳转，由用户点"重新登录"；`not_bound`、`failed`、`denied`
-  这些错误页同样不自动跳转，避免死循环。
+  这些错误页同样不自动跳转，避免死循环。退出走 `POST /api/auth/logout` 路由，而不是 server action：
+  server action 删掉 cookie 后会连同重新渲染的当前页一起返回，那个页面已无会话，会重定向到不带提示的
+  `/login`，接着被自动送去提供方、立刻又登录回来，并和随后的整页跳转竞争。路由处理器不触发这次重渲染。
+  即便如此，退出后页面上还在途的请求或路由器的补救导航，仍可能在整页跳转落地前先到一次不带提示的 `/login`，
+  所以退出路由还会留一个 60 秒的 `cashier_signed_out` cookie：`/login` 看到它就按 `signed_out` 处理、不自动跳转。
+  用户点"重新登录"进入 `/api/auth/login` 时清掉它；会话自己过期时没有这个 cookie，仍然自动去提供方续上。
+  请求只靠 `SameSite=Lax` 的会话 cookie 识别要退出的会话，跨站的 POST 带不上它，所以不需要额外的来源检查。
 - **dev 旁路。** 开发和测试环境保留受 `isDevAuthBypassEnabled()` 限制的 dev 登录，demo 也靠它。
 - **建账号与找回。** 没有网页 setup。首个账号用 `npm run account:create -- --email <addr>` 在一个事务里
   建好用户、登录邮箱、账本、默认分账和分类。提供方那边改了邮箱、应用进不去时，用

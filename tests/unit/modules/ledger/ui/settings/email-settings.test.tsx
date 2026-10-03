@@ -5,33 +5,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { EmailSettings } from "@/modules/ledger/ui/settings/EmailSettings";
 
-const {
-  fetchLoginEmails,
-  removeLoginEmailAction,
-  sendLoginEmailCodeAction,
-  verifyLoginEmailCodeAction,
-} = vi.hoisted(() => ({
+const { fetchLoginEmails, addLoginEmailAction, removeLoginEmailAction } = vi.hoisted(() => ({
   fetchLoginEmails: vi.fn(),
+  addLoginEmailAction: vi.fn(),
   removeLoginEmailAction: vi.fn(),
-  sendLoginEmailCodeAction: vi.fn(),
-  verifyLoginEmailCodeAction: vi.fn(),
 }));
 
 vi.mock("@/modules/auth/queries", () => ({ fetchLoginEmails: fetchLoginEmails }));
 vi.mock("@/modules/auth/server-actions/login-emails", () => ({
+  addLoginEmailAction,
   removeLoginEmailAction,
-  sendLoginEmailCodeAction,
-  verifyLoginEmailCodeAction,
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function renderEmailSettings(
   props: Partial<React.ComponentProps<typeof EmailSettings>> = {},
-  handlers: {
-    onRequireReauthentication?: () => void | Promise<void>;
-    onAllSessionsEnded?: () => void | Promise<void>;
-  } = {}
+  handlers: { onAllSessionsEnded?: () => void | Promise<void> } = {}
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
@@ -42,15 +32,11 @@ function renderEmailSettings(
   return render(<EmailSettings userEmail="me@example.com" {...handlers} {...props} />, { wrapper });
 }
 
-async function addEmail(address: string, code: string) {
+async function addEmail(address: string) {
   fireEvent.click(screen.getByRole("button", { name: "添加邮箱" }));
   fireEvent.change(screen.getByLabelText("新邮箱地址"), { target: { value: address } });
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "发送验证码" }));
-  });
-  fireEvent.change(await screen.findByLabelText("6 位验证码"), { target: { value: code } });
-  await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "确认" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
   });
 }
 
@@ -76,63 +62,44 @@ describe("EmailSettings", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /^移除 / })).toBeDisabled());
   });
 
-  it("refreshes the list after adding an email instead of ending sessions", async () => {
-    sendLoginEmailCodeAction.mockResolvedValue({ ok: true, expiresAt: Date.now() });
-    verifyLoginEmailCodeAction.mockResolvedValue({
+  it("adds an email without any code and refreshes the list instead of ending sessions", async () => {
+    addLoginEmailAction.mockResolvedValue({
       ok: true,
       emails: ["me@example.com", "new@example.com"],
-      verified: true,
     });
     const onAllSessionsEnded = vi.fn();
     renderEmailSettings({}, { onAllSessionsEnded });
+    await waitFor(() => expect(fetchLoginEmails).toHaveBeenCalled());
+    await act(async () => {});
 
-    await addEmail("new@example.com", "123456");
+    await addEmail("new@example.com");
 
+    expect(addLoginEmailAction).toHaveBeenCalledWith("new@example.com");
     expect(await screen.findByText("new@example.com")).toBeInTheDocument();
     expect(onAllSessionsEnded).not.toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith("已添加邮箱");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("clears the pending flag when sending a code throws", async () => {
-    sendLoginEmailCodeAction.mockRejectedValue(new Error("offline"));
+  it("keeps the dialog open and says why an address is refused", async () => {
+    addLoginEmailAction.mockResolvedValue({ ok: false, code: "email_in_use" });
     renderEmailSettings();
 
-    fireEvent.click(screen.getByRole("button", { name: "添加邮箱" }));
-    fireEvent.change(screen.getByLabelText("新邮箱地址"), {
-      target: { value: "new@example.com" },
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "发送验证码" }));
-    });
+    await addEmail("taken@example.com");
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "发送验证码" })).toBeEnabled());
-    expect(toast.error).toHaveBeenCalledWith("出了点问题，请重试。");
+    expect(await screen.findByRole("alert")).toHaveTextContent("该邮箱已被使用。");
+    expect(toast.error).toHaveBeenCalledWith("该邮箱已被使用。");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("clears the pending flag when verification throws", async () => {
-    sendLoginEmailCodeAction.mockResolvedValue({ ok: true, expiresAt: Date.now() });
-    verifyLoginEmailCodeAction.mockRejectedValue(new Error("offline"));
+  it("clears the pending flag when adding throws", async () => {
+    addLoginEmailAction.mockRejectedValue(new Error("offline"));
     renderEmailSettings();
 
-    await addEmail("new@example.com", "123456");
+    await addEmail("new@example.com");
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "确认" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "添加" })).toBeEnabled());
     expect(toast.error).toHaveBeenCalledWith("出了点问题，请重试。");
-  });
-
-  it("routes a re-auth requirement on verify into the re-auth flow", async () => {
-    sendLoginEmailCodeAction.mockResolvedValue({ ok: true, expiresAt: Date.now() });
-    verifyLoginEmailCodeAction.mockResolvedValue({ ok: false, code: "reauth_required" });
-    const onRequireReauthentication = vi.fn();
-    const onAllSessionsEnded = vi.fn();
-    renderEmailSettings({}, { onRequireReauthentication, onAllSessionsEnded });
-
-    await addEmail("new@example.com", "123456");
-
-    await waitFor(() => expect(onRequireReauthentication).toHaveBeenCalledTimes(1));
-    expect(onAllSessionsEnded).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("announces that every session ended before signing out after a removal", async () => {
@@ -151,20 +118,18 @@ describe("EmailSettings", () => {
     expect(screen.queryByText("other@example.com")).not.toBeInTheDocument();
   });
 
-  it("routes a re-auth requirement on removal into the re-auth flow", async () => {
+  it("reports a refused removal and stays signed in", async () => {
     fetchLoginEmails.mockResolvedValue(["me@example.com", "other@example.com"]);
-    removeLoginEmailAction.mockResolvedValue({ ok: false, code: "reauth_required" });
-    const onRequireReauthentication = vi.fn();
+    removeLoginEmailAction.mockResolvedValue({ ok: false, code: "last_email" });
     const onAllSessionsEnded = vi.fn();
-    renderEmailSettings({}, { onRequireReauthentication, onAllSessionsEnded });
+    renderEmailSettings({}, { onAllSessionsEnded });
 
     fireEvent.click(await screen.findByRole("button", { name: "移除 other@example.com" }));
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: "移除" }));
     });
 
-    await waitFor(() => expect(onRequireReauthentication).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("账户至少要保留一个登录邮箱。"));
     expect(onAllSessionsEnded).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
   });
 });
