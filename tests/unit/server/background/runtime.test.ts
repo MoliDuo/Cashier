@@ -7,7 +7,13 @@ const worker = vi.hoisted(() => ({
   drain: vi.fn(),
 }));
 
+const scheduler = vi.hoisted(() => ({
+  start: vi.fn(),
+  stop: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/server/background/worker", () => ({ createBackgroundWorker: () => worker }));
+vi.mock("@/server/background/scheduler", () => ({ createDailyScheduler: () => scheduler }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 const RUNTIME_KEY = Symbol.for("cashier.background.runtime");
@@ -30,6 +36,7 @@ describe("startBackgroundRuntime", () => {
     startBackgroundRuntime();
 
     expect(worker.start).toHaveBeenCalledTimes(1);
+    expect(scheduler.start).toHaveBeenCalledTimes(1);
   });
 
   it("leaves signals to Next unless it was told to hand them over", async () => {
@@ -52,6 +59,7 @@ describe("startBackgroundRuntime", () => {
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
 
     expect(worker.stop).toHaveBeenCalledWith({ graceMs: 20_000 });
+    expect(scheduler.stop).toHaveBeenCalledTimes(1);
     exit.mockRestore();
   });
 });

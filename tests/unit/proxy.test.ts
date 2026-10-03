@@ -55,13 +55,12 @@ describe("proxy", () => {
       expect(proxy(createRequest("/api/protected", "token")).status).toBe(200);
     });
 
-    it("leaves the cron route and API v1 to authenticate themselves", () => {
-      expect(proxy(createRequest("/api/cron/daily")).status).toBe(200);
+    it("leaves API v1 to authenticate itself", () => {
       expect(proxy(createRequest("/api/v1/documents")).status).toBe(200);
     });
 
-    it("does not treat a path that merely starts with cron as the cron route", () => {
-      expect(proxy(createRequest("/api/cronjobs")).status).toBe(401);
+    it("does not treat the retired cron route as public", () => {
+      expect(proxy(createRequest("/api/cron/daily")).status).toBe(401);
     });
 
     it("does not let a dot bypass API authentication", () => {

@@ -1,12 +1,14 @@
 import "server-only";
 import { logger } from "@/lib/logger";
 import { createBackgroundWorker, type BackgroundWorker } from "@/server/background/worker";
+import { createDailyScheduler, type DailyScheduler } from "@/server/background/scheduler";
 
 const RUNTIME_KEY = Symbol.for("cashier.background.runtime");
 const STOP_GRACE_MS = 20_000;
 
 interface Runtime {
   worker: BackgroundWorker;
+  scheduler: DailyScheduler;
 }
 
 function holder(): Record<symbol, Runtime | undefined> {
@@ -14,7 +16,7 @@ function holder(): Record<symbol, Runtime | undefined> {
 }
 
 /**
- * Starts the worker for this process, once. Called from instrumentation, so a development server that
+ * Starts the worker and the daily scheduler for this process, once. Called from instrumentation, so a development server that
  * reloads its modules does not start a second one.
  *
  * On SIGTERM the worker stops claiming work and is given time to finish what it holds, then the
@@ -24,16 +26,17 @@ function holder(): Record<symbol, Runtime | undefined> {
 export function startBackgroundRuntime(): void {
   if (holder()[RUNTIME_KEY] != null) return;
   const worker = createBackgroundWorker();
-  holder()[RUNTIME_KEY] = { worker };
+  const scheduler = createDailyScheduler();
+  holder()[RUNTIME_KEY] = { worker, scheduler };
   worker.start();
-  logger.info("Background worker started");
+  scheduler.start();
+  logger.info("Background worker and daily scheduler started");
 
   if (process.env.NEXT_MANUAL_SIG_HANDLE !== "true") return;
   const shutDown = (signal: NodeJS.Signals) => {
     logger.info({ signal }, "Stopping background worker");
-    void worker
-      .stop({ graceMs: STOP_GRACE_MS })
-      .catch((error: unknown) => logger.error({ error }, "Background worker failed to stop"))
+    void Promise.all([worker.stop({ graceMs: STOP_GRACE_MS }), scheduler.stop()])
+      .catch((error: unknown) => logger.error({ error }, "Background runtime failed to stop"))
       .finally(() => process.exit(0));
   };
   process.once("SIGTERM", shutDown);

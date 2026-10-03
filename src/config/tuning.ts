@@ -22,6 +22,9 @@ export const LEASE_HEARTBEAT_MS = 10_000;
 export const LEASE_DURATION_MS = 3 * LEASE_HEARTBEAT_MS;
 /** How often the background worker looks for due work when nothing wakes it. */
 export const BACKGROUND_POLL_INTERVAL_MS = 5_000;
+/** The in-process daily sweep: when it runs (UTC), and how soon after boot it catches up. */
+export const DAILY_MAINTENANCE_HOUR_UTC = 18;
+export const DAILY_MAINTENANCE_BOOT_DELAY_MS = 30_000;
 /** Runs one piece of background work gets, the first one included, before it is failed. */
 export const BACKGROUND_MAX_ATTEMPTS = 3;
 
