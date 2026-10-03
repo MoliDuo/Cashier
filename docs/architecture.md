@@ -53,7 +53,7 @@ src/app/                  路由与 API handler：认证、校验、调用、映
   api/v1                  外部 API（快捷指令）
   api/stored-files        带授权的图片上传（POST）和文件读取（GET）
   api/health              容器健康检查
-  login、enroll           登录与一次性 passkey 注册
+  login、api/auth         登录说明页，以及 OIDC 登录与回调
 src/modules/<m>/          auth、currency、ledger、source-document、stats、workspace
   server-actions/         Zod 校验 + withLedgerAccess，然后直接调用 server/ 的函数；只用于命令
   queries.ts              本模块的类型化读取，建立在无类型的 postLedgerQuery 传输层之上
@@ -95,19 +95,19 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 表名、列名、枚举和代码里的叫法一致（迁移 0018 统一过一次）。约束和索引按 `uq_<表>_…`、`idx_<表>_…`、
 `fk_<表>_<目标>`、`ck_<表>_…` 命名，主键保持 `<表>_pkey`，由 `schema-contract.test.ts` 检查。
 
-| 概念与表名                                                                                           | 职责                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ledgers`（单行）、`books`、`entry_categories`                                                       | 账本设置（含唯一的时区 `time_zone`）、分账、分类。分类硬删除，名称唯一约束为 `DEFERRABLE`。分账没有自己的时区                                                                      |
-| 票据：`source_documents`                                                                             | 所属分账、标题、日期、当前输入（文本）、`version`、指向最新提取尝试的 `latest_attempt_id`、幂等 key。标题只存在这里：提取成功时写入，用户可改                                      |
-| 票据文件：`source_document_files`                                                                    | 票据当前输入的文件                                                                                                                                                                 |
-| 提取尝试：`extraction_attempts`                                                                      | 每一次提取：请求的日期、状态、租约、尝试次数、失败码。它本身就是任务队列                                                                                                           |
-| 条目：`ledger_entries`                                                                               | 金额、币种、分类、所属票据（必填）。不存折算值                                                                                                                                     |
-| 汇率：`exchange_rates(rate_date, currency, per_eur, …)`                                              | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间                                                                                            |
-| `stored_files`                                                                                       | 对象存储里文件的登记；先登记行、再写对象，没有任何票据引用的行由每日维护清掉                                                                                                       |
-| 批量分类：`category_assignment_jobs`、`category_assignment_documents`、`category_assignment_entries` | 租约放在 job 行上，进度在读取时统计；`ai` 任务的候选分类就是 `candidate_snapshot`                                                                                                  |
-| 认证                                                                                                 | `users`、`login_emails`、`sessions`、`passkeys`、`webauthn_challenges`、`sign_in_challenges`（登录验证码）、`login_email_challenges`（添加登录邮箱的验证码）、`rate_limit_buckets` |
-| API 密钥：`service_credentials`                                                                      | 吊销时写 `revoked_at`，行留作审计                                                                                                                                                  |
-| `ledger_sync_state`（单行）                                                                          | 客户端刷新用的水位线，由行级触发器 `record_ledger_change` 维护：每改一行一条 UPDATE，同一事务复用一个版本号                                                                        |
+| 概念与表名                                                                                           | 职责                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ledgers`（单行）、`books`、`entry_categories`                                                       | 账本设置（含唯一的时区 `time_zone`）、分账、分类。分类硬删除，名称唯一约束为 `DEFERRABLE`。分账没有自己的时区                                 |
+| 票据：`source_documents`                                                                             | 所属分账、标题、日期、当前输入（文本）、`version`、指向最新提取尝试的 `latest_attempt_id`、幂等 key。标题只存在这里：提取成功时写入，用户可改 |
+| 票据文件：`source_document_files`                                                                    | 票据当前输入的文件                                                                                                                            |
+| 提取尝试：`extraction_attempts`                                                                      | 每一次提取：请求的日期、状态、租约、尝试次数、失败码。它本身就是任务队列                                                                      |
+| 条目：`ledger_entries`                                                                               | 金额、币种、分类、所属票据（必填）。不存折算值                                                                                                |
+| 汇率：`exchange_rates(rate_date, currency, per_eur, …)`                                              | 每个自然日、每个币种一行，`source_date` 记录服务商的真实日期，`fetched_at` 记录抓取时间                                                       |
+| `stored_files`                                                                                       | 对象存储里文件的登记；先登记行、再写对象，没有任何票据引用的行由每日维护清掉                                                                  |
+| 批量分类：`category_assignment_jobs`、`category_assignment_documents`、`category_assignment_entries` | 租约放在 job 行上，进度在读取时统计；`ai` 任务的候选分类就是 `candidate_snapshot`                                                             |
+| 认证                                                                                                 | `users`、`login_emails`（可以登录的邮箱白名单）、`sessions`                                                                                   |
+| API 密钥：`service_credentials`                                                                      | 吊销时写 `revoked_at`，行留作审计                                                                                                             |
+| `ledger_sync_state`（单行）                                                                          | 客户端刷新用的水位线，由行级触发器 `record_ledger_change` 维护：每改一行一条 UPDATE，同一事务复用一个版本号                                   |
 
 语义约定：
 
@@ -147,35 +147,42 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 
 ## 5. 认证与安全边界
 
+- **身份来自外部的 OIDC 提供方**（Authelia 或任何标准提供方）。应用不保存密码、passkey 或验证码，
+  只配置三个值：`OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`。回调地址固定为
+  `${APP_URL}/api/auth/callback`，应用不信任请求里的 Host 来构造它。
+- **登录流程**（`src/modules/auth/server/oidc.ts`，授权码加 PKCE）：
+  - 受保护页面没有会话时跳 `/login`。`/login` 在没有 `error`、`notice` 参数时直接服务端重定向到
+    `/api/auth/login`，所以提供方已登录时，用户不用点任何东西。
+  - `/api/auth/login` 生成 state、nonce 和 PKCE verifier，放进短期 cookie `cashier_oidc`（httpOnly、
+    SameSite=Lax、路径 `/api/auth`、10 分钟；内容带 HMAC 签名，不落库），再跳到提供方。`callbackUrl`
+    只接受同站相对路径。
+  - `/api/auth/callback` 校验 state、PKCE、nonce 和 ID token 签名，邮箱取自 ID token，ID token 没有时取
+    userinfo（核对 `sub` 一致）；`email_verified` 明确为 false 时拒绝。state cookie 每次回调都清掉，
+    所以一次授权只能用一次。
+- **谁能用由 `login_emails` 决定。** 回调拿到的邮箱按 `lower()` 匹配 `login_emails`：匹配才创建会话；
+  不匹配就不创建，回到 `/login?error=not_bound`。账号仍是单个共享账号，`login_emails` 是可以登录它的邮箱
+  白名单，要求与提供方那边的用户邮箱一一对应。设置页直接增删邮箱，不再发验证码——能进设置页的人已经通过了
+  提供方；至少保留一个邮箱，删除邮箱会结束该账号的全部会话。
 - **会话。** 自建 `sessions` 表，cookie `cashier_session` 里是 32 字节随机令牌（httpOnly、Secure、
   SameSite=Lax），库里存它的 HMAC。14 天滑动过期，`last_seen_at` 超过 1 天才续期。用 `getCurrentSession`
-  读取，用 `requireAuth`、`requireRecentAuth` 或 `withAuth`（`src/modules/auth/server/session-guards.ts`）
-  把关，吊销就是删除行。一次查询带出用户和登录邮箱。proxy 只检查 cookie 是否存在。
-- **登录方式。** passkey 为主，邮件 OTP 兜底，没有密码。开发和测试环境保留受 `isDevAuthBypassEnabled()`
-  限制的 dev 旁路。
-- **passkey**（`src/modules/auth/server/passkeys.ts`）使用可发现凭证，RP 取自 `APP_URL`。每次流程存一行
-  `webauthn_challenges`，完成时删除，所以一个 challenge 只能应答一次。添加或删除 passkey 需要
-  `requireRecentAuth`（10 分钟内登录过）。
+  读取，用 `requireAuth` 或 `withAuth`（`src/modules/auth/server/session-guards.ts`）把关，吊销就是删除行。
+  一次查询带出用户和登录邮箱。proxy 只检查 cookie 是否存在，`/api/auth/` 是公开路径。
+- **退出。** 只清应用自己的会话，不退出提供方，也不调用提供方的登出端点。退出后落在
+  `/login?notice=signed_out`，这个页面不自动跳转，由用户点"重新登录"；`not_bound`、`failed`、`denied`
+  这些错误页同样不自动跳转，避免死循环。
+- **dev 旁路。** 开发和测试环境保留受 `isDevAuthBypassEnabled()` 限制的 dev 登录，demo 也靠它。
 - **建账号与找回。** 没有网页 setup。首个账号用 `npm run account:create -- --email <addr>` 在一个事务里
-  建好用户、登录邮箱、账本、默认分账和分类。`npm run account:enroll -- --email <addr>` 生成 30 分钟有效的
-  一次性注册链接 `/enroll?token=…`，库里只存令牌的 HMAC（`purpose=enroll`），`/enroll` 在一个事务里注册
-  passkey 并删掉这一行。链接只打印到终端，不写日志；它也是 passkey 全丢时的找回途径。
-- **验证码与限流。** 尝试次数与锁定只有一份实现（`src/modules/auth/domain/verification-challenge.ts`），
-  OTP 和改邮箱共用；重发不清零尝试次数和锁定。限流只加在登录之前（发码、校验、开始 passkey 登录、开始注册，
-  都按 IP），登录后的操作和 API v1 不限流。额度集中在 `SIGN_IN_RATE_LIMITS`（`src/config/tuning.ts`），
-  唯一的入口是 `consumeRateLimit`（`src/lib/rate-limit.ts`），计数存在 Postgres 的 `rate_limit_buckets`，
-  取不到计数时拒绝请求。桶名形如 `<用途>:<HMAC>`，不含原始邮箱或 IP。同一邮箱的发码由 60 秒重发冷却限制，
-  未知邮箱同样冷却，不暴露邮箱是否存在。
+  建好用户、登录邮箱、账本、默认分账和分类。提供方那边改了邮箱、应用进不去时，用
+  `npm run account:add-email -- --email <addr>` 补一个能登录的邮箱。
+- **没有应用层的登录限流。** 口令校验、多因素和暴力破解防护都在提供方；回调只接受带有效 state、PKCE 和提供方
+  签名的授权码。
 - **密钥。** 每一种摘要都用 `deriveKey` / `keyedDigest`（`src/lib/security/keys.ts`），一种用途一把密钥，
   全部由 `AUTH_SECRET` 经 HKDF 派生。
 - **API v1 凭证。** 192 位随机值，HMAC 存储，绑定到分账。
-- **转发的客户端地址** 默认不可信，除非明确配置了 `TRUSTED_PROXY=proxy`。此时只读反向代理写入的单值
-  `X-Real-IP`，所以应用端口只能对反向代理开放，不能直接暴露。
-- **日志。** 只记关联 id 和经 `logIdentifier` 标记的标识，邮箱和 IP 一律哈希。不记原始邮箱、IP、
-  bearer token、OTP、图片内容或服务商负载。
-- 防账号枚举和计时攻击的措施保留。
-- 邮件、汇率、AI、对象存储等外部调用放在数据库事务和账本锁之外。一次性和带租约的流程用条件写、行锁或
-  fencing token。
+- **日志。** 只记关联 id 和经 `logIdentifier` 标记的标识，邮箱一律哈希。不记原始邮箱、bearer token、
+  授权码、令牌、图片内容或服务商负载。
+- 邮件以外的外部调用（汇率、AI、对象存储、OIDC 提供方）放在数据库事务和账本锁之外。一次性和带租约的流程用条件写、
+  行锁或 fencing token。
 
 ## 6. 后台运行模型
 
@@ -247,7 +254,7 @@ src/copy/                 全部界面与邮件文案，按界面区域分文件
 UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`src/server/maintenance/daily.ts`）。
 运行前取一个 Postgres advisory lock，另一个实例持有时直接跳过。每一步独立运行，一步失败不影响后面的：
 
-1. 过期记录（验证码、challenge、会话、限流桶、已结束的分类 job）；
+1. 过期记录（会话、已结束的分类 job）；
 2. 刷新汇率，补齐缺失的日期并替换临时值；
 3. 7 天没有被任何票据使用的文件（先删行，再删对象）；
 4. `stored/` 下超过 1 天、没有任何行指向的孤儿对象。
@@ -343,7 +350,7 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 - 只有主动点"取消编辑"时才确认放弃。后退从不被拦下询问，只会关掉最上层的对话框。对话框退出用 Radix 的
   关闭焦点生命周期，不依赖可能永远不触发的 CSS 动画事件。
 - 主动退出登录时清掉本机的全部草稿、记住的分账（`cashier:` 前缀的 key 和分账 cookie），主题保留；
-  会话因重新验证或凭据变更而结束时草稿留着，回来还能接着写。
+  会话因登录邮箱变更而结束时草稿留着，回来还能接着写。
 
 ### 客户端缓存
 
@@ -371,7 +378,7 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 2. **成组字段用编辑模式加分区级保存 / 取消。** 写库本身是一个事务的一批改动（增删、排序），用一次编辑会话承载，
    未保存的修改存成草稿。编辑期间服务端版本变了，草稿不能覆盖，界面提示"分类已在别处更改"并提供载入最新。
    适用：分类管理。
-3. **弹窗只留给四种事：** 新建尚不存在的对象（新增分账、新建 API 密钥）；多步流程（添加登录邮箱的验证码）；
+3. **弹窗只留给三种事：** 新建尚不存在的对象（新增分账、新建 API 密钥、添加登录邮箱）；
    一次性不可再得的信息（新密钥的 token）；行内放不下的多字段编辑（三个及以上字段，或需要图标选择器 / 长文本，
    例如分类的图标 + 名称 + 描述）。
 4. **破坏性动作一律确认。** 删除、归档、退出登录、放弃未保存草稿，全部用 `ConfirmDialog`，`variant="destructive"`。
@@ -379,12 +386,12 @@ UTC 18:00（ECB 已发布当天汇率）运行一次 `runDailyMaintenance`（`sr
 新增设置项时按 1 → 2 → 3 的顺序问，前两问任意一个答"是"就不要再往弹窗走。
 
 设置页的分区从设一次就不常动的偏好，排到会越来越长的列表，再到账户：外观、时区与货币、AI 解析、分类、分账、
-API 密钥，最后是账户（登录邮箱、通行密钥，退出登录收尾）。外观、时区与货币、AI 解析都是账本设置，共用一次写库，
+API 密钥，最后是账户（登录邮箱，退出登录收尾）。外观、时区与货币、AI 解析都是账本设置，共用一次写库，
 写库期间三个分区的账本字段一起禁用；主题只存在这台浏览器上，不等写库。新增分区按这个顺序找位置。
 
 编辑入口一律是铅笔图标按钮（`Pencil`、`variant="ghost"`、`size="icon-sm"`），带含对象名的 `aria-label` 和
 `title`。一行最多露出两个动作：常用的铅笔留在行内，排序和退役（**上移 / 下移 / 归档 / 删除**，按这个顺序）收进
-行尾的 `⋮` 菜单，删除用危险色。只有两个动作的行（通行密钥的改名和删除）不用菜单。就地编辑态的动作换成勾和叉，
+行尾的 `⋮` 菜单，删除用危险色。只有一两个动作的行（登录邮箱只有删除）不用菜单。就地编辑态的动作换成勾和叉，
 Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 
 ### 视觉基线
@@ -428,7 +435,7 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 
 - 这套字号是冻结的。`micro` 是 Tailwind 没有的一档，定义在 `globals.css` 的 `--text-micro`。
   不要写 `text-[13px]` 这类任意值，也不要在两档之间加新档；标题不用 `text-xl`。更大的展示字号（404 水印、
-  OTP 和金额输入）是有意的例外。
+  金额输入）是有意的例外。
 - 次要文字只用 `text-muted-foreground` 或 `text-muted-foreground/60`。标题用 `font-semibold`，
   `font-bold` 只留给展示数字。
 - 交互控件保留自己的尺寸。Input 和 Textarea 在移动端用 16px，避免 iOS Safari 聚焦时缩放，桌面端 14px。
@@ -447,6 +454,8 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
   只有 provider、目录校验和测试 mock；集中存放保留了"一处看全部文案"的好处，类型和跳转由 TS 直接提供。
 - **之后：限流收敛。** 只有两个人用，登录之后的操作（API v1、上传额度）不再限流；登录前的限流集中到
   `SIGN_IN_RATE_LIMITS` 和 `consumeRateLimit`。按邮箱计数被 60 秒重发冷却覆盖，删掉；汇率刷新不再借用限流表。
+- **之后：统一认证。** 登录交给 OIDC 提供方（Authelia），按邮箱对应 `login_emails`。passkey、邮件验证码、
+  注册链接、邮件发送和登录前的限流整体删除，对应的表由一条迁移丢弃；"限流收敛"那一条随之作废。
 - **之后：数据库整理（迁移 0018）。** 一次发布改完重构留下的误导名字（`revision` 实为提取尝试，
   `reclassification` 与 `assignment` 混用，`email_change` 实为添加登录邮箱），删掉镜像和没人读的列，
   收紧类型，删掉约 10 个没有查询在用的索引，同步触发器每行只剩一条 UPDATE。这是 expand/contract 的一次性例外：
@@ -490,6 +499,6 @@ Enter 等于勾、Esc 等于叉，输入框自动聚焦。
 - **分类按请求块做检查点**：大票据的分类要花很久，进程中途崩溃或重启后不该从头再来。
 - **先锁账本、再锁票据**：用户自己的编辑会和后台写入竞争。
 - **前端数据层**：React Query、SSR 预取与注水、水位线轮询、专用读取路由，不改成 `revalidatePath`。
-- **API v1 凭证设计、登录前的 Postgres 限流、防账号枚举与计时攻击的措施。**
+- **API v1 凭证设计。**
 - **sharp 归一化**：上传经应用，服务端统一缩放、转码并剥离 EXIF。
 - **工程底座**：严格的 tsconfig、testcontainers、MSW 网络守卫、smoke 测试、baseline 迁移守卫。
